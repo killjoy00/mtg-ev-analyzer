@@ -1,0 +1,88 @@
+name: build-replay-data
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [build/real-msh-replays]
+    paths:
+      - '.github/workflows/build-replay-data.yml'
+      - 'scripts/build_replays.py'
+      - 'scripts/fetch_card_metadata.py'
+      - 'scripts/validate_dataset.py'
+
+permissions:
+  contents: write
+
+jobs:
+  msh-premier:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Download MSH Premier Draft public data
+        run: |
+          mkdir -p raw-data generated data/msh
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/draft_data_public.MSH.PremierDraft.csv.gz \
+            https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MSH.PremierDraft.csv.gz
+
+      - name: Fetch offline card metadata
+        run: |
+          if ! python scripts/fetch_card_metadata.py --set MSH --output generated/msh-cards.json; then
+            echo 'Scryfall metadata unavailable; continuing with card-name placeholders.'
+            printf '{}\n' > generated/msh-cards.json
+          fi
+
+      - name: Build real MSH replay shards
+        run: |
+          python scripts/build_replays.py \
+            --input raw-data/draft_data_public.MSH.PremierDraft.csv.gz \
+            --output-dir data/msh \
+            --catalog data/catalog.json \
+            --expansion MSH \
+            --format PremierDraft \
+            --source-date 2026-07-26 \
+            --minimum-games 100 \
+            --top-fraction 0.15 \
+            --max-training-drafts 5000 \
+            --max-output-drafts 300 \
+            --minimum-picks 30 \
+            --folds 5 \
+            --shard-size 10 \
+            --card-metadata generated/msh-cards.json
+
+      - name: Validate generated dataset
+        run: python scripts/validate_dataset.py data/msh/manifest.json --minimum-replays 100
+
+      - name: Upload generated replay data
+        uses: actions/upload-artifact@v4
+        with:
+          name: msh-replay-data
+          path: |
+            data/catalog.json
+            data/msh/
+          retention-days: 14
+
+      - name: Commit generated replay data to branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/catalog.json data/msh
+          if git diff --cached --quiet; then
+            echo 'Generated data is unchanged.'
+            exit 0
+          fi
+          git commit -m 'Generate real MSH replay data [data-generated]'
+          git push origin HEAD:${GITHUB_REF_NAME}
