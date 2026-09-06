@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "sets": [
+    {
+      "id": "msh-fixture",
+      "name": "MSH · interface fixture",
+      "format": "PremierDraft",
+      "data_path": "./data/demo-msh.json",
+      "replay_count": 1,
+      "model_version": "fixture-only",
+      "data_date": "2026-07-26",
+      "is_fixture": true
+    }
+  ]
+}
