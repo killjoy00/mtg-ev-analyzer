@@ -38,16 +38,51 @@ function routeHomeReset() {
   state.results = [];
 }
 
-async function loadCatalog() {
-  const response = await fetch('./data/catalog.json', { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Could not load catalog (${response.status}).`);
+async function loadJson(path, label = 'data') {
+  const response = await fetch(path, { cache: 'no-store' });
+  if (!response.ok) throw new Error(`Could not load ${label} (${response.status}).`);
   return response.json();
 }
 
+async function loadCatalog() {
+  return loadJson('./data/catalog.json', 'catalog');
+}
+
 async function loadSet(setEntry) {
-  const response = await fetch(setEntry.data_path, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Could not load ${setEntry.name} (${response.status}).`);
-  return response.json();
+  const path = setEntry.manifest_path || setEntry.data_path;
+  if (!path) throw new Error(`${setEntry.name} has no data path.`);
+  return loadJson(path, setEntry.name);
+}
+
+function chooseWeightedShard(shards) {
+  const valid = (shards || []).filter((shard) => Number(shard.replay_count) > 0 && shard.path);
+  const total = valid.reduce((sum, shard) => sum + Number(shard.replay_count), 0);
+  if (!total) return null;
+  let ticket = Math.floor(Math.random() * total);
+  for (const shard of valid) {
+    ticket -= Number(shard.replay_count);
+    if (ticket < 0) return shard;
+  }
+  return valid[valid.length - 1];
+}
+
+async function loadRandomReplay(setEntry) {
+  const setData = await loadSet(setEntry);
+  if (Array.isArray(setData.shards) && setData.shards.length) {
+    const shardMeta = chooseWeightedShard(setData.shards);
+    if (!shardMeta) throw new Error('This set has no replay shards.');
+    const shard = await loadJson(shardMeta.path, `${setEntry.name} replay shard`);
+    if (!shard.replays?.length) throw new Error('The selected replay shard is empty.');
+    return {
+      setData,
+      replay: shard.replays[Math.floor(Math.random() * shard.replays.length)],
+    };
+  }
+  if (!setData.replays?.length) throw new Error('This set has no replay drafts.');
+  return {
+    setData,
+    replay: setData.replays[Math.floor(Math.random() * setData.replays.length)],
+  };
 }
 
 function renderError(error) {
@@ -80,7 +115,7 @@ function renderHome() {
     <section class="hero-card">
       <p class="eyebrow">Historical decision replay</p>
       <h1>Draft the pick. Then see what strong players would do.</h1>
-      <p class="lede">You follow one real historical draft path. Your pick is graded against an offline strong-player consensus model; matching the historical drafter is tracked separately.</p>
+      <p class="lede">Follow a historical draft path one decision at a time. Your pick is graded against an offline, pool-conditioned strong-player consensus model; matching the historical drafter is tracked separately.</p>
 
       <div class="home-grid">
         <div class="option-card">
@@ -93,7 +128,7 @@ function renderHome() {
         </div>
 
         <div class="option-card">
-          <span class="option-label">V1 rules</span>
+          <span class="option-label">Study rules</span>
           <div class="meta-list">
             <div class="meta-row"><span>Mode</span><span>Replay study</span></div>
             <div class="meta-row"><span>Skill cohort</span><span>High 17Lands WR</span></div>
@@ -110,13 +145,21 @@ function renderHome() {
 
   const updateSetMeta = () => {
     const entry = selectedSetEntry();
+    const cohortRows = entry.win_rate_cutoff
+      ? `<div class="meta-row"><span>WR bucket midpoint ≥</span><span>${pct(entry.win_rate_cutoff, 1)}</span></div>`
+      : '';
+    const trainingRows = entry.training_drafts
+      ? `<div class="meta-row"><span>Training drafts</span><span>${Number(entry.training_drafts).toLocaleString()}</span></div>`
+      : '';
     document.querySelector('#set-meta').innerHTML = `
       <div class="meta-row"><span>Format</span><span>${esc(entry.format)}</span></div>
-      <div class="meta-row"><span>Replays</span><span>${esc(entry.replay_count)}</span></div>
+      <div class="meta-row"><span>Replays</span><span>${Number(entry.replay_count || 0).toLocaleString()}</span></div>
+      ${cohortRows}
+      ${trainingRows}
       <div class="meta-row"><span>Model</span><span>${esc(entry.model_version)}</span></div>
       <div class="meta-row"><span>Data date</span><span>${esc(entry.data_date)}</span></div>`;
     document.querySelector('#fixture-slot').innerHTML = entry.is_fixture
-      ? '<div class="fixture-warning">Interface fixture only: the current card choices and probabilities are synthetic. The ingestion pipeline is included, but this file is not valid training data.</div>'
+      ? '<div class="fixture-warning">Interface fixture only: these choices and probabilities are synthetic, not 17Lands training data.</div>'
       : '';
   };
 
@@ -130,17 +173,16 @@ function renderHome() {
 
 async function startStudy() {
   const entry = selectedSetEntry();
-  const button = document.querySelector('#start-study');
+  const button = document.querySelector('#start-study') || document.querySelector('#another-replay');
   if (button) {
     button.disabled = true;
     button.textContent = 'Loading…';
   }
 
   try {
-    state.setData = await loadSet(entry);
-    if (!state.setData.replays?.length) throw new Error('This set has no replay drafts.');
-    const randomIndex = Math.floor(Math.random() * state.setData.replays.length);
-    state.replay = state.setData.replays[randomIndex];
+    const loaded = await loadRandomReplay(entry);
+    state.setData = loaded.setData;
+    state.replay = loaded.replay;
     state.pickIndex = 0;
     state.selectedCardId = null;
     state.revealed = false;
@@ -245,6 +287,7 @@ function renderStudy() {
             <div class="meta-row"><span>Set</span><span>${esc(state.setData.name)}</span></div>
             <div class="meta-row"><span>Format</span><span>${esc(state.setData.format)}</span></div>
             <div class="meta-row"><span>Model</span><span>${esc(state.setData.model.model_version)}</span></div>
+            <div class="meta-row"><span>Pool conditioned</span><span>${state.setData.model.pool_conditioned ? 'Yes' : 'No'}</span></div>
           </div>
         </section>
       </aside>
@@ -285,6 +328,15 @@ function nextPick() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+function methodNote() {
+  if (state.setData.is_fixture) {
+    return 'This replay is an interface fixture and must not be interpreted as 17Lands training data.';
+  }
+  const cohort = state.setData.cohort || {};
+  const model = state.setData.model || {};
+  return `Generated offline from the ${esc(state.setData.source?.provider || '17Lands')} public draft dataset. The model trained on ${Number(cohort.training_drafts || 0).toLocaleString()} high-win-rate drafts and uses ${esc(model.holdout || 'draft-level holdout')} so the replay being graded does not train its own probabilities. No model or 17Lands API is called while you study.`;
+}
+
 function renderSummary() {
   const summary = summarizeResults(state.results);
   app.innerHTML = `
@@ -310,7 +362,7 @@ function renderSummary() {
           </div>`).join('') : '<p class="empty-note">No meaningful consensus gaps in this replay.</p>'}
       </div>
 
-      <p class="method-note">The shipped demo set is an interface fixture. Production replay files are generated offline from 17Lands public draft dumps using a high-win-rate cohort and draft-level holdout folds so the historical draft being graded is excluded from its own consensus statistics.</p>
+      <p class="method-note">${methodNote()}</p>
       <div class="button-row">
         <button class="primary" id="another-replay">Study another replay</button>
         <button class="secondary" id="back-home">Change set</button>
