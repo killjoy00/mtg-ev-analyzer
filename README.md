@@ -43,10 +43,10 @@ The repository currently contains MSH Premier Draft replay data generated from t
 
 The generated manifest records:
 
-- 181,803 experienced drafts with a parseable win-rate bucket and an experience-bucket lower bound of at least 100 games;
+- 40,480 experienced drafts with a parseable win-rate bucket and an experience-bucket lower bound of at least 100 games;
 - a 0.60 win-rate-bucket midpoint cutoff for the selected top-15% cohort;
 - 5,000 strong-player drafts used for the capped training sample;
-- 210,000 strong-player pick examples in that training sample;
+- 209,999 strong-player pick examples in that training sample;
 - 300 replay drafts;
 - 42 decisions per replay (12,600 replay decisions total);
 - 30 shards of 10 replays each; and
