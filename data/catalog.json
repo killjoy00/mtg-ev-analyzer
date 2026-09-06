@@ -1,15 +1,17 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "sets": [
     {
-      "id": "msh-fixture",
-      "name": "MSH · interface fixture",
+      "id": "msh",
+      "name": "MSH",
       "format": "PremierDraft",
-      "data_path": "./data/demo-msh.json",
-      "replay_count": 1,
-      "model_version": "fixture-only",
+      "manifest_path": "./data/msh/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-pool-context-v2",
       "data_date": "2026-07-26",
-      "is_fixture": true
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
     }
   ]
 }
