@@ -1,11 +1,12 @@
 {
   "name": "mtg-ev-analyzer",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "type": "module",
   "scripts": {
+    "test:syntax": "node --check app.js",
     "test:js": "node --test tests/scoring.test.mjs",
     "test:py": "python -m unittest discover -s tests -p 'test_*.py'",
-    "test": "npm run test:js && npm run test:py"
+    "test": "npm run test:syntax && npm run test:js && npm run test:py"
   }
 }
