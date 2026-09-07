@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { challengeIndex, computeStreak, previousUtcDateKey, unlockedMilestones, utcDateKey } from '../engagement.mjs';
+import { challengeIndex, computeStreak, gameDateKey, previousGameDateKey, unlockedMilestones } from '../engagement.mjs';
 
 test('challengeIndex is stable and bounded', () => {
   const a = challengeIndex('2026-09-06', 'msh', 'top3', 300);
@@ -10,9 +10,10 @@ test('challengeIndex is stable and bounded', () => {
   assert.notEqual(a, challengeIndex('2026-09-06', 'msh', 'full', 300));
 });
 
-test('UTC date helpers step back cleanly', () => {
-  assert.equal(utcDateKey(new Date('2026-09-06T23:00:00Z')), '2026-09-06');
-  assert.equal(previousUtcDateKey('2026-03-01'), '2026-02-28');
+test('Daily game day resets at midnight Eastern instead of UTC', () => {
+  assert.equal(gameDateKey(new Date('2026-09-07T00:30:00Z')), '2026-09-06');
+  assert.equal(gameDateKey(new Date('2026-09-07T04:30:00Z')), '2026-09-07');
+  assert.equal(previousGameDateKey('2026-03-01'), '2026-02-28');
 });
 
 test('computeStreak counts today and consecutive prior days', () => {
