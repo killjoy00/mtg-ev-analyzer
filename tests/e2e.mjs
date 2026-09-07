@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
+import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
 const base = process.env.PACK1_E2E_URL || 'http://127.0.0.1:4173';
+await mkdir('artifacts', { recursive: true });
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
@@ -19,10 +21,44 @@ await page.route('https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 });
 
+async function assertNoHorizontalOverflow() {
+  const metrics = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  assert.ok(metrics.scrollWidth <= metrics.clientWidth + 1, `horizontal overflow: ${metrics.scrollWidth}px > ${metrics.clientWidth}px`);
+}
+
+async function assertModeCardsAligned() {
+  const boxes = await page.locator('.mode-card').evaluateAll((nodes) => nodes.slice(0, 2).map((node) => {
+    const r = node.getBoundingClientRect();
+    return { x: r.x, y: r.y, width: r.width, height: r.height };
+  }));
+  assert.equal(boxes.length, 2);
+  assert.ok(Math.abs(boxes[0].y - boxes[1].y) <= 1, 'mode cards must share a top edge');
+  assert.ok(Math.abs(boxes[0].height - boxes[1].height) <= 1, 'mode cards must have equal height');
+}
+
+async function assertPackAligned() {
+  const boxes = await page.locator('.opening-pack .card-choice').evaluateAll((nodes) => nodes.slice(0, 7).map((node) => {
+    const r = node.getBoundingClientRect();
+    return { y: r.y, width: r.width };
+  }));
+  assert.ok(boxes.length >= 4);
+  const width = boxes[0].width;
+  const y = boxes[0].y;
+  for (const box of boxes) {
+    assert.ok(Math.abs(box.width - width) <= 1, 'pack cards must have equal width');
+    assert.ok(Math.abs(box.y - y) <= 1, 'first pack row must share a top edge');
+  }
+}
+
 async function home() {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
+  await assertNoHorizontalOverflow();
 }
+
 async function revealTop3() {
   const cards = page.locator('.opening-pack .card-choice');
   await cards.first().waitFor({ timeout: 10000 });
@@ -31,14 +67,32 @@ async function revealTop3() {
   await cards.nth(2).click();
   await page.locator('#reveal-top3').click();
   const score = page.locator('.result-page .score-orb strong');
-  await score.waitFor({ state:'visible', timeout:5000 });
+  await score.waitFor({ state: 'visible', timeout: 5000 });
   assert.match((await score.textContent()) || '', /^\d+$/);
   assert.equal(await page.locator('.opening-pack').isVisible(), false);
+  await assertNoHorizontalOverflow();
   return Number(await score.textContent());
 }
 
 try {
-  for (const setId of ['ecl','tmt','sos','msh']) {
+  // Rendered design checks at desktop and mobile sizes.
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await home();
+  await assertModeCardsAligned();
+  await page.screenshot({ path: 'artifacts/ui-home-desktop.png', fullPage: true });
+
+  await page.locator('#set-select').selectOption('msh');
+  await page.locator('[data-mode="top3"]').click();
+  await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
+  await assertPackAligned();
+  await page.screenshot({ path: 'artifacts/ui-top3-desktop.png', fullPage: true });
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await home();
+  await page.screenshot({ path: 'artifacts/ui-home-mobile.png', fullPage: true });
+
+  // Every production set can start and reveal a Top 3 game.
+  for (const setId of ['ecl', 'tmt', 'sos', 'msh']) {
     await home();
     await page.locator('#set-select').selectOption(setId);
     await page.locator('[data-mode="top3"]').click();
@@ -48,21 +102,23 @@ try {
     await revealTop3();
   }
 
+  // Seeded friend challenges carry the exact pack and compare only after reveal.
   await home();
   await page.locator('#set-select').selectOption('msh');
   await page.locator('[data-mode="top3"]').click();
   const seeded = new URL(page.url());
   await revealTop3();
-  seeded.searchParams.set('vs','80');
-  seeded.searchParams.set('by','Browser Test');
-  await page.goto(seeded.toString(), { waitUntil:'domcontentloaded' });
-  await page.locator('.challenge-callout').waitFor({ timeout:10000 });
+  seeded.searchParams.set('vs', '80');
+  seeded.searchParams.set('by', 'Browser Test');
+  await page.goto(seeded.toString(), { waitUntil: 'domcontentloaded' });
+  await page.locator('.challenge-callout').waitFor({ timeout: 10000 });
   assert.match((await page.locator('.challenge-callout').textContent()) || '', /Browser Test scored 80/);
   assert.equal(await page.locator('.friend-comparison').count(), 0);
   await revealTop3();
-  await page.locator('.friend-comparison').waitFor({ timeout:5000 });
-  await page.locator('.challenge-return').waitFor({ timeout:5000 });
+  await page.locator('.friend-comparison').waitFor({ timeout: 5000 });
+  await page.locator('.challenge-return').waitFor({ timeout: 5000 });
 
+  // Daily remains a dated ranked path and Reveal reaches its result page.
   await home();
   await page.locator('[data-daily-mode="top3"]').click();
   await page.locator('.opening-pack .card-choice').first().waitFor();
@@ -71,29 +127,36 @@ try {
   assert.equal(dailyUrl.searchParams.get('mode'), 'top3');
   await revealTop3();
 
+  // Full Pack can complete all first-pack decisions and reach its summary.
   await home();
   await page.locator('#set-select').selectOption('msh');
   await page.locator('[data-mode="full"]').click();
-  for (let pick=0; pick<20; pick += 1) {
+  for (let pick = 0; pick < 20; pick += 1) {
     if (await page.locator('.scorecard').count()) break;
-    await page.locator('.card-choice').first().waitFor({ timeout:10000 });
+    await page.locator('.card-choice').first().waitFor({ timeout: 10000 });
     await page.locator('.card-choice').first().click();
     await page.locator('#submit-pick').click();
-    await page.locator('#next-pick').waitFor({ timeout:5000 });
+    await page.locator('#next-pick').waitFor({ timeout: 5000 });
     await page.locator('#next-pick').click();
   }
-  await page.locator('.scorecard.result-page').waitFor({ timeout:10000 });
+  await page.locator('.scorecard.result-page').waitFor({ timeout: 10000 });
   assert.match((await page.locator('.scorecard .score-orb strong').textContent()) || '', /^\d+$/);
+  await assertNoHorizontalOverflow();
 
+  // Stats and Account are styled and reachable without an account.
   await home();
   await page.locator('#stats-nav').click();
   await page.locator('.stats-page').waitFor();
   assert.match((await page.locator('.stats-page h1').textContent()) || '', /Pack 1 record/);
+  await assertNoHorizontalOverflow();
+  await page.screenshot({ path: 'artifacts/ui-stats-mobile.png', fullPage: true });
   await page.locator('#account-nav').click();
   await page.locator('.account-page').waitFor();
   assert.ok((await page.locator('#account-signup').count()) + (await page.locator('#account-signout').count()) >= 1);
+  await assertNoHorizontalOverflow();
+  await page.screenshot({ path: 'artifacts/ui-account-mobile.png', fullPage: true });
 
-  console.log('Pack 1 product matrix passed.');
+  console.log('Pack 1 product and layout matrix passed.');
 } finally {
   await browser.close();
 }
