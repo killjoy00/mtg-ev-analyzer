@@ -1,0 +1,24 @@
+name: bundle-pack1api
+
+on:
+  push:
+    branches: [feature/counterfactual-pack-paths]
+    paths:
+      - '.github/workflows/bundle-pack1api.yml'
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Neon function bundle
+        run: |
+          mkdir -p dist/pack1api
+          cp worker/index.js worker/core.mjs worker/path-model.mjs dist/pack1api/
+          cd dist/pack1api
+          zip -q ../pack1api.zip index.js core.mjs path-model.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack1api-neon-bundle
+          path: dist/pack1api.zip
+          retention-days: 1
