@@ -78,7 +78,7 @@ async function fetchStaticJson(input, init, url) {
         body,
         status: response.status,
         statusText: response.statusText,
-        headers: [...response.headers.entries()],
+        contentType: response.headers.get('content-type') || 'application/json',
       };
     })().catch((error) => {
       responseCache.delete(key);
@@ -91,7 +91,7 @@ async function fetchStaticJson(input, init, url) {
   return new Response(stored.body, {
     status: stored.status,
     statusText: stored.statusText,
-    headers: stored.headers,
+    headers: { 'content-type': stored.contentType },
   });
 }
 
