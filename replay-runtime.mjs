@@ -1,5 +1,5 @@
 const nativeFetch = globalThis.fetch?.bind(globalThis);
-const shardCache = new Map();
+const responseCache = new Map();
 let installed = false;
 let catalogSnapshot = null;
 
@@ -71,34 +71,11 @@ function isShard(url) {
   return isSameOriginData(url) && /\/data\/[^/]+\/shards\/[^/]+\.json$/.test(url.pathname);
 }
 
-async function fetchNormalizedShard(input, init, url) {
-  const key = url.href;
-  if (!shardCache.has(key)) {
-    const promise = (async () => {
-      const response = await nativeFetch(input, { ...(init || {}), cache: 'default' });
-      if (!response.ok) {
-        return {
-          body: await response.text(),
-          status: response.status,
-          statusText: response.statusText,
-          contentType: response.headers.get('content-type') || 'application/json',
-        };
-      }
-      const normalized = normalizeReplayPayload(url.pathname, await response.json());
-      return {
-        body: JSON.stringify(normalized),
-        status: response.status,
-        statusText: response.statusText,
-        contentType: 'application/json; charset=utf-8',
-      };
-    })().catch((error) => {
-      shardCache.delete(key);
-      throw error;
-    });
-    shardCache.set(key, promise);
-  }
+function isReplayResource(url) {
+  return isCatalog(url) || isManifest(url) || isShard(url);
+}
 
-  const stored = await shardCache.get(key);
+function storedResponse(stored) {
   return new Response(stored.body, {
     status: stored.status,
     statusText: stored.statusText,
@@ -106,21 +83,61 @@ async function fetchNormalizedShard(input, init, url) {
   });
 }
 
-function rememberCatalog(response) {
-  if (!response?.ok) return;
-  void response.clone().json().then((data) => {
-    catalogSnapshot = normalizeReplayPayload('/data/catalog.json', data);
-    scheduleWarm();
-  }).catch(() => null);
+async function fetchCachedResource(input, init, url) {
+  const key = url.href;
+  if (!responseCache.has(key)) {
+    const promise = (async () => {
+      const response = await nativeFetch(input, { ...(init || {}), cache: 'default' });
+      const contentType = response.headers.get('content-type') || 'application/json';
+      if (!response.ok) {
+        responseCache.delete(key);
+        return {
+          body: await response.text(),
+          status: response.status,
+          statusText: response.statusText,
+          contentType,
+        };
+      }
+
+      let body;
+      if (/json/i.test(contentType) || /\.json$/.test(url.pathname)) {
+        const data = normalizeReplayPayload(url.pathname, await response.json());
+        body = JSON.stringify(data);
+        if (isCatalog(url)) {
+          catalogSnapshot = data;
+          scheduleWarm();
+        }
+      } else {
+        body = await response.text();
+      }
+
+      return {
+        body,
+        status: response.status,
+        statusText: response.statusText,
+        contentType: /json/i.test(contentType) ? 'application/json; charset=utf-8' : contentType,
+      };
+    })().catch((error) => {
+      responseCache.delete(key);
+      throw error;
+    });
+    responseCache.set(key, promise);
+  }
+
+  return storedResponse(await responseCache.get(key));
 }
 
 function warmSelectedManifest() {
   if (!catalogSnapshot || typeof document === 'undefined') return;
-  const selectedId = document.querySelector('#set-select')?.value || catalogSnapshot.featured_set || catalogSnapshot.sets?.[0]?.id;
+  const selectedId = document.querySelector('#set-select')?.value || catalogSnapshot.sets?.[0]?.id;
   const set = catalogSnapshot.sets?.find((entry) => entry.id === selectedId);
   const manifest = set?.manifest || set?.manifest_path;
   if (!manifest) return;
-  void nativeFetch(manifest, { cache: 'default' }).catch(() => null);
+  const url = urlOf(manifest);
+  if (!url || !isManifest(url)) return;
+  // Warm through the same in-page cache used by the app. The previous version
+  // called nativeFetch here, so the warm request could not satisfy loadSet().
+  void fetchCachedResource(manifest, {}, url).catch(() => null);
 }
 
 function scheduleWarm() {
@@ -135,17 +152,8 @@ export function installReplayRuntime() {
   globalThis.fetch = function packOneFetch(input, init) {
     const url = urlOf(input);
     const method = String(init?.method || input?.method || 'GET').toUpperCase();
-    if (method !== 'GET') return nativeFetch(input, init);
-
-    if (isShard(url)) return fetchNormalizedShard(input, init, url);
-
-    if (isCatalog(url) || isManifest(url)) {
-      const responsePromise = nativeFetch(input, { ...(init || {}), cache: 'default' });
-      if (isCatalog(url)) void responsePromise.then(rememberCatalog).catch(() => null);
-      return responsePromise;
-    }
-
-    return nativeFetch(input, init);
+    if (method !== 'GET' || !isReplayResource(url)) return nativeFetch(input, init);
+    return fetchCachedResource(input, init, url);
   };
 
   document.addEventListener('change', (event) => {
