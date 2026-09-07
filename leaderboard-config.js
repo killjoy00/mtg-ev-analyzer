@@ -1,6 +1,4 @@
-// Public Supabase project configuration for Pack 1 leaderboards.
-// The publishable key is safe to expose in browser code; RLS/RPC rules enforce access.
-window.PACK1_SUPABASE = {
-  url: '',
-  key: '',
+// Public Pack 1 API endpoint. The Cloudflare Worker validates and scores ranked runs server-side.
+window.PACK1_API = {
+  url: 'https://pack1-api.planitnow.us',
 };
