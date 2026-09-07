@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#f7f7f5" />
+  <meta name="description" content="How Pack One builds strong-player consensus from replay data, where the model is useful, and where its claims stop." />
+  <meta property="og:type" content="article" />
+  <meta property="og:title" content="Methodology" />
+  <meta property="og:description" content="How Pack One builds strong-player consensus from replay data, where the model is useful, and where its claims stop." />
+  <meta property="og:url" content="https://magic.planitnow.us/methodology/" />
+  <link rel="canonical" href="https://magic.planitnow.us/methodology/" />
+  <link rel="stylesheet" href="/editorial.css?v=1" />
+  <title>Methodology</title>
+</head>
+<body data-page="editorial">
+<header class="site-header">
+  <a class="site-brand" href="/"><span>P1</span><strong>Pack One</strong></a>
+  <nav aria-label="Primary">
+    <a href="/">Play</a>
+    <a href="/learn/">Learn</a>
+    <a href="/scoring/">Scoring</a>
+    <a href="/methodology/">Method</a>
+    <a href="/sets/">Sets</a>
+  </nav>
+</header>
+<main class="editorial-main">
+  <article class="article-shell">
+    <header class="article-header"><p class="kicker">Model notes</p><h1>Methodology</h1><p class="article-deck">How Pack One builds strong-player consensus from replay data, where the model is useful, and where its claims stop.</p></header>
+    <aside class="ad-slot ad-slot-wide" data-ad-slot="article-top" aria-label="Advertisement"><span>Advertisement</span></aside>
+    <div class="prose">
+<h2>Source data</h2><p>Pack One uses public 17Lands Premier Draft data to construct historical replay seats. The site stores a fixed sample of replay drafts for each supported set. Card images are loaded from Scryfall. Pack One is not affiliated with 17Lands, Scryfall, Wizards of the Coast, or TCGplayer.</p>
+<h2>The strong-player cohort</h2><p>The model is trained on an experienced, high-win-rate slice of the available draft data rather than every drafter equally. The exact cutoff and training sample are recorded in each set manifest and surfaced on the set archive pages. This makes the target explicitly “what this stronger cohort tended to support,” not “what all players picked.”</p>
+<h2>Pool-conditioned support</h2><p>A first-pick model can rely heavily on global card preference because the pool is empty. Later in the pack, however, context matters. Pack One's current model adjusts card support using shrinkage-weighted card and pool co-pick information, then normalizes support among the cards available at that decision. The pool remains the historical replay pool so every player receives the same reproducible comparison.</p>
+<h2>Evaluation and holdout</h2><p>Training and evaluation are separated by draft identifier using a five-fold holdout. That reduces leakage from seeing other picks from the same draft during training. Pack One also evaluates whether the model separates historical strong-player choices from deliberately poor or random baselines. Those checks are useful evidence that the score has discrimination, but they do not turn the model into a universal definition of optimal drafting.</p>
+<h2>What the probabilities are not</h2><p>The displayed percentages are not calibrated probabilities that a card is correct. They are normalized model support within the current pack. A 40% card and a 35% card represent a much closer decision than a 70% card and a 10% card, but neither percentage should be interpreted as expected win rate or chance to trophy.</p><div class="callout"><strong>Model humility is part of the product.</strong> Pack One should be most interesting where good drafters can inspect a disagreement, understand the model's confidence, and decide whether the model saw something they missed—or whether they still prefer their own line.</div>
+<h2>Versioning</h2><p>Every set manifest includes the model version, source date, cohort definition, training counts, and replay count. When the scoring or model changes materially, Pack One treats that as a versioned product change rather than silently rewriting what old scores meant.</p></div>
+    <aside class="article-cta"><p class="kicker">Put it into practice</p><h2>Make the decision before you read the answer.</h2><p>Pack One is most useful when you commit first, then use the consensus as a comparison point—not an instruction sheet.</p><a class="button-link" href="/">Play Pack One</a></aside>
+  </article>
+</main>
+<footer class="site-footer">
+  <div><strong>Pack One</strong><p>An independent Limited draft game built from public 17Lands draft data.</p></div>
+  <nav aria-label="Footer"><a href="/about/">About</a><a href="/contact/">Contact</a><a href="/disclosure/">Disclosure</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></nav>
+</footer>
+<script src="/ad-config.js"></script>
+<script src="/tcgplayer-config.js"></script>
+<script type="module" src="/ads.mjs"></script>
+<script type="module" src="/tcgplayer.mjs"></script>
+</body>
+</html>

@@ -2,6 +2,7 @@ import { gradePick, gradeTopThree, rankCandidates, summarizeResults } from './sc
 import { challengeIndex, computeStreak, unlockedMilestones, utcDateKey } from './engagement.mjs';
 import { isLeaderboardConfigured, loadLeaderboard, submitLeaderboardScore, updateLeaderboardDisplayName } from './leaderboard.mjs';
 import { loadReplayJson } from './replay-data.mjs';
+import { tcgplayerUrl } from './tcgplayer.mjs';
 
 const app = document.querySelector('#app');
 const brandHome = document.querySelector('#brand-home');
@@ -525,7 +526,7 @@ function renderTopThreeReveal() {
       ${dailySubmissionMarkup()}
       <div class="top3-comparison">
         <div><h3>Your ranking</h3>${result.selected.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong></div>`).join('')}</div>
-        <div><h3>Consensus</h3>${result.consensusTop.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong><small>${pct(card.model_probability, 1)}</small></div>`).join('')}</div>
+        <div><h3>Consensus</h3>${result.consensusTop.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong><small>${pct(card.model_probability, 1)}</small><a class="market-link" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-link="1" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-set="${esc(state.selectedSetId)}" data-tcgplayer-surface="top3_consensus">TCGplayer</a></div>`).join('')}</div>
       </div>
       <p class="reveal-note">${result.overlap}/3 consensus cards · ${result.exactPositions} exact ${result.exactPositions === 1 ? 'position' : 'positions'}. ${result.historicalRank ? `The historical drafter's first pick was #${result.historicalRank} on your list.` : `The historical drafter's first pick was outside your top three.`}</p>
       <div class="button-row result-actions">
@@ -600,7 +601,7 @@ function renderPickFeedback(pick) {
       <div class="feedback-title"><div><p class="eyebrow">Pick ${state.pickIndex + 1}</p><h2>${esc(result.verdict)}</h2></div><div class="pick-score ${scoreTone(result.score)}"><strong>${result.score}</strong><span>/100</span></div></div>
       <div class="feedback-grid">
         <div><span>You took</span><strong>${esc(result.selectedName)}</strong></div>
-        <div><span>Consensus</span><strong>${esc(result.bestName)}</strong></div>
+        <div><span>Consensus</span><strong>${esc(result.bestName)}</strong><a class="market-link" href="${esc(tcgplayerUrl(result.bestName))}" target="_blank" rel="sponsored noopener" data-tcgplayer-link="1" data-tcgplayer-card="${esc(result.bestName)}" data-tcgplayer-set="${esc(state.selectedSetId)}" data-tcgplayer-surface="full_pick_consensus">TCGplayer</a></div>
         <div><span>Consensus rank</span><strong>#${esc(result.rank)}</strong></div>
         <div><span>Consensus gap</span><strong>${result.gap ? `${(result.gap * 100).toFixed(1)} pts` : '—'}</strong></div>
         <div><span>Real drafter</span><strong>${esc(historical?.name || 'Unknown')}${result.historicalMatch ? ' ✓' : ''}</strong></div>

@@ -286,7 +286,9 @@ function enhanceFullResult() {
 function enhanceHome() {
   const app = document.querySelector('#app');
   const intro = document.querySelector('.home-intro');
-  app?.classList.toggle('home-page', Boolean(intro));
+  const isHome = Boolean(intro);
+  app?.classList.toggle('home-page', isHome);
+  document.body.classList.toggle('is-game', !isHome);
 }
 
 function enhanceConsensusPresentation() {

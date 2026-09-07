@@ -67,6 +67,7 @@ async function home() {
   assert.equal(await page.getByRole('heading', { name: 'Today’s Pack One', exact: true }).count(), 1);
   assert.equal(await page.locator('.daily-main').count(), 1);
   assert.match((await page.locator('.daily-main').textContent()) || '', /Play today’s Top 3/i);
+  assert.equal(await page.locator('#home-editorial').isVisible(), true, 'editorial shell should be visible on home');
   await assertNoHorizontalOverflow();
 }
 
@@ -113,10 +114,16 @@ try {
   await home();
   await assertModeCardsAligned();
   await page.screenshot({ path: 'artifacts/ui-home-desktop.png', fullPage: true });
+  await page.goto(`${base}/?adpreview=1`, { waitUntil: 'domcontentloaded' });
+  await page.locator('#set-select').waitFor({ timeout: 10000 });
+  await page.locator('.ad-preview-creative').waitFor({ timeout: 5000 });
+  await page.screenshot({ path: 'artifacts/ui-monetization-preview-desktop.png', fullPage: true });
+  await home();
 
   await page.locator('#set-select').selectOption('msh');
   await page.locator('[data-mode="top3"]').click();
   await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
+  assert.equal(await page.locator('#home-editorial').isVisible(), false, 'editorial/ad inventory must disappear during active play');
   assert.equal(await page.locator('.challenge-callout').count(), 0, 'ordinary game must not look like a friend challenge');
   await assertPackAligned();
   await page.screenshot({ path: 'artifacts/ui-top3-desktop.png', fullPage: true });
