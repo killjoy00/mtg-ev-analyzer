@@ -52,15 +52,15 @@ jobs:
           }
           """)
           replace_once('worker/index.js', """    details = {
-              consensusAgreement: result.consensusAgreement,
-              topThreeAgreement: result.topThreeAgreement,
-            };
+                consensusAgreement: result.consensusAgreement,
+                topThreeAgreement: result.topThreeAgreement,
+              };
           """, """    details = {
-              consensusAgreement: result.consensusAgreement,
-              topThreeAgreement: result.topThreeAgreement,
-              scoredDecisions: result.results.filter((item) => Number(item.decisionWeight || 0) > 0).length,
-              scoringVersion: 'counterfactual-path-v3',
-            };
+                consensusAgreement: result.consensusAgreement,
+                topThreeAgreement: result.topThreeAgreement,
+                scoredDecisions: result.results.filter((item) => Number(item.decisionWeight || 0) > 0).length,
+                scoringVersion: 'counterfactual-path-v3',
+              };
           """)
           PY
       - name: Run tests
