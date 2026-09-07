@@ -40,7 +40,8 @@ function replaceTextNodes(root = document) {
       .replace(/Practice run\./g, 'Replay.')
       .replace(/practice replay/gi, 'replay')
       .replace(/practice attempt/gi, 'replay')
-      .replace(/Practice runs never count\./g, 'Only Daily Challenge runs count toward the board.');
+      .replace(/Practice runs never count\./g, 'Only Daily Challenge runs count toward the board.')
+      .replace(/Daily rankings reset at 00:00 UTC\./g, 'Daily rankings reset at midnight Eastern.');
   }
 }
 
