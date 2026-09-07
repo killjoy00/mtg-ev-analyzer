@@ -322,7 +322,8 @@ function enhanceConsensusPresentation() {
       .find((button) => button.querySelector('.user-rank-badge')?.textContent?.trim() === '1');
     const footer = firstChoice?.querySelector('.card-footer span')?.textContent || '';
     const support = footer.match(/([0-9.]+%)/)?.[1];
-    if (support) boldTake.textContent = `${support} strong-player support.`;
+    const copy = support ? `${support} strong-player support.` : '';
+    if (copy && boldTake.textContent !== copy) boldTake.textContent = copy;
   }
 
   document.querySelectorAll('.opening-pack .card-image').forEach((image, index) => {
