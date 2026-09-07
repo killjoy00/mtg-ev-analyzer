@@ -22,16 +22,16 @@ export function gradePick(candidates, selectedId, historicalId) {
   let verdict;
   let verdictClass;
   if (rank === 1 || gap <= EPSILON) {
-    verdict = 'Consensus pick';
+    verdict = 'Nailed it';
     verdictClass = 'consensus';
   } else if (gap <= 0.08) {
     verdict = 'Close call';
     verdictClass = 'close';
   } else if (gap <= 0.18) {
-    verdict = 'Reasonable disagreement';
+    verdict = 'Defensible';
     verdictClass = 'reasonable';
   } else {
-    verdict = 'Significant miss';
+    verdict = 'Worth a second look';
     verdictClass = 'miss';
   }
 
@@ -50,6 +50,35 @@ export function gradePick(candidates, selectedId, historicalId) {
     topThree: rank <= 3,
     verdict,
     verdictClass,
+  };
+}
+
+export function gradeTopThree(candidates, selectedIds, historicalId) {
+  if (!Array.isArray(selectedIds) || selectedIds.length !== 3 || new Set(selectedIds).size !== 3) {
+    throw new Error('Choose three different cards before grading the pack.');
+  }
+
+  const ranked = rankCandidates(candidates);
+  const byId = new Map(ranked.map((card) => [card.id, card]));
+  const selected = selectedIds.map((id) => {
+    const card = byId.get(id);
+    if (!card) throw new Error(`Selected card ${id} is not in the pack.`);
+    return card;
+  });
+  const consensusTop = ranked.slice(0, 3);
+  const consensusIds = consensusTop.map((card) => card.id);
+  const overlap = selectedIds.filter((id) => consensusIds.includes(id)).length;
+  const exactPositions = selectedIds.filter((id, index) => id === consensusIds[index]).length;
+  const historicalPosition = selectedIds.indexOf(historicalId);
+
+  return {
+    selected,
+    selectedIds: [...selectedIds],
+    consensusTop,
+    consensusIds,
+    overlap,
+    exactPositions,
+    historicalRank: historicalPosition >= 0 ? historicalPosition + 1 : null,
   };
 }
 
