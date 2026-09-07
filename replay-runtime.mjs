@@ -1,5 +1,5 @@
 const nativeFetch = globalThis.fetch?.bind(globalThis);
-const responseCache = new Map();
+const shardCache = new Map();
 let installed = false;
 let catalogSnapshot = null;
 
@@ -55,39 +55,50 @@ export function normalizeReplayPayload(pathname, data) {
   return data;
 }
 
-function isStaticReplayJson(url) {
-  if (!url || url.origin !== globalThis.location?.origin) return false;
-  return /\/data\/(?:catalog\.json|[^/]+\/manifest\.json|[^/]+\/shards\/[^/]+\.json)$/.test(url.pathname);
+function isSameOriginData(url) {
+  return Boolean(url && url.origin === globalThis.location?.origin && /\/data\//.test(url.pathname));
 }
 
-async function fetchStaticJson(input, init, url) {
+function isCatalog(url) {
+  return isSameOriginData(url) && /\/data\/catalog\.json$/.test(url.pathname);
+}
+
+function isManifest(url) {
+  return isSameOriginData(url) && /\/data\/[^/]+\/manifest\.json$/.test(url.pathname);
+}
+
+function isShard(url) {
+  return isSameOriginData(url) && /\/data\/[^/]+\/shards\/[^/]+\.json$/.test(url.pathname);
+}
+
+async function fetchNormalizedShard(input, init, url) {
   const key = url.href;
-  if (!responseCache.has(key)) {
+  if (!shardCache.has(key)) {
     const promise = (async () => {
       const response = await nativeFetch(input, { ...(init || {}), cache: 'default' });
-      const text = await response.text();
-      let body = text;
-      if (response.ok) {
-        try {
-          const normalized = normalizeReplayPayload(url.pathname, JSON.parse(text));
-          if (/\/data\/catalog\.json$/.test(url.pathname)) catalogSnapshot = normalized;
-          body = JSON.stringify(normalized);
-        } catch {}
+      if (!response.ok) {
+        return {
+          body: await response.text(),
+          status: response.status,
+          statusText: response.statusText,
+          contentType: response.headers.get('content-type') || 'application/json',
+        };
       }
+      const normalized = normalizeReplayPayload(url.pathname, await response.json());
       return {
-        body,
+        body: JSON.stringify(normalized),
         status: response.status,
         statusText: response.statusText,
-        contentType: response.headers.get('content-type') || 'application/json',
+        contentType: 'application/json; charset=utf-8',
       };
     })().catch((error) => {
-      responseCache.delete(key);
+      shardCache.delete(key);
       throw error;
     });
-    responseCache.set(key, promise);
+    shardCache.set(key, promise);
   }
 
-  const stored = await responseCache.get(key);
+  const stored = await shardCache.get(key);
   return new Response(stored.body, {
     status: stored.status,
     statusText: stored.statusText,
@@ -95,13 +106,21 @@ async function fetchStaticJson(input, init, url) {
   });
 }
 
+function rememberCatalog(response) {
+  if (!response?.ok) return;
+  void response.clone().json().then((data) => {
+    catalogSnapshot = normalizeReplayPayload('/data/catalog.json', data);
+    scheduleWarm();
+  }).catch(() => null);
+}
+
 function warmSelectedManifest() {
   if (!catalogSnapshot || typeof document === 'undefined') return;
-  const selectedId = document.querySelector('#set-select')?.value || catalogSnapshot.featured_set;
+  const selectedId = document.querySelector('#set-select')?.value || catalogSnapshot.featured_set || catalogSnapshot.sets?.[0]?.id;
   const set = catalogSnapshot.sets?.find((entry) => entry.id === selectedId);
   const manifest = set?.manifest || set?.manifest_path;
   if (!manifest) return;
-  void globalThis.fetch(manifest).catch(() => null);
+  void nativeFetch(manifest, { cache: 'default' }).catch(() => null);
 }
 
 function scheduleWarm() {
@@ -116,15 +135,20 @@ export function installReplayRuntime() {
   globalThis.fetch = function packOneFetch(input, init) {
     const url = urlOf(input);
     const method = String(init?.method || input?.method || 'GET').toUpperCase();
-    if (method === 'GET' && isStaticReplayJson(url)) return fetchStaticJson(input, init, url);
+    if (method !== 'GET') return nativeFetch(input, init);
+
+    if (isShard(url)) return fetchNormalizedShard(input, init, url);
+
+    if (isCatalog(url) || isManifest(url)) {
+      const responsePromise = nativeFetch(input, { ...(init || {}), cache: 'default' });
+      if (isCatalog(url)) void responsePromise.then(rememberCatalog).catch(() => null);
+      return responsePromise;
+    }
+
     return nativeFetch(input, init);
   };
 
   document.addEventListener('change', (event) => {
     if (event.target?.id === 'set-select') scheduleWarm();
   });
-
-  const app = document.querySelector('#app');
-  if (app) new MutationObserver(scheduleWarm).observe(app, { childList: true, subtree: false });
-  scheduleWarm();
 }
