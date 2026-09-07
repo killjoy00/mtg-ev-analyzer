@@ -14,7 +14,15 @@ test('daily challenge selector is deterministic and bounded', () => {
   const b = challengeIndex('2026-09-06', 'msh', 'top3', 300);
   assert.equal(a, b);
   assert.ok(a >= 0 && a < 300);
-  assert.notEqual(a, challengeIndex('2026-09-07', 'msh', 'top3', 300));
+});
+
+test('worker Daily selector never repeats the prior replay', () => {
+  let previous = challengeIndex('2026-09-01', 'msh', 'top3', 2);
+  for (let day = 2; day <= 9; day += 1) {
+    const current = challengeIndex(`2026-09-0${day}`, 'msh', 'top3', 2);
+    assert.notEqual(current, previous);
+    previous = current;
+  }
 });
 
 test('worker Daily game day resets at midnight Eastern', () => {
