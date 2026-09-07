@@ -2,17 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
-import { gradePick } from '../scoring.mjs';
+import { gradePick, gradeTopThree, rankCandidates, summarizeResults } from '../scoring.mjs';
 
 const SETS = ['msh', 'sos', 'tmt', 'ecl'];
-
-function oldLinearScore(candidates, selectedId) {
-  const ranked = [...candidates].sort((a, b) => Number(b.model_probability || 0) - Number(a.model_probability || 0));
-  const best = Number(ranked[0]?.model_probability || 0);
-  const selected = Number(ranked.find((card) => card.id === selectedId)?.model_probability || 0);
-  if (best <= 1e-9) return 100;
-  return Math.round(Math.max(0, Math.min(1, selected / best)) * 100);
-}
 
 function percentile(values, p) {
   if (!values.length) return 0;
@@ -24,12 +16,33 @@ function average(values) {
   return values.length ? values.reduce((sum, value) => sum + value, 0) / values.length : 0;
 }
 
-test('consensus scoring has a sensible distribution on historical experienced-drafter picks', async () => {
-  const oldPickScores = [];
-  const newPickScores = [];
-  const oldPackScores = [];
-  const newPackScores = [];
-  let consensusPicks = 0;
+function hashText(value) {
+  let hash = 2166136261;
+  for (let i = 0; i < String(value).length; i += 1) {
+    hash ^= String(value).charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  return hash >>> 0;
+}
+
+function firstPackPicks(replay) {
+  const picks = replay.picks || [];
+  if (!picks.length) return [];
+  const firstPackNumber = Math.min(...picks.map((pick) => Number(pick.pack_number)));
+  return picks
+    .filter((pick) => Number(pick.pack_number) === firstPackNumber)
+    .sort((a, b) => Number(a.pick_number) - Number(b.pick_number));
+}
+
+test('consensus scoring separates strong historical seats from random clicking', async () => {
+  const historicalPackScores = [];
+  const randomPackScores = [];
+  const worstPackScores = [];
+  const reversedTopThreeScores = [];
+  const missesTwoTopThreeScores = [];
+  const nearFourthScores = [];
+  let reversedWins = 0;
+  let topThreeComparisons = 0;
   let totalPicks = 0;
   let replayCount = 0;
 
@@ -38,28 +51,46 @@ test('consensus scoring has a sensible distribution on historical experienced-dr
     const files = (await readdir(shardDir)).filter((name) => name.endsWith('.json')).sort();
     for (const file of files) {
       const shard = JSON.parse(await readFile(join(shardDir, file), 'utf8'));
-      for (const replay of shard.replays || []) {
-        const picks = replay.picks || [];
-        if (!picks.length) continue;
-        const firstPackNumber = Math.min(...picks.map((pick) => Number(pick.pack_number)));
-        const firstPack = picks.filter((pick) => Number(pick.pack_number) === firstPackNumber);
-        const replayOld = [];
-        const replayNew = [];
-        for (const pick of firstPack) {
-          const selectedId = pick.historical_pick_id;
-          const result = gradePick(pick.candidates || [], selectedId, selectedId);
-          const oldScore = oldLinearScore(pick.candidates || [], selectedId);
-          replayOld.push(oldScore);
-          replayNew.push(result.score);
-          oldPickScores.push(oldScore);
-          newPickScores.push(result.score);
-          if (result.consensusMatch) consensusPicks += 1;
+      for (let replayIndex = 0; replayIndex < (shard.replays || []).length; replayIndex += 1) {
+        const replay = shard.replays[replayIndex];
+        const firstPack = firstPackPicks(replay);
+        if (!firstPack.length) continue;
+
+        const historicalResults = [];
+        const randomResults = [];
+        const worstResults = [];
+
+        for (let pickIndex = 0; pickIndex < firstPack.length; pickIndex += 1) {
+          const pick = firstPack[pickIndex];
+          const candidates = pick.candidates || [];
+          if (!candidates.length) continue;
+          const historicalId = pick.historical_pick_id;
+          const randomIndex = hashText(`${setId}|${file}|${replayIndex}|${pickIndex}`) % candidates.length;
+          const randomId = candidates[randomIndex].id;
+          const worstId = rankCandidates(candidates).at(-1).id;
+          historicalResults.push(gradePick(candidates, historicalId, historicalId));
+          randomResults.push(gradePick(candidates, randomId, historicalId));
+          worstResults.push(gradePick(candidates, worstId, historicalId));
           totalPicks += 1;
         }
-        if (replayNew.length) {
-          oldPackScores.push(Math.round(average(replayOld)));
-          newPackScores.push(Math.round(average(replayNew)));
-          replayCount += 1;
+
+        historicalPackScores.push(summarizeResults(historicalResults).score);
+        randomPackScores.push(summarizeResults(randomResults).score);
+        worstPackScores.push(summarizeResults(worstResults).score);
+        replayCount += 1;
+
+        const opening = firstPack[0];
+        const ranked = rankCandidates(opening.candidates || []);
+        if (ranked.length >= 5) {
+          const consensus = ranked.slice(0, 3).map((card) => card.id);
+          const reversed = gradeTopThree(ranked, [...consensus].reverse(), opening.historical_pick_id);
+          const missesTwo = gradeTopThree(ranked, [ranked[0].id, ranked[3].id, ranked[4].id], opening.historical_pick_id);
+          const nearFourth = gradeTopThree(ranked, [ranked[0].id, ranked[1].id, ranked[3].id], opening.historical_pick_id);
+          reversedTopThreeScores.push(reversed.score);
+          missesTwoTopThreeScores.push(missesTwo.score);
+          nearFourthScores.push(nearFourth.score);
+          if (reversed.score > missesTwo.score) reversedWins += 1;
+          topThreeComparisons += 1;
         }
       }
     }
@@ -68,23 +99,35 @@ test('consensus scoring has a sensible distribution on historical experienced-dr
   const summary = {
     replays: replayCount,
     picks: totalPicks,
-    consensus_pick_rate: Number((consensusPicks / totalPicks * 100).toFixed(1)),
-    old_pick_mean: Number(average(oldPickScores).toFixed(1)),
-    new_pick_mean: Number(average(newPickScores).toFixed(1)),
-    old_pack_mean: Number(average(oldPackScores).toFixed(1)),
-    new_pack_mean: Number(average(newPackScores).toFixed(1)),
-    old_pack_p10: percentile(oldPackScores, 0.10),
-    old_pack_p50: percentile(oldPackScores, 0.50),
-    old_pack_p90: percentile(oldPackScores, 0.90),
-    new_pack_p10: percentile(newPackScores, 0.10),
-    new_pack_p50: percentile(newPackScores, 0.50),
-    new_pack_p90: percentile(newPackScores, 0.90),
+    historical_pack_mean: Number(average(historicalPackScores).toFixed(1)),
+    historical_pack_p50: percentile(historicalPackScores, 0.50),
+    random_pack_mean: Number(average(randomPackScores).toFixed(1)),
+    random_pack_p50: percentile(randomPackScores, 0.50),
+    random_pack_p90: percentile(randomPackScores, 0.90),
+    worst_pack_mean: Number(average(worstPackScores).toFixed(1)),
+    worst_pack_p50: percentile(worstPackScores, 0.50),
+    strong_random_spread: Number((average(historicalPackScores) - average(randomPackScores)).toFixed(1)),
+    reversed_top3_mean: Number(average(reversedTopThreeScores).toFixed(1)),
+    misses_two_top3_mean: Number(average(missesTwoTopThreeScores).toFixed(1)),
+    reversed_beats_misses_two_rate: Number((reversedWins / Math.max(1, topThreeComparisons) * 100).toFixed(1)),
+    near_fourth_p50: percentile(nearFourthScores, 0.50),
   };
   console.log('SCORING_DISTRIBUTION', JSON.stringify(summary));
 
   assert.equal(replayCount, 1200);
   assert.ok(totalPicks > 10000);
-  assert.ok(summary.new_pick_mean >= summary.old_pick_mean);
-  assert.ok(summary.new_pack_p90 <= 100);
-  assert.ok(summary.new_pack_p10 >= summary.old_pack_p10);
+
+  // Quality gates are about discrimination, not whether a new formula simply
+  // inflates every score. Historical strong-drafter choices should remain
+  // clearly separated from uniform random clicking.
+  assert.ok(summary.historical_pack_p50 >= 80, `historical p50 too low: ${summary.historical_pack_p50}`);
+  assert.ok(summary.strong_random_spread >= 25, `strong/random spread too small: ${summary.strong_random_spread}`);
+  assert.ok(summary.random_pack_p50 < 65, `random p50 should not grade as C+ or better: ${summary.random_pack_p50}`);
+  assert.ok(summary.worst_pack_p50 < 50, `worst-card p50 should be F territory: ${summary.worst_pack_p50}`);
+
+  // Top 3 should primarily reward finding the right group while retaining a
+  // smaller ordering signal. A near-equivalent #4 can still score well.
+  assert.ok(summary.reversed_beats_misses_two_rate >= 75, `reversed top 3 loses too often: ${summary.reversed_beats_misses_two_rate}%`);
+  assert.ok(summary.reversed_top3_mean >= summary.misses_two_top3_mean + 10);
+  assert.ok(summary.near_fourth_p50 >= 80, `near #4 replacement is too punitive: ${summary.near_fourth_p50}`);
 });
