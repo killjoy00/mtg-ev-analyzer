@@ -1,10 +1,11 @@
 const params = new URLSearchParams(window.location.search);
 const challengeMode = params.has('challenge');
+const product = await import('./product.mjs');
 
 if (challengeMode) {
   await import('./social.mjs');
+  product.installProductLayer();
 } else {
-  const product = await import('./product.mjs');
   const seed = params.get('seed');
   if (seed) product.seedGameRandom(seed);
   await import('./app.js');
