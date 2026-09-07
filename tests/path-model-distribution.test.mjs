@@ -4,6 +4,7 @@ import { access, readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { gradePick, rankCandidates, summarizeResults } from '../scoring.mjs';
 import { conditionCandidatesForPath, poolsEqual } from '../path-model.mjs';
+import { gradeFullPack as gradeWorkerFullPack } from '../worker/core.mjs';
 
 const SETS = ['msh', 'sos', 'tmt', 'ecl'];
 
@@ -56,6 +57,7 @@ test('counterfactual path model changes later decisions without rewriting the hi
 
   const historicalScores = [];
   const randomPathScores = [];
+  const rankedRandomScores = [];
   const tvEarly = [];
   const tvLate = [];
   const pathMultipliers = [];
@@ -104,9 +106,12 @@ test('counterfactual path model changes later decisions without rewriting the hi
         historicalScores.push(summarizeResults(historicalResults).score);
 
         // 2) Deterministic random clicking is scored sequentially on the pool
-        // those random choices actually create.
+        // those random choices actually create. We also run those exact IDs
+        // through the production worker grader so replay-bound wheels get the
+        // same zero-weight treatment used by ranked Daily Full Pack scores.
         const randomPool = { ...(picks[0].pool || {}) };
         const randomResults = [];
+        const randomIds = [];
         for (let pickIndex = 0; pickIndex < picks.length; pickIndex += 1) {
           const pick = picks[pickIndex];
           const conditioned = conditionCandidatesForPath(pick.candidates, {
@@ -116,10 +121,12 @@ test('counterfactual path model changes later decisions without rewriting the hi
             pathModel,
           });
           const selected = conditioned[hashText(`${setId}|${file}|${replayIndex}|${pickIndex}|path`) % conditioned.length];
+          randomIds.push(selected.id);
           randomResults.push(gradePick(conditioned, selected.id, pick.historical_pick_id));
           addToPool(randomPool, selected.name);
         }
         randomPathScores.push(summarizeResults(randomResults).score);
+        rankedRandomScores.push(gradeWorkerFullPack(replay, randomIds, pathModel).score);
 
         // 3) Force the first observed decision away from the historical pick,
         // then follow the path-aware leader. Measure how much later support
@@ -166,6 +173,8 @@ test('counterfactual path model changes later decisions without rewriting the hi
     historical_score_p50: percentile(historicalScores, 0.5),
     random_path_mean: Number(average(randomPathScores).toFixed(1)),
     random_path_p50: percentile(randomPathScores, 0.5),
+    ranked_random_mean: Number(average(rankedRandomScores).toFixed(1)),
+    ranked_random_p50: percentile(rankedRandomScores, 0.5),
     changed_leader_rate: Number((changedLeaders / Math.max(1, divergentDecisions) * 100).toFixed(1)),
     early_tv_mean: Number((average(tvEarly) * 100).toFixed(2)),
     late_tv_mean: Number((average(tvLate) * 100).toFixed(2)),
@@ -179,7 +188,9 @@ test('counterfactual path model changes later decisions without rewriting the hi
   assert.equal(historicalProbabilityChanges, 0, 'matching the historical path must preserve stored support exactly');
   assert.ok(summary.historical_score_p50 >= 80, `historical benchmark regressed: ${summary.historical_score_p50}`);
   assert.ok(summary.historical_score_mean >= summary.random_path_mean + 20, 'path-aware random clicking is too close to strong historical drafting');
+  assert.ok(summary.historical_score_mean >= summary.ranked_random_mean + 20, 'ranked path-aware random clicking is too close to strong historical drafting');
   assert.ok(summary.random_path_p50 < 70, `random path p50 too generous: ${summary.random_path_p50}`);
+  assert.ok(summary.ranked_random_p50 < 70, `ranked random path p50 too generous: ${summary.ranked_random_p50}`);
   assert.ok(summary.changed_leader_rate >= 1, `counterfactual path almost never changes a leader: ${summary.changed_leader_rate}%`);
   assert.ok(summary.late_tv_mean >= summary.early_tv_mean, `path influence should not shrink as the pool grows: early ${summary.early_tv_mean}, late ${summary.late_tv_mean}`);
   assert.ok(Math.min(...pathMultipliers) >= Math.exp(-0.9) - 1e-9);
