@@ -97,6 +97,42 @@ test('worker Full Pack grading follows the player path instead of reusing the hi
   assert.ok(pathAware.results[1].score > historicalOnly.results[1].score);
 });
 
+test('divergent first-pass choices make historical wheel packs feedback-only', () => {
+  const picks = [];
+  for (let pickNumber = 1; pickNumber <= 9; pickNumber += 1) {
+    if (pickNumber === 1) {
+      picks.push({
+        pack_number: 1,
+        pick_number: 1,
+        pool: {},
+        historical_pick_id: 'red',
+        candidates: [
+          { id: 'red', name: 'Red Start', model_probability: 0.5 },
+          { id: 'blue', name: 'Blue Start', model_probability: 0.5 },
+        ],
+      });
+    } else {
+      picks.push({
+        pack_number: 1,
+        pick_number: pickNumber,
+        pool: { 'Red Start': 1 },
+        historical_pick_id: `h${pickNumber}`,
+        candidates: [
+          { id: `h${pickNumber}`, name: `Historical ${pickNumber}`, model_probability: 0.7 },
+          { id: `a${pickNumber}`, name: `Alternative ${pickNumber}`, model_probability: 0.3 },
+        ],
+      });
+    }
+  }
+  const diverged = gradeFullPack({ picks }, ['blue', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9']);
+  assert.equal(diverged.results[8].replayBoundWheel, true);
+  assert.equal(diverged.results[8].decisionWeight, 0);
+
+  const historical = gradeFullPack({ picks }, ['red', 'h2', 'h3', 'h4', 'h5', 'h6', 'h7', 'h8', 'h9']);
+  assert.equal(historical.results[8].replayBoundWheel, false);
+  assert.ok(historical.results[8].decisionWeight > 0);
+});
+
 test('pool comparison is count-aware', () => {
   assert.equal(poolsEqual({ X: 1 }, { X: 1 }), true);
   assert.equal(poolsEqual({ X: 1 }, { X: 2 }), false);

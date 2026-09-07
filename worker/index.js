@@ -430,7 +430,7 @@ async function handleGetChallenge(id) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, service: 'pack1-api', version: 3, date: gameDateKey(), timeZone: 'America/New_York' });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, service: 'pack1-api', version: 4, scoring: 'counterfactual-path-v3', date: gameDateKey(), timeZone: 'America/New_York' });
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
   if (request.method === 'PATCH' && url.pathname === '/v1/player') return handlePlayer(request);
   if (request.method === 'POST' && url.pathname === '/v1/scores') return handleScore(request);

@@ -413,7 +413,7 @@ function renderHome() {
         <article class="mode-card game-mode-row">
           <div class="mode-topline"><p class="eyebrow">Full first pack</p>${bestChip('full')}</div>
           <h3>Full Pack</h3>
-          <p>Make every pick in Pack One and get a 100-point finish.</p>
+          <p>Make every pick in Pack One. Later choices adapt to the cards you actually took.</p>
           <button class="button secondary mode-button" data-mode="full">New Full Pack</button>
         </article>
       </div>
@@ -421,7 +421,7 @@ function renderHome() {
 
     <section class="data-note">
       <strong>What “consensus” means</strong>
-      <span>Consensus is a model of experienced, high-win-rate 17Lands drafters. It compares how much support each card gets in the current pack and historical pool. The percentages are relative model support—not win rates, card grades, or objective truth. Your score measures how closely your choices track that model; only Daily Challenge scores rank.</span>
+      <span>Consensus is a model of experienced, high-win-rate 17Lands drafters. Opening-pack support starts from the current pack; in Full Pack, later support also follows the cards you actually chose. Your score measures how closely your choices track that model; only Daily Challenge scores rank.</span>
     </section>`;
 
   document.querySelector('#set-select').addEventListener('change', (event) => {
@@ -612,7 +612,7 @@ function submitTopThree() {
 
 function renderPool(pool) {
   const entries = Object.entries(pool || {}).filter(([, count]) => Number(count) > 0);
-  if (!entries.length) return '<p class="empty-note">Opening pick. The replay pool is empty.</p>';
+  if (!entries.length) return '<p class="empty-note">No cards yet.</p>';
   return `<div class="pool-list">${entries.map(([name, count]) => `<div class="pool-item"><span>${esc(name)}</span><span>${Number(count) > 1 ? `×${esc(count)}` : ''}</span></div>`).join('')}</div>`;
 }
 
@@ -666,6 +666,7 @@ function renderPickFeedback(pick) {
         <div><span>Support gap</span><strong>${result.gap ? `${(result.gap * 100).toFixed(1)} pts` : '—'}</strong></div>
         <div><span>Real drafter</span><strong>${esc(historical?.name || 'Unknown')}${result.historicalMatch ? ' ✓' : ''}</strong></div>
       </div>
+      ${result.replayBoundWheel ? '<div class="challenge-status practice"><strong>Replay-bound wheel.</strong> Your earlier choices could have changed what came back around, so this pick gets feedback but does not count toward the final score.</div>' : ''}
     </section>`;
 }
 
@@ -700,7 +701,17 @@ function submitPick() {
   if (!state.selectedCardId || state.revealed) return;
   const pick = conditionedPick();
   const grade = gradePick(pick.candidates, state.selectedCardId, pick.historical_pick_id);
-  state.results.push({ ...grade, pack_number: 1, pick_number: state.pickIndex + 1, pathDiverged: Boolean(pick.path_diverged) });
+  const actualPickNumber = Number(pick.pick_number) || state.pickIndex + 1;
+  const firstPassDiverged = state.results.some((result) => Number(result.pick_number) <= 8 && !result.historicalMatch);
+  const replayBoundWheel = actualPickNumber >= 9 && firstPassDiverged;
+  state.results.push({
+    ...grade,
+    decisionWeight: replayBoundWheel ? 0 : grade.decisionWeight,
+    pack_number: 1,
+    pick_number: actualPickNumber,
+    pathDiverged: Boolean(pick.path_diverged),
+    replayBoundWheel,
+  });
   state.revealed = true;
   renderFullPack();
 }
@@ -721,7 +732,7 @@ function methodNote() {
   if (state.setData.is_fixture) return 'This is interface fixture data, not a real 17Lands-trained replay.';
   const cohort = state.setData.cohort || {};
   const model = state.setData.model || {};
-  return `Generated offline from ${state.setData.source?.provider || '17Lands'} public draft data. ${Number(cohort.training_drafts || 0).toLocaleString()} high-win-rate drafts train the consensus model with ${model.holdout || 'draft-level holdout'}. In Full Pack, later support is reconditioned on the cards you actually selected using separate strong-player co-pick statistics that exclude the replay seats. Available cards still follow the historical replay, so this is path-aware grading rather than a simulation of the other seven drafters.`;
+  return `Generated offline from ${state.setData.source?.provider || '17Lands'} public draft data. ${Number(cohort.training_drafts || 0).toLocaleString()} high-win-rate drafts train the consensus model with ${model.holdout || 'draft-level holdout'}. In Full Pack, later support is reconditioned on the cards you actually selected using separate strong-player co-pick statistics that hold out the replay seats. Picks 2–8 keep the historical candidate packs because your own earlier choices cannot change which unopened packs reach you. Once packs wheel, a divergent first pass could change what survived, so replay-bound wheel decisions receive feedback but no final-score weight.`;
 }
 
 function fullPackShareText(summary) {
@@ -743,7 +754,7 @@ function renderSummary() {
       <p class="eyebrow">${state.isDailyChallenge ? 'Daily Challenge complete' : 'Full Pack complete'}</p>
       ${renderScoreHero(summary.score, summary.grade, summary.gradeLabel, state.scoreMeta)}
       ${dailySubmissionMarkup()}
-      <p class="lede result-lede">You made ${summary.total} decisions. Here's where your picks lined up with the strong-player model along the path you actually drafted.</p>
+      <p class="lede result-lede">You made ${summary.total} decisions. ${summary.scoredDecisions < summary.total ? `${summary.scoredDecisions} had reliable replay context and counted toward the final score. ` : ''}Here's where your picks lined up with the strong-player model along the path you actually drafted.</p>
       <div class="summary-grid">
         <div class="summary-stat"><strong>${summary.consensusAgreement.toFixed(0)}%</strong><span>Path-leader picks</span></div>
         <div class="summary-stat"><strong>${summary.topThreeAgreement.toFixed(0)}%</strong><span>Path top-3 picks</span></div>

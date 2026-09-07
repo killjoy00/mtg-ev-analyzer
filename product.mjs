@@ -370,7 +370,7 @@ function enhanceConsensusPresentation() {
   const note = document.querySelector('.data-note span');
   if (note && note.dataset.compactCopy !== '1') {
     note.dataset.compactCopy = '1';
-    note.textContent = 'Consensus is a model of experienced, high-win-rate 17Lands drafters. It compares how much support each card gets in the current pack and historical pool. Your score measures how closely your choices track that model; only Daily Challenge scores rank.';
+    note.textContent = 'Consensus is a model of experienced, high-win-rate 17Lands drafters. Opening-pack support starts from the current pack; in Full Pack, later support also follows the cards you actually chose. Only Daily Challenge scores rank.';
   }
 
   const scoreContext = document.querySelector('.score-context');
