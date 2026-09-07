@@ -35,6 +35,14 @@
     .result-picks figure > span { color: var(--green); font-size: 22px; font-weight: 800; text-align: center; }
     .result-picks img, .result-card-blank { width: 58px; aspect-ratio: 63 / 88; object-fit: contain; border-radius: 5px; background: #e6e8e5; }
     .result-picks figcaption { min-width: 0; font-size: 12px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+    /* Top 3 already renders the user's ranking beside consensus. The product
+       layer's older "Your three" card strip duplicates that information. */
+    .top3-result-page .result-picks { display: none !important; }
+    /* Replacing a pack grid after a tap should not let browser scroll anchoring
+       move the content under the player's thumb on mobile. */
+    #app, .pack-grid { overflow-anchor: none; }
+    /* A new-best badge already communicates the current personal best. */
+    .score-copy:has(.new-best) > p:not(.score-context) { display: none; }
     @media (max-width: 680px) {
       .game-heading { display: block; }
       .game-heading > .challenge-callout { margin-bottom: 18px; }
