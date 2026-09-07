@@ -30,7 +30,7 @@ function applyHumanCopy() {
   });
   replaceText('.mode-points li', 'Unlimited practice', 'Play again anytime');
   replaceText('.data-note span', 'random practice runs', 'unlimited games');
-  replaceText('.stats-page h1, .stats-page p, .account-page p', 'Pack 1', 'Pack One');
+  replaceText('.mode-card p, .stats-page h1, .stats-page p, .account-page p', 'Pack 1', 'Pack One');
 
   const note = document.querySelector('.data-note');
   if (note) {
