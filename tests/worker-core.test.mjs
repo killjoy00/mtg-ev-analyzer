@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { challengeIndex, featuredSetId, gradeFullPack, gradeTopThree, periodStart } from '../worker/core.mjs';
+import { challengeIndex, featuredSetId, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from '../worker/core.mjs';
 
 const cards = [
   { id: 'a', name: 'A', model_probability: 0.4 },
@@ -15,6 +15,11 @@ test('daily challenge selector is deterministic and bounded', () => {
   assert.equal(a, b);
   assert.ok(a >= 0 && a < 300);
   assert.notEqual(a, challengeIndex('2026-09-07', 'msh', 'top3', 300));
+});
+
+test('worker Daily game day resets at midnight Eastern', () => {
+  assert.equal(gameDateKey(new Date('2026-09-07T00:30:00Z')), '2026-09-06');
+  assert.equal(gameDateKey(new Date('2026-09-07T04:30:00Z')), '2026-09-07');
 });
 
 test('worker top-three grading matches app weights', () => {
@@ -43,10 +48,10 @@ test('newest catalog set is the featured global challenge', () => {
   ] }), 'new');
 });
 
-test('period starts use UTC monday and month boundaries', () => {
-  const date = new Date('2026-09-06T23:00:00Z');
-  assert.equal(periodStart('daily', date), '2026-09-06');
-  assert.equal(periodStart('weekly', date), '2026-08-31');
-  assert.equal(periodStart('monthly', date), '2026-09-01');
-  assert.equal(periodStart('all', date), '1970-01-01');
+test('period starts follow Eastern game-day monday and month boundaries', () => {
+  const beforeEasternMidnight = new Date('2026-09-07T00:30:00Z');
+  assert.equal(periodStart('daily', beforeEasternMidnight), '2026-09-06');
+  assert.equal(periodStart('weekly', beforeEasternMidnight), '2026-08-31');
+  assert.equal(periodStart('monthly', beforeEasternMidnight), '2026-09-01');
+  assert.equal(periodStart('all', beforeEasternMidnight), '1970-01-01');
 });
