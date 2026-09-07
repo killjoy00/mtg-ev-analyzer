@@ -54,6 +54,15 @@ async function assertPackAligned() {
   }
 }
 
+async function assertPrimaryResultActions(root = '.result-page') {
+  const buttons = page.locator(`${root} .result-actions > .button`);
+  assert.ok(await buttons.count() >= 2, 'result must offer at least two obvious next actions');
+  assert.match((await buttons.nth(0).textContent()) || '', /New pack/i);
+  assert.match((await buttons.nth(1).textContent()) || '', /Challenge a friend/i);
+  assert.match((await buttons.nth(0).getAttribute('class')) || '', /primary/);
+  assert.match((await buttons.nth(1).getAttribute('class')) || '', /primary/);
+}
+
 async function home() {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
@@ -62,7 +71,7 @@ async function home() {
   assert.deepEqual(setOrder.slice(0, 4), ['msh', 'sos', 'tmt', 'ecl']);
   const consensusCopy = (await page.locator('.data-note').textContent()) || '';
   assert.match(consensusCopy, /high-win-rate 17Lands drafters/i);
-  assert.match(consensusCopy, /not win rates/i);
+  assert.doesNotMatch(consensusCopy, /not win rates|not win probability|card grades|objective truth/i);
   assert.doesNotMatch((await page.locator('.home-intro').textContent()) || '', /defend it/i);
   assert.equal(await page.getByRole('heading', { name: 'Today’s Pack One', exact: true }).count(), 1);
   assert.equal(await page.locator('.daily-main').count(), 1);
@@ -85,6 +94,9 @@ async function revealTop3() {
   assert.match((await page.locator('.score-context').textContent()) || '', /Consensus alignment score/i);
   assert.equal(await page.locator('.top3-result-page .result-picks').isVisible(), false, 'Top 3 result must not list the same user picks twice');
   assert.equal(await page.getByRole('heading', { name: 'Your ranking' }).count(), 1);
+  const revealedFooters = await page.locator('.opening-pack .card-footer span').allTextContents();
+  assert.ok(revealedFooters.some((text) => /consensus support/i.test(text)), 'reveal should label modeled support directly');
+  assert.ok(revealedFooters.every((text) => !/consensus #\d+/i.test(text)), 'reveal must not turn low support into a misleading ordinal rank');
   if (await page.locator('.new-best').count()) {
     const duplicateBest = page.locator('.score-copy > p').filter({ hasText: /^Personal best:/ });
     if (await duplicateBest.count()) assert.equal(await duplicateBest.isVisible(), false, 'new-best result must not repeat the personal best value');
@@ -144,9 +156,7 @@ try {
     assert.equal(await page.locator('.challenge-callout').count(), 0);
     await revealTop3();
     assert.equal(await page.locator('.friend-comparison').count(), 0, 'ordinary result must not contain friend comparison');
-    const challengeButton = page.locator('#share-top3');
-    assert.match((await challengeButton.textContent()) || '', /Challenge a friend/i);
-    assert.match((await challengeButton.getAttribute('class')) || '', /primary/);
+    await assertPrimaryResultActions('.top3-result-page');
     if (setId === 'ecl') await page.screenshot({ path: 'artifacts/ui-result-mobile.png', fullPage: true });
   }
 
@@ -180,6 +190,8 @@ try {
   assert.ok(dailyUrl.searchParams.get('daily'));
   assert.equal(dailyUrl.searchParams.get('mode'), 'top3');
   await revealTop3();
+  await assertPrimaryResultActions('.top3-result-page');
+  assert.match((await page.locator('#challenge-leaders').getAttribute('class')) || '', /secondary/);
 
   // Full Pack can complete all first-pack decisions and reach its summary.
   await home();
@@ -195,6 +207,7 @@ try {
   }
   await page.locator('.scorecard.result-page').waitFor({ timeout: 10000 });
   assert.match((await page.locator('.scorecard .score-orb strong').textContent()) || '', /^\d+$/);
+  await assertPrimaryResultActions('.scorecard.result-page');
   await assertNoHorizontalOverflow();
 
   // Stats and Account are styled and reachable without an account.
