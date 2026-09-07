@@ -1,0 +1,76 @@
+name: path-correctness-polish
+
+on:
+  push:
+    branches: [feature/counterfactual-pack-paths]
+    paths:
+      - '.github/workflows/path-correctness-polish.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  polish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply correctness polish
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p=Path(path)
+              text=p.read_text()
+              assert text.count(old)==1, (path, text.count(old), old[:100])
+              p.write_text(text.replace(old,new,1))
+
+          replace_once('app.js', """  } catch (error) {
+              console.warn('Counterfactual path model unavailable; using historical-path support.', error);
+              pathModelCache.set(setId, null);
+              return null;
+            }
+          }
+          """, """  } catch (error) {
+              pathModelCache.delete(setId);
+              console.error('Counterfactual path model unavailable.', error);
+              throw new Error(`Path-aware Full Pack data for ${setEntry.name} is unavailable. Try again shortly.`);
+            }
+          }
+          """)
+          replace_once('app.js', """function bestKey(mode) {
+            return `pack1-best:${state.selectedSetId}:${mode}`;
+          }
+          """, """function bestKey(mode) {
+            const scoringVersion = mode === 'full' ? 'path-v3' : 'classic';
+            return `pack1-best:${scoringVersion}:${state.selectedSetId}:${mode}`;
+          }
+          """)
+          replace_once('worker/index.js', """    details = {
+              consensusAgreement: result.consensusAgreement,
+              topThreeAgreement: result.topThreeAgreement,
+            };
+          """, """    details = {
+              consensusAgreement: result.consensusAgreement,
+              topThreeAgreement: result.topThreeAgreement,
+              scoredDecisions: result.results.filter((item) => Number(item.decisionWeight || 0) > 0).length,
+              scoringVersion: 'counterfactual-path-v3',
+            };
+          """)
+          PY
+      - name: Run tests
+        run: npm test
+      - name: Remove one-shot workflow and commit
+        run: |
+          rm -f .github/workflows/path-correctness-polish.yml
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Fail closed on missing path model data'
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
