@@ -4,7 +4,7 @@ import { chromium } from 'playwright';
 
 const base = process.env.PACK1_E2E_URL || 'http://127.0.0.1:4173';
 await mkdir('artifacts', { recursive: true });
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch(process.env.CI ? { headless: true, channel: 'chrome' } : { headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
 // Exercise the client contract without polluting production analytics/results.
