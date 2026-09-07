@@ -30,15 +30,15 @@ test('worker Daily game day resets at midnight Eastern', () => {
   assert.equal(gameDateKey(new Date('2026-09-07T04:30:00Z')), '2026-09-07');
 });
 
-test('worker top-three grading matches app weights', () => {
+test('worker top-three grading matches app probability-sensitive scoring', () => {
   const perfect = gradeTopThree(cards, ['a', 'b', 'c'], 'a');
   assert.equal(perfect.score, 100);
   assert.equal(perfect.grade, 'A+');
   const scrambled = gradeTopThree(cards, ['c', 'b', 'a'], 'a');
-  assert.equal(scrambled.score, 83);
+  assert.equal(scrambled.score, 85);
 });
 
-test('full pack score averages pick support ratios', () => {
+test('full pack score averages softened pick support', () => {
   const replay = { picks: [
     { pack_number: 0, pick_number: 0, historical_pick_id: 'a', candidates: cards },
     { pack_number: 0, pick_number: 1, historical_pick_id: 'a', candidates: cards },
@@ -46,7 +46,7 @@ test('full pack score averages pick support ratios', () => {
   ] };
   const result = gradeFullPack(replay, ['a', 'b']);
   assert.equal(result.results.length, 2);
-  assert.equal(result.score, 88);
+  assert.equal(result.score, 94);
 });
 
 test('newest catalog set is the featured global challenge', () => {
