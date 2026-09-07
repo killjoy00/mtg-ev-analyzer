@@ -3,6 +3,8 @@ import { onAppRender } from './render-lifecycle.mjs';
 import { preloadSeededReplay } from './replay-data.mjs';
 
 const SHARE_ORIGIN = 'https://magic.planitnow.us/';
+const LOW_SUPPORT_THRESHOLD = 0.08;
+const LOW_SUPPORT_COPY = 'Low support: under 8% modeled strong-player support. A card can still sit near the top when support below the leader is thin.';
 let autoStarting = false;
 let autoStarted = false;
 let preparedNextGame = null;
@@ -77,6 +79,24 @@ function resultScore(root = document) {
 function isDailyResult(root) {
   const text = root.querySelector('.eyebrow')?.textContent || '';
   return /daily challenge/i.test(text);
+}
+
+function supportPercent(text) {
+  const match = String(text || '').match(/([0-9]+(?:\.[0-9]+)?)%/);
+  return match ? Number(match[1]) : null;
+}
+
+function isLowSupport(percent) {
+  return Number.isFinite(percent) && percent < LOW_SUPPORT_THRESHOLD * 100;
+}
+
+function makeLowSupportFlag(percent) {
+  const flag = document.createElement('span');
+  flag.className = 'best-chip support-outlier-flag';
+  flag.textContent = 'Low support';
+  flag.title = LOW_SUPPORT_COPY;
+  flag.setAttribute('aria-label', `${Number(percent).toFixed(1)}% support. ${LOW_SUPPORT_COPY}`);
+  return flag;
 }
 
 function friendComparisonMarkup(score) {
@@ -299,6 +319,53 @@ function enhanceHome() {
   document.body.classList.toggle('is-game', !isHome);
 }
 
+function enhanceFullPickFeedback() {
+  const feedback = document.querySelector('.pick-feedback');
+  if (!feedback || feedback.dataset.supportPresentation === '1') return;
+  feedback.dataset.supportPresentation = '1';
+
+  const selectedFooter = document.querySelector('.study-main .card-choice.selected .card-footer span');
+  const selectedPercent = supportPercent(selectedFooter?.textContent || '');
+  const cells = [...feedback.querySelectorAll('.feedback-grid > div')];
+
+  const leaderCell = cells.find((cell) => /^Consensus$/i.test(cell.querySelector('span')?.textContent || ''));
+  if (leaderCell) leaderCell.querySelector('span').textContent = 'Strong-player leader';
+
+  const rankCell = cells.find((cell) => /Consensus rank/i.test(cell.querySelector('span')?.textContent || ''));
+  if (rankCell && Number.isFinite(selectedPercent)) {
+    const label = rankCell.querySelector('span');
+    const value = rankCell.querySelector('strong');
+    if (label) label.textContent = 'Your support';
+    if (value) {
+      value.textContent = `${selectedPercent.toFixed(1)}%`;
+      if (isLowSupport(selectedPercent) && !value.querySelector('.support-outlier-flag')) {
+        value.append(' ', makeLowSupportFlag(selectedPercent));
+      }
+    }
+  }
+
+  const gapCell = cells.find((cell) => /Consensus gap/i.test(cell.querySelector('span')?.textContent || ''));
+  if (gapCell) gapCell.querySelector('span').textContent = 'Support gap';
+}
+
+function enhanceFullPickDock() {
+  const dock = document.querySelector('.study-main .action-dock.inline-dock');
+  const next = dock?.querySelector('#next-pick');
+  const feedback = document.querySelector('.pick-feedback');
+  if (!dock || !next || !feedback || dock.dataset.floatingScore === '1') return;
+  dock.dataset.floatingScore = '1';
+
+  const score = feedback.querySelector('.pick-score strong')?.textContent?.trim();
+  const verdict = feedback.querySelector('.feedback-title h2')?.textContent?.trim();
+  const selected = feedback.querySelector('.feedback-grid > div:first-child strong')?.textContent?.trim();
+  const info = dock.firstElementChild;
+  const strong = info?.querySelector('strong');
+  const span = info?.querySelector('span');
+
+  if (strong && score) strong.textContent = `${score}/100${verdict ? ` · ${verdict}` : ''}`;
+  if (span) span.textContent = selected ? `You took ${selected}` : 'Pick scored.';
+}
+
 function enhanceConsensusPresentation() {
   const note = document.querySelector('.data-note span');
   if (note && note.dataset.compactCopy !== '1') {
@@ -311,18 +378,30 @@ function enhanceConsensusPresentation() {
     scoreContext.textContent = 'Consensus alignment score.';
   }
 
-  document.querySelectorAll('.opening-pack .card-footer span').forEach((footer) => {
+  document.querySelectorAll('.card-choice .card-footer span').forEach((footer) => {
     const text = footer.textContent || '';
     const match = text.match(/^([0-9.]+%)\s*·\s*consensus #\d+(.*)$/i);
-    if (!match) return;
-    footer.textContent = `${match[1]} consensus support${match[2] || ''}`;
+    if (match) footer.textContent = `${match[1]} consensus support${match[2] || ''}`;
+
+    const percent = supportPercent(footer.textContent || '');
+    if (isLowSupport(percent) && footer.dataset.lowSupport !== '1') {
+      footer.dataset.lowSupport = '1';
+      footer.textContent = `${footer.textContent} · Low support`;
+      footer.title = LOW_SUPPORT_COPY;
+      footer.setAttribute('aria-label', `${Number(percent).toFixed(1)}% consensus support. ${LOW_SUPPORT_COPY}`);
+    }
   });
 
-  document.querySelectorAll('.opening-pack .card-choice').forEach((button) => {
+  document.querySelectorAll('.card-choice').forEach((button) => {
     const footer = button.querySelector('.card-footer span')?.textContent || '';
     const support = footer.match(/([0-9.]+%)/)?.[1];
+    const percent = supportPercent(footer);
     const badge = button.querySelector('.consensus-badge');
     if (badge && support && badge.textContent !== support) badge.textContent = support;
+    if (badge && isLowSupport(percent)) {
+      badge.title = LOW_SUPPORT_COPY;
+      badge.setAttribute('aria-label', `${Number(percent).toFixed(1)}% support. ${LOW_SUPPORT_COPY}`);
+    }
   });
 
   const supportColumn = document.querySelector('.top3-comparison > div:nth-child(2)');
@@ -331,6 +410,13 @@ function enhanceConsensusPresentation() {
     if (heading && heading.textContent !== 'Strong-player support') heading.textContent = 'Strong-player support';
     supportColumn.querySelectorAll('.rank-row > span').forEach((rank) => {
       if (!rank.hidden) rank.hidden = true;
+    });
+    supportColumn.querySelectorAll('.rank-row').forEach((row) => {
+      const support = supportPercent(row.querySelector('small')?.textContent || '');
+      const name = row.querySelector('strong');
+      if (name && isLowSupport(support) && !name.querySelector('.support-outlier-flag')) {
+        name.append(' ', makeLowSupportFlag(support));
+      }
     });
   }
 
@@ -372,6 +458,8 @@ function enhance() {
   enhanceTopThreeResult();
   enhanceFullResult();
   enhanceConsensusPresentation();
+  enhanceFullPickFeedback();
+  enhanceFullPickDock();
   autoStartSeededGame();
 }
 
