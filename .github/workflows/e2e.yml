@@ -21,9 +21,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install browser test dependency
-        run: |
-          npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
+        run: npm install --no-save playwright@1.55.0
       - name: Start static site
         run: |
           python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
