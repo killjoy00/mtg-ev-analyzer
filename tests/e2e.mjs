@@ -5,6 +5,20 @@ const base = process.env.PACK1_E2E_URL || 'http://127.0.0.1:4173';
 const browser = await chromium.launch({ headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 
+// Exercise the client contract without polluting production analytics/results.
+await page.route('https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**', async (route) => {
+  const url = new URL(route.request().url());
+  const path = url.pathname;
+  let status = 200;
+  let body = { ok: true };
+  if (path === '/v1/session') body = { token: 'p1_00000000-0000-4000-8000-000000000000.e2e', playerId: '00000000-0000-4000-8000-000000000000', displayName: 'Pack Player' };
+  else if (path === '/v1/stats') body = { summary: { games: 0, average_score: 0, best_score: 0, challenge_wins: 0, challenge_losses: 0, challenge_ties: 0 }, daily: { daily_plays: 0, daily_days: 0, daily_best: 0 }, bySet: [], byMode: [], recent: [] };
+  else if (path === '/v1/account/daily-dates') body = { dates: [] };
+  else if (path === '/v1/account/session') { status = 401; body = { error: 'Account session required.' }; }
+  else if (path === '/v1/events') body = { ok: true, accepted: 1 };
+  await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+});
+
 async function home() {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
@@ -24,7 +38,6 @@ async function revealTop3() {
 }
 
 try {
-  // Every production set can start and reveal a Top 3 game.
   for (const setId of ['ecl','tmt','sos','msh']) {
     await home();
     await page.locator('#set-select').selectOption(setId);
@@ -35,7 +48,6 @@ try {
     await revealTop3();
   }
 
-  // Seeded friend challenges carry the exact pack and expose comparison only after reveal.
   await home();
   await page.locator('#set-select').selectOption('msh');
   await page.locator('[data-mode="top3"]').click();
@@ -51,7 +63,6 @@ try {
   await page.locator('.friend-comparison').waitFor({ timeout:5000 });
   await page.locator('.challenge-return').waitFor({ timeout:5000 });
 
-  // Daily remains a dated ranked path and Reveal still reaches the dedicated result page.
   await home();
   await page.locator('[data-daily-mode="top3"]').click();
   await page.locator('.opening-pack .card-choice').first().waitFor();
@@ -60,7 +71,6 @@ try {
   assert.equal(dailyUrl.searchParams.get('mode'), 'top3');
   await revealTop3();
 
-  // Full Pack can complete all first-pack decisions and reach its dedicated summary.
   await home();
   await page.locator('#set-select').selectOption('msh');
   await page.locator('[data-mode="full"]').click();
@@ -75,7 +85,6 @@ try {
   await page.locator('.scorecard.result-page').waitFor({ timeout:10000 });
   assert.match((await page.locator('.scorecard .score-orb strong').textContent()) || '', /^\d+$/);
 
-  // New retention surfaces are reachable without requiring an account.
   await home();
   await page.locator('#stats-nav').click();
   await page.locator('.stats-page').waitFor();
