@@ -34,7 +34,8 @@ export function gameShareUrl({ origin, setId, mode, seed, score = null, name = n
   url.searchParams.set('set', String(setId || ''));
   url.searchParams.set('mode', String(mode || 'top3'));
   url.searchParams.set('seed', cleanSeed(seed));
-  if (Number.isFinite(Number(score))) url.searchParams.set('vs', String(Math.round(Number(score))));
+  const hasScore = score !== null && score !== undefined && score !== '';
+  if (hasScore && Number.isFinite(Number(score))) url.searchParams.set('vs', String(Math.round(Number(score))));
   if (name) url.searchParams.set('by', String(name).slice(0, 24));
   return url.toString();
 }
