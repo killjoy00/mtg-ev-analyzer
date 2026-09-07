@@ -1,3 +1,5 @@
+import { conditionCandidatesForPath, poolsEqual } from './path-model.mjs';
+
 const EPSILON = 1e-9;
 const SUPPORT_EXPONENT = 0.75;
 export const GAME_TIME_ZONE = 'America/New_York';
@@ -160,12 +162,38 @@ export function firstPackPicks(replay) {
     .sort((a, b) => Number(a.pick_number) - Number(b.pick_number));
 }
 
-export function gradeFullPack(replay, selectedIds) {
+export function gradeFullPack(replay, selectedIds, pathModel = null) {
   const picks = firstPackPicks(replay);
   if (!Array.isArray(selectedIds) || selectedIds.length !== picks.length) {
     throw new Error(`Full Pack requires ${picks.length} selections.`);
   }
-  const results = picks.map((pick, index) => gradePick(pick.candidates, selectedIds[index], pick.historical_pick_id));
+
+  const userPool = { ...(picks[0]?.pool || {}) };
+  const results = [];
+  let firstPassDiverged = false;
+  for (let index = 0; index < picks.length; index += 1) {
+    const pick = picks[index];
+    const pickNumber = Number(pick.pick_number) || index + 1;
+    const candidates = conditionCandidatesForPath(pick.candidates, {
+      pickNumber,
+      historicalPool: pick.pool || {},
+      userPool,
+      pathModel,
+    });
+    const result = gradePick(candidates, selectedIds[index], pick.historical_pick_id);
+    const replayBoundWheel = pickNumber >= 9 && firstPassDiverged;
+    results.push({
+      ...result,
+      decisionWeight: replayBoundWheel ? 0 : result.decisionWeight,
+      pathDiverged: !poolsEqual(pick.pool || {}, userPool),
+      replayBoundWheel,
+      pick_number: pickNumber,
+    });
+    const selected = candidates.find((card) => card.id === selectedIds[index]);
+    if (selected?.name) userPool[selected.name] = (Number(userPool[selected.name]) || 0) + 1;
+    if (pickNumber <= 8 && selectedIds[index] !== pick.historical_pick_id) firstPassDiverged = true;
+  }
+
   const totalWeight = results.reduce((sum, result) => sum + result.decisionWeight, 0);
   const score = results.length
     ? Math.round(totalWeight > EPSILON

@@ -7,6 +7,7 @@ on:
     paths:
       - '.github/workflows/build-more-sets.yml'
       - 'scripts/build_replays.py'
+      - 'scripts/build_path_model.py'
       - 'scripts/fetch_card_metadata.py'
       - 'scripts/validate_dataset.py'
 
@@ -67,7 +68,28 @@ jobs:
               --shard-size 2 \
               --card-metadata "generated/${lower}-cards.json"
 
+            python scripts/build_path_model.py \
+              --input "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz" \
+              --output-dir "data/$lower" \
+              --expansion "$SET" \
+              --source-date "$SOURCE_DATE" \
+              --minimum-games 100 \
+              --top-fraction 0.15 \
+              --max-training-drafts 5000 \
+              --max-bytes 4000000
+
             python scripts/validate_dataset.py "data/$lower/manifest.json" --minimum-replays 100
+            python - "$lower" <<'PY'
+          import json, sys
+          from pathlib import Path
+          path = Path('data') / sys.argv[1] / 'path-model.json'
+          model = json.loads(path.read_text())
+          assert model['model_version'] == 'strong-player-counterfactual-path-v3'
+          assert model['training']['excluded_replay_drafts'] >= 250
+          assert len(model['cards']) > 100
+          assert len(model['pairs']) > 100
+          assert path.stat().st_size < 4_000_000
+          PY
             rm -f "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz"
           done <<'SETS'
           SOS 2026-06-02

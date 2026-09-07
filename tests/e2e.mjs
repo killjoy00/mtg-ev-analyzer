@@ -197,6 +197,8 @@ try {
   await home();
   await page.locator('#set-select').selectOption('msh');
   await page.locator('[data-mode="full"]').click();
+  assert.match((await page.locator('.replay-sidebar').textContent()) || '', /Your pool so far/i);
+  assert.match((await page.locator('.replay-sidebar').textContent()) || '', /does not simulate|historical replay/i);
   for (let pick = 0; pick < 20; pick += 1) {
     if (await page.locator('.scorecard').count()) break;
     await page.locator('.card-choice').first().waitFor({ timeout: 10000 });
