@@ -114,9 +114,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: ${{ inputs.expansion }}-replay-data
-          path: |
-            data/catalog.json
-            data/${{ inputs.expansion }}/
+          path: data/
           retention-days: 14
       - name: Commit generated replay data to branch
         env:
