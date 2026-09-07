@@ -24,9 +24,7 @@ function hashText(value) {
   return hash >>> 0;
 }
 
-export function challengeIndex(dateKey, setId, mode, replayCount) {
-  const count = Math.max(0, Number(replayCount) || 0);
-  if (!count) return 0;
+function rawChallengeIndex(dateKey, setId, mode, count) {
   return hashText(`${dateKey}|${setId}|${mode}|pack1-daily-v1`) % count;
 }
 
@@ -34,6 +32,15 @@ export function previousGameDateKey(dateKey, days = 1) {
   const date = new Date(`${dateKey}T12:00:00Z`);
   date.setUTCDate(date.getUTCDate() - days);
   return date.toISOString().slice(0, 10);
+}
+
+export function challengeIndex(dateKey, setId, mode, replayCount) {
+  const count = Math.max(0, Number(replayCount) || 0);
+  if (!count) return 0;
+  const today = rawChallengeIndex(dateKey, setId, mode, count);
+  if (count === 1) return today;
+  const yesterday = rawChallengeIndex(previousGameDateKey(dateKey), setId, mode, count);
+  return today === yesterday ? (today + 1) % count : today;
 }
 
 // Compatibility alias for existing imports/tests.
