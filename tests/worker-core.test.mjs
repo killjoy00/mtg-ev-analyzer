@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { challengeIndex, featuredSetId, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from '../worker/core.mjs';
+import { challengeIndex, featuredSetId, fullPackDecisionWeight, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from '../worker/core.mjs';
 
 const cards = [
   { id: 'a', name: 'A', model_probability: 0.4 },
@@ -30,23 +30,27 @@ test('worker Daily game day resets at midnight Eastern', () => {
   assert.equal(gameDateKey(new Date('2026-09-07T04:30:00Z')), '2026-09-07');
 });
 
-test('worker top-three grading matches app probability-sensitive scoring', () => {
+test('worker top-three grading matches app set-first scoring', () => {
   const perfect = gradeTopThree(cards, ['a', 'b', 'c'], 'a');
   assert.equal(perfect.score, 100);
   assert.equal(perfect.grade, 'A+');
   const scrambled = gradeTopThree(cards, ['c', 'b', 'a'], 'a');
-  assert.equal(scrambled.score, 85);
+  assert.equal(scrambled.setSupport, 100);
+  assert.equal(scrambled.score, 94);
 });
 
-test('full pack score averages softened pick support', () => {
+test('full pack score weights meaningful decisions and ignores forced picks', () => {
   const replay = { picks: [
     { pack_number: 0, pick_number: 0, historical_pick_id: 'a', candidates: cards },
     { pack_number: 0, pick_number: 1, historical_pick_id: 'a', candidates: cards },
+    { pack_number: 0, pick_number: 2, historical_pick_id: 'z', candidates: [{ id: 'z', name: 'Z', model_probability: 1 }] },
     { pack_number: 1, pick_number: 0, historical_pick_id: 'a', candidates: cards },
   ] };
-  const result = gradeFullPack(replay, ['a', 'b']);
-  assert.equal(result.results.length, 2);
-  assert.equal(result.score, 94);
+  const result = gradeFullPack(replay, ['a', 'b', 'z']);
+  assert.equal(result.results.length, 3);
+  assert.equal(result.results[2].decisionWeight, 0);
+  assert.equal(result.score, 91);
+  assert.equal(fullPackDecisionWeight(1), 0);
 });
 
 test('newest catalog set is the featured global challenge', () => {
