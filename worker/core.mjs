@@ -1,4 +1,17 @@
 const EPSILON = 1e-9;
+export const GAME_TIME_ZONE = 'America/New_York';
+
+export function gameDateKey(date = new Date()) {
+  const value = date instanceof Date ? date : new Date(date);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: GAME_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value);
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
+}
 
 export function hashText(value) {
   let hash = 2166136261;
@@ -138,11 +151,12 @@ export function featuredSetId(catalog) {
 }
 
 export function periodStart(period, date = new Date()) {
-  const value = new Date(date);
+  if (period === 'all') return '1970-01-01';
+  const key = gameDateKey(date);
+  const value = new Date(`${key}T12:00:00Z`);
   const y = value.getUTCFullYear();
   const m = value.getUTCMonth();
   const d = value.getUTCDate();
-  if (period === 'all') return '1970-01-01';
   if (period === 'monthly') return new Date(Date.UTC(y, m, 1)).toISOString().slice(0, 10);
   if (period === 'weekly') {
     const copy = new Date(Date.UTC(y, m, d));
@@ -151,5 +165,5 @@ export function periodStart(period, date = new Date()) {
     copy.setUTCDate(copy.getUTCDate() - back);
     return copy.toISOString().slice(0, 10);
   }
-  return new Date(Date.UTC(y, m, d)).toISOString().slice(0, 10);
+  return key;
 }
