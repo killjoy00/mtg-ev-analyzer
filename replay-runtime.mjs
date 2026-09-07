@@ -64,7 +64,7 @@ async function fetchStaticJson(input, init, url) {
   const key = url.href;
   if (!responseCache.has(key)) {
     const promise = (async () => {
-      const response = await nativeFetch(input, { ...(init || {}), cache: 'force-cache' });
+      const response = await nativeFetch(input, { ...(init || {}), cache: 'default' });
       const text = await response.text();
       let body = text;
       if (response.ok) {
@@ -101,7 +101,7 @@ function warmSelectedManifest() {
   const set = catalogSnapshot.sets?.find((entry) => entry.id === selectedId);
   const manifest = set?.manifest || set?.manifest_path;
   if (!manifest) return;
-  void globalThis.fetch(manifest, { cache: 'force-cache' }).catch(() => null);
+  void globalThis.fetch(manifest).catch(() => null);
 }
 
 function scheduleWarm() {
