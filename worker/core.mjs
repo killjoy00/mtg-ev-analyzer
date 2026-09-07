@@ -1,4 +1,5 @@
 const EPSILON = 1e-9;
+const SUPPORT_EXPONENT = 0.75;
 export const GAME_TIME_ZONE = 'America/New_York';
 
 export function gameDateKey(date = new Date()) {
@@ -48,7 +49,13 @@ function supportScore(selectedProbability, targetProbability) {
   const selected = Math.max(0, Number(selectedProbability) || 0);
   const target = Math.max(0, Number(targetProbability) || 0);
   if (target <= EPSILON) return 1;
-  return Math.sqrt(Math.max(0, Math.min(1, selected / target)));
+  const ratio = Math.max(0, Math.min(1, selected / target));
+  return ratio ** SUPPORT_EXPONENT;
+}
+
+export function fullPackDecisionWeight(candidateCount) {
+  const count = Math.max(1, Number(candidateCount) || 1);
+  return Math.log2(count);
 }
 
 export function scoreGrade(score) {
@@ -76,6 +83,8 @@ export function gradePick(candidates, selectedId, historicalId) {
   const selectedProbability = Number(selected.model_probability || 0);
   const gap = Math.max(0, bestProbability - selectedProbability);
   const score = Math.round(supportScore(selectedProbability, bestProbability) * 100);
+  const candidateCount = ranked.length;
+  const decisionWeight = fullPackDecisionWeight(candidateCount);
   return {
     selectedId,
     historicalId,
@@ -87,6 +96,8 @@ export function gradePick(candidates, selectedId, historicalId) {
     gap,
     rank,
     score,
+    candidateCount,
+    decisionWeight,
     historicalMatch: selectedId === historicalId,
     consensusMatch: selectedId === best.id,
     topThree: rank <= 3,
@@ -109,11 +120,21 @@ export function gradeTopThree(candidates, selectedIds, historicalId) {
   const overlap = selectedIds.filter((id) => consensusIds.includes(id)).length;
   const exactPositions = selectedIds.filter((id, index) => id === consensusIds[index]).length;
   const historicalPosition = selectedIds.indexOf(historicalId);
-  const slotWeights = [50, 30, 20];
-  const score = Math.max(0, Math.min(100, Math.round(selected.reduce((total, card, index) => {
+
+  const setWeights = [40, 35, 25];
+  const selectedBySupport = rankCandidates(selected);
+  const setSupport = selectedBySupport.reduce((total, card, index) => {
     const target = consensusTop[index];
-    return total + slotWeights[index] * supportScore(card.model_probability, target?.model_probability);
-  }, 0))));
+    return total + setWeights[index] * supportScore(card.model_probability, target?.model_probability);
+  }, 0);
+
+  const orderWeights = [50, 30, 20];
+  const orderSupport = selected.reduce((total, card, index) => {
+    const target = consensusTop[index];
+    return total + orderWeights[index] * supportScore(card.model_probability, target?.model_probability);
+  }, 0);
+
+  const score = Math.max(0, Math.min(100, Math.round((setSupport * 0.70) + (orderSupport * 0.30))));
   return {
     selected,
     selectedIds: [...selectedIds],
@@ -122,6 +143,8 @@ export function gradeTopThree(candidates, selectedIds, historicalId) {
     overlap,
     exactPositions,
     historicalRank: historicalPosition >= 0 ? historicalPosition + 1 : null,
+    setSupport: Math.round(setSupport),
+    orderSupport: Math.round(orderSupport),
     score,
     ...scoreGrade(score),
   };
@@ -143,8 +166,11 @@ export function gradeFullPack(replay, selectedIds) {
     throw new Error(`Full Pack requires ${picks.length} selections.`);
   }
   const results = picks.map((pick, index) => gradePick(pick.candidates, selectedIds[index], pick.historical_pick_id));
+  const totalWeight = results.reduce((sum, result) => sum + result.decisionWeight, 0);
   const score = results.length
-    ? Math.round(results.reduce((sum, result) => sum + result.score, 0) / results.length)
+    ? Math.round(totalWeight > EPSILON
+      ? results.reduce((sum, result) => sum + result.score * result.decisionWeight, 0) / totalWeight
+      : results.reduce((sum, result) => sum + result.score, 0) / results.length)
     : 0;
   const consensusAgreement = results.length ? (results.filter((r) => r.consensusMatch).length / results.length) * 100 : 0;
   const topThreeAgreement = results.length ? (results.filter((r) => r.topThree).length / results.length) * 100 : 0;
