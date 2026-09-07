@@ -21,6 +21,22 @@
     }
   </script>
   <link rel="stylesheet" href="pack1.css?v=2" />
+  <style>
+    .result-hidden-source { display: none !important; }
+    .result-page { max-width: 980px; margin-left: auto; margin-right: auto; }
+    .result-picks { margin: 24px 0; padding: 22px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .result-label { margin: 0 0 12px; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .result-picks > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .result-picks figure { min-width: 0; margin: 0; padding: 12px; display: grid; grid-template-columns: 30px 58px minmax(0, 1fr); gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+    .result-picks figure > span { color: var(--green); font-size: 22px; font-weight: 800; text-align: center; }
+    .result-picks img, .result-card-blank { width: 58px; aspect-ratio: 63 / 88; object-fit: contain; border-radius: 5px; background: #e6e8e5; }
+    .result-picks figcaption { min-width: 0; font-size: 12px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+    @media (max-width: 680px) {
+      .result-picks > div { grid-template-columns: 1fr; }
+      .result-picks figure { grid-template-columns: 28px 54px minmax(0, 1fr); }
+      .result-picks img, .result-card-blank { width: 54px; }
+    }
+  </style>
 </head>
 <body>
   <div class="app-shell">
