@@ -1,4 +1,4 @@
-import { gradePick, rankCandidates, summarizeResults } from './scoring.mjs';
+import { gradePick, gradeTopThree, rankCandidates, summarizeResults } from './scoring.mjs';
 
 const app = document.querySelector('#app');
 const brandHome = document.querySelector('#brand-home');
@@ -8,13 +8,17 @@ const state = {
   selectedSetId: null,
   setData: null,
   replay: null,
+  mode: null,
+  packPicks: [],
   pickIndex: 0,
   selectedCardId: null,
+  topThreeIds: [],
   revealed: false,
   results: [],
+  quickResult: null,
 };
 
-brandHome.addEventListener('click', () => renderHome());
+brandHome.addEventListener('click', renderHome);
 
 function esc(value) {
   return String(value ?? '')
@@ -29,13 +33,17 @@ function pct(value, digits = 0) {
   return `${(Number(value || 0) * 100).toFixed(digits)}%`;
 }
 
-function routeHomeReset() {
+function resetSession() {
   state.setData = null;
   state.replay = null;
+  state.mode = null;
+  state.packPicks = [];
   state.pickIndex = 0;
   state.selectedCardId = null;
+  state.topThreeIds = [];
   state.revealed = false;
   state.results = [];
+  state.quickResult = null;
 }
 
 async function loadJson(path, label = 'data') {
@@ -85,13 +93,23 @@ async function loadRandomReplay(setEntry) {
   };
 }
 
+function firstPackPicks(replay) {
+  const picks = replay?.picks || [];
+  if (!picks.length) return [];
+  const packNumbers = picks.map((pick) => Number(pick.pack_number)).filter(Number.isFinite);
+  const firstPackNumber = packNumbers.length ? Math.min(...packNumbers) : picks[0].pack_number;
+  return picks
+    .filter((pick) => Number(pick.pack_number) === Number(firstPackNumber))
+    .sort((a, b) => Number(a.pick_number) - Number(b.pick_number));
+}
+
 function renderError(error) {
   app.innerHTML = `
-    <section class="center-card">
-      <p class="eyebrow">Data error</p>
-      <h1>Replay data could not be loaded.</h1>
+    <section class="message-card">
+      <p class="eyebrow">Something went wrong</p>
+      <h1>We couldn't open this pack.</h1>
       <p class="lede">${esc(error.message)}</p>
-      <div class="button-row"><button class="secondary" id="retry">Retry</button></div>
+      <div class="button-row"><button class="button secondary" id="retry">Try again</button></div>
     </section>`;
   document.querySelector('#retry')?.addEventListener('click', init);
 }
@@ -100,11 +118,17 @@ function selectedSetEntry() {
   return state.catalog.sets.find((set) => set.id === state.selectedSetId) || state.catalog.sets[0];
 }
 
+function setMetaLine(entry) {
+  const replays = Number(entry.replay_count || 0).toLocaleString();
+  const cutoff = entry.win_rate_cutoff ? ` · ${pct(entry.win_rate_cutoff, 0)}+ WR bucket` : '';
+  return `${replays} replay drafts${cutoff} · ${esc(entry.data_date || '')}`;
+}
+
 function renderHome() {
-  routeHomeReset();
+  resetSession();
   const sets = state.catalog?.sets || [];
   if (!sets.length) {
-    app.innerHTML = '<section class="center-card"><h1>No replay sets are available yet.</h1></section>';
+    app.innerHTML = '<section class="message-card"><h1>No sets are ready yet.</h1></section>';
     return;
   }
 
@@ -112,195 +136,327 @@ function renderHome() {
   const active = selectedSetEntry();
 
   app.innerHTML = `
-    <section class="hero-card">
-      <p class="eyebrow">Historical decision replay</p>
-      <h1>Draft the pick. Then see what strong players would do.</h1>
-      <p class="lede">Follow a historical draft path one decision at a time. Your pick is graded against an offline, pool-conditioned strong-player consensus model; matching the historical drafter is tracked separately.</p>
+    <section class="home-intro">
+      <p class="eyebrow">Limited draft training</p>
+      <h1>Get better at Pack 1.</h1>
+      <p class="lede">Real draft seats. Strong-player consensus. Two quick ways to test the decisions that shape the start of a draft.</p>
+    </section>
 
-      <div class="home-grid">
-        <div class="option-card">
-          <label class="option-label" for="set-select">Training set</label>
-          <select class="select" id="set-select">
-            ${sets.map((set) => `<option value="${esc(set.id)}" ${set.id === active.id ? 'selected' : ''}>${esc(set.name)}</option>`).join('')}
-          </select>
-          <div class="meta-list" id="set-meta"></div>
-          <div id="fixture-slot"></div>
-        </div>
-
-        <div class="option-card">
-          <span class="option-label">Study rules</span>
-          <div class="meta-list">
-            <div class="meta-row"><span>Mode</span><span>Replay study</span></div>
-            <div class="meta-row"><span>Skill cohort</span><span>High 17Lands WR</span></div>
-            <div class="meta-row"><span>Primary grade</span><span>Consensus likelihood</span></div>
-            <div class="meta-row"><span>Historical pick</span><span>Secondary metric</span></div>
-            <div class="meta-row"><span>Runtime model/API</span><span>None</span></div>
-          </div>
-          <div class="button-row">
-            <button class="primary" id="start-study">Start replay</button>
-          </div>
-        </div>
+    <section class="set-bar" aria-label="Set selection">
+      <div>
+        <label class="field-label" for="set-select">Set</label>
+        <select class="select" id="set-select">
+          ${sets.map((set) => `<option value="${esc(set.id)}" ${set.id === active.id ? 'selected' : ''}>${esc(set.name)}</option>`).join('')}
+        </select>
       </div>
+      <p class="set-meta" id="set-meta">${setMetaLine(active)}</p>
+    </section>
+
+    <section class="mode-grid" aria-label="Choose a game mode">
+      <article class="mode-card">
+        <div class="mode-number">01</div>
+        <p class="eyebrow">Fast game</p>
+        <h2>Top 3</h2>
+        <p>See one fresh opening pack and rank the three cards you'd most want to start with. Then compare your order with the consensus.</p>
+        <ul class="mode-points">
+          <li>One opening pack</li>
+          <li>Rank three cards</li>
+          <li>Instant reveal</li>
+        </ul>
+        <button class="button primary mode-button" data-mode="top3">Play Top 3</button>
+      </article>
+
+      <article class="mode-card featured">
+        <div class="mode-number">02</div>
+        <p class="eyebrow">Deeper game</p>
+        <h2>Full Pack</h2>
+        <p>Work through every pick in the first pack of a real draft seat. The replay path stays fixed so each decision can be compared cleanly.</p>
+        <ul class="mode-points">
+          <li>Every Pack 1 decision</li>
+          <li>See the replay pool develop</li>
+          <li>Scorecard at the end</li>
+        </ul>
+        <button class="button primary mode-button" data-mode="full">Draft Pack 1</button>
+      </article>
+    </section>
+
+    <section class="data-note">
+      <strong>How grading works</strong>
+      <span>Consensus comes from an offline model trained on high-win-rate 17Lands drafts. The historical drafter's pick is shown separately. No AI or 17Lands API runs while you play.</span>
     </section>`;
 
-  const updateSetMeta = () => {
-    const entry = selectedSetEntry();
-    const cohortRows = entry.win_rate_cutoff
-      ? `<div class="meta-row"><span>WR bucket midpoint ≥</span><span>${pct(entry.win_rate_cutoff, 1)}</span></div>`
-      : '';
-    const trainingRows = entry.training_drafts
-      ? `<div class="meta-row"><span>Training drafts</span><span>${Number(entry.training_drafts).toLocaleString()}</span></div>`
-      : '';
-    document.querySelector('#set-meta').innerHTML = `
-      <div class="meta-row"><span>Format</span><span>${esc(entry.format)}</span></div>
-      <div class="meta-row"><span>Replays</span><span>${Number(entry.replay_count || 0).toLocaleString()}</span></div>
-      ${cohortRows}
-      ${trainingRows}
-      <div class="meta-row"><span>Model</span><span>${esc(entry.model_version)}</span></div>
-      <div class="meta-row"><span>Data date</span><span>${esc(entry.data_date)}</span></div>`;
-    document.querySelector('#fixture-slot').innerHTML = entry.is_fixture
-      ? '<div class="fixture-warning">Interface fixture only: these choices and probabilities are synthetic, not 17Lands training data.</div>'
-      : '';
-  };
-
-  updateSetMeta();
   document.querySelector('#set-select').addEventListener('change', (event) => {
     state.selectedSetId = event.target.value;
-    updateSetMeta();
+    const entry = selectedSetEntry();
+    document.querySelector('#set-meta').textContent = `${Number(entry.replay_count || 0).toLocaleString()} replay drafts${entry.win_rate_cutoff ? ` · ${pct(entry.win_rate_cutoff, 0)}+ WR bucket` : ''} · ${entry.data_date || ''}`;
   });
-  document.querySelector('#start-study').addEventListener('click', startStudy);
+
+  document.querySelectorAll('[data-mode]').forEach((button) => {
+    button.addEventListener('click', () => startMode(button.dataset.mode));
+  });
 }
 
-async function startStudy() {
+async function startMode(mode) {
   const entry = selectedSetEntry();
-  const button = document.querySelector('#start-study') || document.querySelector('#another-replay');
-  if (button) {
+  document.querySelectorAll('.mode-button').forEach((button) => {
     button.disabled = true;
-    button.textContent = 'Loading…';
-  }
+    if (button.dataset.mode === mode) button.textContent = 'Shuffling…';
+  });
 
   try {
     const loaded = await loadRandomReplay(entry);
+    const packPicks = firstPackPicks(loaded.replay);
+    if (!packPicks.length) throw new Error('This replay does not contain a first pack.');
+
     state.setData = loaded.setData;
     state.replay = loaded.replay;
+    state.mode = mode;
+    state.packPicks = packPicks;
     state.pickIndex = 0;
     state.selectedCardId = null;
+    state.topThreeIds = [];
     state.revealed = false;
     state.results = [];
-    renderStudy();
+    state.quickResult = null;
+
+    if (mode === 'top3') renderTopThree();
+    else renderFullPack();
   } catch (error) {
     renderError(error);
   }
 }
 
-function renderPool(pool) {
-  const entries = Object.entries(pool || {}).filter(([, count]) => Number(count) > 0);
-  if (!entries.length) return '<p class="empty-note">No cards yet. This is the first decision of the draft.</p>';
-  return `<div class="pool-list">${entries.map(([name, count]) => `
-    <div class="pool-item"><span>${esc(name)}</span><span class="pool-count">${Number(count) > 1 ? `×${esc(count)}` : ''}</span></div>`).join('')}</div>`;
+function rankedInfo(pick, cardId) {
+  const ranked = rankCandidates(pick.candidates);
+  return {
+    rank: ranked.findIndex((card) => card.id === cardId) + 1,
+    ranked,
+  };
 }
 
-function renderCard(card, pick) {
-  const selected = state.selectedCardId === card.id;
-  const consensus = state.revealed && card.id === pick.consensus_pick_id;
-  const historical = state.revealed && card.id === pick.historical_pick_id;
-  const classes = ['card-choice', selected ? 'selected' : '', consensus ? 'consensus' : '', historical ? 'historical' : ''].filter(Boolean).join(' ');
-  const ranked = state.revealed ? rankCandidates(pick.candidates) : [];
-  const rank = state.revealed ? ranked.findIndex((item) => item.id === card.id) + 1 : null;
+function renderCard(card, pick, context = {}) {
+  const { mode = 'full', reveal = false } = context;
+  const fullSelected = mode === 'full' && state.selectedCardId === card.id;
+  const userRank = mode === 'top3' ? state.topThreeIds.indexOf(card.id) + 1 : 0;
+  const { rank: consensusRank } = rankedInfo(pick, card.id);
+  const isConsensus = reveal && consensusRank <= (mode === 'top3' ? 3 : 1);
+  const isHistorical = reveal && card.id === pick.historical_pick_id;
+  const classes = [
+    'card-choice',
+    fullSelected ? 'selected' : '',
+    userRank ? 'ranked-choice' : '',
+    isConsensus ? 'consensus' : '',
+  ].filter(Boolean).join(' ');
+
   return `
-    <button class="${classes}" type="button" data-card-id="${esc(card.id)}" ${state.revealed ? 'disabled' : ''}>
+    <button class="${classes}" type="button" data-card-id="${esc(card.id)}" ${reveal ? 'disabled' : ''}>
       <div class="card-image-wrap">
-        ${card.image_url
-          ? `<img class="card-image" src="${esc(card.image_url)}" alt="${esc(card.name)}" loading="lazy" />`
-          : `<div class="card-art-placeholder">${esc(card.name)}</div>`}
+        <div class="card-art-placeholder">${esc(card.name)}</div>
+        ${card.image_url ? `<img class="card-image" src="${esc(card.image_url)}" alt="${esc(card.name)}" loading="lazy" />` : ''}
+        ${userRank ? `<span class="user-rank-badge">${userRank}</span>` : ''}
+        ${reveal && consensusRank <= 3 ? `<span class="consensus-badge">C${consensusRank}</span>` : ''}
       </div>
-      <div class="card-body">
-        <div class="card-name">${esc(card.name)}</div>
-        ${state.revealed ? `<div class="card-reveal"><span class="card-prob">${pct(card.model_probability, 1)}</span><span class="card-rank">model #${rank}</span></div>` : ''}
+      <div class="card-footer">
+        <strong>${esc(card.name)}</strong>
+        ${reveal ? `<span>${pct(card.model_probability, 1)} · consensus #${consensusRank}${isHistorical ? ' · drafter pick' : ''}</span>` : '<span>Choose this card</span>'}
       </div>
     </button>`;
 }
 
-function currentPick() {
-  return state.replay.picks[state.pickIndex];
+function attachCardImageFallbacks() {
+  document.querySelectorAll('.card-image').forEach((image) => {
+    image.addEventListener('error', () => image.remove(), { once: true });
+  });
 }
 
-function renderFeedback(pick) {
+function openingPick() {
+  return state.packPicks[0];
+}
+
+function topThreeResultCopy(result) {
+  if (result.overlap === 3 && result.exactPositions === 3) return 'Perfect order.';
+  if (result.overlap === 3) return 'You found all three.';
+  if (result.overlap === 2) return 'Strong read.';
+  if (result.overlap === 1) return 'One consensus card made your list.';
+  return 'This pack saw things differently.';
+}
+
+function renderTopThreeReveal(pick) {
+  if (!state.revealed || !state.quickResult) return '';
+  const result = state.quickResult;
+  return `
+    <section class="reveal-panel">
+      <div class="reveal-heading">
+        <div>
+          <p class="eyebrow">Pack revealed</p>
+          <h2>${topThreeResultCopy(result)}</h2>
+        </div>
+        <div class="score-stamp"><strong>${result.overlap}/3</strong><span>consensus cards</span></div>
+      </div>
+      <div class="top3-comparison">
+        <div>
+          <h3>Your ranking</h3>
+          ${result.selected.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong></div>`).join('')}
+        </div>
+        <div>
+          <h3>Consensus</h3>
+          ${result.consensusTop.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong><small>${pct(card.model_probability, 1)}</small></div>`).join('')}
+        </div>
+      </div>
+      <p class="reveal-note">${result.exactPositions} exact ${result.exactPositions === 1 ? 'position' : 'positions'}. ${result.historicalRank ? `The historical drafter's first pick was #${result.historicalRank} on your list.` : `The historical drafter's first pick was outside your top three.`}</p>
+      <div class="button-row">
+        <button class="button primary" id="another-top3">Another pack</button>
+        <button class="button secondary" id="top3-home">Choose a mode</button>
+      </div>
+    </section>`;
+}
+
+function renderTopThree() {
+  const pick = openingPick();
+  const count = state.topThreeIds.length;
+
+  app.innerHTML = `
+    <section class="game-heading">
+      <div>
+        <p class="eyebrow">Top 3 · ${esc(state.setData.name)}</p>
+        <h1>Rank your three best starts.</h1>
+        <p class="game-instruction">Click your first choice, then second, then third. Click a ranked card again to remove it.</p>
+      </div>
+      <button class="text-button" id="quit-game">Exit</button>
+    </section>
+
+    <div class="pack-grid opening-pack">${pick.candidates.map((card) => renderCard(card, pick, { mode: 'top3', reveal: state.revealed })).join('')}</div>
+
+    ${renderTopThreeReveal(pick)}
+
+    ${state.revealed ? '' : `
+      <div class="action-dock">
+        <div>
+          <strong>${count === 0 ? 'Pick your #1.' : count === 1 ? 'Now pick #2.' : count === 2 ? 'One more: pick #3.' : 'Ranking ready.'}</strong>
+          <span>${count}/3 selected</span>
+        </div>
+        <button class="button primary" id="reveal-top3" ${count === 3 ? '' : 'disabled'}>Reveal consensus</button>
+      </div>`}`;
+
+  attachCardImageFallbacks();
+  if (!state.revealed) {
+    document.querySelectorAll('[data-card-id]').forEach((button) => {
+      button.addEventListener('click', () => toggleTopThree(button.dataset.cardId));
+    });
+  }
+  document.querySelector('#reveal-top3')?.addEventListener('click', submitTopThree);
+  document.querySelector('#another-top3')?.addEventListener('click', () => startMode('top3'));
+  document.querySelector('#top3-home')?.addEventListener('click', renderHome);
+  document.querySelector('#quit-game')?.addEventListener('click', renderHome);
+}
+
+function toggleTopThree(cardId) {
+  if (state.revealed) return;
+  const existing = state.topThreeIds.indexOf(cardId);
+  if (existing >= 0) state.topThreeIds.splice(existing, 1);
+  else if (state.topThreeIds.length < 3) state.topThreeIds.push(cardId);
+  renderTopThree();
+}
+
+function submitTopThree() {
+  if (state.topThreeIds.length !== 3 || state.revealed) return;
+  const pick = openingPick();
+  state.quickResult = gradeTopThree(pick.candidates, state.topThreeIds, pick.historical_pick_id);
+  state.revealed = true;
+  renderTopThree();
+  document.querySelector('.reveal-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderPool(pool) {
+  const entries = Object.entries(pool || {}).filter(([, count]) => Number(count) > 0);
+  if (!entries.length) return '<p class="empty-note">Opening pick. The replay pool is empty.</p>';
+  return `<div class="pool-list">${entries.map(([name, count]) => `
+    <div class="pool-item"><span>${esc(name)}</span><span>${Number(count) > 1 ? `×${esc(count)}` : ''}</span></div>`).join('')}</div>`;
+}
+
+function currentPick() {
+  return state.packPicks[state.pickIndex];
+}
+
+function renderPickFeedback(pick) {
   if (!state.revealed) return '';
   const result = state.results[state.results.length - 1];
   const historical = pick.candidates.find((card) => card.id === pick.historical_pick_id);
   return `
-    <section class="feedback">
-      <div class="feedback-top">
+    <section class="pick-feedback">
+      <div class="feedback-title">
         <div>
-          <p class="eyebrow">Pick graded</p>
-          <h3>${esc(result.selectedName)}</h3>
+          <p class="eyebrow">Pick ${state.pickIndex + 1}</p>
+          <h2>${esc(result.verdict)}</h2>
         </div>
-        <span class="verdict ${esc(result.verdictClass)}">${esc(result.verdict)}</span>
+        <span class="verdict ${esc(result.verdictClass)}">Consensus #${esc(result.rank)}</span>
       </div>
       <div class="feedback-grid">
-        <div class="feedback-stat"><small>Your likelihood</small><strong>${pct(result.selectedProbability, 1)}</strong></div>
-        <div class="feedback-stat"><small>Consensus</small><strong>${esc(result.bestName)} · ${pct(result.bestProbability, 1)}</strong></div>
-        <div class="feedback-stat"><small>Model rank</small><strong>#${esc(result.rank)}</strong></div>
-        <div class="feedback-stat"><small>Historical</small><strong>${esc(historical?.name || 'Unknown')}${result.historicalMatch ? ' ✓' : ''}</strong></div>
+        <div><span>You took</span><strong>${esc(result.selectedName)}</strong></div>
+        <div><span>Consensus</span><strong>${esc(result.bestName)}</strong></div>
+        <div><span>Consensus gap</span><strong>${result.gap ? `${(result.gap * 100).toFixed(1)} pts` : '—'}</strong></div>
+        <div><span>Real drafter</span><strong>${esc(historical?.name || 'Unknown')}${result.historicalMatch ? ' ✓' : ''}</strong></div>
       </div>
     </section>`;
 }
 
-function renderStudy() {
+function renderFullPack() {
   const pick = currentPick();
-  const total = state.replay.picks.length;
+  const total = state.packPicks.length;
   const progress = ((state.pickIndex + (state.revealed ? 1 : 0)) / total) * 100;
   const selected = pick.candidates.find((card) => card.id === state.selectedCardId);
 
   app.innerHTML = `
-    <section class="study-layout">
+    <section class="game-heading compact">
+      <div>
+        <p class="eyebrow">Full Pack · ${esc(state.setData.name)}</p>
+        <h1>Pick ${state.pickIndex + 1} of ${total}</h1>
+        <p class="game-instruction">Choose the card you'd take from this seat.</p>
+      </div>
+      <button class="text-button" id="quit-game">Exit</button>
+    </section>
+    <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
+
+    <section class="full-pack-layout">
       <div class="study-main">
-        <div class="study-header">
+        <div class="pack-grid">${pick.candidates.map((card) => renderCard(card, pick, { mode: 'full', reveal: state.revealed })).join('')}</div>
+        ${renderPickFeedback(pick)}
+        <div class="action-dock inline-dock">
           <div>
-            <div class="pick-kicker">P${esc(pick.pack_number)}P${esc(pick.pick_number)}</div>
-            <div class="pick-title">Choose your pick</div>
+            <strong>${selected ? esc(selected.name) : 'Choose a card.'}</strong>
+            <span>${state.revealed ? 'Consensus is revealed above.' : 'Lock it in when you are ready.'}</span>
           </div>
-          <div class="progress-copy">Decision ${state.pickIndex + 1} of ${total}</div>
-        </div>
-        <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
-
-        <div class="pack-grid">${pick.candidates.map((card) => renderCard(card, pick)).join('')}</div>
-        ${renderFeedback(pick)}
-
-        <div class="action-dock">
-          <div class="selection-copy">${selected ? `Selected: <strong>${esc(selected.name)}</strong>` : 'Select a card from the pack.'}</div>
           ${state.revealed
-            ? `<button class="primary" id="next-pick">${state.pickIndex === total - 1 ? 'Finish draft' : 'Next pick'}</button>`
-            : `<button class="primary" id="submit-pick" ${selected ? '' : 'disabled'}>Lock in pick</button>`}
+            ? `<button class="button primary" id="next-pick">${state.pickIndex === total - 1 ? 'See scorecard' : 'Next pick'}</button>`
+            : `<button class="button primary" id="submit-pick" ${selected ? '' : 'disabled'}>Lock in pick</button>`}
         </div>
       </div>
 
-      <aside class="study-sidebar">
+      <aside class="replay-sidebar">
         <section class="sidebar-card">
-          <p class="sidebar-title">Historical pool entering pick</p>
+          <p class="eyebrow">Replay pool</p>
+          <h3>Cards entering this pick</h3>
           ${renderPool(pick.pool)}
         </section>
-        <section class="sidebar-card">
-          <p class="sidebar-title">Session</p>
-          <div class="meta-list">
-            <div class="meta-row"><span>Set</span><span>${esc(state.setData.name)}</span></div>
-            <div class="meta-row"><span>Format</span><span>${esc(state.setData.format)}</span></div>
-            <div class="meta-row"><span>Model</span><span>${esc(state.setData.model.model_version)}</span></div>
-            <div class="meta-row"><span>Pool conditioned</span><span>${state.setData.model.pool_conditioned ? 'Yes' : 'No'}</span></div>
-          </div>
+        <section class="sidebar-card quiet">
+          <h3>Why the pool is fixed</h3>
+          <p>This is a replay, not a draft simulator. Later packs and consensus stay tied to the original seat, even when your picks differ.</p>
         </section>
       </aside>
     </section>`;
 
-  document.querySelectorAll('[data-card-id]').forEach((button) => {
-    button.addEventListener('click', () => {
-      state.selectedCardId = button.dataset.cardId;
-      renderStudy();
+  attachCardImageFallbacks();
+  if (!state.revealed) {
+    document.querySelectorAll('[data-card-id]').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.selectedCardId = button.dataset.cardId;
+        renderFullPack();
+      });
     });
-  });
+  }
   document.querySelector('#submit-pick')?.addEventListener('click', submitPick);
   document.querySelector('#next-pick')?.addEventListener('click', nextPick);
+  document.querySelector('#quit-game')?.addEventListener('click', renderHome);
 }
 
 function submitPick() {
@@ -309,68 +465,79 @@ function submitPick() {
   const grade = gradePick(pick.candidates, state.selectedCardId, pick.historical_pick_id);
   state.results.push({
     ...grade,
-    pack_number: pick.pack_number,
-    pick_number: pick.pick_number,
+    pack_number: 1,
+    pick_number: state.pickIndex + 1,
   });
   state.revealed = true;
-  renderStudy();
+  renderFullPack();
 }
 
 function nextPick() {
-  if (state.pickIndex >= state.replay.picks.length - 1) {
+  if (state.pickIndex >= state.packPicks.length - 1) {
     renderSummary();
     return;
   }
   state.pickIndex += 1;
   state.selectedCardId = null;
   state.revealed = false;
-  renderStudy();
+  renderFullPack();
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function methodNote() {
-  if (state.setData.is_fixture) {
-    return 'This replay is an interface fixture and must not be interpreted as 17Lands training data.';
-  }
+  if (state.setData.is_fixture) return 'This is interface fixture data, not a real 17Lands-trained replay.';
   const cohort = state.setData.cohort || {};
   const model = state.setData.model || {};
-  return `Generated offline from the ${esc(state.setData.source?.provider || '17Lands')} public draft dataset. The model trained on ${Number(cohort.training_drafts || 0).toLocaleString()} high-win-rate drafts and uses ${esc(model.holdout || 'draft-level holdout')} so the replay being graded does not train its own probabilities. No model or 17Lands API is called while you study.`;
+  return `Generated offline from ${state.setData.source?.provider || '17Lands'} public draft data. ${Number(cohort.training_drafts || 0).toLocaleString()} high-win-rate drafts train the consensus model with ${model.holdout || 'draft-level holdout'}. Probabilities are comparative within each pack, not calibrated odds that a pick is objectively correct.`;
+}
+
+function scorecardLabel(summary) {
+  if (summary.consensusAgreement >= 65) return 'Excellent Pack 1.';
+  if (summary.topThreeAgreement >= 75) return 'Strong Pack 1.';
+  if (summary.topThreeAgreement >= 55) return 'Solid start.';
+  return 'Plenty to study.';
 }
 
 function renderSummary() {
   const summary = summarizeResults(state.results);
   app.innerHTML = `
-    <section class="summary-card">
-      <p class="eyebrow">Replay complete</p>
-      <h1>Decision report</h1>
-      <p class="lede">Consensus is the primary signal. Historical agreement is shown separately because a strong drafter can make a defensible choice that is not the model's top-ranked option.</p>
+    <section class="scorecard">
+      <p class="eyebrow">Full Pack complete</p>
+      <h1>${scorecardLabel(summary)}</h1>
+      <p class="lede">You made ${summary.total} decisions. Here's where your instincts lined up with the strong-player consensus.</p>
 
       <div class="summary-grid">
-        <div class="summary-stat"><span>Consensus agreement</span><strong>${summary.consensusAgreement.toFixed(0)}%</strong></div>
-        <div class="summary-stat"><span>Top-3 agreement</span><strong>${summary.topThreeAgreement.toFixed(0)}%</strong></div>
-        <div class="summary-stat"><span>Historical agreement</span><strong>${summary.historicalAgreement.toFixed(0)}%</strong></div>
-        <div class="summary-stat"><span>Avg. likelihood gap</span><strong>${(summary.averageGap * 100).toFixed(1)}pp</strong></div>
+        <div class="summary-stat"><strong>${summary.consensusAgreement.toFixed(0)}%</strong><span>Consensus picks</span></div>
+        <div class="summary-stat"><strong>${summary.topThreeAgreement.toFixed(0)}%</strong><span>Top-3 picks</span></div>
+        <div class="summary-stat"><strong>${summary.historicalAgreement.toFixed(0)}%</strong><span>Matched drafter</span></div>
+        <div class="summary-stat"><strong>${(summary.averageGap * 100).toFixed(1)}</strong><span>Avg. gap, pts</span></div>
       </div>
 
-      <h3>Largest disagreements</h3>
-      <div class="miss-list">
-        ${summary.biggestMisses.length ? summary.biggestMisses.map((result) => `
-          <div class="miss-row">
-            <div class="miss-pick">P${esc(result.pack_number)}P${esc(result.pick_number)}</div>
-            <div class="miss-choice"><strong>${esc(result.selectedName)}</strong> vs consensus ${esc(result.bestName)}</div>
-            <div class="miss-gap">-${(result.gap * 100).toFixed(1)}pp</div>
-          </div>`).join('') : '<p class="empty-note">No meaningful consensus gaps in this replay.</p>'}
-      </div>
+      <section class="review-section">
+        <h2>Worth another look</h2>
+        <div class="miss-list">
+          ${summary.biggestMisses.length ? summary.biggestMisses.map((result) => `
+            <div class="miss-row">
+              <span class="pick-number">Pick ${esc(result.pick_number)}</span>
+              <div><strong>${esc(result.selectedName)}</strong><small>Consensus: ${esc(result.bestName)}</small></div>
+              <span class="gap-number">-${(result.gap * 100).toFixed(1)}</span>
+            </div>`).join('') : '<p class="empty-note">Nothing major. Your picks stayed close to consensus all pack.</p>'}
+        </div>
+      </section>
 
-      <p class="method-note">${methodNote()}</p>
+      <details class="method-details">
+        <summary>About the grading</summary>
+        <p>${esc(methodNote())}</p>
+      </details>
+
       <div class="button-row">
-        <button class="primary" id="another-replay">Study another replay</button>
-        <button class="secondary" id="back-home">Change set</button>
+        <button class="button primary" id="another-full">Draft another Pack 1</button>
+        <button class="button secondary" id="summary-home">Choose a mode</button>
       </div>
     </section>`;
 
-  document.querySelector('#another-replay').addEventListener('click', startStudy);
-  document.querySelector('#back-home').addEventListener('click', renderHome);
+  document.querySelector('#another-full').addEventListener('click', () => startMode('full'));
+  document.querySelector('#summary-home').addEventListener('click', renderHome);
 }
 
 async function init() {
