@@ -1,3 +1,5 @@
+import { seededRandom } from './gameplay.mjs';
+
 const responseCache = new Map();
 let catalogSnapshot = null;
 let warmupInstalled = false;
@@ -90,6 +92,38 @@ export async function loadReplayJson(path, label = 'data') {
     responseCache.set(key, request);
   }
   return responseCache.get(key);
+}
+
+export function seededReplayPlan(setData, seed) {
+  const shards = (setData?.shards || []).filter((shard) => Number(shard?.replay_count) > 0 && shard?.path);
+  const total = shards.reduce((sum, shard) => sum + Number(shard.replay_count), 0);
+  if (!total || !seed) return null;
+  const random = seededRandom(seed);
+  let ticket = Math.floor(random() * total);
+  let selected = shards[shards.length - 1];
+  for (const shard of shards) {
+    ticket -= Number(shard.replay_count);
+    if (ticket < 0) {
+      selected = shard;
+      break;
+    }
+  }
+  return {
+    shard: selected,
+    replayIndex: Math.floor(random() * Number(selected.replay_count)),
+  };
+}
+
+export async function preloadSeededReplay({ setId, seed }) {
+  const catalog = catalogSnapshot || await loadReplayJson('./data/catalog.json', 'catalog');
+  const set = catalog?.sets?.find((entry) => entry.id === setId);
+  const manifestPath = set?.manifest || set?.manifest_path;
+  if (!manifestPath) return null;
+  const setData = await loadReplayJson(manifestPath, set?.name || 'set manifest');
+  const plan = seededReplayPlan(setData, seed);
+  if (!plan?.shard?.path) return null;
+  await loadReplayJson(plan.shard.path, `${set?.name || setId} next replay shard`);
+  return plan;
 }
 
 export function clearReplayCache() {

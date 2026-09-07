@@ -512,7 +512,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--max-output-drafts", type=int, default=300)
     parser.add_argument("--minimum-picks", type=int, default=30)
     parser.add_argument("--folds", type=int, default=5)
-    parser.add_argument("--shard-size", type=int, default=10)
+    parser.add_argument("--shard-size", type=int, default=2)
     parser.add_argument("--card-metadata")
     return parser.parse_args(argv)
 

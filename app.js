@@ -275,20 +275,32 @@ async function copyText(text) {
   textarea.remove();
 }
 
+function reportShareCompleted(method, url, context = 'score') {
+  let challenge = false;
+  try {
+    const parsed = new URL(url, SHARE_URL);
+    challenge = parsed.searchParams.has('seed') || parsed.searchParams.has('daily');
+  } catch { /* analytics is optional */ }
+  document.dispatchEvent(new CustomEvent('pack1:share-completed', { detail: { method, context, challenge } }));
+}
+
 async function shareScore(button, text, url = SHARE_URL) {
   const original = button.textContent;
   try {
     if (navigator.share) {
-      await navigator.share({ title: 'Pack 1', text, url });
+      await navigator.share({ title: 'Pack One', text, url });
+      reportShareCompleted('native', url);
       return;
     }
     await copyText(`${text}\n${url}`);
+    reportShareCompleted('copy_fallback', url);
     button.textContent = 'Copied!';
     setTimeout(() => { button.textContent = original; }, 1600);
   } catch (error) {
     if (error?.name !== 'AbortError') {
       try {
         await copyText(`${text}\n${url}`);
+        reportShareCompleted('copy_fallback', url);
         button.textContent = 'Copied!';
         setTimeout(() => { button.textContent = original; }, 1600);
       } catch { /* sharing is optional */ }
@@ -333,7 +345,7 @@ function renderHome() {
     <section class="home-intro">
       <p class="eyebrow">LIMITED DRAFT GAME</p>
       <h1>Pack One</h1>
-      <p class="lede">Draft real opening packs from 17Lands. Rank your Top 3 or play the full first pack, then compare your choices with the strong-player consensus.</p>
+      <p class="lede">One real opening pack. Make your picks, see how you line up with strong-player consensus, then put the same pack in front of a friend.</p>
     </section>
 
     <section class="set-bar" aria-label="Set selection">
@@ -349,36 +361,37 @@ function renderHome() {
     <section class="daily-card daily-feature" id="daily-challenge">
       <div class="daily-copy">
         <div class="daily-kicker"><span class="live-dot"></span><span>Daily Challenge</span><span class="streak-chip">${streak ? `${streak}-day streak` : 'Start a streak'}</span></div>
-        <h2>One pack. One ranked shot.</h2>
-        <p>Everyone sees the same draft seat today. Your first Top 3 and Full Pack scores are the ones that go on the board.</p>
+        <h2>Today’s Pack One</h2>
+        <p>Everyone gets the same draft seat. Top 3 is the fastest way in; your first score is the one that reaches today’s board.</p>
         ${milestoneMarkup()}
       </div>
       <div class="daily-actions">
-        <button class="daily-mode" data-daily-mode="top3"><span>Top 3</span><strong>${esc(dailyModeStatus('top3', active.id))}</strong></button>
-        <button class="daily-mode" data-daily-mode="full"><span>Full Pack</span><strong>${esc(dailyModeStatus('full', active.id))}</strong></button>
-        <button class="button secondary" id="daily-leaders">View leaderboard</button>
+        <button class="button primary daily-mode daily-main" data-daily-mode="top3"><span>Play today’s Top 3</span><strong>${esc(dailyModeStatus('top3', active.id))}</strong></button>
+        <button class="button secondary daily-mode daily-secondary" data-daily-mode="full"><span>Play the full pack</span><strong>${esc(dailyModeStatus('full', active.id))}</strong></button>
+        <button class="text-button daily-leader-link" id="daily-leaders">See today’s leaderboard</button>
         <small>${todayRuns ? `${todayRuns} challenge ${todayRuns === 1 ? 'run' : 'runs'} completed today` : 'Nothing on the board yet today'}</small>
       </div>
     </section>
 
-    <section class="mode-grid" aria-label="Choose a game mode">
-      <article class="mode-card game-mode-row">
-        <div class="mode-number">01</div>
-        <div class="mode-topline"><p class="eyebrow">Opening pack</p>${bestChip('top3')}</div>
-        <h2>Top 3</h2>
-        <p>Rank your top three from one fresh opening pack. Fast, opinionated, and built to argue about.</p>
-        <ul class="mode-points"><li>One pack</li><li>Top-three score</li><li>Share the exact seed</li></ul>
-        <button class="button primary mode-button" data-mode="top3">Play Top 3</button>
-      </article>
-
-      <article class="mode-card game-mode-row featured">
-        <div class="mode-number">02</div>
-        <div class="mode-topline"><p class="eyebrow">Full first pack</p>${bestChip('full')}</div>
-        <h2>Full Pack</h2>
-        <p>Play every pick in Pack One. Your choices get scored as the seat develops.</p>
-        <ul class="mode-points"><li>Every first-pack pick</li><li>100-point finish</li><li>Share the exact seed</li></ul>
-        <button class="button primary mode-button" data-mode="full">Play Full Pack</button>
-      </article>
+    <section class="mode-section" aria-labelledby="more-pack-one">
+      <div class="mode-section-heading">
+        <div><p class="eyebrow">More Pack One</p><h2 id="more-pack-one">Play another pack</h2></div>
+        <p>Unlimited practice. These scores stay personal; Daily Challenge is the ranked game.</p>
+      </div>
+      <div class="mode-grid" aria-label="Choose a practice mode">
+        <article class="mode-card game-mode-row">
+          <div class="mode-topline"><p class="eyebrow">Opening pack</p>${bestChip('top3')}</div>
+          <h3>Top 3</h3>
+          <p>Rank your three best starts from a fresh opening pack.</p>
+          <button class="button secondary mode-button" data-mode="top3">New Top 3</button>
+        </article>
+        <article class="mode-card game-mode-row">
+          <div class="mode-topline"><p class="eyebrow">Full first pack</p>${bestChip('full')}</div>
+          <h3>Full Pack</h3>
+          <p>Make every pick in Pack One and get a 100-point finish.</p>
+          <button class="button secondary mode-button" data-mode="full">New Full Pack</button>
+        </article>
+      </div>
     </section>
 
     <section class="data-note">

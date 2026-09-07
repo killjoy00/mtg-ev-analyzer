@@ -6,6 +6,7 @@ const base = process.env.PACK1_E2E_URL || 'http://127.0.0.1:4173';
 await mkdir('artifacts', { recursive: true });
 const browser = await chromium.launch(process.env.CI ? { headless: true, channel: 'chrome' } : { headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+const capturedEvents = [];
 
 // Exercise the client contract without polluting production analytics/results.
 await page.route('https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**', async (route) => {
@@ -17,7 +18,7 @@ await page.route('https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-
   else if (path === '/v1/stats') body = { summary: { games: 0, average_score: 0, best_score: 0, challenge_wins: 0, challenge_losses: 0, challenge_ties: 0 }, daily: { daily_plays: 0, daily_days: 0, daily_best: 0 }, bySet: [], byMode: [], recent: [] };
   else if (path === '/v1/account/daily-dates') body = { dates: [] };
   else if (path === '/v1/account/session') { status = 401; body = { error: 'Account session required.' }; }
-  else if (path === '/v1/events') body = { ok: true, accepted: 1 };
+  else if (path === '/v1/events') { const payload = route.request().postDataJSON?.() || {}; capturedEvents.push(...(payload.events || []).map((item) => item.name)); body = { ok: true, accepted: 1 }; }
   await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
 });
 
@@ -63,6 +64,9 @@ async function home() {
   assert.match(consensusCopy, /high-win-rate 17Lands drafters/i);
   assert.match(consensusCopy, /not win rates/i);
   assert.doesNotMatch((await page.locator('.home-intro').textContent()) || '', /defend it/i);
+  assert.equal(await page.getByRole('heading', { name: 'Today’s Pack One', exact: true }).count(), 1);
+  assert.equal(await page.locator('.daily-main').count(), 1);
+  assert.match((await page.locator('.daily-main').textContent()) || '', /Play today’s Top 3/i);
   await assertNoHorizontalOverflow();
 }
 
@@ -133,6 +137,9 @@ try {
     assert.equal(await page.locator('.challenge-callout').count(), 0);
     await revealTop3();
     assert.equal(await page.locator('.friend-comparison').count(), 0, 'ordinary result must not contain friend comparison');
+    const challengeButton = page.locator('#share-top3');
+    assert.match((await challengeButton.textContent()) || '', /Challenge a friend/i);
+    assert.match((await challengeButton.getAttribute('class')) || '', /primary/);
     if (setId === 'ecl') await page.screenshot({ path: 'artifacts/ui-result-mobile.png', fullPage: true });
   }
 
@@ -153,6 +160,9 @@ try {
   await revealTop3();
   await page.locator('.friend-comparison').waitFor({ timeout: 5000 });
   await page.locator('.challenge-return').waitFor({ timeout: 5000 });
+  await page.waitForTimeout(100);
+  assert.ok(capturedEvents.includes('challenge_start'), 'friend challenge must record a challenge_start event');
+  assert.ok(capturedEvents.includes('challenge_complete'), 'friend challenge must record a challenge_complete event');
   await assertNoHorizontalOverflow();
 
   // Daily remains a dated ranked path and Reveal reaches its result page.

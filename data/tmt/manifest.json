@@ -26,127 +26,607 @@
     "pool_conditioned": true
   },
   "replay_count": 300,
-  "shard_size": 10,
+  "shard_size": 2,
   "shards": [
     {
       "path": "./data/tmt/shards/000.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/001.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/002.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/003.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/004.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/005.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/006.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/007.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/008.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/009.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/010.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/011.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/012.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/013.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/014.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/015.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/016.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/017.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/018.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/019.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/020.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/021.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/022.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/023.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/024.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/025.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/026.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/027.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/028.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/tmt/shards/029.json",
-      "replay_count": 10
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/030.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/031.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/032.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/033.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/034.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/035.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/036.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/037.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/038.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/039.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/040.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/041.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/042.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/043.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/044.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/045.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/046.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/047.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/048.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/049.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/050.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/051.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/052.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/053.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/054.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/055.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/056.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/057.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/058.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/059.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/060.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/061.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/062.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/063.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/064.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/065.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/066.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/067.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/068.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/069.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/070.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/071.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/072.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/073.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/074.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/075.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/076.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/077.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/078.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/079.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/080.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/081.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/082.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/083.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/084.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/085.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/086.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/087.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/088.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/089.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/090.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/091.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/092.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/093.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/094.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/095.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/096.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/097.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/098.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/099.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/100.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/101.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/102.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/103.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/104.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/105.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/106.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/107.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/108.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/109.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/110.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/111.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/112.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/113.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/114.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/115.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/116.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/117.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/118.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/119.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/120.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/121.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/122.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/123.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/124.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/125.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/126.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/127.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/128.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/129.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/130.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/131.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/132.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/133.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/134.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/135.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/136.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/137.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/138.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/139.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/140.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/141.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/142.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/143.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/144.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/145.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/146.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/147.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/148.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/tmt/shards/149.json",
+      "replay_count": 2
     }
   ]
 }

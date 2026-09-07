@@ -26,127 +26,607 @@
     "pool_conditioned": true
   },
   "replay_count": 300,
-  "shard_size": 10,
+  "shard_size": 2,
   "shards": [
     {
       "path": "./data/sos/shards/000.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/001.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/002.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/003.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/004.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/005.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/006.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/007.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/008.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/009.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/010.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/011.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/012.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/013.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/014.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/015.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/016.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/017.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/018.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/019.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/020.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/021.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/022.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/023.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/024.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/025.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/026.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/027.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/028.json",
-      "replay_count": 10
+      "replay_count": 2
     },
     {
       "path": "./data/sos/shards/029.json",
-      "replay_count": 10
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/030.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/031.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/032.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/033.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/034.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/035.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/036.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/037.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/038.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/039.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/040.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/041.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/042.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/043.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/044.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/045.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/046.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/047.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/048.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/049.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/050.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/051.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/052.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/053.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/054.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/055.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/056.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/057.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/058.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/059.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/060.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/061.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/062.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/063.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/064.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/065.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/066.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/067.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/068.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/069.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/070.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/071.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/072.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/073.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/074.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/075.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/076.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/077.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/078.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/079.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/080.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/081.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/082.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/083.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/084.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/085.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/086.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/087.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/088.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/089.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/090.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/091.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/092.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/093.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/094.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/095.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/096.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/097.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/098.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/099.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/100.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/101.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/102.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/103.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/104.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/105.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/106.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/107.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/108.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/109.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/110.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/111.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/112.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/113.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/114.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/115.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/116.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/117.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/118.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/119.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/120.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/121.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/122.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/123.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/124.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/125.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/126.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/127.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/128.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/129.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/130.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/131.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/132.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/133.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/134.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/135.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/136.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/137.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/138.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/139.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/140.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/141.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/142.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/143.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/144.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/145.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/146.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/147.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/148.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/sos/shards/149.json",
+      "replay_count": 2
     }
   ]
 }

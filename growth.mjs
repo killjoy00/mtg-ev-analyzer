@@ -4,10 +4,11 @@ import { onAppRender } from './render-lifecycle.mjs';
 const HISTORY_KEY = 'pack1-game-history-v2';
 const RESULT_SEEN = new WeakSet();
 let currentAccount = null;
+let challengeStartTracked = false;
 
 function esc(value) { return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
 function params() { return new URLSearchParams(location.search); }
-function event(name, props={}) { void sendEvents([{ name, props:{ ...props, path:location.pathname, set:params().get('set')||undefined, mode:params().get('mode')||undefined } }]); }
+function event(name, props={}) { void sendEvents([{ name, props:{ ...props, path:location.pathname, set:params().get('set')||undefined, mode:params().get('mode')||undefined, seed:params().get('seed')||undefined } }]); }
 function readHistory() { try { const v=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]'); return Array.isArray(v)?v:[]; } catch { return []; } }
 function writeHistory(items) { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(-500))); } catch {} }
 function resultId() { return `r:${Date.now().toString(36)}:${crypto.randomUUID?.().slice(0,8) || Math.random().toString(36).slice(2,10)}`; }
@@ -61,17 +62,23 @@ function challengeBanner() {
   const heading=document.querySelector('.game-heading');
   if(!heading || !Number.isFinite(target) || heading.querySelector('.challenge-callout')) return;
   const box=document.createElement('aside'); box.className='challenge-callout';
-  box.innerHTML=`<span>Friend challenge</span><strong>${esc(by||'Your friend')} scored ${target}</strong><em>Same pack. Beat the score.</em>`;
+  box.innerHTML=`<span>Friend challenge</span><strong>${esc(by||'Your friend')} scored ${target}</strong><em>Same exact pack. Beat the score.</em>`;
   heading.prepend(box);
   event('challenge_open',{ target_score:target, challenger:by||'friend', kind:'seed' });
+  if(!challengeStartTracked){
+    challengeStartTracked=true;
+    event('challenge_start',{ mode:modeFromPage(), target_score:target, challenger:by||'friend', source:'rendered_challenge' });
+  }
 }
 function resultChallengeActions() {
   const root=document.querySelector('.result-page'); if(!root || root.dataset.growthActions==='1') return;
   root.dataset.growthActions='1';
   const q=params(); if(!q.has('vs')&&!q.has('challenge')) return;
   const actions=root.querySelector('.result-actions,.button-row'); if(!actions) return;
+  const share=root.querySelector('#share-top3,#share-full');
+  if(share){share.classList.remove('primary','challenge-primary');share.classList.add('secondary');share.textContent='Challenge someone else';}
   const button=document.createElement('button'); button.type='button'; button.className='button primary challenge-return'; button.textContent='Send the result back';
-  button.addEventListener('click',()=>{ const share=root.querySelector('#share-top3,#share-full'); if(share) share.click(); else navigator.share?.({title:'Pack 1',url:location.href}); event('challenge_reshare'); });
+  button.addEventListener('click',()=>{ if(share) share.click(); else navigator.share?.({title:'Pack One',url:location.href}); event('challenge_reshare'); });
   actions.prepend(button);
 }
 function nav() {
@@ -128,11 +135,22 @@ async function renderAccount() {
 }
 function clickAnalytics(eventObject) {
   const target=eventObject.target.closest?.('button,a'); if(!target) return;
-  if(target.matches('[data-mode]')) event('game_start',{ daily:false, mode:target.dataset.mode });
+  if(target.matches('[data-mode]')) {
+    const challenge=params().has('challenge')||params().has('vs');
+    event('game_start',{ daily:false, mode:target.dataset.mode, challenge });
+    if(challenge&&!challengeStartTracked){
+      challengeStartTracked=true;
+      event('challenge_start',{ mode:target.dataset.mode, target_score:Number(params().get('vs'))||undefined, challenger:params().get('by')||'friend' });
+    }
+  }
   else if(target.matches('[data-daily-mode]')) event('game_start',{ daily:true, mode:target.dataset.dailyMode });
   else if(target.matches('#reveal-top3,#reveal-challenge')) event('reveal_click');
-  else if(target.matches('#share-top3,#share-full,.challenge-return,#reshare-challenge')) event('share_click',{ challenge:true });
+  else if(target.matches('#share-top3,#share-full,.challenge-return,#reshare-challenge')) event('share_click',{ challenge:true, surface:target.id||'challenge_return' });
   else if(target.matches('#daily-leaders,#leaderboard-nav')) event('leaderboard_view');
+}
+function shareCompletedAnalytics(eventObject) {
+  const detail=eventObject.detail||{};
+  event('share_completed',{ method:String(detail.method||'unknown').slice(0,40), context:String(detail.context||'unknown').slice(0,40), challenge:Boolean(detail.challenge) });
 }
 function enhance() { nav(); challengeBanner(); resultChallengeActions(); findResults(); }
 
@@ -142,5 +160,6 @@ export async function installGrowthLayer() {
   if(currentAccount?.session?.token) await linkAccount(currentAccount.session.token).catch(()=>null);
   event('page_view',{ account:Boolean(currentAccount?.user), challenge:params().has('challenge')||params().has('vs') });
   document.addEventListener('click',clickAnalytics,true);
+  document.addEventListener('pack1:share-completed',shareCompletedAnalytics);
   onAppRender(enhance);
 }

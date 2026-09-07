@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeReplayPayload, rarityBucket, sortCatalogSets, sortPackByRarity } from '../replay-data.mjs';
+import { normalizeReplayPayload, rarityBucket, seededReplayPlan, sortCatalogSets, sortPackByRarity } from '../replay-data.mjs';
 
 test('rarity buckets put mythics and rares before uncommons and commons', () => {
   assert.equal(rarityBucket('mythic'), 0);
@@ -42,4 +42,18 @@ test('normalizeReplayPayload sorts candidates inside every pick', () => {
   };
   const normalized = normalizeReplayPayload('/data/msh/shards/000.json', payload);
   assert.deepEqual(normalized.replays[0].picks[0].candidates.map((card) => card.name), ['R', 'U', 'C']);
+});
+
+
+test('seededReplayPlan deterministically identifies the exact next shard and replay', () => {
+  const manifest = { shards: [
+    { path: './a.json', replay_count: 2 },
+    { path: './b.json', replay_count: 2 },
+    { path: './c.json', replay_count: 2 },
+  ] };
+  const first = seededReplayPlan(manifest, 'nextpackseed123');
+  const second = seededReplayPlan(manifest, 'nextpackseed123');
+  assert.deepEqual(first, second);
+  assert.ok(manifest.shards.includes(first.shard));
+  assert.ok(first.replayIndex >= 0 && first.replayIndex < first.shard.replay_count);
 });
