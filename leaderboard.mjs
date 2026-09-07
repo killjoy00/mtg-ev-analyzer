@@ -88,7 +88,8 @@ async function rpc(name, args, { authenticated = false } = {}) {
     body: JSON.stringify(args || {}),
   });
   const text = await response.text();
-  const data = text ? JSON.parse(text) : null;
+  let data = null;
+  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
   if (!response.ok) throw new Error(data?.message || data?.hint || `Leaderboard request failed (${response.status}).`);
   return data;
 }
@@ -104,6 +105,10 @@ export async function submitLeaderboardScore({ setId, mode, score, grade, challe
     p_details: details,
   }, { authenticated: true });
   return Array.isArray(data) ? data[0] : data;
+}
+
+export async function updateLeaderboardDisplayName(displayName) {
+  await rpc('pack1_set_display_name', { p_display_name: displayName }, { authenticated: true });
 }
 
 export async function loadLeaderboard({ period = 'daily', setId = null, mode = 'top3', limit = 50 } = {}) {
