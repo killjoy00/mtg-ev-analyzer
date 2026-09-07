@@ -1,0 +1,312 @@
+:root {
+  --p1-paper: #f4f0e6;
+  --p1-ink: #171713;
+  --p1-faint: #d8d1c2;
+  --p1-red: #9d3827;
+  --p1-green: #2f493b;
+}
+
+/* A deliberately specific visual language: draft sheet, event program, box score. */
+.pack1-redesign {
+  background:
+    linear-gradient(rgba(23, 23, 19, .022) 1px, transparent 1px) 0 0 / 100% 28px,
+    var(--p1-paper);
+}
+
+.pack1-redesign .app-shell { background: transparent; }
+
+.pack1-redesign .topbar {
+  background: var(--p1-paper);
+  border-top-width: 8px;
+  position: relative;
+}
+.pack1-redesign .brand-mark {
+  width: auto;
+  min-width: 0;
+  height: auto;
+  border: 0;
+  background: transparent;
+  color: var(--p1-red);
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 22px;
+  font-style: italic;
+  letter-spacing: -.08em;
+}
+.pack1-redesign .brand-copy small { display: none; }
+.pack1-redesign .source-note {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 9px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  opacity: .7;
+}
+
+.pack1-redesign .home-intro {
+  position: relative;
+  padding-top: 18px;
+  grid-template-columns: 110px minmax(0, 1fr) minmax(210px, 320px);
+  grid-template-areas: "eyebrow title lede";
+  gap: clamp(18px, 3vw, 42px);
+}
+.pack1-redesign .home-intro .eyebrow {
+  grid-area: eyebrow;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  align-self: stretch;
+  margin: 0;
+  padding: 0 11px 0 0;
+  border: 0;
+  border-right: 1px solid var(--p1-ink);
+  color: var(--p1-red);
+}
+.pack1-redesign .home-intro h1 {
+  grid-area: title;
+  margin: 0;
+  font-size: clamp(50px, 7.2vw, 96px);
+  line-height: .86;
+  max-width: 720px;
+}
+.pack1-redesign .home-intro .lede {
+  grid-area: lede;
+  align-self: end;
+  margin: 0 0 4px;
+  padding: 12px 0 0;
+  font-size: 13px;
+}
+
+.pack1-redesign .set-bar {
+  display: grid;
+  grid-template-columns: minmax(160px, 230px) 1fr;
+  margin-top: 10px;
+  margin-bottom: 46px;
+  border-top: 1px solid var(--p1-ink);
+  border-bottom: 0;
+}
+.pack1-redesign .set-bar > div {
+  display: grid;
+  grid-template-columns: 42px 1fr;
+  align-items: baseline;
+}
+.pack1-redesign .set-meta {
+  justify-self: end;
+  font-variant-numeric: tabular-nums;
+}
+
+.pack1-redesign .daily-card {
+  grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
+  border-top-width: 7px;
+  border-bottom: 2px solid var(--p1-ink);
+}
+.pack1-redesign .daily-copy {
+  position: relative;
+  padding: 26px 56px 34px 20px;
+  border-left: 5px solid var(--p1-red);
+}
+.pack1-redesign .daily-copy h2 {
+  max-width: 650px;
+  font-size: clamp(38px, 4.5vw, 64px);
+  letter-spacing: -.045em;
+}
+.pack1-redesign .daily-copy p {
+  max-width: 610px;
+  font-size: 13px;
+}
+.pack1-redesign .daily-kicker {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 9px;
+  letter-spacing: .13em;
+  text-transform: uppercase;
+}
+.pack1-redesign .live-dot { display: none; }
+.pack1-redesign .streak-chip::before { content: "— "; }
+.pack1-redesign .daily-actions {
+  padding: 20px 0 28px 30px;
+  align-self: stretch;
+}
+.pack1-redesign .daily-mode {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  min-height: 64px;
+  border: 0;
+  border-top: 1px solid var(--p1-ink);
+  text-align: left;
+}
+.pack1-redesign .daily-mode:last-of-type { border-bottom: 1px solid var(--p1-ink); }
+.pack1-redesign .daily-mode span {
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 19px;
+}
+.pack1-redesign .daily-mode strong {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+/* Game choices read as entries on a score sheet rather than product cards. */
+.pack1-redesign .mode-grid {
+  display: block;
+  border-top: 7px solid var(--p1-ink);
+  border-bottom: 2px solid var(--p1-ink);
+}
+.pack1-redesign .mode-card,
+.pack1-redesign .mode-card + .mode-card {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 70px minmax(170px, .55fr) minmax(250px, 1fr) minmax(180px, .8fr) 130px;
+  grid-template-rows: auto;
+  align-items: center;
+  gap: 24px;
+  padding: 24px 0;
+  border: 0;
+  border-bottom: 1px solid var(--p1-ink);
+  background: transparent;
+}
+.pack1-redesign .mode-card:last-child { border-bottom: 0; }
+.pack1-redesign .mode-card.featured { background: transparent; }
+.pack1-redesign .mode-number {
+  margin: 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 30px;
+  font-style: italic;
+  color: var(--p1-red);
+}
+.pack1-redesign .mode-topline {
+  align-self: center;
+}
+.pack1-redesign .mode-topline .eyebrow {
+  margin: 0 0 4px;
+  color: var(--p1-green);
+}
+.pack1-redesign .best-chip {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  border-radius: 0;
+  font-family: "Arial Narrow", Arial, sans-serif;
+  font-size: 9px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.pack1-redesign .mode-card h2 {
+  margin: 0;
+  font-size: clamp(30px, 3vw, 46px);
+}
+.pack1-redesign .mode-card > p {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.pack1-redesign .mode-points {
+  margin: 0;
+  font-size: 9px;
+}
+.pack1-redesign .mode-card .button {
+  justify-self: end;
+  white-space: nowrap;
+}
+
+.pack1-redesign .data-note {
+  margin-top: 12px;
+  padding-bottom: 34px;
+  border-bottom: 1px solid var(--p1-faint);
+}
+
+/* Remove the remaining dashboard-y surfaces. */
+.pack1-redesign .message-card,
+.pack1-redesign .feedback-panel,
+.pack1-redesign .leaderboard-card,
+.pack1-redesign .result-card,
+.pack1-redesign .stat-card {
+  border-radius: 0;
+  box-shadow: none;
+}
+.pack1-redesign .grade-badge,
+.pack1-redesign .best-chip,
+.pack1-redesign .milestone-chip,
+.pack1-redesign .streak-chip { border-radius: 0; }
+
+/* Scores are typography, not a decorative orb. */
+.pack1-redesign .result-page .score-orb {
+  width: auto;
+  height: auto;
+  min-width: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  align-items: flex-start;
+}
+.pack1-redesign .result-page .score-orb::after { display: none; }
+.pack1-redesign .result-page .score-orb small {
+  font-family: "Arial Narrow", Arial, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: .12em;
+}
+.pack1-redesign .result-page .score-hero {
+  column-gap: 52px;
+}
+.pack1-redesign .result-actions .button {
+  border-radius: 0;
+}
+
+/* Leaderboard should resemble standings. */
+.pack1-redesign .leaderboard-row,
+.pack1-redesign .leader-row {
+  border-radius: 0;
+  box-shadow: none;
+  border-bottom: 1px solid var(--p1-faint);
+}
+.pack1-redesign .period-tab {
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.pack1-redesign .period-tab.active {
+  background: var(--p1-ink);
+  color: var(--p1-paper);
+}
+
+@media (max-width: 900px) {
+  .pack1-redesign .home-intro {
+    grid-template-columns: 44px 1fr;
+    grid-template-areas: "eyebrow title" "eyebrow lede";
+  }
+  .pack1-redesign .mode-card,
+  .pack1-redesign .mode-card + .mode-card {
+    grid-template-columns: 44px 1fr auto;
+    gap: 12px 18px;
+  }
+  .pack1-redesign .mode-number { grid-row: 1 / 4; align-self: start; font-size: 24px; }
+  .pack1-redesign .mode-topline { grid-column: 2; }
+  .pack1-redesign .mode-card h2 { grid-column: 2; }
+  .pack1-redesign .mode-card > p { grid-column: 2 / 4; }
+  .pack1-redesign .mode-points { grid-column: 2; }
+  .pack1-redesign .mode-card .button { grid-column: 3; grid-row: 1 / 3; }
+}
+
+@media (max-width: 620px) {
+  .pack1-redesign .source-note { display: none; }
+  .pack1-redesign .home-intro {
+    grid-template-columns: 28px 1fr;
+    gap: 12px;
+  }
+  .pack1-redesign .home-intro h1 { font-size: clamp(44px, 14vw, 68px); }
+  .pack1-redesign .set-bar { grid-template-columns: 1fr; gap: 8px; }
+  .pack1-redesign .set-meta { justify-self: start; }
+  .pack1-redesign .daily-card { grid-template-columns: 1fr; }
+  .pack1-redesign .daily-copy { padding: 20px 0 24px 14px; border-right: 0; }
+  .pack1-redesign .daily-actions { padding: 0 0 26px 14px; }
+  .pack1-redesign .mode-card,
+  .pack1-redesign .mode-card + .mode-card {
+    grid-template-columns: 34px 1fr;
+    padding: 20px 0;
+  }
+  .pack1-redesign .mode-number { grid-column: 1; grid-row: 1 / 5; }
+  .pack1-redesign .mode-topline,
+  .pack1-redesign .mode-card h2,
+  .pack1-redesign .mode-card > p,
+  .pack1-redesign .mode-points,
+  .pack1-redesign .mode-card .button { grid-column: 2; grid-row: auto; justify-self: start; }
+}
