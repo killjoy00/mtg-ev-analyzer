@@ -1,122 +1,85 @@
-const config = () => window.PACK1_SUPABASE || {};
-const SESSION_PREFIX = 'pack1-supabase-session:';
+const TOKEN_KEY = 'pack1-api-session-v1';
+const NAME_KEY = 'pack1-player-name-v1';
 
-export function isLeaderboardConfigured() {
-  const { url, key } = config();
-  return /^https:\/\/[^/]+\.supabase\.co\/?$/i.test(String(url || '')) && String(key || '').length > 20;
+function config() { return window.PACK1_API || {}; }
+function baseUrl() { return String(config().url || '').replace(/\/$/, ''); }
+export function isLeaderboardConfigured() { return /^https:\/\//.test(baseUrl()); }
+
+function displayName() {
+  try { return window.localStorage.getItem(NAME_KEY) || 'Pack Player'; } catch { return 'Pack Player'; }
 }
+function loadToken() { try { return window.localStorage.getItem(TOKEN_KEY); } catch { return null; } }
+function saveToken(token) { try { window.localStorage.setItem(TOKEN_KEY, token); } catch {} return token; }
 
-function baseUrl() {
-  return String(config().url || '').replace(/\/$/, '');
-}
-
-function storageKey() {
-  return `${SESSION_PREFIX}${baseUrl()}`;
-}
-
-function parseJwtExpiry(token) {
-  try {
-    const payload = token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
-    return Number(JSON.parse(atob(payload)).exp || 0);
-  } catch {
-    return 0;
-  }
-}
-
-function loadStoredSession() {
-  try {
-    return JSON.parse(window.localStorage.getItem(storageKey()) || 'null');
-  } catch {
-    return null;
-  }
-}
-
-function saveSession(session) {
-  try { window.localStorage.setItem(storageKey(), JSON.stringify(session)); } catch { /* optional */ }
-  return session;
-}
-
-async function authPost(path, body) {
-  const { key } = config();
-  const response = await fetch(`${baseUrl()}/auth/v1/${path}`, {
-    method: 'POST',
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
-  const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.msg || data.message || data.error_description || `Auth failed (${response.status}).`);
-  return data;
-}
-
-async function refreshSession(session) {
-  if (!session?.refresh_token) return null;
-  try {
-    return saveSession(await authPost('token?grant_type=refresh_token', { refresh_token: session.refresh_token }));
-  } catch {
-    return null;
-  }
-}
-
-export async function getLeaderboardSession({ create = false } = {}) {
-  if (!isLeaderboardConfigured()) return null;
-  let session = loadStoredSession();
-  const expiry = parseJwtExpiry(session?.access_token || '');
-  if (session?.access_token && expiry > (Date.now() / 1000) + 90) return session;
-  if (session?.refresh_token) session = await refreshSession(session);
-  if (session?.access_token) return session;
-  if (!create) return null;
-  const created = await authPost('signup', { data: { app: 'pack1' } });
-  return saveSession(created);
-}
-
-async function rpc(name, args, { authenticated = false } = {}) {
+async function request(path, options = {}, { auth = false } = {}) {
   if (!isLeaderboardConfigured()) throw new Error('Global leaderboard is not configured yet.');
-  const { key } = config();
-  const session = await getLeaderboardSession({ create: authenticated });
-  const token = session?.access_token || key;
-  const response = await fetch(`${baseUrl()}/rest/v1/rpc/${name}`, {
-    method: 'POST',
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(args || {}),
-  });
-  const text = await response.text();
-  let data = null;
-  try { data = text ? JSON.parse(text) : null; } catch { data = null; }
-  if (!response.ok) throw new Error(data?.message || data?.hint || `Leaderboard request failed (${response.status}).`);
+  const headers = new Headers(options.headers || {});
+  headers.set('content-type', 'application/json');
+  if (auth) headers.set('authorization', `Bearer ${await ensureSession()}`);
+  const response = await fetch(`${baseUrl()}${path}`, { ...options, headers });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || `Pack 1 API failed (${response.status}).`);
   return data;
 }
 
-export async function submitLeaderboardScore({ setId, mode, score, grade, challengeDate, displayName, details = {} }) {
-  const data = await rpc('pack1_submit_score', {
-    p_set_id: setId,
-    p_mode: mode,
-    p_score: score,
-    p_grade: grade,
-    p_challenge_date: challengeDate,
-    p_display_name: displayName,
-    p_details: details,
-  }, { authenticated: true });
-  return Array.isArray(data) ? data[0] : data;
+async function ensureSession() {
+  const existing = loadToken();
+  if (existing) return existing;
+  const data = await request('/v1/session', {
+    method: 'POST',
+    body: JSON.stringify({ displayName: displayName() }),
+  });
+  return saveToken(data.token);
 }
 
-export async function updateLeaderboardDisplayName(displayName) {
-  await rpc('pack1_set_display_name', { p_display_name: displayName }, { authenticated: true });
+function captureTopThree() {
+  return [...document.querySelectorAll('.card-choice')]
+    .map((node) => ({ id: node.dataset.cardId, rank: Number(node.querySelector('.user-rank-badge')?.textContent || 0) }))
+    .filter((item) => item.id && item.rank)
+    .sort((a, b) => a.rank - b.rank)
+    .map((item) => item.id);
+}
+
+function captureSelections(mode) {
+  if (mode === 'top3') return captureTopThree();
+  return Array.isArray(window.PACK1_CAPTURED_PICKS) ? [...window.PACK1_CAPTURED_PICKS] : [];
+}
+
+export async function submitLeaderboardScore({ setId, mode, score, grade, challengeDate, displayName: name }) {
+  const data = await request('/v1/scores', {
+    method: 'POST',
+    body: JSON.stringify({
+      setId, mode, challengeDate,
+      displayName: name || displayName(),
+      selections: captureSelections(mode),
+      clientScore: score,
+      clientGrade: grade,
+    }),
+  }, { auth: true });
+  window.PACK1_LAST_SUBMISSION = data;
+  return data;
 }
 
 export async function loadLeaderboard({ period = 'daily', setId = null, mode = 'top3', limit = 50 } = {}) {
-  const data = await rpc('pack1_leaderboard', {
-    p_period: period,
-    p_set_id: setId || null,
-    p_mode: mode,
-    p_limit: limit,
-  });
-  return Array.isArray(data) ? data : [];
+  const params = new URLSearchParams({ period, set: setId || 'all', mode, limit: String(limit) });
+  const token = loadToken();
+  const headers = token ? { authorization: `Bearer ${token}` } : {};
+  return request(`/v1/leaderboard?${params}`, { headers });
+}
+
+export async function updateLeaderboardDisplayName(name) {
+  return request('/v1/player', { method: 'PATCH', body: JSON.stringify({ displayName: name }) }, { auth: true });
+}
+
+export async function createShareChallenge(payload) {
+  return request('/v1/challenges', { method: 'POST', body: JSON.stringify(payload) }, { auth: true });
+}
+
+export async function loadShareChallenge(id) {
+  return request(`/v1/challenges/${encodeURIComponent(id)}`);
+}
+
+export async function loadCommunityDistribution({ date, setId, mode = 'top3' }) {
+  const params = new URLSearchParams({ date, set: setId, mode });
+  return request(`/v1/distribution?${params}`);
 }
