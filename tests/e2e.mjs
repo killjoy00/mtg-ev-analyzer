@@ -56,6 +56,13 @@ async function assertPackAligned() {
 async function home() {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
+  await page.getByRole('heading', { name: 'Pack One', exact: true }).waitFor({ timeout: 5000 });
+  const setOrder = await page.locator('#set-select option').evaluateAll((nodes) => nodes.map((node) => node.value));
+  assert.deepEqual(setOrder.slice(0, 4), ['msh', 'sos', 'tmt', 'ecl']);
+  const consensusCopy = (await page.locator('.data-note').textContent()) || '';
+  assert.match(consensusCopy, /high-win-rate 17Lands drafters/i);
+  assert.match(consensusCopy, /not win rates/i);
+  assert.doesNotMatch((await page.locator('.home-intro').textContent()) || '', /defend it/i);
   await assertNoHorizontalOverflow();
 }
 
@@ -70,6 +77,7 @@ async function revealTop3() {
   await score.waitFor({ state: 'visible', timeout: 5000 });
   assert.match((await score.textContent()) || '', /^\d+$/);
   assert.equal(await page.locator('.opening-pack').isVisible(), false);
+  assert.match((await page.locator('.score-context').textContent()) || '', /Consensus alignment score/i);
   await assertNoHorizontalOverflow();
   return Number(await score.textContent());
 }
@@ -154,7 +162,7 @@ try {
   await home();
   await page.locator('#stats-nav').click();
   await page.locator('.stats-page').waitFor();
-  assert.match((await page.locator('.stats-page h1').textContent()) || '', /Pack 1 record/);
+  assert.match((await page.locator('.stats-page h1').textContent()) || '', /Pack One record/);
   await assertNoHorizontalOverflow();
   await page.screenshot({ path: 'artifacts/ui-stats-mobile.png', fullPage: true });
   await page.locator('#account-nav').click();
@@ -163,7 +171,7 @@ try {
   await assertNoHorizontalOverflow();
   await page.screenshot({ path: 'artifacts/ui-account-mobile.png', fullPage: true });
 
-  console.log('Pack 1 product and layout matrix passed.');
+  console.log('Pack One product and layout matrix passed.');
 } finally {
   await browser.close();
 }
