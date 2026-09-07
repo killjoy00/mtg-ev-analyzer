@@ -4,6 +4,7 @@ const product = await import('./product.mjs');
 const flow = await import('./flow-fixes.mjs');
 const humanCopy = await import('./human-copy.mjs');
 const growth = await import('./growth.mjs');
+const retention = await import('./retention.mjs');
 
 if (challengeMode) {
   await import('./social.mjs');
@@ -11,6 +12,7 @@ if (challengeMode) {
   flow.installFlowFixes();
   humanCopy.installHumanCopy();
   await growth.installGrowthLayer();
+  retention.installRetentionLayer();
 } else {
   const seed = params.get('seed');
   if (seed) product.seedGameRandom(seed);
@@ -20,4 +22,5 @@ if (challengeMode) {
   flow.installFlowFixes();
   humanCopy.installHumanCopy();
   await growth.installGrowthLayer();
+  retention.installRetentionLayer();
 }
