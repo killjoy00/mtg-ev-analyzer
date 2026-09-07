@@ -65,6 +65,10 @@ function challengeBanner() {
   box.innerHTML=`<span>Friend challenge</span><strong>${esc(by||'Your friend')} scored ${target}</strong><em>Same exact pack. Beat the score.</em>`;
   heading.prepend(box);
   event('challenge_open',{ target_score:target, challenger:by||'friend', kind:'seed' });
+  if(!challengeStartTracked){
+    challengeStartTracked=true;
+    event('challenge_start',{ mode:modeFromPage(), target_score:target, challenger:by||'friend', source:'rendered_challenge' });
+  }
 }
 function resultChallengeActions() {
   const root=document.querySelector('.result-page'); if(!root || root.dataset.growthActions==='1') return;
