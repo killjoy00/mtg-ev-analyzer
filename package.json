@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:syntax": "node --check app.js && node --check bootstrap.mjs && node --check engagement.mjs && node --check flow-fixes.mjs && node --check gameplay.mjs && node --check growth-api.mjs && node --check growth.mjs && node --check human-copy.mjs && node --check leaderboard.mjs && node --check product.mjs && node --check social.mjs && node --check worker/core.mjs && node --check worker/index.js && node --check worker/index-v4.js",
+    "test:syntax": "node --check app.js && node --check bootstrap.mjs && node --check engagement.mjs && node --check flow-fixes.mjs && node --check gameplay.mjs && node --check growth-api.mjs && node --check growth.mjs && node --check human-copy.mjs && node --check leaderboard.mjs && node --check product.mjs && node --check social.mjs && node --check worker/core.mjs && node --check worker/index.js && node --check worker/index-v4.js && node --check worker/index-v5.js",
     "test:js": "node --test tests/*.test.mjs",
     "test:py": "python -m unittest discover -s tests -p 'test_*.py'",
     "test": "npm run test:syntax && npm run test:js && npm run test:py"
