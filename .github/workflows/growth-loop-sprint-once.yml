@@ -6,6 +6,7 @@ on:
       - feature/growth-loop-sprint
     paths:
       - scripts/growth_loop_sprint.py
+      - scripts/fix_growth_loop_sprint.py
       - .github/workflows/growth-loop-sprint-once.yml
 
 permissions:
@@ -24,6 +25,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Repair one-shot script escaping
+        run: python scripts/fix_growth_loop_sprint.py
       - name: Apply product, performance, analytics, and data changes
         run: python scripts/growth_loop_sprint.py
       - name: Validate all production replay sets
@@ -37,7 +40,7 @@ jobs:
         run: git diff --check
       - name: Commit release changes
         run: |
-          rm scripts/growth_loop_sprint.py .github/workflows/growth-loop-sprint-once.yml
+          rm scripts/growth_loop_sprint.py scripts/fix_growth_loop_sprint.py .github/workflows/growth-loop-sprint-once.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
