@@ -2,19 +2,37 @@ name: build-replay-data
 
 on:
   workflow_dispatch:
-  push:
-    branches: [build/real-msh-replays]
-    paths:
-      - '.github/workflows/build-replay-data.yml'
-      - 'scripts/build_replays.py'
-      - 'scripts/fetch_card_metadata.py'
-      - 'scripts/validate_dataset.py'
+    inputs:
+      expansion:
+        description: '17Lands expansion code, e.g. MSH'
+        required: true
+        type: string
+      source_date:
+        description: 'Public dump date (YYYY-MM-DD) recorded in manifest'
+        required: true
+        type: string
+      format:
+        description: '17Lands draft format'
+        required: true
+        default: PremierDraft
+        type: choice
+        options: [PremierDraft]
+      max_training_drafts:
+        description: 'Training draft cap'
+        required: true
+        default: '5000'
+        type: string
+      max_output_drafts:
+        description: 'Replay count'
+        required: true
+        default: '300'
+        type: string
 
 permissions:
   contents: write
 
 jobs:
-  msh-premier:
+  build-set:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -26,63 +44,93 @@ jobs:
           python-version: '3.12'
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
-
+          node-version: 24
+      - name: Validate inputs
+        env:
+          EXPANSION: ${{ inputs.expansion }}
+          SOURCE_DATE: ${{ inputs.source_date }}
+          MAX_TRAINING: ${{ inputs.max_training_drafts }}
+          MAX_OUTPUT: ${{ inputs.max_output_drafts }}
+        run: |
+          [[ "$EXPANSION" =~ ^[A-Za-z0-9]{2,8}$ ]] || { echo 'Invalid expansion'; exit 1; }
+          [[ "$SOURCE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo 'Invalid source date'; exit 1; }
+          [[ "$MAX_TRAINING" =~ ^[0-9]+$ ]] || exit 1
+          [[ "$MAX_OUTPUT" =~ ^[0-9]+$ ]] || exit 1
       - name: Run unit tests
         run: npm test
-
-      - name: Download MSH Premier Draft public data
+      - name: Download public draft data
+        env:
+          EXPANSION: ${{ inputs.expansion }}
+          FORMAT: ${{ inputs.format }}
         run: |
-          mkdir -p raw-data generated data/msh
+          UPPER=$(printf '%s' "$EXPANSION" | tr '[:lower:]' '[:upper:]')
+          LOWER=$(printf '%s' "$EXPANSION" | tr '[:upper:]' '[:lower:]')
+          mkdir -p raw-data generated "data/$LOWER"
           curl --fail --location --retry 5 --retry-delay 3 \
-            --output raw-data/draft_data_public.MSH.PremierDraft.csv.gz \
-            https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.MSH.PremierDraft.csv.gz
-
+            --output "raw-data/draft_data_public.$UPPER.$FORMAT.csv.gz" \
+            "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.$UPPER.$FORMAT.csv.gz"
       - name: Fetch offline card metadata
+        env:
+          EXPANSION: ${{ inputs.expansion }}
         run: |
-          if ! python scripts/fetch_card_metadata.py --set MSH --output generated/msh-cards.json; then
-            echo 'Scryfall metadata unavailable; continuing with card-name placeholders.'
-            printf '{}\n' > generated/msh-cards.json
+          UPPER=$(printf '%s' "$EXPANSION" | tr '[:lower:]' '[:upper:]')
+          LOWER=$(printf '%s' "$EXPANSION" | tr '[:upper:]' '[:lower:]')
+          if ! python scripts/fetch_card_metadata.py --set "$UPPER" --output "generated/$LOWER-cards.json"; then
+            echo 'Card metadata unavailable; continuing with card-name placeholders.'
+            printf '{}\n' > "generated/$LOWER-cards.json"
           fi
-
-      - name: Build real MSH replay shards
+      - name: Build replay shards
+        env:
+          EXPANSION: ${{ inputs.expansion }}
+          FORMAT: ${{ inputs.format }}
+          SOURCE_DATE: ${{ inputs.source_date }}
+          MAX_TRAINING: ${{ inputs.max_training_drafts }}
+          MAX_OUTPUT: ${{ inputs.max_output_drafts }}
         run: |
+          UPPER=$(printf '%s' "$EXPANSION" | tr '[:lower:]' '[:upper:]')
+          LOWER=$(printf '%s' "$EXPANSION" | tr '[:upper:]' '[:lower:]')
           python scripts/build_replays.py \
-            --input raw-data/draft_data_public.MSH.PremierDraft.csv.gz \
-            --output-dir data/msh \
+            --input "raw-data/draft_data_public.$UPPER.$FORMAT.csv.gz" \
+            --output-dir "data/$LOWER" \
             --catalog data/catalog.json \
-            --expansion MSH \
-            --format PremierDraft \
-            --source-date 2026-07-26 \
+            --expansion "$UPPER" \
+            --format "$FORMAT" \
+            --source-date "$SOURCE_DATE" \
             --minimum-games 100 \
             --top-fraction 0.15 \
-            --max-training-drafts 5000 \
-            --max-output-drafts 300 \
+            --max-training-drafts "$MAX_TRAINING" \
+            --max-output-drafts "$MAX_OUTPUT" \
             --minimum-picks 30 \
             --folds 5 \
             --shard-size 10 \
-            --card-metadata generated/msh-cards.json
-
+            --card-metadata "generated/$LOWER-cards.json"
       - name: Validate generated dataset
-        run: python scripts/validate_dataset.py data/msh/manifest.json --minimum-replays 100
-
+        env:
+          EXPANSION: ${{ inputs.expansion }}
+        run: |
+          LOWER=$(printf '%s' "$EXPANSION" | tr '[:upper:]' '[:lower:]')
+          python scripts/validate_dataset.py "data/$LOWER/manifest.json" --minimum-replays 100
       - name: Upload generated replay data
         uses: actions/upload-artifact@v4
         with:
-          name: msh-replay-data
+          name: ${{ inputs.expansion }}-replay-data
           path: |
             data/catalog.json
-            data/msh/
+            data/${{ inputs.expansion }}/
           retention-days: 14
-
       - name: Commit generated replay data to branch
+        env:
+          EXPANSION: ${{ inputs.expansion }}
         run: |
+          LOWER=$(printf '%s' "$EXPANSION" | tr '[:upper:]' '[:lower:]')
+          UPPER=$(printf '%s' "$EXPANSION" | tr '[:lower:]' '[:upper:]')
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/catalog.json data/msh
+          git add data/catalog.json "data/$LOWER"
           if git diff --cached --quiet; then
             echo 'Generated data is unchanged.'
             exit 0
           fi
-          git commit -m 'Generate real MSH replay data [data-generated]'
-          git push origin HEAD:${GITHUB_REF_NAME}
+          git commit -m "Generate $UPPER replay data [data-generated]"
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
