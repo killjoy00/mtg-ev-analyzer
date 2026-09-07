@@ -84,9 +84,9 @@ The game never requires login. Auth session tokens are stored first-party by Pac
 
 The internal Neon view `analytics_funnel_daily` summarizes:
 
-`page_view -> game_start -> game_reveal -> share_click -> challenge_open -> challenge_complete`
+`page_view -> game_start -> game_reveal -> share_click -> share_completed -> challenge_open -> challenge_start -> challenge_complete`
 
-This is intended to answer the core viral-loop question: how often does a shared challenge turn into another completed game?
+This is intended to answer the core viral-loop question: how often does a completed result become a real share, then an opened, started, and completed friend challenge? `share_completed` records `native`, `native_file`, `copy_fallback`, or `copy_link`; seeded events carry the game seed so the funnel can be tied to the exact pack. Run `analytics/viral_funnel.sql` for the daily conversion view and viral completion rate.
 
 ## My Stats
 
@@ -150,7 +150,7 @@ python scripts/build_replays.py \
   --max-output-drafts 300 \
   --minimum-picks 30 \
   --folds 5 \
-  --shard-size 10 \
+  --shard-size 2 \
   --card-metadata generated/msh-cards.json
 python scripts/validate_dataset.py data/msh/manifest.json --minimum-replays 100
 ```

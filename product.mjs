@@ -1,9 +1,11 @@
 import { gameShareUrl, makeGameSeed, seededRandom, cleanSeed } from './gameplay.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
+import { preloadSeededReplay } from './replay-data.mjs';
 
 const SHARE_ORIGIN = 'https://magic.planitnow.us/';
 let autoStarting = false;
 let autoStarted = false;
+let preparedNextGame = null;
 
 function esc(value) {
   return String(value ?? '')
@@ -42,10 +44,30 @@ function setGameUrl({ seed, mode, setId, score = null, name = null, replace = tr
 }
 
 function beginFreshGame(mode) {
-  const seed = freshSeed();
+  const setId = currentSet();
+  const prepared = preparedNextGame?.mode === mode && preparedNextGame?.setId === setId ? preparedNextGame : null;
+  const seed = prepared?.seed || freshSeed();
+  preparedNextGame = null;
   seedGameRandom(seed);
-  setGameUrl({ seed, mode, setId: currentSet() });
+  setGameUrl({ seed, mode, setId });
   return seed;
+}
+
+function prepareNextGame(mode) {
+  const setId = currentSet();
+  const sourceSeed = currentSeed();
+  if (!setId || !sourceSeed || !mode) return;
+  const key = `${setId}:${mode}:${sourceSeed}`;
+  if (preparedNextGame?.key === key) return;
+  const seed = freshSeed();
+  preparedNextGame = { key, setId, mode, seed };
+  void preloadSeededReplay({ setId, seed }).catch(() => null);
+}
+
+function emitShareCompleted(method, context = 'challenge') {
+  document.dispatchEvent(new CustomEvent('pack1:share-completed', {
+    detail: { method, context, challenge: true },
+  }));
 }
 
 function resultScore(root = document) {
@@ -128,23 +150,33 @@ async function shareSeededGame(button, mode) {
   const score = resultScore();
   const grade = document.querySelector('.grade-badge')?.textContent || '';
   const url = seededChallengeUrl(score, mode);
-  const text = `Pack 1 · ${mode === 'full' ? 'Full Pack' : 'Top 3'}\n${score}/100${grade ? ` (${grade})` : ''}\nPlay the exact same pack and beat me.`;
+  const challenger = playerName();
+  const text = `${challenger} scored ${score}/100 in Pack One ${mode === 'full' ? 'Full Pack' : 'Top 3'}${grade ? ` (${grade})` : ''}.
+Same exact pack. Can you beat that?`;
   const original = button.textContent;
   button.disabled = true;
   button.textContent = 'Making challenge…';
   try {
     const blob = await scoreImage({ score, grade, mode, setId: currentSet() });
     const file = blob ? new File([blob], 'pack1-result.png', { type: 'image/png' }) : null;
-    if (file && navigator.canShare?.({ files: [file] })) await navigator.share({ title: 'Pack 1', text, url, files: [file] });
-    else if (navigator.share) await navigator.share({ title: 'Pack 1', text, url });
-    else {
-      await copyText(`${text}\n${url}`);
+    if (file && navigator.canShare?.({ files: [file] })) {
+      await navigator.share({ title: 'Pack One challenge', text, url, files: [file] });
+      emitShareCompleted('native_file', 'result_challenge');
+    } else if (navigator.share) {
+      await navigator.share({ title: 'Pack One challenge', text, url });
+      emitShareCompleted('native', 'result_challenge');
+    } else {
+      await copyText(`${text}
+${url}`);
       button.textContent = 'Challenge copied';
+      emitShareCompleted('copy_fallback', 'result_challenge');
     }
   } catch (error) {
     if (error?.name !== 'AbortError') {
-      await copyText(`${text}\n${url}`).catch(() => null);
+      await copyText(`${text}
+${url}`).catch(() => null);
       button.textContent = 'Challenge copied';
+      emitShareCompleted('copy_fallback', 'result_challenge');
     }
   }
   setTimeout(() => { button.disabled = false; button.textContent = original; }, 1300);
@@ -153,9 +185,22 @@ async function shareSeededGame(button, mode) {
 async function copySeededLink(button, mode) {
   const score = resultScore();
   await copyText(seededChallengeUrl(score, mode));
+  emitShareCompleted('copy_link', 'result_challenge');
   const original = button.textContent;
   button.textContent = 'Link copied';
   setTimeout(() => { button.textContent = original; }, 1200);
+}
+
+function prioritizeChallenge(actions, share, another) {
+  if (!actions || !share) return;
+  share.textContent = 'Challenge a friend';
+  share.classList.remove('share-button', 'secondary');
+  share.classList.add('primary', 'challenge-primary');
+  if (another) {
+    another.classList.remove('primary');
+    another.classList.add('secondary');
+  }
+  actions.prepend(share);
 }
 
 function addReplayButton(actions, mode) {
@@ -205,9 +250,10 @@ function enhanceTopThreeResult() {
   const share = reveal.querySelector('#share-top3');
   const home = reveal.querySelector('#top3-home');
   if (another) another.textContent = isDailyResult(reveal) ? 'Play another game' : 'New pack';
-  if (share) share.textContent = 'Challenge a friend';
   if (home) home.textContent = 'Home';
+  prioritizeChallenge(actions, share, another);
   if (actions && currentSeed()) addReplayButton(actions, 'top3');
+  prepareNextGame('top3');
 
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
@@ -229,10 +275,11 @@ function enhanceFullResult() {
   const share = scorecard.querySelector('#share-full');
   const home = scorecard.querySelector('#summary-home');
   if (another) another.textContent = isDailyResult(scorecard) ? 'Play another game' : 'New pack';
-  if (share) share.textContent = currentSeed() ? 'Challenge a friend' : 'Share score';
   if (home) home.textContent = 'Home';
   const actions = scorecard.querySelector('.result-actions');
+  prioritizeChallenge(actions, share, another);
   if (actions && currentSeed()) addReplayButton(actions, 'full');
+  prepareNextGame('full');
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
@@ -278,11 +325,11 @@ function captureGameClicks(event) {
   const another = event.target.closest?.('#another-top3, #another-full');
   if (another && currentSeed()) beginFreshGame(another.id.includes('top3') ? 'top3' : 'full');
 
-  const shareFull = event.target.closest?.('#share-full');
-  if (shareFull && currentSeed()) {
+  const share = event.target.closest?.('#share-top3, #share-full');
+  if (share && currentSeed()) {
     event.preventDefault();
     event.stopImmediatePropagation();
-    void shareSeededGame(shareFull, 'full');
+    void shareSeededGame(share, share.id === 'share-full' ? 'full' : 'top3');
   }
 }
 

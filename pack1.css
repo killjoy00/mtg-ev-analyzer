@@ -221,10 +221,14 @@ h3 {
   gap: 16px;
   align-items: stretch;
 }
+.mode-section { margin-top: 26px; }
+.mode-section-heading { margin-bottom: 12px; display: flex; justify-content: space-between; gap: 24px; align-items: end; }
+.mode-section-heading h2 { margin-bottom: 0; font-size: clamp(22px, 2.6vw, 30px); }
+.mode-section-heading > p { max-width: 500px; margin: 0; color: var(--muted); font-size: 12px; text-align: right; }
 .mode-card {
   position: relative;
   min-width: 0;
-  min-height: 340px;
+  min-height: 210px;
   padding: 28px;
   display: flex;
   flex-direction: column;
@@ -840,4 +844,24 @@ h3 {
 @media (max-width: 680px) {
   .game-heading { display: block; }
   .game-heading > .challenge-callout { margin-bottom: 18px; }
+}
+
+
+/* Growth-loop release */
+.daily-feature { padding: 34px; grid-template-columns: minmax(0, 1.45fr) minmax(300px, .55fr); }
+.daily-feature .daily-copy h2 { font-size: clamp(34px, 4.5vw, 52px); letter-spacing: -.04em; }
+.daily-main { min-height: 64px; }
+.daily-main span { font-size: 15px; }
+.daily-secondary { min-height: 50px; }
+.daily-leader-link { justify-self: center; font-size: 12px; }
+.challenge-primary { min-width: 190px; }
+.result-actions .challenge-primary { order: -2; }
+.result-actions .challenge-return { order: -3; }
+
+@media (max-width: 760px) {
+  .mode-section-heading { display: block; }
+  .mode-section-heading > p { margin-top: 6px; text-align: left; }
+  .daily-feature { padding: 24px; }
+  .daily-feature .daily-copy h2 { font-size: 36px; }
+  .challenge-primary, .challenge-return { width: 100%; }
 }
