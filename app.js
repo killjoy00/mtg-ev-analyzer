@@ -3,6 +3,7 @@ import { challengeIndex, computeStreak, unlockedMilestones, utcDateKey } from '.
 import { isLeaderboardConfigured, loadLeaderboard, submitLeaderboardScore, updateLeaderboardDisplayName } from './leaderboard.mjs';
 import { loadReplayJson } from './replay-data.mjs';
 import { tcgplayerUrl } from './tcgplayer.mjs';
+import { conditionCandidatesForPath, pathHasDiverged } from './path-model.mjs';
 
 const app = document.querySelector('#app');
 const brandHome = document.querySelector('#brand-home');
@@ -17,6 +18,7 @@ const state = {
   selectedSetId: null,
   setData: null,
   replay: null,
+  pathModel: null,
   mode: null,
   packPicks: [],
   pickIndex: 0,
@@ -62,6 +64,7 @@ function goHome() {
 function resetSession() {
   state.setData = null;
   state.replay = null;
+  state.pathModel = null;
   state.mode = null;
   state.packPicks = [];
   state.pickIndex = 0;
@@ -90,6 +93,27 @@ async function loadSet(setEntry) {
   const path = setEntry.manifest_path || setEntry.data_path;
   if (!path) throw new Error(`${setEntry.name} has no data path.`);
   return loadJson(path, setEntry.name);
+}
+
+const pathModelCache = new Map();
+
+async function loadPathModel(setEntry) {
+  const setId = String(setEntry?.id || '').toLowerCase();
+  if (!setId) return null;
+  if (pathModelCache.has(setId)) return pathModelCache.get(setId);
+  const path = setEntry.path_model_path || `./data/${setId}/path-model.json`;
+  try {
+    const model = await loadJson(path, `${setEntry.name} path model`);
+    if (model?.model_version !== 'strong-player-counterfactual-path-v3') {
+      throw new Error(`Unsupported path model for ${setEntry.name}.`);
+    }
+    pathModelCache.set(setId, model);
+    return model;
+  } catch (error) {
+    console.warn('Counterfactual path model unavailable; using historical-path support.', error);
+    pathModelCache.set(setId, null);
+    return null;
+  }
 }
 
 function chooseWeightedShard(shards) {
@@ -415,11 +439,15 @@ async function startMode(mode, options = {}) {
   try {
     const daily = Boolean(options.daily);
     const date = options.date || utcDateKey();
-    const loaded = daily ? await loadChallengeReplay(entry, date, mode) : await loadRandomReplay(entry);
+    const [loaded, pathModel] = await Promise.all([
+      daily ? loadChallengeReplay(entry, date, mode) : loadRandomReplay(entry),
+      mode === 'full' ? loadPathModel(entry) : Promise.resolve(null),
+    ]);
     const packPicks = firstPackPicks(loaded.replay);
     if (!packPicks.length) throw new Error('This replay does not contain a first pack.');
     state.setData = loaded.setData;
     state.replay = loaded.replay;
+    state.pathModel = pathModel;
     state.mode = mode;
     state.packPicks = packPicks;
     state.pickIndex = 0;
@@ -592,6 +620,38 @@ function currentPick() {
   return state.packPicks[state.pickIndex];
 }
 
+function addPoolCard(pool, name) {
+  if (!name) return pool;
+  pool[name] = (Number(pool[name]) || 0) + 1;
+  return pool;
+}
+
+function userPoolBeforePick(index = state.pickIndex) {
+  // Some stored seats begin after P1P1. Unseen earlier cards are inherited from
+  // the replay's starting pool; every decision the player actually makes then
+  // replaces the historical drafter's choice in the counterfactual path.
+  const pool = { ...(state.packPicks[0]?.pool || {}) };
+  for (const result of state.results.slice(0, Math.max(0, index))) addPoolCard(pool, result.selectedName);
+  return pool;
+}
+
+function conditionedPick(pick = currentPick()) {
+  if (!pick) return pick;
+  const userPool = userPoolBeforePick();
+  const candidates = conditionCandidatesForPath(pick.candidates, {
+    pickNumber: Number(pick.pick_number),
+    historicalPool: pick.pool || {},
+    userPool,
+    pathModel: state.pathModel,
+  });
+  return {
+    ...pick,
+    candidates,
+    user_pool: userPool,
+    path_diverged: pathHasDiverged(pick.pool || {}, userPool),
+  };
+}
+
 function renderPickFeedback(pick) {
   if (!state.revealed) return '';
   const result = state.results[state.results.length - 1];
@@ -601,16 +661,16 @@ function renderPickFeedback(pick) {
       <div class="feedback-title"><div><p class="eyebrow">Pick ${state.pickIndex + 1}</p><h2>${esc(result.verdict)}</h2></div><div class="pick-score ${scoreTone(result.score)}"><strong>${result.score}</strong><span>/100</span></div></div>
       <div class="feedback-grid">
         <div><span>You took</span><strong>${esc(result.selectedName)}</strong></div>
-        <div><span>Consensus</span><strong>${esc(result.bestName)}</strong><a class="market-link" href="${esc(tcgplayerUrl(result.bestName))}" target="_blank" rel="sponsored noopener" data-tcgplayer-link="1" data-tcgplayer-card="${esc(result.bestName)}" data-tcgplayer-set="${esc(state.selectedSetId)}" data-tcgplayer-surface="full_pick_consensus">TCGplayer</a></div>
-        <div><span>Consensus rank</span><strong>#${esc(result.rank)}</strong></div>
-        <div><span>Consensus gap</span><strong>${result.gap ? `${(result.gap * 100).toFixed(1)} pts` : '—'}</strong></div>
+        <div><span>${result.pathDiverged ? 'Your-path leader' : 'Strong-player leader'}</span><strong>${esc(result.bestName)}</strong><a class="market-link" href="${esc(tcgplayerUrl(result.bestName))}" target="_blank" rel="sponsored noopener" data-tcgplayer-link="1" data-tcgplayer-card="${esc(result.bestName)}" data-tcgplayer-set="${esc(state.selectedSetId)}" data-tcgplayer-surface="full_pick_consensus">TCGplayer</a></div>
+        <div><span>Your support</span><strong>${pct(result.selectedProbability, 1)}</strong></div>
+        <div><span>Support gap</span><strong>${result.gap ? `${(result.gap * 100).toFixed(1)} pts` : '—'}</strong></div>
         <div><span>Real drafter</span><strong>${esc(historical?.name || 'Unknown')}${result.historicalMatch ? ' ✓' : ''}</strong></div>
       </div>
     </section>`;
 }
 
 function renderFullPack() {
-  const pick = currentPick();
+  const pick = conditionedPick();
   const total = state.packPicks.length;
   const progress = ((state.pickIndex + (state.revealed ? 1 : 0)) / total) * 100;
   const selected = pick.candidates.find((card) => card.id === state.selectedCardId);
@@ -626,7 +686,7 @@ function renderFullPack() {
         ${renderPickFeedback(pick)}
         <div class="action-dock inline-dock"><div><strong>${selected ? esc(selected.name) : 'Choose a card.'}</strong><span>${state.revealed ? 'Your pick score is above.' : 'Lock it in when you are ready.'}</span></div>${state.revealed ? `<button class="button primary" id="next-pick">${state.pickIndex === total - 1 ? 'See final score' : 'Next pick'}</button>` : `<button class="button primary" id="submit-pick" ${selected ? '' : 'disabled'}>Lock in pick</button>`}</div>
       </div>
-      <aside class="replay-sidebar"><section class="sidebar-card"><p class="eyebrow">Replay pool</p><h3>Cards entering this pick</h3>${renderPool(pick.pool)}</section><section class="sidebar-card quiet"><h3>Why the pool is fixed</h3><p>This is a replay, not a draft simulator. Later decisions and consensus stay tied to the original seat, even when your picks differ.</p></section></aside>
+      <aside class="replay-sidebar"><section class="sidebar-card"><p class="eyebrow">Your path</p><h3>Your pool so far</h3>${renderPool(pick.user_pool)}</section><section class="sidebar-card quiet"><h3>What stays fixed</h3><p>The available cards still come from the historical replay. Your later-pick support now reconditions on the cards you actually chose; Pack One does not simulate how seven other drafters might change what wheels.</p></section></aside>
     </section>`;
 
   attachCardImageFallbacks();
@@ -638,9 +698,9 @@ function renderFullPack() {
 
 function submitPick() {
   if (!state.selectedCardId || state.revealed) return;
-  const pick = currentPick();
+  const pick = conditionedPick();
   const grade = gradePick(pick.candidates, state.selectedCardId, pick.historical_pick_id);
-  state.results.push({ ...grade, pack_number: 1, pick_number: state.pickIndex + 1 });
+  state.results.push({ ...grade, pack_number: 1, pick_number: state.pickIndex + 1, pathDiverged: Boolean(pick.path_diverged) });
   state.revealed = true;
   renderFullPack();
 }
@@ -661,7 +721,7 @@ function methodNote() {
   if (state.setData.is_fixture) return 'This is interface fixture data, not a real 17Lands-trained replay.';
   const cohort = state.setData.cohort || {};
   const model = state.setData.model || {};
-  return `Generated offline from ${state.setData.source?.provider || '17Lands'} public draft data. ${Number(cohort.training_drafts || 0).toLocaleString()} high-win-rate drafts train the consensus model with ${model.holdout || 'draft-level holdout'}. Pick scores compare your card's model support with the top-supported card in that pack. Probabilities are comparative, not calibrated odds that a choice is objectively correct.`;
+  return `Generated offline from ${state.setData.source?.provider || '17Lands'} public draft data. ${Number(cohort.training_drafts || 0).toLocaleString()} high-win-rate drafts train the consensus model with ${model.holdout || 'draft-level holdout'}. In Full Pack, later support is reconditioned on the cards you actually selected using separate strong-player co-pick statistics that exclude the replay seats. Available cards still follow the historical replay, so this is path-aware grading rather than a simulation of the other seven drafters.`;
 }
 
 function fullPackShareText(summary) {
@@ -683,10 +743,10 @@ function renderSummary() {
       <p class="eyebrow">${state.isDailyChallenge ? 'Daily Challenge complete' : 'Full Pack complete'}</p>
       ${renderScoreHero(summary.score, summary.grade, summary.gradeLabel, state.scoreMeta)}
       ${dailySubmissionMarkup()}
-      <p class="lede result-lede">You made ${summary.total} decisions. Here's where your instincts lined up with the strong-player consensus.</p>
+      <p class="lede result-lede">You made ${summary.total} decisions. Here's where your picks lined up with the strong-player model along the path you actually drafted.</p>
       <div class="summary-grid">
-        <div class="summary-stat"><strong>${summary.consensusAgreement.toFixed(0)}%</strong><span>Consensus picks</span></div>
-        <div class="summary-stat"><strong>${summary.topThreeAgreement.toFixed(0)}%</strong><span>Top-3 picks</span></div>
+        <div class="summary-stat"><strong>${summary.consensusAgreement.toFixed(0)}%</strong><span>Path-leader picks</span></div>
+        <div class="summary-stat"><strong>${summary.topThreeAgreement.toFixed(0)}%</strong><span>Path top-3 picks</span></div>
         <div class="summary-stat"><strong>${summary.historicalAgreement.toFixed(0)}%</strong><span>Matched drafter</span></div>
         <div class="summary-stat"><strong>${(summary.averageGap * 100).toFixed(1)}</strong><span>Avg. gap, pts</span></div>
       </div>

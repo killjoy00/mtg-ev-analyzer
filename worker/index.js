@@ -138,6 +138,9 @@ async function loadDailyReplay(date, setId, mode) {
   const setEntry = (catalog.sets || []).find((set) => set.id === setId);
   if (!setEntry) throw Object.assign(new Error('Unknown set.'), { status: 400 });
   const setData = await staticJson(setEntry.manifest_path || setEntry.data_path);
+  const pathModel = mode === 'full'
+    ? await staticJson(setEntry.path_model_path || `data/${setId}/path-model.json`)
+    : null;
   if (setData.shards?.length) {
     const total = setData.shards.reduce((sum, shard) => sum + Number(shard.replay_count || 0), 0);
     let index = challengeIndex(date, setId, mode, total);
@@ -145,7 +148,7 @@ async function loadDailyReplay(date, setId, mode) {
       const count = Number(shardMeta.replay_count || 0);
       if (index < count) {
         const shard = await staticJson(shardMeta.path);
-        return { replay: shard.replays?.[index], featured: featuredSetId(catalog) === setId };
+        return { replay: shard.replays?.[index], featured: featuredSetId(catalog) === setId, pathModel };
       }
       index -= count;
     }
@@ -154,6 +157,7 @@ async function loadDailyReplay(date, setId, mode) {
   return {
     replay: replays[challengeIndex(date, setId, mode, replays.length)],
     featured: featuredSetId(catalog) === setId,
+    pathModel,
   };
 }
 
@@ -228,7 +232,7 @@ async function handleScore(request) {
     top = selections;
     details = { overlap: result.overlap, exactPositions: result.exactPositions };
   } else {
-    result = gradeFullPack(loaded.replay, selections);
+    result = gradeFullPack(loaded.replay, selections, loaded.pathModel);
     details = {
       consensusAgreement: result.consensusAgreement,
       topThreeAgreement: result.topThreeAgreement,
