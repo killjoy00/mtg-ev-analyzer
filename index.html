@@ -4,17 +4,19 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f4f0e6" />
-  <meta name="description" content="Play Pack 1, score your Limited draft instincts out of 100, and compare with strong-player consensus from real 17Lands drafts." />
+  <meta name="description" content="Play Pack 1, take the Daily Challenge, score your Limited draft instincts out of 100, and climb the leaderboard." />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Pack 1 — How good are your draft instincts?" />
-  <meta property="og:description" content="Play a real Pack 1, get a score out of 100, and challenge a friend to beat it." />
+  <meta property="og:description" content="Play the same Pack 1 Daily Challenge as everyone else, get a score out of 100, and challenge a friend to beat it." />
   <meta property="og:url" content="https://magic.planitnow.us/" />
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="Pack 1 — Limited Draft Training" />
-  <meta name="twitter:description" content="Play a real Pack 1, get a score out of 100, and challenge a friend to beat it." />
+  <meta name="twitter:description" content="Play the Pack 1 Daily Challenge, get a score out of 100, and challenge a friend to beat it." />
   <title>Pack 1 — Limited Draft Training</title>
   <link rel="stylesheet" href="styles.css" />
   <link rel="stylesheet" href="score.css" />
+  <link rel="stylesheet" href="engagement.css" />
+  <link rel="stylesheet" href="social.css" />
 </head>
 <body>
   <div class="app-shell">
@@ -26,7 +28,11 @@
           <small>Limited draft training</small>
         </span>
       </button>
-      <span class="source-note">Built from real 17Lands draft data</span>
+      <div class="top-actions">
+        <button class="top-nav-button" id="daily-nav" type="button">Daily</button>
+        <button class="top-nav-button" id="leaderboard-nav" type="button">Leaders</button>
+        <span class="source-note">Built from real 17Lands draft data</span>
+      </div>
     </header>
 
     <main id="app" class="app" aria-live="polite"></main>
@@ -39,6 +45,7 @@
     </section>
   </template>
 
-  <script type="module" src="app.js"></script>
+  <script src="leaderboard-config.js"></script>
+  <script type="module" src="bootstrap.mjs"></script>
 </body>
 </html>
