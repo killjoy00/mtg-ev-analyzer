@@ -3,31 +3,31 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#101410" />
-  <meta name="description" content="Replay real Limited draft decisions and compare your picks with strong-player consensus." />
-  <title>Draft Study</title>
+  <meta name="theme-color" content="#f4f0e6" />
+  <meta name="description" content="Pack 1 is a Limited draft training game built from real 17Lands replay data." />
+  <title>Pack 1 — Limited Draft Training</title>
   <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
-      <button class="brand" id="brand-home" type="button" aria-label="Return home">
-        <span class="brand-mark">DS</span>
-        <span>
-          <strong>Draft Study</strong>
-          <small>17Lands replay trainer</small>
+      <button class="brand" id="brand-home" type="button" aria-label="Return to Pack 1 home">
+        <span class="brand-mark">P1</span>
+        <span class="brand-copy">
+          <strong>Pack 1</strong>
+          <small>Limited draft training</small>
         </span>
       </button>
-      <div class="source-note">Offline consensus · no runtime AI</div>
+      <span class="source-note">Built from real 17Lands draft data</span>
     </header>
 
     <main id="app" class="app" aria-live="polite"></main>
   </div>
 
   <template id="loading-template">
-    <section class="center-card">
+    <section class="message-card">
       <p class="eyebrow">Loading</p>
-      <h1>Preparing replay data…</h1>
+      <h1>Shuffling a pack…</h1>
     </section>
   </template>
 
