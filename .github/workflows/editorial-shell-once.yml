@@ -6,6 +6,7 @@ on:
       - feature/editorial-monetization-shell
     paths:
       - scripts/editorial_monetization_sprint.py
+      - scripts/repair_editorial_sprint.py
       - .github/workflows/editorial-shell-once.yml
 
 permissions:
@@ -24,6 +25,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Repair generated-data selector
+        run: python scripts/repair_editorial_sprint.py
       - name: Generate editorial and monetization shell
         run: python scripts/editorial_monetization_sprint.py
       - name: Run test suite
@@ -37,7 +40,7 @@ jobs:
           test -f tcgplayer.mjs
       - name: Commit generated release
         run: |
-          rm scripts/editorial_monetization_sprint.py .github/workflows/editorial-shell-once.yml
+          rm scripts/editorial_monetization_sprint.py scripts/repair_editorial_sprint.py .github/workflows/editorial-shell-once.yml
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add -A
