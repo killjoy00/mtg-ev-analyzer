@@ -44,21 +44,6 @@ function freshGameUrl(mode) {
   });
 }
 
-function replaceTextNodes(root = document) {
-  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-  const nodes = [];
-  while (walker.nextNode()) nodes.push(walker.currentNode);
-  for (const node of nodes) {
-    if (!node.nodeValue) continue;
-    node.nodeValue = node.nodeValue
-      .replace(/Practice run\./g, 'Replay.')
-      .replace(/practice replay/gi, 'replay')
-      .replace(/practice attempt/gi, 'replay')
-      .replace(/Practice runs never count\./g, 'Only Daily Challenge runs count toward the board.')
-      .replace(/Daily rankings reset at 00:00 UTC\./g, 'Daily rankings reset at midnight Eastern.');
-  }
-}
-
 function captureFlow(event) {
   const daily = event.target.closest?.('[data-daily-mode]');
   if (daily) setDailyUrl(daily.dataset.dailyMode);
@@ -76,7 +61,4 @@ function captureFlow(event) {
 export function installFlowFixes() {
   migrateDailyHistory();
   document.addEventListener('click', captureFlow, true);
-  const app = document.querySelector('#app');
-  if (app) new MutationObserver(() => replaceTextNodes(app)).observe(app, { childList: true, subtree: true });
-  replaceTextNodes(app || document);
 }

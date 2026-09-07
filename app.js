@@ -1,6 +1,7 @@
 import { gradePick, gradeTopThree, rankCandidates, summarizeResults } from './scoring.mjs';
 import { challengeIndex, computeStreak, unlockedMilestones, utcDateKey } from './engagement.mjs';
 import { isLeaderboardConfigured, loadLeaderboard, submitLeaderboardScore, updateLeaderboardDisplayName } from './leaderboard.mjs';
+import { loadReplayJson } from './replay-data.mjs';
 
 const app = document.querySelector('#app');
 const brandHome = document.querySelector('#brand-home');
@@ -77,9 +78,7 @@ function resetSession() {
 }
 
 async function loadJson(path, label = 'data') {
-  const response = await fetch(path, { cache: 'no-store' });
-  if (!response.ok) throw new Error(`Could not load ${label} (${response.status}).`);
-  return response.json();
+  return loadReplayJson(path, label);
 }
 
 async function loadCatalog() {
@@ -332,9 +331,9 @@ function renderHome() {
 
   app.innerHTML = `
     <section class="home-intro">
-      <p class="eyebrow">Limited draft training</p>
-      <h1>How good is your Pack 1?</h1>
-      <p class="lede">Real draft seats. Strong-player consensus. Play a quick opening-pack challenge or draft the whole first pack and get a score out of 100.</p>
+      <p class="eyebrow">LIMITED DRAFT GAME</p>
+      <h1>Pack One</h1>
+      <p class="lede">Draft real opening packs from 17Lands. Rank your Top 3 or play the full first pack, then compare your choices with the strong-player consensus.</p>
     </section>
 
     <section class="set-bar" aria-label="Set selection">
@@ -347,11 +346,11 @@ function renderHome() {
       <p class="set-meta" id="set-meta">${setMetaLine(active)}</p>
     </section>
 
-    <section class="daily-card" id="daily-challenge">
+    <section class="daily-card daily-feature" id="daily-challenge">
       <div class="daily-copy">
         <div class="daily-kicker"><span class="live-dot"></span><span>Daily Challenge</span><span class="streak-chip">${streak ? `${streak}-day streak` : 'Start a streak'}</span></div>
-        <h2>Same challenge. Same day. Global board.</h2>
-        <p>Everyone gets the same replay for each mode, so the score is actually comparable. Your first attempt today is the ranked one.</p>
+        <h2>One pack. One ranked shot.</h2>
+        <p>Everyone sees the same draft seat today. Your first Top 3 and Full Pack scores are the ones that go on the board.</p>
         ${milestoneMarkup()}
       </div>
       <div class="daily-actions">
@@ -362,29 +361,29 @@ function renderHome() {
       </div>
     </section>
 
-    <section class="mode-grid" aria-label="Choose a practice mode">
-      <article class="mode-card">
+    <section class="mode-grid" aria-label="Choose a game mode">
+      <article class="mode-card game-mode-row">
         <div class="mode-number">01</div>
-        <div class="mode-topline"><p class="eyebrow">Practice</p>${bestChip('top3')}</div>
+        <div class="mode-topline"><p class="eyebrow">Opening pack</p>${bestChip('top3')}</div>
         <h2>Top 3</h2>
-        <p>See one fresh opening pack and rank the three cards you'd most want to start with. Score your card evaluation and ordering against consensus.</p>
-        <ul class="mode-points"><li>One opening pack</li><li>100-point score</li><li>Unlimited practice</li></ul>
+        <p>Rank your top three from one fresh opening pack. Fast, opinionated, and built to argue about.</p>
+        <ul class="mode-points"><li>One pack</li><li>Top-three score</li><li>Share the exact seed</li></ul>
         <button class="button primary mode-button" data-mode="top3">Play Top 3</button>
       </article>
 
-      <article class="mode-card featured">
+      <article class="mode-card game-mode-row featured">
         <div class="mode-number">02</div>
-        <div class="mode-topline"><p class="eyebrow">Practice</p>${bestChip('full')}</div>
+        <div class="mode-topline"><p class="eyebrow">Full first pack</p>${bestChip('full')}</div>
         <h2>Full Pack</h2>
-        <p>Work through every pick in the first pack of a real draft seat. Every decision gets a score, then the whole pack gets a grade.</p>
-        <ul class="mode-points"><li>Every Pack 1 decision</li><li>Live pick scores</li><li>Final grade + share card</li></ul>
-        <button class="button primary mode-button" data-mode="full">Draft Pack 1</button>
+        <p>Play every pick in Pack One. Your choices get scored as the seat develops.</p>
+        <ul class="mode-points"><li>Every first-pack pick</li><li>100-point finish</li><li>Share the exact seed</li></ul>
+        <button class="button primary mode-button" data-mode="full">Play Full Pack</button>
       </article>
     </section>
 
     <section class="data-note">
-      <strong>How scoring works</strong>
-      <span>Scores measure how much strong-player model support your choices had relative to the consensus choice. Public leaderboards use Daily Challenge scores only; random practice runs never count.</span>
+      <strong>What “consensus” means</strong>
+      <span>Consensus is a model of experienced, high-win-rate 17Lands drafters. It compares how much support each card gets in the current pack and historical pool. The percentages are relative model support—not win rates, card grades, or objective truth. Your score measures how closely your choices track that model; only Daily Challenge scores rank.</span>
     </section>`;
 
   document.querySelector('#set-select').addEventListener('change', (event) => {
@@ -486,7 +485,8 @@ function renderScoreHero(score, grade, label, meta) {
       <div class="score-copy">
         <div class="grade-row"><span class="grade-badge">${esc(grade)}</span>${meta?.isNewBest ? '<span class="new-best">New personal best</span>' : ''}</div>
         <h2>${esc(label)}</h2>
-        ${meta ? `<p>Personal best: <strong>${meta.best}</strong></p>` : ''}
+        ${meta && !meta.isNewBest ? `<p>Personal best: <strong>${meta.best}</strong></p>` : ''}
+        <p class="score-context">Consensus alignment score — not win probability or an objective card grade.</p>
       </div>
     </div>`;
 }
@@ -494,7 +494,7 @@ function renderScoreHero(score, grade, label, meta) {
 function dailySubmissionMarkup() {
   if (!state.isDailyChallenge) return '';
   const existing = challengeRecord(state.challengeDate, state.selectedSetId, state.mode);
-  if (!state.challengeRanked && existing) return `<div class="challenge-status practice">Practice run. Today's ranked score is already locked at <strong>${existing.score}/100</strong>.</div>`;
+  if (!state.challengeRanked && existing) return `<div class="challenge-status practice">Replay. Today's ranked score is already locked at <strong>${existing.score}/100</strong>.</div>`;
   if (state.challengeDate !== utcDateKey()) return '<div class="challenge-status practice">Shared challenge replay. Only today’s challenge can enter the live board.</div>';
   if (state.challengeSubmitStatus === 'saved') return `<div class="challenge-status saved">On the board${state.challengeRank ? ` · <strong>#${state.challengeRank} today</strong>` : ''}.</div>`;
   if (state.challengeSubmitStatus === 'local') return '<div class="challenge-status practice">Ranked score saved on this device. Global sync is not configured yet.</div>';
@@ -516,7 +516,7 @@ function renderTopThreeReveal() {
       </div>
       <p class="reveal-note">${result.overlap}/3 consensus cards · ${result.exactPositions} exact ${result.exactPositions === 1 ? 'position' : 'positions'}. ${result.historicalRank ? `The historical drafter's first pick was #${result.historicalRank} on your list.` : `The historical drafter's first pick was outside your top three.`}</p>
       <div class="button-row result-actions">
-        ${state.isDailyChallenge ? '<button class="button primary" id="challenge-leaders">Today’s leaderboard</button><button class="button secondary" id="another-top3">Practice this pack</button>' : '<button class="button primary" id="another-top3">Play another</button>'}
+        ${state.isDailyChallenge ? '<button class="button primary" id="challenge-leaders">Today’s leaderboard</button><button class="button secondary" id="another-top3">Play another game</button>' : '<button class="button primary" id="another-top3">Play another</button>'}
         <button class="button share-button" id="share-top3">Share score</button>
         <button class="button secondary" id="top3-home">Choose a mode</button>
       </div>
@@ -533,7 +533,7 @@ function renderTopThree() {
     </section>
     <div class="pack-grid opening-pack">${pick.candidates.map((card) => renderCard(card, pick, { mode: 'top3', reveal: state.revealed })).join('')}</div>
     ${renderTopThreeReveal()}
-    ${state.revealed ? '' : `<div class="action-dock"><div><strong>${count === 0 ? 'Pick your #1.' : count === 1 ? 'Now pick #2.' : count === 2 ? 'One more: pick #3.' : 'Ranking ready.'}</strong><span>${count}/3 selected${state.isDailyChallenge && !state.challengeRanked ? ' · practice attempt' : ''}</span></div><button class="button primary" id="reveal-top3" ${count === 3 ? '' : 'disabled'}>Reveal score</button></div>`}`;
+    ${state.revealed ? '' : `<div class="action-dock"><div><strong>${count === 0 ? 'Pick your #1.' : count === 1 ? 'Now pick #2.' : count === 2 ? 'One more: pick #3.' : 'Ranking ready.'}</strong><span>${count}/3 selected${state.isDailyChallenge && !state.challengeRanked ? ' · replay' : ''}</span></div><button class="button primary" id="reveal-top3" ${count === 3 ? '' : 'disabled'}>Reveal score</button></div>`}`;
 
   attachCardImageFallbacks();
   if (!state.revealed) document.querySelectorAll('[data-card-id]').forEach((button) => button.addEventListener('click', () => toggleTopThree(button.dataset.cardId)));
@@ -602,7 +602,7 @@ function renderFullPack() {
   const selected = pick.candidates.find((card) => card.id === state.selectedCardId);
   app.innerHTML = `
     <section class="game-heading compact">
-      <div><p class="eyebrow">${state.isDailyChallenge ? `Daily Challenge · ${state.challengeDate}` : 'Full Pack'} · ${esc(state.setData.name)}</p><h1>Pick ${state.pickIndex + 1} of ${total}</h1><p class="game-instruction">Choose the card you'd take from this seat.${state.isDailyChallenge && !state.challengeRanked ? ' This is a practice replay of today’s challenge.' : ''}</p></div>
+      <div><p class="eyebrow">${state.isDailyChallenge ? `Daily Challenge · ${state.challengeDate}` : 'Full Pack'} · ${esc(state.setData.name)}</p><h1>Pick ${state.pickIndex + 1} of ${total}</h1><p class="game-instruction">Choose the card you'd take from this seat.${state.isDailyChallenge && !state.challengeRanked ? ' This is a replay of today’s challenge.' : ''}</p></div>
       <button class="text-button" id="quit-game">Exit</button>
     </section>
     <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
@@ -679,7 +679,7 @@ function renderSummary() {
       <section class="review-section"><h2>Worth another look</h2><div class="miss-list">${summary.biggestMisses.length ? summary.biggestMisses.map((result) => `<div class="miss-row"><span class="pick-number">Pick ${esc(result.pick_number)}</span><div><strong>${esc(result.selectedName)}</strong><small>Consensus: ${esc(result.bestName)}</small></div><span class="gap-number">${result.score}</span></div>`).join('') : '<p class="empty-note">Nothing major. Your picks stayed close to consensus all pack.</p>'}</div></section>
       <details class="method-details"><summary>About the grading</summary><p>${esc(methodNote())}</p></details>
       <div class="button-row result-actions">
-        ${state.isDailyChallenge ? '<button class="button primary" id="challenge-leaders">Today’s leaderboard</button><button class="button secondary" id="another-full">Practice this pack</button>' : '<button class="button primary" id="another-full">Draft another Pack 1</button>'}
+        ${state.isDailyChallenge ? '<button class="button primary" id="challenge-leaders">Today’s leaderboard</button><button class="button secondary" id="another-full">Play another game</button>' : '<button class="button primary" id="another-full">Draft another Pack 1</button>'}
         <button class="button share-button" id="share-full">Share score</button>
         <button class="button secondary" id="summary-home">Choose a mode</button>
       </div>
@@ -783,7 +783,7 @@ async function renderLeaderboards(options = {}) {
     const valueLabel = leaderboardPeriodLabel(period, setFilter);
     content.innerHTML = `
       <div class="leaderboard-table-wrap"><table class="leaderboard-table"><thead><tr><th>Rank</th><th>Player</th><th>${valueLabel}</th><th>Avg</th><th>Played</th><th>100s</th></tr></thead><tbody>${rows.map((row) => `<tr class="${row.is_me ? 'is-me' : ''}"><td class="rank-cell">#${row.rank}</td><td><strong>${esc(row.display_name)}</strong>${row.is_me ? '<small>You</small>' : ''}</td><td class="points-cell">${row.points}</td><td>${Number(row.average_score).toFixed(1)}</td><td>${row.plays}</td><td>${row.perfects}</td></tr>`).join('')}</tbody></table></div>
-      <p class="leaderboard-note">${period === 'daily' ? 'Daily rankings reset at 00:00 UTC.' : 'Points are the sum of ranked Daily Challenge scores in this period.'} Practice runs never count.</p>`;
+      <p class="leaderboard-note">${period === 'daily' ? 'Daily rankings reset at midnight Eastern.' : 'Points are the sum of ranked Daily Challenge scores in this period.'} Only Daily Challenge runs count toward the board.</p>`;
   } catch (error) {
     content.innerHTML = `<div class="leaderboard-empty"><strong>Couldn’t load the standings.</strong><span>${esc(error.message)}</span></div>`;
   }
