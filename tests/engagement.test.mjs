@@ -10,6 +10,16 @@ test('challengeIndex is stable and bounded', () => {
   assert.notEqual(a, challengeIndex('2026-09-06', 'msh', 'full', 300));
 });
 
+test('Daily selector never repeats the previous day when multiple replays exist', () => {
+  let previous = challengeIndex('2026-09-01', 'msh', 'top3', 2);
+  for (let day = 2; day <= 9; day += 1) {
+    const key = `2026-09-0${day}`;
+    const current = challengeIndex(key, 'msh', 'top3', 2);
+    assert.notEqual(current, previous, `${key} repeated the prior replay`);
+    previous = current;
+  }
+});
+
 test('Daily game day resets at midnight Eastern instead of UTC', () => {
   assert.equal(gameDateKey(new Date('2026-09-07T00:30:00Z')), '2026-09-06');
   assert.equal(gameDateKey(new Date('2026-09-07T04:30:00Z')), '2026-09-07');
