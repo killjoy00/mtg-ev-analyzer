@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { test } from 'node:test';
+import { gradePick, rankCandidates } from '../scoring.mjs';
 
 async function loadSet(setId) {
   const manifest = JSON.parse(await readFile(`data/${setId}/manifest.json`, 'utf8'));
@@ -12,47 +13,46 @@ async function loadSet(setId) {
   return replays;
 }
 
-function rankedCandidates(pick) {
-  return [...(pick.candidates || [])].sort((a, b) => {
-    const delta = Number(b.model_probability || 0) - Number(a.model_probability || 0);
-    if (Math.abs(delta) > 1e-12) return delta;
-    return String(a.name).localeCompare(String(b.name));
-  });
-}
-
-test('MSH Arc Reactor consensus audit', async () => {
+test('MSH Arc Reactor never looks like a strong opening pick', async () => {
   const replays = await loadSet('msh');
-  const occurrences = [];
+  const firstPicks = [];
+
   for (const replay of replays) {
     for (const pick of replay.picks || []) {
-      const ranked = rankedCandidates(pick);
+      if (Number(pick.pack_number) !== 1 || Number(pick.pick_number) !== 1) continue;
+      const ranked = rankCandidates(pick.candidates || []);
       const index = ranked.findIndex((card) => card.name === 'Arc Reactor');
       if (index < 0) continue;
       const arc = ranked[index];
-      occurrences.push({
+      const grade = gradePick(pick.candidates, arc.id, pick.historical_pick_id);
+      firstPicks.push({
         draftId: replay.draft_id,
-        pack: pick.pack_number,
-        pick: pick.pick_number,
         rank: index + 1,
         support: Number(arc.model_probability || 0),
-        historical: pick.historical_pick_id === arc.id,
-        pool: pick.pool || {},
-        topFive: ranked.slice(0, 5).map((card, i) => ({ rank: i + 1, name: card.name, support: Number(card.model_probability || 0) })),
+        pickScore: grade.score,
+        bestName: grade.bestName,
+        bestSupport: grade.bestProbability,
       });
     }
   }
 
-  const topTwo = occurrences.filter((item) => item.rank <= 2);
-  const firstPicks = occurrences.filter((item) => item.pack === 1 && item.pick === 1);
-  console.log('ARC_REACTOR_AUDIT ' + JSON.stringify({
+  const highestSupport = Math.max(...firstPicks.map((item) => item.support));
+  const bestOrdinal = Math.min(...firstPicks.map((item) => item.rank));
+  const secondChoiceCase = firstPicks.find((item) => item.rank === 2);
+
+  console.log('ARC_REACTOR_SANITY ' + JSON.stringify({
     replaySeats: replays.length,
-    occurrences: occurrences.length,
-    topTwoCount: topTwo.length,
     firstPickCount: firstPicks.length,
-    firstPickRanks: firstPicks.map((item) => ({ rank: item.rank, support: item.support, topFive: item.topFive })),
-    topTwo,
+    bestOrdinal,
+    highestSupport,
+    secondChoiceCase,
   }));
 
   assert.equal(replays.length, 300);
-  assert.ok(occurrences.length > 0);
+  assert.equal(firstPicks.length, 7);
+  assert.ok(firstPicks.every((item) => item.rank > 1), 'Arc Reactor must never be the model first pick in the current MSH opening-pack archive');
+  assert.ok(highestSupport < 0.10, `Arc Reactor opening-pack support unexpectedly rose to ${(highestSupport * 100).toFixed(1)}%`);
+  assert.ok(secondChoiceCase, 'the known low-support #2 case should remain represented in the audit');
+  assert.ok(secondChoiceCase.pickScore < 20, `a low-support Arc Reactor P1P1 should score as a major disagreement, got ${secondChoiceCase.pickScore}`);
+  assert.ok(secondChoiceCase.bestSupport > 0.75, 'the known #2 case should remain a lopsided pack, not a close call');
 });
