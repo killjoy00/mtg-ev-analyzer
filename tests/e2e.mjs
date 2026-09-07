@@ -84,6 +84,7 @@ try {
   await page.locator('#set-select').selectOption('msh');
   await page.locator('[data-mode="top3"]').click();
   await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
+  assert.equal(await page.locator('.challenge-callout').count(), 0, 'ordinary game must not look like a friend challenge');
   await assertPackAligned();
   await page.screenshot({ path: 'artifacts/ui-top3-desktop.png', fullPage: true });
 
@@ -99,7 +100,10 @@ try {
     const gameUrl = new URL(page.url());
     assert.equal(gameUrl.searchParams.get('set'), setId);
     assert.ok(gameUrl.searchParams.get('seed'));
+    assert.equal(await page.locator('.challenge-callout').count(), 0);
     await revealTop3();
+    assert.equal(await page.locator('.friend-comparison').count(), 0, 'ordinary result must not contain friend comparison');
+    if (setId === 'ecl') await page.screenshot({ path: 'artifacts/ui-result-mobile.png', fullPage: true });
   }
 
   // Seeded friend challenges carry the exact pack and compare only after reveal.
@@ -114,9 +118,12 @@ try {
   await page.locator('.challenge-callout').waitFor({ timeout: 10000 });
   assert.match((await page.locator('.challenge-callout').textContent()) || '', /Browser Test scored 80/);
   assert.equal(await page.locator('.friend-comparison').count(), 0);
+  await assertNoHorizontalOverflow();
+  await page.screenshot({ path: 'artifacts/ui-challenge-mobile.png', fullPage: true });
   await revealTop3();
   await page.locator('.friend-comparison').waitFor({ timeout: 5000 });
   await page.locator('.challenge-return').waitFor({ timeout: 5000 });
+  await assertNoHorizontalOverflow();
 
   // Daily remains a dated ranked path and Reveal reaches its result page.
   await home();
