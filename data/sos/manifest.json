@@ -1,0 +1,152 @@
+{
+  "schema_version": 2,
+  "set_id": "sos",
+  "name": "SOS",
+  "format": "PremierDraft",
+  "is_fixture": false,
+  "source": {
+    "provider": "17Lands",
+    "dataset_kind": "draft_data",
+    "data_date": "2026-06-02",
+    "license": "CC BY 4.0 unless otherwise noted by 17Lands"
+  },
+  "cohort": {
+    "definition": "experienced drafts in top 15% of parsed 17Lands user win-rate buckets",
+    "minimum_games_bucket_lower_bound": 100,
+    "win_rate_cutoff": 0.6,
+    "experienced_drafts": 70209,
+    "training_drafts": 5000,
+    "training_picks": 210000
+  },
+  "model": {
+    "model_version": "strong-player-pool-context-v2",
+    "holdout": "5-fold by draft_id",
+    "probabilities_are_calibrated": false,
+    "description": "Hierarchical strong-player pick tendency adjusted by shrinkage-weighted card/pool co-pick lift; normalized within each pack.",
+    "pool_conditioned": true
+  },
+  "replay_count": 300,
+  "shard_size": 10,
+  "shards": [
+    {
+      "path": "./data/sos/shards/000.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/001.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/002.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/003.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/004.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/005.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/006.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/007.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/008.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/009.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/010.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/011.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/012.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/013.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/014.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/015.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/016.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/017.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/018.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/019.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/020.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/021.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/022.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/023.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/024.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/025.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/026.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/027.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/028.json",
+      "replay_count": 10
+    },
+    {
+      "path": "./data/sos/shards/029.json",
+      "replay_count": 10
+    }
+  ]
+}

@@ -2,6 +2,42 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "ecl",
+      "name": "ECL",
+      "format": "PremierDraft",
+      "manifest_path": "./data/ecl/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2026-02-08",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "tmt",
+      "name": "TMT",
+      "format": "PremierDraft",
+      "manifest_path": "./data/tmt/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2026-04-08",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.62,
+      "training_drafts": 3126
+    },
+    {
+      "id": "sos",
+      "name": "SOS",
+      "format": "PremierDraft",
+      "manifest_path": "./data/sos/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2026-06-02",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
       "id": "msh",
       "name": "MSH",
       "format": "PremierDraft",
