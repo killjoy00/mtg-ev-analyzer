@@ -1,94 +1,142 @@
-# Draft Study
+# Pack 1
 
-`mtg-ev-analyzer` is now a Limited replay-study trainer built around real historical 17Lands draft decisions.
+Pack 1 is a Limited draft game built from real historical 17Lands Premier Draft decisions. Play the ranked Daily Challenge or unlimited seeded games, get a score out of 100 from an offline strong-player consensus model, then send the exact same pack to a friend.
 
-The learner follows a **historical draft path**. At each pick they see the real pack and the historical drafter's pool entering that pick, make their own selection, then reveal:
-
-- the historical pick,
-- the offline strong-player consensus pick,
-- the modeled choice likelihood of every candidate,
-- the learner's model rank and likelihood gap.
-
-The historical drafter is a reference point, not the definition of correctness.
+Live site: `https://magic.planitnow.us`
 
 ## Product rules
 
-- Replay study, **not** a counterfactual simulator.
+- Historical replay study, **not** a counterfactual draft simulator.
 - High 17Lands win rate is the primary definition of player strength.
-- Strong-player consensus is the primary grading signal.
-- Historical-pick agreement is tracked separately.
-- No LLM or model API calls at runtime.
-- No live 17Lands API dependency; production data comes from public draft dumps after release.
-- Premier Draft first.
+- Strong-player consensus is the grading signal; it is not presented as objective truth.
+- Historical drafter picks are shown separately from consensus.
+- No model/LLM API is used for runtime scoring.
+- Raw 17Lands archives are never committed or shipped to the browser.
+- Daily is ranked; ordinary Top 3 and Full Pack games are unlimited.
+- Accounts are optional. Guest-first play remains the default.
+
+## Game modes
+
+### Daily Challenge
+
+One deterministic replay per set/mode/day, with the game day resetting at midnight Eastern. The first attempt is ranked and submitted to the global leaderboard. Consecutive days cannot select the same replay when a set has multiple replays.
+
+### Top 3
+
+Rank the three cards you would most want to start a draft with. The result compares membership and ordering against the model's top three. Ordinary games receive deterministic seed URLs so friends can play the exact same opening pack.
+
+### Full Pack
+
+Play every decision in Pack 1 of a historical draft seat. Your hypothetical selections do not alter the later historical packs/pool. The final score summarizes the per-pick model-support scores.
+
+## Production data
+
+The current catalog contains four Premier Draft sets, each with 300 historical replays:
+
+- ECL
+- TMT
+- SOS
+- MSH
+
+Each set has a manifest plus compact replay shards under `data/<set>/`. The browser loads only the shard required for the selected replay.
+
+The consensus model is `strong-player-pool-context-v2`: hierarchical strong-player pick tendencies plus shrinkage-adjusted candidate/pool co-pick lift. Replays are scored out-of-fold by draft ID. Model probabilities are comparative choice support, not calibrated win probabilities.
 
 ## Architecture
 
-The live application deliberately remains static:
+### Static game frontend
 
-- `index.html` / `styles.css` / `app.js`: replay UI.
-- `scoring.mjs`: browser-independent grading and summary logic.
-- `data/<set>/manifest.json`: set/cohort/model metadata and replay shard index.
-- `data/<set>/shards/*.json`: compact precomputed historical replays.
-- `scripts/build_replays.py`: streaming 17Lands CSV -> pool-conditioned consensus -> replay shards.
-- `scripts/fetch_card_metadata.py`: optional offline card/image enrichment.
-- `scripts/validate_dataset.py`: generated-data integrity checks.
-- `.github/workflows/build-replay-data.yml`: reproducible public-dump ingestion.
-- `tests/`: Node and Python tests.
+GitHub Pages serves the application and compact replay data:
 
-The browser picks one small replay shard and loads only that shard before starting a session. Raw 17Lands archives are never committed or sent to the client.
+- `app.js` / `scoring.mjs`: core game and grading UI.
+- `product.mjs` / `flow-fixes.mjs`: seeded-game and dedicated-result flows.
+- `social.mjs`: challenge sharing, community picks, result cards.
+- `growth.mjs` / `retention.mjs`: analytics, My Stats, optional account surfaces, local/remote result sync.
+- `data/catalog.json`: production set catalog.
+- `data/<set>/manifest.json` + `shards/`: precomputed replay data.
 
-## Current production dataset
+### Neon backend
 
-The repository currently contains MSH Premier Draft replay data generated from the 17Lands public draft-data dump dated 2026-07-26.
+Pack 1 uses a dedicated Neon project/database.
 
-The generated manifest records:
+`pack1api` remains the isolated authority for ranked Daily scoring, leaderboards, anonymous player identity, community distributions, and stored share challenges.
 
-- 40,480 experienced drafts with a parseable win-rate bucket and an experience-bucket lower bound of at least 100 games;
-- a 0.60 win-rate-bucket midpoint cutoff for the selected top-15% cohort;
-- 5,000 strong-player drafts used for the capped training sample;
-- 209,999 strong-player pick examples in that training sample;
-- 300 replay drafts;
-- 42 decisions per replay (12,600 replay decisions total);
-- 30 shards of 10 replays each; and
-- a 5-fold draft-level holdout model.
+`pack1growth` is a separate Neon Function for non-ranking product services:
 
-The 5,000-draft value is a performance cap on the training sample, not the total number of drafts that meet the strong-player cohort definition.
+- anonymous product analytics;
+- ordinary game-result history;
+- My Stats sync;
+- optional account-to-player claiming;
+- account-session validation/sign-out; and
+- cross-device Daily streak dates.
 
-## Running locally
+Keeping ranking and growth endpoints separate means growth changes cannot silently alter Daily scoring semantics.
 
-The app uses `fetch`, so serve it over HTTP rather than opening `index.html` directly:
+### Optional accounts
 
-```bash
-python -m http.server 8000
-```
+Neon Auth (managed Better Auth) supplies email/password accounts. The first signed-in device claims the existing anonymous Pack 1 player ID. Later devices can sign in and receive a Pack 1 token for that same player, preserving leaderboard identity and synced stats.
 
-Then open `http://localhost:8000`.
+The game never requires login. Auth session tokens are stored first-party by Pack 1 and validated server-side against Neon Auth; the flow does not depend on third-party cookies.
+
+### Analytics
+
+`analytics_events` stores an event name, sanitized gameplay properties, optional Pack 1 player ID, and timestamp. Email/password data is not written to product analytics.
+
+The internal Neon view `analytics_funnel_daily` summarizes:
+
+`page_view -> game_start -> game_reveal -> share_click -> challenge_open -> challenge_complete`
+
+This is intended to answer the core viral-loop question: how often does a shared challenge turn into another completed game?
+
+## My Stats
+
+My Stats is local-first and works without an account. It tracks:
+
+- games played;
+- average and best score;
+- Daily streak;
+- challenge win/loss/tie record;
+- performance by set;
+- performance by mode; and
+- recent games.
+
+When an account is claimed, results are synced to the linked Pack 1 player identity and can be restored on another device.
 
 ## Tests
-
-There are no third-party test dependencies.
 
 ```bash
 npm test
 ```
 
-The suite checks browser JavaScript syntax, grading behavior, cohort parsing, pool-conditioned model behavior, holdout subtraction, sharding/catalog generation, card metadata extraction, and generated dataset validation.
+The unit suite covers scoring, Daily selection, cohort/model logic, sharding, dataset validation, and JavaScript syntax.
 
-## Building replay data from a 17Lands draft dump
+`.github/workflows/e2e.yml` runs a mobile-width Chromium product matrix covering:
 
-Download a public `draft_data` CSV/CSV.gz from 17Lands and keep it outside git, for example under `raw-data/`.
+- Top 3 reveal for all four production sets;
+- deterministic seeded friend challenges;
+- hidden-before-reveal friend comparison;
+- Daily Top 3;
+- a complete Full Pack run;
+- dedicated result screens;
+- My Stats; and
+- optional Account UI.
 
-Optionally fetch static card display metadata first:
+## Adding a set
+
+The generic `.github/workflows/build-replay-data.yml` workflow accepts:
+
+- `expansion`
+- `source_date`
+- `format` (currently PremierDraft)
+- `max_training_drafts`
+- `max_output_drafts`
+
+It downloads the official 17Lands public archive, fetches offline card metadata when available, builds the strong-player model/replay shards, validates the generated dataset, uploads an artifact, and commits only compact generated data plus the catalog back to the invoking branch.
+
+Manual equivalent:
 
 ```bash
-python scripts/fetch_card_metadata.py \
-  --set MSH \
-  --output generated/msh-cards.json
-```
-
-Then build the replay set:
-
-```bash
+python scripts/fetch_card_metadata.py --set MSH --output generated/msh-cards.json
 python scripts/build_replays.py \
   --input raw-data/draft_data_public.MSH.PremierDraft.csv.gz \
   --output-dir data/msh \
@@ -104,53 +152,9 @@ python scripts/build_replays.py \
   --folds 5 \
   --shard-size 10 \
   --card-metadata generated/msh-cards.json
-```
-
-Validate before publishing:
-
-```bash
 python scripts/validate_dataset.py data/msh/manifest.json --minimum-replays 100
 ```
 
-### Cohort selection
-
-The builder reads each draft's 17Lands win-rate and experience buckets. It requires the lower bound of the experience bucket to meet `--minimum-games`, then computes the set-specific win-rate-bucket midpoint cutoff needed to retain the top `--top-fraction` of those experienced drafts.
-
-The cutoff is derived from the actual set population rather than hard-coded. The defaults are starting assumptions, not gospel.
-
-### Consensus model v2
-
-The model is intentionally interpretable and offline. It combines:
-
-1. hierarchical strong-player card pick tendency at the same pack/pick position, with pack-level and global backoff; and
-2. shrinkage-adjusted **card/pool co-pick lift**, so the same card can receive a different modeled likelihood depending on what the historical drafter has already selected.
-
-Candidate tendencies are normalized within the current pack to form modeled strong-player choice likelihoods. These values are **not claimed to be calibrated win probabilities**.
-
-Every replay is graded out of fold by `draft_id`. Counts from the replay's entire holdout fold are subtracted from the model before that replay is scored, so a historical draft never contributes to its own consensus probabilities.
-
-### Sharding
-
-`build_replays.py` writes a manifest plus small replay shards. A set can therefore contain hundreds of drafts without requiring a phone to download the entire corpus before the first decision.
-
-### Card art
-
-Card metadata and image URLs are enriched during the offline build. The study app makes no Scryfall API requests. If metadata enrichment is unavailable, the replay remains usable with card-name placeholders.
-
-## Automated MSH build
-
-`.github/workflows/build-replay-data.yml` reproduces the current MSH dataset from the official public Premier Draft dump. It:
-
-1. runs the test suite,
-2. downloads the public archive,
-3. fetches static card metadata,
-4. trains/generates the replay shards,
-5. validates the output,
-6. stores the generated data as a workflow artifact, and
-7. commits only the compact `data/msh/` output and catalog back to the build branch.
-
-The raw archive and intermediate files remain outside git.
-
 ## Data source and attribution
 
-Production replay files are derived from 17Lands public datasets. Preserve 17Lands attribution in the deployed product and review the current 17Lands usage guidelines whenever ingestion changes.
+Production replay files are derived from 17Lands public datasets. Preserve 17Lands attribution in the deployed product and review current 17Lands usage guidelines whenever ingestion changes.
