@@ -64,7 +64,7 @@ jobs:
               --max-output-drafts 300 \
               --minimum-picks 30 \
               --folds 5 \
-              --shard-size 10 \
+              --shard-size 2 \
               --card-metadata "generated/${lower}-cards.json"
 
             python scripts/validate_dataset.py "data/$lower/manifest.json" --minimum-replays 100
