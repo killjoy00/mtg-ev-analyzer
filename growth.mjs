@@ -22,10 +22,11 @@ function setFromPage() {
 }
 function challengeContext(score) {
   const q=params();
-  const opponentScore = Number(q.get('vs'));
+  const hasSeedChallenge=q.has('vs');
+  const opponentScore=hasSeedChallenge ? Number(q.get('vs')) : NaN;
   const challengeId=q.get('challenge');
   let opponentName=q.get('by')||null;
-  let sourceScore=Number.isFinite(opponentScore)?opponentScore:null;
+  let sourceScore=hasSeedChallenge && Number.isFinite(opponentScore)?opponentScore:null;
   const versus=document.querySelector('.versus-score');
   if(versus) {
     opponentName=versus.querySelector('div:first-child span')?.textContent?.trim()||opponentName;
@@ -55,7 +56,8 @@ function findResults() {
   });
 }
 function challengeBanner() {
-  const q=params(); const target=Number(q.get('vs')); const by=q.get('by');
+  const q=params(); if(!q.has('vs')) return;
+  const target=Number(q.get('vs')); const by=q.get('by');
   const heading=document.querySelector('.game-heading');
   if(!heading || !Number.isFinite(target) || heading.querySelector('.challenge-callout')) return;
   const box=document.createElement('aside'); box.className='challenge-callout';
@@ -133,10 +135,9 @@ function clickAnalytics(eventObject) {
   else if(target.matches('#daily-leaders,#leaderboard-nav')) event('leaderboard_view');
 }
 function enhance() { nav(); challengeBanner(); resultChallengeActions(); findResults(); }
-function installCss() { if(document.querySelector('link[data-growth-css]')) return; const link=document.createElement('link');link.rel='stylesheet';link.href='growth.css';link.dataset.growthCss='1';document.head.appendChild(link); }
 
 export async function installGrowthLayer() {
-  installCss(); nav();
+  nav();
   currentAccount=await getAuthSession();
   if(currentAccount?.session?.token) await linkAccount(currentAccount.session.token).catch(()=>null);
   event('page_view',{ account:Boolean(currentAccount?.user), challenge:params().has('challenge')||params().has('vs') });

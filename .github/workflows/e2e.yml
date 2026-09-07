@@ -21,15 +21,20 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install browser test dependency
-        run: |
-          npm install --no-save playwright@1.55.0
-          npx playwright install --with-deps chromium
+        run: npm install --no-save playwright@1.55.0
       - name: Start static site
         run: |
           python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
           echo $! > /tmp/pack1-http.pid
       - name: Run browser regression
         run: node tests/e2e.mjs
+      - name: Upload UI screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack1-ui-screenshots
+          path: artifacts/*.png
+          if-no-files-found: ignore
       - name: Stop static site
         if: always()
         run: |

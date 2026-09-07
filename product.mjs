@@ -59,6 +59,7 @@ function isDailyResult(root) {
 
 function friendComparisonMarkup(score) {
   const query = params();
+  if (!query.has('vs')) return '';
   const target = Number(query.get('vs'));
   if (!Number.isFinite(target)) return '';
   const by = query.get('by') || 'Your friend';
@@ -96,21 +97,21 @@ async function scoreImage({ score, grade, mode, setId }) {
   canvas.width = 1200;
   canvas.height = 630;
   const ctx = canvas.getContext('2d');
-  ctx.fillStyle = '#f1ecdf';
+  ctx.fillStyle = '#f7f7f5';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.fillStyle = '#17221c';
+  ctx.fillStyle = '#171918';
   ctx.fillRect(0, 0, 1200, 16);
   ctx.font = '800 30px Arial, sans-serif';
   ctx.fillText('PACK 1', 58, 74);
-  ctx.font = '700 126px Georgia, serif';
+  ctx.font = '800 126px Arial, sans-serif';
   ctx.fillText(String(score), 54, 225);
   ctx.font = '800 32px Arial, sans-serif';
   ctx.fillText(`/ 100   ${grade}`, 60, 278);
-  ctx.font = '700 44px Georgia, serif';
+  ctx.font = '800 44px Arial, sans-serif';
   ctx.fillText(mode === 'full' ? 'Full Pack' : 'Top 3', 60, 372);
   ctx.font = '600 24px Arial, sans-serif';
   ctx.fillText(String(setId || '').toUpperCase(), 62, 416);
-  ctx.strokeStyle = '#17221c';
+  ctx.strokeStyle = '#171918';
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(60, 470);

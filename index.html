@@ -3,7 +3,8 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#f2ecdf" />
+  <meta name="theme-color" content="#f7f7f5" />
+  <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
   <meta name="description" content="Play Pack 1, take the Daily Challenge, score your Limited draft instincts out of 100, and challenge friends on the same packs." />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Pack 1 — Make the pick. Defend it." />
@@ -12,15 +13,34 @@
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:title" content="Pack 1 — Limited Draft Game" />
   <meta name="twitter:description" content="Make the picks, get a score, then challenge a friend on the exact same Pack 1." />
+  <link rel="canonical" href="https://magic.planitnow.us/" />
   <title>Pack 1 — Limited Draft Game</title>
-  <link rel="stylesheet" href="styles.css" />
-  <link rel="stylesheet" href="score.css" />
-  <link rel="stylesheet" href="engagement.css" />
-  <link rel="stylesheet" href="social.css" />
-  <link rel="stylesheet" href="design.css" />
-  <link rel="stylesheet" href="design-results.css" />
-  <link rel="stylesheet" href="editorial.css" />
-  <link rel="stylesheet" href="human-pass.css" />
+  <script>
+    if (location.protocol === 'http:' && location.hostname === 'magic.planitnow.us') {
+      location.replace('https://' + location.host + location.pathname + location.search + location.hash);
+    }
+  </script>
+  <link rel="stylesheet" href="pack1.css?v=2" />
+  <style>
+    .game-heading { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: start; }
+    .game-heading > .challenge-callout { grid-column: 1 / -1; width: 100%; margin-bottom: 4px; }
+    .result-hidden-source { display: none !important; }
+    .result-page { max-width: 980px; margin-left: auto; margin-right: auto; }
+    .result-picks { margin: 24px 0; padding: 22px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+    .result-label { margin: 0 0 12px; color: var(--muted); font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .08em; }
+    .result-picks > div { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
+    .result-picks figure { min-width: 0; margin: 0; padding: 12px; display: grid; grid-template-columns: 30px 58px minmax(0, 1fr); gap: 10px; align-items: center; border: 1px solid var(--line); border-radius: 9px; background: var(--surface-soft); }
+    .result-picks figure > span { color: var(--green); font-size: 22px; font-weight: 800; text-align: center; }
+    .result-picks img, .result-card-blank { width: 58px; aspect-ratio: 63 / 88; object-fit: contain; border-radius: 5px; background: #e6e8e5; }
+    .result-picks figcaption { min-width: 0; font-size: 12px; font-weight: 700; line-height: 1.35; overflow-wrap: anywhere; }
+    @media (max-width: 680px) {
+      .game-heading { display: block; }
+      .game-heading > .challenge-callout { margin-bottom: 18px; }
+      .result-picks > div { grid-template-columns: 1fr; }
+      .result-picks figure { grid-template-columns: 28px 54px minmax(0, 1fr); }
+      .result-picks img, .result-card-blank { width: 54px; }
+    }
+  </style>
 </head>
 <body>
   <div class="app-shell">
