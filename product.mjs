@@ -222,7 +222,7 @@ function enhanceTopThreeResult() {
   if (home) home.textContent = 'Home';
   if (actions && currentSeed()) addReplayButton(actions, 'top3');
 
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
 function enhanceFullResult() {
@@ -246,7 +246,7 @@ function enhanceFullResult() {
   if (home) home.textContent = 'Home';
   const actions = scorecard.querySelector('.result-actions');
   if (actions && currentSeed()) addReplayButton(actions, 'full');
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
 function replacePracticeLanguage(root = document) {
@@ -350,10 +350,22 @@ function captureGameClicks(event) {
   }
 }
 
+function finishGameClicks(event) {
+  const wasTopThreeReveal = event.target?.id === 'reveal-top3' || event.target?.closest?.('#reveal-top3');
+  const wasFinalFullPick = event.target?.id === 'next-pick' && /final score/i.test(event.target.textContent || '');
+  if (!wasTopThreeReveal && !wasFinalFullPick) return;
+  setTimeout(() => {
+    if (wasTopThreeReveal) enhanceTopThreeResult();
+    if (wasFinalFullPick) enhanceFullResult();
+  }, 0);
+}
+
 export function installProductLayer() {
   document.body.classList.add('pack1-redesign');
   document.addEventListener('click', captureGameClicks, true);
+  document.addEventListener('click', finishGameClicks, false);
   observer = new MutationObserver(enhance);
-  observer.observe(document.querySelector('#app'), { childList: true, subtree: true });
+  const app = document.querySelector('#app');
+  if (app) observer.observe(app, { childList: true, subtree: true });
   enhance();
 }

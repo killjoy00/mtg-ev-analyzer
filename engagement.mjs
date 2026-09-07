@@ -1,7 +1,19 @@
-export function utcDateKey(date = new Date()) {
+export const GAME_TIME_ZONE = 'America/New_York';
+
+export function gameDateKey(date = new Date()) {
   const value = date instanceof Date ? date : new Date(date);
-  return value.toISOString().slice(0, 10);
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: GAME_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(value);
+  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${byType.year}-${byType.month}-${byType.day}`;
 }
+
+// Kept as a compatibility alias while the app migrates away from the old UTC name.
+export const utcDateKey = gameDateKey;
 
 function hashText(value) {
   let hash = 2166136261;
@@ -12,28 +24,39 @@ function hashText(value) {
   return hash >>> 0;
 }
 
+function dateOrdinal(dateKey) {
+  const [year, month, day] = String(dateKey).split('-').map(Number);
+  return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+}
+
+export function previousGameDateKey(dateKey, days = 1) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - days);
+  return date.toISOString().slice(0, 10);
+}
+
 export function challengeIndex(dateKey, setId, mode, replayCount) {
   const count = Math.max(0, Number(replayCount) || 0);
   if (!count) return 0;
-  return hashText(`${dateKey}|${setId}|${mode}|pack1-daily-v1`) % count;
+  if (count === 1) return 0;
+  const base = hashText(`${setId}|${mode}|pack1-daily-base-v2`) % count;
+  const step = 1 + (hashText(`${setId}|${mode}|pack1-daily-step-v2`) % (count - 1));
+  return (base + (dateOrdinal(dateKey) * step)) % count;
 }
 
-export function previousUtcDateKey(dateKey, days = 1) {
-  const date = new Date(`${dateKey}T00:00:00Z`);
-  date.setUTCDate(date.getUTCDate() - days);
-  return utcDateKey(date);
-}
+// Compatibility alias for existing imports/tests.
+export const previousUtcDateKey = previousGameDateKey;
 
-export function computeStreak(completedDateKeys, todayKey = utcDateKey()) {
+export function computeStreak(completedDateKeys, todayKey = gameDateKey()) {
   const completed = new Set((completedDateKeys || []).filter(Boolean));
   if (!completed.size) return 0;
-  const start = completed.has(todayKey) ? todayKey : previousUtcDateKey(todayKey);
+  const start = completed.has(todayKey) ? todayKey : previousGameDateKey(todayKey);
   if (!completed.has(start)) return 0;
   let streak = 0;
   let cursor = start;
   while (completed.has(cursor)) {
     streak += 1;
-    cursor = previousUtcDateKey(cursor);
+    cursor = previousGameDateKey(cursor);
   }
   return streak;
 }

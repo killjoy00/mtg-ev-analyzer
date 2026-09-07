@@ -1,0 +1,100 @@
+name: build-more-sets
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [fix/daily-reveal-and-more-sets]
+    paths:
+      - '.github/workflows/build-more-sets.yml'
+      - 'scripts/build_replays.py'
+      - 'scripts/fetch_card_metadata.py'
+      - 'scripts/validate_dataset.py'
+
+permissions:
+  contents: write
+
+jobs:
+  build-sets:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build recent Premier Draft sets
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p raw-data generated
+
+          while read -r SET SOURCE_DATE; do
+            lower="$(printf '%s' "$SET" | tr '[:upper:]' '[:lower:]')"
+            echo "=== Building $SET ($SOURCE_DATE) ==="
+            mkdir -p "data/$lower"
+
+            curl --fail --location --retry 5 --retry-delay 3 \
+              --output "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz" \
+              "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.${SET}.PremierDraft.csv.gz"
+
+            if ! python scripts/fetch_card_metadata.py --set "$SET" --output "generated/${lower}-cards.json"; then
+              echo "Scryfall metadata unavailable for $SET; continuing with placeholders."
+              printf '{}\n' > "generated/${lower}-cards.json"
+            fi
+
+            python scripts/build_replays.py \
+              --input "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz" \
+              --output-dir "data/$lower" \
+              --catalog data/catalog.json \
+              --expansion "$SET" \
+              --format PremierDraft \
+              --source-date "$SOURCE_DATE" \
+              --minimum-games 100 \
+              --top-fraction 0.15 \
+              --max-training-drafts 5000 \
+              --max-output-drafts 300 \
+              --minimum-picks 30 \
+              --folds 5 \
+              --shard-size 10 \
+              --card-metadata "generated/${lower}-cards.json"
+
+            python scripts/validate_dataset.py "data/$lower/manifest.json" --minimum-replays 100
+            rm -f "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz"
+          done <<'SETS'
+          SOS 2026-06-02
+          TMT 2026-04-08
+          ECL 2026-02-08
+          SETS
+
+      - name: Upload generated replay data
+        uses: actions/upload-artifact@v4
+        with:
+          name: recent-replay-data
+          path: |
+            data/catalog.json
+            data/sos/
+            data/tmt/
+            data/ecl/
+          retention-days: 14
+
+      - name: Commit generated data to branch
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/catalog.json data/sos data/tmt data/ecl
+          if git diff --cached --quiet; then
+            echo 'Generated data is unchanged.'
+            exit 0
+          fi
+          git commit -m 'Add SOS TMT and ECL replay data [data-generated]'
+          git pull --rebase origin "${GITHUB_REF_NAME}"
+          git push origin HEAD:${GITHUB_REF_NAME}

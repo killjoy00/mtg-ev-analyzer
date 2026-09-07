@@ -1,10 +1,9 @@
+import { gameDateKey } from './engagement.mjs';
 import { gameShareUrl, makeGameSeed } from './gameplay.mjs';
 
 const SHARE_ORIGIN = 'https://magic.planitnow.us/';
-
-function utcDateKey() {
-  return new Date().toISOString().slice(0, 10);
-}
+const HISTORY_KEY = 'pack1-daily-history-v1';
+const DAILY_MIGRATION_KEY = 'pack1-daily-selector-v2-migrated';
 
 function currentSet() {
   const params = new URLSearchParams(window.location.search);
@@ -15,10 +14,22 @@ function freshSeed() {
   return makeGameSeed(globalThis.crypto?.randomUUID ? () => crypto.randomUUID() : null);
 }
 
+function migrateDailyHistory() {
+  try {
+    if (localStorage.getItem(DAILY_MIGRATION_KEY)) return;
+    const today = gameDateKey();
+    const history = JSON.parse(localStorage.getItem(HISTORY_KEY) || '[]');
+    if (Array.isArray(history)) {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(history.filter((item) => item?.date !== today)));
+    }
+    localStorage.setItem(DAILY_MIGRATION_KEY, '1');
+  } catch { /* local persistence is optional */ }
+}
+
 function setDailyUrl(mode) {
   const url = new URL(window.location.href);
   url.search = '';
-  url.searchParams.set('daily', utcDateKey());
+  url.searchParams.set('daily', gameDateKey());
   url.searchParams.set('set', currentSet());
   url.searchParams.set('mode', mode);
   history.replaceState({}, '', `${url.pathname}${url.search}`);
@@ -43,7 +54,8 @@ function replaceTextNodes(root = document) {
       .replace(/Practice run\./g, 'Replay.')
       .replace(/practice replay/gi, 'replay')
       .replace(/practice attempt/gi, 'replay')
-      .replace(/Practice runs never count\./g, 'Only Daily Challenge runs count toward the board.');
+      .replace(/Practice runs never count\./g, 'Only Daily Challenge runs count toward the board.')
+      .replace(/Daily rankings reset at 00:00 UTC\./g, 'Daily rankings reset at midnight Eastern.');
   }
 }
 
@@ -62,6 +74,7 @@ function captureFlow(event) {
 }
 
 export function installFlowFixes() {
+  migrateDailyHistory();
   document.addEventListener('click', captureFlow, true);
   const app = document.querySelector('#app');
   if (app) new MutationObserver(() => replaceTextNodes(app)).observe(app, { childList: true, subtree: true });

@@ -1,4 +1,4 @@
-import { challengeIndex, featuredSetId, firstPackPicks, gradeFullPack, gradeTopThree, periodStart } from './core.mjs';
+import { challengeIndex, featuredSetId, firstPackPicks, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from './core.mjs';
 
 const STATIC_ORIGIN = 'https://magic.planitnow.us';
 const ALLOWED_ORIGINS = new Set(['https://magic.planitnow.us', 'https://killjoy00.github.io']);
@@ -157,8 +157,6 @@ async function loadDailyReplay(date, setId, mode) {
   };
 }
 
-const utcToday = () => new Date().toISOString().slice(0, 10);
-
 function validMode(value) {
   if (!['top3', 'full'].includes(value)) throw Object.assign(new Error('Invalid mode.'), { status: 400 });
   return value;
@@ -213,7 +211,7 @@ async function handleScore(request) {
   const setId = validSetId(payload.setId);
   const mode = validMode(payload.mode);
   const challengeDate = String(payload.challengeDate || '');
-  if (challengeDate !== utcToday()) {
+  if (challengeDate !== gameDateKey()) {
     throw Object.assign(new Error("Only today's Daily Challenge can be ranked."), { status: 400 });
   }
   const selections = sanitizeSelections(payload.selections);
@@ -334,7 +332,7 @@ async function handleLeaderboard(request) {
 
 async function handleDistribution(request) {
   const url = new URL(request.url);
-  const date = String(url.searchParams.get('date') || utcToday());
+  const date = String(url.searchParams.get('date') || gameDateKey());
   const setId = validSetId(url.searchParams.get('set'));
   const mode = validMode(url.searchParams.get('mode') || 'top3');
   if (mode !== 'top3') return json({ total: 0, rows: [] });
@@ -428,7 +426,7 @@ async function handleGetChallenge(id) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, service: 'pack1-api', version: 2, date: utcToday() });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, service: 'pack1-api', version: 3, date: gameDateKey(), timeZone: 'America/New_York' });
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
   if (request.method === 'PATCH' && url.pathname === '/v1/player') return handlePlayer(request);
   if (request.method === 'POST' && url.pathname === '/v1/scores') return handleScore(request);
