@@ -102,7 +102,7 @@ jobs:
             --max-output-drafts "$MAX_OUTPUT" \
             --minimum-picks 30 \
             --folds 5 \
-            --shard-size 10 \
+            --shard-size 2 \
             --card-metadata "generated/$LOWER-cards.json"
       - name: Validate generated dataset
         env:
