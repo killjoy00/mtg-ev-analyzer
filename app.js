@@ -110,9 +110,9 @@ async function loadPathModel(setEntry) {
     pathModelCache.set(setId, model);
     return model;
   } catch (error) {
-    console.warn('Counterfactual path model unavailable; using historical-path support.', error);
-    pathModelCache.set(setId, null);
-    return null;
+    pathModelCache.delete(setId);
+    console.error('Counterfactual path model unavailable.', error);
+    throw new Error(`Path-aware Full Pack data for ${setEntry.name} is unavailable. Try again shortly.`);
   }
 }
 
@@ -195,7 +195,8 @@ function setMetaLine(entry) {
 }
 
 function bestKey(mode) {
-  return `pack1-best:${state.selectedSetId}:${mode}`;
+  const scoringVersion = mode === 'full' ? 'path-v3' : 'classic';
+  return `pack1-best:${scoringVersion}:${state.selectedSetId}:${mode}`;
 }
 
 function getBestScore(mode) {

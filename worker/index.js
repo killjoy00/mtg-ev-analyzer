@@ -236,6 +236,8 @@ async function handleScore(request) {
     details = {
       consensusAgreement: result.consensusAgreement,
       topThreeAgreement: result.topThreeAgreement,
+      scoredDecisions: result.results.filter((item) => Number(item.decisionWeight || 0) > 0).length,
+      scoringVersion: 'counterfactual-path-v3',
     };
   }
 
