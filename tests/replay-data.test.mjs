@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { normalizeReplayPayload, rarityBucket, sortCatalogSets, sortPackByRarity } from '../replay-runtime.mjs';
+import { normalizeReplayPayload, rarityBucket, sortCatalogSets, sortPackByRarity } from '../replay-data.mjs';
 
 test('rarity buckets put mythics and rares before uncommons and commons', () => {
   assert.equal(rarityBucket('mythic'), 0);

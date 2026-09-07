@@ -1,9 +1,9 @@
 import { computeStreak, utcDateKey } from './engagement.mjs';
 import { ensurePackSession, loadAccountDailyDates, saveGameResult } from './growth-api.mjs';
+import { onAppRender } from './render-lifecycle.mjs';
 
 const GAME_HISTORY_KEY = 'pack1-game-history-v2';
 const DAILY_HISTORY_KEY = 'pack1-daily-history-v1';
-let observer = null;
 let enhancing = false;
 
 function readArray(key) {
@@ -42,8 +42,5 @@ async function enhanceStats() {
 
 export function installRetentionLayer() {
   void syncLocalResults();
-  observer = new MutationObserver(() => void enhanceStats());
-  const app = document.querySelector('#app');
-  if (app) observer.observe(app, { childList:true, subtree:true });
-  void enhanceStats();
+  onAppRender(() => void enhanceStats());
 }

@@ -1,5 +1,7 @@
 import { gradeTopThree, rankCandidates } from './scoring.mjs';
 import { createShareChallenge, isLeaderboardConfigured, loadCommunityDistribution, loadShareChallenge } from './leaderboard.mjs';
+import { loadReplayJson } from './replay-data.mjs';
+import { onAppRender } from './render-lifecycle.mjs';
 
 const SHARE_URL = 'https://magic.planitnow.us/';
 let fullPackSelections = [];
@@ -10,11 +12,13 @@ function esc(value) {
 }
 
 async function resolveSetId(setName) {
+  const fallback = String(setName || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 24);
   try {
-    const response = await fetch('./data/catalog.json', { cache: 'no-store' });
-    const data = await response.json();
-    return data.sets?.find((set) => String(set.name).toLowerCase() === String(setName).toLowerCase())?.id || String(setName || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 24);
-  } catch { return String(setName || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 24); }
+    const data = await loadReplayJson('./data/catalog.json', 'catalog');
+    return data.sets?.find((set) => String(set.name).toLowerCase() === String(setName).toLowerCase())?.id || fallback;
+  } catch {
+    return fallback;
+  }
 }
 
 function playerName() {
@@ -179,7 +183,7 @@ document.addEventListener('click', (event)=>{
   }
 }, true);
 
-new MutationObserver(()=>enhanceResult()).observe(document.querySelector('#app'), { childList:true, subtree:true });
+onAppRender(enhanceResult);
 
 function renderChallenge(pack) {
   const app = document.querySelector('#app');

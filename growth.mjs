@@ -1,9 +1,9 @@
 import { getAuthSession, linkAccount, loadRemoteStats, saveGameResult, sendEvents, signInAccount, signOutAccount, signUpAccount } from './growth-api.mjs';
+import { onAppRender } from './render-lifecycle.mjs';
 
 const HISTORY_KEY = 'pack1-game-history-v2';
 const RESULT_SEEN = new WeakSet();
 let currentAccount = null;
-let mutationTimer = null;
 
 function esc(value) { return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
 function params() { return new URLSearchParams(location.search); }
@@ -97,7 +97,7 @@ async function renderStats() {
   const remote=await loadRemoteStats(); const data=remote?.summary ? remote : localData;
   const recent=remote?.recent?.length ? remote.recent.map((r)=>({playedAt:r.played_at,setId:r.set_id,mode:r.mode,score:Number(r.score),grade:r.grade,isDaily:r.is_daily,outcome:r.outcome,opponentName:r.opponent_name})) : localData.recent;
   const s=data.summary;
-  app.innerHTML=`<section class="stats-page growth-page"><header><p class="eyebrow">My Stats</p><h1>Your Pack 1 record</h1><p>${currentAccount?.user?.email ? `Synced to ${esc(currentAccount.user.email)}.` : 'Saved on this device. Claim an account to carry it across devices.'}</p></header>
+  app.innerHTML=`<section class="stats-page growth-page"><header><p class="eyebrow">My Stats</p><h1>Your Pack One record</h1><p>${currentAccount?.user?.email ? `Synced to ${esc(currentAccount.user.email)}.` : 'Saved on this device. Claim an account to carry it across devices.'}</p></header>
     <div class="stat-scoreboard"><div><span>Games</span><strong>${Number(s.games||0)}</strong></div><div><span>Average</span><strong>${Number(s.average_score||0).toFixed(1)}</strong></div><div><span>Best</span><strong>${Number(s.best_score||0)}</strong></div><div><span>Challenges</span><strong>${Number(s.challenge_wins||0)}–${Number(s.challenge_losses||0)}${Number(s.challenge_ties||0)?`–${Number(s.challenge_ties)}`:''}</strong></div></div>
     <section class="stats-split"><div><h2>By set</h2><table><thead><tr><th>Set</th><th>GP</th><th>Avg</th><th>Best</th></tr></thead><tbody>${statsRows(data.bySet||[],remote?'set_id':'name')}</tbody></table></div><div><h2>By mode</h2><table><thead><tr><th>Mode</th><th>GP</th><th>Avg</th><th>Best</th></tr></thead><tbody>${statsRows(data.byMode||[],remote?'mode':'name')}</tbody></table></div></section>
     <section class="recent-games"><h2>Recent games</h2>${recent.length?`<ol>${recent.map((r)=>`<li><span>${esc(String(r.setId||'').toUpperCase())} · ${r.mode==='full'?'Full Pack':'Top 3'}${r.isDaily?' · Daily':''}</span><strong>${r.score}</strong><em>${esc(r.grade||'')}${r.outcome?` · ${r.outcome}`:''}</em></li>`).join('')}</ol>`:'<p>No games recorded yet. Play one and come back.</p>'}</section>
@@ -116,12 +116,12 @@ async function renderAccount() {
   currentAccount=await getAuthSession();
   if(currentAccount?.session?.token && currentAccount?.user) {
     await linkAccount(currentAccount.session.token).catch(()=>null);
-    app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account</p><h1>Stats saved.</h1><p>Signed in as <strong>${esc(currentAccount.user.email)}</strong>. Your Pack 1 identity now follows you across devices.</p></header><div class="account-actions"><button class="button primary" id="account-stats">View My Stats</button><button class="button secondary" id="account-signout">Sign out</button></div><p class="account-note">Playing never requires an account. Signing out returns this browser to guest-first play.</p></section>`;
+    app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account</p><h1>Stats saved.</h1><p>Signed in as <strong>${esc(currentAccount.user.email)}</strong>. Your Pack One identity now follows you across devices.</p></header><div class="account-actions"><button class="button primary" id="account-stats">View My Stats</button><button class="button secondary" id="account-signout">Sign out</button></div><p class="account-note">Playing never requires an account. Signing out returns this browser to guest-first play.</p></section>`;
     document.querySelector('#account-stats')?.addEventListener('click',()=>void renderStats());
     document.querySelector('#account-signout')?.addEventListener('click',async()=>{await signOutAccount();currentAccount=null;event('auth_sign_out');void renderAccount();});
     return;
   }
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Optional account</p><h1>Keep playing as a guest—or save your record.</h1><p>No login wall. Create an account only if you want cross-device stats and a persistent Pack 1 identity.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><button class="text-button" id="account-home">Keep playing as guest</button></section>`;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Optional account</p><h1>Keep playing as a guest—or save your record.</h1><p>No login wall. Create an account only if you want cross-device stats and a persistent Pack One identity.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><button class="text-button" id="account-home">Keep playing as guest</button></section>`;
   document.querySelector('#account-home')?.addEventListener('click',()=>document.querySelector('#brand-home')?.click());
   document.querySelector('#account-signup')?.addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget,err=f.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(f));await signUpAccount(data);await claimCurrentSession();event('auth_sign_up');await renderAccount();}catch(x){err.textContent=x.message;}});
   document.querySelector('#account-signin')?.addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget,err=f.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(f));await signInAccount(data);await claimCurrentSession();event('auth_sign_in');await renderAccount();}catch(x){err.textContent=x.message;}});
@@ -142,6 +142,5 @@ export async function installGrowthLayer() {
   if(currentAccount?.session?.token) await linkAccount(currentAccount.session.token).catch(()=>null);
   event('page_view',{ account:Boolean(currentAccount?.user), challenge:params().has('challenge')||params().has('vs') });
   document.addEventListener('click',clickAnalytics,true);
-  new MutationObserver(()=>{clearTimeout(mutationTimer);mutationTimer=setTimeout(enhance,0);}).observe(document.querySelector('#app'),{childList:true,subtree:true});
-  enhance();
+  onAppRender(enhance);
 }

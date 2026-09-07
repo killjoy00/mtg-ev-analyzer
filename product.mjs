@@ -1,9 +1,9 @@
 import { gameShareUrl, makeGameSeed, seededRandom, cleanSeed } from './gameplay.mjs';
+import { onAppRender } from './render-lifecycle.mjs';
 
 const SHARE_ORIGIN = 'https://magic.planitnow.us/';
 let autoStarting = false;
 let autoStarted = false;
-let observer = null;
 
 function esc(value) {
   return String(value ?? '')
@@ -65,19 +65,6 @@ function friendComparisonMarkup(score) {
   const by = query.get('by') || 'Your friend';
   const result = score > target ? 'You beat it.' : score === target ? 'Dead even.' : `${target - score} points short.`;
   return `<section class="friend-comparison"><span>Friend challenge</span><div><strong>${esc(by)}</strong><b>${target}</b><i>vs</i><strong>You</strong><b>${score}</b></div><p>${esc(result)}</p></section>`;
-}
-
-function resultCardsMarkup() {
-  const cards = [...document.querySelectorAll('.opening-pack .card-choice')]
-    .map((button) => ({
-      rank: Number(button.querySelector('.user-rank-badge')?.textContent || 0),
-      name: button.querySelector('.card-footer strong')?.textContent || '',
-      image: button.querySelector('img')?.src || '',
-    }))
-    .filter((card) => card.rank)
-    .sort((a, b) => a.rank - b.rank);
-  if (!cards.length) return '';
-  return `<section class="result-picks"><p class="result-label">Your three</p><div>${cards.map((card) => `<figure><span>${card.rank}</span>${card.image ? `<img src="${esc(card.image)}" alt="${esc(card.name)}">` : '<div class="result-card-blank"></div>'}<figcaption>${esc(card.name)}</figcaption></figure>`).join('')}</div></section>`;
 }
 
 async function copyText(text) {
@@ -207,7 +194,6 @@ function enhanceTopThreeResult() {
   if (eyebrow) eyebrow.textContent = isDailyResult(reveal) ? 'Today’s result' : 'Game result';
 
   const hero = reveal.querySelector('.score-hero');
-  if (hero && !reveal.querySelector('.result-picks')) hero.insertAdjacentHTML('afterend', resultCardsMarkup());
   const score = resultScore(reveal);
   if (!reveal.querySelector('.friend-comparison')) {
     const comparison = friendComparisonMarkup(score);
@@ -250,68 +236,17 @@ function enhanceFullResult() {
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
-function replacePracticeLanguage(root = document) {
-  const selectors = ['.game-instruction', '.action-dock span', '.challenge-status', '.leaderboard-note'];
-  for (const node of root.querySelectorAll(selectors.join(','))) {
-    const next = node.textContent
-      .replace(/practice replay/gi, 'replay')
-      .replace(/practice attempt/gi, 'replay')
-      .replace(/Practice run\./g, 'Replay.')
-      .replace(/Practice runs never count\./g, 'Only Daily Challenge runs count toward the board.');
-    if (next !== node.textContent && !node.children.length) node.textContent = next;
-  }
+function enhanceHome() {
+  const app = document.querySelector('#app');
+  const intro = document.querySelector('.home-intro');
+  app?.classList.toggle('home-page', Boolean(intro));
 }
 
-function enhanceHome() {
-  const intro = document.querySelector('.home-intro');
-  if (!intro || intro.dataset.redesigned === '1') return;
-  intro.dataset.redesigned = '1';
-  document.querySelector('#app')?.classList.add('home-page');
-  const eyebrow = intro.querySelector('.eyebrow');
-  const heading = intro.querySelector('h1');
-  const lede = intro.querySelector('.lede');
-  if (eyebrow) eyebrow.textContent = 'PACK 1';
-  if (heading) heading.textContent = 'Make the pick. Defend it.';
-  if (lede) lede.textContent = 'Real opening packs from strong drafts. Get a score, see where you disagreed, then send the exact same pack to somebody who thinks they can do better.';
-
-  const daily = document.querySelector('.daily-card');
-  if (daily) {
-    daily.classList.add('daily-feature');
-    const dailyHeading = daily.querySelector('h2');
-    const dailyCopy = daily.querySelector('.daily-copy > p');
-    if (dailyHeading) dailyHeading.textContent = 'Today’s Pack 1 is live.';
-    if (dailyCopy) dailyCopy.textContent = 'One shared challenge, one ranked score. Everyone sees the same cards, so the leaderboard actually means something.';
-  }
-
-  const cards = [...document.querySelectorAll('.mode-card')];
-  const labels = ['Opening pack', 'Full first pack'];
-  const copy = [
-    'Rank your top three from one fresh opening pack. Fast, opinionated, and built to argue about.',
-    'Play every pick in Pack 1. Your choices get scored as the seat develops.',
-  ];
-  const points = [
-    ['One pack', 'Top-three score', 'Share the exact seed'],
-    ['Every first-pack pick', '100-point finish', 'Share the exact seed'],
-  ];
-  cards.forEach((card, index) => {
-    card.classList.add('game-mode-row');
-    const label = card.querySelector('.mode-topline .eyebrow');
-    if (label) label.textContent = labels[index] || 'Game';
-    const p = card.querySelector('p:not(.eyebrow)');
-    if (p && copy[index]) p.textContent = copy[index];
-    const list = card.querySelector('.mode-points');
-    if (list && points[index]) list.innerHTML = points[index].map((item) => `<li>${esc(item)}</li>`).join('');
+function enhanceConsensusPresentation() {
+  document.querySelectorAll('.opening-pack .card-image').forEach((image, index) => {
+    image.loading = 'eager';
+    if (index < 8) image.fetchPriority = 'high';
   });
-  const top3Button = document.querySelector('[data-mode="top3"]');
-  const fullButton = document.querySelector('[data-mode="full"]');
-  if (top3Button) top3Button.textContent = 'Play Top 3';
-  if (fullButton) fullButton.textContent = 'Play Full Pack';
-
-  const note = document.querySelector('.data-note');
-  if (note) {
-    note.querySelector('strong').textContent = 'What counts';
-    note.querySelector('span').textContent = 'Daily Challenge is the ranked competition. Top 3 and Full Pack are unlimited games: play as many as you want, chase your best score, and challenge friends on the exact same seeded pack.';
-  }
 }
 
 function autoStartSeededGame() {
@@ -332,7 +267,7 @@ function enhance() {
   enhanceHome();
   enhanceTopThreeResult();
   enhanceFullResult();
-  replacePracticeLanguage();
+  enhanceConsensusPresentation();
   autoStartSeededGame();
 }
 
@@ -351,22 +286,8 @@ function captureGameClicks(event) {
   }
 }
 
-function finishGameClicks(event) {
-  const wasTopThreeReveal = event.target?.id === 'reveal-top3' || event.target?.closest?.('#reveal-top3');
-  const wasFinalFullPick = event.target?.id === 'next-pick' && /final score/i.test(event.target.textContent || '');
-  if (!wasTopThreeReveal && !wasFinalFullPick) return;
-  setTimeout(() => {
-    if (wasTopThreeReveal) enhanceTopThreeResult();
-    if (wasFinalFullPick) enhanceFullResult();
-  }, 0);
-}
-
 export function installProductLayer() {
   document.body.classList.add('pack1-redesign');
   document.addEventListener('click', captureGameClicks, true);
-  document.addEventListener('click', finishGameClicks, false);
-  observer = new MutationObserver(enhance);
-  const app = document.querySelector('#app');
-  if (app) observer.observe(app, { childList: true, subtree: true });
-  enhance();
+  onAppRender(enhance);
 }
