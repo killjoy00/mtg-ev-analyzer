@@ -78,8 +78,29 @@ async function revealTop3() {
   assert.match((await score.textContent()) || '', /^\d+$/);
   assert.equal(await page.locator('.opening-pack').isVisible(), false);
   assert.match((await page.locator('.score-context').textContent()) || '', /Consensus alignment score/i);
+  assert.equal(await page.locator('.top3-result-page .result-picks').isVisible(), false, 'Top 3 result must not list the same user picks twice');
+  assert.equal(await page.getByRole('heading', { name: 'Your ranking' }).count(), 1);
+  if (await page.locator('.new-best').count()) {
+    const duplicateBest = page.locator('.score-copy > p').filter({ hasText: /^Personal best:/ });
+    if (await duplicateBest.count()) assert.equal(await duplicateBest.isVisible(), false, 'new-best result must not repeat the personal best value');
+  }
   await assertNoHorizontalOverflow();
   return Number(await score.textContent());
+}
+
+async function assertMobileTapScrollStable() {
+  await home();
+  await page.locator('#set-select').selectOption('msh');
+  await page.locator('[data-mode="top3"]').click();
+  const card = page.locator('.opening-pack .card-choice').nth(8);
+  await card.waitFor({ timeout: 10000 });
+  await card.evaluate((node) => node.scrollIntoView({ block: 'center' }));
+  const before = await page.evaluate(() => window.scrollY);
+  assert.ok(before > 300, `mobile regression needs a deep pack scroll, got ${before}`);
+  await card.click();
+  await page.waitForTimeout(50);
+  const after = await page.evaluate(() => window.scrollY);
+  assert.ok(Math.abs(after - before) <= 24, `card tap moved page ${Math.round(after - before)}px (${before} → ${after})`);
 }
 
 try {
@@ -99,6 +120,7 @@ try {
   await page.setViewportSize({ width: 390, height: 844 });
   await home();
   await page.screenshot({ path: 'artifacts/ui-home-mobile.png', fullPage: true });
+  await assertMobileTapScrollStable();
 
   // Every production set can start and reveal a Top 3 game.
   for (const setId of ['ecl', 'tmt', 'sos', 'msh']) {
