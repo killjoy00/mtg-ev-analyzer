@@ -191,16 +191,26 @@ async function copySeededLink(button, mode) {
   setTimeout(() => { button.textContent = original; }, 1200);
 }
 
-function prioritizeChallenge(actions, share, another) {
-  if (!actions || !share) return;
+function prioritizeResultActions(actions, share, another) {
+  if (!actions || !share || !another) return;
+
+  another.textContent = 'New pack';
+  another.classList.remove('secondary');
+  another.classList.add('primary', 'result-new-pack');
+
   share.textContent = 'Challenge a friend';
-  share.classList.remove('share-button', 'secondary');
-  share.classList.add('primary', 'challenge-primary');
-  if (another) {
-    another.classList.remove('primary');
-    another.classList.add('secondary');
+  share.classList.remove('share-button', 'secondary', 'challenge-primary');
+  share.classList.add('primary', 'result-challenge');
+
+  const leaderboard = actions.querySelector('#challenge-leaders');
+  if (leaderboard) {
+    leaderboard.classList.remove('primary');
+    leaderboard.classList.add('secondary');
   }
+
+  // The two obvious next steps are deliberately first, in this order.
   actions.prepend(share);
+  actions.prepend(another);
 }
 
 function addReplayButton(actions, mode) {
@@ -249,9 +259,8 @@ function enhanceTopThreeResult() {
   const another = reveal.querySelector('#another-top3');
   const share = reveal.querySelector('#share-top3');
   const home = reveal.querySelector('#top3-home');
-  if (another) another.textContent = isDailyResult(reveal) ? 'Play another game' : 'New pack';
   if (home) home.textContent = 'Home';
-  prioritizeChallenge(actions, share, another);
+  prioritizeResultActions(actions, share, another);
   if (actions && currentSeed()) addReplayButton(actions, 'top3');
   prepareNextGame('top3');
 
@@ -274,10 +283,9 @@ function enhanceFullResult() {
   const another = scorecard.querySelector('#another-full');
   const share = scorecard.querySelector('#share-full');
   const home = scorecard.querySelector('#summary-home');
-  if (another) another.textContent = isDailyResult(scorecard) ? 'Play another game' : 'New pack';
   if (home) home.textContent = 'Home';
   const actions = scorecard.querySelector('.result-actions');
-  prioritizeChallenge(actions, share, another);
+  prioritizeResultActions(actions, share, another);
   if (actions && currentSeed()) addReplayButton(actions, 'full');
   prepareNextGame('full');
   window.scrollTo({ top: 0, behavior: 'auto' });
@@ -292,6 +300,31 @@ function enhanceHome() {
 }
 
 function enhanceConsensusPresentation() {
+  const note = document.querySelector('.data-note span');
+  if (note && note.dataset.compactCopy !== '1') {
+    note.dataset.compactCopy = '1';
+    note.textContent = 'Consensus is a model of experienced, high-win-rate 17Lands drafters. It compares how much support each card gets in the current pack and historical pool. Your score measures how closely your choices track that model; only Daily Challenge scores rank.';
+  }
+
+  document.querySelectorAll('.opening-pack .card-footer span').forEach((footer) => {
+    const text = footer.textContent || '';
+    const match = text.match(/^([0-9.]+%)\s*·\s*consensus #\d+(.*)$/i);
+    if (!match) return;
+    footer.textContent = `${match[1]} consensus support${match[2] || ''}`;
+  });
+
+  // Ordinal ranks can overstate a tiny tail of support (for example, a 4% #2
+  // behind an 82% #1). If the social layer adds a bold-take note, show the
+  // actual support rather than repeating the ordinal rank.
+  const boldTake = document.querySelector('.bold-take small');
+  if (boldTake) {
+    const firstChoice = [...document.querySelectorAll('.opening-pack .card-choice')]
+      .find((button) => button.querySelector('.user-rank-badge')?.textContent?.trim() === '1');
+    const footer = firstChoice?.querySelector('.card-footer span')?.textContent || '';
+    const support = footer.match(/([0-9.]+%)/)?.[1];
+    if (support) boldTake.textContent = `${support} strong-player support.`;
+  }
+
   document.querySelectorAll('.opening-pack .card-image').forEach((image, index) => {
     image.loading = 'eager';
     if (index < 8) image.fetchPriority = 'high';
