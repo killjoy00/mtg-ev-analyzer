@@ -101,8 +101,8 @@ test('summarizeResults weights meaningful Full Pack decisions instead of forced 
   const summary = summarizeResults(results);
   assert.equal(summary.total, 3);
   assert.equal(summary.scoredDecisions, 2);
-  assert.equal(summary.consensusAgreement, 200 / 3);
-  assert.equal(summary.historicalAgreement, 200 / 3);
+  assert.ok(Math.abs(summary.consensusAgreement - (200 / 3)) < 1e-9);
+  assert.ok(Math.abs(summary.historicalAgreement - (200 / 3)) < 1e-9);
   assert.equal(summary.score, 60);
   assert.equal(summary.grade, 'C');
   assert.equal(summary.biggestMisses[0].selectedId, 'd');
