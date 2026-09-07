@@ -8,18 +8,29 @@ export function rankCandidates(candidates) {
   });
 }
 
+function supportScore(selectedProbability, targetProbability) {
+  const selected = Math.max(0, Number(selectedProbability) || 0);
+  const target = Math.max(0, Number(targetProbability) || 0);
+  if (target <= EPSILON) return 1;
+  const ratio = Math.max(0, Math.min(1, selected / target));
+  // The model probabilities are comparative and uncalibrated. A square-root
+  // curve keeps clear misses costly without pretending a plausible alternative
+  // is proportionally "half as good" just because it has half the model support.
+  return Math.sqrt(ratio);
+}
+
 export function scoreGrade(score) {
   const value = Math.max(0, Math.min(100, Math.round(Number(score) || 0)));
-  if (value >= 95) return { grade: 'A+', label: 'Locked in' };
+  if (value >= 95) return { grade: 'A+', label: 'Near consensus' };
   if (value >= 90) return { grade: 'A', label: 'Excellent' };
-  if (value >= 85) return { grade: 'A-', label: 'Sharp' };
+  if (value >= 85) return { grade: 'A-', label: 'Very close' };
   if (value >= 80) return { grade: 'B+', label: 'Strong' };
   if (value >= 75) return { grade: 'B', label: 'Good' };
-  if (value >= 70) return { grade: 'B-', label: 'Solid' };
-  if (value >= 65) return { grade: 'C+', label: 'Competitive' };
-  if (value >= 60) return { grade: 'C', label: 'Mixed' };
-  if (value >= 50) return { grade: 'D', label: 'Needs a review' };
-  return { grade: 'F', label: 'Run it back' };
+  if (value >= 70) return { grade: 'B-', label: 'Reasonable' };
+  if (value >= 65) return { grade: 'C+', label: 'Mixed' };
+  if (value >= 60) return { grade: 'C', label: 'Off consensus' };
+  if (value >= 50) return { grade: 'D', label: 'Big disagreement' };
+  return { grade: 'F', label: 'Far off consensus' };
 }
 
 export function gradePick(candidates, selectedId, historicalId) {
@@ -32,23 +43,24 @@ export function gradePick(candidates, selectedId, historicalId) {
   const bestProbability = Number(best.model_probability || 0);
   const selectedProbability = Number(selected.model_probability || 0);
   const gap = Math.max(0, bestProbability - selectedProbability);
-  const score = bestProbability > EPSILON
-    ? Math.round(Math.max(0, Math.min(1, selectedProbability / bestProbability)) * 100)
-    : 100;
+  const score = Math.round(supportScore(selectedProbability, bestProbability) * 100);
 
   let verdict;
   let verdictClass;
   if (rank === 1 || gap <= EPSILON) {
-    verdict = 'Nailed it';
+    verdict = 'Consensus pick';
     verdictClass = 'consensus';
-  } else if (gap <= 0.08) {
+  } else if (score >= 90) {
     verdict = 'Close call';
     verdictClass = 'close';
-  } else if (gap <= 0.18) {
-    verdict = 'Defensible';
+  } else if (score >= 75) {
+    verdict = 'In the mix';
+    verdictClass = 'reasonable';
+  } else if (score >= 55) {
+    verdict = 'Off consensus';
     verdictClass = 'reasonable';
   } else {
-    verdict = 'Worth a second look';
+    verdict = 'Big disagreement';
     verdictClass = 'miss';
   }
 
@@ -89,16 +101,14 @@ export function gradeTopThree(candidates, selectedIds, historicalId) {
   const exactPositions = selectedIds.filter((id, index) => id === consensusIds[index]).length;
   const historicalPosition = selectedIds.indexOf(historicalId);
 
-  const membershipWeights = [35, 25, 15];
-  const orderBonuses = [12, 8, 5];
-  let score = 0;
-  selectedIds.forEach((id, userIndex) => {
-    const consensusIndex = consensusIds.indexOf(id);
-    if (consensusIndex < 0) return;
-    score += membershipWeights[consensusIndex];
-    if (userIndex === consensusIndex) score += orderBonuses[consensusIndex];
-  });
-  score = Math.max(0, Math.min(100, Math.round(score)));
+  // Slot weights reflect how important the user's #1/#2/#3 opinions are, while
+  // each slot receives continuous credit based on model support. This avoids the
+  // old cliff where a near-tied #4 received zero credit simply for missing top 3.
+  const slotWeights = [50, 30, 20];
+  const score = Math.max(0, Math.min(100, Math.round(selected.reduce((total, card, index) => {
+    const target = consensusTop[index];
+    return total + slotWeights[index] * supportScore(card.model_probability, target?.model_probability);
+  }, 0))));
 
   return {
     selected,
@@ -123,7 +133,7 @@ export function summarizeResults(results) {
       averageGap: 0,
       score: 0,
       grade: 'F',
-      gradeLabel: 'Run it back',
+      gradeLabel: 'Far off consensus',
       biggestMisses: [],
     };
   }

@@ -1,5 +1,7 @@
 const params = new URLSearchParams(window.location.search);
 const challengeMode = params.has('challenge');
+const runtime = await import('./replay-runtime.mjs');
+runtime.installReplayRuntime();
 const product = await import('./product.mjs');
 const flow = await import('./flow-fixes.mjs');
 const humanCopy = await import('./human-copy.mjs');
