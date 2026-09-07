@@ -22,10 +22,23 @@ export function hashText(value) {
   return hash >>> 0;
 }
 
+function previousDateKey(dateKey) {
+  const date = new Date(`${dateKey}T12:00:00Z`);
+  date.setUTCDate(date.getUTCDate() - 1);
+  return date.toISOString().slice(0, 10);
+}
+
+function rawChallengeIndex(dateKey, setId, mode, count) {
+  return hashText(`${dateKey}|${setId}|${mode}|pack1-daily-v1`) % count;
+}
+
 export function challengeIndex(dateKey, setId, mode, replayCount) {
   const count = Math.max(0, Number(replayCount) || 0);
   if (!count) return 0;
-  return hashText(`${dateKey}|${setId}|${mode}|pack1-daily-v1`) % count;
+  const today = rawChallengeIndex(dateKey, setId, mode, count);
+  if (count === 1) return today;
+  const yesterday = rawChallengeIndex(previousDateKey(dateKey), setId, mode, count);
+  return today === yesterday ? (today + 1) % count : today;
 }
 
 export function rankCandidates(candidates) {
