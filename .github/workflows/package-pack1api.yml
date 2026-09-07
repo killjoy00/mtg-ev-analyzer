@@ -1,0 +1,29 @@
+name: package-pack1api
+
+on:
+  push:
+    branches: [fix/scoring-discrimination-pack-loading]
+    paths:
+      - '.github/workflows/package-pack1api.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build Neon function zip
+        run: |
+          mkdir -p artifact
+          cp worker/index.js artifact/index.js
+          cp worker/core.mjs artifact/core.mjs
+          cd artifact
+          zip ../pack1api.zip index.js core.mjs
+      - name: Upload deployment artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack1api-deploy
+          path: pack1api.zip
+          retention-days: 1
