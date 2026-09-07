@@ -143,7 +143,10 @@ function enhanceResult() {
   const result = scrapeTop3();
   if (!result) return;
   const button = document.querySelector('#share-top3');
-  if (button) button.textContent = 'Challenge a friend';
+  // Assigning textContent creates a child-list mutation even when the text is
+  // unchanged. Guard it so this MutationObserver cannot recursively trigger
+  // itself forever on the result screen.
+  if (button && button.textContent !== 'Challenge a friend') button.textContent = 'Challenge a friend';
   const reveal = document.querySelector('.reveal-panel');
   if (reveal && !reveal.querySelector('.bold-take')) {
     const markup = boldTakeMarkup(result);
