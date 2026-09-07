@@ -1,0 +1,45 @@
+name: Growth loop sprint once
+
+on:
+  push:
+    branches:
+      - feature/growth-loop-sprint
+    paths:
+      - scripts/growth_loop_sprint.py
+      - .github/workflows/growth-loop-sprint-once.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply product, performance, analytics, and data changes
+        run: python scripts/growth_loop_sprint.py
+      - name: Validate all production replay sets
+        run: |
+          for set_id in msh sos tmt ecl; do
+            python scripts/validate_dataset.py "data/$set_id/manifest.json" --minimum-replays 100
+          done
+      - name: Run unit and architecture tests
+        run: npm test
+      - name: Check whitespace
+        run: git diff --check
+      - name: Commit release changes
+        run: |
+          rm scripts/growth_loop_sprint.py .github/workflows/growth-loop-sprint-once.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Build the Pack One growth loop"
+          git push origin HEAD:feature/growth-loop-sprint
