@@ -1,8 +1,14 @@
 import { gradePick, gradeTopThree, rankCandidates, summarizeResults } from './scoring.mjs';
+import { challengeIndex, computeStreak, unlockedMilestones, utcDateKey } from './engagement.mjs';
+import { isLeaderboardConfigured, loadLeaderboard, submitLeaderboardScore, updateLeaderboardDisplayName } from './leaderboard.mjs';
 
 const app = document.querySelector('#app');
 const brandHome = document.querySelector('#brand-home');
+const dailyNav = document.querySelector('#daily-nav');
+const leaderboardNav = document.querySelector('#leaderboard-nav');
 const SHARE_URL = 'https://magic.planitnow.us/';
+const HISTORY_KEY = 'pack1-daily-history-v1';
+const NAME_KEY = 'pack1-player-name-v1';
 
 const state = {
   catalog: null,
@@ -18,9 +24,20 @@ const state = {
   results: [],
   quickResult: null,
   scoreMeta: null,
+  isDailyChallenge: false,
+  challengeDate: null,
+  challengeRanked: false,
+  challengeSubmitStatus: null,
+  challengeRank: null,
 };
 
-brandHome.addEventListener('click', renderHome);
+brandHome?.addEventListener('click', goHome);
+dailyNav?.addEventListener('click', () => {
+  if (!state.catalog?.sets?.length) return;
+  renderHome();
+  document.querySelector('#daily-challenge')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+});
+leaderboardNav?.addEventListener('click', () => renderLeaderboards());
 
 function esc(value) {
   return String(value ?? '')
@@ -35,6 +52,11 @@ function pct(value, digits = 0) {
   return `${(Number(value || 0) * 100).toFixed(digits)}%`;
 }
 
+function goHome() {
+  if (window.location.search) window.history.replaceState({}, '', window.location.pathname);
+  renderHome();
+}
+
 function resetSession() {
   state.setData = null;
   state.replay = null;
@@ -47,6 +69,11 @@ function resetSession() {
   state.results = [];
   state.quickResult = null;
   state.scoreMeta = null;
+  state.isDailyChallenge = false;
+  state.challengeDate = null;
+  state.challengeRanked = false;
+  state.challengeSubmitStatus = null;
+  state.challengeRank = null;
 }
 
 async function loadJson(path, label = 'data') {
@@ -88,6 +115,28 @@ async function loadRandomReplay(setEntry) {
   }
   if (!setData.replays?.length) throw new Error('This set has no replay drafts.');
   return { setData, replay: setData.replays[Math.floor(Math.random() * setData.replays.length)] };
+}
+
+async function loadChallengeReplay(setEntry, dateKey, mode) {
+  const setData = await loadSet(setEntry);
+  const replayCount = Number(setData.replay_count || setEntry.replay_count || 0);
+  if (Array.isArray(setData.shards) && setData.shards.length) {
+    const total = setData.shards.reduce((sum, shard) => sum + Number(shard.replay_count || 0), 0);
+    if (!total) throw new Error('This set has no replay shards.');
+    let replayIndex = challengeIndex(dateKey, setEntry.id, mode, total);
+    for (const shardMeta of setData.shards) {
+      const count = Number(shardMeta.replay_count || 0);
+      if (replayIndex < count) {
+        const shard = await loadJson(shardMeta.path, `${setEntry.name} Daily Challenge`);
+        if (!shard.replays?.[replayIndex]) throw new Error('Daily Challenge replay is unavailable.');
+        return { setData, replay: shard.replays[replayIndex] };
+      }
+      replayIndex -= count;
+    }
+  }
+  if (!setData.replays?.length) throw new Error('This set has no replay drafts.');
+  const index = challengeIndex(dateKey, setEntry.id, mode, replayCount || setData.replays.length);
+  return { setData, replay: setData.replays[index % setData.replays.length] };
 }
 
 function firstPackPicks(replay) {
@@ -137,13 +186,73 @@ function getBestScore(mode) {
 function recordBestScore(mode, score) {
   const previous = getBestScore(mode);
   const best = previous === null ? score : Math.max(previous, score);
-  try { window.localStorage.setItem(bestKey(mode), String(best)); } catch { /* local storage is optional */ }
+  try { window.localStorage.setItem(bestKey(mode), String(best)); } catch { /* optional */ }
   return { best, previous, isNewBest: previous === null || score > previous };
 }
 
 function bestChip(mode) {
   const best = getBestScore(mode);
   return best === null ? '' : `<span class="best-chip">Personal best <strong>${best}</strong></span>`;
+}
+
+function readChallengeHistory() {
+  try {
+    const value = JSON.parse(window.localStorage.getItem(HISTORY_KEY) || '[]');
+    return Array.isArray(value) ? value : [];
+  } catch {
+    return [];
+  }
+}
+
+function writeChallengeHistory(history) {
+  try { window.localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(-500))); } catch { /* optional */ }
+}
+
+function challengeRecord(date, setId, mode) {
+  return readChallengeHistory().find((item) => item.date === date && item.setId === setId && item.mode === mode) || null;
+}
+
+function recordChallengeCompletion({ date, setId, mode, score, grade }) {
+  const history = readChallengeHistory();
+  const existing = history.find((item) => item.date === date && item.setId === setId && item.mode === mode);
+  if (existing) return existing;
+  const entry = { date, setId, mode, score, grade, completedAt: new Date().toISOString() };
+  history.push(entry);
+  writeChallengeHistory(history);
+  return entry;
+}
+
+function challengeStats() {
+  const history = readChallengeHistory();
+  const dates = [...new Set(history.map((item) => item.date))];
+  const streak = computeStreak(dates, utcDateKey());
+  const bestScore = history.reduce((best, item) => Math.max(best, Number(item.score || 0)), 0);
+  return { history, streak, bestScore, milestones: unlockedMilestones({ completedRuns: history, streak, bestScore }) };
+}
+
+function randomPlayerName() {
+  const first = ['Copper', 'Quiet', 'Clever', 'Mossy', 'Bright', 'Swift', 'Lucky', 'Patient', 'Bold', 'Wandering'];
+  const second = ['Fox', 'Owl', 'Drake', 'Badger', 'Heron', 'Moth', 'Raven', 'Stag', 'Otter', 'Lynx'];
+  return `${first[Math.floor(Math.random() * first.length)]} ${second[Math.floor(Math.random() * second.length)]} ${Math.floor(10 + Math.random() * 90)}`;
+}
+
+function getDisplayName() {
+  try {
+    const saved = window.localStorage.getItem(NAME_KEY);
+    if (saved) return saved;
+    const generated = randomPlayerName();
+    window.localStorage.setItem(NAME_KEY, generated);
+    return generated;
+  } catch {
+    return 'Pack Player';
+  }
+}
+
+function saveDisplayName(value) {
+  const cleaned = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 24);
+  if (cleaned.length < 2) throw new Error('Use at least 2 characters.');
+  try { window.localStorage.setItem(NAME_KEY, cleaned); } catch { /* optional */ }
+  return cleaned;
 }
 
 function scoreTone(score) {
@@ -167,25 +276,45 @@ async function copyText(text) {
   textarea.remove();
 }
 
-async function shareScore(button, text) {
+async function shareScore(button, text, url = SHARE_URL) {
   const original = button.textContent;
   try {
     if (navigator.share) {
-      await navigator.share({ title: 'Pack 1', text, url: SHARE_URL });
+      await navigator.share({ title: 'Pack 1', text, url });
       return;
     }
-    await copyText(`${text}\n${SHARE_URL}`);
+    await copyText(`${text}\n${url}`);
     button.textContent = 'Copied!';
     setTimeout(() => { button.textContent = original; }, 1600);
   } catch (error) {
     if (error?.name !== 'AbortError') {
       try {
-        await copyText(`${text}\n${SHARE_URL}`);
+        await copyText(`${text}\n${url}`);
         button.textContent = 'Copied!';
         setTimeout(() => { button.textContent = original; }, 1600);
-      } catch { /* keep the game usable if sharing is unavailable */ }
+      } catch { /* sharing is optional */ }
     }
   }
+}
+
+function challengeShareUrl(mode) {
+  const url = new URL(SHARE_URL);
+  url.searchParams.set('daily', state.challengeDate || utcDateKey());
+  url.searchParams.set('set', state.selectedSetId);
+  url.searchParams.set('mode', mode);
+  return url.toString();
+}
+
+function dailyModeStatus(mode, setId = state.selectedSetId) {
+  const record = challengeRecord(utcDateKey(), setId, mode);
+  if (!record) return 'Not played';
+  return `${record.score}/100 · ${record.grade}`;
+}
+
+function milestoneMarkup() {
+  const { milestones } = challengeStats();
+  if (!milestones.length) return '';
+  return `<div class="milestone-row" aria-label="Unlocked milestones">${milestones.slice(-4).map((item) => `<span class="milestone-chip">${esc(item.label)}</span>`).join('')}</div>`;
 }
 
 function renderHome() {
@@ -198,6 +327,8 @@ function renderHome() {
 
   state.selectedSetId ||= sets[0].id;
   const active = selectedSetEntry();
+  const { streak, history } = challengeStats();
+  const todayRuns = history.filter((item) => item.date === utcDateKey()).length;
 
   app.innerHTML = `
     <section class="home-intro">
@@ -216,19 +347,34 @@ function renderHome() {
       <p class="set-meta" id="set-meta">${setMetaLine(active)}</p>
     </section>
 
-    <section class="mode-grid" aria-label="Choose a game mode">
+    <section class="daily-card" id="daily-challenge">
+      <div class="daily-copy">
+        <div class="daily-kicker"><span class="live-dot"></span><span>Daily Challenge</span><span class="streak-chip">${streak ? `${streak}-day streak` : 'Start a streak'}</span></div>
+        <h2>Same challenge. Same day. Global board.</h2>
+        <p>Everyone gets the same replay for each mode, so the score is actually comparable. Your first attempt today is the ranked one.</p>
+        ${milestoneMarkup()}
+      </div>
+      <div class="daily-actions">
+        <button class="daily-mode" data-daily-mode="top3"><span>Top 3</span><strong>${esc(dailyModeStatus('top3', active.id))}</strong></button>
+        <button class="daily-mode" data-daily-mode="full"><span>Full Pack</span><strong>${esc(dailyModeStatus('full', active.id))}</strong></button>
+        <button class="button secondary" id="daily-leaders">View leaderboard</button>
+        <small>${todayRuns ? `${todayRuns} challenge ${todayRuns === 1 ? 'run' : 'runs'} completed today` : 'Nothing on the board yet today'}</small>
+      </div>
+    </section>
+
+    <section class="mode-grid" aria-label="Choose a practice mode">
       <article class="mode-card">
         <div class="mode-number">01</div>
-        <div class="mode-topline"><p class="eyebrow">Fast game</p>${bestChip('top3')}</div>
+        <div class="mode-topline"><p class="eyebrow">Practice</p>${bestChip('top3')}</div>
         <h2>Top 3</h2>
         <p>See one fresh opening pack and rank the three cards you'd most want to start with. Score your card evaluation and ordering against consensus.</p>
-        <ul class="mode-points"><li>One opening pack</li><li>100-point score</li><li>Easy to share</li></ul>
+        <ul class="mode-points"><li>One opening pack</li><li>100-point score</li><li>Unlimited practice</li></ul>
         <button class="button primary mode-button" data-mode="top3">Play Top 3</button>
       </article>
 
       <article class="mode-card featured">
         <div class="mode-number">02</div>
-        <div class="mode-topline"><p class="eyebrow">Deeper game</p>${bestChip('full')}</div>
+        <div class="mode-topline"><p class="eyebrow">Practice</p>${bestChip('full')}</div>
         <h2>Full Pack</h2>
         <p>Work through every pick in the first pack of a real draft seat. Every decision gets a score, then the whole pack gets a grade.</p>
         <ul class="mode-points"><li>Every Pack 1 decision</li><li>Live pick scores</li><li>Final grade + share card</li></ul>
@@ -238,27 +384,25 @@ function renderHome() {
 
     <section class="data-note">
       <strong>How scoring works</strong>
-      <span>Scores measure how much strong-player model support your choices had relative to the consensus choice. They are training-game scores, not claims that a draft pick is objectively right or wrong.</span>
+      <span>Scores measure how much strong-player model support your choices had relative to the consensus choice. Public leaderboards use Daily Challenge scores only; random practice runs never count.</span>
     </section>`;
 
   document.querySelector('#set-select').addEventListener('change', (event) => {
     state.selectedSetId = event.target.value;
     renderHome();
   });
-  document.querySelectorAll('[data-mode]').forEach((button) => {
-    button.addEventListener('click', () => startMode(button.dataset.mode));
-  });
+  document.querySelectorAll('[data-mode]').forEach((button) => button.addEventListener('click', () => startMode(button.dataset.mode)));
+  document.querySelectorAll('[data-daily-mode]').forEach((button) => button.addEventListener('click', () => startMode(button.dataset.dailyMode, { daily: true })));
+  document.querySelector('#daily-leaders')?.addEventListener('click', () => renderLeaderboards({ setId: active.id }));
 }
 
-async function startMode(mode) {
+async function startMode(mode, options = {}) {
   const entry = selectedSetEntry();
-  document.querySelectorAll('.mode-button').forEach((button) => {
-    button.disabled = true;
-    if (button.dataset.mode === mode) button.textContent = 'Shuffling…';
-  });
-
+  document.querySelectorAll('.mode-button, .daily-mode').forEach((button) => { button.disabled = true; });
   try {
-    const loaded = await loadRandomReplay(entry);
+    const daily = Boolean(options.daily);
+    const date = options.date || utcDateKey();
+    const loaded = daily ? await loadChallengeReplay(entry, date, mode) : await loadRandomReplay(entry);
     const packPicks = firstPackPicks(loaded.replay);
     if (!packPicks.length) throw new Error('This replay does not contain a first pack.');
     state.setData = loaded.setData;
@@ -272,6 +416,11 @@ async function startMode(mode) {
     state.results = [];
     state.quickResult = null;
     state.scoreMeta = null;
+    state.isDailyChallenge = daily;
+    state.challengeDate = daily ? date : null;
+    state.challengeRanked = daily && date === utcDateKey() && !challengeRecord(date, entry.id, mode);
+    state.challengeSubmitStatus = null;
+    state.challengeRank = null;
     if (mode === 'top3') renderTopThree();
     else renderFullPack();
   } catch (error) {
@@ -309,9 +458,7 @@ function renderCard(card, pick, context = {}) {
 }
 
 function attachCardImageFallbacks() {
-  document.querySelectorAll('.card-image').forEach((image) => {
-    image.addEventListener('error', () => image.remove(), { once: true });
-  });
+  document.querySelectorAll('.card-image').forEach((image) => image.addEventListener('error', () => image.remove(), { once: true }));
 }
 
 function openingPick() {
@@ -327,7 +474,9 @@ function topThreeResultCopy(result) {
 }
 
 function topThreeShareText(result) {
-  return `Pack 1 · Top 3 · ${state.setData.name}\n${result.score}/100 (${result.grade}) · ${result.overlap}/3 consensus cards · ${result.exactPositions} exact positions\nCan you beat it?`;
+  const prefix = state.isDailyChallenge ? 'Pack 1 Daily · Top 3' : 'Pack 1 · Top 3';
+  const challenge = state.isDailyChallenge ? '\nSame pack for everyone. Beat my score.' : '\nCan you beat it?';
+  return `${prefix} · ${state.setData.name}\n${result.score}/100 (${result.grade}) · ${result.overlap}/3 consensus cards · ${result.exactPositions} exact positions${challenge}`;
 }
 
 function renderScoreHero(score, grade, label, meta) {
@@ -342,26 +491,32 @@ function renderScoreHero(score, grade, label, meta) {
     </div>`;
 }
 
+function dailySubmissionMarkup() {
+  if (!state.isDailyChallenge) return '';
+  const existing = challengeRecord(state.challengeDate, state.selectedSetId, state.mode);
+  if (!state.challengeRanked && existing) return `<div class="challenge-status practice">Practice run. Today's ranked score is already locked at <strong>${existing.score}/100</strong>.</div>`;
+  if (state.challengeDate !== utcDateKey()) return '<div class="challenge-status practice">Shared challenge replay. Only today’s challenge can enter the live board.</div>';
+  if (state.challengeSubmitStatus === 'saved') return `<div class="challenge-status saved">On the board${state.challengeRank ? ` · <strong>#${state.challengeRank} today</strong>` : ''}.</div>`;
+  if (state.challengeSubmitStatus === 'local') return '<div class="challenge-status practice">Ranked score saved on this device. Global sync is not configured yet.</div>';
+  if (state.challengeSubmitStatus === 'error') return '<div class="challenge-status practice">Your ranked score is saved locally; global sync did not complete.</div>';
+  return '<div class="challenge-status pending">Saving your ranked score…</div>';
+}
+
 function renderTopThreeReveal() {
   if (!state.revealed || !state.quickResult) return '';
   const result = state.quickResult;
   return `
     <section class="reveal-panel">
-      <p class="eyebrow">Pack revealed</p>
+      <p class="eyebrow">${state.isDailyChallenge ? 'Daily Challenge revealed' : 'Pack revealed'}</p>
       ${renderScoreHero(result.score, result.grade, topThreeResultCopy(result), state.scoreMeta)}
+      ${dailySubmissionMarkup()}
       <div class="top3-comparison">
-        <div>
-          <h3>Your ranking</h3>
-          ${result.selected.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong></div>`).join('')}
-        </div>
-        <div>
-          <h3>Consensus</h3>
-          ${result.consensusTop.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong><small>${pct(card.model_probability, 1)}</small></div>`).join('')}
-        </div>
+        <div><h3>Your ranking</h3>${result.selected.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong></div>`).join('')}</div>
+        <div><h3>Consensus</h3>${result.consensusTop.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong><small>${pct(card.model_probability, 1)}</small></div>`).join('')}</div>
       </div>
       <p class="reveal-note">${result.overlap}/3 consensus cards · ${result.exactPositions} exact ${result.exactPositions === 1 ? 'position' : 'positions'}. ${result.historicalRank ? `The historical drafter's first pick was #${result.historicalRank} on your list.` : `The historical drafter's first pick was outside your top three.`}</p>
       <div class="button-row result-actions">
-        <button class="button primary" id="another-top3">Play another</button>
+        ${state.isDailyChallenge ? '<button class="button primary" id="challenge-leaders">Today’s leaderboard</button><button class="button secondary" id="another-top3">Practice this pack</button>' : '<button class="button primary" id="another-top3">Play another</button>'}
         <button class="button share-button" id="share-top3">Share score</button>
         <button class="button secondary" id="top3-home">Choose a mode</button>
       </div>
@@ -373,24 +528,21 @@ function renderTopThree() {
   const count = state.topThreeIds.length;
   app.innerHTML = `
     <section class="game-heading">
-      <div><p class="eyebrow">Top 3 · ${esc(state.setData.name)}</p><h1>Rank your three best starts.</h1><p class="game-instruction">Click your first choice, then second, then third. Click a ranked card again to remove it.</p></div>
+      <div><p class="eyebrow">${state.isDailyChallenge ? `Daily Challenge · ${state.challengeDate}` : 'Top 3'} · ${esc(state.setData.name)}</p><h1>Rank your three best starts.</h1><p class="game-instruction">Click your first choice, then second, then third. Click a ranked card again to remove it.</p></div>
       <button class="text-button" id="quit-game">Exit</button>
     </section>
     <div class="pack-grid opening-pack">${pick.candidates.map((card) => renderCard(card, pick, { mode: 'top3', reveal: state.revealed })).join('')}</div>
     ${renderTopThreeReveal()}
-    ${state.revealed ? '' : `
-      <div class="action-dock">
-        <div><strong>${count === 0 ? 'Pick your #1.' : count === 1 ? 'Now pick #2.' : count === 2 ? 'One more: pick #3.' : 'Ranking ready.'}</strong><span>${count}/3 selected</span></div>
-        <button class="button primary" id="reveal-top3" ${count === 3 ? '' : 'disabled'}>Reveal score</button>
-      </div>`}`;
+    ${state.revealed ? '' : `<div class="action-dock"><div><strong>${count === 0 ? 'Pick your #1.' : count === 1 ? 'Now pick #2.' : count === 2 ? 'One more: pick #3.' : 'Ranking ready.'}</strong><span>${count}/3 selected${state.isDailyChallenge && !state.challengeRanked ? ' · practice attempt' : ''}</span></div><button class="button primary" id="reveal-top3" ${count === 3 ? '' : 'disabled'}>Reveal score</button></div>`}`;
 
   attachCardImageFallbacks();
   if (!state.revealed) document.querySelectorAll('[data-card-id]').forEach((button) => button.addEventListener('click', () => toggleTopThree(button.dataset.cardId)));
   document.querySelector('#reveal-top3')?.addEventListener('click', submitTopThree);
-  document.querySelector('#another-top3')?.addEventListener('click', () => startMode('top3'));
-  document.querySelector('#share-top3')?.addEventListener('click', (event) => shareScore(event.currentTarget, topThreeShareText(state.quickResult)));
-  document.querySelector('#top3-home')?.addEventListener('click', renderHome);
-  document.querySelector('#quit-game')?.addEventListener('click', renderHome);
+  document.querySelector('#another-top3')?.addEventListener('click', () => startMode('top3', state.isDailyChallenge ? { daily: true, date: state.challengeDate } : {}));
+  document.querySelector('#share-top3')?.addEventListener('click', (event) => shareScore(event.currentTarget, topThreeShareText(state.quickResult), state.isDailyChallenge ? challengeShareUrl('top3') : SHARE_URL));
+  document.querySelector('#challenge-leaders')?.addEventListener('click', () => renderLeaderboards({ period: 'daily', setId: state.selectedSetId, mode: 'top3' }));
+  document.querySelector('#top3-home')?.addEventListener('click', goHome);
+  document.querySelector('#quit-game')?.addEventListener('click', goHome);
 }
 
 function toggleTopThree(cardId) {
@@ -407,7 +559,12 @@ function submitTopThree() {
   state.quickResult = gradeTopThree(pick.candidates, state.topThreeIds, pick.historical_pick_id);
   state.scoreMeta = recordBestScore('top3', state.quickResult.score);
   state.revealed = true;
+  if (state.isDailyChallenge && state.challengeRanked) {
+    recordChallengeCompletion({ date: state.challengeDate, setId: state.selectedSetId, mode: 'top3', score: state.quickResult.score, grade: state.quickResult.grade });
+    state.challengeSubmitStatus = 'pending';
+  }
   renderTopThree();
+  if (state.isDailyChallenge && state.challengeRanked) void syncDailyScore('top3', state.quickResult.score, state.quickResult.grade, { overlap: state.quickResult.overlap, exact_positions: state.quickResult.exactPositions });
   document.querySelector('.reveal-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
@@ -427,10 +584,7 @@ function renderPickFeedback(pick) {
   const historical = pick.candidates.find((card) => card.id === pick.historical_pick_id);
   return `
     <section class="pick-feedback">
-      <div class="feedback-title">
-        <div><p class="eyebrow">Pick ${state.pickIndex + 1}</p><h2>${esc(result.verdict)}</h2></div>
-        <div class="pick-score ${scoreTone(result.score)}"><strong>${result.score}</strong><span>/100</span></div>
-      </div>
+      <div class="feedback-title"><div><p class="eyebrow">Pick ${state.pickIndex + 1}</p><h2>${esc(result.verdict)}</h2></div><div class="pick-score ${scoreTone(result.score)}"><strong>${result.score}</strong><span>/100</span></div></div>
       <div class="feedback-grid">
         <div><span>You took</span><strong>${esc(result.selectedName)}</strong></div>
         <div><span>Consensus</span><strong>${esc(result.bestName)}</strong></div>
@@ -448,7 +602,7 @@ function renderFullPack() {
   const selected = pick.candidates.find((card) => card.id === state.selectedCardId);
   app.innerHTML = `
     <section class="game-heading compact">
-      <div><p class="eyebrow">Full Pack · ${esc(state.setData.name)}</p><h1>Pick ${state.pickIndex + 1} of ${total}</h1><p class="game-instruction">Choose the card you'd take from this seat.</p></div>
+      <div><p class="eyebrow">${state.isDailyChallenge ? `Daily Challenge · ${state.challengeDate}` : 'Full Pack'} · ${esc(state.setData.name)}</p><h1>Pick ${state.pickIndex + 1} of ${total}</h1><p class="game-instruction">Choose the card you'd take from this seat.${state.isDailyChallenge && !state.challengeRanked ? ' This is a practice replay of today’s challenge.' : ''}</p></div>
       <button class="text-button" id="quit-game">Exit</button>
     </section>
     <div class="progress-track"><div class="progress-fill" style="width:${progress}%"></div></div>
@@ -456,22 +610,16 @@ function renderFullPack() {
       <div class="study-main">
         <div class="pack-grid">${pick.candidates.map((card) => renderCard(card, pick, { mode: 'full', reveal: state.revealed })).join('')}</div>
         ${renderPickFeedback(pick)}
-        <div class="action-dock inline-dock">
-          <div><strong>${selected ? esc(selected.name) : 'Choose a card.'}</strong><span>${state.revealed ? 'Your pick score is above.' : 'Lock it in when you are ready.'}</span></div>
-          ${state.revealed ? `<button class="button primary" id="next-pick">${state.pickIndex === total - 1 ? 'See final score' : 'Next pick'}</button>` : `<button class="button primary" id="submit-pick" ${selected ? '' : 'disabled'}>Lock in pick</button>`}
-        </div>
+        <div class="action-dock inline-dock"><div><strong>${selected ? esc(selected.name) : 'Choose a card.'}</strong><span>${state.revealed ? 'Your pick score is above.' : 'Lock it in when you are ready.'}</span></div>${state.revealed ? `<button class="button primary" id="next-pick">${state.pickIndex === total - 1 ? 'See final score' : 'Next pick'}</button>` : `<button class="button primary" id="submit-pick" ${selected ? '' : 'disabled'}>Lock in pick</button>`}</div>
       </div>
-      <aside class="replay-sidebar">
-        <section class="sidebar-card"><p class="eyebrow">Replay pool</p><h3>Cards entering this pick</h3>${renderPool(pick.pool)}</section>
-        <section class="sidebar-card quiet"><h3>Why the pool is fixed</h3><p>This is a replay, not a draft simulator. Later decisions and consensus stay tied to the original seat, even when your picks differ.</p></section>
-      </aside>
+      <aside class="replay-sidebar"><section class="sidebar-card"><p class="eyebrow">Replay pool</p><h3>Cards entering this pick</h3>${renderPool(pick.pool)}</section><section class="sidebar-card quiet"><h3>Why the pool is fixed</h3><p>This is a replay, not a draft simulator. Later decisions and consensus stay tied to the original seat, even when your picks differ.</p></section></aside>
     </section>`;
 
   attachCardImageFallbacks();
   if (!state.revealed) document.querySelectorAll('[data-card-id]').forEach((button) => button.addEventListener('click', () => { state.selectedCardId = button.dataset.cardId; renderFullPack(); }));
   document.querySelector('#submit-pick')?.addEventListener('click', submitPick);
   document.querySelector('#next-pick')?.addEventListener('click', nextPick);
-  document.querySelector('#quit-game')?.addEventListener('click', renderHome);
+  document.querySelector('#quit-game')?.addEventListener('click', goHome);
 }
 
 function submitPick() {
@@ -503,52 +651,155 @@ function methodNote() {
 }
 
 function fullPackShareText(summary) {
-  return `Pack 1 · Full Pack · ${state.setData.name}\n${summary.score}/100 (${summary.grade}) · ${summary.consensusAgreement.toFixed(0)}% consensus · ${summary.topThreeAgreement.toFixed(0)}% top 3\nCan you beat it?`;
+  const prefix = state.isDailyChallenge ? 'Pack 1 Daily · Full Pack' : 'Pack 1 · Full Pack';
+  const challenge = state.isDailyChallenge ? '\nSame pack for everyone. Beat my score.' : '\nCan you beat it?';
+  return `${prefix} · ${state.setData.name}\n${summary.score}/100 (${summary.grade}) · ${summary.consensusAgreement.toFixed(0)}% consensus · ${summary.topThreeAgreement.toFixed(0)}% top 3${challenge}`;
 }
 
 function renderSummary() {
   const summary = summarizeResults(state.results);
   state.scoreMeta ||= recordBestScore('full', summary.score);
+  if (state.isDailyChallenge && state.challengeRanked && !challengeRecord(state.challengeDate, state.selectedSetId, 'full')) {
+    recordChallengeCompletion({ date: state.challengeDate, setId: state.selectedSetId, mode: 'full', score: summary.score, grade: summary.grade });
+    state.challengeSubmitStatus = 'pending';
+    void syncDailyScore('full', summary.score, summary.grade, { consensus_agreement: summary.consensusAgreement, top_three_agreement: summary.topThreeAgreement });
+  }
   app.innerHTML = `
     <section class="scorecard">
-      <p class="eyebrow">Full Pack complete</p>
+      <p class="eyebrow">${state.isDailyChallenge ? 'Daily Challenge complete' : 'Full Pack complete'}</p>
       ${renderScoreHero(summary.score, summary.grade, summary.gradeLabel, state.scoreMeta)}
+      ${dailySubmissionMarkup()}
       <p class="lede result-lede">You made ${summary.total} decisions. Here's where your instincts lined up with the strong-player consensus.</p>
-
       <div class="summary-grid">
         <div class="summary-stat"><strong>${summary.consensusAgreement.toFixed(0)}%</strong><span>Consensus picks</span></div>
         <div class="summary-stat"><strong>${summary.topThreeAgreement.toFixed(0)}%</strong><span>Top-3 picks</span></div>
         <div class="summary-stat"><strong>${summary.historicalAgreement.toFixed(0)}%</strong><span>Matched drafter</span></div>
         <div class="summary-stat"><strong>${(summary.averageGap * 100).toFixed(1)}</strong><span>Avg. gap, pts</span></div>
       </div>
-
-      <section class="review-section">
-        <h2>Worth another look</h2>
-        <div class="miss-list">
-          ${summary.biggestMisses.length ? summary.biggestMisses.map((result) => `
-            <div class="miss-row"><span class="pick-number">Pick ${esc(result.pick_number)}</span><div><strong>${esc(result.selectedName)}</strong><small>Consensus: ${esc(result.bestName)}</small></div><span class="gap-number">${result.score}</span></div>`).join('') : '<p class="empty-note">Nothing major. Your picks stayed close to consensus all pack.</p>'}
-        </div>
-      </section>
-
+      <section class="review-section"><h2>Worth another look</h2><div class="miss-list">${summary.biggestMisses.length ? summary.biggestMisses.map((result) => `<div class="miss-row"><span class="pick-number">Pick ${esc(result.pick_number)}</span><div><strong>${esc(result.selectedName)}</strong><small>Consensus: ${esc(result.bestName)}</small></div><span class="gap-number">${result.score}</span></div>`).join('') : '<p class="empty-note">Nothing major. Your picks stayed close to consensus all pack.</p>'}</div></section>
       <details class="method-details"><summary>About the grading</summary><p>${esc(methodNote())}</p></details>
       <div class="button-row result-actions">
-        <button class="button primary" id="another-full">Draft another Pack 1</button>
+        ${state.isDailyChallenge ? '<button class="button primary" id="challenge-leaders">Today’s leaderboard</button><button class="button secondary" id="another-full">Practice this pack</button>' : '<button class="button primary" id="another-full">Draft another Pack 1</button>'}
         <button class="button share-button" id="share-full">Share score</button>
         <button class="button secondary" id="summary-home">Choose a mode</button>
       </div>
     </section>`;
 
-  document.querySelector('#another-full').addEventListener('click', () => startMode('full'));
-  document.querySelector('#share-full').addEventListener('click', (event) => shareScore(event.currentTarget, fullPackShareText(summary)));
-  document.querySelector('#summary-home').addEventListener('click', renderHome);
+  document.querySelector('#another-full').addEventListener('click', () => startMode('full', state.isDailyChallenge ? { daily: true, date: state.challengeDate } : {}));
+  document.querySelector('#share-full').addEventListener('click', (event) => shareScore(event.currentTarget, fullPackShareText(summary), state.isDailyChallenge ? challengeShareUrl('full') : SHARE_URL));
+  document.querySelector('#challenge-leaders')?.addEventListener('click', () => renderLeaderboards({ period: 'daily', setId: state.selectedSetId, mode: 'full' }));
+  document.querySelector('#summary-home').addEventListener('click', goHome);
+}
+
+async function syncDailyScore(mode, score, grade, details) {
+  if (!state.challengeRanked || state.challengeDate !== utcDateKey()) return;
+  if (!isLeaderboardConfigured()) {
+    state.challengeSubmitStatus = 'local';
+    refreshChallengeStatus();
+    return;
+  }
+  try {
+    await submitLeaderboardScore({
+      setId: state.selectedSetId,
+      mode,
+      score,
+      grade,
+      challengeDate: state.challengeDate,
+      displayName: getDisplayName(),
+      details,
+    });
+    state.challengeSubmitStatus = 'saved';
+    const rows = await loadLeaderboard({ period: 'daily', setId: state.selectedSetId, mode, limit: 100 });
+    state.challengeRank = rows.find((row) => row.is_me)?.rank || null;
+  } catch (error) {
+    console.warn('Daily leaderboard sync failed:', error);
+    state.challengeSubmitStatus = 'error';
+  }
+  refreshChallengeStatus();
+}
+
+function refreshChallengeStatus() {
+  const node = document.querySelector('.challenge-status');
+  if (!node) return;
+  const wrapper = document.createElement('div');
+  wrapper.innerHTML = dailySubmissionMarkup();
+  node.replaceWith(wrapper.firstElementChild);
+}
+
+function leaderboardSetOptions(selected) {
+  return `<option value="all" ${selected === 'all' ? 'selected' : ''}>All sets</option>${state.catalog.sets.map((set) => `<option value="${esc(set.id)}" ${selected === set.id ? 'selected' : ''}>${esc(set.name)}</option>`).join('')}`;
+}
+
+function leaderboardPeriodLabel(period, setFilter) {
+  if (period === 'daily' && setFilter !== 'all') return 'Score';
+  return 'Points';
+}
+
+async function renderLeaderboards(options = {}) {
+  resetSession();
+  const period = options.period || 'daily';
+  const mode = options.mode || 'top3';
+  const setFilter = options.setId || state.selectedSetId || state.catalog?.sets?.[0]?.id || 'all';
+  const playerName = getDisplayName();
+  app.innerHTML = `
+    <section class="leaderboard-shell">
+      <div class="leaderboard-heading"><div><p class="eyebrow">Global leaderboard</p><h1>Pack 1 standings</h1><p class="lede">Daily uses one shared challenge. Weekly, monthly, and all-time boards add up Daily Challenge points, rewarding both sharp picks and showing up.</p></div><button class="text-button" id="leaderboard-home">Back home</button></div>
+      <div class="leaderboard-toolbar">
+        <div class="period-tabs" role="tablist">${['daily', 'weekly', 'monthly', 'all'].map((item) => `<button class="period-tab ${item === period ? 'active' : ''}" data-period="${item}">${item === 'all' ? 'All-time' : item[0].toUpperCase() + item.slice(1)}</button>`).join('')}</div>
+        <div class="leaderboard-filters"><label><span>Mode</span><select id="leader-mode" class="select"><option value="top3" ${mode === 'top3' ? 'selected' : ''}>Top 3</option><option value="full" ${mode === 'full' ? 'selected' : ''}>Full Pack</option></select></label><label><span>Set</span><select id="leader-set" class="select">${leaderboardSetOptions(setFilter)}</select></label></div>
+      </div>
+      <div class="player-card"><div><span>Your board name</span><strong>${esc(playerName)}</strong><small>No account required. This name stays on this device.</small></div><div class="player-name-edit"><input id="player-name" maxlength="24" value="${esc(playerName)}" aria-label="Leaderboard display name"><button class="button secondary" id="save-player-name">Save</button></div></div>
+      <section id="leaderboard-content" class="leaderboard-content"><div class="leaderboard-loading">Loading standings…</div></section>
+    </section>`;
+
+  document.querySelector('#leaderboard-home').addEventListener('click', goHome);
+  document.querySelectorAll('[data-period]').forEach((button) => button.addEventListener('click', () => renderLeaderboards({ period: button.dataset.period, mode, setId: setFilter })));
+  document.querySelector('#leader-mode').addEventListener('change', (event) => renderLeaderboards({ period, mode: event.target.value, setId: setFilter }));
+  document.querySelector('#leader-set').addEventListener('change', (event) => renderLeaderboards({ period, mode, setId: event.target.value }));
+  document.querySelector('#save-player-name').addEventListener('click', async () => {
+    const button = document.querySelector('#save-player-name');
+    try {
+      const saved = saveDisplayName(document.querySelector('#player-name').value);
+      button.textContent = 'Saved';
+      if (isLeaderboardConfigured()) await updateLeaderboardDisplayName(saved).catch(() => null);
+      setTimeout(() => renderLeaderboards({ period, mode, setId: setFilter }), 500);
+    } catch (error) {
+      button.textContent = error.message;
+      setTimeout(() => { button.textContent = 'Save'; }, 1600);
+    }
+  });
+
+  const content = document.querySelector('#leaderboard-content');
+  if (!isLeaderboardConfigured()) {
+    content.innerHTML = '<div class="leaderboard-empty"><strong>Global standings are ready in the app, but the shared score database has not been connected to this deployment yet.</strong><span>Daily Challenge, streaks, milestones, and local ranked results still work.</span></div>';
+    return;
+  }
+  try {
+    const rows = await loadLeaderboard({ period, setId: setFilter === 'all' ? null : setFilter, mode, limit: 50 });
+    if (!rows.length) {
+      content.innerHTML = '<div class="leaderboard-empty"><strong>No scores yet.</strong><span>Be the first name on this board.</span></div>';
+      return;
+    }
+    const valueLabel = leaderboardPeriodLabel(period, setFilter);
+    content.innerHTML = `
+      <div class="leaderboard-table-wrap"><table class="leaderboard-table"><thead><tr><th>Rank</th><th>Player</th><th>${valueLabel}</th><th>Avg</th><th>Played</th><th>100s</th></tr></thead><tbody>${rows.map((row) => `<tr class="${row.is_me ? 'is-me' : ''}"><td class="rank-cell">#${row.rank}</td><td><strong>${esc(row.display_name)}</strong>${row.is_me ? '<small>You</small>' : ''}</td><td class="points-cell">${row.points}</td><td>${Number(row.average_score).toFixed(1)}</td><td>${row.plays}</td><td>${row.perfects}</td></tr>`).join('')}</tbody></table></div>
+      <p class="leaderboard-note">${period === 'daily' ? 'Daily rankings reset at 00:00 UTC.' : 'Points are the sum of ranked Daily Challenge scores in this period.'} Practice runs never count.</p>`;
+  } catch (error) {
+    content.innerHTML = `<div class="leaderboard-empty"><strong>Couldn’t load the standings.</strong><span>${esc(error.message)}</span></div>`;
+  }
 }
 
 async function init() {
   app.innerHTML = document.querySelector('#loading-template').innerHTML;
   try {
     state.catalog = await loadCatalog();
-    state.selectedSetId = state.catalog.sets?.[0]?.id || null;
-    renderHome();
+    const params = new URLSearchParams(window.location.search);
+    const requestedSet = params.get('set');
+    state.selectedSetId = state.catalog.sets?.some((set) => set.id === requestedSet) ? requestedSet : state.catalog.sets?.[0]?.id || null;
+    const daily = params.get('daily');
+    const mode = params.get('mode');
+    if (daily && ['top3', 'full'].includes(mode)) await startMode(mode, { daily: true, date: daily });
+    else renderHome();
   } catch (error) {
     renderError(error);
   }
