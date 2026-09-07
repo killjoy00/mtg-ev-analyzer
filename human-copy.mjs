@@ -1,8 +1,3 @@
-function setText(selector, from, to) {
-  const node = document.querySelector(selector);
-  if (node && node.textContent.trim() === from) node.textContent = to;
-}
-
 function replaceText(selector, from, to) {
   document.querySelectorAll(selector).forEach((node) => {
     if (node.textContent.includes(from)) node.textContent = node.textContent.replace(from, to);
@@ -10,26 +5,38 @@ function replaceText(selector, from, to) {
 }
 
 function applyHumanCopy() {
-  setText('.home-intro .eyebrow', 'Limited draft training', 'Pack 1 / Limited');
-  setText('.home-intro h1', 'How good is your Pack 1?', 'Make the pick.');
-  setText(
-    '.home-intro .lede',
-    'Real draft seats. Strong-player consensus. Play a quick opening-pack challenge or draft the whole first pack and get a score out of 100.',
-    'Real opening packs from 17Lands drafts. Rank your Top 3 or play the whole first pack. Then see where you stood against strong-player consensus.'
-  );
+  const intro = document.querySelector('.home-intro');
+  if (intro) {
+    const eyebrow = intro.querySelector('.eyebrow');
+    const heading = intro.querySelector('h1');
+    const lede = intro.querySelector('.lede');
+    if (eyebrow) eyebrow.textContent = 'LIMITED DRAFT GAME';
+    if (heading) heading.textContent = 'Pack One';
+    if (lede) lede.textContent = 'Draft real opening packs from 17Lands. Rank your Top 3 or play the full first pack, then compare your choices with the strong-player consensus.';
+  }
 
-  setText('.daily-copy h2', 'Same challenge. Same day. Global board.', 'One pack. One ranked shot.');
-  setText(
-    '.daily-copy > p',
-    'Everyone gets the same replay for each mode, so the score is actually comparable. Your first attempt today is the ranked one.',
-    'Everyone sees the same draft seat today. Your first Top 3 and Full Pack scores are the ones that go on the board.'
-  );
+  const dailyHeading = document.querySelector('.daily-copy h2');
+  if (dailyHeading) dailyHeading.textContent = 'One pack. One ranked shot.';
+  const dailyCopy = document.querySelector('.daily-copy > p');
+  if (dailyCopy) dailyCopy.textContent = 'Everyone sees the same draft seat today. Your first Top 3 and Full Pack scores are the ones that go on the board.';
 
   document.querySelectorAll('.mode-topline .eyebrow').forEach((node) => {
     if (node.textContent.trim() === 'Practice') node.textContent = 'Unlimited game';
   });
   replaceText('.mode-points li', 'Unlimited practice', 'Play again anytime');
   replaceText('.data-note span', 'random practice runs', 'unlimited games');
+
+  const note = document.querySelector('.data-note');
+  if (note) {
+    const title = note.querySelector('strong');
+    const copy = note.querySelector('span');
+    if (title) title.textContent = 'What “consensus” means';
+    if (copy) copy.textContent = 'Consensus is a model of experienced, high-win-rate 17Lands drafters. It compares how much support each card gets in the current pack and historical pool. The percentages are relative model support—not win rates, card grades, or objective truth. Your score measures how closely your choices track that model; only Daily Challenge scores rank.';
+  }
+
+  document.querySelectorAll('.consensus-box p, .consensus-explanation').forEach((node) => {
+    node.textContent = 'Model-implied support among experienced, high-win-rate 17Lands drafters for this pack and historical pool. These percentages are comparative—not win rates or objective card grades.';
+  });
 
   const modeGrid = document.querySelector('.mode-grid');
   if (modeGrid?.getAttribute('aria-label') === 'Choose a practice mode') {
