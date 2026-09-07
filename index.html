@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <meta name="theme-color" content="#f7f7f5" />
   <meta http-equiv="Content-Security-Policy" content="upgrade-insecure-requests" />
+  <meta name='impact-site-verification' value='90785cbe-56bd-41a8-8282-59967ea86f97'>
   <meta name="description" content="Play Pack One, take the Daily Challenge, compare your Limited draft choices with strong-player consensus, and challenge friends on the same packs." />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Pack One — Limited Draft Game" />
@@ -22,7 +23,7 @@
       location.replace('https://' + location.host + location.pathname + location.search + location.hash);
     }
   </script>
-  <link rel="stylesheet" href="pack1.css?v=4" />
+  <link rel="stylesheet" href="pack1.css?v=5" />
 </head>
 <body>
   <div class="app-shell">
@@ -37,11 +38,28 @@
       <div class="top-actions">
         <button class="top-nav-button" id="daily-nav" type="button">Daily</button>
         <button class="top-nav-button" id="leaderboard-nav" type="button">Leaders</button>
+        <a class="top-nav-button top-nav-link" href="/learn/">Learn</a>
+        <a class="top-nav-button top-nav-link" href="/methodology/">Method</a>
         <span class="source-note">Built from real 17Lands draft data</span>
       </div>
     </header>
 
     <main id="app" class="app" aria-live="polite"></main>
+
+    <section class="home-editorial" id="home-editorial" aria-label="Pack One guides and methodology">
+      <hr class="editorial-rule" />
+      <aside class="ad-slot ad-slot-wide" data-ad-slot="home" aria-label="Advertisement"><span>Advertisement</span></aside>
+      <div class="home-editorial-head"><p class="kicker">Beyond the score</p><h2>Learn what the consensus is telling you.</h2><p>Pack One is a game first, but the score only becomes useful when you understand the model behind it. These guides explain how the replay works, what support percentages mean, and how to use disagreement as a study tool rather than treating the model as an answer key.</p></div>
+      <div class="guide-grid">
+        <article class="content-card"><h3>How Pack One works</h3><p>Why the packs are real replay seats, why later cards stay fixed, and what Top 3 versus Full Pack is actually measuring.</p><a href="/how-it-works/">Read the explainer</a></article>
+        <article class="content-card"><h3>How scoring works</h3><p>A plain-English guide to consensus support, ranking quality, decision weight, and why a 90 is not a 90% chance of being correct.</p><a href="/scoring/">Understand the score</a></article>
+        <article class="content-card"><h3>Methodology</h3><p>See the strong-player cohort, pool-conditioned model, holdout approach, limitations, and the line between descriptive consensus and objective truth.</p><a href="/methodology/">Read the methodology</a></article>
+        <article class="content-card"><h3>First-pick discipline</h3><p>Use opening packs to practice committing before the reveal, separating card strength from confidence, and reviewing close calls.</p><a href="/learn/first-pick-discipline/">Read the guide</a></article>
+      </div>
+      <div class="home-editorial-head" style="margin-top:42px"><p class="kicker">Set archive</p><h2>1,200 opening-pack replay seats.</h2><p>Each set page summarizes the actual Pack One replay sample, including how often the model found a clear first pick, which cards most often led opening packs, and the closest decisions in the archive.</p></div>
+      <div class="guide-grid"><article class="content-card"><p class="kicker">MSH archive</p><h3>MSH opening packs</h3><p>300 replay seats · 24% of opening packs were close calls within 10 support points.</p><a href="/sets/msh/">See the set analysis</a></article><article class="content-card"><p class="kicker">SOS archive</p><h3>SOS opening packs</h3><p>300 replay seats · 26% of opening packs were close calls within 10 support points.</p><a href="/sets/sos/">See the set analysis</a></article><article class="content-card"><p class="kicker">TMT archive</p><h3>TMT opening packs</h3><p>300 replay seats · 42% of opening packs were close calls within 10 support points.</p><a href="/sets/tmt/">See the set analysis</a></article><article class="content-card"><p class="kicker">ECL archive</p><h3>ECL opening packs</h3><p>300 replay seats · 42% of opening packs were close calls within 10 support points.</p><a href="/sets/ecl/">See the set analysis</a></article></div>
+      <p class="affiliate-note"><strong>Commerce disclosure:</strong> Pack One may earn a commission from eligible purchases made through TCGplayer links after the affiliate program is activated. Marketplace links never affect scores, rankings, or recommendations.</p>
+    </section>
   </div>
 
   <template id="loading-template">
@@ -52,6 +70,9 @@
   </template>
 
   <script src="leaderboard-config.js"></script>
+  <script src="ad-config.js"></script>
+  <script src="tcgplayer-config.js"></script>
   <script type="module" src="bootstrap.mjs"></script>
+  <script type="module" src="ads.mjs"></script>
 </body>
 </html>
