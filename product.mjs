@@ -306,12 +306,33 @@ function enhanceConsensusPresentation() {
     note.textContent = 'Consensus is a model of experienced, high-win-rate 17Lands drafters. It compares how much support each card gets in the current pack and historical pool. Your score measures how closely your choices track that model; only Daily Challenge scores rank.';
   }
 
+  const scoreContext = document.querySelector('.score-context');
+  if (scoreContext && scoreContext.textContent !== 'Consensus alignment score.') {
+    scoreContext.textContent = 'Consensus alignment score.';
+  }
+
   document.querySelectorAll('.opening-pack .card-footer span').forEach((footer) => {
     const text = footer.textContent || '';
     const match = text.match(/^([0-9.]+%)\s*·\s*consensus #\d+(.*)$/i);
     if (!match) return;
     footer.textContent = `${match[1]} consensus support${match[2] || ''}`;
   });
+
+  document.querySelectorAll('.opening-pack .card-choice').forEach((button) => {
+    const footer = button.querySelector('.card-footer span')?.textContent || '';
+    const support = footer.match(/([0-9.]+%)/)?.[1];
+    const badge = button.querySelector('.consensus-badge');
+    if (badge && support && badge.textContent !== support) badge.textContent = support;
+  });
+
+  const supportColumn = document.querySelector('.top3-comparison > div:nth-child(2)');
+  if (supportColumn) {
+    const heading = supportColumn.querySelector('h3');
+    if (heading && heading.textContent !== 'Strong-player support') heading.textContent = 'Strong-player support';
+    supportColumn.querySelectorAll('.rank-row > span').forEach((rank) => {
+      if (!rank.hidden) rank.hidden = true;
+    });
+  }
 
   // Ordinal ranks can overstate a tiny tail of support (for example, a 4% #2
   // behind an 82% #1). If the social layer adds a bold-take note, show the
