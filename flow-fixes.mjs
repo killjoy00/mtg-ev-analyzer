@@ -1,10 +1,7 @@
+import { gameDateKey } from './engagement.mjs';
 import { gameShareUrl, makeGameSeed } from './gameplay.mjs';
 
 const SHARE_ORIGIN = 'https://magic.planitnow.us/';
-
-function utcDateKey() {
-  return new Date().toISOString().slice(0, 10);
-}
 
 function currentSet() {
   const params = new URLSearchParams(window.location.search);
@@ -18,7 +15,7 @@ function freshSeed() {
 function setDailyUrl(mode) {
   const url = new URL(window.location.href);
   url.search = '';
-  url.searchParams.set('daily', utcDateKey());
+  url.searchParams.set('daily', gameDateKey());
   url.searchParams.set('set', currentSet());
   url.searchParams.set('mode', mode);
   history.replaceState({}, '', `${url.pathname}${url.search}`);
