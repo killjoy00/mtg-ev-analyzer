@@ -4,7 +4,7 @@ const AUTH_USER_KEY = 'pack1-auth-user-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 const AUTH_BASE = 'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 
-function baseUrl() { return String(window.PACK1_API?.url || '').replace(/\/$/, ''); }
+function baseUrl() { return String(window.PACK1_API?.growthUrl || window.PACK1_API?.url || '').replace(/\/$/, ''); }
 function loadPackToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
 function loadAuthToken() { try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch { return null; } }
 function displayName() { try { return localStorage.getItem(NAME_KEY) || 'Pack Player'; } catch { return 'Pack Player'; } }
