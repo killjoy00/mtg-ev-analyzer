@@ -45,8 +45,8 @@ export function normalizeReplayPayload(pathname, data) {
       replays: data.replays.map((replay) => ({
         ...replay,
         picks: Array.isArray(replay.picks)
-? replay.picks.map((pick) => ({ ...pick, candidates: sortPackByRarity(pick.candidates || []) }))
-: replay.picks,
+          ? replay.picks.map((pick) => ({ ...pick, candidates: sortPackByRarity(pick.candidates || []) }))
+          : replay.picks,
       })),
     };
   }
@@ -78,8 +78,8 @@ export async function loadReplayJson(path, label = 'data') {
         if (!response.ok) throw new Error(`Could not load ${label} (${response.status}).`);
         const data = normalizeReplayPayload(url.pathname, await response.json());
         if (isCatalog(url)) {
-catalogSnapshot = data;
-scheduleWarm();
+          catalogSnapshot = data;
+          scheduleWarm();
         }
         return data;
       })

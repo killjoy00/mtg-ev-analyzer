@@ -679,7 +679,7 @@ function renderSummary() {
       <section class="review-section"><h2>Worth another look</h2><div class="miss-list">${summary.biggestMisses.length ? summary.biggestMisses.map((result) => `<div class="miss-row"><span class="pick-number">Pick ${esc(result.pick_number)}</span><div><strong>${esc(result.selectedName)}</strong><small>Consensus: ${esc(result.bestName)}</small></div><span class="gap-number">${result.score}</span></div>`).join('') : '<p class="empty-note">Nothing major. Your picks stayed close to consensus all pack.</p>'}</div></section>
       <details class="method-details"><summary>About the grading</summary><p>${esc(methodNote())}</p></details>
       <div class="button-row result-actions">
-        ${state.isDailyChallenge ? '<button class="button primary" id="challenge-leaders">Today’s leaderboard</button><button class="button secondary" id="another-full">Play another game</button>' : '<button class="button primary" id="another-full">Draft another Pack 1</button>'}
+        ${state.isDailyChallenge ? '<button class="button primary" id="challenge-leaders">Today’s leaderboard</button><button class="button secondary" id="another-full">Play another game</button>' : '<button class="button primary" id="another-full">New pack</button>'}
         <button class="button share-button" id="share-full">Share score</button>
         <button class="button secondary" id="summary-home">Choose a mode</button>
       </div>

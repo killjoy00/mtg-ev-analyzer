@@ -116,7 +116,7 @@ async function renderAccount() {
   currentAccount=await getAuthSession();
   if(currentAccount?.session?.token && currentAccount?.user) {
     await linkAccount(currentAccount.session.token).catch(()=>null);
-    app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account</p><h1>Stats saved.</h1><p>Signed in as <strong>${esc(currentAccount.user.email)}</strong>. Your Pack 1 identity now follows you across devices.</p></header><div class="account-actions"><button class="button primary" id="account-stats">View My Stats</button><button class="button secondary" id="account-signout">Sign out</button></div><p class="account-note">Playing never requires an account. Signing out returns this browser to guest-first play.</p></section>`;
+    app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account</p><h1>Stats saved.</h1><p>Signed in as <strong>${esc(currentAccount.user.email)}</strong>. Your Pack One identity now follows you across devices.</p></header><div class="account-actions"><button class="button primary" id="account-stats">View My Stats</button><button class="button secondary" id="account-signout">Sign out</button></div><p class="account-note">Playing never requires an account. Signing out returns this browser to guest-first play.</p></section>`;
     document.querySelector('#account-stats')?.addEventListener('click',()=>void renderStats());
     document.querySelector('#account-signout')?.addEventListener('click',async()=>{await signOutAccount();currentAccount=null;event('auth_sign_out');void renderAccount();});
     return;
