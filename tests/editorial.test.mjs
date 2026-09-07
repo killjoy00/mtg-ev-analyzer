@@ -17,6 +17,7 @@ const home = await readFile('index.html','utf8');
 assert.match(home, /id="home-editorial"/);
 assert.match(home, /data-ad-slot="home"/);
 assert.match(home, /href="\/learn\/"/);
+assert.match(home, /<meta name='impact-site-verification' value='90785cbe-56bd-41a8-8282-59967ea86f97'>/);
 const ads = await readFile('ad-config.js','utf8');
 assert.match(ads, /enabled:\s*false/);
 const tcg = await readFile('tcgplayer.mjs','utf8');
