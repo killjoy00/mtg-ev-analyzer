@@ -7,8 +7,9 @@ replace those probabilities. It supplies a context delta that lets the browser
 and score worker ask: how would strong-player support move if the player had
 made different earlier picks?
 
-To keep that delta independent of the 300 scored replay seats, every draft_id
-present in the current replay shards is excluded from this model's counts.
+To keep that delta independent of the scored replay seats, every replay draft
+that also belongs to the selected strong-player training cohort is held out of
+this model's counts.
 """
 
 from __future__ import annotations
@@ -20,11 +21,8 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 from build_replays import (
-    CARD_PREFIX,
-    POOL_PREFIX,
     CountStore,
     candidate_columns,
-    column_card_name,
     open_text,
     parse_example,
     pool_columns,
@@ -168,7 +166,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
     input_path = Path(args.input)
     output_dir = Path(args.output_dir)
-    excluded = replay_draft_ids(output_dir)
+    replay_ids = replay_draft_ids(output_dir)
 
     skills, fieldnames = scan_draft_skill(input_path)
     strong_ids, cutoff, _ = select_strong_drafts(
@@ -177,10 +175,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         args.top_fraction,
         args.max_training_drafts,
     )
+    strong_ids = set(strong_ids)
+    held_out = replay_ids & strong_ids
     counts, min_pack, min_pick, examples, training_drafts = collect_counts(
         input_path,
-        set(strong_ids),
-        excluded,
+        strong_ids,
+        held_out,
         fieldnames,
     )
     model = render_model(
@@ -191,7 +191,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         min_pick,
         examples,
         training_drafts,
-        len(excluded),
+        len(held_out),
         cutoff,
     )
     encoded = json.dumps(model, separators=(",", ":")) + "\n"
@@ -205,7 +205,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "set": args.expansion.lower(),
         "training_drafts": training_drafts,
         "training_picks": examples,
-        "excluded_replay_drafts": len(excluded),
+        "excluded_replay_drafts": len(held_out),
         "cards": len(model["cards"]),
         "pairs": len(model["pairs"]),
         "bytes": size,
