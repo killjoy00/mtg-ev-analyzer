@@ -1,0 +1,44 @@
+name: finalize-counterfactual-path
+
+on:
+  push:
+    branches: [feature/counterfactual-pack-paths]
+    paths:
+      - scripts/finalize_counterfactual_path_patch.py
+      - .github/workflows/finalize-counterfactual-path.yml
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Apply polish
+        run: python scripts/finalize_counterfactual_path_patch.py
+      - name: Run unit tests
+        run: npm test
+      - name: Remove one-shot branch scaffolding
+        run: |
+          rm -f .github/workflows/apply-counterfactual-path.yml
+          rm -f .github/workflows/path-model-v3.yml
+          rm -f scripts/apply_counterfactual_path_patch.py
+          rm -f scripts/finalize_counterfactual_path_patch.py
+          rm -f .github/workflows/finalize-counterfactual-path.yml
+      - name: Commit finalized implementation
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Finalize path-aware Full Pack grading' || exit 0
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
