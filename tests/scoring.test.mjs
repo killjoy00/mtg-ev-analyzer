@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { gradePick, rankCandidates, summarizeResults } from '../scoring.mjs';
+import { gradePick, gradeTopThree, rankCandidates, summarizeResults } from '../scoring.mjs';
 
 const candidates = [
   { id: 'a', name: 'A', model_probability: 0.45 },
@@ -26,6 +26,18 @@ test('gradePick tracks historical agreement separately from consensus', () => {
   const result = gradePick(candidates, 'b', 'b');
   assert.equal(result.historicalMatch, true);
   assert.equal(result.consensusMatch, false);
+});
+
+test('gradeTopThree measures overlap and exact ordering', () => {
+  const result = gradeTopThree(candidates, ['a', 'c', 'b'], 'a');
+  assert.equal(result.overlap, 3);
+  assert.equal(result.exactPositions, 1);
+  assert.equal(result.historicalRank, 1);
+  assert.deepEqual(result.consensusIds, ['a', 'b', 'c']);
+});
+
+test('gradeTopThree rejects duplicate choices', () => {
+  assert.throws(() => gradeTopThree(candidates, ['a', 'a', 'b'], 'a'));
 });
 
 test('summarizeResults reports agreement and biggest misses', () => {
