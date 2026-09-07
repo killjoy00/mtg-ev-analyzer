@@ -1,4 +1,4 @@
-name: Technical debt refactor
+name: Technical debt refactor follow-up
 
 on:
   push:
@@ -19,367 +19,110 @@ jobs:
           ref: refactor/technical-debt-cleanup
           fetch-depth: 0
 
-      - name: Apply architecture cleanup
+      - name: Tighten architecture cleanup
         shell: bash
         run: |
           python - <<'PY'
           from pathlib import Path
-          import re
 
-          def read(path):
-              return Path(path).read_text()
-
-          def write(path, text):
-              Path(path).write_text(text)
-
-          def replace_once(text, old, new, label):
+          def replace_once(path, old, new, label):
+              file = Path(path)
+              text = file.read_text()
               count = text.count(old)
               if count != 1:
                   raise SystemExit(f'{label}: expected exactly one match, found {count}')
-              return text.replace(old, new, 1)
+              file.write_text(text.replace(old, new, 1))
 
-          lifecycle = r'''const listeners = new Set();
-          let observer = null;
-          let scheduled = false;
-
-          function report(error) {
-            console.error('Pack One render hook failed:', error);
-          }
-
-          function flush() {
-            scheduled = false;
-            for (const listener of [...listeners]) {
-              Promise.resolve().then(listener).catch(report);
-            }
-          }
-
-          function schedule() {
-            if (scheduled) return;
-            scheduled = true;
-            queueMicrotask(flush);
-          }
-
-          export function installRenderLifecycle(root = document.querySelector('#app')) {
-            if (observer || !root || typeof MutationObserver === 'undefined') return;
-            observer = new MutationObserver(schedule);
-            observer.observe(root, { childList: true, subtree: true });
-            schedule();
-          }
-
-          export function onAppRender(listener, { immediate = true } = {}) {
-            if (typeof listener !== 'function') throw new TypeError('Render listener must be a function.');
-            listeners.add(listener);
-            if (immediate) schedule();
-            return () => listeners.delete(listener);
-          }
-          '''.replace('\n          ', '\n').lstrip()
-          write('render-lifecycle.mjs', lifecycle)
-
-          replay_data = r'''const responseCache = new Map();
-          let catalogSnapshot = null;
-          let warmupInstalled = false;
-
-          function urlOf(input) {
-            try {
-              return new URL(String(input), globalThis.location?.href || 'https://magic.planitnow.us/');
-            } catch {
-              return null;
-            }
-          }
-
-          export function rarityBucket(rarity) {
-            const value = String(rarity || '').toLowerCase();
-            if (value === 'mythic' || value === 'rare') return 0;
-            if (value === 'uncommon') return 1;
-            if (value === 'common') return 2;
-            return 3;
-          }
-
-          export function sortPackByRarity(candidates = []) {
-            return candidates
-              .map((card, index) => ({ card, index }))
-              .sort((a, b) => rarityBucket(a.card?.rarity) - rarityBucket(b.card?.rarity) || a.index - b.index)
-              .map(({ card }) => card);
-          }
-
-          export function sortCatalogSets(sets = []) {
-            return sets
-              .map((set, index) => ({ set, index, date: Date.parse(set?.data_date || '') || 0 }))
-              .sort((a, b) => b.date - a.date || a.index - b.index)
-              .map(({ set }) => set);
-          }
-
-          export function normalizeReplayPayload(pathname, data) {
-            if (!data || typeof data !== 'object') return data;
-
-            if (/\/data\/catalog\.json$/.test(pathname) && Array.isArray(data.sets)) {
-              return { ...data, sets: sortCatalogSets(data.sets) };
-            }
-
-            if (/\/data\/[^/]+\/shards\/[^/]+\.json$/.test(pathname) && Array.isArray(data.replays)) {
-              return {
-                ...data,
-                replays: data.replays.map((replay) => ({
-                  ...replay,
-                  picks: Array.isArray(replay.picks)
-                    ? replay.picks.map((pick) => ({ ...pick, candidates: sortPackByRarity(pick.candidates || []) }))
-                    : replay.picks,
-                })),
-              };
-            }
-
-            return data;
-          }
-
-          function isCatalog(url) {
-            return Boolean(url && /\/data\/catalog\.json$/.test(url.pathname));
-          }
-
-          function isManifest(url) {
-            return Boolean(url && /\/data\/[^/]+\/manifest\.json$/.test(url.pathname));
-          }
-
-          function isReplayResource(url) {
-            return Boolean(url && /\/data\/.+\.json$/.test(url.pathname));
-          }
-
-          export async function loadReplayJson(path, label = 'data') {
-            const url = urlOf(path);
-            if (!url) throw new Error(`Could not load ${label}: invalid URL.`);
-            const key = url.href;
-            if (!isReplayResource(url)) throw new Error(`Could not load ${label}: unsupported replay resource.`);
-
-            if (!responseCache.has(key)) {
-              const request = fetch(url.href, { cache: 'default' })
-                .then(async (response) => {
-                  if (!response.ok) throw new Error(`Could not load ${label} (${response.status}).`);
-                  const data = normalizeReplayPayload(url.pathname, await response.json());
-                  if (isCatalog(url)) {
-                    catalogSnapshot = data;
-                    scheduleWarm();
-                  }
-                  return data;
-                })
-                .catch((error) => {
-                  responseCache.delete(key);
-                  throw error;
-                });
-              responseCache.set(key, request);
-            }
-            return responseCache.get(key);
-          }
-
-          export function clearReplayCache() {
-            responseCache.clear();
-            catalogSnapshot = null;
-          }
-
-          function selectedSetId() {
-            if (typeof document === 'undefined') return null;
-            const requested = new URLSearchParams(globalThis.location?.search || '').get('set');
-            return requested || document.querySelector('#set-select')?.value || catalogSnapshot?.sets?.[0]?.id || null;
-          }
-
-          function warmSelectedManifest() {
-            if (!catalogSnapshot) return;
-            const set = catalogSnapshot.sets?.find((entry) => entry.id === selectedSetId());
-            const manifest = set?.manifest || set?.manifest_path;
-            const url = urlOf(manifest);
-            if (!url || !isManifest(url)) return;
-            void loadReplayJson(manifest, set?.name || 'set manifest').catch(() => null);
-          }
-
-          function scheduleWarm() {
-            if (typeof document === 'undefined') return;
-            if (typeof requestIdleCallback === 'function') requestIdleCallback(warmSelectedManifest, { timeout: 800 });
-            else setTimeout(warmSelectedManifest, 100);
-          }
-
-          export function installReplayDataWarmup() {
-            if (warmupInstalled || typeof document === 'undefined') return;
-            warmupInstalled = true;
-            document.addEventListener('change', (event) => {
-              if (event.target?.id === 'set-select') scheduleWarm();
-            });
-          }
-          '''.replace('\n          ', '\n').lstrip()
-          write('replay-data.mjs', replay_data)
-
-          bootstrap = '''import { installRenderLifecycle } from './render-lifecycle.mjs';\nimport { installReplayDataWarmup } from './replay-data.mjs';\n\nconst params = new URLSearchParams(window.location.search);\nconst challengeMode = params.has('challenge');\n\ninstallRenderLifecycle();\ninstallReplayDataWarmup();\n\nconst product = await import('./product.mjs');\nconst flow = await import('./flow-fixes.mjs');\nconst growth = await import('./growth.mjs');\nconst retention = await import('./retention.mjs');\n\nif (challengeMode) {\n  await import('./social.mjs');\n  product.installProductLayer();\n  flow.installFlowFixes();\n  await growth.installGrowthLayer();\n  retention.installRetentionLayer();\n} else {\n  const seed = params.get('seed');\n  if (seed) product.seedGameRandom(seed);\n  await import('./app.js');\n  await import('./social.mjs');\n  product.installProductLayer();\n  flow.installFlowFixes();\n  await growth.installGrowthLayer();\n  retention.installRetentionLayer();\n}\n'''
-          write('bootstrap.mjs', bootstrap)
-
-          flow = read('flow-fixes.mjs')
-          flow = re.sub(r'\nfunction replaceTextNodes\(root = document\) \{.*?\n\}\n\nfunction captureFlow', '\nfunction captureFlow', flow, flags=re.S)
-          flow = replace_once(
-              flow,
-              "  const app = document.querySelector('#app');\n  if (app) new MutationObserver(() => replaceTextNodes(app)).observe(app, { childList: true, subtree: true });\n  replaceTextNodes(app || document);\n",
-              '',
-              'flow observer removal',
+          replace_once(
+              'growth.mjs',
+              'Your Pack 1 identity now follows you across devices.',
+              'Your Pack One identity now follows you across devices.',
+              'account branding',
           )
-          write('flow-fixes.mjs', flow)
-
-          retention = read('retention.mjs')
-          retention = replace_once(retention, "import { ensurePackSession, loadAccountDailyDates, saveGameResult } from './growth-api.mjs';\n", "import { ensurePackSession, loadAccountDailyDates, saveGameResult } from './growth-api.mjs';\nimport { onAppRender } from './render-lifecycle.mjs';\n", 'retention import')
-          retention = retention.replace('let observer = null;\n', '')
-          retention = replace_once(retention, "  observer = new MutationObserver(() => void enhanceStats());\n  const app = document.querySelector('#app');\n  if (app) observer.observe(app, { childList:true, subtree:true });\n  void enhanceStats();\n", "  onAppRender(() => void enhanceStats());\n", 'retention lifecycle')
-          write('retention.mjs', retention)
-
-          product = read('product.mjs')
-          product = replace_once(product, "import { gameShareUrl, makeGameSeed, seededRandom, cleanSeed } from './gameplay.mjs';\n", "import { gameShareUrl, makeGameSeed, seededRandom, cleanSeed } from './gameplay.mjs';\nimport { onAppRender } from './render-lifecycle.mjs';\n", 'product import')
-          product = product.replace('let observer = null;\n', '')
-          product = re.sub(r'\nfunction resultCardsMarkup\(\) \{.*?\n\}\n\nasync function copyText', '\nasync function copyText', product, flags=re.S)
-          product = product.replace("  if (hero && !reveal.querySelector('.result-picks')) hero.insertAdjacentHTML('afterend', resultCardsMarkup());\n", '')
-          product = re.sub(r'\nfunction replacePracticeLanguage\(root = document\) \{.*?\n\}\n\nfunction enhanceHome', '\nfunction enhanceHome', product, flags=re.S)
-          product = re.sub(
-              r'function enhanceHome\(\) \{.*?\n\}\n\nfunction autoStartSeededGame',
-              '''function enhanceHome() {\n  const app = document.querySelector('#app');\n  const intro = document.querySelector('.home-intro');\n  app?.classList.toggle('home-page', Boolean(intro));\n}\n\nfunction enhanceConsensusPresentation() {\n  document.querySelectorAll('.opening-pack .card-image').forEach((image, index) => {\n    image.loading = 'eager';\n    if (index < 8) image.fetchPriority = 'high';\n  });\n}\n\nfunction autoStartSeededGame''',
-              product,
-              flags=re.S,
+          replace_once(
+              'app.js',
+              '<button class="button primary" id="another-full">Draft another Pack 1</button>',
+              '<button class="button primary" id="another-full">New pack</button>',
+              'full pack result button',
           )
-          product = replace_once(product, "  enhanceFullResult();\n  replacePracticeLanguage();\n  autoStartSeededGame();\n", "  enhanceFullResult();\n  enhanceConsensusPresentation();\n  autoStartSeededGame();\n", 'product enhance')
-          product = re.sub(r'\nfunction finishGameClicks\(event\) \{.*?\n\}\n\nexport function installProductLayer', '\nexport function installProductLayer', product, flags=re.S)
-          product = replace_once(product, "  document.addEventListener('click', finishGameClicks, false);\n  observer = new MutationObserver(enhance);\n  const app = document.querySelector('#app');\n  if (app) observer.observe(app, { childList: true, subtree: true });\n  enhance();\n", "  onAppRender(enhance);\n", 'product lifecycle')
-          write('product.mjs', product)
 
-          growth = read('growth.mjs')
-          growth = replace_once(growth, "import { getAuthSession, linkAccount, loadRemoteStats, saveGameResult, sendEvents, signInAccount, signOutAccount, signUpAccount } from './growth-api.mjs';\n", "import { getAuthSession, linkAccount, loadRemoteStats, saveGameResult, sendEvents, signInAccount, signOutAccount, signUpAccount } from './growth-api.mjs';\nimport { onAppRender } from './render-lifecycle.mjs';\n", 'growth import')
-          growth = growth.replace('let mutationTimer = null;\n', '')
-          growth = growth.replace('Your Pack 1 record', 'Your Pack One record')
-          growth = growth.replace('persistent Pack 1 identity', 'persistent Pack One identity')
-          growth = replace_once(growth, "  new MutationObserver(()=>{clearTimeout(mutationTimer);mutationTimer=setTimeout(enhance,0);}).observe(document.querySelector('#app'),{childList:true,subtree:true});\n  enhance();\n", "  onAppRender(enhance);\n", 'growth lifecycle')
-          write('growth.mjs', growth)
-
-          social = read('social.mjs')
-          social = replace_once(social, "import { createShareChallenge, isLeaderboardConfigured, loadCommunityDistribution, loadShareChallenge } from './leaderboard.mjs';\n", "import { createShareChallenge, isLeaderboardConfigured, loadCommunityDistribution, loadShareChallenge } from './leaderboard.mjs';\nimport { loadReplayJson } from './replay-data.mjs';\nimport { onAppRender } from './render-lifecycle.mjs';\n", 'social imports')
-          social = re.sub(
-              r"async function resolveSetId\(setName\) \{\n  try \{\n    const response = await fetch\('./data/catalog\.json', \{ cache: 'no-store' \}\);\n    const data = await response\.json\(\);\n    return data\.sets\?\.find\(\(set\) => String\(set\.name\)\.toLowerCase\(\) === String\(setName\)\.toLowerCase\(\)\)\?\.id \|\| String\(setName \|\| ''\)\.toLowerCase\(\)\.replace\(/\[\^a-z0-9_-\]\+/g, '-'\)\.slice\(0, 24\);\n  \} catch \{ return String\(setName \|\| ''\)\.toLowerCase\(\)\.replace\(/\[\^a-z0-9_-\]\+/g, '-'\)\.slice\(0, 24\); \}\n\}",
-              """async function resolveSetId(setName) {\n  const fallback = String(setName || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 24);\n  try {\n    const data = await loadReplayJson('./data/catalog.json', 'catalog');\n    return data.sets?.find((set) => String(set.name).toLowerCase() === String(setName).toLowerCase())?.id || fallback;\n  } catch {\n    return fallback;\n  }\n}""",
-              social,
+          replay = Path('replay-data.mjs').read_text()
+          replay = replay.replace(
+              "picks: Array.isArray(replay.picks)\n? replay.picks.map((pick) => ({ ...pick, candidates: sortPackByRarity(pick.candidates || []) }))\n: replay.picks,",
+              "picks: Array.isArray(replay.picks)\n          ? replay.picks.map((pick) => ({ ...pick, candidates: sortPackByRarity(pick.candidates || []) }))\n          : replay.picks,",
           )
-          if "const response = await fetch('./data/catalog.json'" in social:
-              raise SystemExit('social resolveSetId replacement failed')
-          social = replace_once(social, "new MutationObserver(()=>enhanceResult()).observe(document.querySelector('#app'), { childList:true, subtree:true });\n", "onAppRender(enhanceResult);\n", 'social lifecycle')
-          write('social.mjs', social)
-
-          app = read('app.js')
-          app = replace_once(app, "import { isLeaderboardConfigured, loadLeaderboard, submitLeaderboardScore, updateLeaderboardDisplayName } from './leaderboard.mjs';\n", "import { isLeaderboardConfigured, loadLeaderboard, submitLeaderboardScore, updateLeaderboardDisplayName } from './leaderboard.mjs';\nimport { loadReplayJson } from './replay-data.mjs';\n", 'app replay import')
-          app = replace_once(app, "async function loadJson(path, label = 'data') {\n  const response = await fetch(path, { cache: 'no-store' });\n  if (!response.ok) throw new Error(`Could not load ${label} (${response.status}).`);\n  return response.json();\n}\n", "async function loadJson(path, label = 'data') {\n  return loadReplayJson(path, label);\n}\n", 'app loader')
-
-          substitutions = {
-              '<p class="eyebrow">Limited draft training</p>': '<p class="eyebrow">LIMITED DRAFT GAME</p>',
-              '<h1>How good is your Pack 1?</h1>': '<h1>Pack One</h1>',
-              '<p class="lede">Real draft seats. Strong-player consensus. Play a quick opening-pack challenge or draft the whole first pack and get a score out of 100.</p>': '<p class="lede">Draft real opening packs from 17Lands. Rank your Top 3 or play the full first pack, then compare your choices with the strong-player consensus.</p>',
-              '<section class="daily-card" id="daily-challenge">': '<section class="daily-card daily-feature" id="daily-challenge">',
-              '<h2>Same challenge. Same day. Global board.</h2>': '<h2>One pack. One ranked shot.</h2>',
-              '<p>Everyone gets the same replay for each mode, so the score is actually comparable. Your first attempt today is the ranked one.</p>': '<p>Everyone sees the same draft seat today. Your first Top 3 and Full Pack scores are the ones that go on the board.</p>',
-              '<section class="mode-grid" aria-label="Choose a practice mode">': '<section class="mode-grid" aria-label="Choose a game mode">',
-              '<article class="mode-card">': '<article class="mode-card game-mode-row">',
-              '<div class="mode-topline"><p class="eyebrow">Practice</p>${bestChip(\'top3\')}</div>': '<div class="mode-topline"><p class="eyebrow">Opening pack</p>${bestChip(\'top3\')}</div>',
-              '<p>See one fresh opening pack and rank the three cards you\'d most want to start with. Score your card evaluation and ordering against consensus.</p>': '<p>Rank your top three from one fresh opening pack. Fast, opinionated, and built to argue about.</p>',
-              '<ul class="mode-points"><li>One opening pack</li><li>100-point score</li><li>Unlimited practice</li></ul>': '<ul class="mode-points"><li>One pack</li><li>Top-three score</li><li>Share the exact seed</li></ul>',
-              '<article class="mode-card featured">': '<article class="mode-card game-mode-row featured">',
-              '<div class="mode-topline"><p class="eyebrow">Practice</p>${bestChip(\'full\')}</div>': '<div class="mode-topline"><p class="eyebrow">Full first pack</p>${bestChip(\'full\')}</div>',
-              '<p>Work through every pick in the first pack of a real draft seat. Every decision gets a score, then the whole pack gets a grade.</p>': '<p>Play every pick in Pack One. Your choices get scored as the seat develops.</p>',
-              '<ul class="mode-points"><li>Every Pack 1 decision</li><li>Live pick scores</li><li>Final grade + share card</li></ul>': '<ul class="mode-points"><li>Every first-pack pick</li><li>100-point finish</li><li>Share the exact seed</li></ul>',
-              '<button class="button primary mode-button" data-mode="full">Draft Pack 1</button>': '<button class="button primary mode-button" data-mode="full">Play Full Pack</button>',
-              '<strong>How scoring works</strong>': '<strong>What “consensus” means</strong>',
-              '<span>Scores measure how much strong-player model support your choices had relative to the consensus choice. Public leaderboards use Daily Challenge scores only; random practice runs never count.</span>': '<span>Consensus is a model of experienced, high-win-rate 17Lands drafters. It compares how much support each card gets in the current pack and historical pool. The percentages are relative model support—not win rates, card grades, or objective truth. Your score measures how closely your choices track that model; only Daily Challenge scores rank.</span>',
-              "Practice run. Today's ranked score is already locked at": "Replay. Today's ranked score is already locked at",
-              '>Practice this pack</button>': '>Play another game</button>',
-              " · practice attempt": " · replay",
-              ' This is a practice replay of today’s challenge.': ' This is a replay of today’s challenge.',
-              'Daily rankings reset at 00:00 UTC.': 'Daily rankings reset at midnight Eastern.',
-              ' Practice runs never count.': ' Only Daily Challenge runs count toward the board.',
-          }
-          for old, new in substitutions.items():
-              if old not in app:
-                  raise SystemExit(f'app substitution missing: {old[:80]}')
-              app = app.replace(old, new)
-
-          app = replace_once(
-              app,
-              "        ${meta ? `<p>Personal best: <strong>${meta.best}</strong></p>` : ''}\n",
-              "        ${meta && !meta.isNewBest ? `<p>Personal best: <strong>${meta.best}</strong></p>` : ''}\n        <p class=\"score-context\">Consensus alignment score — not win probability or an objective card grade.</p>\n",
-              'score context',
+          replay = replay.replace(
+              "if (isCatalog(url)) {\ncatalogSnapshot = data;\nscheduleWarm();\n        }",
+              "if (isCatalog(url)) {\n          catalogSnapshot = data;\n          scheduleWarm();\n        }",
           )
-          write('app.js', app)
+          Path('replay-data.mjs').write_text(replay)
 
-          tests = read('tests/replay-runtime.test.mjs').replace("../replay-runtime.mjs", "../replay-data.mjs")
-          write('tests/replay-data.test.mjs', tests)
-          Path('tests/replay-runtime.test.mjs').unlink()
+          Path('tests/architecture.test.mjs').write_text(r'''import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import { existsSync, readFileSync } from 'node:fs';
 
-          package = read('package.json')
-          package = package.replace(' && node --check human-copy.mjs', '')
-          package = package.replace('node --check replay-runtime.mjs', 'node --check render-lifecycle.mjs && node --check replay-data.mjs')
-          write('package.json', package)
-
-          index = read('index.html')
-          index, count = re.subn(r'\n  <style>.*?</style>', '', index, count=1, flags=re.S)
-          if count != 1:
-              raise SystemExit('index inline style block not found')
-          index = index.replace('pack1.css?v=2', 'pack1.css?v=3')
-          write('index.html', index)
-
-          css = read('pack1.css')
-          marker = '/* Result layout and render-stability rules. */'
-          if marker not in css:
-              css += r'''
-
-          /* Result layout and render-stability rules. */
-          .game-heading {
-            display: grid;
-            grid-template-columns: minmax(0, 1fr) auto;
-            align-items: start;
+          function source(path) {
+            return readFileSync(new URL(`../${path}`, import.meta.url), 'utf8');
           }
-          .game-heading > .challenge-callout {
-            grid-column: 1 / -1;
-            width: 100%;
-            margin-bottom: 4px;
-          }
-          .result-hidden-source { display: none !important; }
-          .result-page {
-            max-width: 980px;
-            margin-left: auto;
-            margin-right: auto;
-          }
-          #app, .pack-grid { overflow-anchor: none; }
 
-          @media (max-width: 680px) {
-            .game-heading { display: block; }
-            .game-heading > .challenge-callout { margin-bottom: 18px; }
-          }
-          '''.replace('\n          ', '\n')
-          write('pack1.css', css)
+          const lifecycleModules = [
+            'render-lifecycle.mjs',
+            'bootstrap.mjs',
+            'product.mjs',
+            'flow-fixes.mjs',
+            'growth.mjs',
+            'retention.mjs',
+            'social.mjs',
+          ];
 
-          for orphan in ['styles.css', 'design.css', 'design-results.css', 'editorial.css', 'engagement.css']:
-              if Path(orphan).exists():
-                  Path(orphan).unlink()
+          test('one centralized render lifecycle owns DOM mutation observation', () => {
+            const sources = lifecycleModules.map(source);
+            const observerCount = sources.reduce(
+              (sum, text) => sum + (text.match(/\bnew MutationObserver\b/g)?.length || 0),
+              0,
+            );
+            assert.equal(observerCount, 1);
+            assert.match(source('render-lifecycle.mjs'), /new MutationObserver/);
+            for (const path of lifecycleModules.filter((path) => path !== 'render-lifecycle.mjs')) {
+              assert.doesNotMatch(source(path), /\bnew MutationObserver\b/, `${path} must subscribe to the shared lifecycle`);
+            }
+          });
 
-          for obsolete in ['human-copy.mjs', 'replay-runtime.mjs']:
-              if Path(obsolete).exists():
-                  Path(obsolete).unlink()
+          test('replay loading never monkeypatches global fetch', () => {
+            const sources = ['bootstrap.mjs', 'replay-data.mjs', 'app.js', 'social.mjs'].map(source).join('\n');
+            assert.doesNotMatch(sources, /globalThis\.fetch\s*=/);
+            assert.match(source('app.js'), /loadReplayJson/);
+            assert.match(source('social.mjs'), /loadReplayJson/);
+          });
 
-          # Guardrails: the old patch-layer mechanisms must be gone from active browser code.
-          active = '\n'.join(read(p) for p in ['bootstrap.mjs','product.mjs','flow-fixes.mjs','growth.mjs','retention.mjs','social.mjs'])
-          if 'new MutationObserver' in active:
-              raise SystemExit('A feature module still owns its own MutationObserver')
-          if 'globalThis.fetch =' in '\n'.join(read(p) for p in Path('.').glob('*.mjs')):
-              raise SystemExit('Global fetch monkeypatch still present')
-          if 'human-copy.mjs' in read('package.json') or 'replay-runtime.mjs' in read('package.json'):
-              raise SystemExit('Obsolete patch modules still referenced by package.json')
+          test('obsolete patch modules stay removed', () => {
+            const root = new URL('../', import.meta.url);
+            assert.equal(existsSync(new URL('human-copy.mjs', root)), false);
+            assert.equal(existsSync(new URL('replay-runtime.mjs', root)), false);
+            assert.doesNotMatch(source('bootstrap.mjs'), /human-copy|replay-runtime/);
+            assert.doesNotMatch(source('package.json'), /human-copy|replay-runtime/);
+          });
+
+          test('the page has one stylesheet entrypoint and no inline style block', () => {
+            const html = source('index.html');
+            assert.doesNotMatch(html, /<style(?:\s|>)/i);
+            const stylesheets = [...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/gi)].map((match) => match[1]);
+            assert.deepEqual(stylesheets, ['pack1.css?v=3']);
+          });
+          '''.replace('\n          ', '\n').lstrip())
           PY
 
-      - name: Verify unit suite
+      - name: Verify full test suite
         run: npm test
 
       - name: Verify diff
         run: git diff --check
 
-      - name: Commit cleanup
+      - name: Commit follow-up
         shell: bash
         run: |
           git config user.name "pack-one-refactor-bot"
           git config user.email "actions@users.noreply.github.com"
           git add -A
-          git commit -m "Refactor browser patch layers"
+          git commit -m "Add architecture guardrails"
           git push origin HEAD:refactor/technical-debt-cleanup
