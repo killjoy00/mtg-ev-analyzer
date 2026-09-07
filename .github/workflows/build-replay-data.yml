@@ -104,12 +104,41 @@ jobs:
             --folds 5 \
             --shard-size 2 \
             --card-metadata "generated/$LOWER-cards.json"
+      - name: Build counterfactual path model
+        env:
+          EXPANSION: ${{ inputs.expansion }}
+          FORMAT: ${{ inputs.format }}
+          SOURCE_DATE: ${{ inputs.source_date }}
+          MAX_TRAINING: ${{ inputs.max_training_drafts }}
+        run: |
+          UPPER=$(printf '%s' "$EXPANSION" | tr '[:lower:]' '[:upper:]')
+          LOWER=$(printf '%s' "$EXPANSION" | tr '[:upper:]' '[:lower:]')
+          python scripts/build_path_model.py \
+            --input "raw-data/draft_data_public.$UPPER.$FORMAT.csv.gz" \
+            --output-dir "data/$LOWER" \
+            --expansion "$UPPER" \
+            --source-date "$SOURCE_DATE" \
+            --minimum-games 100 \
+            --top-fraction 0.15 \
+            --max-training-drafts "$MAX_TRAINING" \
+            --max-bytes 4000000
       - name: Validate generated dataset
         env:
           EXPANSION: ${{ inputs.expansion }}
         run: |
           LOWER=$(printf '%s' "$EXPANSION" | tr '[:upper:]' '[:lower:]')
           python scripts/validate_dataset.py "data/$LOWER/manifest.json" --minimum-replays 100
+          python - "$LOWER" <<'PY'
+          import json, sys
+          from pathlib import Path
+          path=Path('data')/sys.argv[1]/'path-model.json'
+          model=json.loads(path.read_text())
+          assert model['model_version']=='strong-player-counterfactual-path-v3'
+          assert model['training']['excluded_replay_drafts'] >= 250
+          assert len(model['cards']) > 100
+          assert len(model['pairs']) > 100
+          assert path.stat().st_size < 4_000_000
+          PY
       - name: Upload generated replay data
         uses: actions/upload-artifact@v4
         with:
