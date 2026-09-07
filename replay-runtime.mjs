@@ -99,8 +99,9 @@ function warmSelectedManifest() {
   if (!catalogSnapshot || typeof document === 'undefined') return;
   const selectedId = document.querySelector('#set-select')?.value || catalogSnapshot.featured_set;
   const set = catalogSnapshot.sets?.find((entry) => entry.id === selectedId);
-  if (!set?.manifest) return;
-  void globalThis.fetch(set.manifest, { cache: 'force-cache' }).catch(() => null);
+  const manifest = set?.manifest || set?.manifest_path;
+  if (!manifest) return;
+  void globalThis.fetch(manifest, { cache: 'force-cache' }).catch(() => null);
 }
 
 function scheduleWarm() {
