@@ -102,6 +102,26 @@ begin
 end;
 $$;
 
+create or replace function public.pack1_set_display_name(p_display_name text)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  v_user_id uuid := auth.uid();
+  v_name text := regexp_replace(btrim(coalesce(p_display_name, '')), '\s+', ' ', 'g');
+begin
+  if v_user_id is null then
+    raise exception 'Authentication required';
+  end if;
+  if char_length(v_name) < 2 or char_length(v_name) > 24 then
+    raise exception 'Display name must be 2-24 characters';
+  end if;
+  update public.pack1_scores set display_name = v_name where user_id = v_user_id;
+end;
+$$;
+
 create or replace function public.pack1_leaderboard(
   p_period text default 'daily',
   p_set_id text default null,
@@ -166,6 +186,9 @@ $$;
 
 revoke all on function public.pack1_submit_score(text, text, integer, text, date, text, jsonb) from public, anon;
 grant execute on function public.pack1_submit_score(text, text, integer, text, date, text, jsonb) to authenticated;
+
+revoke all on function public.pack1_set_display_name(text) from public, anon;
+grant execute on function public.pack1_set_display_name(text) to authenticated;
 
 revoke all on function public.pack1_leaderboard(text, text, text, integer) from public;
 grant execute on function public.pack1_leaderboard(text, text, text, integer) to anon, authenticated;
