@@ -34,3 +34,16 @@ test('gameShareUrl preserves the replay seed and challenge score', () => {
   assert.equal(url.searchParams.get('vs'), '87');
   assert.equal(url.searchParams.get('by'), 'Copper Fox 22');
 });
+
+test('gameShareUrl does not invent a zero-score challenge', () => {
+  const url = new URL(gameShareUrl({
+    origin: 'https://magic.planitnow.us/',
+    setId: 'ecl',
+    mode: 'top3',
+    seed: 'normal-game',
+  }));
+  assert.equal(url.searchParams.get('set'), 'ecl');
+  assert.equal(url.searchParams.get('mode'), 'top3');
+  assert.equal(url.searchParams.has('vs'), false);
+  assert.equal(url.searchParams.has('by'), false);
+});
