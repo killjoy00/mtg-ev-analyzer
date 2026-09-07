@@ -25,6 +25,7 @@ function applyHumanCopy() {
   });
   replaceText('.mode-points li', 'Unlimited practice', 'Play again anytime');
   replaceText('.data-note span', 'random practice runs', 'unlimited games');
+  replaceText('.stats-page h1, .stats-page p, .account-page p', 'Pack 1', 'Pack One');
 
   const note = document.querySelector('.data-note');
   if (note) {
@@ -36,6 +37,19 @@ function applyHumanCopy() {
 
   document.querySelectorAll('.consensus-box p, .consensus-explanation').forEach((node) => {
     node.textContent = 'Model-implied support among experienced, high-win-rate 17Lands drafters for this pack and historical pool. These percentages are comparative—not win rates or objective card grades.';
+  });
+
+  document.querySelectorAll('.score-copy').forEach((copy) => {
+    if (copy.querySelector('.score-context')) return;
+    const context = document.createElement('p');
+    context.className = 'score-context';
+    context.textContent = 'Consensus alignment score — not win probability or an objective card grade.';
+    copy.appendChild(context);
+  });
+
+  document.querySelectorAll('.opening-pack .card-image').forEach((image, index) => {
+    image.loading = 'eager';
+    if (index < 8) image.fetchPriority = 'high';
   });
 
   const modeGrid = document.querySelector('.mode-grid');
