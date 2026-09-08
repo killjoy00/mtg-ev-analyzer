@@ -31,6 +31,19 @@ class PoweredCubeImportTests(unittest.TestCase):
                 # A complete future P1P1 row at the same coordinates must remain.
                 {"draft_id": "d2", "pack_number": "0", "pick_number": "0", "pack_card_A": "1", "pack_card_B": "1"},
             ]
+            # Keep this synthetic archive above the same 1 KB safety floor used
+            # in production without weakening that guard for tests. These rows
+            # use pack 2 coordinates so they cannot affect the P1P1 assertion.
+            rows.extend(
+                {
+                    "draft_id": f"filler-{index:04d}-{index * 7919}",
+                    "pack_number": "1",
+                    "pick_number": str(index % 15),
+                    "pack_card_A": "1" if index % 3 else "0",
+                    "pack_card_B": "1" if index % 5 else "0",
+                }
+                for index in range(1000)
+            )
             with gzip.open(source, "wt", encoding="utf-8", newline="") as handle:
                 writer = csv.DictWriter(handle, fieldnames=fieldnames)
                 writer.writeheader()
@@ -40,7 +53,12 @@ class PoweredCubeImportTests(unittest.TestCase):
             self.assertEqual(removed, 1)
             with gzip.open(output, "rt", encoding="utf-8", newline="") as handle:
                 kept = list(csv.DictReader(handle))
-            self.assertEqual([(row["draft_id"], row["pick_number"]) for row in kept], [("d1", "1"), ("d1", "14"), ("d2", "0")])
+            self.assertEqual(
+                [(row["draft_id"], row["pick_number"]) for row in kept[:3]],
+                [("d1", "1"), ("d1", "14"), ("d2", "0")],
+            )
+            self.assertEqual(len(kept), 1003)
+            self.assertGreater(output.stat().st_size, 1024)
 
     def test_bulk_discovery_prefers_current_jsonl_uri_and_supports_legacy_uri(self):
         current = {
