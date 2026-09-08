@@ -1,0 +1,95 @@
+name: build-powered-cube
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/build-powered-cube.yml'
+      - 'scripts/import_powered_cube.py'
+      - 'cube-product.mjs'
+      - 'bootstrap.mjs'
+      - 'package.json'
+      - 'tests/test_powered_cube_import.py'
+      - 'tests/powered-cube.test.mjs'
+
+permissions:
+  contents: write
+
+# Share the normal set import lock. Both workflows can update data/catalog.json.
+concurrency:
+  group: set-data-import-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  powered-cube:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Run unit tests
+        run: npm test
+
+      - name: Build and validate Powered Cube
+        run: >-
+          python scripts/import_powered_cube.py
+          --max-training-drafts 5000
+          --max-output-candidates 1200
+          --target-replays 300
+          --minimum-replays 100
+          --minimum-opening-candidates 15
+          --shard-size 2
+          --max-path-bytes 8000000
+
+      - name: Publish build report to job summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f generated/powered-cube-report.json ]]; then
+            echo '## Powered Cube build report' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat generated/powered-cube-report.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload build report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: powered-cube-report-${{ github.run_id }}
+          path: generated/powered-cube-report.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Commit validated Cube data
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data/catalog.json data/powered-cube/
+          if git diff --cached --quiet; then
+            echo 'Powered Cube data is already current.'
+            exit 0
+          fi
+
+          git commit -m 'Build Powered Cube mode [data-generated]'
+          for attempt in 1 2 3; do
+            echo "Publish attempt ${attempt}/3"
+            if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
+              exit 0
+            fi
+            git rebase --abort >/dev/null 2>&1 || true
+            sleep $((attempt * 5))
+          done
+          echo 'Could not publish Powered Cube data after three attempts.' >&2
+          exit 1
