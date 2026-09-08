@@ -66,8 +66,8 @@ function cubeSectionMarkup() {
           <h3>Cube Top 3</h3>
           <p>Rank the three cards you would start with from a complete Powered Cube P1P1.</p>
           <div class="button-row">
-            <a class="button primary" href="${esc(dailyTop3)}">Today’s Cube</a>
-            <a class="button secondary" href="${esc(top3)}">New Top 3</a>
+            <button class="button primary" type="button" data-cube-href="${esc(dailyTop3)}">Today’s Cube</button>
+            <button class="button secondary" type="button" data-cube-href="${esc(top3)}">New Top 3</button>
           </div>
         </article>
         <article class="mode-card game-mode-row cube-mode-card">
@@ -75,13 +75,23 @@ function cubeSectionMarkup() {
           <h3>Cube Full Pack</h3>
           <p>Make every Pack One pick from a real Cube seat, with later support adapting to the cards you take.</p>
           <div class="button-row">
-            <a class="button primary" href="${esc(dailyFull)}">Today’s Full Pack</a>
-            <a class="button secondary" href="${esc(full)}">New Full Pack</a>
+            <button class="button primary" type="button" data-cube-href="${esc(dailyFull)}">Today’s Full Pack</button>
+            <button class="button secondary" type="button" data-cube-href="${esc(full)}">New Full Pack</button>
           </div>
         </article>
       </div>
       <p class="set-meta">Powered Cube Daily scores use the Powered Cube board under Leaders. Practice games remain unlimited.</p>
     </section>`;
+}
+
+function bindCubeLaunchers(root = document) {
+  root.querySelectorAll('[data-cube-href]').forEach((button) => {
+    if (button.dataset.cubeBound === '1') return;
+    button.dataset.cubeBound = '1';
+    button.addEventListener('click', () => {
+      window.location.href = button.dataset.cubeHref;
+    });
+  });
 }
 
 function enhanceHome() {
@@ -105,10 +115,12 @@ function enhanceHome() {
     }
   }
 
-  if (document.querySelector('[data-powered-cube-section="1"]')) return;
-  const standardModes = document.querySelector('.mode-section');
-  if (!standardModes) return;
-  standardModes.insertAdjacentHTML('beforebegin', cubeSectionMarkup());
+  if (!document.querySelector('[data-powered-cube-section="1"]')) {
+    const standardModes = document.querySelector('.mode-section');
+    if (!standardModes) return;
+    standardModes.insertAdjacentHTML('beforebegin', cubeSectionMarkup());
+  }
+  bindCubeLaunchers();
 }
 
 function enhanceLeaderboard() {
