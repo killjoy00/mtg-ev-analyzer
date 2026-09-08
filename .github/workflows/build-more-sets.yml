@@ -4,17 +4,17 @@ on:
   workflow_dispatch:
     inputs:
       sets:
-        description: 'Optional comma-separated set codes. Leave blank to import the next missing public sets.'
+        description: 'Optional comma-separated set codes. Leave blank to consume the explicit backlog queue.'
         required: false
         default: ''
         type: string
       limit:
-        description: 'Maximum auto-discovered sets to import this run'
+        description: 'Maximum successful queued imports this run'
         required: true
         default: '3'
         type: string
       earliest:
-        description: 'Earliest Scryfall release date to consider for backlog discovery'
+        description: 'Legacy discovery fallback cutoff if the queue file is unavailable'
         required: true
         default: '2021-01-01'
         type: string
@@ -22,6 +22,11 @@ on:
     branches: [main]
     paths:
       - '.github/workflows/build-more-sets.yml'
+      - 'data/import-queue.json'
+      # Every successful batch updates the catalog. That commit launches the
+      # next batch; when the queue is empty, no catalog change is produced and
+      # the chain stops naturally.
+      - 'data/catalog.json'
       - 'scripts/import_sets.py'
       - 'scripts/build_replays.py'
       - 'scripts/build_path_model.py'
@@ -34,6 +39,8 @@ on:
 permissions:
   contents: write
 
+# Powered Cube shares this lock because both workflows can publish catalog.json.
+# This lets normal-set backfill continue without risking a lost catalog update.
 concurrency:
   group: set-data-import-${{ github.ref }}
   cancel-in-progress: false
@@ -68,6 +75,7 @@ jobs:
           set -euo pipefail
           args=(
             --format PremierDraft
+            --queue data/import-queue.json
             --limit "$LIMIT"
             --earliest "$EARLIEST"
             --max-training-drafts 5000
@@ -112,7 +120,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data/catalog.json data/
           if git diff --cached --quiet; then
-            echo 'No generated set data changed.'
+            echo 'No generated set data changed. Queue chain stops here.'
             exit 0
           fi
 
@@ -131,5 +139,5 @@ jobs:
       - name: Surface importer failure after preserving successful sets
         if: steps.importer.outcome == 'failure'
         run: |
-          echo 'One or more selected sets failed. Successful staged sets were committed; see the import report artifact.' >&2
+          echo 'One or more queued sets failed. Successful sets were committed and the next catalog-triggered batch can continue past the failure; see the import report artifact.' >&2
           exit 1
