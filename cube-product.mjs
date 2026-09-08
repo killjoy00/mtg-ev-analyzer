@@ -3,7 +3,7 @@ import { utcDateKey } from './engagement.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 
 export const POWERED_CUBE_ID = 'powered-cube';
-const MODES = new Set(['top3', 'full']);
+const MODES = new Set(['full']);
 
 function esc(value) {
   return String(value ?? '')
@@ -20,7 +20,7 @@ function freshSeed() {
 
 export function poweredCubeUrl({
   origin = 'https://magic.planitnow.us/',
-  mode = 'top3',
+  mode = 'full',
   daily = null,
   seed = null,
 } = {}) {
@@ -49,38 +49,27 @@ function homeOrigin() {
 function cubeSectionMarkup() {
   const today = utcDateKey();
   const origin = homeOrigin();
-  const top3 = poweredCubeUrl({ origin, mode: 'top3' });
-  const full = poweredCubeUrl({ origin, mode: 'full' });
-  const dailyTop3 = poweredCubeUrl({ origin, mode: 'top3', daily: today });
-  const dailyFull = poweredCubeUrl({ origin, mode: 'full', daily: today });
+  const run = poweredCubeUrl({ origin, mode: 'full' });
+  const daily = poweredCubeUrl({ origin, mode: 'full', daily: today });
 
   return `
     <section class="mode-section cube-mode-section" data-powered-cube-section="1" aria-labelledby="powered-cube-heading">
       <div class="mode-section-heading">
         <div><p class="eyebrow">Special format</p><h2 id="powered-cube-heading">Powered Cube</h2></div>
-        <p>Vintage power, broken mana, and one real 17Lands Cube seat. Powered Cube has its own games and its own leaderboard filter; it is not part of the expansion-set picker.</p>
+        <p>A separate Pack One game built from real 17Lands Powered Cube seats. Arena omits the full P1P1 pack, so your run inherits that drafter’s first card and starts at the complete 14-card P1P2.</p>
       </div>
-      <div class="mode-grid" aria-label="Powered Cube modes">
+      <div class="mode-grid cube-single-mode" aria-label="Powered Cube mode">
         <article class="mode-card game-mode-row cube-mode-card">
-          <div class="mode-topline"><p class="eyebrow">Opening pack</p><span class="best-chip">Powered Cube</span></div>
-          <h3>Cube Top 3</h3>
-          <p>Rank the three cards you would start with from a complete Powered Cube P1P1.</p>
+          <div class="mode-topline"><p class="eyebrow">14 real decisions</p><span class="best-chip">Powered Cube</span></div>
+          <h3>Cube Pack Run</h3>
+          <p>Start with the real P1P1 card already in your pool, then make every fully observed Pack One choice from P1P2 through P1P15. Later support adapts to the cards you take.</p>
           <div class="button-row">
-            <button class="button primary" type="button" data-cube-href="${esc(dailyTop3)}">Today’s Cube</button>
-            <button class="button secondary" type="button" data-cube-href="${esc(top3)}">New Top 3</button>
-          </div>
-        </article>
-        <article class="mode-card game-mode-row cube-mode-card">
-          <div class="mode-topline"><p class="eyebrow">Full first pack</p><span class="best-chip">Powered Cube</span></div>
-          <h3>Cube Full Pack</h3>
-          <p>Make every Pack One pick from a real Cube seat, with later support adapting to the cards you take.</p>
-          <div class="button-row">
-            <button class="button primary" type="button" data-cube-href="${esc(dailyFull)}">Today’s Full Pack</button>
-            <button class="button secondary" type="button" data-cube-href="${esc(full)}">New Full Pack</button>
+            <button class="button primary" type="button" data-cube-href="${esc(daily)}">Today’s Cube</button>
+            <button class="button secondary" type="button" data-cube-href="${esc(run)}">New Cube Run</button>
           </div>
         </article>
       </div>
-      <p class="set-meta">Powered Cube Daily scores use the Powered Cube board under Leaders. Practice games remain unlimited.</p>
+      <p class="set-meta">Powered Cube is scored and ranked separately from expansion drafts. The current public training corpus is the 2025 Arena Powered Cube dataset; a newer public dump can replace it without changing the mode.</p>
     </section>`;
 }
 
@@ -92,6 +81,16 @@ function bindCubeLaunchers(root = document) {
       window.location.href = button.dataset.cubeHref;
     });
   });
+}
+
+function redirectUnsupportedCubeMode() {
+  const query = currentParams();
+  if (query.get('set') !== POWERED_CUBE_ID) return false;
+  const mode = query.get('mode');
+  if (!mode || MODES.has(mode)) return false;
+  query.set('mode', 'full');
+  window.location.replace(`${window.location.pathname}?${query.toString()}`);
+  return true;
 }
 
 function enhanceHome() {
@@ -123,6 +122,36 @@ function enhanceHome() {
   bindCubeLaunchers();
 }
 
+function enhanceCubeGame() {
+  if (!isLaunchingCube()) return;
+  const heading = document.querySelector('.game-heading');
+  if (heading) {
+    const eyebrow = heading.querySelector('.eyebrow');
+    if (eyebrow) {
+      const daily = currentParams().has('daily');
+      eyebrow.textContent = daily ? 'Powered Cube Daily · Pack Run' : 'Powered Cube · Pack Run';
+    }
+    const instruction = heading.querySelector('.game-instruction');
+    if (instruction && !instruction.dataset.cubeExplained) {
+      instruction.dataset.cubeExplained = '1';
+      instruction.textContent = `${instruction.textContent} Your pool begins with the real drafter’s P1P1 because Arena does not expose that opening pack’s full contents.`;
+    }
+  }
+
+  const poolHeading = document.querySelector('.replay-sidebar .sidebar-card h3');
+  if (poolHeading) poolHeading.textContent = 'Your pool · inherited P1P1 included';
+  const fixedCard = document.querySelector('.replay-sidebar .sidebar-card.quiet');
+  if (fixedCard) {
+    const title = fixedCard.querySelector('h3');
+    const copy = fixedCard.querySelector('p');
+    if (title) title.textContent = 'Why Cube starts at P1P2';
+    if (copy) copy.textContent = 'Arena’s Powered Cube logs omit the complete P1P1 pack. Pack One uses the historical first card as your starting pool, then gives you every real, fully observed pack from P1P2 onward. Wheel picks are feedback-only after your path diverges.';
+  }
+
+  const summaryEyebrow = document.querySelector('.scorecard > .eyebrow');
+  if (summaryEyebrow) summaryEyebrow.textContent = 'Powered Cube Pack Run complete';
+}
+
 function enhanceLeaderboard() {
   const select = document.querySelector('#leader-set');
   if (!select) return;
@@ -137,9 +166,11 @@ function enhanceLeaderboard() {
 
 function enhance() {
   enhanceHome();
+  enhanceCubeGame();
   enhanceLeaderboard();
 }
 
 export function installPoweredCubeLayer() {
+  if (redirectUnsupportedCubeMode()) return;
   onAppRender(enhance);
 }
