@@ -46,7 +46,7 @@ jobs:
           --max-output-candidates 1200
           --target-replays 300
           --minimum-replays 100
-          --minimum-opening-candidates 15
+          --minimum-first-visible-candidates 14
           --shard-size 2
           --max-path-bytes 8000000
 
