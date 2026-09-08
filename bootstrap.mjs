@@ -8,6 +8,7 @@ installRenderLifecycle();
 installReplayDataWarmup();
 
 const product = await import('./product.mjs');
+const poweredCube = await import('./cube-product.mjs');
 const flow = await import('./flow-fixes.mjs');
 const growth = await import('./growth.mjs');
 const retention = await import('./retention.mjs');
@@ -15,6 +16,7 @@ const retention = await import('./retention.mjs');
 if (challengeMode) {
   await import('./social.mjs');
   product.installProductLayer();
+  poweredCube.installPoweredCubeLayer();
   flow.installFlowFixes();
   await growth.installGrowthLayer();
   retention.installRetentionLayer();
@@ -24,6 +26,7 @@ if (challengeMode) {
   await import('./app.js');
   await import('./social.mjs');
   product.installProductLayer();
+  poweredCube.installPoweredCubeLayer();
   flow.installFlowFixes();
   await growth.installGrowthLayer();
   retention.installRetentionLayer();
