@@ -1,0 +1,632 @@
+{
+  "schema_version": 2,
+  "set_id": "hob",
+  "name": "HOB",
+  "format": "PremierDraft",
+  "is_fixture": false,
+  "source": {
+    "provider": "17Lands",
+    "dataset_kind": "draft_data",
+    "data_date": "2026-09-03",
+    "license": "CC BY 4.0 unless otherwise noted by 17Lands"
+  },
+  "cohort": {
+    "definition": "experienced drafts in top 15% of parsed 17Lands user win-rate buckets",
+    "minimum_games_bucket_lower_bound": 100,
+    "win_rate_cutoff": 0.62,
+    "experienced_drafts": 14674,
+    "training_drafts": 2341,
+    "training_picks": 98322
+  },
+  "model": {
+    "model_version": "strong-player-pool-context-v2",
+    "holdout": "5-fold by draft_id",
+    "probabilities_are_calibrated": false,
+    "description": "Hierarchical strong-player pick tendency adjusted by shrinkage-weighted card/pool co-pick lift; normalized within each pack.",
+    "pool_conditioned": true
+  },
+  "replay_count": 300,
+  "shard_size": 2,
+  "shards": [
+    {
+      "path": "./data/hob/shards/000.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/001.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/002.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/003.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/004.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/005.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/006.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/007.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/008.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/009.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/010.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/011.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/012.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/013.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/014.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/015.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/016.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/017.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/018.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/019.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/020.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/021.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/022.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/023.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/024.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/025.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/026.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/027.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/028.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/029.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/030.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/031.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/032.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/033.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/034.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/035.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/036.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/037.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/038.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/039.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/040.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/041.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/042.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/043.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/044.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/045.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/046.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/047.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/048.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/049.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/050.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/051.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/052.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/053.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/054.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/055.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/056.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/057.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/058.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/059.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/060.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/061.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/062.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/063.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/064.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/065.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/066.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/067.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/068.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/069.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/070.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/071.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/072.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/073.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/074.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/075.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/076.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/077.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/078.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/079.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/080.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/081.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/082.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/083.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/084.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/085.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/086.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/087.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/088.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/089.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/090.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/091.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/092.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/093.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/094.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/095.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/096.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/097.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/098.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/099.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/100.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/101.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/102.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/103.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/104.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/105.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/106.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/107.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/108.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/109.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/110.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/111.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/112.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/113.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/114.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/115.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/116.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/117.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/118.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/119.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/120.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/121.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/122.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/123.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/124.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/125.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/126.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/127.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/128.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/129.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/130.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/131.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/132.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/133.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/134.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/135.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/136.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/137.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/138.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/139.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/140.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/141.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/142.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/143.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/144.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/145.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/146.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/147.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/148.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/hob/shards/149.json",
+      "replay_count": 2
+    }
+  ]
+}

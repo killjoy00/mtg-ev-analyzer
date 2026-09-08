@@ -1,0 +1,632 @@
+{
+  "schema_version": 2,
+  "set_id": "eoe",
+  "name": "EOE",
+  "format": "PremierDraft",
+  "is_fixture": false,
+  "source": {
+    "provider": "17Lands",
+    "dataset_kind": "draft_data",
+    "data_date": "2025-09-03",
+    "license": "CC BY 4.0 unless otherwise noted by 17Lands"
+  },
+  "cohort": {
+    "definition": "experienced drafts in top 15% of parsed 17Lands user win-rate buckets",
+    "minimum_games_bucket_lower_bound": 100,
+    "win_rate_cutoff": 0.6,
+    "experienced_drafts": 65590,
+    "training_drafts": 5000,
+    "training_picks": 195000
+  },
+  "model": {
+    "model_version": "strong-player-pool-context-v2",
+    "holdout": "5-fold by draft_id",
+    "probabilities_are_calibrated": false,
+    "description": "Hierarchical strong-player pick tendency adjusted by shrinkage-weighted card/pool co-pick lift; normalized within each pack.",
+    "pool_conditioned": true
+  },
+  "replay_count": 300,
+  "shard_size": 2,
+  "shards": [
+    {
+      "path": "./data/eoe/shards/000.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/001.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/002.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/003.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/004.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/005.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/006.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/007.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/008.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/009.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/010.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/011.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/012.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/013.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/014.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/015.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/016.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/017.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/018.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/019.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/020.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/021.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/022.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/023.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/024.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/025.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/026.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/027.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/028.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/029.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/030.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/031.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/032.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/033.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/034.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/035.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/036.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/037.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/038.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/039.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/040.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/041.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/042.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/043.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/044.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/045.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/046.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/047.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/048.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/049.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/050.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/051.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/052.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/053.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/054.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/055.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/056.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/057.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/058.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/059.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/060.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/061.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/062.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/063.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/064.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/065.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/066.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/067.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/068.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/069.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/070.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/071.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/072.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/073.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/074.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/075.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/076.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/077.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/078.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/079.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/080.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/081.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/082.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/083.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/084.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/085.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/086.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/087.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/088.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/089.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/090.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/091.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/092.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/093.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/094.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/095.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/096.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/097.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/098.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/099.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/100.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/101.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/102.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/103.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/104.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/105.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/106.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/107.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/108.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/109.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/110.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/111.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/112.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/113.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/114.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/115.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/116.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/117.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/118.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/119.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/120.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/121.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/122.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/123.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/124.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/125.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/126.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/127.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/128.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/129.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/130.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/131.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/132.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/133.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/134.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/135.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/136.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/137.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/138.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/139.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/140.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/141.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/142.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/143.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/144.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/145.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/146.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/147.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/148.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/eoe/shards/149.json",
+      "replay_count": 2
+    }
+  ]
+}
