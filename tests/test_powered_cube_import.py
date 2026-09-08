@@ -16,6 +16,50 @@ class PoweredCubeImportTests(unittest.TestCase):
                 handle.write("d1,1,1,1\n")
             self.assertEqual(cube.draft_candidate_names(path), ["Black Lotus", "Mox Sapphire"])
 
+    def test_bulk_discovery_prefers_current_jsonl_uri_and_supports_legacy_uri(self):
+        current = {
+            "object": "list",
+            "data": [{
+                "type": "oracle_cards",
+                "jsonl_download_uri": "https://data.scryfall.io/oracle-cards/current.jsonl.gz",
+                "download_uri": "https://data.scryfall.io/oracle-cards/legacy.json",
+            }],
+        }
+        self.assertEqual(
+            cube.oracle_bulk_download_uri(current),
+            "https://data.scryfall.io/oracle-cards/current.jsonl.gz",
+        )
+
+        legacy = {
+            "data": [{
+                "type": "oracle_cards",
+                "download_uri": "https://data.scryfall.io/oracle-cards/legacy.json",
+            }],
+        }
+        self.assertEqual(
+            cube.oracle_bulk_download_uri(legacy),
+            "https://data.scryfall.io/oracle-cards/legacy.json",
+        )
+        with self.assertRaises(ValueError):
+            cube.oracle_bulk_download_uri({"data": [{"type": "default_cards"}]})
+
+    def test_oracle_bulk_reader_accepts_gzipped_jsonl_and_legacy_array(self):
+        cards = [
+            {"name": "Black Lotus", "rarity": "rare"},
+            {"name": "Mox Sapphire", "rarity": "rare"},
+        ]
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            jsonl = root / "oracle.jsonl.gz"
+            with gzip.open(jsonl, "wt", encoding="utf-8") as handle:
+                for card in cards:
+                    handle.write(json.dumps(card) + "\n")
+            self.assertEqual(list(cube.iter_oracle_bulk(jsonl)), cards)
+
+            legacy = root / "oracle.json"
+            legacy.write_text(json.dumps(cards), encoding="utf-8")
+            self.assertEqual(list(cube.iter_oracle_bulk(legacy)), cards)
+
     def test_complete_cube_opening_requires_real_p1p1_and_full_pack(self):
         picks = []
         for pick_number in range(1, 16):
