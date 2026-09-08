@@ -55,7 +55,10 @@ CUBE_ARCHIVE_URL = (
     "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/"
     "draft_data_public.Cube_-_Powered.PremierDraft.csv.gz"
 )
-SCRYFALL_BULK_URL = "https://api.scryfall.com/bulk-data/oracle-cards"
+# Scryfall's current bulk contract is discovered from this list endpoint. In
+# 2026 the preferred card export moved to a gzipped JSONL URL exposed as
+# jsonl_download_uri; legacy metadata/files are still accepted below.
+SCRYFALL_BULK_URL = "https://api.scryfall.com/bulk-data"
 USER_AGENT = "Pack1-Powered-Cube-Builder/1.0 (+https://github.com/killjoy00/mtg-ev-analyzer)"
 JSON_ACCEPT = "application/json;q=0.9,*/*;q=0.8"
 PATH_MODEL_VERSION = "strong-player-counterfactual-path-v3"
@@ -111,17 +114,91 @@ def draft_candidate_names(path: Path) -> list[str]:
     return names
 
 
-def _bulk_cards() -> list[dict]:
-    with request(SCRYFALL_BULK_URL, accept=JSON_ACCEPT, timeout=60) as response:
-        metadata = json.load(response)
-    download_uri = str(metadata.get("download_uri") or "")
+def oracle_bulk_download_uri(payload: dict) -> str:
+    entries = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("Scryfall bulk-data discovery returned no data list.")
+    oracle = next(
+        (item for item in entries if isinstance(item, dict) and item.get("type") == "oracle_cards"),
+        None,
+    )
+    if oracle is None:
+        raise ValueError("Scryfall bulk-data discovery did not include oracle_cards.")
+    # jsonl_download_uri is the current 2026 contract; download_uri supports the
+    # older JSON-array export and compatible mirrors.
+    download_uri = str(oracle.get("jsonl_download_uri") or oracle.get("download_uri") or "")
     if not download_uri.startswith("https://"):
-        raise ValueError("Scryfall oracle-card bulk metadata had no HTTPS download_uri.")
-    with request(download_uri, accept=JSON_ACCEPT, timeout=180) as response:
-        cards = json.load(response)
-    if not isinstance(cards, list) or not cards:
-        raise ValueError("Scryfall oracle-card bulk download was empty.")
-    return cards
+        raise ValueError("Scryfall oracle_cards metadata had no HTTPS bulk download URI.")
+    return download_uri
+
+
+def download_oracle_bulk(destination: Path) -> str:
+    with request(SCRYFALL_BULK_URL, accept=JSON_ACCEPT, timeout=60) as response:
+        payload = json.load(response)
+    download_uri = oracle_bulk_download_uri(payload)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with request(
+        download_uri,
+        accept="application/x-ndjson,application/json;q=0.9,application/gzip;q=0.8,*/*;q=0.7",
+        timeout=180,
+    ) as response:
+        with destination.open("wb") as handle:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                handle.write(chunk)
+    if destination.stat().st_size < 1024:
+        raise ValueError("Scryfall oracle_cards bulk download was unexpectedly small.")
+    return download_uri
+
+
+def iter_oracle_bulk(path: Path) -> Iterable[dict]:
+    """Read both current gzipped JSONL and legacy JSON-array bulk exports."""
+    with path.open("rb") as raw:
+        gzipped = raw.read(2) == b"\x1f\x8b"
+    opener = gzip.open if gzipped else open
+    with opener(path, "rt", encoding="utf-8") as handle:
+        first_line = handle.readline()
+        if not first_line:
+            raise ValueError("Scryfall oracle_cards bulk download was empty.")
+        first_content = first_line.lstrip("\ufeff \t\r\n")
+        if first_content.startswith("["):
+            # Compatibility with Scryfall's pre-2026 JSON-array bulk format.
+            cards = json.loads(first_line + handle.read())
+            if not isinstance(cards, list) or not cards:
+                raise ValueError("Legacy Scryfall oracle_cards bulk payload was empty.")
+            for card in cards:
+                if isinstance(card, dict):
+                    yield card
+            return
+
+        # Current format: one Scryfall card object per line.
+        count = 0
+        for raw_line in (first_line,):
+            line = raw_line.strip()
+            if line:
+                card = json.loads(line)
+                if isinstance(card, dict):
+                    count += 1
+                    yield card
+        for raw_line in handle:
+            line = raw_line.strip()
+            if not line:
+                continue
+            card = json.loads(line)
+            if isinstance(card, dict):
+                count += 1
+                yield card
+        if count == 0:
+            raise ValueError("Scryfall oracle_cards JSONL payload contained no card objects.")
+
+
+def _bulk_cards() -> Iterable[dict]:
+    with tempfile.TemporaryDirectory(prefix="pack1-scryfall-oracle-") as tmp:
+        path = Path(tmp) / "oracle-cards.bulk"
+        download_oracle_bulk(path)
+        yield from iter_oracle_bulk(path)
 
 
 def _named_card(name: str) -> Optional[dict]:
