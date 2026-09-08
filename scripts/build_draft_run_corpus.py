@@ -19,7 +19,7 @@ from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Iterable, List, Mapping, Sequence, Set, Tuple
 
-from build_replays import (
+from scripts.build_replays import (
     CountStore,
     OutOfFoldModel,
     candidate_columns,
