@@ -1,3 +1,4 @@
+import csv
 import gzip
 import json
 import tempfile
@@ -15,6 +16,31 @@ class PoweredCubeImportTests(unittest.TestCase):
                 handle.write("draft_id,pack_card_Black Lotus,pack_card_Mox Sapphire,pool_Ancestral Recall\n")
                 handle.write("d1,1,1,1\n")
             self.assertEqual(cube.draft_candidate_names(path), ["Black Lotus", "Mox Sapphire"])
+
+    def test_model_archive_removes_only_incomplete_raw_p1p1(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.csv.gz"
+            output = root / "model.csv.gz"
+            fieldnames = ["draft_id", "pack_number", "pick_number", "pack_card_A", "pack_card_B"]
+            rows = [
+                {"draft_id": "d1", "pack_number": "0", "pick_number": "0", "pack_card_A": "1", "pack_card_B": "0"},
+                {"draft_id": "d1", "pack_number": "0", "pick_number": "1", "pack_card_A": "1", "pack_card_B": "1"},
+                # A legitimate late one-card decision must remain.
+                {"draft_id": "d1", "pack_number": "0", "pick_number": "14", "pack_card_A": "1", "pack_card_B": "0"},
+                # A complete future P1P1 row at the same coordinates must remain.
+                {"draft_id": "d2", "pack_number": "0", "pick_number": "0", "pack_card_A": "1", "pack_card_B": "1"},
+            ]
+            with gzip.open(source, "wt", encoding="utf-8", newline="") as handle:
+                writer = csv.DictWriter(handle, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(rows)
+
+            removed = cube.write_model_archive(source, output, complete_p1p1_candidates=2)
+            self.assertEqual(removed, 1)
+            with gzip.open(output, "rt", encoding="utf-8", newline="") as handle:
+                kept = list(csv.DictReader(handle))
+            self.assertEqual([(row["draft_id"], row["pick_number"]) for row in kept], [("d1", "1"), ("d1", "14"), ("d2", "0")])
 
     def test_bulk_discovery_prefers_current_jsonl_uri_and_supports_legacy_uri(self):
         current = {
@@ -61,53 +87,62 @@ class PoweredCubeImportTests(unittest.TestCase):
             self.assertEqual(list(cube.iter_oracle_bulk(legacy)), cards)
 
     @staticmethod
-    def _pack_picks(*, complete_p1p1: bool):
+    def _rendered_pack(*, start_pick: int, decisions: int, first_candidates: int, inherited_pool: bool):
         picks = []
-        for pick_number in range(1, 16):
-            count = 16 - pick_number
-            if pick_number == 1 and not complete_p1p1:
-                count = 1
-            pool = {} if pick_number == 1 else {"Black Lotus": 1}
+        for offset in range(decisions):
+            pick_number = start_pick + offset
+            count = max(1, first_candidates - offset)
             picks.append({
                 "pack_number": 1,
                 "pick_number": pick_number,
-                "historical_pick_id": "black-lotus" if pick_number == 1 else f"p{pick_number}",
-                "pool": pool,
+                "historical_pick_id": f"p{pick_number}",
+                "pool": {"Black Lotus": 1} if inherited_pool else {},
                 "candidates": [{"id": f"c{pick_number}-{index}"} for index in range(count)],
             })
         return picks
 
     def test_cube_run_uses_full_p1p1_if_arena_restores_it(self):
-        replay = {"draft_id": "full", "picks": self._pack_picks(complete_p1p1=True)}
+        replay = {
+            "draft_id": "full",
+            "picks": self._rendered_pack(start_pick=1, decisions=15, first_candidates=15, inherited_pool=False),
+        }
         prepared = cube.prepare_cube_run(replay, 14)
         self.assertIsNotNone(prepared)
         self.assertEqual(prepared["cube_start_pick"], 1)
         self.assertFalse(prepared["cube_missing_p1p1"])
-        self.assertEqual(len(prepared["picks"]), 15)
 
-    def test_cube_run_inherits_p1p1_and_starts_at_complete_p1p2(self):
-        replay = {"draft_id": "missing", "picks": self._pack_picks(complete_p1p1=False)}
+    def test_cube_run_accepts_reindexed_p1p2_with_inherited_starter(self):
+        replay = {
+            "draft_id": "missing",
+            # After incomplete raw P1P1 is removed, the builder normalizes the
+            # fourteen visible P1P2-P1P15 decisions to pick numbers 1-14.
+            "picks": self._rendered_pack(start_pick=1, decisions=14, first_candidates=14, inherited_pool=True),
+        }
         prepared = cube.prepare_cube_run(replay, 14)
         self.assertIsNotNone(prepared)
         self.assertEqual(prepared["cube_start_pick"], 2)
         self.assertTrue(prepared["cube_missing_p1p1"])
-        first = prepared["picks"][0]
-        self.assertEqual(first["pick_number"], 2)
-        self.assertEqual(len(first["candidates"]), 14)
-        self.assertEqual(first["pool"], {"Black Lotus": 1})
-        self.assertEqual([pick["pick_number"] for pick in prepared["picks"]], list(range(2, 16)))
+        self.assertEqual(len(prepared["picks"][0]["candidates"]), 14)
+        self.assertEqual(prepared["picks"][0]["pool"], {"Black Lotus": 1})
 
-    def test_cube_run_rejects_partial_p1p2_or_missing_later_pick(self):
-        partial = {"draft_id": "partial", "picks": self._pack_picks(complete_p1p1=False)}
-        partial["picks"][1]["candidates"] = [{"id": "only-one"}]
+    def test_cube_run_rejects_partial_first_visible_pack_or_missing_pick(self):
+        partial = {
+            "draft_id": "partial",
+            "picks": self._rendered_pack(start_pick=1, decisions=14, first_candidates=13, inherited_pool=True),
+        }
         self.assertIsNone(cube.prepare_cube_run(partial, 14))
 
-        incomplete = {"draft_id": "incomplete", "picks": self._pack_picks(complete_p1p1=False)}
-        incomplete["picks"] = [pick for pick in incomplete["picks"] if pick["pick_number"] != 12]
+        incomplete = {
+            "draft_id": "incomplete",
+            "picks": self._rendered_pack(start_pick=1, decisions=14, first_candidates=14, inherited_pool=True),
+        }
+        incomplete["picks"] = [pick for pick in incomplete["picks"] if pick["pick_number"] != 10]
         self.assertIsNone(cube.prepare_cube_run(incomplete, 14))
 
-        no_starter = {"draft_id": "no-starter", "picks": self._pack_picks(complete_p1p1=False)}
-        no_starter["picks"][1]["pool"] = {}
+        no_starter = {
+            "draft_id": "no-starter",
+            "picks": self._rendered_pack(start_pick=1, decisions=14, first_candidates=14, inherited_pool=False),
+        }
         self.assertIsNone(cube.prepare_cube_run(no_starter, 14))
 
     def test_register_cube_appends_special_mode_without_replacing_featured_set(self):
