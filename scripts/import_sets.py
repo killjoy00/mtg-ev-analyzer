@@ -1,17 +1,21 @@
 #!/usr/bin/env python3
-"""Discover and safely import missing 17Lands Premier Draft sets.
+"""Safely import the known 17Lands Premier Draft backlog.
 
-This is the orchestration layer around the existing replay/model builders. It:
+The normal-set backlog is declared explicitly in data/import-queue.json. This
+orchestration layer:
 
-* asks Scryfall for released set codes in one request;
-* probes the official 17Lands public S3 archives (not the unsupported API);
-* selects only public draft datasets that are missing from data/catalog.json;
+* consumes that human-readable newest-first queue instead of rediscovering history;
+* skips sets already present in data/catalog.json;
+* probes the official 17Lands public S3 Draft Data archive before each build;
+* keeps scanning past unavailable or failed entries until the requested number
+  of successful imports is reached;
 * derives the source date from the archive's Last-Modified header;
 * builds each set in an isolated staging tree;
 * validates replay shards and the counterfactual path model before publishing;
 * preserves successful sets when another set in the same batch fails.
 
 Raw 17Lands archives remain temporary and are never written under data/.
+Powered Cube is deliberately excluded from this queue and has its own builder.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from typing import Callable, Iterable, Optional, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 CATALOG_PATH = REPO_ROOT / "data" / "catalog.json"
+QUEUE_PATH = REPO_ROOT / "data" / "import-queue.json"
 GENERATED_DIR = REPO_ROOT / "generated"
 SCRYFALL_SETS_URL = "https://api.scryfall.com/sets"
 PUBLIC_DRAFT_URL = (
@@ -105,6 +110,27 @@ def catalog_codes(catalog: dict) -> set[str]:
     }
 
 
+def load_import_queue(path: Path = QUEUE_PATH) -> tuple[str, list[str]]:
+    payload = json.loads(path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Invalid import queue: {path}")
+    format_name = str(payload.get("format") or "").strip()
+    raw_sets = payload.get("sets")
+    if not format_name or not isinstance(raw_sets, list):
+        raise ValueError(f"Import queue must define format and sets: {path}")
+    codes: list[str] = []
+    seen: set[str] = set()
+    for raw in raw_sets:
+        code = normalize_code(str(raw))
+        if code in seen:
+            raise ValueError(f"Duplicate set in import queue: {code}")
+        seen.add(code)
+        codes.append(code)
+    if not codes:
+        raise ValueError(f"Import queue is empty: {path}")
+    return format_name, codes
+
+
 def request(url: str, *, method: str = "GET", accept: str = "*/*", timeout: int = 30):
     headers = {"User-Agent": USER_AGENT, "Accept": accept}
     req = urllib.request.Request(url, method=method, headers=headers)
@@ -124,7 +150,11 @@ def http_date_to_iso(value: Optional[str], fallback: str) -> str:
 
 
 def fetch_scryfall_sets(earliest: str) -> list[tuple[str, str]]:
-    """Return released Scryfall set codes newest-first using one API request."""
+    """Return released Scryfall set codes newest-first using one API request.
+
+    This remains available for explicit/manual imports and as a legacy discovery
+    fallback. Normal backlog processing uses data/import-queue.json instead.
+    """
     earliest_date = dt.date.fromisoformat(earliest)
     today = dt.datetime.now(dt.timezone.utc).date()
     with request(SCRYFALL_SETS_URL, accept=SCRYFALL_ACCEPT) as response:
@@ -188,6 +218,7 @@ def discover_missing_sets(
     fetch_sets: Callable[[str], list[tuple[str, str]]] = fetch_scryfall_sets,
     probe: Callable[[str, str, str], Optional[RemoteDataset]] = probe_public_dataset,
 ) -> list[RemoteDataset]:
+    """Legacy dynamic discovery fallback used only when no queue file exists."""
     if limit < 1:
         raise ValueError("limit must be at least 1")
     existing = catalog_codes(catalog)
@@ -215,6 +246,38 @@ def discover_missing_sets(
         if len(selected) >= limit:
             break
     return selected
+
+
+def resolve_queue_sets(
+    catalog: dict,
+    *,
+    format_name: str,
+    queue_path: Path = QUEUE_PATH,
+    probe: Callable[[str, str, str], Optional[RemoteDataset]] = probe_public_dataset,
+) -> tuple[list[RemoteDataset], list[str]]:
+    """Return all missing queued archives in queue order plus unavailable codes.
+
+    We intentionally do not stop at the per-run success limit here. main() keeps
+    scanning these candidates until it reaches that many *successful* imports,
+    so one broken historical set cannot permanently pin older backlog entries.
+    """
+    queue_format, queue_codes = load_import_queue(queue_path)
+    if queue_format != format_name:
+        raise ValueError(
+            f"Import queue format is {queue_format}, but importer requested {format_name}."
+        )
+    existing = catalog_codes(catalog)
+    selected: list[RemoteDataset] = []
+    unavailable: list[str] = []
+    for code in queue_codes:
+        if code in existing:
+            continue
+        remote = probe(code, format_name, "")
+        if remote is None:
+            unavailable.append(code)
+            continue
+        selected.append(remote)
+    return selected, unavailable
 
 
 def resolve_explicit_sets(codes: Iterable[str], format_name: str) -> list[RemoteDataset]:
@@ -299,7 +362,9 @@ def publish_staged_set(stage_root: Path, code: str) -> None:
         shutil.copy2(staged_catalog, catalog_tmp)
         os.replace(catalog_tmp, target_catalog)
     except Exception:
-        if target_set.exists() and moved_existing:
+        # If this was a brand-new set and the directory swap succeeded before a
+        # later catalog failure, remove the orphan as part of the rollback too.
+        if target_set.exists():
             shutil.rmtree(target_set)
         if moved_existing and backup.exists():
             backup.rename(target_set)
@@ -424,16 +489,25 @@ def write_report(path: Path, report: dict) -> None:
     print(json.dumps(report, indent=2), flush=True)
 
 
+def pending_queue_codes(path: Path = QUEUE_PATH) -> list[str]:
+    if not path.exists():
+        return []
+    _format, codes = load_import_queue(path)
+    existing = catalog_codes(load_catalog())
+    return [code for code in codes if code not in existing]
+
+
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--sets",
         default="",
-        help="Comma/space-separated explicit set codes. Omit to discover missing public sets.",
+        help="Comma/space-separated explicit set codes. Omit to consume the import queue.",
     )
     parser.add_argument("--format", default="PremierDraft")
-    parser.add_argument("--limit", type=int, default=3, help="Maximum discovered sets to import this run.")
-    parser.add_argument("--earliest", default="2021-01-01", help="Earliest Scryfall release date to consider.")
+    parser.add_argument("--limit", type=int, default=3, help="Maximum successful queued imports this run.")
+    parser.add_argument("--earliest", default="2021-01-01", help="Legacy discovery fallback cutoff.")
+    parser.add_argument("--queue", default=str(QUEUE_PATH.relative_to(REPO_ROOT)))
     parser.add_argument("--minimum-games", type=int, default=100)
     parser.add_argument("--top-fraction", type=float, default=0.15)
     parser.add_argument("--max-training-drafts", type=int, default=5000)
@@ -444,25 +518,39 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--shard-size", type=int, default=2)
     parser.add_argument("--max-path-bytes", type=int, default=4_000_000)
     parser.add_argument("--report", default="generated/import-report.json")
-    parser.add_argument("--dry-run", action="store_true", help="Discover/probe but do not download or build sets.")
+    parser.add_argument("--dry-run", action="store_true", help="Probe the queue but do not download or build sets.")
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
+    if args.limit < 1:
+        raise ValueError("limit must be at least 1")
+
     started = dt.datetime.now(dt.timezone.utc).isoformat()
     catalog = load_catalog()
     explicit = parse_codes(args.sets)
+    queue_path = REPO_ROOT / args.queue
+    unavailable: list[str] = []
 
     if explicit:
         selected = resolve_explicit_sets(explicit, args.format)
         mode = "explicit"
+    elif queue_path.exists():
+        selected, unavailable = resolve_queue_sets(
+            catalog,
+            format_name=args.format,
+            queue_path=queue_path,
+        )
+        mode = "explicit-queue"
     else:
         selected = discover_missing_sets(
             catalog,
             format_name=args.format,
             earliest=args.earliest,
-            limit=args.limit,
+            # Ask legacy discovery for a wider scan so one build failure does
+            # not necessarily block all useful work in a manual fallback run.
+            limit=max(args.limit * 4, args.limit),
         )
         mode = "missing-backlog"
 
@@ -470,7 +558,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         "started_at": started,
         "mode": mode,
         "format": args.format,
+        "success_target": None if explicit else args.limit,
         "selected": [asdict(item) for item in selected],
+        "unavailable": unavailable,
         "successes": [],
         "failures": [],
     }
@@ -478,10 +568,13 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if args.dry_run:
         report["finished_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
         report["dry_run"] = True
+        report["pending_queue"] = pending_queue_codes(queue_path)
         write_report(REPO_ROOT / args.report, report)
         return 0
 
     for remote in selected:
+        if not explicit and len(report["successes"]) >= args.limit:
+            break
         try:
             result = build_one(remote, args)
             report["successes"].append(asdict(result))
@@ -490,6 +583,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             report["failures"].append({"code": remote.code, "error": f"{type(exc).__name__}: {exc}"})
 
     report["finished_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
+    report["pending_queue"] = pending_queue_codes(queue_path)
     write_report(REPO_ROOT / args.report, report)
 
     if report["failures"]:
