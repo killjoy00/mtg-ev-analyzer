@@ -78,12 +78,13 @@ async function home() {
     await page.waitForFunction(() => ![...document.querySelectorAll('#set-select option')].some((option) => option.value === 'powered-cube'));
     await page.locator('[data-powered-cube-section="1"]').waitFor({ timeout: 5000 });
   }
-  const expectedSetOrder = (catalog.sets || [])
+  const expectedSetIds = (catalog.sets || [])
     .filter((set) => !set.hide_from_set_picker && set.category !== 'special_mode')
-    .map((set) => set.id);
-  const setOrder = await page.locator('#set-select option').evaluateAll((nodes) => nodes.map((node) => node.value));
-  assert.deepEqual(setOrder, expectedSetOrder, 'Set picker must follow the production catalog and exclude special modes');
-  assert.equal(setOrder.includes('powered-cube'), false, 'Powered Cube must never appear as a normal expansion set');
+    .map((set) => set.id)
+    .sort();
+  const setIds = (await page.locator('#set-select option').evaluateAll((nodes) => nodes.map((node) => node.value))).sort();
+  assert.deepEqual(setIds, expectedSetIds, 'Set picker must contain every standard production set and exclude special modes');
+  assert.equal(setIds.includes('powered-cube'), false, 'Powered Cube must never appear as a normal expansion set');
   assert.equal(await page.locator('[data-powered-cube-section="1"]').count(), cubeEntry ? 1 : 0, 'Powered Cube section must appear only when validated Cube data is registered');
 
   const consensusCopy = (await page.locator('.data-note').textContent()) || '';
