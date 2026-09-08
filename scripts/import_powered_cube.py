@@ -4,12 +4,14 @@
 Powered Cube is deliberately not part of normal set discovery. 17Lands publishes
 it under the filename expansion ``Cube_-_Powered`` even though the public catalog
 labels it "Powered Cube". Arena does not expose the complete P1P1 pack for this
-format, so the playable Cube run inherits the historical drafter's real first
-pick and begins at the first fully observed decision, P1P2. The builder resolves
-card display metadata across *all* Scryfall sets, keeps only replay seats with a
-complete P1P2-P1P15 run, builds the existing leakage-safe consensus and
-counterfactual path models, validates the result, and finally registers the
-dataset as a special product mode in ``data/catalog.json``.
+format, so those incomplete rows are excluded from model training and the
+playable Cube run inherits the historical drafter's real first pick from the
+P1P2 pool. The player then starts at the first fully observed decision, P1P2.
+
+The builder resolves card display metadata across *all* Scryfall sets, keeps
+only replay seats with a complete P1P2-P1P15 run, builds the existing
+leakage-safe consensus and counterfactual path models, validates the result, and
+finally registers the dataset as a special product mode in ``data/catalog.json``.
 
 The catalog still uses its existing ``sets`` array as a generic playable-data
 registry for backwards compatibility with the score worker. The Cube entry is
@@ -38,10 +40,10 @@ from pathlib import Path
 from typing import Iterable, Optional, Sequence
 
 try:  # Script execution (python scripts/import_powered_cube.py)
-    from build_replays import write_sharded_dataset
+    from build_replays import truthy_count, write_sharded_dataset
     from fetch_card_metadata import aliases, compact_card
 except ModuleNotFoundError:  # Unit-test import (from scripts import import_powered_cube)
-    from scripts.build_replays import write_sharded_dataset
+    from scripts.build_replays import truthy_count, write_sharded_dataset
     from scripts.fetch_card_metadata import aliases, compact_card
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -114,6 +116,48 @@ def draft_candidate_names(path: Path) -> list[str]:
     if not names:
         raise ValueError("Powered Cube draft data has no pack_card_ columns.")
     return names
+
+
+def write_model_archive(source: Path, destination: Path, *, complete_p1p1_candidates: int = 15) -> int:
+    """Copy the public dump while removing only incomplete first-seat P1P1 rows.
+
+    The first CSV row establishes 17Lands' raw P1P1 coordinates (currently
+    zero-indexed). Later one-card wheel decisions remain valid and are retained.
+    Complete P1P1 rows are also retained automatically if Arena restores them.
+    """
+    source_opener = gzip.open if str(source).endswith(".gz") else open
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    removed = 0
+    p1p1_coords: Optional[tuple[int, int]] = None
+
+    with source_opener(source, "rt", encoding="utf-8", newline="") as src:
+        reader = csv.DictReader(src)
+        fieldnames = reader.fieldnames or []
+        pack_columns = [name for name in fieldnames if name.startswith("pack_card_")]
+        if not pack_columns:
+            raise ValueError("Powered Cube draft data has no pack_card_ columns.")
+        with gzip.open(destination, "wt", encoding="utf-8", newline="") as dst:
+            writer = csv.DictWriter(dst, fieldnames=fieldnames)
+            writer.writeheader()
+            for row in reader:
+                try:
+                    coords = (int(float(row.get("pack_number", 0))), int(float(row.get("pick_number", 0))))
+                except (TypeError, ValueError):
+                    writer.writerow(row)
+                    continue
+                if p1p1_coords is None:
+                    p1p1_coords = coords
+                candidate_count = sum(1 for column in pack_columns if truthy_count(row.get(column)) > 0)
+                if coords == p1p1_coords and candidate_count < complete_p1p1_candidates:
+                    removed += 1
+                    continue
+                writer.writerow(row)
+
+    if p1p1_coords is None:
+        raise ValueError("Powered Cube draft archive contained no draft rows.")
+    if destination.stat().st_size < 1024:
+        raise ValueError("Filtered Powered Cube model archive is unexpectedly small.")
+    return removed
 
 
 def oracle_bulk_download_uri(payload: dict) -> str:
@@ -265,45 +309,39 @@ def _read_replays(output_dir: Path, manifest: dict) -> list[dict]:
 
 
 def prepare_cube_run(replay: dict, minimum_candidates: int = 14) -> Optional[dict]:
-    """Return a playable Cube run beginning at the first fully observed pack.
-
-    17Lands documents that Arena omits the full P1P1 contents for this format.
-    The chosen P1P1 card is still present in the P1P2 pool, so we preserve that
-    inherited pool and remove only the unusable one-card P1P1 decision. If Arena
-    later restores complete P1P1 logging, full 15-pick seats work automatically.
-    """
+    """Return a complete playable Cube run from the replay's first pack."""
     picks = replay.get("picks") or []
     if not picks:
         return None
     pack_numbers = [int(p.get("pack_number") or 0) for p in picks]
     first_pack = min(pack_numbers)
-    pack = [p for p in picks if int(p.get("pack_number") or 0) == first_pack]
+    pack = sorted(
+        (p for p in picks if int(p.get("pack_number") or 0) == first_pack),
+        key=lambda p: int(p.get("pick_number") or 0),
+    )
+    if not pack:
+        return None
+
+    first = pack[0]
+    first_number = int(first.get("pick_number") or 0)
+    first_candidates = len(first.get("candidates") or [])
     by_pick = {int(p.get("pick_number") or 0): p for p in pack}
 
-    p1p1 = by_pick.get(1)
-    if p1p1 and len(p1p1.get("candidates") or []) >= 15 and all(number in by_pick for number in range(1, 16)):
+    if first_candidates >= 15 and all(number in by_pick for number in range(first_number, first_number + 15)):
         prepared = dict(replay)
         prepared["cube_start_pick"] = 1
         prepared["cube_missing_p1p1"] = False
         return prepared
 
-    first_visible = by_pick.get(2)
-    if first_visible is None or len(first_visible.get("candidates") or []) < minimum_candidates:
+    if first_candidates < minimum_candidates:
         return None
-    if not all(number in by_pick for number in range(2, 16)):
+    if not all(number in by_pick for number in range(first_number, first_number + 14)):
         return None
-    inherited_pool = first_visible.get("pool") or {}
-    if not any(Number > 0 for Number in [int(value or 0) for value in inherited_pool.values()]):
+    inherited_pool = first.get("pool") or {}
+    if not any(int(value or 0) > 0 for value in inherited_pool.values()):
         return None
 
     prepared = dict(replay)
-    prepared["picks"] = [
-        pick for pick in picks
-        if not (
-            int(pick.get("pack_number") or 0) == first_pack
-            and int(pick.get("pick_number") or 0) == 1
-        )
-    ]
     prepared["cube_start_pick"] = 2
     prepared["cube_missing_p1p1"] = True
     return prepared
@@ -414,9 +452,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     with tempfile.TemporaryDirectory(prefix="pack1-powered-cube-") as tmp:
         temp = Path(tmp)
         archive = temp / "powered-cube.csv.gz"
+        model_archive = temp / "powered-cube-model.csv.gz"
         metadata_path = temp / "powered-cube-cards.json"
         source_date = download_archive(archive)
         names = draft_candidate_names(archive)
+        incomplete_p1p1_rows_removed = write_model_archive(archive, model_archive)
         metadata, unresolved = fetch_cross_set_metadata(names)
         write_metadata(metadata_path, metadata)
 
@@ -427,7 +467,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         run_command([
             sys.executable,
             "scripts/build_replays.py",
-            "--input", str(archive),
+            "--input", str(model_archive),
             "--output-dir", str(OUTPUT_DIR),
             "--expansion", CUBE_ID,
             "--format", CUBE_FORMAT,
@@ -453,7 +493,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         run_command([
             sys.executable,
             "scripts/build_path_model.py",
-            "--input", str(archive),
+            "--input", str(model_archive),
             "--output-dir", str(OUTPUT_DIR),
             "--expansion", CUBE_ID,
             "--source-date", source_date,
@@ -481,6 +521,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "candidate_card_names": len(names),
             "metadata_resolved": len(metadata),
             "metadata_unresolved": unresolved,
+            "incomplete_p1p1_rows_removed_from_training": incomplete_p1p1_rows_removed,
             "candidate_replays": candidate_replays,
             "playable_cube_replays": playable_replays,
             "published_replays": int(manifest["replay_count"]),
