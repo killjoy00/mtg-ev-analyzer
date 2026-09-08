@@ -67,8 +67,25 @@ async function home() {
   await page.goto(base, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
   await page.getByRole('heading', { name: 'Pack One', exact: true }).waitFor({ timeout: 5000 });
+
+  const catalog = await page.evaluate(async () => {
+    const response = await fetch('/data/catalog.json', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`catalog request failed: ${response.status}`);
+    return response.json();
+  });
+  const cubeEntry = (catalog.sets || []).find((set) => set.id === 'powered-cube');
+  if (cubeEntry) {
+    await page.waitForFunction(() => ![...document.querySelectorAll('#set-select option')].some((option) => option.value === 'powered-cube'));
+    await page.locator('[data-powered-cube-section="1"]').waitFor({ timeout: 5000 });
+  }
+  const expectedSetOrder = (catalog.sets || [])
+    .filter((set) => !set.hide_from_set_picker && set.category !== 'special_mode')
+    .map((set) => set.id);
   const setOrder = await page.locator('#set-select option').evaluateAll((nodes) => nodes.map((node) => node.value));
-  assert.deepEqual(setOrder.slice(0, 4), ['msh', 'sos', 'tmt', 'ecl']);
+  assert.deepEqual(setOrder, expectedSetOrder, 'Set picker must follow the production catalog and exclude special modes');
+  assert.equal(setOrder.includes('powered-cube'), false, 'Powered Cube must never appear as a normal expansion set');
+  assert.equal(await page.locator('[data-powered-cube-section="1"]').count(), cubeEntry ? 1 : 0, 'Powered Cube section must appear only when validated Cube data is registered');
+
   const consensusCopy = (await page.locator('.data-note').textContent()) || '';
   assert.match(consensusCopy, /high-win-rate 17Lands drafters/i);
   assert.doesNotMatch(consensusCopy, /not win rates|not win probability|card grades|objective truth/i);
@@ -145,7 +162,7 @@ try {
   await page.screenshot({ path: 'artifacts/ui-home-mobile.png', fullPage: true });
   await assertMobileTapScrollStable();
 
-  // Every production set can start and reveal a Top 3 game.
+  // Representative production sets can start and reveal a Top 3 game.
   for (const setId of ['ecl', 'tmt', 'sos', 'msh']) {
     await home();
     await page.locator('#set-select').selectOption(setId);
