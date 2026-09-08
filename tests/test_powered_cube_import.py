@@ -60,28 +60,55 @@ class PoweredCubeImportTests(unittest.TestCase):
             legacy.write_text(json.dumps(cards), encoding="utf-8")
             self.assertEqual(list(cube.iter_oracle_bulk(legacy)), cards)
 
-    def test_complete_cube_opening_requires_real_p1p1_and_full_pack(self):
+    @staticmethod
+    def _pack_picks(*, complete_p1p1: bool):
         picks = []
         for pick_number in range(1, 16):
             count = 16 - pick_number
+            if pick_number == 1 and not complete_p1p1:
+                count = 1
+            pool = {} if pick_number == 1 else {"Black Lotus": 1}
             picks.append({
                 "pack_number": 1,
                 "pick_number": pick_number,
-                "candidates": [{"id": f"c{index}"} for index in range(count)],
+                "historical_pick_id": "black-lotus" if pick_number == 1 else f"p{pick_number}",
+                "pool": pool,
+                "candidates": [{"id": f"c{pick_number}-{index}"} for index in range(count)],
             })
-        replay = {"draft_id": "complete", "picks": picks}
-        self.assertTrue(cube.complete_cube_opening(replay, 15))
+        return picks
 
-        missing_p1p1 = {"draft_id": "missing", "picks": picks[1:]}
-        self.assertFalse(cube.complete_cube_opening(missing_p1p1, 15))
+    def test_cube_run_uses_full_p1p1_if_arena_restores_it(self):
+        replay = {"draft_id": "full", "picks": self._pack_picks(complete_p1p1=True)}
+        prepared = cube.prepare_cube_run(replay, 14)
+        self.assertIsNotNone(prepared)
+        self.assertEqual(prepared["cube_start_pick"], 1)
+        self.assertFalse(prepared["cube_missing_p1p1"])
+        self.assertEqual(len(prepared["picks"]), 15)
 
-        partial_p1p1 = json.loads(json.dumps(replay))
-        partial_p1p1["picks"][0]["candidates"] = [{"id": "lotus"}]
-        self.assertFalse(cube.complete_cube_opening(partial_p1p1, 15))
+    def test_cube_run_inherits_p1p1_and_starts_at_complete_p1p2(self):
+        replay = {"draft_id": "missing", "picks": self._pack_picks(complete_p1p1=False)}
+        prepared = cube.prepare_cube_run(replay, 14)
+        self.assertIsNotNone(prepared)
+        self.assertEqual(prepared["cube_start_pick"], 2)
+        self.assertTrue(prepared["cube_missing_p1p1"])
+        first = prepared["picks"][0]
+        self.assertEqual(first["pick_number"], 2)
+        self.assertEqual(len(first["candidates"]), 14)
+        self.assertEqual(first["pool"], {"Black Lotus": 1})
+        self.assertEqual([pick["pick_number"] for pick in prepared["picks"]], list(range(2, 16)))
 
-        incomplete_pack = json.loads(json.dumps(replay))
-        incomplete_pack["picks"] = [pick for pick in incomplete_pack["picks"] if pick["pick_number"] != 12]
-        self.assertFalse(cube.complete_cube_opening(incomplete_pack, 15))
+    def test_cube_run_rejects_partial_p1p2_or_missing_later_pick(self):
+        partial = {"draft_id": "partial", "picks": self._pack_picks(complete_p1p1=False)}
+        partial["picks"][1]["candidates"] = [{"id": "only-one"}]
+        self.assertIsNone(cube.prepare_cube_run(partial, 14))
+
+        incomplete = {"draft_id": "incomplete", "picks": self._pack_picks(complete_p1p1=False)}
+        incomplete["picks"] = [pick for pick in incomplete["picks"] if pick["pick_number"] != 12]
+        self.assertIsNone(cube.prepare_cube_run(incomplete, 14))
+
+        no_starter = {"draft_id": "no-starter", "picks": self._pack_picks(complete_p1p1=False)}
+        no_starter["picks"][1]["pool"] = {}
+        self.assertIsNone(cube.prepare_cube_run(no_starter, 14))
 
     def test_register_cube_appends_special_mode_without_replacing_featured_set(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -113,6 +140,7 @@ class PoweredCubeImportTests(unittest.TestCase):
             self.assertTrue(entry["hide_from_set_picker"])
             self.assertEqual(manifest["name"], "Powered Cube")
             self.assertEqual(manifest["source"]["archive_expansion"], "Cube_-_Powered")
+            self.assertIn("P1P2", manifest["source"]["first_playable_pick"])
 
 
 if __name__ == "__main__":
