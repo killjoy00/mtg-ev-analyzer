@@ -31,14 +31,9 @@ Play every decision in Pack 1 of a historical draft seat. Your hypothetical sele
 
 ## Production data
 
-The current catalog contains four Premier Draft sets, each with 300 historical replays:
+The production catalog is generated from eligible 17Lands Premier Draft public datasets. Each imported set has 300 target historical replays, a manifest, compact replay shards, and a separate counterfactual path model under `data/<set>/`. The browser loads only the shard required for the selected replay.
 
-- ECL
-- TMT
-- SOS
-- MSH
-
-Each set has a manifest plus compact replay shards under `data/<set>/`. The browser loads only the shard required for the selected replay.
+The catalog-driven importer automatically works backward through missing public sets in small validated batches, so the set list is no longer maintained by hand. `data/catalog.json` is the source of truth for what is currently playable.
 
 The consensus model is `strong-player-pool-context-v2`: hierarchical strong-player pick tendencies plus shrinkage-adjusted candidate/pool co-pick lift. Replays are scored out-of-fold by draft ID. Model probabilities are comparative choice support, not calibrated win probabilities.
 
@@ -108,53 +103,38 @@ When an account is claimed, results are synced to the linked Pack 1 player ident
 npm test
 ```
 
-The unit suite covers scoring, Daily selection, cohort/model logic, sharding, dataset validation, and JavaScript syntax.
+The unit suite covers scoring, Daily selection, cohort/model logic, sharding, dataset validation, importer discovery, and JavaScript syntax.
 
-`.github/workflows/e2e.yml` runs a mobile-width Chromium product matrix covering:
+`.github/workflows/e2e.yml` runs a mobile-width Chromium product matrix covering production sets, deterministic seeded friend challenges, hidden-before-reveal friend comparison, Daily Top 3, a complete Full Pack run, dedicated result screens, My Stats, and optional Account UI.
 
-- Top 3 reveal for all four production sets;
-- deterministic seeded friend challenges;
-- hidden-before-reveal friend comparison;
-- Daily Top 3;
-- a complete Full Pack run;
-- dedicated result screens;
-- My Stats; and
-- optional Account UI.
+## Importing sets
 
-## Adding a set
+`.github/workflows/build-more-sets.yml` is the automatic backlog importer. On a normal run it:
 
-The generic `.github/workflows/build-replay-data.yml` workflow accepts:
+1. makes one Scryfall set-catalog request and considers released sets newest-first;
+2. probes the official 17Lands public S3 draft archive for missing Premier Draft datasets;
+3. imports up to three available missing sets;
+4. derives each 17Lands source date from the archive metadata;
+5. stages each set outside `data/`, builds replay shards plus the path model, and validates both;
+6. publishes only fully validated set directories/catalog changes; and
+7. makes one serialized Git commit with push/rebase retries.
 
-- `expansion`
-- `source_date`
-- `format` (currently PremierDraft)
-- `max_training_drafts`
-- `max_output_drafts`
+The workflow runs daily, and also runs when importer/model code lands on `main`, so a historical backlog fills itself without hand-editing YAML. A failed set does not contaminate the catalog or discard other successful sets from the same batch. Raw 17Lands CSV archives are temporary and never committed.
 
-It downloads the official 17Lands public archive, fetches offline card metadata when available, builds the strong-player model/replay shards, validates the generated dataset, uploads an artifact, and commits only compact generated data plus the catalog back to the invoking branch.
-
-Manual equivalent:
+Manual discovery without building:
 
 ```bash
-python scripts/fetch_card_metadata.py --set MSH --output generated/msh-cards.json
-python scripts/build_replays.py \
-  --input raw-data/draft_data_public.MSH.PremierDraft.csv.gz \
-  --output-dir data/msh \
-  --catalog data/catalog.json \
-  --expansion MSH \
-  --format PremierDraft \
-  --source-date 2026-07-26 \
-  --minimum-games 100 \
-  --top-fraction 0.15 \
-  --max-training-drafts 5000 \
-  --max-output-drafts 300 \
-  --minimum-picks 30 \
-  --folds 5 \
-  --shard-size 2 \
-  --card-metadata generated/msh-cards.json
-python scripts/validate_dataset.py data/msh/manifest.json --minimum-replays 100
+python scripts/import_sets.py --dry-run --limit 3
 ```
+
+Manual import of particular public sets:
+
+```bash
+python scripts/import_sets.py --sets TLA,EOE
+```
+
+The older `.github/workflows/build-replay-data.yml` remains available as a one-set manual fallback while the automatic importer is established.
 
 ## Data source and attribution
 
-Production replay files are derived from 17Lands public datasets. Preserve 17Lands attribution in the deployed product and review current 17Lands usage guidelines whenever ingestion changes.
+Production replay files are derived from 17Lands public datasets. Preserve 17Lands attribution in the deployed product and review current 17Lands usage guidelines whenever ingestion changes. The importer uses the public downloadable archives rather than scraping 17Lands' unsupported analytics API.

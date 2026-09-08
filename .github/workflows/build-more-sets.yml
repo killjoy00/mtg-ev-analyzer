@@ -1,21 +1,45 @@
-name: build-more-sets
+name: import-set-backlog
 
 on:
   workflow_dispatch:
+    inputs:
+      sets:
+        description: 'Optional comma-separated set codes. Leave blank to import the next missing public sets.'
+        required: false
+        default: ''
+        type: string
+      limit:
+        description: 'Maximum auto-discovered sets to import this run'
+        required: true
+        default: '3'
+        type: string
+      earliest:
+        description: 'Earliest Scryfall release date to consider for backlog discovery'
+        required: true
+        default: '2021-01-01'
+        type: string
   push:
-    branches: [fix/daily-reveal-and-more-sets]
+    branches: [main]
     paths:
       - '.github/workflows/build-more-sets.yml'
+      - 'scripts/import_sets.py'
       - 'scripts/build_replays.py'
       - 'scripts/build_path_model.py'
       - 'scripts/fetch_card_metadata.py'
       - 'scripts/validate_dataset.py'
+      - 'tests/test_import_sets.py'
+  schedule:
+    - cron: '17 10 * * *'
 
 permissions:
   contents: write
 
+concurrency:
+  group: set-data-import-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  build-sets:
+  import-sets:
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
@@ -32,91 +56,80 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: Build recent Premier Draft sets
+      - name: Import public Premier Draft backlog
+        id: importer
+        continue-on-error: true
+        env:
+          SETS: ${{ inputs.sets || '' }}
+          LIMIT: ${{ inputs.limit || '3' }}
+          EARLIEST: ${{ inputs.earliest || '2021-01-01' }}
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p raw-data generated
+          args=(
+            --format PremierDraft
+            --limit "$LIMIT"
+            --earliest "$EARLIEST"
+            --max-training-drafts 5000
+            --max-output-drafts 300
+            --minimum-replays 100
+            --minimum-picks 30
+            --folds 5
+            --shard-size 2
+            --max-path-bytes 4000000
+          )
+          if [[ -n "$SETS" ]]; then
+            args+=(--sets "$SETS")
+          fi
+          python scripts/import_sets.py "${args[@]}"
 
-          while read -r SET SOURCE_DATE; do
-            lower="$(printf '%s' "$SET" | tr '[:upper:]' '[:lower:]')"
-            echo "=== Building $SET ($SOURCE_DATE) ==="
-            mkdir -p "data/$lower"
+      - name: Publish import report to job summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f generated/import-report.json ]]; then
+            echo '## Set import report' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat generated/import-report.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
-            curl --fail --location --retry 5 --retry-delay 3 \
-              --output "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz" \
-              "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.${SET}.PremierDraft.csv.gz"
-
-            if ! python scripts/fetch_card_metadata.py --set "$SET" --output "generated/${lower}-cards.json"; then
-              echo "Scryfall metadata unavailable for $SET; continuing with placeholders."
-              printf '{}\n' > "generated/${lower}-cards.json"
-            fi
-
-            python scripts/build_replays.py \
-              --input "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz" \
-              --output-dir "data/$lower" \
-              --catalog data/catalog.json \
-              --expansion "$SET" \
-              --format PremierDraft \
-              --source-date "$SOURCE_DATE" \
-              --minimum-games 100 \
-              --top-fraction 0.15 \
-              --max-training-drafts 5000 \
-              --max-output-drafts 300 \
-              --minimum-picks 30 \
-              --folds 5 \
-              --shard-size 2 \
-              --card-metadata "generated/${lower}-cards.json"
-
-            python scripts/build_path_model.py \
-              --input "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz" \
-              --output-dir "data/$lower" \
-              --expansion "$SET" \
-              --source-date "$SOURCE_DATE" \
-              --minimum-games 100 \
-              --top-fraction 0.15 \
-              --max-training-drafts 5000 \
-              --max-bytes 4000000
-
-            python scripts/validate_dataset.py "data/$lower/manifest.json" --minimum-replays 100
-            python - "$lower" <<'PY'
-          import json, sys
-          from pathlib import Path
-          path = Path('data') / sys.argv[1] / 'path-model.json'
-          model = json.loads(path.read_text())
-          assert model['model_version'] == 'strong-player-counterfactual-path-v3'
-          assert model['training']['excluded_replay_drafts'] >= 250
-          assert len(model['cards']) > 100
-          assert len(model['pairs']) > 100
-          assert path.stat().st_size < 4_000_000
-          PY
-            rm -f "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz"
-          done <<'SETS'
-          SOS 2026-06-02
-          TMT 2026-04-08
-          ECL 2026-02-08
-          SETS
-
-      - name: Upload generated replay data
+      - name: Upload import report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: recent-replay-data
-          path: |
-            data/catalog.json
-            data/sos/
-            data/tmt/
-            data/ecl/
-          retention-days: 14
+          name: set-import-report-${{ github.run_id }}
+          path: generated/import-report.json
+          retention-days: 30
+          if-no-files-found: ignore
 
-      - name: Commit generated data to branch
+      - name: Commit successful imports
+        if: always()
+        shell: bash
         run: |
+          set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/catalog.json data/sos data/tmt data/ecl
+          git add data/catalog.json data/
           if git diff --cached --quiet; then
-            echo 'Generated data is unchanged.'
+            echo 'No generated set data changed.'
             exit 0
           fi
-          git commit -m 'Add SOS TMT and ECL replay data [data-generated]'
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin HEAD:${GITHUB_REF_NAME}
+
+          git commit -m 'Import 17Lands set backlog [data-generated]'
+          for attempt in 1 2 3; do
+            echo "Publish attempt ${attempt}/3"
+            if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
+              exit 0
+            fi
+            git rebase --abort >/dev/null 2>&1 || true
+            sleep $((attempt * 5))
+          done
+          echo 'Could not publish generated set data after three attempts.' >&2
+          exit 1
+
+      - name: Surface importer failure after preserving successful sets
+        if: steps.importer.outcome == 'failure'
+        run: |
+          echo 'One or more selected sets failed. Successful staged sets were committed; see the import report artifact.' >&2
+          exit 1
