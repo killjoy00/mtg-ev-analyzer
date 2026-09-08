@@ -26,14 +26,9 @@ class PoweredCubeImportTests(unittest.TestCase):
             rows = [
                 {"draft_id": "d1", "pack_number": "0", "pick_number": "0", "pack_card_A": "1", "pack_card_B": "0"},
                 {"draft_id": "d1", "pack_number": "0", "pick_number": "1", "pack_card_A": "1", "pack_card_B": "1"},
-                # A legitimate late one-card decision must remain.
                 {"draft_id": "d1", "pack_number": "0", "pick_number": "14", "pack_card_A": "1", "pack_card_B": "0"},
-                # A complete future P1P1 row at the same coordinates must remain.
                 {"draft_id": "d2", "pack_number": "0", "pick_number": "0", "pack_card_A": "1", "pack_card_B": "1"},
             ]
-            # Keep this synthetic archive above the same 1 KB safety floor used
-            # in production without weakening that guard for tests. These rows
-            # use pack 2 coordinates so they cannot affect the P1P1 assertion.
             rows.extend(
                 {
                     "draft_id": f"filler-{index:04d}-{index * 7919}",
@@ -128,18 +123,22 @@ class PoweredCubeImportTests(unittest.TestCase):
         self.assertIsNotNone(prepared)
         self.assertEqual(prepared["cube_start_pick"], 1)
         self.assertFalse(prepared["cube_missing_p1p1"])
+        self.assertEqual(prepared["cube_pick_number_offset"], 0)
+        self.assertEqual([pick["pick_number"] for pick in prepared["picks"][:15]], list(range(1, 16)))
 
-    def test_cube_run_accepts_reindexed_p1p2_with_inherited_starter(self):
+    def test_cube_run_restores_true_p1p2_to_p1p15_numbers(self):
         replay = {
             "draft_id": "missing",
-            # After incomplete raw P1P1 is removed, the builder normalizes the
-            # fourteen visible P1P2-P1P15 decisions to pick numbers 1-14.
+            # build_replays sees the filtered archive as picks 1-14. The Cube
+            # adapter must restore their true physical positions 2-15.
             "picks": self._rendered_pack(start_pick=1, decisions=14, first_candidates=14, inherited_pool=True),
         }
         prepared = cube.prepare_cube_run(replay, 14)
         self.assertIsNotNone(prepared)
         self.assertEqual(prepared["cube_start_pick"], 2)
         self.assertTrue(prepared["cube_missing_p1p1"])
+        self.assertEqual(prepared["cube_pick_number_offset"], 1)
+        self.assertEqual([pick["pick_number"] for pick in prepared["picks"][:14]], list(range(2, 16)))
         self.assertEqual(len(prepared["picks"][0]["candidates"]), 14)
         self.assertEqual(prepared["picks"][0]["pool"], {"Black Lotus": 1})
 
@@ -162,6 +161,28 @@ class PoweredCubeImportTests(unittest.TestCase):
             "picks": self._rendered_pack(start_pick=1, decisions=14, first_candidates=14, inherited_pool=False),
         }
         self.assertIsNone(cube.prepare_cube_run(no_starter, 14))
+
+    def test_path_model_exact_pick_keys_shift_with_replay_positions(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "path-model.json"
+            path.write_text(json.dumps({
+                "model_version": cube.PATH_MODEL_VERSION,
+                "source": {"provider": "17Lands"},
+                "training": {"excluded_replay_drafts": 120},
+                "cards": [f"card-{index}" for index in range(300)],
+                "pairs": [[0, 1, 10, 5] for _ in range(600)],
+                "stats": [
+                    [100, 20, 80, 16, [[1, 30, 6], [8, 12, 3], [14, 8, 1]]],
+                    [90, 15, 70, 12, []],
+                ],
+            }), encoding="utf-8")
+
+            shifted = cube.shift_path_model_pick_numbers(path, 1, 8_000_000)
+            model = json.loads(path.read_text(encoding="utf-8"))
+            self.assertEqual(shifted, 3)
+            self.assertEqual([row[0] for row in model["stats"][0][4]], [2, 9, 15])
+            self.assertEqual(model["source"]["pick_number_offset"], 1)
+            self.assertEqual(model["source"]["first_playable_pick"], "P1P2")
 
     def test_register_cube_appends_special_mode_without_replacing_featured_set(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -194,6 +215,7 @@ class PoweredCubeImportTests(unittest.TestCase):
             self.assertEqual(manifest["name"], "Powered Cube")
             self.assertEqual(manifest["source"]["archive_expansion"], "Cube_-_Powered")
             self.assertIn("P1P2", manifest["source"]["first_playable_pick"])
+            self.assertEqual(manifest["source"]["stored_pick_numbers"], "true Pack One positions")
 
 
 if __name__ == "__main__":
