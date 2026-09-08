@@ -9,9 +9,10 @@ playable Cube run inherits the historical drafter's real first pick from the
 P1P2 pool. The player then starts at the first fully observed decision, P1P2.
 
 The builder resolves card display metadata across *all* Scryfall sets, keeps
-only replay seats with a complete P1P2-P1P15 run, builds the existing
-leakage-safe consensus and counterfactual path models, validates the result, and
-finally registers the dataset as a special product mode in ``data/catalog.json``.
+only replay seats with a complete P1P2-P1P15 run, restores their true Pack One
+pick numbers after the missing row is removed, builds the existing leakage-safe
+consensus and counterfactual path models, validates the result, and finally
+registers the dataset as a special product mode in ``data/catalog.json``.
 
 The catalog still uses its existing ``sets`` array as a generic playable-data
 registry for backwards compatibility with the score worker. The Cube entry is
@@ -331,6 +332,7 @@ def prepare_cube_run(replay: dict, minimum_candidates: int = 14) -> Optional[dic
         prepared = dict(replay)
         prepared["cube_start_pick"] = 1
         prepared["cube_missing_p1p1"] = False
+        prepared["cube_pick_number_offset"] = 0
         return prepared
 
     if first_candidates < minimum_candidates:
@@ -341,9 +343,22 @@ def prepare_cube_run(replay: dict, minimum_candidates: int = 14) -> Optional[dic
     if not any(int(value or 0) > 0 for value in inherited_pool.values()):
         return None
 
+    # build_replays normalizes the filtered archive so the first visible P1P2
+    # becomes pick 1. Restore true pack positions here: P1P2-P1P15 must remain
+    # 2-15 so the shared first-pass/wheel boundary (wheel begins at pick 9) is
+    # correct in both the browser and score worker.
+    shifted_picks = []
+    for pick in picks:
+        rendered = dict(pick)
+        if int(pick.get("pack_number") or 0) == first_pack:
+            rendered["pick_number"] = int(pick.get("pick_number") or 0) + 1
+        shifted_picks.append(rendered)
+
     prepared = dict(replay)
+    prepared["picks"] = shifted_picks
     prepared["cube_start_pick"] = 2
     prepared["cube_missing_p1p1"] = True
+    prepared["cube_pick_number_offset"] = 1
     return prepared
 
 
@@ -354,7 +369,7 @@ def filter_playable_cube_runs(
     minimum_replays: int,
     minimum_candidates: int,
     shard_size: int,
-) -> tuple[dict, int, int, int]:
+) -> tuple[dict, int, int, int, int]:
     manifest_path = output_dir / "manifest.json"
     manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
     source_replays = _read_replays(output_dir, manifest)
@@ -366,6 +381,12 @@ def filter_playable_cube_runs(
             f"Only {len(selected)} Powered Cube replay seats have a complete first visible pack run; "
             f"need at least {minimum_replays}."
         )
+    if missing_p1p1 not in {0, len(selected)}:
+        raise ValueError(
+            "Powered Cube replay sample mixes complete and incomplete P1P1 logging; "
+            "refusing to apply an ambiguous pick-number offset."
+        )
+    pick_number_offset = 1 if missing_p1p1 == len(selected) else 0
 
     dataset = {
         key: value
@@ -374,7 +395,30 @@ def filter_playable_cube_runs(
     }
     dataset["replays"] = selected
     filtered = write_sharded_dataset(dataset, output_dir, shard_size)
-    return filtered, len(source_replays), len(prepared), missing_p1p1
+    return filtered, len(source_replays), len(prepared), missing_p1p1, pick_number_offset
+
+
+def shift_path_model_pick_numbers(path: Path, offset: int, max_bytes: int) -> int:
+    """Keep the Cube path model's exact-pick keys aligned with replay shards."""
+    if offset == 0:
+        return 0
+    model = json.loads(path.read_text(encoding="utf-8"))
+    shifted = 0
+    for stat in model.get("stats") or []:
+        if not isinstance(stat, list) or len(stat) < 5 or not isinstance(stat[4], list):
+            continue
+        for exact in stat[4]:
+            if not isinstance(exact, list) or len(exact) < 3:
+                continue
+            exact[0] = int(exact[0]) + offset
+            shifted += 1
+    model.setdefault("source", {})["pick_number_offset"] = offset
+    model["source"]["first_playable_pick"] = "P1P2"
+    encoded = json.dumps(model, separators=(",", ":")) + "\n"
+    if len(encoded.encode("utf-8")) > max_bytes:
+        raise ValueError("Shifted Powered Cube path model exceeds the configured byte limit.")
+    path.write_text(encoded, encoding="utf-8")
+    return shifted
 
 
 def validate_path_model(path: Path, *, minimum_replays: int, max_bytes: int) -> tuple[int, int, int]:
@@ -404,6 +448,7 @@ def register_cube(catalog_path: Path, output_dir: Path) -> dict:
     manifest["source"]["expansion_label"] = CUBE_NAME
     manifest["source"]["archive_expansion"] = "Cube_-_Powered"
     manifest["source"]["first_playable_pick"] = "P1P2 when P1P1 contents are unavailable"
+    manifest["source"]["stored_pick_numbers"] = "true Pack One positions"
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
 
     catalog = json.loads(catalog_path.read_text(encoding="utf-8"))
@@ -482,7 +527,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "--card-metadata", str(metadata_path),
         ])
 
-        manifest, candidate_replays, playable_replays, missing_p1p1_replays = filter_playable_cube_runs(
+        manifest, candidate_replays, playable_replays, missing_p1p1_replays, pick_number_offset = filter_playable_cube_runs(
             OUTPUT_DIR,
             target_replays=args.target_replays,
             minimum_replays=args.minimum_replays,
@@ -502,6 +547,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "--max-training-drafts", str(args.max_training_drafts),
             "--max-bytes", str(args.max_path_bytes),
         ])
+        shifted_path_exact_rows = shift_path_model_pick_numbers(
+            OUTPUT_DIR / "path-model.json",
+            pick_number_offset,
+            args.max_path_bytes,
+        )
         run_command([
             sys.executable,
             "scripts/validate_dataset.py",
@@ -526,6 +576,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "playable_cube_replays": playable_replays,
             "published_replays": int(manifest["replay_count"]),
             "published_runs_starting_at_p1p2": missing_p1p1_replays,
+            "pick_number_offset": pick_number_offset,
+            "shifted_path_exact_rows": shifted_path_exact_rows,
             "path_model_excluded_replays": excluded,
             "path_cards": path_cards,
             "path_pairs": path_pairs,
