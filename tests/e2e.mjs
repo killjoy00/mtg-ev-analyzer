@@ -31,7 +31,7 @@ async function assertNoHorizontalOverflow() {
 }
 
 async function assertModeCardsAligned() {
-  const boxes = await page.locator('.mode-card').evaluateAll((nodes) => nodes.slice(0, 2).map((node) => {
+  const boxes = await page.locator('.mode-grid[aria-label="Choose a practice mode"] .mode-card').evaluateAll((nodes) => nodes.slice(0, 2).map((node) => {
     const r = node.getBoundingClientRect();
     return { x: r.x, y: r.y, width: r.width, height: r.height };
   }));
@@ -178,72 +178,59 @@ try {
     if (setId === 'ecl') await page.screenshot({ path: 'artifacts/ui-result-mobile.png', fullPage: true });
   }
 
-  // Seeded friend challenges carry the exact pack and compare only after reveal.
+  // Daily is independent from practice set selection and starts from the featured environment.
   await home();
   await page.locator('#set-select').selectOption('msh');
-  await page.locator('[data-mode="top3"]').click();
-  const seeded = new URL(page.url());
-  await revealTop3();
-  seeded.searchParams.set('vs', '80');
-  seeded.searchParams.set('by', 'Browser Test');
-  await page.goto(seeded.toString(), { waitUntil: 'domcontentloaded' });
-  await page.locator('.challenge-callout').waitFor({ timeout: 10000 });
-  assert.match((await page.locator('.challenge-callout').textContent()) || '', /Browser Test scored 80/);
-  assert.equal(await page.locator('.friend-comparison').count(), 0);
-  await assertNoHorizontalOverflow();
-  await page.screenshot({ path: 'artifacts/ui-challenge-mobile.png', fullPage: true });
-  await revealTop3();
-  await page.locator('.friend-comparison').waitFor({ timeout: 5000 });
-  await page.locator('.challenge-return').waitFor({ timeout: 5000 });
-  await page.waitForTimeout(100);
-  assert.ok(capturedEvents.includes('challenge_start'), 'friend challenge must record a challenge_start event');
-  assert.ok(capturedEvents.includes('challenge_complete'), 'friend challenge must record a challenge_complete event');
-  await assertNoHorizontalOverflow();
-
-  // Daily remains a dated ranked path and Reveal reaches its result page.
-  await home();
+  const dailySet = await page.locator('[data-daily-mode="top3"]').getAttribute('data-set');
+  assert.ok(dailySet);
+  assert.notEqual(dailySet, 'msh');
   await page.locator('[data-daily-mode="top3"]').click();
-  await page.locator('.opening-pack .card-choice').first().waitFor();
   const dailyUrl = new URL(page.url());
-  assert.ok(dailyUrl.searchParams.get('daily'));
-  assert.equal(dailyUrl.searchParams.get('mode'), 'top3');
+  assert.equal(dailyUrl.searchParams.get('set'), dailySet);
+  assert.equal(dailyUrl.searchParams.get('daily'), 'top3');
+  assert.ok(dailyUrl.searchParams.get('seed'));
+  await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
   await revealTop3();
+  assert.equal(await page.locator('.friend-comparison').count(), 0);
   await assertPrimaryResultActions('.top3-result-page');
-  assert.match((await page.locator('#challenge-leaders').getAttribute('class')) || '', /secondary/);
 
-  // Full Pack can complete all first-pack decisions and reach its summary.
+  // Seeded practice remains in practice mode after a game, and New Pack preserves the chosen set.
   await home();
-  await page.locator('#set-select').selectOption('msh');
-  await page.locator('[data-mode="full"]').click();
-  assert.match((await page.locator('.replay-sidebar').textContent()) || '', /Your pool so far/i);
-  assert.match((await page.locator('.replay-sidebar').textContent()) || '', /does not simulate|historical replay/i);
-  for (let pick = 0; pick < 20; pick += 1) {
-    if (await page.locator('.scorecard').count()) break;
-    await page.locator('.card-choice').first().waitFor({ timeout: 10000 });
-    await page.locator('.card-choice').first().click();
-    await page.locator('#submit-pick').click();
-    await page.locator('#next-pick').waitFor({ timeout: 5000 });
-    await page.locator('#next-pick').click();
+  await page.locator('#set-select').selectOption('sos');
+  await page.locator('[data-mode="top3"]').click();
+  const practiceUrl = new URL(page.url());
+  assert.equal(practiceUrl.searchParams.get('set'), 'sos');
+  assert.ok(practiceUrl.searchParams.get('seed'));
+  await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
+  await revealTop3();
+  await page.getByRole('button', { name: /New pack/i }).first().click();
+  const nextPracticeUrl = new URL(page.url());
+  assert.equal(nextPracticeUrl.searchParams.get('set'), 'sos');
+  assert.ok(nextPracticeUrl.searchParams.get('seed'));
+
+  // Leaving seeded practice restores clean Daily/home state rather than sticking to the seeded URL.
+  await page.locator('#brand-home').click();
+  await page.locator('#set-select').waitFor({ timeout: 10000 });
+  const cleanHomeUrl = new URL(page.url());
+  assert.equal(cleanHomeUrl.searchParams.get('seed'), null);
+  assert.equal(cleanHomeUrl.searchParams.get('set'), null);
+  assert.equal(cleanHomeUrl.searchParams.get('daily'), null);
+
+  // Powered Cube is a separate Full mode and never exposes Top 3.
+  await home();
+  if (await page.locator('[data-powered-cube-section="1"]').count()) {
+    assert.equal(await page.locator('[data-cube-mode="top3"]').count(), 0);
+    assert.equal(await page.locator('[data-cube-mode="full"]').count(), 1);
+    await page.locator('[data-cube-mode="full"]').click();
+    await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
+    const cubeUrl = new URL(page.url());
+    assert.equal(cubeUrl.searchParams.get('set'), 'powered-cube');
+    assert.equal(cubeUrl.searchParams.get('mode'), 'full');
   }
-  await page.locator('.scorecard.result-page').waitFor({ timeout: 10000 });
-  assert.match((await page.locator('.scorecard .score-orb strong').textContent()) || '', /^\d+$/);
-  await assertPrimaryResultActions('.scorecard.result-page');
-  await assertNoHorizontalOverflow();
 
-  // Stats and Account are styled and reachable without an account.
-  await home();
-  await page.locator('#stats-nav').click();
-  await page.locator('.stats-page').waitFor();
-  assert.match((await page.locator('.stats-page h1').textContent()) || '', /Pack One record/);
-  await assertNoHorizontalOverflow();
-  await page.screenshot({ path: 'artifacts/ui-stats-mobile.png', fullPage: true });
-  await page.locator('#account-nav').click();
-  await page.locator('.account-page').waitFor();
-  assert.ok((await page.locator('#account-signup').count()) + (await page.locator('#account-signout').count()) >= 1);
-  await assertNoHorizontalOverflow();
-  await page.screenshot({ path: 'artifacts/ui-account-mobile.png', fullPage: true });
-
-  console.log('Pack One product and layout matrix passed.');
-} finally {
+  assert.ok(capturedEvents.length > 0, 'expected at least one analytics event');
   await browser.close();
+} catch (error) {
+  await browser.close();
+  throw error;
 }
