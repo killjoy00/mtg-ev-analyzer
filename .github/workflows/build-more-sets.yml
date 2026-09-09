@@ -41,16 +41,91 @@ permissions:
   contents: write
   actions: write
 
-# Powered Cube's data-producing job shares this lock because both workflows can
-# publish catalog.json. Read-only Cube preflight diagnostics do not need it.
-concurrency:
-  group: set-data-import-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
+  # Do not enter the shared catalog concurrency group until we know Powered Cube
+  # is already published. GitHub keeps only one pending item per concurrency
+  # group, so a newly queued backlog job can otherwise evict a pending Cube job
+  # even when cancel-in-progress is false.
+  route:
+    runs-on: ubuntu-latest
+    outputs:
+      should_import: ${{ steps.route.outputs.should_import }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward routing view to latest main
+        if: github.ref_name == 'main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          git reset --hard "origin/$GITHUB_REF_NAME"
+
+      - name: Route catalog ownership
+        id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SETS: ${{ inputs.sets || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'should_import=false' >> "$GITHUB_OUTPUT"
+
+          read -r pending cube_live < <(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          status_path = Path('data/status.json')
+          if status_path.exists():
+              status = json.loads(status_path.read_text())
+              pending = int((status.get('normal_queue_counts') or {}).get('pending') or 0)
+              cube_live = any(
+                  item.get('id') == 'powered-cube' and item.get('status') == 'live'
+                  for item in status.get('special_modes', [])
+              )
+          else:
+              pending = 1
+              cube_live = False
+
+          print(pending, 1 if cube_live else 0)
+          PY
+          )
+
+          if [[ "$cube_live" != '1' ]]; then
+            echo "Powered Cube is not live; backlog will not enter the shared catalog lock."
+            active_cube="$(gh run list \
+              --workflow build-powered-cube.yml \
+              --limit 30 \
+              --json status \
+              --jq '[.[] | select(.status == "in_progress" or .status == "queued" or .status == "pending" or .status == "waiting" or .status == "requested")] | length')"
+
+            if [[ "$active_cube" -eq 0 ]]; then
+              echo 'No active Cube run found; dispatching one now.'
+              gh workflow run build-powered-cube.yml --ref "$GITHUB_REF_NAME"
+            else
+              echo "Cube already has ${active_cube} active or queued run(s); leaving them undisturbed."
+            fi
+            exit 0
+          fi
+
+          if [[ -z "$SETS" && "$pending" -le 0 ]]; then
+            echo 'Normal import queue is already complete.'
+            exit 0
+          fi
+
+          echo 'Powered Cube is live; this backlog run may acquire the shared catalog lock.'
+          echo 'should_import=true' >> "$GITHUB_OUTPUT"
+
   import-sets:
+    needs: route
+    if: needs.route.outputs.should_import == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    concurrency:
+      group: set-data-import-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -228,8 +303,8 @@ jobs:
           exit 1
 
       # GITHUB_TOKEN pushes do not recursively launch push workflows. Explicit
-      # workflow_dispatch does. If Powered Cube is still unpublished, yield the
-      # next shared-lock slot to Cube; Cube will hand control back after it lands.
+      # workflow_dispatch does. If Powered Cube somehow becomes unpublished
+      # again, yield rather than enqueue another backlog writer ahead of it.
       - name: Continue data migration
         if: steps.publish.outputs.published == 'true'
         env:
