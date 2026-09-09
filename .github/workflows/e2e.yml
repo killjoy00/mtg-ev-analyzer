@@ -28,6 +28,41 @@ jobs:
           echo $! > /tmp/pack1-http.pid
       - name: Run browser regression
         run: node tests/e2e.mjs
+      - name: Debug Cube launch on browser failure
+        if: failure()
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({ headless: true, channel: 'chrome' });
+          const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
+          page.on('pageerror', (error) => console.log('PAGE_ERROR', error.message));
+          page.on('console', (message) => {
+            if (['error', 'warning'].includes(message.type())) console.log('BROWSER_CONSOLE', message.type(), message.text());
+          });
+          await page.route('https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**', async (route) => {
+            const path = new URL(route.request().url()).pathname;
+            let status = 200;
+            let body = { ok: true };
+            if (path === '/v1/session') body = { token: 'p1_00000000-0000-4000-8000-000000000000.e2e', playerId: '00000000-0000-4000-8000-000000000000', displayName: 'Pack Player' };
+            else if (path === '/v1/stats') body = { summary: { games: 0, average_score: 0, best_score: 0, challenge_wins: 0, challenge_losses: 0, challenge_ties: 0 }, daily: { daily_plays: 0, daily_days: 0, daily_best: 0 }, bySet: [], byMode: [], recent: [] };
+            else if (path === '/v1/account/daily-dates') body = { dates: [] };
+            else if (path === '/v1/account/session') { status = 401; body = { error: 'Account session required.' }; }
+            await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
+          });
+          await page.goto('http://127.0.0.1:4173', { waitUntil: 'domcontentloaded' });
+          await page.locator('[data-powered-cube-section="1"]').waitFor({ timeout: 10000 });
+          const href = await page.getByRole('button', { name: 'New Cube Run', exact: true }).getAttribute('data-cube-href');
+          console.log('CUBE_HREF', href);
+          await page.getByRole('button', { name: 'New Cube Run', exact: true }).click();
+          for (const delay of [1000, 4000, 10000]) {
+            await page.waitForTimeout(delay);
+            console.log('CUBE_AFTER_MS', delay, page.url());
+            console.log('CUBE_APP_TEXT', (await page.locator('#app').innerText()).slice(0, 1600).replace(/\n/g, ' | '));
+            console.log('CUBE_STUDY_COUNT', await page.locator('.study-main .card-choice').count());
+          }
+          await browser.close();
+          NODE
       - name: Run Daily / Set Practice regression
         run: node tests/practice-e2e.mjs
       - name: Upload UI screenshots
