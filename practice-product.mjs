@@ -3,6 +3,7 @@ import { onAppRender } from './render-lifecycle.mjs';
 
 const PRACTICE_SET_KEY = 'pack1-practice-set-v1';
 const CUBE_ID = 'powered-cube';
+const narrowHome = typeof matchMedia === 'function' ? matchMedia('(max-width: 760px)') : null;
 
 function freshSeed() {
   return makeGameSeed(globalThis.crypto?.randomUUID ? () => crypto.randomUUID() : null);
@@ -59,6 +60,16 @@ function placePracticeSelector(select) {
   }
 }
 
+function fixResponsiveHomeLayout() {
+  const daily = document.querySelector('.daily-feature');
+  if (!daily) return;
+  if (narrowHome?.matches) {
+    if (daily.style.gridTemplateColumns !== '1fr') daily.style.gridTemplateColumns = '1fr';
+  } else if (daily.style.gridTemplateColumns) {
+    daily.style.removeProperty('grid-template-columns');
+  }
+}
+
 function updateHomeCopy(select) {
   const featured = featuredOption(select);
   if (!featured) return;
@@ -78,7 +89,7 @@ function updateHomeCopy(select) {
   const featuredName = featured.dataset.practiceOriginalLabel || featured.textContent;
   const meta = document.querySelector('#set-meta');
   const metaCopy = selected.value === featured.value
-    ? `Use the featured environment, or choose one set to stay locked there for Set Practice.`
+    ? 'Use the featured environment, or choose one set to stay locked there for Set Practice.'
     : `Set Practice locked to ${selectedName}. Change this only when you want a different practice environment.`;
   setText(meta, metaCopy);
 
@@ -110,6 +121,7 @@ function enhanceHome() {
   }
   placePracticeSelector(select);
   updateHomeCopy(select);
+  fixResponsiveHomeLayout();
 }
 
 function cleanHomeUrl() {
@@ -173,5 +185,6 @@ function capturePractice(event) {
 export function installPracticeProductLayer() {
   document.addEventListener('change', capturePractice, true);
   document.addEventListener('click', capturePractice, true);
+  narrowHome?.addEventListener?.('change', enhanceHome);
   onAppRender(enhanceHome);
 }
