@@ -2,7 +2,7 @@ import unittest
 from pathlib import Path
 
 
-# This file is also an explicit, harmless restart trigger for both data workflows.
+# This file is also an explicit, harmless restart trigger for the backlog workflow.
 ROOT = Path(__file__).resolve().parents[1]
 BACKLOG = ROOT / ".github" / "workflows" / "build-more-sets.yml"
 CUBE = ROOT / ".github" / "workflows" / "build-powered-cube.yml"
@@ -45,6 +45,42 @@ class DataPipelineWorkflowTests(unittest.TestCase):
         text = CUBE.read_text()
         self.assertIn("Fast-forward to latest main under import lock", text)
         self.assertIn('git reset --hard "origin/$GITHUB_REF_NAME"', text)
+
+    def test_cube_skips_stale_duplicate_dispatches(self):
+        text = CUBE.read_text()
+        self.assertIn("force:", text)
+        self.assertIn("  cube-route:", text)
+        self.assertIn("skipping this non-forced dispatch before preflight", text)
+
+        powered = text.split("  powered-cube:", 1)[1]
+        fast_forward = powered.index("Fast-forward to latest main under import lock")
+        gate = powered.index("Re-check Cube state under import lock")
+        unit_tests = powered.index("Run unit tests")
+        build = powered.index("Build and validate Powered Cube")
+        self.assertLess(fast_forward, gate)
+        self.assertLess(gate, unit_tests)
+        self.assertLess(unit_tests, build)
+        self.assertIn("became live while this run was waiting", powered)
+        self.assertIn("steps.cube_gate.outputs.should_build == 'true'", powered)
+
+    def test_cube_push_only_rebuilds_for_data_pipeline_changes(self):
+        text = CUBE.read_text()
+        triggers = text.split("permissions:", 1)[0]
+        for path in (
+            ".github/workflows/build-powered-cube.yml",
+            "tests/test_data_pipeline_workflows.py",
+            "cube-product.mjs",
+            "leaderboard-product.mjs",
+            "practice-product.mjs",
+            "bootstrap.mjs",
+            "package.json",
+            "tests/powered-cube.test.mjs",
+            "tests/test_powered_cube_builder.py",
+        ):
+            self.assertNotIn(path, triggers)
+        self.assertIn("scripts/build_powered_cube_v3.py", triggers)
+        self.assertIn("scripts/import_powered_cube.py", triggers)
+        self.assertIn("scripts/audit_datasets.py", triggers)
 
     def test_cube_regenerates_status_after_rebase(self):
         text = CUBE.read_text()

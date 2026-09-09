@@ -2,35 +2,82 @@ name: build-powered-cube
 
 on:
   workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild even if Powered Cube is already live
+        required: false
+        type: boolean
+        default: false
   push:
     branches: [main]
+    # Product/UI/tests are covered by normal CI and must not rebuild the
+    # production Cube dataset. Only data-generation or audit code does that.
     paths:
-      - '.github/workflows/build-powered-cube.yml'
       - 'scripts/import_powered_cube.py'
       - 'scripts/build_powered_cube.py'
       - 'scripts/build_powered_cube_v3.py'
       - 'scripts/powered_cube_shape.py'
       - 'scripts/diagnose_powered_cube_raw.py'
       - 'scripts/audit_datasets.py'
-      - 'cube-product.mjs'
-      - 'leaderboard-product.mjs'
-      - 'practice-product.mjs'
-      - 'bootstrap.mjs'
-      - 'package.json'
-      - 'tests/test_powered_cube_import.py'
-      - 'tests/test_powered_cube_builder.py'
-      - 'tests/test_powered_cube_shape.py'
-      - 'tests/powered-cube.test.mjs'
-      - 'tests/leaderboard-product.test.mjs'
-      - 'tests/practice-product.test.mjs'
-      - 'tests/test_data_pipeline_workflows.py'
 
 permissions:
   contents: write
   actions: write
 
 jobs:
+  cube-route:
+    runs-on: ubuntu-latest
+    outputs:
+      should_build: ${{ steps.route.outputs.should_build }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward routing view to latest main
+        if: github.ref_name == 'main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          git reset --hard "origin/$GITHUB_REF_NAME"
+
+      - name: Route Cube work
+        id: route
+        shell: bash
+        run: |
+          set -euo pipefail
+          should_build=true
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "${{ inputs.force }}" != "true" ]]; then
+            live="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('data/status.json')
+          if not path.exists():
+              print('false')
+              raise SystemExit
+
+          status = json.loads(path.read_text())
+          live = any(
+              item.get('id') == 'powered-cube' and item.get('status') == 'live'
+              for item in status.get('special_modes', [])
+          )
+          print('true' if live else 'false')
+          PY
+            )"
+            if [[ "$live" == "true" ]]; then
+              should_build=false
+              echo 'Powered Cube is already live on latest main; skipping this non-forced dispatch before preflight.'
+            fi
+          fi
+
+          echo "should_build=$should_build" >> "$GITHUB_OUTPUT"
+
   cube-preflight:
+    needs: cube-route
+    if: needs.cube-route.outputs.should_build == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -65,7 +112,8 @@ jobs:
           if-no-files-found: ignore
 
   powered-cube:
-    needs: cube-preflight
+    needs: [cube-route, cube-preflight]
+    if: always() && needs.cube-route.outputs.should_build == 'true' && needs.cube-preflight.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     # Only the data-producing job needs the shared catalog lock. The cheap raw
@@ -92,15 +140,56 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      # A second Cube run can finish preflight while the first one is still
+      # building, then wait behind it for the shared lock. Re-check latest main
+      # after acquiring the lock so that stale duplicate dispatches exit before
+      # unit tests or the expensive Cube build.
+      - name: Re-check Cube state under import lock
+        id: cube_gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          should_build=true
+
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" && "${{ inputs.force }}" != "true" ]]; then
+            live="$(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          path = Path('data/status.json')
+          if not path.exists():
+              print('false')
+              raise SystemExit
+
+          status = json.loads(path.read_text())
+          live = any(
+              item.get('id') == 'powered-cube' and item.get('status') == 'live'
+              for item in status.get('special_modes', [])
+          )
+          print('true' if live else 'false')
+          PY
+            )"
+            if [[ "$live" == "true" ]]; then
+              should_build=false
+              echo 'Powered Cube became live while this run was waiting; skipping stale duplicate build under the shared lock.'
+            fi
+          fi
+
+          echo "should_build=$should_build" >> "$GITHUB_OUTPUT"
+
       - uses: actions/setup-node@v4
+        if: steps.cube_gate.outputs.should_build == 'true'
         with:
           node-version: 24
 
       - name: Run unit tests
+        if: steps.cube_gate.outputs.should_build == 'true'
         run: npm test
 
       - name: Build and validate Powered Cube
         id: cube_builder
+        if: steps.cube_gate.outputs.should_build == 'true'
         continue-on-error: true
         run: >-
           python scripts/build_powered_cube_v3.py
@@ -114,7 +203,7 @@ jobs:
 
       - name: Audit published datasets and refresh health status
         id: audit
-        if: always()
+        if: always() && steps.cube_gate.outputs.should_build == 'true'
         continue-on-error: true
         shell: bash
         run: |
@@ -125,7 +214,7 @@ jobs:
           python scripts/audit_datasets.py "${args[@]}"
 
       - name: Publish build report to job summary
-        if: always()
+        if: always() && steps.cube_gate.outputs.should_build == 'true'
         shell: bash
         run: |
           if [[ -f generated/powered-cube-report.json ]]; then
@@ -142,7 +231,7 @@ jobs:
           fi
 
       - name: Upload build report
-        if: always()
+        if: always() && steps.cube_gate.outputs.should_build == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: powered-cube-report-${{ github.run_id }}
@@ -154,7 +243,7 @@ jobs:
 
       - name: Commit validated Cube data or health status
         id: publish_cube
-        if: always() && steps.audit.outcome == 'success'
+        if: always() && steps.cube_gate.outputs.should_build == 'true' && steps.audit.outcome == 'success'
         env:
           CUBE_OUTCOME: ${{ steps.cube_builder.outcome }}
         shell: bash
@@ -229,7 +318,7 @@ jobs:
       # gives the next slot back to the normal backlog because its GITHUB_TOKEN
       # data commit will not create a recursive push workflow run.
       - name: Resume normal-set backlog after Cube
-        if: steps.cube_builder.outcome == 'success' && steps.audit.outcome == 'success' && steps.publish_cube.outcome == 'success'
+        if: steps.cube_gate.outputs.should_build == 'true' && steps.cube_builder.outcome == 'success' && steps.audit.outcome == 'success' && steps.publish_cube.outcome == 'success'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -254,13 +343,13 @@ jobs:
             -f earliest=2021-01-01
 
       - name: Surface dataset audit failure
-        if: always() && steps.audit.outcome == 'failure'
+        if: always() && steps.cube_gate.outputs.should_build == 'true' && steps.audit.outcome == 'failure'
         run: |
           echo 'Published dataset health audit failed. No Cube data was published.' >&2
           exit 1
 
       - name: Surface Cube build failure after preserving diagnostics
-        if: always() && steps.cube_builder.outcome == 'failure'
+        if: always() && steps.cube_gate.outputs.should_build == 'true' && steps.cube_builder.outcome == 'failure'
         run: |
           echo 'Powered Cube build failed. Diagnostic report and data/status.json were preserved.' >&2
           exit 1

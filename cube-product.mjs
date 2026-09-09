@@ -14,6 +14,10 @@ function esc(value) {
     .replaceAll("'", '&#039;');
 }
 
+function setText(node, value) {
+  if (node && node.textContent !== value) node.textContent = value;
+}
+
 function freshSeed() {
   return makeGameSeed(globalThis.crypto?.randomUUID ? () => crypto.randomUUID() : null);
 }
@@ -126,10 +130,9 @@ function enhanceCubeGame() {
   const heading = document.querySelector('.game-heading');
   if (heading) {
     const eyebrow = heading.querySelector('.eyebrow');
-    if (eyebrow) {
-      const daily = currentParams().has('daily');
-      eyebrow.textContent = daily ? 'Powered Cube Daily · Pack Run' : 'Powered Cube · Pack Run';
-    }
+    const daily = currentParams().has('daily');
+    setText(eyebrow, daily ? 'Powered Cube Daily · Pack Run' : 'Powered Cube · Pack Run');
+
     const instruction = heading.querySelector('.game-instruction');
     if (instruction && !instruction.dataset.cubeExplained) {
       instruction.dataset.cubeExplained = '1';
@@ -138,17 +141,16 @@ function enhanceCubeGame() {
   }
 
   const poolHeading = document.querySelector('.replay-sidebar .sidebar-card h3');
-  if (poolHeading) poolHeading.textContent = 'Your pool · inherited P1P1 included';
+  setText(poolHeading, 'Your pool · inherited P1P1 included');
+
   const fixedCard = document.querySelector('.replay-sidebar .sidebar-card.quiet');
   if (fixedCard) {
-    const title = fixedCard.querySelector('h3');
-    const copy = fixedCard.querySelector('p');
-    if (title) title.textContent = 'Why Cube starts at P1P2';
-    if (copy) copy.textContent = 'Arena’s Powered Cube logs omit the complete P1P1 pack. Pack One uses the historical first card as your starting pool, then gives you every real, fully observed pack from P1P2 onward. Wheel picks are feedback-only after your path diverges.';
+    setText(fixedCard.querySelector('h3'), 'Why Cube starts at P1P2');
+    setText(fixedCard.querySelector('p'), 'Arena’s Powered Cube logs omit the complete P1P1 pack. Pack One uses the historical first card as your starting pool, then gives you every real, fully observed pack from P1P2 onward. Wheel picks are feedback-only after your path diverges.');
   }
 
   const summaryEyebrow = document.querySelector('.scorecard > .eyebrow');
-  if (summaryEyebrow) summaryEyebrow.textContent = 'Powered Cube Pack Run complete';
+  setText(summaryEyebrow, 'Powered Cube Pack Run complete');
 }
 
 function enhanceLeaderboard() {
@@ -156,9 +158,8 @@ function enhanceLeaderboard() {
   if (!select) return;
   const cube = [...select.options].find((option) => option.value === POWERED_CUBE_ID);
   if (!cube) return;
-  const label = select.closest('label')?.querySelector('span');
-  if (label) label.textContent = 'Environment';
-  cube.textContent = 'Powered Cube';
+  setText(select.closest('label')?.querySelector('span'), 'Environment');
+  setText(cube, 'Powered Cube');
 }
 
 function enhance() {
