@@ -10,6 +10,8 @@ on:
         default: false
   push:
     branches: [main]
+    # Product/UI/tests are covered by normal CI and must not rebuild the
+    # production Cube dataset. Only data-generation or audit code does that.
     paths:
       - 'scripts/import_powered_cube.py'
       - 'scripts/build_powered_cube.py'
@@ -17,17 +19,6 @@ on:
       - 'scripts/powered_cube_shape.py'
       - 'scripts/diagnose_powered_cube_raw.py'
       - 'scripts/audit_datasets.py'
-      - 'cube-product.mjs'
-      - 'leaderboard-product.mjs'
-      - 'practice-product.mjs'
-      - 'bootstrap.mjs'
-      - 'package.json'
-      - 'tests/test_powered_cube_import.py'
-      - 'tests/test_powered_cube_builder.py'
-      - 'tests/test_powered_cube_shape.py'
-      - 'tests/powered-cube.test.mjs'
-      - 'tests/leaderboard-product.test.mjs'
-      - 'tests/practice-product.test.mjs'
 
 permissions:
   contents: write
