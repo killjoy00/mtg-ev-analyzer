@@ -264,6 +264,21 @@
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
       "training_drafts": 5000
+    },
+    {
+      "id": "powered-cube",
+      "name": "Powered Cube",
+      "format": "PremierDraft",
+      "category": "special_mode",
+      "product_mode": "powered-cube",
+      "hide_from_set_picker": true,
+      "manifest_path": "./data/powered-cube/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2025-12-01",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
     }
   ]
 }

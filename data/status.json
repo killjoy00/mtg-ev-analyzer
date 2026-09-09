@@ -21,7 +21,8 @@
     "hob:2026-09-03:300",
     "msh:2026-07-26:300",
     "tmt:2026-04-08:300",
-    "ecl:2026-02-08:300"
+    "ecl:2026-02-08:300",
+    "powered-cube:2025-12-01:300"
   ],
   "datasets": [
     {
@@ -221,6 +222,15 @@
       "replay_count": 300,
       "status": "healthy",
       "warning_codes": []
+    },
+    {
+      "data_date": "2025-12-01",
+      "error_codes": [],
+      "id": "powered-cube",
+      "name": "Powered Cube",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
     }
   ],
   "normal_queue": [
@@ -363,10 +373,10 @@
     "pending": 11
   },
   "overall": "healthy",
-  "published_dataset_count": 22,
+  "published_dataset_count": 23,
   "quality_counts": {
     "error": 0,
-    "healthy": 22,
+    "healthy": 23,
     "warning": 0
   },
   "schema_version": 1,
@@ -374,8 +384,8 @@
     {
       "id": "powered-cube",
       "name": "Powered Cube",
-      "reason": "not yet published",
-      "status": "blocked"
+      "replay_count": 300,
+      "status": "live"
     }
   ]
 }

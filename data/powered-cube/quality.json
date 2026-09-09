@@ -1,0 +1,43 @@
+{
+  "data_date": "2025-12-01",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 103500,
+      "image_metadata_coverage": 0.986,
+      "rarity_metadata_coverage": 0.986,
+      "unique_candidates": 540
+    },
+    "consensus": {
+      "historical_pack_score_p10": 73.92,
+      "historical_pack_score_p50": 84.46,
+      "historical_pack_score_p90": 92.55,
+      "opening_top_support_p10": 0.2,
+      "opening_top_support_p50": 0.3,
+      "opening_top_support_p90": 0.44
+    },
+    "path_model": {
+      "bytes": 4668149,
+      "candidate_card_coverage": 1.0,
+      "cards": 540,
+      "excluded_replay_drafts": 300,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 290187,
+      "present": true
+    },
+    "replays": {
+      "actual": 300,
+      "declared": 300
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 219999,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "Powered Cube",
+  "schema_version": 1,
+  "set_id": "powered-cube",
+  "status": "healthy",
+  "warnings": []
+}
