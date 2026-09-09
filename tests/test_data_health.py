@@ -44,7 +44,7 @@ class DataHealthTests(unittest.TestCase):
             for i in range(8)
         ]
         replays = []
-        for replay_index in range(100):
+        for replay_index in range(300):
             rotated = []
             for i, card in enumerate(cards):
                 clone = dict(card)
@@ -71,22 +71,22 @@ class DataHealthTests(unittest.TestCase):
             "source": {"data_date": "2026-01-01"},
             "cohort": {"training_drafts": 5000, "training_picks": 100000, "win_rate_cutoff": 0.6},
             "model": {"model_version": "strong-player-pool-context-v2"},
-            "replay_count": 100,
-            "shards": [{"path": "./data/abc/shards/000.json", "replay_count": 100}],
+            "replay_count": 300,
+            "shards": [{"path": "./data/abc/shards/000.json", "replay_count": 300}],
         }
         self._write_json(self.root / "data" / "abc" / "manifest.json", manifest)
         self._write_json(self.root / "data" / "abc" / "shards" / "000.json", {"replays": replays})
         self._write_json(self.root / "data" / "abc" / "path-model.json", {
             "model_version": audit_datasets.PATH_MODEL_VERSION,
-            "cards": [f"Card {i}" for i in range(800)],
+            "cards": [f"Card {i}" for i in range(2400)],
             "pairs": [[0, 1, 8, 4] for _ in range(100)],
-            "training": {"excluded_replay_drafts": 100},
+            "training": {"excluded_replay_drafts": 300},
         })
         return {
             "id": "abc",
             "name": "ABC",
             "manifest_path": "./data/abc/manifest.json",
-            "replay_count": 100,
+            "replay_count": 300,
             "data_date": "2026-01-01",
             "is_fixture": False,
         }
@@ -95,9 +95,9 @@ class DataHealthTests(unittest.TestCase):
         entry = self._healthy_fixture()
         report = audit_datasets.audit_dataset(entry)
         self.assertEqual(report["status"], "healthy")
-        self.assertEqual(report["metrics"]["replays"]["actual"], 100)
+        self.assertEqual(report["metrics"]["replays"]["actual"], 300)
         self.assertEqual(report["metrics"]["cards"]["image_metadata_coverage"], 1.0)
-        self.assertEqual(report["metrics"]["path_model"]["cards"], 800)
+        self.assertEqual(report["metrics"]["path_model"]["cards"], 2400)
         self.assertEqual(report["errors"], [])
 
     def test_status_tracks_live_pending_and_blocked_queue_entries(self):
