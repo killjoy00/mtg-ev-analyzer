@@ -2,6 +2,42 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "snc",
+      "name": "SNC",
+      "format": "PremierDraft",
+      "manifest_path": "./data/snc/manifest.json",
+      "replay_count": 296,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2022-07-07",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "hbg",
+      "name": "HBG",
+      "format": "PremierDraft",
+      "manifest_path": "./data/hbg/manifest.json",
+      "replay_count": 295,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2022-07-29",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.62,
+      "training_drafts": 3048
+    },
+    {
+      "id": "dmu",
+      "name": "DMU",
+      "format": "PremierDraft",
+      "manifest_path": "./data/dmu/manifest.json",
+      "replay_count": 297,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2022-10-28",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.62,
+      "training_drafts": 5000
+    },
+    {
       "id": "bro",
       "name": "BRO",
       "format": "PremierDraft",

@@ -1,0 +1,43 @@
+{
+  "data_date": "2022-07-07",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 93120,
+      "image_metadata_coverage": 1.0,
+      "rarity_metadata_coverage": 1.0,
+      "unique_candidates": 261
+    },
+    "consensus": {
+      "historical_pack_score_p10": 75.74,
+      "historical_pack_score_p50": 87.39,
+      "historical_pack_score_p90": 95.11,
+      "opening_top_support_p10": 0.32,
+      "opening_top_support_p50": 0.48,
+      "opening_top_support_p90": 0.7
+    },
+    "path_model": {
+      "bytes": 1015143,
+      "candidate_card_coverage": 1.0,
+      "cards": 261,
+      "excluded_replay_drafts": 296,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 61841,
+      "present": true
+    },
+    "replays": {
+      "actual": 296,
+      "declared": 296
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 205897,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "SNC",
+  "schema_version": 1,
+  "set_id": "snc",
+  "status": "healthy",
+  "warnings": []
+}

@@ -1,0 +1,43 @@
+{
+  "data_date": "2022-10-28",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 93534,
+      "image_metadata_coverage": 1.0,
+      "rarity_metadata_coverage": 1.0,
+      "unique_candidates": 261
+    },
+    "consensus": {
+      "historical_pack_score_p10": 74.66,
+      "historical_pack_score_p50": 86.3,
+      "historical_pack_score_p90": 93.73,
+      "opening_top_support_p10": 0.33,
+      "opening_top_support_p50": 0.52,
+      "opening_top_support_p90": 0.72
+    },
+    "path_model": {
+      "bytes": 1026789,
+      "candidate_card_coverage": 1.0,
+      "cards": 261,
+      "excluded_replay_drafts": 297,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 62433,
+      "present": true
+    },
+    "replays": {
+      "actual": 297,
+      "declared": 297
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 208694,
+      "win_rate_cutoff": 0.62
+    }
+  },
+  "name": "DMU",
+  "schema_version": 1,
+  "set_id": "dmu",
+  "status": "healthy",
+  "warnings": []
+}

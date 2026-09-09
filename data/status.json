@@ -1,5 +1,8 @@
 {
   "catalog_signature": [
+    "snc:2022-07-07:296",
+    "hbg:2022-07-29:295",
+    "dmu:2022-10-28:297",
     "bro:2022-12-15:297",
     "one:2023-03-01:297",
     "sir:2023-04-21:300",
@@ -28,6 +31,33 @@
     "powered-cube:2025-12-01:300"
   ],
   "datasets": [
+    {
+      "data_date": "2022-07-07",
+      "error_codes": [],
+      "id": "snc",
+      "name": "SNC",
+      "replay_count": 296,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2022-07-29",
+      "error_codes": [],
+      "id": "hbg",
+      "name": "HBG",
+      "replay_count": 295,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2022-10-28",
+      "error_codes": [],
+      "id": "dmu",
+      "name": "DMU",
+      "replay_count": 297,
+      "status": "healthy",
+      "warning_codes": []
+    },
     {
       "data_date": "2022-12-15",
       "error_codes": [],
@@ -366,15 +396,15 @@
     },
     {
       "code": "DMU",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "HBG",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "SNC",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "NEO",
@@ -399,14 +429,14 @@
   ],
   "normal_queue_counts": {
     "blocked": 0,
-    "live": 25,
-    "pending": 8
+    "live": 28,
+    "pending": 5
   },
   "overall": "healthy",
-  "published_dataset_count": 26,
+  "published_dataset_count": 29,
   "quality_counts": {
     "error": 0,
-    "healthy": 26,
+    "healthy": 29,
     "warning": 0
   },
   "schema_version": 1,
