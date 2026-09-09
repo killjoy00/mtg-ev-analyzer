@@ -17,3 +17,5 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm test
+      - name: Audit checked-in production datasets
+        run: python scripts/audit_datasets.py --fail-on-error
