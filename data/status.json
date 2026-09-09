@@ -1,5 +1,8 @@
 {
   "catalog_signature": [
+    "mom:2023-06-14:297",
+    "ltr:2023-08-30:299",
+    "woe:2023-10-18:296",
     "lci:2023-12-27:294",
     "ktk:2024-01-18:298",
     "mkm:2024-03-20:298",
@@ -21,6 +24,33 @@
     "ecl:2026-02-08:300"
   ],
   "datasets": [
+    {
+      "data_date": "2023-06-14",
+      "error_codes": [],
+      "id": "mom",
+      "name": "MOM",
+      "replay_count": 297,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2023-08-30",
+      "error_codes": [],
+      "id": "ltr",
+      "name": "LTR",
+      "replay_count": 299,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2023-10-18",
+      "error_codes": [],
+      "id": "woe",
+      "name": "WOE",
+      "replay_count": 296,
+      "status": "healthy",
+      "warning_codes": []
+    },
     {
       "data_date": "2023-12-27",
       "error_codes": [],
@@ -272,15 +302,15 @@
     },
     {
       "code": "WOE",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "LTR",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "MOM",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "SIR",
@@ -329,14 +359,14 @@
   ],
   "normal_queue_counts": {
     "blocked": 0,
-    "live": 19,
-    "pending": 14
+    "live": 22,
+    "pending": 11
   },
   "overall": "healthy",
-  "published_dataset_count": 19,
+  "published_dataset_count": 22,
   "quality_counts": {
     "error": 0,
-    "healthy": 19,
+    "healthy": 22,
     "warning": 0
   },
   "schema_version": 1,

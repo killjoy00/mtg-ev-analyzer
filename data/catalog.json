@@ -2,6 +2,42 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "mom",
+      "name": "MOM",
+      "format": "PremierDraft",
+      "manifest_path": "./data/mom/manifest.json",
+      "replay_count": 297,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2023-06-14",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "ltr",
+      "name": "LTR",
+      "format": "PremierDraft",
+      "manifest_path": "./data/ltr/manifest.json",
+      "replay_count": 299,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2023-08-30",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "woe",
+      "name": "WOE",
+      "format": "PremierDraft",
+      "manifest_path": "./data/woe/manifest.json",
+      "replay_count": 296,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2023-10-18",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
       "id": "lci",
       "name": "LCI",
       "format": "PremierDraft",

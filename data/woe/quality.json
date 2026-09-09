@@ -1,0 +1,43 @@
+{
+  "data_date": "2023-10-18",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 93213,
+      "image_metadata_coverage": 0.9949,
+      "rarity_metadata_coverage": 0.9949,
+      "unique_candidates": 324
+    },
+    "consensus": {
+      "historical_pack_score_p10": 77.87,
+      "historical_pack_score_p50": 87.6,
+      "historical_pack_score_p90": 95.55,
+      "opening_top_support_p10": 0.33,
+      "opening_top_support_p50": 0.51,
+      "opening_top_support_p90": 0.73
+    },
+    "path_model": {
+      "bytes": 1449205,
+      "candidate_card_coverage": 1.0,
+      "cards": 324,
+      "excluded_replay_drafts": 296,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 89721,
+      "present": true
+    },
+    "replays": {
+      "actual": 296,
+      "declared": 296
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 206585,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "WOE",
+  "schema_version": 1,
+  "set_id": "woe",
+  "status": "healthy",
+  "warnings": []
+}
