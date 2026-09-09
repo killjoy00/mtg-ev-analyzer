@@ -9,6 +9,17 @@ CUBE = ROOT / ".github" / "workflows" / "build-powered-cube.yml"
 
 
 class DataPipelineWorkflowTests(unittest.TestCase):
+    def test_backlog_routes_before_shared_lock(self):
+        text = BACKLOG.read_text()
+        route = text.index("  route:")
+        import_job = text.index("  import-sets:")
+        lock = text.index("    concurrency:")
+        self.assertLess(route, import_job)
+        self.assertLess(import_job, lock)
+        self.assertIn("should_import", text)
+        self.assertIn("backlog will not enter the shared catalog lock", text)
+        self.assertIn("Cube already has", text)
+
     def test_backlog_fast_forwards_after_shared_lock(self):
         text = BACKLOG.read_text()
         self.assertIn("Fast-forward to latest main under import lock", text)
@@ -24,7 +35,7 @@ class DataPipelineWorkflowTests(unittest.TestCase):
 
     def test_backlog_yields_to_unpublished_cube(self):
         text = BACKLOG.read_text()
-        self.assertIn("Powered Cube is not live; yielding the next catalog slot to Cube", text)
+        self.assertIn("Powered Cube is not live; backlog will not enter the shared catalog lock", text)
         self.assertIn("gh workflow run build-powered-cube.yml", text)
         cube_dispatch = text.index("gh workflow run build-powered-cube.yml")
         backlog_dispatch = text.index("gh workflow run build-more-sets.yml")
