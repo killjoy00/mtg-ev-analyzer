@@ -48,6 +48,17 @@ export function practiceLaunchUrl({ origin = 'https://magic.planitnow.us/', setI
   return url.toString();
 }
 
+function placePracticeSelector(select) {
+  const bar = select.closest('.set-bar');
+  const section = document.querySelector('.mode-section');
+  const heading = section?.querySelector('.mode-section-heading');
+  if (!bar || !section || !heading) return;
+  bar.classList.add('practice-set-bar');
+  if (bar.parentElement !== section || heading.nextElementSibling !== bar) {
+    heading.insertAdjacentElement('afterend', bar);
+  }
+}
+
 function updateHomeCopy(select) {
   const featured = featuredOption(select);
   if (!featured) return;
@@ -67,8 +78,8 @@ function updateHomeCopy(select) {
   const featuredName = featured.dataset.practiceOriginalLabel || featured.textContent;
   const meta = document.querySelector('#set-meta');
   const metaCopy = selected.value === featured.value
-    ? `Default practice follows the featured environment (${featuredName}). Choose another set here to lock practice to it.`
-    : `Set Practice locked to ${selectedName}. Daily Challenge still uses featured ${featuredName}.`;
+    ? `Use the featured environment, or choose one set to stay locked there for Set Practice.`
+    : `Set Practice locked to ${selectedName}. Change this only when you want a different practice environment.`;
   setText(meta, metaCopy);
 
   const daily = document.querySelector('#daily-challenge .daily-kicker');
@@ -82,8 +93,8 @@ function updateHomeCopy(select) {
 
   const practiceHeading = document.querySelector('.mode-section-heading > p');
   const practiceCopy = selected.value === featured.value
-    ? 'Unlimited practice in the featured environment. Choose a set above only when you want focused Set Practice.'
-    : `Unlimited practice locked to ${selectedName}. Change the Practice set above when you want a different environment.`;
+    ? 'Unlimited practice. Leave the featured set selected, or lock practice to one environment below.'
+    : `Unlimited practice locked to ${selectedName}.`;
   setText(practiceHeading, practiceCopy);
 }
 
@@ -97,6 +108,7 @@ function enhanceHome() {
     const selected = readPracticeSet(select);
     if (selected && select.value !== selected) select.value = selected;
   }
+  placePracticeSelector(select);
   updateHomeCopy(select);
 }
 
