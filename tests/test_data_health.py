@@ -32,11 +32,12 @@ class DataHealthTests(unittest.TestCase):
         path.write_text(json.dumps(payload), encoding="utf-8")
 
     def _healthy_fixture(self):
+        probabilities = [0.20, 0.15, 0.13, 0.12, 0.11, 0.10, 0.10, 0.09]
         cards = [
             {
                 "id": f"card-{i}",
                 "name": f"Card {i}",
-                "model_probability": 0.125,
+                "model_probability": probabilities[i],
                 "image_url": f"https://example.invalid/{i}.jpg",
                 "rarity": "common",
             }
@@ -55,7 +56,7 @@ class DataHealthTests(unittest.TestCase):
                 "picks": [{
                     "pack_number": 1,
                     "pick_number": 1,
-                    "historical_pick_id": rotated[0]["id"],
+                    "historical_pick_id": rotated[1]["id"],
                     "consensus_pick_id": rotated[0]["id"],
                     "pool": {},
                     "candidates": rotated,
