@@ -2,6 +2,18 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "neo",
+      "name": "NEO",
+      "format": "PremierDraft",
+      "manifest_path": "./data/neo/manifest.json",
+      "replay_count": 296,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2022-03-13",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
       "id": "snc",
       "name": "SNC",
       "format": "PremierDraft",

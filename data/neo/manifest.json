@@ -1,0 +1,624 @@
+{
+  "schema_version": 2,
+  "set_id": "neo",
+  "name": "NEO",
+  "format": "PremierDraft",
+  "is_fixture": false,
+  "source": {
+    "provider": "17Lands",
+    "dataset_kind": "draft_data",
+    "data_date": "2022-03-13",
+    "license": "CC BY 4.0 unless otherwise noted by 17Lands"
+  },
+  "cohort": {
+    "definition": "experienced drafts in top 15% of parsed 17Lands user win-rate buckets",
+    "minimum_games_bucket_lower_bound": 100,
+    "win_rate_cutoff": 0.6,
+    "experienced_drafts": 65553,
+    "training_drafts": 5000,
+    "training_picks": 223264
+  },
+  "model": {
+    "model_version": "strong-player-pool-context-v2",
+    "holdout": "5-fold by draft_id",
+    "probabilities_are_calibrated": false,
+    "description": "Hierarchical strong-player pick tendency adjusted by shrinkage-weighted card/pool co-pick lift; normalized within each pack.",
+    "pool_conditioned": true
+  },
+  "replay_count": 296,
+  "shard_size": 2,
+  "shards": [
+    {
+      "path": "./data/neo/shards/000.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/001.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/002.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/003.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/004.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/005.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/006.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/007.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/008.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/009.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/010.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/011.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/012.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/013.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/014.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/015.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/016.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/017.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/018.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/019.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/020.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/021.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/022.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/023.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/024.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/025.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/026.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/027.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/028.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/029.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/030.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/031.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/032.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/033.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/034.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/035.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/036.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/037.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/038.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/039.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/040.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/041.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/042.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/043.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/044.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/045.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/046.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/047.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/048.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/049.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/050.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/051.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/052.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/053.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/054.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/055.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/056.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/057.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/058.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/059.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/060.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/061.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/062.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/063.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/064.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/065.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/066.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/067.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/068.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/069.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/070.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/071.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/072.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/073.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/074.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/075.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/076.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/077.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/078.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/079.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/080.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/081.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/082.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/083.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/084.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/085.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/086.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/087.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/088.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/089.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/090.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/091.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/092.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/093.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/094.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/095.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/096.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/097.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/098.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/099.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/100.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/101.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/102.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/103.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/104.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/105.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/106.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/107.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/108.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/109.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/110.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/111.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/112.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/113.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/114.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/115.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/116.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/117.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/118.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/119.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/120.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/121.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/122.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/123.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/124.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/125.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/126.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/127.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/128.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/129.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/130.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/131.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/132.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/133.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/134.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/135.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/136.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/137.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/138.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/139.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/140.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/141.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/142.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/143.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/144.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/145.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/146.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/neo/shards/147.json",
+      "replay_count": 2
+    }
+  ]
+}
