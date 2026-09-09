@@ -218,13 +218,17 @@ try {
   // Powered Cube is a separate Full mode and never exposes Top 3.
   await home();
   if (await page.locator('[data-powered-cube-section="1"]').count()) {
-    assert.equal(await page.locator('[data-cube-mode="top3"]').count(), 0);
-    assert.equal(await page.locator('[data-cube-mode="full"]').count(), 1);
-    await page.locator('[data-cube-mode="full"]').click();
+    const cubeLaunchers = page.locator('[data-powered-cube-section="1"] [data-cube-href]');
+    assert.equal(await cubeLaunchers.count(), 2);
+    const cubeHrefs = await cubeLaunchers.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-cube-href')));
+    assert.ok(cubeHrefs.every((href) => href && new URL(href).searchParams.get('mode') === 'full'));
+    assert.ok(cubeHrefs.every((href) => href && new URL(href).searchParams.get('set') === 'powered-cube'));
+    await page.getByRole('button', { name: 'New Cube Run', exact: true }).click();
     await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
     const cubeUrl = new URL(page.url());
     assert.equal(cubeUrl.searchParams.get('set'), 'powered-cube');
     assert.equal(cubeUrl.searchParams.get('mode'), 'full');
+    assert.ok(cubeUrl.searchParams.get('seed'));
   }
 
   assert.ok(capturedEvents.length > 0, 'expected at least one analytics event');
