@@ -32,15 +32,17 @@ on:
       - 'scripts/build_path_model.py'
       - 'scripts/fetch_card_metadata.py'
       - 'scripts/validate_dataset.py'
+      - 'scripts/audit_datasets.py'
       - 'tests/test_import_sets.py'
+      - 'tests/test_data_health.py'
   schedule:
     - cron: '17 10 * * *'
 
 permissions:
   contents: write
 
-# Powered Cube shares this lock because both workflows can publish catalog.json.
-# This lets normal-set backfill continue without risking a lost catalog update.
+# Powered Cube's data-producing job shares this lock because both workflows can
+# publish catalog.json. Read-only Cube preflight diagnostics do not need it.
 concurrency:
   group: set-data-import-${{ github.ref }}
   cancel-in-progress: false
@@ -91,6 +93,18 @@ jobs:
           fi
           python scripts/import_sets.py "${args[@]}"
 
+      - name: Audit datasets and refresh data health
+        id: audit
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          args=(--fail-on-error)
+          if [[ -f generated/import-report.json ]]; then
+            args+=(--import-report generated/import-report.json)
+          fi
+          python scripts/audit_datasets.py "${args[@]}"
+
       - name: Publish import report to job summary
         if: always()
         shell: bash
@@ -101,24 +115,32 @@ jobs:
             cat generated/import-report.json >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
+          if [[ -f data/status.json ]]; then
+            echo '## Data health' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat data/status.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload import report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: set-import-report-${{ github.run_id }}
-          path: generated/import-report.json
+          path: |
+            generated/import-report.json
+            data/status.json
           retention-days: 30
           if-no-files-found: ignore
 
       - name: Commit successful imports
-        if: always()
+        if: always() && steps.audit.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/catalog.json data/
+          git add data/catalog.json data/status.json data/
           if git diff --cached --quiet; then
             echo 'No generated set data changed. Queue chain stops here.'
             exit 0
@@ -136,8 +158,14 @@ jobs:
           echo 'Could not publish generated set data after three attempts.' >&2
           exit 1
 
-      - name: Surface importer failure after preserving successful sets
-        if: steps.importer.outcome == 'failure'
+      - name: Surface data-health gate failure
+        if: always() && steps.audit.outcome == 'failure'
         run: |
-          echo 'One or more queued sets failed. Successful sets were committed and the next catalog-triggered batch can continue past the failure; see the import report artifact.' >&2
+          echo 'Dataset health audit failed. Newly generated data was not published.' >&2
+          exit 1
+
+      - name: Surface importer failure after preserving successful sets
+        if: steps.importer.outcome == 'failure' && steps.audit.outcome == 'success'
+        run: |
+          echo 'One or more queued sets failed. Healthy successful sets were committed and the next catalog-triggered batch can continue past the failure; see the import report artifact.' >&2
           exit 1

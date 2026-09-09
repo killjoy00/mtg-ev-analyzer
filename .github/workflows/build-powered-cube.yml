@@ -7,24 +7,65 @@ on:
     paths:
       - '.github/workflows/build-powered-cube.yml'
       - 'scripts/import_powered_cube.py'
+      - 'scripts/build_powered_cube.py'
+      - 'scripts/diagnose_powered_cube_raw.py'
+      - 'scripts/audit_datasets.py'
       - 'cube-product.mjs'
+      - 'leaderboard-product.mjs'
       - 'bootstrap.mjs'
       - 'package.json'
       - 'tests/test_powered_cube_import.py'
+      - 'tests/test_powered_cube_builder.py'
       - 'tests/powered-cube.test.mjs'
+      - 'tests/leaderboard-product.test.mjs'
 
 permissions:
   contents: write
 
-# Share the normal set import lock. Both workflows can update data/catalog.json.
-concurrency:
-  group: set-data-import-${{ github.ref }}
-  cancel-in-progress: false
-
 jobs:
+  cube-preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Inspect raw Powered Cube shape
+        run: >-
+          python scripts/diagnose_powered_cube_raw.py
+          --minimum-replays 100
+          --minimum-first-visible-candidates 14
+
+      - name: Publish preflight report
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f generated/powered-cube-preflight.json ]]; then
+            echo '## Powered Cube raw preflight' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat generated/powered-cube-preflight.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload preflight report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: powered-cube-preflight-${{ github.run_id }}
+          path: generated/powered-cube-preflight.json
+          retention-days: 30
+          if-no-files-found: ignore
+
   powered-cube:
+    needs: cube-preflight
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    # Only the data-producing job needs the shared catalog lock. The cheap raw
+    # preflight above can run while normal-set imports are using the catalog.
+    concurrency:
+      group: set-data-import-${{ github.ref }}
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
         with:
@@ -40,8 +81,10 @@ jobs:
         run: npm test
 
       - name: Build and validate Powered Cube
+        id: cube_builder
+        continue-on-error: true
         run: >-
-          python scripts/import_powered_cube.py
+          python scripts/build_powered_cube.py
           --max-training-drafts 5000
           --max-output-candidates 1200
           --target-replays 300
@@ -49,6 +92,18 @@ jobs:
           --minimum-first-visible-candidates 14
           --shard-size 2
           --max-path-bytes 8000000
+
+      - name: Audit published datasets and refresh health status
+        id: audit
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          args=(--fail-on-error)
+          if [[ -f generated/powered-cube-report.json ]]; then
+            args+=(--cube-report generated/powered-cube-report.json)
+          fi
+          python scripts/audit_datasets.py "${args[@]}"
 
       - name: Publish build report to job summary
         if: always()
@@ -60,29 +115,53 @@ jobs:
             cat generated/powered-cube-report.json >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
+          if [[ -f data/status.json ]]; then
+            echo '## Data health' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat data/status.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
 
       - name: Upload build report
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: powered-cube-report-${{ github.run_id }}
-          path: generated/powered-cube-report.json
+          path: |
+            generated/powered-cube-report.json
+            data/status.json
           retention-days: 30
           if-no-files-found: ignore
 
-      - name: Commit validated Cube data
+      - name: Commit validated Cube data or health status
+        if: always() && steps.audit.outcome == 'success'
+        env:
+          CUBE_OUTCOME: ${{ steps.cube_builder.outcome }}
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/catalog.json data/powered-cube/
+
+          git add data/status.json
+          find data -mindepth 2 -maxdepth 2 -name quality.json -print0 | xargs -0 -r git add --
+
+          if [[ "$CUBE_OUTCOME" == 'success' ]]; then
+            git add data/catalog.json data/powered-cube/
+            message='Build Powered Cube mode [data-generated]'
+          else
+            # Never let an invalid partial Cube output into the repository.
+            git reset -- data/powered-cube/ >/dev/null 2>&1 || true
+            rm -rf data/powered-cube
+            message='Refresh Pack One data health [data-generated]'
+          fi
+
           if git diff --cached --quiet; then
-            echo 'Powered Cube data is already current.'
+            echo 'Cube/data-health outputs are already current.'
             exit 0
           fi
 
-          git commit -m 'Build Powered Cube mode [data-generated]'
+          git commit -m "$message"
           for attempt in 1 2 3; do
             echo "Publish attempt ${attempt}/3"
             if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
@@ -91,5 +170,17 @@ jobs:
             git rebase --abort >/dev/null 2>&1 || true
             sleep $((attempt * 5))
           done
-          echo 'Could not publish Powered Cube data after three attempts.' >&2
+          echo 'Could not publish Cube/data-health outputs after three attempts.' >&2
+          exit 1
+
+      - name: Surface dataset audit failure
+        if: always() && steps.audit.outcome == 'failure'
+        run: |
+          echo 'Published dataset health audit failed. No Cube data was published.' >&2
+          exit 1
+
+      - name: Surface Cube build failure after preserving diagnostics
+        if: always() && steps.cube_builder.outcome == 'failure'
+        run: |
+          echo 'Powered Cube build failed. Diagnostic report and data/status.json were preserved.' >&2
           exit 1
