@@ -1,0 +1,43 @@
+{
+  "data_date": "2023-12-27",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 105807,
+      "image_metadata_coverage": 1.0,
+      "rarity_metadata_coverage": 1.0,
+      "unique_candidates": 291
+    },
+    "consensus": {
+      "historical_pack_score_p10": 75.01,
+      "historical_pack_score_p50": 86.65,
+      "historical_pack_score_p90": 95.02,
+      "opening_top_support_p10": 0.35,
+      "opening_top_support_p50": 0.55,
+      "opening_top_support_p90": 0.76
+    },
+    "path_model": {
+      "bytes": 1276177,
+      "candidate_card_coverage": 1.0,
+      "cards": 291,
+      "excluded_replay_drafts": 294,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 77366,
+      "present": true
+    },
+    "replays": {
+      "actual": 294,
+      "declared": 294
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 223424,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "LCI",
+  "schema_version": 1,
+  "set_id": "lci",
+  "status": "healthy",
+  "warnings": []
+}

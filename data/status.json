@@ -1,5 +1,8 @@
 {
   "catalog_signature": [
+    "lci:2023-12-27:294",
+    "ktk:2024-01-18:298",
+    "mkm:2024-03-20:298",
     "otj:2024-06-27:299",
     "mh3:2024-07-17:299",
     "blb:2024-10-08:297",
@@ -18,6 +21,33 @@
     "ecl:2026-02-08:300"
   ],
   "datasets": [
+    {
+      "data_date": "2023-12-27",
+      "error_codes": [],
+      "id": "lci",
+      "name": "LCI",
+      "replay_count": 294,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2024-01-18",
+      "error_codes": [],
+      "id": "ktk",
+      "name": "KTK",
+      "replay_count": 298,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2024-03-20",
+      "error_codes": [],
+      "id": "mkm",
+      "name": "MKM",
+      "replay_count": 298,
+      "status": "healthy",
+      "warning_codes": []
+    },
     {
       "data_date": "2024-06-27",
       "error_codes": [],
@@ -230,15 +260,15 @@
     },
     {
       "code": "MKM",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "KTK",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "LCI",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "WOE",
@@ -299,14 +329,14 @@
   ],
   "normal_queue_counts": {
     "blocked": 0,
-    "live": 16,
-    "pending": 17
+    "live": 19,
+    "pending": 14
   },
   "overall": "healthy",
-  "published_dataset_count": 16,
+  "published_dataset_count": 19,
   "quality_counts": {
     "error": 0,
-    "healthy": 16,
+    "healthy": 19,
     "warning": 0
   },
   "schema_version": 1,

@@ -1,0 +1,43 @@
+{
+  "data_date": "2024-01-18",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 93782,
+      "image_metadata_coverage": 1.0,
+      "rarity_metadata_coverage": 1.0,
+      "unique_candidates": 249
+    },
+    "consensus": {
+      "historical_pack_score_p10": 77.91,
+      "historical_pack_score_p50": 87.31,
+      "historical_pack_score_p90": 95.84,
+      "opening_top_support_p10": 0.32,
+      "opening_top_support_p50": 0.48,
+      "opening_top_support_p90": 0.66
+    },
+    "path_model": {
+      "bytes": 875092,
+      "candidate_card_coverage": 1.0,
+      "cards": 249,
+      "excluded_replay_drafts": 298,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 54678,
+      "present": true
+    },
+    "replays": {
+      "actual": 298,
+      "declared": 298
+    },
+    "training": {
+      "drafts": 2548,
+      "picks": 106502,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "KTK",
+  "schema_version": 1,
+  "set_id": "ktk",
+  "status": "healthy",
+  "warnings": []
+}
