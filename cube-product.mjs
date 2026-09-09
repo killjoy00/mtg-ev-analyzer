@@ -104,12 +104,11 @@ function enhanceHome() {
   const wasCubeSelected = select.value === POWERED_CUBE_ID;
   if (!isLaunchingCube()) {
     cubeOption.remove();
-    // Returning Home from a Cube game leaves app.js pointed at the Cube dataset.
-    // Fire the existing set-change handler once so ordinary Set Draft buttons
-    // cannot accidentally start another Cube game.
-    if (wasCubeSelected && select.options.length) {
-      select.value = select.options[0].value;
-      select.dispatchEvent(new Event('change', { bubbles: true }));
+    // A Cube result can return through app.js with its dataset still selected.
+    // Reconstruct Home from a clean URL instead of mutating the practice-only
+    // set control; the clean load restores the featured expansion deterministically.
+    if (wasCubeSelected) {
+      window.location.replace(homeOrigin());
       return;
     }
   }
@@ -159,8 +158,6 @@ function enhanceLeaderboard() {
   if (!cube) return;
   const label = select.closest('label')?.querySelector('span');
   if (label) label.textContent = 'Environment';
-  const all = [...select.options].find((option) => option.value === 'all');
-  if (all) all.textContent = 'All standard sets';
   cube.textContent = 'Powered Cube';
 }
 
