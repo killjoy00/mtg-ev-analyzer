@@ -17,10 +17,18 @@ class DataPipelineWorkflowTests(unittest.TestCase):
     def test_backlog_explicitly_dispatches_next_batch(self):
         text = BACKLOG.read_text()
         self.assertIn("actions: write", text)
-        self.assertIn("Continue normal-set backlog", text)
+        self.assertIn("Continue data migration", text)
         self.assertIn("gh workflow run build-more-sets.yml", text)
         self.assertIn("normal_queue_counts", text)
         self.assertIn("pending", text)
+
+    def test_backlog_yields_to_unpublished_cube(self):
+        text = BACKLOG.read_text()
+        self.assertIn("Powered Cube is not live; yielding the next catalog slot to Cube", text)
+        self.assertIn("gh workflow run build-powered-cube.yml", text)
+        cube_dispatch = text.index("gh workflow run build-powered-cube.yml")
+        backlog_dispatch = text.index("gh workflow run build-more-sets.yml")
+        self.assertLess(cube_dispatch, backlog_dispatch)
 
     def test_cube_fast_forwards_after_shared_lock(self):
         text = CUBE.read_text()
@@ -37,6 +45,13 @@ class DataPipelineWorkflowTests(unittest.TestCase):
         self.assertLess(rebase, audit)
         self.assertLess(audit, stage_status)
         self.assertLess(stage_status, amend)
+
+    def test_cube_hands_control_back_to_backlog(self):
+        text = CUBE.read_text()
+        self.assertIn("actions: write", text)
+        self.assertIn("Resume normal-set backlog after Cube", text)
+        self.assertIn("Powered Cube is live; returning the shared catalog slot", text)
+        self.assertIn("gh workflow run build-more-sets.yml", text)
 
 
 if __name__ == "__main__":
