@@ -1,0 +1,43 @@
+{
+  "data_date": "2025-07-19",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 94500,
+      "image_metadata_coverage": 0.9825,
+      "rarity_metadata_coverage": 0.9825,
+      "unique_candidates": 361
+    },
+    "consensus": {
+      "historical_pack_score_p10": 75.11,
+      "historical_pack_score_p50": 87.02,
+      "historical_pack_score_p90": 94.7,
+      "opening_top_support_p10": 0.28,
+      "opening_top_support_p50": 0.42,
+      "opening_top_support_p90": 0.67
+    },
+    "path_model": {
+      "bytes": 1656320,
+      "candidate_card_coverage": 1.0,
+      "cards": 362,
+      "excluded_replay_drafts": 300,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 102664,
+      "present": true
+    },
+    "replays": {
+      "actual": 300,
+      "declared": 300
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 210000,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "FIN",
+  "schema_version": 1,
+  "set_id": "fin",
+  "status": "healthy",
+  "warnings": []
+}

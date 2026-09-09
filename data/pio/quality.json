@@ -1,0 +1,43 @@
+{
+  "data_date": "2025-01-15",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 107512,
+      "image_metadata_coverage": 1.0,
+      "rarity_metadata_coverage": 1.0,
+      "unique_candidates": 398
+    },
+    "consensus": {
+      "historical_pack_score_p10": 72.07,
+      "historical_pack_score_p50": 84.11,
+      "historical_pack_score_p90": 92.79,
+      "opening_top_support_p10": 0.28,
+      "opening_top_support_p50": 0.4,
+      "opening_top_support_p90": 0.56
+    },
+    "path_model": {
+      "bytes": 1902477,
+      "candidate_card_coverage": 1.0,
+      "cards": 398,
+      "excluded_replay_drafts": 299,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 118483,
+      "present": true
+    },
+    "replays": {
+      "actual": 299,
+      "declared": 299
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 222825,
+      "win_rate_cutoff": 0.62
+    }
+  },
+  "name": "PIO",
+  "schema_version": 1,
+  "set_id": "pio",
+  "status": "healthy",
+  "warnings": []
+}

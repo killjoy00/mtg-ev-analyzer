@@ -2,6 +2,42 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "dsk",
+      "name": "DSK",
+      "format": "PremierDraft",
+      "manifest_path": "./data/dsk/manifest.json",
+      "replay_count": 299,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2024-10-30",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "fdn",
+      "name": "FDN",
+      "format": "PremierDraft",
+      "manifest_path": "./data/fdn/manifest.json",
+      "replay_count": 298,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2024-12-19",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "pio",
+      "name": "PIO",
+      "format": "PremierDraft",
+      "manifest_path": "./data/pio/manifest.json",
+      "replay_count": 299,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2025-01-15",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.62,
+      "training_drafts": 5000
+    },
+    {
       "id": "dft",
       "name": "DFT",
       "format": "PremierDraft",

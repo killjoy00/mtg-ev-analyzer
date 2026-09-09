@@ -1,0 +1,43 @@
+{
+  "data_date": "2025-05-20",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 94486,
+      "image_metadata_coverage": 0.9994,
+      "rarity_metadata_coverage": 0.9994,
+      "unique_candidates": 286
+    },
+    "consensus": {
+      "historical_pack_score_p10": 75.18,
+      "historical_pack_score_p50": 86.31,
+      "historical_pack_score_p90": 94.83,
+      "opening_top_support_p10": 0.33,
+      "opening_top_support_p50": 0.47,
+      "opening_top_support_p90": 0.68
+    },
+    "path_model": {
+      "bytes": 1228666,
+      "candidate_card_coverage": 1.0,
+      "cards": 286,
+      "excluded_replay_drafts": 300,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 74863,
+      "present": true
+    },
+    "replays": {
+      "actual": 300,
+      "declared": 300
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 210000,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "TDM",
+  "schema_version": 1,
+  "set_id": "tdm",
+  "status": "healthy",
+  "warnings": []
+}

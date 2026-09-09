@@ -1,0 +1,78 @@
+{
+  "data_date": "2026-06-02",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 94500,
+      "image_metadata_coverage": 0.9324,
+      "rarity_metadata_coverage": 0.9324,
+      "unique_candidates": 346
+    },
+    "consensus": {
+      "historical_pack_score_p10": 73.73,
+      "historical_pack_score_p50": 86.52,
+      "historical_pack_score_p90": 95.27,
+      "opening_top_support_p10": 0.29,
+      "opening_top_support_p50": 0.49,
+      "opening_top_support_p90": 0.7
+    },
+    "path_model": {
+      "bytes": 1631020,
+      "candidate_card_coverage": 1.0,
+      "cards": 346,
+      "excluded_replay_drafts": 300,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 100553,
+      "present": true
+    },
+    "replays": {
+      "actual": 300,
+      "declared": 300
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 210000,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "SOS",
+  "schema_version": 1,
+  "set_id": "sos",
+  "status": "warning",
+  "warnings": [
+    {
+      "code": "image_metadata_coverage",
+      "details": {
+        "coverage": 0.9324,
+        "examples": [
+          "Abrade",
+          "Ad Nauseam",
+          "Adrix and Nev, Twincasters",
+          "Akroma's Will",
+          "Angel's Grace",
+          "Archaeomancer",
+          "Archmage Emeritus",
+          "Armageddon"
+        ]
+      },
+      "message": "Card image metadata coverage is below 95%."
+    },
+    {
+      "code": "rarity_metadata_coverage",
+      "details": {
+        "coverage": 0.9324,
+        "examples": [
+          "Abrade",
+          "Ad Nauseam",
+          "Adrix and Nev, Twincasters",
+          "Akroma's Will",
+          "Angel's Grace",
+          "Archaeomancer",
+          "Archmage Emeritus",
+          "Armageddon"
+        ]
+      },
+      "message": "Card rarity metadata coverage is below 95%."
+    }
+  ]
+}

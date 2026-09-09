@@ -1,0 +1,294 @@
+{
+  "catalog_signature": [
+    "dsk:2024-10-30:299",
+    "fdn:2024-12-19:298",
+    "pio:2025-01-15:299",
+    "dft:2025-03-23:297",
+    "tdm:2025-05-20:300",
+    "fin:2025-07-19:300",
+    "eoe:2025-09-03:300",
+    "tla:2026-01-10:300",
+    "hob:2026-09-03:300",
+    "msh:2026-07-26:300",
+    "sos:2026-06-02:300",
+    "tmt:2026-04-08:300",
+    "ecl:2026-02-08:300"
+  ],
+  "datasets": [
+    {
+      "data_date": "2024-10-30",
+      "error_codes": [],
+      "id": "dsk",
+      "name": "DSK",
+      "replay_count": 299,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2024-12-19",
+      "error_codes": [],
+      "id": "fdn",
+      "name": "FDN",
+      "replay_count": 298,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2025-01-15",
+      "error_codes": [],
+      "id": "pio",
+      "name": "PIO",
+      "replay_count": 299,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2025-03-23",
+      "error_codes": [],
+      "id": "dft",
+      "name": "DFT",
+      "replay_count": 297,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2025-05-20",
+      "error_codes": [],
+      "id": "tdm",
+      "name": "TDM",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2025-07-19",
+      "error_codes": [],
+      "id": "fin",
+      "name": "FIN",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2025-09-03",
+      "error_codes": [],
+      "id": "eoe",
+      "name": "EOE",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2026-01-10",
+      "error_codes": [],
+      "id": "tla",
+      "name": "TLA",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2026-09-03",
+      "error_codes": [],
+      "id": "hob",
+      "name": "HOB",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2026-07-26",
+      "error_codes": [],
+      "id": "msh",
+      "name": "MSH",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2026-06-02",
+      "error_codes": [],
+      "id": "sos",
+      "name": "SOS",
+      "replay_count": 300,
+      "status": "warning",
+      "warning_codes": [
+        "image_metadata_coverage",
+        "rarity_metadata_coverage"
+      ]
+    },
+    {
+      "data_date": "2026-04-08",
+      "error_codes": [],
+      "id": "tmt",
+      "name": "TMT",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2026-02-08",
+      "error_codes": [],
+      "id": "ecl",
+      "name": "ECL",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    }
+  ],
+  "normal_queue": [
+    {
+      "code": "HOB",
+      "status": "live"
+    },
+    {
+      "code": "MSH",
+      "status": "live"
+    },
+    {
+      "code": "SOS",
+      "status": "live"
+    },
+    {
+      "code": "TMT",
+      "status": "live"
+    },
+    {
+      "code": "ECL",
+      "status": "live"
+    },
+    {
+      "code": "TLA",
+      "status": "live"
+    },
+    {
+      "code": "EOE",
+      "status": "live"
+    },
+    {
+      "code": "FIN",
+      "status": "live"
+    },
+    {
+      "code": "TDM",
+      "status": "live"
+    },
+    {
+      "code": "DFT",
+      "status": "live"
+    },
+    {
+      "code": "PIO",
+      "status": "live"
+    },
+    {
+      "code": "FDN",
+      "status": "live"
+    },
+    {
+      "code": "DSK",
+      "status": "live"
+    },
+    {
+      "code": "BLB",
+      "status": "pending"
+    },
+    {
+      "code": "MH3",
+      "status": "pending"
+    },
+    {
+      "code": "OTJ",
+      "status": "pending"
+    },
+    {
+      "code": "MKM",
+      "status": "pending"
+    },
+    {
+      "code": "KTK",
+      "status": "pending"
+    },
+    {
+      "code": "LCI",
+      "status": "pending"
+    },
+    {
+      "code": "WOE",
+      "status": "pending"
+    },
+    {
+      "code": "LTR",
+      "status": "pending"
+    },
+    {
+      "code": "MOM",
+      "status": "pending"
+    },
+    {
+      "code": "SIR",
+      "status": "pending"
+    },
+    {
+      "code": "ONE",
+      "status": "pending"
+    },
+    {
+      "code": "BRO",
+      "status": "pending"
+    },
+    {
+      "code": "DMU",
+      "status": "pending"
+    },
+    {
+      "code": "HBG",
+      "status": "pending"
+    },
+    {
+      "code": "SNC",
+      "status": "pending"
+    },
+    {
+      "code": "NEO",
+      "status": "pending"
+    },
+    {
+      "code": "VOW",
+      "status": "pending"
+    },
+    {
+      "code": "MID",
+      "status": "pending"
+    },
+    {
+      "code": "AFR",
+      "status": "pending"
+    },
+    {
+      "code": "STX",
+      "status": "pending"
+    }
+  ],
+  "normal_queue_counts": {
+    "blocked": 0,
+    "live": 13,
+    "pending": 20
+  },
+  "overall": "warning",
+  "published_dataset_count": 13,
+  "quality_counts": {
+    "error": 0,
+    "healthy": 12,
+    "warning": 1
+  },
+  "schema_version": 1,
+  "special_modes": [
+    {
+      "id": "powered-cube",
+      "name": "Powered Cube",
+      "reason": "not yet published",
+      "status": "blocked"
+    }
+  ]
+}

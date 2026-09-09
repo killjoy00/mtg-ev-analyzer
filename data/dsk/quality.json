@@ -1,0 +1,43 @@
+{
+  "data_date": "2024-10-30",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 93635,
+      "image_metadata_coverage": 0.9995,
+      "rarity_metadata_coverage": 0.9995,
+      "unique_candidates": 286
+    },
+    "consensus": {
+      "historical_pack_score_p10": 76.13,
+      "historical_pack_score_p50": 88.24,
+      "historical_pack_score_p90": 96.33,
+      "opening_top_support_p10": 0.31,
+      "opening_top_support_p50": 0.5,
+      "opening_top_support_p90": 0.72
+    },
+    "path_model": {
+      "bytes": 1219990,
+      "candidate_card_coverage": 1.0,
+      "cards": 286,
+      "excluded_replay_drafts": 299,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 74259,
+      "present": true
+    },
+    "replays": {
+      "actual": 299,
+      "declared": 299
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 208960,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "DSK",
+  "schema_version": 1,
+  "set_id": "dsk",
+  "status": "healthy",
+  "warnings": []
+}
