@@ -40,6 +40,15 @@ jobs:
           page.on('console', (message) => {
             if (['error', 'warning'].includes(message.type())) console.log('BROWSER_CONSOLE', message.type(), message.text());
           });
+          page.on('request', (request) => {
+            if (request.url().includes('/data/powered-cube/')) console.log('CUBE_REQUEST', request.url());
+          });
+          page.on('response', (response) => {
+            if (response.url().includes('/data/powered-cube/')) console.log('CUBE_RESPONSE', response.status(), response.url());
+          });
+          page.on('requestfailed', (request) => {
+            if (request.url().includes('/data/powered-cube/')) console.log('CUBE_REQUEST_FAILED', request.url(), request.failure()?.errorText || 'unknown');
+          });
           await page.route('https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**', async (route) => {
             const path = new URL(route.request().url()).pathname;
             let status = 200;
@@ -55,14 +64,15 @@ jobs:
           const href = await page.getByRole('button', { name: 'New Cube Run', exact: true }).getAttribute('data-cube-href');
           console.log('CUBE_HREF', href);
           await page.getByRole('button', { name: 'New Cube Run', exact: true }).click();
-          for (const delay of [1000, 4000, 10000]) {
-            await page.waitForTimeout(delay);
-            console.log('CUBE_AFTER_MS', delay, page.url());
-            console.log('CUBE_APP_TEXT', (await page.locator('#app').innerText()).slice(0, 1600).replace(/\n/g, ' | '));
-            console.log('CUBE_STUDY_COUNT', await page.locator('.study-main .card-choice').count());
-          }
-          await browser.close();
+          await new Promise((resolve) => setTimeout(resolve, 15000));
+          console.log('CUBE_FINAL_URL', page.url());
+          await browser.close().catch(() => null);
           NODE
+      - name: Dump static-site requests after browser failure
+        if: failure()
+        run: |
+          echo '--- static server tail ---'
+          tail -n 120 /tmp/pack1-http.log || true
       - name: Run Daily / Set Practice regression
         run: node tests/practice-e2e.mjs
       - name: Upload UI screenshots
