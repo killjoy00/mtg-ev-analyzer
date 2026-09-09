@@ -186,8 +186,8 @@ try {
   const dailySet = dailyUrl.searchParams.get('set');
   assert.ok(dailySet);
   assert.notEqual(dailySet, 'msh');
-  assert.equal(dailyUrl.searchParams.get('daily'), 'top3');
-  assert.ok(dailyUrl.searchParams.get('seed'));
+  assert.match(dailyUrl.searchParams.get('daily') || '', /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(dailyUrl.searchParams.get('mode'), 'top3');
   await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
   await revealTop3();
   assert.equal(await page.locator('.friend-comparison').count(), 0);
