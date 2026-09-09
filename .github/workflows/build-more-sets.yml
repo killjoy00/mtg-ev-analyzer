@@ -227,11 +227,10 @@ jobs:
           echo 'Could not publish generated set data after three attempts.' >&2
           exit 1
 
-      # Pushes made with GITHUB_TOKEN intentionally do not trigger ordinary
-      # push workflows. Explicit workflow_dispatch is the supported exception,
-      # so dispatch the next batch after a successful publication while the
-      # normal queue still contains pending environments.
-      - name: Continue normal-set backlog
+      # GITHUB_TOKEN pushes do not recursively launch push workflows. Explicit
+      # workflow_dispatch does. If Powered Cube is still unpublished, yield the
+      # next shared-lock slot to Cube; Cube will hand control back after it lands.
+      - name: Continue data migration
         if: steps.publish.outputs.published == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
@@ -246,15 +245,27 @@ jobs:
             exit 0
           fi
 
-          pending="$(python - <<'PY'
+          read -r pending cube_live < <(python - <<'PY'
           import json
           from pathlib import Path
           status = json.loads(Path('data/status.json').read_text())
-          print(int((status.get('normal_queue_counts') or {}).get('pending') or 0))
+          pending = int((status.get('normal_queue_counts') or {}).get('pending') or 0)
+          cube_live = any(
+              item.get('id') == 'powered-cube' and item.get('status') == 'live'
+              for item in status.get('special_modes', [])
+          )
+          print(pending, 1 if cube_live else 0)
           PY
-          )"
+          )
+
           if [[ "$pending" -le 0 ]]; then
             echo 'Normal import queue is complete.'
+            exit 0
+          fi
+
+          if [[ "$cube_live" != '1' ]]; then
+            echo "Powered Cube is not live; yielding the next catalog slot to Cube before ${pending} remaining environments."
+            gh workflow run build-powered-cube.yml --ref "$GITHUB_REF_NAME"
             exit 0
           fi
 
@@ -273,5 +284,5 @@ jobs:
       - name: Surface importer failure after preserving successful sets
         if: steps.importer.outcome == 'failure' && steps.audit.outcome == 'success'
         run: |
-          echo 'One or more queued sets failed. Healthy successful sets were committed and the explicitly dispatched next batch can continue past the failure; see the import report artifact.' >&2
+          echo 'One or more queued sets failed. Healthy successful sets were committed and the data migration can continue past the failure; see the import report artifact.' >&2
           exit 1
