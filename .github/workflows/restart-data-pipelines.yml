@@ -1,0 +1,49 @@
+name: one-shot-data-restart
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  restart:
+    if: github.event.issue.title == 'Restart Pack One data pipelines'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Publish Powered Cube, then restart normal backlog
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo 'Dispatching Powered Cube first so it owns the shared catalog lock.'
+          gh workflow run build-powered-cube.yml --ref main
+          sleep 5
+
+          cube_run_id="$(gh run list \
+            --workflow build-powered-cube.yml \
+            --branch main \
+            --event workflow_dispatch \
+            --limit 1 \
+            --json databaseId \
+            --jq '.[0].databaseId')"
+
+          if [[ -z "$cube_run_id" || "$cube_run_id" == 'null' ]]; then
+            echo 'Could not identify the dispatched Powered Cube run.' >&2
+            exit 1
+          fi
+
+          echo "Waiting for Powered Cube run ${cube_run_id} to finish."
+          gh run watch "$cube_run_id" --exit-status
+
+          echo 'Powered Cube completed successfully; dispatching the normal backlog.'
+          gh workflow run build-more-sets.yml \
+            --ref main \
+            -f limit=3 \
+            -f earliest=2021-01-01
