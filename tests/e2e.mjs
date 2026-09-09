@@ -224,7 +224,7 @@ try {
     assert.ok(cubeHrefs.every((href) => href && new URL(href).searchParams.get('mode') === 'full'));
     assert.ok(cubeHrefs.every((href) => href && new URL(href).searchParams.get('set') === 'powered-cube'));
     await page.getByRole('button', { name: 'New Cube Run', exact: true }).click();
-    await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
+    await page.locator('.study-main .card-choice').first().waitFor({ timeout: 10000 });
     const cubeUrl = new URL(page.url());
     assert.equal(cubeUrl.searchParams.get('set'), 'powered-cube');
     assert.equal(cubeUrl.searchParams.get('mode'), 'full');
