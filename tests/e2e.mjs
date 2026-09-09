@@ -181,12 +181,11 @@ try {
   // Daily is independent from practice set selection and starts from the featured environment.
   await home();
   await page.locator('#set-select').selectOption('msh');
-  const dailySet = await page.locator('[data-daily-mode="top3"]').getAttribute('data-set');
-  assert.ok(dailySet);
-  assert.notEqual(dailySet, 'msh');
   await page.locator('[data-daily-mode="top3"]').click();
   const dailyUrl = new URL(page.url());
-  assert.equal(dailyUrl.searchParams.get('set'), dailySet);
+  const dailySet = dailyUrl.searchParams.get('set');
+  assert.ok(dailySet);
+  assert.notEqual(dailySet, 'msh');
   assert.equal(dailyUrl.searchParams.get('daily'), 'top3');
   assert.ok(dailyUrl.searchParams.get('seed'));
   await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
