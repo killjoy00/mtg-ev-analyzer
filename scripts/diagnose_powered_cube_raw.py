@@ -10,11 +10,11 @@ import tempfile
 from pathlib import Path
 
 try:
-    import build_powered_cube as builder
     import import_powered_cube as cube
+    import powered_cube_shape as shape
 except ModuleNotFoundError:
-    from scripts import build_powered_cube as builder
     from scripts import import_powered_cube as cube
+    from scripts import powered_cube_shape as shape
 
 DEFAULT_REPORT = Path("generated/powered-cube-preflight.json")
 
@@ -31,7 +31,7 @@ def main() -> int:
     args = parse_args()
     destination = Path(args.report)
     report = {
-        "schema_version": 1,
+        "schema_version": 2,
         "mode": cube.CUBE_ID,
         "source_url": cube.CUBE_ARCHIVE_URL,
         "started_at": dt.datetime.now(dt.timezone.utc).isoformat(),
@@ -40,26 +40,28 @@ def main() -> int:
         with tempfile.TemporaryDirectory(prefix="pack1-cube-preflight-") as tmp:
             archive = Path(tmp) / "powered-cube.csv.gz"
             source_date = cube.download_archive(archive)
-            raw_shape, inherited = builder.analyze_raw_archive(archive)
-            p1p1 = raw_shape["raw_p1p1_coordinates"]
-            expected_visible_pick = int(p1p1[1]) + 1
-            visible = next(
-                (item for item in raw_shape["first_pack_picks"] if int(item["raw_pick_number"]) == expected_visible_pick),
-                None,
+            raw_shape, inherited = shape.analyze_raw_archive(
+                archive,
+                minimum_first_visible_candidates=args.minimum_first_visible_candidates,
             )
+            visible = raw_shape["first_visible_summary"]
+            missing_p1p1 = bool(raw_shape["missing_p1p1"])
+            required_candidates = args.minimum_first_visible_candidates if missing_p1p1 else 15
             checks = {
-                "recovered_inherited_p1p1_picks": len(inherited) >= args.minimum_replays,
                 "first_visible_pick_present": visible is not None,
-                "first_visible_pick_has_enough_rows": bool(visible and int(visible["rows"]) >= args.minimum_replays),
-                "first_visible_pack_is_complete": bool(
-                    visible and int(visible["dominant_candidate_count"]) >= args.minimum_first_visible_candidates
+                "first_visible_pick_has_enough_rows": int(visible["rows"]) >= args.minimum_replays,
+                "first_visible_pack_is_complete": int(visible["dominant_candidate_count"]) >= required_candidates,
+                "first_visible_pool_context_present": (
+                    not missing_p1p1 or float(visible["pool_nonempty_share"]) >= 0.99
+                ),
+                "recovered_inherited_p1p1_picks": (
+                    not missing_p1p1 or len(inherited) >= args.minimum_replays
                 ),
             }
             report.update({
                 "status": "pass" if all(checks.values()) else "fail",
                 "source_date": source_date,
                 "raw_shape": raw_shape,
-                "expected_first_visible_raw_pick": expected_visible_pick,
                 "first_visible_summary": visible,
                 "checks": checks,
             })

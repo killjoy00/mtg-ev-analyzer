@@ -7,6 +7,7 @@ const challengeMode = params.has('challenge');
 installRenderLifecycle();
 installReplayDataWarmup();
 
+const practice = await import('./practice-product.mjs');
 const product = await import('./product.mjs');
 const poweredCube = await import('./cube-product.mjs');
 const leaderboardProduct = await import('./leaderboard-product.mjs');
@@ -16,6 +17,7 @@ const retention = await import('./retention.mjs');
 
 if (challengeMode) {
   await import('./social.mjs');
+  practice.installPracticeProductLayer();
   product.installProductLayer();
   poweredCube.installPoweredCubeLayer();
   leaderboardProduct.installLeaderboardProductLayer();
@@ -27,6 +29,7 @@ if (challengeMode) {
   if (seed) product.seedGameRandom(seed);
   await import('./app.js');
   await import('./social.mjs');
+  practice.installPracticeProductLayer();
   product.installProductLayer();
   poweredCube.installPoweredCubeLayer();
   leaderboardProduct.installLeaderboardProductLayer();

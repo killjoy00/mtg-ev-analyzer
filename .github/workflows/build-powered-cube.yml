@@ -8,16 +8,21 @@ on:
       - '.github/workflows/build-powered-cube.yml'
       - 'scripts/import_powered_cube.py'
       - 'scripts/build_powered_cube.py'
+      - 'scripts/build_powered_cube_v3.py'
+      - 'scripts/powered_cube_shape.py'
       - 'scripts/diagnose_powered_cube_raw.py'
       - 'scripts/audit_datasets.py'
       - 'cube-product.mjs'
       - 'leaderboard-product.mjs'
+      - 'practice-product.mjs'
       - 'bootstrap.mjs'
       - 'package.json'
       - 'tests/test_powered_cube_import.py'
       - 'tests/test_powered_cube_builder.py'
+      - 'tests/test_powered_cube_shape.py'
       - 'tests/powered-cube.test.mjs'
       - 'tests/leaderboard-product.test.mjs'
+      - 'tests/practice-product.test.mjs'
 
 permissions:
   contents: write
@@ -84,7 +89,7 @@ jobs:
         id: cube_builder
         continue-on-error: true
         run: >-
-          python scripts/build_powered_cube.py
+          python scripts/build_powered_cube_v3.py
           --max-training-drafts 5000
           --max-output-candidates 1200
           --target-replays 300
