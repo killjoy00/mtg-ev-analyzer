@@ -23,6 +23,7 @@ on:
       - 'tests/powered-cube.test.mjs'
       - 'tests/leaderboard-product.test.mjs'
       - 'tests/practice-product.test.mjs'
+      - 'tests/test_data_pipeline_workflows.py'
 
 permissions:
   contents: write
@@ -75,6 +76,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # The Cube job can wait behind a long normal-set import. GitHub checks out
+      # the triggering event SHA by default, which may be stale by the time this
+      # job acquires the shared lock. Always build from the newest main instead.
+      - name: Fast-forward to latest main under import lock
+        if: github.ref_name == 'main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          git reset --hard "origin/$GITHUB_REF_NAME"
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -148,35 +161,66 @@ jobs:
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
 
+          if [[ "$CUBE_OUTCOME" == 'success' ]]; then
+            # status.json is derived from the catalog. Do not put the stale
+            # pre-rebase copy in the Cube commit; that was the source of the
+            # previous conflict with normal-set imports.
+            git restore --staged --worktree data/status.json >/dev/null 2>&1 || true
+            git add data/catalog.json data/powered-cube/
+            message='Build Powered Cube mode [data-generated]'
+
+            if git diff --cached --quiet; then
+              echo 'Powered Cube data are already current.'
+              exit 0
+            fi
+
+            git commit -m "$message"
+            for attempt in 1 2 3; do
+              echo "Publish attempt ${attempt}/3"
+              if git pull --rebase origin "$GITHUB_REF_NAME"; then
+                # Recreate all derived health output *after* rebasing onto the
+                # newest catalog, then fold it into the same generated commit.
+                python scripts/audit_datasets.py \
+                  --fail-on-error \
+                  --cube-report generated/powered-cube-report.json
+                git add data/status.json
+                find data -mindepth 2 -maxdepth 2 -name quality.json -print0 | xargs -0 -r git add --
+                git commit --amend --no-edit
+                if git push origin "HEAD:$GITHUB_REF_NAME"; then
+                  exit 0
+                fi
+              fi
+              git rebase --abort >/dev/null 2>&1 || true
+              sleep $((attempt * 5))
+            done
+
+            echo 'Could not publish validated Powered Cube data after three attempts.' >&2
+            exit 1
+          fi
+
+          # Never let invalid partial Cube output into the repository. For a
+          # failed build, sync first and then generate only the diagnostic
+          # health snapshot from the newest catalog.
+          git reset -- data/powered-cube/ >/dev/null 2>&1 || true
+          rm -rf data/powered-cube
+          git restore data/catalog.json data/status.json >/dev/null 2>&1 || true
+          git pull --ff-only origin "$GITHUB_REF_NAME"
+
+          args=()
+          if [[ -f generated/powered-cube-report.json ]]; then
+            args+=(--cube-report generated/powered-cube-report.json)
+          fi
+          python scripts/audit_datasets.py "${args[@]}"
           git add data/status.json
           find data -mindepth 2 -maxdepth 2 -name quality.json -print0 | xargs -0 -r git add --
 
-          if [[ "$CUBE_OUTCOME" == 'success' ]]; then
-            git add data/catalog.json data/powered-cube/
-            message='Build Powered Cube mode [data-generated]'
-          else
-            # Never let an invalid partial Cube output into the repository.
-            git reset -- data/powered-cube/ >/dev/null 2>&1 || true
-            rm -rf data/powered-cube
-            message='Refresh Pack One data health [data-generated]'
-          fi
-
           if git diff --cached --quiet; then
-            echo 'Cube/data-health outputs are already current.'
+            echo 'Cube diagnostic health output is already current.'
             exit 0
           fi
 
-          git commit -m "$message"
-          for attempt in 1 2 3; do
-            echo "Publish attempt ${attempt}/3"
-            if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
-              exit 0
-            fi
-            git rebase --abort >/dev/null 2>&1 || true
-            sleep $((attempt * 5))
-          done
-          echo 'Could not publish Cube/data-health outputs after three attempts.' >&2
-          exit 1
+          git commit -m 'Refresh Pack One data health [data-generated]'
+          git push origin "HEAD:$GITHUB_REF_NAME"
 
       - name: Surface dataset audit failure
         if: always() && steps.audit.outcome == 'failure'
