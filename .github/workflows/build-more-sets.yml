@@ -35,6 +35,7 @@ on:
       - 'scripts/audit_datasets.py'
       - 'tests/test_import_sets.py'
       - 'tests/test_data_health.py'
+      - 'tests/test_card_metadata.py'
   schedule:
     - cron: '17 10 * * *'
 
@@ -64,6 +65,53 @@ jobs:
 
       - name: Run unit tests
         run: npm test
+
+      - name: Repair published metadata warnings
+        id: metadata_repair
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -f data/status.json ]]; then
+            echo 'No data-health snapshot yet; nothing to repair.'
+            exit 0
+          fi
+
+          mapfile -t repair_sets < <(python - <<'PY'
+          import json
+          from pathlib import Path
+          status = json.loads(Path('data/status.json').read_text())
+          wanted = {'image_metadata_coverage', 'rarity_metadata_coverage'}
+          rows = []
+          for item in status.get('datasets', []):
+              if wanted.intersection(item.get('warning_codes') or []):
+                  rows.append(str(item.get('id') or '').upper())
+          for code in rows[:2]:
+              if code:
+                  print(code)
+          PY
+          )
+
+          if [[ ${#repair_sets[@]} -eq 0 ]]; then
+            echo 'No published metadata coverage warnings.'
+            exit 0
+          fi
+
+          for code in "${repair_sets[@]}"; do
+            echo "Rebuilding ${code} to repair card metadata coverage."
+            python scripts/import_sets.py \
+              --sets "$code" \
+              --format PremierDraft \
+              --limit 1 \
+              --max-training-drafts 5000 \
+              --max-output-drafts 300 \
+              --minimum-replays 100 \
+              --minimum-picks 30 \
+              --folds 5 \
+              --shard-size 2 \
+              --max-path-bytes 4000000 \
+              --report "generated/metadata-repair-${code}.json"
+          done
 
       - name: Import public Premier Draft backlog
         id: importer
@@ -115,6 +163,12 @@ jobs:
             cat generated/import-report.json >> "$GITHUB_STEP_SUMMARY"
             echo '```' >> "$GITHUB_STEP_SUMMARY"
           fi
+          if compgen -G 'generated/metadata-repair-*.json' > /dev/null; then
+            echo '## Metadata repair reports' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat generated/metadata-repair-*.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
           if [[ -f data/status.json ]]; then
             echo '## Data health' >> "$GITHUB_STEP_SUMMARY"
             echo '```json' >> "$GITHUB_STEP_SUMMARY"
@@ -129,6 +183,7 @@ jobs:
           name: set-import-report-${{ github.run_id }}
           path: |
             generated/import-report.json
+            generated/metadata-repair-*.json
             data/status.json
           retention-days: 30
           if-no-files-found: ignore
