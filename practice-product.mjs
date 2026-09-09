@@ -34,6 +34,10 @@ function writePracticeSet(value) {
   try { localStorage.setItem(PRACTICE_SET_KEY, value); } catch { /* optional */ }
 }
 
+function setText(node, value) {
+  if (node && node.textContent !== value) node.textContent = value;
+}
+
 export function practiceLaunchUrl({ origin = 'https://magic.planitnow.us/', setId, mode, seed = null } = {}) {
   if (!setId) throw new Error('Set Practice requires a set.');
   if (!['top3', 'full'].includes(mode)) throw new Error(`Unsupported practice mode: ${mode}`);
@@ -48,56 +52,51 @@ function updateHomeCopy(select) {
   const featured = featuredOption(select);
   if (!featured) return;
   const selected = standardOptions(select).find((option) => option.value === select.value) || featured;
-  const label = select.closest('.set-bar')?.querySelector('label');
-  if (label) label.childNodes[0].textContent = '';
   const fieldLabel = document.querySelector('label[for="set-select"]');
-  if (fieldLabel) fieldLabel.textContent = 'Practice set';
+  setText(fieldLabel, 'Practice set');
 
   // Make the default choice explicit without turning the Daily Challenge into a set picker.
   for (const option of standardOptions(select)) {
-    const original = option.dataset.practiceOriginalLabel || option.textContent;
-    option.dataset.practiceOriginalLabel = original.replace(/^Featured\s*[—-]\s*/i, '');
-    option.textContent = option === featured ? `Featured — ${option.dataset.practiceOriginalLabel}` : option.dataset.practiceOriginalLabel;
+    const original = option.dataset.practiceOriginalLabel || option.textContent.replace(/^Featured\s*[—-]\s*/i, '');
+    if (!option.dataset.practiceOriginalLabel) option.dataset.practiceOriginalLabel = original;
+    const desired = option === featured ? `Featured — ${original}` : original;
+    setText(option, desired);
   }
 
+  const selectedName = selected.dataset.practiceOriginalLabel || selected.textContent;
+  const featuredName = featured.dataset.practiceOriginalLabel || featured.textContent;
   const meta = document.querySelector('#set-meta');
-  if (meta) {
-    const selectedName = selected.dataset.practiceOriginalLabel || selected.textContent;
-    const featuredName = featured.dataset.practiceOriginalLabel || featured.textContent;
-    meta.textContent = selected.value === featured.value
-      ? `Default practice follows the featured environment (${featuredName}). Choose another set here to lock practice to it.`
-      : `Set Practice locked to ${selectedName}. Daily Challenge still uses featured ${featuredName}.`;
-  }
+  const metaCopy = selected.value === featured.value
+    ? `Default practice follows the featured environment (${featuredName}). Choose another set here to lock practice to it.`
+    : `Set Practice locked to ${selectedName}. Daily Challenge still uses featured ${featuredName}.`;
+  setText(meta, metaCopy);
 
   const daily = document.querySelector('#daily-challenge .daily-kicker');
   if (daily && !daily.querySelector('[data-featured-environment]')) {
     const chip = document.createElement('span');
     chip.className = 'best-chip';
     chip.dataset.featuredEnvironment = '1';
-    chip.textContent = `Featured · ${featured.dataset.practiceOriginalLabel || featured.textContent}`;
+    chip.textContent = `Featured · ${featuredName}`;
     daily.appendChild(chip);
   }
 
   const practiceHeading = document.querySelector('.mode-section-heading > p');
-  if (practiceHeading) {
-    const selectedName = selected.dataset.practiceOriginalLabel || selected.textContent;
-    practiceHeading.textContent = selected.value === featured.value
-      ? 'Unlimited practice in the featured environment. Choose a set above only when you want focused Set Practice.'
-      : `Unlimited practice locked to ${selectedName}. Change the Practice set above when you want a different environment.`;
-  }
+  const practiceCopy = selected.value === featured.value
+    ? 'Unlimited practice in the featured environment. Choose a set above only when you want focused Set Practice.'
+    : `Unlimited practice locked to ${selectedName}. Change the Practice set above when you want a different environment.`;
+  setText(practiceHeading, practiceCopy);
 }
 
 function enhanceHome() {
   if (!document.querySelector('.home-intro')) return;
   const select = document.querySelector('#set-select');
-  if (!select || select.dataset.practiceOnly === '1') {
-    if (select) updateHomeCopy(select);
-    return;
-  }
+  if (!select) return;
 
-  select.dataset.practiceOnly = '1';
-  const selected = readPracticeSet(select);
-  if (selected) select.value = selected;
+  if (select.dataset.practiceOnly !== '1') {
+    select.dataset.practiceOnly = '1';
+    const selected = readPracticeSet(select);
+    if (selected && select.value !== selected) select.value = selected;
+  }
   updateHomeCopy(select);
 }
 
@@ -123,7 +122,7 @@ function capturePractice(event) {
   const daily = event.target.closest?.('[data-daily-mode]');
   if (daily && select) {
     const featured = featuredOption(select);
-    if (featured) select.value = featured.value;
+    if (featured && select.value !== featured.value) select.value = featured.value;
     return; // Existing Daily handlers now see the featured environment.
   }
 
