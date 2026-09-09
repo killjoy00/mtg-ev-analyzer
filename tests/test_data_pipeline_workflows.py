@@ -63,11 +63,24 @@ class DataPipelineWorkflowTests(unittest.TestCase):
         self.assertIn("became live while this run was waiting", powered)
         self.assertIn("steps.cube_gate.outputs.should_build == 'true'", powered)
 
-    def test_cube_workflow_changes_do_not_trigger_data_rebuild(self):
+    def test_cube_push_only_rebuilds_for_data_pipeline_changes(self):
         text = CUBE.read_text()
         triggers = text.split("permissions:", 1)[0]
-        self.assertNotIn(".github/workflows/build-powered-cube.yml", triggers)
-        self.assertNotIn("tests/test_data_pipeline_workflows.py", triggers)
+        for path in (
+            ".github/workflows/build-powered-cube.yml",
+            "tests/test_data_pipeline_workflows.py",
+            "cube-product.mjs",
+            "leaderboard-product.mjs",
+            "practice-product.mjs",
+            "bootstrap.mjs",
+            "package.json",
+            "tests/powered-cube.test.mjs",
+            "tests/test_powered_cube_builder.py",
+        ):
+            self.assertNotIn(path, triggers)
+        self.assertIn("scripts/build_powered_cube_v3.py", triggers)
+        self.assertIn("scripts/import_powered_cube.py", triggers)
+        self.assertIn("scripts/audit_datasets.py", triggers)
 
     def test_cube_regenerates_status_after_rebase(self):
         text = CUBE.read_text()
