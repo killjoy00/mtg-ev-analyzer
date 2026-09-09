@@ -1,5 +1,9 @@
 {
   "catalog_signature": [
+    "otj:2024-06-27:299",
+    "mh3:2024-07-17:299",
+    "blb:2024-10-08:297",
+    "sos:2026-06-05:300",
     "dsk:2024-10-30:299",
     "fdn:2024-12-19:298",
     "pio:2025-01-15:299",
@@ -10,11 +14,46 @@
     "tla:2026-01-10:300",
     "hob:2026-09-03:300",
     "msh:2026-07-26:300",
-    "sos:2026-06-02:300",
     "tmt:2026-04-08:300",
     "ecl:2026-02-08:300"
   ],
   "datasets": [
+    {
+      "data_date": "2024-06-27",
+      "error_codes": [],
+      "id": "otj",
+      "name": "OTJ",
+      "replay_count": 299,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2024-07-17",
+      "error_codes": [],
+      "id": "mh3",
+      "name": "MH3",
+      "replay_count": 299,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2024-10-08",
+      "error_codes": [],
+      "id": "blb",
+      "name": "BLB",
+      "replay_count": 297,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2026-06-05",
+      "error_codes": [],
+      "id": "sos",
+      "name": "SOS",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
     {
       "data_date": "2024-10-30",
       "error_codes": [],
@@ -106,18 +145,6 @@
       "warning_codes": []
     },
     {
-      "data_date": "2026-06-02",
-      "error_codes": [],
-      "id": "sos",
-      "name": "SOS",
-      "replay_count": 300,
-      "status": "warning",
-      "warning_codes": [
-        "image_metadata_coverage",
-        "rarity_metadata_coverage"
-      ]
-    },
-    {
       "data_date": "2026-04-08",
       "error_codes": [],
       "id": "tmt",
@@ -191,15 +218,15 @@
     },
     {
       "code": "BLB",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "MH3",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "OTJ",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "MKM",
@@ -272,15 +299,15 @@
   ],
   "normal_queue_counts": {
     "blocked": 0,
-    "live": 13,
-    "pending": 20
+    "live": 16,
+    "pending": 17
   },
-  "overall": "warning",
-  "published_dataset_count": 13,
+  "overall": "healthy",
+  "published_dataset_count": 16,
   "quality_counts": {
     "error": 0,
-    "healthy": 12,
-    "warning": 1
+    "healthy": 16,
+    "warning": 0
   },
   "schema_version": 1,
   "special_modes": [

@@ -1,0 +1,632 @@
+{
+  "schema_version": 2,
+  "set_id": "otj",
+  "name": "OTJ",
+  "format": "PremierDraft",
+  "is_fixture": false,
+  "source": {
+    "provider": "17Lands",
+    "dataset_kind": "draft_data",
+    "data_date": "2024-06-27",
+    "license": "CC BY 4.0 unless otherwise noted by 17Lands"
+  },
+  "cohort": {
+    "definition": "experienced drafts in top 15% of parsed 17Lands user win-rate buckets",
+    "minimum_games_bucket_lower_bound": 100,
+    "win_rate_cutoff": 0.6,
+    "experienced_drafts": 143209,
+    "training_drafts": 5000,
+    "training_picks": 208998
+  },
+  "model": {
+    "model_version": "strong-player-pool-context-v2",
+    "holdout": "5-fold by draft_id",
+    "probabilities_are_calibrated": false,
+    "description": "Hierarchical strong-player pick tendency adjusted by shrinkage-weighted card/pool co-pick lift; normalized within each pack.",
+    "pool_conditioned": true
+  },
+  "replay_count": 299,
+  "shard_size": 2,
+  "shards": [
+    {
+      "path": "./data/otj/shards/000.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/001.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/002.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/003.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/004.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/005.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/006.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/007.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/008.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/009.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/010.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/011.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/012.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/013.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/014.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/015.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/016.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/017.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/018.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/019.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/020.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/021.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/022.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/023.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/024.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/025.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/026.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/027.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/028.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/029.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/030.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/031.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/032.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/033.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/034.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/035.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/036.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/037.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/038.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/039.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/040.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/041.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/042.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/043.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/044.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/045.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/046.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/047.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/048.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/049.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/050.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/051.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/052.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/053.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/054.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/055.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/056.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/057.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/058.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/059.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/060.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/061.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/062.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/063.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/064.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/065.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/066.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/067.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/068.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/069.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/070.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/071.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/072.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/073.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/074.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/075.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/076.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/077.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/078.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/079.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/080.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/081.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/082.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/083.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/084.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/085.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/086.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/087.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/088.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/089.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/090.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/091.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/092.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/093.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/094.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/095.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/096.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/097.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/098.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/099.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/100.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/101.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/102.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/103.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/104.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/105.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/106.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/107.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/108.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/109.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/110.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/111.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/112.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/113.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/114.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/115.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/116.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/117.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/118.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/119.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/120.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/121.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/122.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/123.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/124.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/125.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/126.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/127.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/128.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/129.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/130.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/131.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/132.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/133.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/134.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/135.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/136.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/137.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/138.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/139.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/140.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/141.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/142.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/143.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/144.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/145.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/146.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/147.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/148.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/otj/shards/149.json",
+      "replay_count": 1
+    }
+  ]
+}

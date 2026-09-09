@@ -1,11 +1,11 @@
 {
-  "data_date": "2026-06-02",
+  "data_date": "2026-06-05",
   "errors": [],
   "metrics": {
     "cards": {
       "candidate_occurrences": 94500,
-      "image_metadata_coverage": 0.9324,
-      "rarity_metadata_coverage": 0.9324,
+      "image_metadata_coverage": 0.995,
+      "rarity_metadata_coverage": 0.995,
       "unique_candidates": 346
     },
     "consensus": {
@@ -38,41 +38,6 @@
   "name": "SOS",
   "schema_version": 1,
   "set_id": "sos",
-  "status": "warning",
-  "warnings": [
-    {
-      "code": "image_metadata_coverage",
-      "details": {
-        "coverage": 0.9324,
-        "examples": [
-          "Abrade",
-          "Ad Nauseam",
-          "Adrix and Nev, Twincasters",
-          "Akroma's Will",
-          "Angel's Grace",
-          "Archaeomancer",
-          "Archmage Emeritus",
-          "Armageddon"
-        ]
-      },
-      "message": "Card image metadata coverage is below 95%."
-    },
-    {
-      "code": "rarity_metadata_coverage",
-      "details": {
-        "coverage": 0.9324,
-        "examples": [
-          "Abrade",
-          "Ad Nauseam",
-          "Adrix and Nev, Twincasters",
-          "Akroma's Will",
-          "Angel's Grace",
-          "Archaeomancer",
-          "Archmage Emeritus",
-          "Armageddon"
-        ]
-      },
-      "message": "Card rarity metadata coverage is below 95%."
-    }
-  ]
+  "status": "healthy",
+  "warnings": []
 }

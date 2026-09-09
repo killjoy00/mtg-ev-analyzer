@@ -2,6 +2,54 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "otj",
+      "name": "OTJ",
+      "format": "PremierDraft",
+      "manifest_path": "./data/otj/manifest.json",
+      "replay_count": 299,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2024-06-27",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "mh3",
+      "name": "MH3",
+      "format": "PremierDraft",
+      "manifest_path": "./data/mh3/manifest.json",
+      "replay_count": 299,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2024-07-17",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "blb",
+      "name": "BLB",
+      "format": "PremierDraft",
+      "manifest_path": "./data/blb/manifest.json",
+      "replay_count": 297,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2024-10-08",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "sos",
+      "name": "SOS",
+      "format": "PremierDraft",
+      "manifest_path": "./data/sos/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2026-06-05",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
       "id": "dsk",
       "name": "DSK",
       "format": "PremierDraft",
@@ -117,18 +165,6 @@
       "replay_count": 300,
       "model_version": "strong-player-pool-context-v2",
       "data_date": "2026-07-26",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
-      "id": "sos",
-      "name": "SOS",
-      "format": "PremierDraft",
-      "manifest_path": "./data/sos/manifest.json",
-      "replay_count": 300,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2026-06-02",
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
       "training_drafts": 5000
