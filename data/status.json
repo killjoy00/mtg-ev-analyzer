@@ -1,5 +1,8 @@
 {
   "catalog_signature": [
+    "bro:2022-12-15:297",
+    "one:2023-03-01:297",
+    "sir:2023-04-21:300",
     "mom:2023-06-14:297",
     "ltr:2023-08-30:299",
     "woe:2023-10-18:296",
@@ -25,6 +28,33 @@
     "powered-cube:2025-12-01:300"
   ],
   "datasets": [
+    {
+      "data_date": "2022-12-15",
+      "error_codes": [],
+      "id": "bro",
+      "name": "BRO",
+      "replay_count": 297,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2023-03-01",
+      "error_codes": [],
+      "id": "one",
+      "name": "ONE",
+      "replay_count": 297,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2023-04-21",
+      "error_codes": [],
+      "id": "sir",
+      "name": "SIR",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
     {
       "data_date": "2023-06-14",
       "error_codes": [],
@@ -324,15 +354,15 @@
     },
     {
       "code": "SIR",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "ONE",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "BRO",
-      "status": "pending"
+      "status": "live"
     },
     {
       "code": "DMU",
@@ -369,14 +399,14 @@
   ],
   "normal_queue_counts": {
     "blocked": 0,
-    "live": 22,
-    "pending": 11
+    "live": 25,
+    "pending": 8
   },
   "overall": "healthy",
-  "published_dataset_count": 23,
+  "published_dataset_count": 26,
   "quality_counts": {
     "error": 0,
-    "healthy": 23,
+    "healthy": 26,
     "warning": 0
   },
   "schema_version": 1,

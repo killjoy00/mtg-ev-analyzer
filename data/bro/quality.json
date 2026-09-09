@@ -1,0 +1,43 @@
+{
+  "data_date": "2022-12-15",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 106910,
+      "image_metadata_coverage": 0.9969,
+      "rarity_metadata_coverage": 0.9969,
+      "unique_candidates": 330
+    },
+    "consensus": {
+      "historical_pack_score_p10": 74.43,
+      "historical_pack_score_p50": 86.55,
+      "historical_pack_score_p90": 94.12,
+      "opening_top_support_p10": 0.32,
+      "opening_top_support_p50": 0.49,
+      "opening_top_support_p90": 0.73
+    },
+    "path_model": {
+      "bytes": 1458942,
+      "candidate_card_coverage": 1.0,
+      "cards": 330,
+      "excluded_replay_drafts": 297,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 89882,
+      "present": true
+    },
+    "replays": {
+      "actual": 297,
+      "declared": 297
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 223221,
+      "win_rate_cutoff": 0.62
+    }
+  },
+  "name": "BRO",
+  "schema_version": 1,
+  "set_id": "bro",
+  "status": "healthy",
+  "warnings": []
+}
