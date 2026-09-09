@@ -27,6 +27,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
   cube-preflight:
@@ -152,6 +153,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Commit validated Cube data or health status
+        id: publish_cube
         if: always() && steps.audit.outcome == 'success'
         env:
           CUBE_OUTCOME: ${{ steps.cube_builder.outcome }}
@@ -221,6 +223,35 @@ jobs:
 
           git commit -m 'Refresh Pack One data health [data-generated]'
           git push origin "HEAD:$GITHUB_REF_NAME"
+
+      # Cube and the historical importer deliberately serialize catalog writes.
+      # When Cube owns the shared slot and lands successfully, it explicitly
+      # gives the next slot back to the normal backlog because its GITHUB_TOKEN
+      # data commit will not create a recursive push workflow run.
+      - name: Resume normal-set backlog after Cube
+        if: steps.cube_builder.outcome == 'success' && steps.audit.outcome == 'success' && steps.publish_cube.outcome == 'success'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          pending="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          status = json.loads(Path('data/status.json').read_text())
+          print(int((status.get('normal_queue_counts') or {}).get('pending') or 0))
+          PY
+          )"
+          if [[ "$pending" -le 0 ]]; then
+            echo 'Normal import queue is already complete.'
+            exit 0
+          fi
+
+          echo "Powered Cube is live; returning the shared catalog slot to ${pending} pending normal environments."
+          gh workflow run build-more-sets.yml \
+            --ref "$GITHUB_REF_NAME" \
+            -f limit=3 \
+            -f earliest=2021-01-01
 
       - name: Surface dataset audit failure
         if: always() && steps.audit.outcome == 'failure'
