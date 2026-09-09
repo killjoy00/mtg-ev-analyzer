@@ -119,6 +119,7 @@ function capturePractice(event) {
 
   if (event.type !== 'click') return;
 
+  const query = params();
   const daily = event.target.closest?.('[data-daily-mode]');
   if (daily && select) {
     const featured = featuredOption(select);
@@ -127,7 +128,8 @@ function capturePractice(event) {
   }
 
   const modeButton = event.target.closest?.('[data-mode]');
-  if (modeButton && document.querySelector('.home-intro') && select) {
+  const cleanHomeLaunch = !query.get('seed') && !query.get('daily') && !query.get('mode');
+  if (modeButton && cleanHomeLaunch && document.querySelector('.home-intro') && select) {
     const featured = featuredOption(select);
     const chosen = standardOptions(select).find((option) => option.value === select.value) || featured;
     if (chosen && featured && chosen.value !== featured.value) {
@@ -146,7 +148,6 @@ function capturePractice(event) {
   // A seeded non-Daily run is practice (including shared exact-pack links).
   // Returning home should always reconstruct the featured Daily state instead
   // of leaving app.js pointed at the practice set.
-  const query = params();
   if (query.get('seed') && !query.get('daily')) {
     const exit = event.target.closest?.('#brand-home, #quit-game, #top3-home, #summary-home');
     if (exit) {
