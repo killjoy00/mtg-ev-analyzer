@@ -28,6 +28,8 @@ jobs:
           echo $! > /tmp/pack1-http.pid
       - name: Run browser regression
         run: node tests/e2e.mjs
+      - name: Run Daily / Set Practice regression
+        run: node tests/practice-e2e.mjs
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4
