@@ -23,9 +23,6 @@ on:
     paths:
       - '.github/workflows/build-more-sets.yml'
       - 'data/import-queue.json'
-      # Every successful batch updates the catalog. That commit launches the
-      # next batch; when the queue is empty, no catalog change is produced and
-      # the chain stops naturally.
       - 'data/catalog.json'
       - 'scripts/import_sets.py'
       - 'scripts/build_replays.py'
@@ -36,11 +33,13 @@ on:
       - 'tests/test_import_sets.py'
       - 'tests/test_data_health.py'
       - 'tests/test_card_metadata.py'
+      - 'tests/test_data_pipeline_workflows.py'
   schedule:
     - cron: '17 10 * * *'
 
 permissions:
   contents: write
+  actions: write
 
 # Powered Cube's data-producing job shares this lock because both workflows can
 # publish catalog.json. Read-only Cube preflight diagnostics do not need it.
@@ -56,6 +55,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      # A data job can sit behind the shared import lock for a long time. The
+      # event SHA may be stale by the time the job starts, so move to the latest
+      # main before generating anything that will later be committed.
+      - name: Fast-forward to latest main under import lock
+        if: github.ref_name == 'main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          git reset --hard "origin/$GITHUB_REF_NAME"
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -189,10 +200,12 @@ jobs:
           if-no-files-found: ignore
 
       - name: Commit successful imports
+        id: publish
         if: always() && steps.audit.outcome == 'success'
         shell: bash
         run: |
           set -euo pipefail
+          echo 'published=false' >> "$GITHUB_OUTPUT"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data/catalog.json data/status.json data/
@@ -205,6 +218,7 @@ jobs:
           for attempt in 1 2 3; do
             echo "Publish attempt ${attempt}/3"
             if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
+              echo 'published=true' >> "$GITHUB_OUTPUT"
               exit 0
             fi
             git rebase --abort >/dev/null 2>&1 || true
@@ -212,6 +226,43 @@ jobs:
           done
           echo 'Could not publish generated set data after three attempts.' >&2
           exit 1
+
+      # Pushes made with GITHUB_TOKEN intentionally do not trigger ordinary
+      # push workflows. Explicit workflow_dispatch is the supported exception,
+      # so dispatch the next batch after a successful publication while the
+      # normal queue still contains pending environments.
+      - name: Continue normal-set backlog
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SETS: ${{ inputs.sets || '' }}
+          LIMIT: ${{ inputs.limit || '3' }}
+          EARLIEST: ${{ inputs.earliest || '2021-01-01' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$SETS" ]]; then
+            echo 'Explicit set import requested; not chaining the normal backlog.'
+            exit 0
+          fi
+
+          pending="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          status = json.loads(Path('data/status.json').read_text())
+          print(int((status.get('normal_queue_counts') or {}).get('pending') or 0))
+          PY
+          )"
+          if [[ "$pending" -le 0 ]]; then
+            echo 'Normal import queue is complete.'
+            exit 0
+          fi
+
+          echo "Dispatching the next backlog batch; ${pending} environments remain."
+          gh workflow run build-more-sets.yml \
+            --ref "$GITHUB_REF_NAME" \
+            -f limit="$LIMIT" \
+            -f earliest="$EARLIEST"
 
       - name: Surface data-health gate failure
         if: always() && steps.audit.outcome == 'failure'
@@ -222,5 +273,5 @@ jobs:
       - name: Surface importer failure after preserving successful sets
         if: steps.importer.outcome == 'failure' && steps.audit.outcome == 'success'
         run: |
-          echo 'One or more queued sets failed. Healthy successful sets were committed and the next catalog-triggered batch can continue past the failure; see the import report artifact.' >&2
+          echo 'One or more queued sets failed. Healthy successful sets were committed and the explicitly dispatched next batch can continue past the failure; see the import report artifact.' >&2
           exit 1
