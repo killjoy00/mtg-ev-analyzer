@@ -2,6 +2,7 @@ import unittest
 from pathlib import Path
 
 
+# This file is also an explicit, harmless restart trigger for both data workflows.
 ROOT = Path(__file__).resolve().parents[1]
 BACKLOG = ROOT / ".github" / "workflows" / "build-more-sets.yml"
 CUBE = ROOT / ".github" / "workflows" / "build-powered-cube.yml"
