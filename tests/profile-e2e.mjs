@@ -148,7 +148,7 @@ try {
 
   await page.locator('#profile-load-more').click();
   await page.getByText('WOE', { exact:true }).last().waitFor({ timeout:5000 });
-  assert.equal(await page.locator('#profile-load-more').isHidden(), true);
+  await page.locator('#profile-load-more').waitFor({ state:'hidden', timeout:5000 });
 
   await page.locator('select[name="favoriteSetId"]').selectOption('stx');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
