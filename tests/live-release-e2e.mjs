@@ -77,8 +77,8 @@ async function finishRun({ cube=false }) {
   await page.goto(url, { waitUntil:'domcontentloaded' });
   await waitForCards();
   interactionTimings.push({ name:`${environment}-practice-load`, ms:Date.now()-started });
-  assert.match(await page.locator('.run-heading .eyebrow').innerText(), /Practice/);
-  assert.doesNotMatch(await page.locator('.run-heading .eyebrow').innerText(), /Daily/);
+  assert.match(await page.locator('.run-heading .eyebrow').innerText(), /Practice/i);
+  assert.doesNotMatch(await page.locator('.run-heading .eyebrow').innerText(), /Daily/i);
   await noOverflow(`${environment} initial`);
 
   if (cube) {
