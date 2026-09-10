@@ -1,5 +1,13 @@
 # Pack One monetization setup
 
+## Product decision, September 2026
+
+Keep advertising disabled while the new game establishes retention. Blank slots are hidden. Draft Run and other active card-selection surfaces have no ad placements. Do not sell extra rerolls or gate the core game behind signup.
+
+The preferred first experiment is one clearly labeled Daily sponsorship on the home/result surface, followed by an optional supporter/ad-free account if demand warrants it. Keep career history useful for free players. A paid tier needs server-verified entitlements and a separate payment/privacy review before activation; no subscription or paywall has been enabled in this release.
+
+Measure completion, next-day return, second-game rate, account claims, and shares before optimizing ad revenue. `analytics/retention_funnel.sql` supplies these cohorts.
+
 ## TCGplayer / Impact
 
 TCGplayer's affiliate program currently operates through Impact. Apply through the TCGplayer campaign in Impact. New TCGplayer API developer access is not currently being granted, so this integration intentionally does **not** depend on API pricing access.

@@ -42,6 +42,7 @@ export function unlockedAchievements(profile) {
 }
 
 export function bestPercentile(profile) {
+  if(Number(profile?.best_final_percentile)>0) return Number(profile.best_final_percentile);
   const values = (profile?.daily_history || [])
     .filter(row=>row.final!==false)
     .map((row) => Number(row.percentile))

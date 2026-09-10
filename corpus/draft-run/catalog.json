@@ -9,7 +9,7 @@
       "puzzles": 536,
       "trophy_drafts": 54,
       "source_date": "2024-10-08",
-      "sha256": "81ded62204dce25727f9fda9e672c79e105ee1e1736473574a9d83a2b94b3d43"
+      "sha256": "36ed35913cc38273eaee2c94e79747168fba6ac79640af49a6e0b67f38c84627"
     },
     {
       "id": "dft",
@@ -17,7 +17,7 @@
       "puzzles": 660,
       "trophy_drafts": 60,
       "source_date": "2025-03-23",
-      "sha256": "0d29d4db25b35316dabe2949cdb561956878b0b07e13727446bda4cc31e6e2ad"
+      "sha256": "1d635b7683dc5b5ddf82ba36207b49eefaba04be81ff9619abab46cb723e1a91"
     },
     {
       "id": "dsk",
@@ -25,7 +25,7 @@
       "puzzles": 605,
       "trophy_drafts": 55,
       "source_date": "2024-10-30",
-      "sha256": "de29ca7a077faadfb9ea8b014a2412bbb7a050173dc16cdad0d6caa5ea4cf9ac"
+      "sha256": "de70862583330611d92d3661b279d8238e1e80f210cb2e642ebcb7d1bf76f61e"
     },
     {
       "id": "eoe",
@@ -33,7 +33,7 @@
       "puzzles": 690,
       "trophy_drafts": 69,
       "source_date": "2025-09-03",
-      "sha256": "380dcc10b1e14012520c9c0846b228ba2f0dc8ad208d7364a3602a4f39604b42"
+      "sha256": "a1e9e892db4f226eda6cb46707d739d929f6b8dc4a0029fd0917886c7c646b33"
     },
     {
       "id": "fin",
@@ -41,7 +41,7 @@
       "puzzles": 649,
       "trophy_drafts": 59,
       "source_date": "2025-07-19",
-      "sha256": "fee5922f1fe35c707dac8d766cad888d259645e2ca8871555eb406e335455574"
+      "sha256": "ebc4aaa72e9b843eb27a6cec4dc900bf9257e4df0d70713a52dc74e4c5f82e6a"
     },
     {
       "id": "mh3",
@@ -49,7 +49,7 @@
       "puzzles": 627,
       "trophy_drafts": 57,
       "source_date": "2024-07-17",
-      "sha256": "cce41b78299e4814515e6dab7559a7f6192b032a10489baeb536259617f2d122"
+      "sha256": "33db4edab66e55f8c3fca6650da712479d38c54440f473c5607257e4f4d09377"
     },
     {
       "id": "msh",
@@ -57,7 +57,7 @@
       "puzzles": 803,
       "trophy_drafts": 73,
       "source_date": "2026-07-26",
-      "sha256": "b28f586ec8b95c28e6688e1978d53737abda80ac514e46a6d6f964e03f5cee26"
+      "sha256": "f5b423ec806a8e33d685e447b5bc6d2d04804036651b22dd1900a94b03034d05"
     },
     {
       "id": "sos",
@@ -65,7 +65,7 @@
       "puzzles": 704,
       "trophy_drafts": 64,
       "source_date": "2026-06-05",
-      "sha256": "edd400d2a3cae42980755a3725a5d5fe61f39ed5eb10898d83be688a905223c3"
+      "sha256": "190950077de3204230dede153974a32bb3e0aee11ef6860839d7554399b80514"
     },
     {
       "id": "tdm",
@@ -73,7 +73,7 @@
       "puzzles": 572,
       "trophy_drafts": 52,
       "source_date": "2025-05-20",
-      "sha256": "97255d1d9c292a127000e0737261e58d0063742e8626eaeaddb6bfc524114abc"
+      "sha256": "0f4999cb05497f1812d77094a19ceca7bcfb13c9204aa9a415b40e67ab211d72"
     },
     {
       "id": "woe",
@@ -81,7 +81,7 @@
       "puzzles": 660,
       "trophy_drafts": 60,
       "source_date": "2023-10-18",
-      "sha256": "579b2d685df5258c7654aff4c39bcfc4cbcdba1a2abb412f5b671d8f55837cb3"
+      "sha256": "ef332c6c6a083defd9145d3fe56d2a6081675fbede27f875e5f6bb72d96bf235"
     }
   ]
 }

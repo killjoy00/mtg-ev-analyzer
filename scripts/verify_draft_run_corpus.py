@@ -21,6 +21,7 @@ def fingerprint(picks):
 
 
 def build(matches, root=Path('.')):
+    images = json.loads((root / 'corpus/draft-run/card-images.json').read_text())
     by_set = {}
     for m in matches:
         by_set.setdefault(m['set_id'], {})[m['draft_id']] = m
@@ -42,11 +43,12 @@ def build(matches, root=Path('.')):
                 assert int(m['wins']) == 7 and int(m['games']) >= 100 and float(m['win_rate']) >= .6
                 prior = []
                 for p in picks:
-                    historical = next(c for c in p['candidates'] if c['id'] == p['historical_pick_id'])
+                    cards = [{**images.get(c['id'], {}), **c} for c in p['candidates']]
+                    assert all(c.get('image_url', '').startswith('https://') for c in cards)
+                    historical = next(c for c in cards if c['id'] == p['historical_pick_id'])
                     # Verify the actual model context, not merely its length.
                     expected = Counter(c['name'] for c in prior)
                     assert dict(expected) == p['pool'], (set_id,r['draft_id'],p['pick_number'],'pool mismatch')
-                    cards = p['candidates']
                     if len(cards) >= 4 and len({c['id'] for c in cards}) == len(cards):
                         rows.append({
                             'puzzle_id': hashlib.sha256(f"{VERSION}|{set_id}|{r['draft_id']}|{p['pick_number']}".encode()).hexdigest()[:32],

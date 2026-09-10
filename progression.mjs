@@ -1,6 +1,5 @@
 import { loadMyProfile } from './growth-api.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { onAppRender } from './render-lifecycle.mjs';
 
 export function nextMilestones(profile,limit=3) {
   return (profile?.achievements||[]).filter(a=>!a.unlocked&&a.target>1&&a.current>0)
@@ -25,7 +24,7 @@ async function enhance(detail={}) {
     const current=(profile.achievements||[]).filter(a=>a.unlocked),previous=latest;
     latest=new Set(current.map(a=>a.id));
     const unlocked=previous?current.filter(a=>!previous.has(a.id)):[];
-    for(const a of unlocked)trackEvent('achievement_unlocked',{achievement:a.id});
+    for(const a of unlocked)trackEvent('achievement_view',{achievement:a.id,source:'result'});
     const next=nextMilestones(profile,1)[0],reason=claimReason(profile);
     if(!next&&!reason&&!unlocked.length)return;
     const box=root.id==='post-game-progress'?root:document.createElement('aside');box.className='post-game-progress';
@@ -40,5 +39,4 @@ export function installProgression() {
   void loadMyProfile().then(p=>{latest=new Set((p.achievements||[]).filter(a=>a.unlocked).map(a=>a.id));}).catch(()=>{});
   document.addEventListener('pack1:result-completed',e=>{if(seen.has(e.detail.id))return;seen.add(e.detail.id);trackEvent('result_viewed',e.detail);});
   document.addEventListener('pack1:result-visible',e=>void enhance(e.detail));
-  onAppRender(()=>void enhance());
 }

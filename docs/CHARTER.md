@@ -1,14 +1,14 @@
 # Pack One product charter
 
-Status: working charter for the trophy-puzzle rebuild.
+Status: implemented Draft Run contract, September 2026.
 
 ## Product promise
 
 Pack One is a fast Limited decision game built from real 17Lands Premier Draft data. It is not a deck builder and it is not a counterfactual draft simulator. The player makes difficult draft choices, sees what an elite drafter actually did, and gets a compact score that also respects strong-player consensus.
 
-The product has two core modes.
+Draft Run is the primary game and Daily entry point. Top 3, Full Pack, and Powered Cube remain available as additional modes.
 
-## Mode 1: Pack One
+## Additional mode: Top 3
 
 The existing opening-pack game stays intact.
 
@@ -20,9 +20,9 @@ The existing opening-pack game stays intact.
 
 This mode is the quick, low-context version of Pack One.
 
-## Mode 2: Draft Run
+## Core game: Draft Run
 
-Working name: **Draft Run**.
+**Draft Run** is the ten-decision game.
 
 A Draft Run is ten independent first-pack puzzles. Each puzzle comes from a different real Premier Draft trophy draft by a very strong, experienced 17Lands drafter. The ten questions do **not** pretend to be one continuous draft.
 
@@ -63,7 +63,9 @@ Every puzzle must be scored out-of-fold by draft ID so the source draft never co
 
 ### Set coverage
 
-Ingest every set for which 17Lands publishes Premier Draft draft data. Frozen historical sets are built once. Active sets may be refreshed when the public bulk dataset changes.
+Coverage expands only after verification. The launch corpus contains 6,506 verified decisions (6,346 pass the interesting-decision filter) from 603 trophy drafts across ten sets. The larger ordinary replay catalog is separate and must not be described as trophy-only. Frozen historical sets are built once; active sets can be refreshed from new public data.
+
+The earlier Neon importer could not establish reproducible held-out probabilities, and its TMT prior-pick histories were malformed. It is excluded from serving. The verified corpus matches all eleven early picks, including candidate IDs and actual choices, against existing five-fold held-out replay artifacts. The model pool must exactly equal all earlier historical picks. Source matches, card-image supplements, manifests, and checksummed artifacts are checked in. See `docs/LAUNCH_REVIEW.md` for reproduction and limits.
 
 Raw 17Lands archives are build inputs only. Do not commit or ship raw archives to the browser. Store only the derived trophy puzzle corpus and compact model outputs needed by the game.
 
@@ -101,13 +103,13 @@ The trophy drafter is the primary target; consensus gives graded partial credit.
 1. If the player matches the source trophy drafter, the question score is **100**.
 2. Otherwise, the held-out consensus leader is the highest-scoring alternative.
 3. Consensus #2 is the next-highest alternative, and so on monotonically by model support.
-4. Consensus credit is capped below 100 and gradually matters less at deeper pick positions.
+4. All non-historical choices are capped at 95. Pick depth already informs the contextual model; it does not apply another arbitrary penalty.
 
-Initial formula for a non-historical selection:
+Version `trophy-consensus-v2` formula for a non-historical selection:
 
-`score = consensus_cap(pick_number) * (selected_support / leader_support) ^ 0.75`
+`score = round(95 * selected_support / leader_support)`
 
-with the cap starting near 96 at P1P1 and tapering toward the high 80s by late Pack 1. The exact taper is a calibrated product parameter and must be covered by distribution tests.
+An alternative with 90% of the leader’s support earns 86; half the support earns 48. The former 0.75 exponent inflated uninformed choices; calibration tests now cover weak, random, runner-up, and historical-choice baselines. The ten decisions contribute equally.
 
 This guarantees that an idiosyncratic trophy pick can still be the game's full-credit answer while a strong consensus alternative receives substantial partial credit.
 
@@ -146,7 +148,7 @@ Replacement matching should consider:
 - normalized support entropy;
 - prior-pool size.
 
-Daily rerolls must be deterministic: everyone gets the same base ten questions and the same two replacement options for each eligible question.
+Daily rerolls are deterministic for the same day, round, and reroll history. Each replacement stays in the round bucket, within one pick of the original, with distance at most 0.16 under the shared matching function. Rerolls may repeat another set in the run but never reuse a source draft.
 
 ## Daily and unlimited play
 
@@ -154,7 +156,7 @@ Daily rerolls must be deterministic: everyone gets the same base ten questions a
 
 - One shared ten-question run per Eastern game day.
 - Same base questions and deterministic reroll replacements for every player.
-- First completed score is the ranked score.
+- The first attempt is reserved when the run starts; resuming returns that attempt. Its completed score is ranked. A second tab cannot reset it.
 - Global daily/weekly/monthly/all-time leaderboard treatment can mirror the current Daily framework.
 
 ### Unlimited Draft Run
@@ -185,13 +187,3 @@ Daily rerolls must be deterministic: everyone gets the same base ten questions a
 Neon is the source of truth for the derived Draft Run corpus. Store source-draft metadata and one queryable puzzle row per historical first-pack decision. The browser should receive only the selected puzzle payloads through a server endpoint.
 
 The existing static opening-pack corpus remains appropriate for Pack One / Top 3.
-
-## Working name shortlist
-
-1. **Draft Run** — recommended; clear, game-like, flexible.
-2. **Trophy Run** — emphasizes the source material, but may imply the player is drafting a trophy deck themselves.
-3. **Ten Picks** — maximally clear, less ownable as a mode name.
-4. **Draft Gauntlet** — communicates a sequence of tests, slightly more competitive/serious.
-5. **Pick Run** — short and game-like, but less immediately descriptive than Draft Run.
-
-Use **Draft Run** as the implementation name until product naming changes.

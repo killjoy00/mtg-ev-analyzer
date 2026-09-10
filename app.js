@@ -387,7 +387,7 @@ function renderHome() {
     <section class="daily-card daily-feature" id="daily-challenge">
       <div class="daily-copy">
         <div class="daily-kicker"><span class="live-dot"></span><span>Daily Challenge</span><span class="streak-chip">${streak ? `${streak}-day streak` : 'Start a streak'}</span></div>
-        <h2>Today’s Pack One</h2>
+        <h2>Today’s opening pack</h2>
         <p>Everyone gets the same draft seat. Top 3 is the fastest way in; your first score is the one that reaches today’s board.</p>
         ${milestoneMarkup()}
       </div>

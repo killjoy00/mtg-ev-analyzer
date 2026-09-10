@@ -15,7 +15,7 @@ const pool=all.filter(interestingDraftRunPuzzle);
 
 test('every playable decision has trophy, skill, complete history and valid scoring evidence',()=>{
   assert.ok(all.length>=5000);
-  for(const p of all){assert.ok(validateDraftRunPuzzle(p),p.puzzle_id);assert.equal(gradeDraftRunPick(p,p.historical_pick_id).score,100);}
+  for(const p of all){assert.ok(validateDraftRunPuzzle(p),p.puzzle_id);assert.equal(gradeDraftRunPick(p,p.historical_pick_id).score,100);for(const c of [...p.candidates,...p.prior_picks])assert.match(c.image_url,/^https:\/\//,c.name);}
   for(const patch of [{event_match_wins:6},{player_games_lower_bound:99},{player_win_rate_bucket:.55},{prior_picks:[{id:'extra',name:'Extra'}]},{historical_pick_id:'missing'}]) assert.equal(validateDraftRunPuzzle({...all.find(p=>p.pick_number===1),...patch}),false);
 });
 test('unanswered payloads contain neither the answer nor model rankings, support, or source identity',()=>{

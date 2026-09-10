@@ -227,19 +227,26 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
     try { await navigator.clipboard.writeText(url); event.currentTarget.textContent = 'Copied'; } catch {}
   });
   document.querySelector('#profile-share')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    const original = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Making card…';
-    await shareProfileCard(profile, progress, names);
-    track('profile_share', { public: profile.player.profile_public, environments: progress.played });
-    button.disabled = false;
-    button.textContent = original;
+    await performShare(event.currentTarget,()=>shareProfileCard(profile, progress, names),'profile_share',{public:profile.player.profile_public,environments:progress.played});
   });
-  document.querySelector('#profile-share-progress')?.addEventListener('click', async () => {
-    await shareProgressCard(profile, progress);
-    track('profile_progress_share', { environments: progress.played, total: progress.total });
+  document.querySelector('#profile-share-progress')?.addEventListener('click', async (event) => {
+    await performShare(event.currentTarget,()=>shareProgressCard(profile, progress),'profile_progress_share',{environments:progress.played,total:progress.total});
   });
+  async function performShare(button,makeCard,name,props) {
+    const original=button.textContent;button.disabled=true;button.textContent='Making card…';
+    let status=document.querySelector('#profile-share-status');
+    if(!status){status=document.createElement('p');status.id='profile-share-status';status.setAttribute('role','status');button.parentElement.after(status);}
+    status.textContent='';
+    try {
+      const result=await makeCard();
+      if(result?.failed) {
+        status.textContent='Copy this link: ';const a=document.createElement('a');
+        a.href=profile.player.profile_public?`${location.origin}${location.pathname}?profile=${encodeURIComponent(profile.player.profile_key)}`:`${location.origin}${location.pathname}`;
+        a.textContent=a.href;status.append(a);
+      } else if(!result?.cancelled) {track(name,{...props,method:result?.method});status.textContent=result?.method==='copy_fallback'?'Link copied.':'Ready to share.';}
+    } catch {status.textContent='Couldn’t make the share card. Please try again.';}
+    finally {button.disabled=false;button.textContent=original;}
+  }
 
   document.querySelector('#profile-settings-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -255,7 +262,6 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       });
       status.textContent = 'Saved';
       track('profile_settings_saved', { public: updated.player?.profile_public || false });
-      if(updated.player?.profile_public&&!profile.player.profile_public)track('public_profile_enabled');
       await renderProfile(updated, { own: true });
     } catch (error) {
       status.textContent = error.message;
@@ -263,22 +269,24 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   });
 
   document.querySelectorAll('[data-showcase-achievement]').forEach((button) => button.addEventListener('click', async () => {
+    button.disabled=true;
     const id = button.dataset.showcaseAchievement;
-    const updated = await updateProfile({ showcaseAchievement: id });
-    track('achievement_showcase', { achievement: id });
-    await renderProfile(updated, { own: true });
+    try {
+      const updated = await updateProfile({ showcaseAchievement: id });
+      track('achievement_showcase', { achievement: id });
+      await renderProfile(updated, { own: true });
+    } catch {button.textContent='Try showcasing again';}
+    finally {button.disabled=false;}
   }));
   document.querySelectorAll('[data-share-achievement]').forEach((button) => button.addEventListener('click', async () => {
     const achievement = (profile.achievements || []).find((item) => item.id === button.dataset.shareAchievement);
     if (!achievement?.unlocked) return;
-    await shareAchievementCard(profile, achievement);
-    track('achievement_share', { achievement: achievement.id });
+    await performShare(button,()=>shareAchievementCard(profile, achievement),'achievement_share',{achievement:achievement.id});
   }));
   document.querySelectorAll('[data-share-daily]').forEach((button) => button.addEventListener('click', async () => {
     const row = (profile.daily_history || [])[Number(button.dataset.shareDaily)];
     if (!row) return;
-    await shareResultCard(profile, row, names.get(String(row.set_id || '').toLowerCase()));
-    track('daily_result_share', { set: row.set_id, mode: row.mode, percentile: row.percentile || undefined });
+    await performShare(button,()=>shareResultCard(profile, row, names.get(String(row.set_id || '').toLowerCase())),'daily_result_share',{set:row.set_id,mode:row.mode,percentile:row.percentile||undefined});
   }));
 
   const loadMore = document.querySelector('#profile-load-more');
@@ -309,6 +317,7 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
   if (profileRendering) return;
   profileRendering = true;
   try {
+    document.body.classList.remove('is-game');
     ensureProfileStyles();
     const catalog = await loadCatalog();
     const app = document.querySelector('#app');

@@ -80,3 +80,27 @@ CREATE TABLE IF NOT EXISTS player_achievements (
 CREATE INDEX IF NOT EXISTS players_public_name_idx ON players(lower(display_name)) WHERE profile_public;
 -- statement
 CREATE INDEX IF NOT EXISTS scores_draft_run_period_idx ON scores(challenge_date,player_id) INCLUDE(score) WHERE mode='draft_run';
+-- statement
+-- Existing production already allows draft_run. Extend older checkouts too.
+DO $$ BEGIN
+  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='scores'::regclass AND conname='scores_mode_check' AND pg_get_constraintdef(oid) LIKE '%draft_run%') THEN
+    ALTER TABLE scores DROP CONSTRAINT IF EXISTS scores_mode_check;
+    ALTER TABLE scores ADD CONSTRAINT scores_mode_check CHECK(mode IN('top3','full','draft_run'));
+  END IF;
+  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='game_results'::regclass AND conname='game_results_mode_check' AND pg_get_constraintdef(oid) LIKE '%draft_run%') THEN
+    ALTER TABLE game_results DROP CONSTRAINT IF EXISTS game_results_mode_check;
+    ALTER TABLE game_results ADD CONSTRAINT game_results_mode_check CHECK(mode IN('top3','full','draft_run'));
+  END IF;
+END $$;
+-- statement
+DO $$ BEGIN
+  IF NOT EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='draft_run_verified_puzzles'::regclass AND conname='draft_run_evidence_required') THEN
+    ALTER TABLE draft_run_verified_puzzles ADD CONSTRAINT draft_run_evidence_required CHECK (
+      ((payload->>'event_match_wins')::int=7 AND
+       (payload->>'player_games_lower_bound')::int>=100 AND
+       (payload->>'player_win_rate_bucket')::numeric BETWEEN .6 AND 1 AND
+       jsonb_array_length(payload->'prior_picks')=pick_number-1 AND
+       jsonb_array_length(payload->'candidates')=candidate_count) IS TRUE
+    );
+  END IF;
+END $$;

@@ -19,7 +19,7 @@ async function api(path,body,auth=true) {
 }
 function image(card,extra='') {
   const url=/^https:\/\//.test(card.image_url||'')?card.image_url:'';
-  return url?`<img src="${esc(url)}" alt="${esc(card.name)}" loading="lazy" decoding="async" ${extra}>`:`<span class="run-card-fallback">${esc(card.name)}</span>`;
+  return url?`<img src="${esc(url)}" alt="${esc(card.name)}" decoding="async" ${extra}>`:`<span class="run-card-fallback">${esc(card.name)}</span>`;
 }
 function steps() {
   return `<ol class="run-steps" aria-label="Run progress">${Array.from({length:10},(_,i)=>`<li class="${run.answers[i]?'done':i===run.answers.length?'current':''}" ${i===run.answers.length?'aria-current="step"':''}>${run.answers[i]?run.answers[i].score:i+1}</li>`).join('')}</ol>`;
@@ -136,10 +136,14 @@ export async function installDraftRunPage() {
 }
 export function installDraftRunHome() {
   styles();
+  if(!new URLSearchParams(location.search).has('legacy-board')) {
+    for(const [id,url] of [['daily-nav','?game=draft-run&daily=1'],['leaderboard-nav','?game=draft-run&board=daily']])
+      document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();location.href=url;},true);
+  }
   onAppRender(()=>{
     const intro=document.querySelector('.home-intro');if(!intro||document.querySelector('.draft-run-feature'))return;
     const copy=intro.querySelector('p:last-child');if(copy)copy.textContent='Ten tough choices from trophy drafts. Read the drafter’s pool, make your pick, and see how you did.';
-    intro.insertAdjacentHTML('afterend',`<section class="draft-run-feature"><div><p class="eyebrow">The Daily Draft Run</p><h2>Ten picks.<br>Your call.</h2><p>Different sets. Real trophy drafts. One set reroll and one pack reroll when you need them.</p></div><div class="draft-run-feature-actions"><a class="button primary" href="?game=draft-run&daily=1">Play today’s Draft Run</a><a class="button secondary" href="?game=draft-run">Practice a Draft Run</a><a class="text-button" href="?game=draft-run&board=daily">See the Draft Run board</a><small>Free to play · No account needed</small></div></section>`);
+    intro.insertAdjacentHTML('afterend',`<section class="draft-run-feature"><div><p class="eyebrow">The Daily Draft Run</p><h2>Ten picks.<br> Your call.</h2><p>Different sets. Real trophy drafts. One set reroll and one pack reroll when you need them.</p></div><div class="draft-run-feature-actions"><a class="button primary" href="?game=draft-run&daily=1">Play today’s Draft Run</a><a class="button secondary" href="?game=draft-run">Practice a Draft Run</a><a class="text-button" href="?game=draft-run&board=daily">See the Draft Run board</a><small>Free to play · No account needed</small></div></section>`);
   });
   if(new URLSearchParams(location.search).has('legacy-board')) queueMicrotask(()=>document.querySelector('#leaderboard-nav')?.click());
 }

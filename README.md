@@ -1,6 +1,6 @@
 # Pack 1
 
-Pack 1 is a Limited draft game built from real historical 17Lands Premier Draft decisions. Play the ranked Daily Challenge or unlimited seeded games, get a score out of 100 from an offline strong-player consensus model, then send the exact same pack to a friend.
+Pack One is a Limited draft game built from historical 17Lands Premier Draft decisions. Its primary game is **Draft Run**: ten independent choices from verified trophy drafts, two one-use rerolls, and contextual partial credit. Play the Eastern-time Daily or unlimited practice, then send the same ten packs to a friend.
 
 Live site: `https://magic.planitnow.us`
 
@@ -8,7 +8,7 @@ Live site: `https://magic.planitnow.us`
 
 - Historical replay study, **not** a counterfactual draft simulator.
 - High 17Lands win rate is the primary definition of player strength.
-- Strong-player consensus is the grading signal; it is not presented as objective truth.
+- Draft Run awards 100 for the trophy pick and up to 95 from relative contextual support for alternatives. Other modes retain their existing scoring.
 - Historical drafter picks are shown separately from consensus.
 - No model/LLM API is used for runtime scoring.
 - Raw 17Lands archives are never committed or shipped to the browser.
@@ -17,7 +17,11 @@ Live site: `https://magic.planitnow.us`
 
 ## Game modes
 
-### Daily Challenge
+### Draft Run
+
+`?game=draft-run` starts unlimited practice; add `&daily=1` for the ranked Daily. Round one is P1P1, round two is P1P2 with the original drafter’s earlier choice, and later rounds sample pick buckets. Each question uses a separate successful draft. See [the game contract](docs/CHARTER.md) and [launch review](docs/LAUNCH_REVIEW.md).
+
+### Other Daily Challenges
 
 One deterministic replay per set/mode/day, with the game day resetting at midnight Eastern. The first attempt is ranked and submitted to the global leaderboard. Consecutive days cannot select the same replay when a set has multiple replays.
 
@@ -66,6 +70,8 @@ Pack 1 uses a dedicated Neon project/database.
 - cross-device Daily streak dates.
 
 Keeping ranking and growth endpoints separate means growth changes cannot silently alter Daily scoring semantics.
+
+`draftrunapi` is the server authority for the trophy-only corpus, ten-round sessions, deterministic Daily schedules, rerolls, grading, stored friend challenges, and Draft Run leaderboards. It writes a completed run once to career history and records its environment contributions separately.
 
 ### Optional accounts
 

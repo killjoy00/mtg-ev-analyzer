@@ -65,6 +65,10 @@ BEGIN
     selections_json, details_json, is_featured, created_at
   FROM scores
   WHERE player_id = source_player
+    AND NOT (mode='draft_run' AND EXISTS (
+      SELECT 1 FROM draft_run_sessions target
+      WHERE target.player_id=target_player AND target.day=scores.challenge_date
+    ))
   ON CONFLICT (player_id, challenge_date, set_id, mode) DO NOTHING;
   DELETE FROM scores WHERE player_id = source_player;
 

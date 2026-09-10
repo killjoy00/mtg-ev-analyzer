@@ -24,9 +24,9 @@ for(const set of catalog.sets) {
   const rows=JSON.parse(zlib.gunzipSync(bytes));
   if(rows.some(p=>!validateDraftRunPuzzle(p))) throw new Error('Invalid puzzle in '+set.id);
   await query(`INSERT INTO draft_run_verified_sets(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb) ON CONFLICT(set_id) DO UPDATE SET corpus_version=EXCLUDED.corpus_version,manifest=EXCLUDED.manifest`,[set.id,catalog.corpus_version,JSON.stringify(set)]);
-  for(let i=0;i<rows.length;i+=75) {
-    const batch=rows.slice(i,i+75).map(p=>({puzzle_id:p.puzzle_id,set_id:p.set_id,source_draft_hash:p.source_draft_hash,corpus_version:p.corpus_version,pick_number:p.pick_number,candidate_count:p.candidates.length,consensus_top_gap:draftRunDifficulty(p).topGap,support_entropy:draftRunDifficulty(p).entropy,interesting:interestingDraftRunPuzzle(p),payload:p}));
-    await query(`INSERT INTO draft_run_verified_puzzles SELECT * FROM jsonb_to_recordset($1::jsonb) AS p(puzzle_id text,set_id text,source_draft_hash text,corpus_version text,pick_number smallint,candidate_count smallint,consensus_top_gap real,support_entropy real,interesting boolean,payload jsonb) ON CONFLICT(puzzle_id) DO NOTHING`,[JSON.stringify(batch)]);
+  for(let i=0;i<rows.length;i+=250) {
+    const batch=rows.slice(i,i+250).map(p=>({puzzle_id:p.puzzle_id,set_id:p.set_id,source_draft_hash:p.source_draft_hash,corpus_version:p.corpus_version,pick_number:p.pick_number,candidate_count:p.candidates.length,consensus_top_gap:draftRunDifficulty(p).topGap,support_entropy:draftRunDifficulty(p).entropy,interesting:interestingDraftRunPuzzle(p),payload:p}));
+    await query(`INSERT INTO draft_run_verified_puzzles SELECT * FROM jsonb_to_recordset($1::jsonb) AS p(puzzle_id text,set_id text,source_draft_hash text,corpus_version text,pick_number smallint,candidate_count smallint,consensus_top_gap real,support_entropy real,interesting boolean,payload jsonb) ON CONFLICT(puzzle_id) DO UPDATE SET payload=EXCLUDED.payload WHERE draft_run_verified_puzzles.payload->>'source_fingerprint'=EXCLUDED.payload->>'source_fingerprint'`,[JSON.stringify(batch)]);
   }
   console.log(set.id,rows.length,'verified puzzles');
 }

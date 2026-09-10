@@ -8,6 +8,7 @@ const TOKEN_PREFIX = 'p1_';
 const STATIC_ORIGIN = 'https://magic.planitnow.us';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 let catalogCache = { at: 0, data: null };
+let signingKeyCache = { at: 0, key: null };
 
 function json(value, status = 200) {
   return new Response(JSON.stringify(value), {
@@ -99,15 +100,19 @@ async function secret() {
   return result.rows[0].value;
 }
 
-async function signature(id) {
-  const key = await crypto.subtle.importKey(
+async function signingKey() {
+  if(signingKeyCache.key&&Date.now()-signingKeyCache.at<60000)return signingKeyCache.key;
+  const key=await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(await secret()),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ['sign'],
+    ['sign','verify'],
   );
-  return base64Url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(id)));
+  signingKeyCache={at:Date.now(),key};return key;
+}
+async function signature(id) {
+  return base64Url(await crypto.subtle.sign('HMAC', await signingKey(), new TextEncoder().encode(id)));
 }
 
 async function tokenFor(id) {
@@ -118,8 +123,8 @@ async function verifyToken(value) {
   const raw = String(value || '');
   if (!raw.startsWith(TOKEN_PREFIX)) return null;
   const [id, supplied] = raw.slice(TOKEN_PREFIX.length).split('.');
-  if (!/^[a-f0-9-]{36}$/i.test(id || '') || !supplied) return null;
-  return (await signature(id)) === supplied ? id : null;
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id || '') || !/^[A-Za-z0-9_-]{43}$/.test(supplied||'')) return null;
+  return await crypto.subtle.verify('HMAC',await signingKey(),Buffer.from(supplied,'base64url'),new TextEncoder().encode(id))?id:null;
 }
 
 async function player(request, required = true) {
@@ -317,16 +322,15 @@ async function dailyHistoryFor(playerId) {
        SELECT challenge_date,set_id,mode,score,grade,created_at
        FROM scores
        WHERE player_id=$1::uuid
-       ORDER BY challenge_date DESC,created_at DESC
-       LIMIT 120
      )
      SELECT m.challenge_date::text date,m.set_id,m.mode,m.score,m.grade,m.created_at,
-            (SELECT count(*) FROM scores x
-             WHERE x.challenge_date=m.challenge_date AND x.set_id=m.set_id AND x.mode=m.mode) total,
-            1 + (SELECT count(*) FROM scores x
-                 WHERE x.challenge_date=m.challenge_date AND x.set_id=m.set_id AND x.mode=m.mode AND x.score>m.score) rank,
-            (SELECT count(*) FROM scores x WHERE x.challenge_date=m.challenge_date AND x.set_id=m.set_id AND x.mode=m.mode AND x.score>=m.score) through_ties
+            b.total,b.rank,b.through_ties
      FROM mine m
+     CROSS JOIN LATERAL (
+       SELECT count(*) total,1+count(*) FILTER(WHERE x.score>m.score) rank,
+              count(*) FILTER(WHERE x.score>=m.score) through_ties
+       FROM scores x WHERE x.challenge_date=m.challenge_date AND x.set_id=m.set_id AND x.mode=m.mode
+     ) b
      ORDER BY m.challenge_date DESC,m.created_at DESC`,
     [playerId],
   );
@@ -474,7 +478,10 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     INSERT INTO player_achievements(player_id,achievement_id) SELECT $1::uuid,value FROM jsonb_array_elements_text($2::jsonb)
     ON CONFLICT DO NOTHING RETURNING achievement_id
   ) INSERT INTO analytics_events(player_id,event_name,event_props)
-    SELECT $1::uuid,'achievement_unlocked',jsonb_build_object('achievement',achievement_id) FROM earned`,[playerId,JSON.stringify(newlyEarned)]);
+    SELECT $1::uuid,n.name,jsonb_build_object('achievement',achievement_id) FROM earned
+    CROSS JOIN LATERAL (SELECT 'achievement_unlocked' name UNION ALL
+      SELECT CASE WHEN achievement_id LIKE 'streak%' THEN 'streak_milestone_reached' ELSE 'archive_milestone_reached' END
+      WHERE achievement_id LIKE 'streak%' OR achievement_id LIKE 'explorer%' OR achievement_id='archive_complete') n`,[playerId,JSON.stringify(newlyEarned)]);
   const earned=await query('SELECT achievement_id,earned_at FROM player_achievements WHERE player_id=$1::uuid',[playerId]);
   for(const a of achievements){const saved=earned.rows.find(r=>r.achievement_id===a.id);if(saved){a.unlocked=true;a.earned_at=saved.earned_at;a.current=a.target;a.progress_text='Unlocked';}}
   const bestEnvironments = bySet
@@ -482,6 +489,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     .sort((a, b) => b.average_score - a.average_score || b.games - a.games || a.set_id.localeCompare(b.set_id))
     .slice(0, 5);
   const cube = bySet.find((row) => row.set_id === 'powered-cube') || null;
+  const finalPercentiles=dailyHistory.filter(r=>r.final&&r.percentile).map(r=>r.percentile);
 
   return {
     player: {
@@ -498,7 +506,8 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     by_mode: byMode,
     best_environments: bestEnvironments,
     cube,
-    daily_history: dailyHistory,
+    best_final_percentile: finalPercentiles.length?Math.min(...finalPercentiles):null,
+    daily_history: dailyHistory.slice(0,120),
     recent,
     trend: [...recent].slice(0, 40).reverse().map((row) => ({
       played_at: row.played_at,
@@ -636,7 +645,9 @@ async function handleLink(request) {
 
   if (!old.rows.length) {
     await query(
-      'INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid) ON CONFLICT(auth_user_id) DO NOTHING',
+      `WITH claimed AS (INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)
+        ON CONFLICT(auth_user_id) DO NOTHING RETURNING player_id)
+       INSERT INTO analytics_events(player_id,event_name) SELECT player_id,'account_claimed' FROM claimed`,
       [auth.user_id, current],
     );
     const resolved = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
@@ -723,9 +734,10 @@ async function handleProfileUpdate(request) {
   if (showcase && !unlocked.has(showcase)) throw Object.assign(new Error('Showcase an achievement you have unlocked.'), { status: 400 });
 
   await query(
-    `UPDATE players
+    `WITH previous AS MATERIALIZED (SELECT profile_public FROM players WHERE id=$1::uuid FOR UPDATE), changed AS (UPDATE players
      SET profile_public=$2::boolean,favorite_set_id=$3,showcase_achievement=$4,updated_at=now()
-     WHERE id=$1::uuid`,
+     FROM previous WHERE id=$1::uuid RETURNING previous.profile_public was_public)
+     INSERT INTO analytics_events(player_id,event_name) SELECT $1::uuid,'public_profile_enabled' FROM changed WHERE NOT was_public AND $2::boolean`,
     [id, profilePublic, favorite, showcase],
   );
   const updatedMeta = await profileMetaByPlayer(id);

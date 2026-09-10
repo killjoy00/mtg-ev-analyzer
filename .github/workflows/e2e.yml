@@ -34,6 +34,8 @@ jobs:
         run: node tests/profile-e2e.mjs
       - name: Run ten-decision Draft Run regression
         run: node tests/draft-run-e2e.mjs
+      - name: Run account browser contract
+        run: node tests/account-e2e.mjs
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4

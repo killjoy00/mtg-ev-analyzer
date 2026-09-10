@@ -139,7 +139,7 @@ async function change(request,id,action) {
     if(!replacement) fail('No comparable replacement is available. Your reroll is still yours.',409);
     s.puzzle_ids[round]=replacement.puzzle_id;s.seen_sources.push(replacement.source_draft_hash);s.rerolls[type]=0;
   }
-  const updated=await query(`UPDATE draft_run_sessions SET puzzle_ids=$3::jsonb,answers=$4::jsonb,rerolls=$5::jsonb,seen_sources=$6::jsonb,score=$7::int,revision=revision+1,updated_at=now() WHERE id=$1::uuid AND revision=$2::int RETURNING *`,[id,s.revision,JSON.stringify(s.puzzle_ids),JSON.stringify(s.answers),JSON.stringify(s.rerolls),JSON.stringify(s.seen_sources),s.score]);
+  const updated=await query(`UPDATE draft_run_sessions SET puzzle_ids=$3::jsonb,answers=$4::jsonb,rerolls=$5::jsonb,seen_sources=$6::jsonb,score=$7::int,revision=revision+1,updated_at=now() WHERE id=$1::uuid AND revision=$2::int AND player_id=$8::uuid RETURNING *`,[id,s.revision,JSON.stringify(s.puzzle_ids),JSON.stringify(s.answers),JSON.stringify(s.rerolls),JSON.stringify(s.seen_sources),s.score,owner]);
   if(!updated.rows[0]) fail('Your run changed in another tab. Reload to continue.',409);
   return json(await responseFor(decode(updated.rows[0])));
 }

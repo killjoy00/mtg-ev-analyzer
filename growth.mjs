@@ -48,7 +48,7 @@ function captureResult(root) {
     grade:parseGrade(root), seed:params().get('seed')||null, isDaily:params().has('daily'), ...context,
   };
   const history=readHistory(); history.push(item); writeHistory(history);
-  void saveGameResult(item);
+  void saveGameResult(item).then(()=>document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:item.clientResultId,score:item.score,mode:item.mode,daily:item.isDaily}})));
   document.dispatchEvent(new CustomEvent('pack1:result-completed',{detail:{id:item.clientResultId,score:item.score,mode:item.mode,daily:item.isDaily}}));
   event('game_reveal',{ score:item.score, grade:item.grade, daily:item.isDaily, challenge:Boolean(item.challengeId||item.opponentScore!=null), outcome:item.outcome||undefined });
   if(item.challengeId||item.opponentScore!=null) event('challenge_complete',{ outcome:item.outcome, score:item.score, opponent_score:item.opponentScore });
@@ -103,6 +103,7 @@ function group(items,key) {
 }
 function statsRows(rows,labelKey='name') { return rows.map((row)=>`<tr><th>${esc(String(row[labelKey]||'').toUpperCase())}</th><td>${Number(row.games||0)}</td><td>${Number(row.average_score||0).toFixed(1)}</td><td>${Number(row.best_score||0)}</td></tr>`).join(''); }
 async function renderStats() {
+  document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
   const local=readHistory(); const localData={summary:localSummary(local),bySet:group(local,'setId'),byMode:group(local,'mode'),recent:[...local].reverse().slice(0,30)};
   const remote=await loadRemoteStats(); const data=remote?.summary ? remote : localData;
@@ -120,9 +121,10 @@ function formMarkup(kind) {
 }
 async function claimCurrentSession() {
   const session=await getAuthSession(); if(!session?.session?.token || !session?.user) return null;
-  const linked=await linkAccount(session.session.token); currentAccount=session; event('account_claimed'); return linked;
+  const linked=await linkAccount(session.session.token); currentAccount=session; return linked;
 }
 async function renderAccount() {
+  document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
   currentAccount=await getAuthSession();
   if(currentAccount?.session?.token && currentAccount?.user) {
