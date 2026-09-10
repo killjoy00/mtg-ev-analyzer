@@ -48,7 +48,7 @@ jobs:
         continue-on-error: true
         run: >-
           python scripts/backfill_legacy_sets.py
-          --sets VOW,MID,AFR,STX
+          --sets VOW,MID,STX
           --format PremierDraft
           --minimum-games 100
           --top-fraction 0.15
