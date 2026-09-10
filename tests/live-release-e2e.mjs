@@ -15,10 +15,7 @@ const interactionTimings = [];
 
 await mkdir('artifacts', { recursive: true });
 const browser = await chromium.launch(process.env.CI ? { headless:true, channel:'chrome' } : { headless:true });
-const context = await browser.newContext({
-  viewport:{ width:390, height:844 },
-  extraHTTPHeaders:{ 'cache-control':'no-cache', pragma:'no-cache' },
-});
+const context = await browser.newContext({ viewport:{ width:390, height:844 } });
 const page = await context.newPage();
 page.setDefaultTimeout(45000);
 page.on('pageerror', error => pageErrors.push(error.message));
