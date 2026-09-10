@@ -10,7 +10,7 @@ from scripts.backfill_legacy_sets import (
     arena_rank_proxy,
     arena_rank_tier,
     augment_draft_with_rank_proxy,
-    read_experience_buckets,
+    read_legacy_player_history,
 )
 from scripts.build_replays import scan_draft_skill
 
@@ -35,24 +35,38 @@ class LegacySkillBackfillTests(unittest.TestCase):
         self.assertEqual(arena_rank_tier("Platinum-2"), "platinum")
         self.assertIsNone(arena_rank_proxy("Unknown", "draft-a"))
 
-    def test_game_data_supplies_only_modal_experience_bucket(self):
+    def test_game_history_uses_earliest_row_not_later_outcome_or_rank(self):
         with tempfile.TemporaryDirectory() as tmp:
             game = Path(tmp) / "game.csv.gz"
             self.write_csv_gz(
                 game,
-                ["draft_id", "won", "event_match_wins", "user_n_games_bucket"],
                 [
-                    {"draft_id": "d1", "won": "True", "event_match_wins": "7", "user_n_games_bucket": "100"},
-                    {"draft_id": "d1", "won": "False", "event_match_wins": "0", "user_n_games_bucket": "100"},
-                    {"draft_id": "d1", "won": "True", "event_match_wins": "7", "user_n_games_bucket": "500"},
-                    {"draft_id": "d2", "won": "False", "event_match_wins": "0", "user_n_games_bucket": "500"},
+                    "draft_id", "game_time", "match_number", "game_number", "rank",
+                    "won", "event_match_wins", "event_match_losses", "user_n_games_bucket",
+                ],
+                [
+                    {
+                        "draft_id": "d1", "game_time": "2021-09-10T12:30:00Z", "match_number": "2", "game_number": "1",
+                        "rank": "Diamond", "won": "True", "event_match_wins": "2", "event_match_losses": "0",
+                        "user_n_games_bucket": "500",
+                    },
+                    {
+                        "draft_id": "d1", "game_time": "2021-09-10T12:00:00Z", "match_number": "1", "game_number": "1",
+                        "rank": "Platinum", "won": "False", "event_match_wins": "0", "event_match_losses": "0",
+                        "user_n_games_bucket": "100",
+                    },
+                    {
+                        "draft_id": "d2", "game_time": "2021-09-11T12:00:00Z", "match_number": "1", "game_number": "1",
+                        "rank": "Gold", "won": "True", "event_match_wins": "7", "event_match_losses": "0",
+                        "user_n_games_bucket": "500",
+                    },
                 ],
             )
-            skills = read_experience_buckets(game)
-            self.assertEqual(skills["d1"], "100")
-            self.assertEqual(skills["d2"], "500")
+            history = read_legacy_player_history(game)
+            self.assertEqual(history["d1"], {"rank": "Platinum", "games": "100"})
+            self.assertEqual(history["d2"], {"rank": "Gold", "games": "500"})
 
-    def test_legacy_join_makes_old_draft_schema_builder_compatible(self):
+    def test_legacy_join_makes_rankless_draft_schema_builder_compatible(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             draft = root / "draft.csv.gz"
@@ -60,8 +74,12 @@ class LegacySkillBackfillTests(unittest.TestCase):
             joined = root / "joined.csv.gz"
 
             draft_fields = [
-                "draft_id", "pack_number", "pick_number", "pick", "rank",
+                "draft_id", "pack_number", "pick_number", "pick",
                 "pack_card_A", "pack_card_B", "pool_A", "pool_B",
+            ]
+            game_fields = [
+                "draft_id", "game_time", "rank", "won", "event_match_wins",
+                "event_match_losses", "user_n_games_bucket",
             ]
             draft_rows = []
             game_rows = []
@@ -73,7 +91,6 @@ class LegacySkillBackfillTests(unittest.TestCase):
                     "pack_number": "0",
                     "pick_number": "0",
                     "pick": "A",
-                    "rank": tiers[index % len(tiers)],
                     "pack_card_A": "1",
                     "pack_card_B": "1",
                     "pool_A": "0",
@@ -81,17 +98,16 @@ class LegacySkillBackfillTests(unittest.TestCase):
                 })
                 game_rows.append({
                     "draft_id": draft_id,
+                    "game_time": f"2021-09-10T12:{index % 60:02d}:00Z",
+                    "rank": tiers[index % len(tiers)],
                     "won": str(index % 2 == 0),
                     "event_match_wins": "7" if index % 2 == 0 else "0",
+                    "event_match_losses": "0" if index % 2 == 0 else "3",
                     "user_n_games_bucket": "100",
                 })
 
             self.write_csv_gz(draft, draft_fields, draft_rows)
-            self.write_csv_gz(
-                game,
-                ["draft_id", "won", "event_match_wins", "user_n_games_bucket"],
-                game_rows,
-            )
+            self.write_csv_gz(game, game_fields, game_rows)
 
             stats = augment_draft_with_rank_proxy(draft, game, joined)
             self.assertEqual(stats["covered_drafts"], 100)
@@ -105,15 +121,19 @@ class LegacySkillBackfillTests(unittest.TestCase):
             self.assertEqual(skills["d0"].games_lower_bound, 100)
             self.assertGreater(skills["d0"].rate, skills["d1"].rate)
 
-    def test_outcome_columns_cannot_change_rank_selection_proxy(self):
+    def test_later_outcomes_cannot_change_earliest_game_selection(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             draft = root / "draft.csv.gz"
             game = root / "game.csv.gz"
             joined = root / "joined.csv.gz"
             draft_fields = [
-                "draft_id", "pack_number", "pick_number", "pick", "rank",
+                "draft_id", "pack_number", "pick_number", "pick",
                 "pack_card_A", "pack_card_B", "pool_A", "pool_B",
+            ]
+            game_fields = [
+                "draft_id", "game_time", "rank", "won", "event_match_wins",
+                "event_match_losses", "user_n_games_bucket",
             ]
             draft_rows = []
             game_rows = []
@@ -124,29 +144,39 @@ class LegacySkillBackfillTests(unittest.TestCase):
                     "pack_number": "0",
                     "pick_number": "0",
                     "pick": "A",
-                    "rank": "Diamond",
                     "pack_card_A": "1",
                     "pack_card_B": "1",
                     "pool_A": "0",
                     "pool_B": "0",
                 })
-                game_rows.append({
-                    "draft_id": draft_id,
-                    "won": "True" if index < 50 else "False",
-                    "event_match_wins": "7" if index < 50 else "0",
-                    "event_match_losses": "0" if index < 50 else "3",
-                    "user_n_games_bucket": "100",
-                })
+                game_rows.extend([
+                    {
+                        "draft_id": draft_id,
+                        "game_time": "2021-09-10T12:00:00Z",
+                        "rank": "Platinum",
+                        "won": "False",
+                        "event_match_wins": "0",
+                        "event_match_losses": "0",
+                        "user_n_games_bucket": "100",
+                    },
+                    {
+                        "draft_id": draft_id,
+                        "game_time": "2021-09-10T13:00:00Z",
+                        "rank": "Mythic" if index < 50 else "Bronze",
+                        "won": "True" if index < 50 else "False",
+                        "event_match_wins": "7" if index < 50 else "0",
+                        "event_match_losses": "0" if index < 50 else "3",
+                        "user_n_games_bucket": "500",
+                    },
+                ])
             self.write_csv_gz(draft, draft_fields, draft_rows)
-            self.write_csv_gz(
-                game,
-                ["draft_id", "won", "event_match_wins", "event_match_losses", "user_n_games_bucket"],
-                game_rows,
-            )
+            self.write_csv_gz(game, game_fields, game_rows)
             augment_draft_with_rank_proxy(draft, game, joined)
             skills, _ = scan_draft_skill(joined)
-            self.assertAlmostEqual(skills["d0"].rate, arena_rank_proxy("Diamond", "d0"))
-            self.assertAlmostEqual(skills["d99"].rate, arena_rank_proxy("Diamond", "d99"))
+            self.assertAlmostEqual(skills["d0"].rate, arena_rank_proxy("Platinum", "d0"))
+            self.assertAlmostEqual(skills["d99"].rate, arena_rank_proxy("Platinum", "d99"))
+            self.assertEqual(skills["d0"].games_lower_bound, 100)
+            self.assertEqual(skills["d99"].games_lower_bound, 100)
 
     def test_published_provenance_removes_synthetic_win_rate(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -189,17 +219,17 @@ class LegacySkillBackfillTests(unittest.TestCase):
 
             published_manifest = json.loads((output / "manifest.json").read_text())
             self.assertNotIn("win_rate_cutoff", published_manifest["cohort"])
-            self.assertEqual(published_manifest["cohort"]["selection_metric"], "arena_rank")
-            self.assertIn("Game outcomes", published_manifest["cohort"]["selection_note"])
+            self.assertEqual(published_manifest["cohort"]["selection_metric"], "earliest_game_arena_rank")
+            self.assertIn("earliest game row", published_manifest["cohort"]["selection_note"])
 
             published_model = json.loads((output / "path-model.json").read_text())
             self.assertNotIn("win_rate_cutoff", published_model["training"])
-            self.assertEqual(published_model["training"]["selection_metric"], "arena_rank")
+            self.assertEqual(published_model["training"]["selection_metric"], "earliest_game_arena_rank")
 
             published_catalog = json.loads(catalog_path.read_text())
             entry = published_catalog["sets"][0]
             self.assertNotIn("win_rate_cutoff", entry)
-            self.assertEqual(entry["cohort_selection"], "arena_rank")
+            self.assertEqual(entry["cohort_selection"], "earliest_game_arena_rank")
             self.assertEqual(entry["cohort_label"], "Experienced Arena-rank cohort")
 
 

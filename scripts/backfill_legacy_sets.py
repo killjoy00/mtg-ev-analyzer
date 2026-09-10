@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
-"""Backfill legacy 17Lands draft sets whose draft_data lacks win-rate history.
+"""Backfill legacy 17Lands draft sets whose draft_data lacks skill history.
 
-VOW, MID, AFR, and STX predate the draft-data schema that exposes
-``user_game_win_rate_bucket``. Their draft rows still carry Arena ``rank`` and
-the matching legacy game_data carries ``user_n_games_bucket``. For these frozen
-sets we therefore select an experienced, high-ranked Arena cohort instead of
-inventing a win rate or selecting on the draft's own results.
+VOW, MID, AFR, and STX predate the draft-data schema that exposes both
+``user_game_win_rate_bucket`` and ``rank``. Their matching legacy game_data
+still carries Arena rank plus ``user_n_games_bucket``. For these frozen sets we
+select an experienced, high-ranked Arena cohort instead of inventing a win rate
+or selecting on the draft's own results.
+
+For each draft, only the earliest available game row is used. Its rank and
+prior-games bucket are observed before that game's outcome, so later wins,
+losses, rank changes, and event record cannot affect cohort membership.
 
 Implementation detail: the existing replay/path builders intentionally consume
 a numeric ``user_game_win_rate_bucket``. This helper writes a temporary rank
@@ -13,9 +17,6 @@ proxy into that column so the mature builders, holdouts, and model code can run
 unchanged. Before publication every synthetic win-rate field is removed and the
 manifest, path model, and catalog are relabeled with the actual Arena-rank
 cohort definition.
-
-No game result, deck content, event record, match win, or match loss is used to
-choose the cohort.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ import shutil
 import sys
 import tempfile
 import time
-from collections import Counter, defaultdict
+from collections import Counter
 from pathlib import Path
 from typing import Optional, Sequence
 
@@ -75,10 +76,11 @@ PUBLIC_GAME_URL = (
 EXPERIENCE_COLUMN = "user_n_games_bucket"
 TEMP_RATE_COLUMN = "user_game_win_rate_bucket"
 RANK_COLUMN = "rank"
+GAME_TIME_COLUMN = "game_time"
 
 # Large spacing between tiers means the tiny deterministic tie-break can never
-# move a lower Arena tier above a higher one. The values are selection scores,
-# never win-rate estimates, and are removed from published metadata.
+# move a lower Arena tier above a higher one. These are selection scores, never
+# win-rate estimates, and are removed from published metadata.
 RANK_BASE = {
     "mythic": 0.90,
     "diamond": 0.80,
@@ -134,7 +136,6 @@ def arena_rank_proxy(rank: object, draft_id: str) -> Optional[float]:
     tier = arena_rank_tier(rank)
     if not tier or not draft_id:
         return None
-    # At most 0.000999999, far smaller than the 0.10 gap between tiers.
     tie_break = (stable_score(f"legacy-rank:{draft_id}") % 1_000_000) / 1_000_000_000
     return RANK_BASE[tier] + tie_break
 
@@ -150,36 +151,60 @@ def proxy_cutoff_tier(value: object) -> Optional[str]:
     return None
 
 
-def read_experience_buckets(game_path: Path) -> dict[str, str]:
-    """Return the modal prior-games bucket for each draft_id.
+def _numeric_order(value: object, fallback: int) -> int:
+    try:
+        return int(float(str(value or "")))
+    except (TypeError, ValueError):
+        return fallback
 
-    Legacy game_data may contain outcome columns, but this routine only reads
-    draft_id and user_n_games_bucket.
+
+def _game_order(row: dict, index: int) -> tuple:
+    """Order game rows chronologically, falling back to file order."""
+    game_time = str(row.get(GAME_TIME_COLUMN) or "").strip()
+    if game_time:
+        return (
+            0,
+            game_time,
+            _numeric_order(row.get("match_number"), 10**9),
+            _numeric_order(row.get("game_number"), 10**9),
+            index,
+        )
+    return (1, index)
+
+
+def read_legacy_player_history(game_path: Path) -> dict[str, dict[str, str]]:
+    """Return rank + prior-games bucket from each draft's earliest game row.
+
+    Outcome fields may exist in the CSV but are never read. If game_time exists,
+    it determines the earliest row; otherwise the first row encountered for that
+    draft is used.
     """
-    observations: dict[str, Counter] = defaultdict(Counter)
+    earliest: dict[str, tuple[tuple, dict[str, str]]] = {}
     with open_text(game_path) as handle:
         reader = csv.DictReader(handle)
         fieldnames = set(reader.fieldnames or [])
-        required = {"draft_id", EXPERIENCE_COLUMN}
+        required = {"draft_id", RANK_COLUMN, EXPERIENCE_COLUMN}
         missing = required - fieldnames
         if missing:
             raise ValueError(
-                "Legacy game_data cannot supply Pack One's experience filter; "
+                "Legacy game_data cannot supply the Arena-rank cohort; "
                 f"missing columns: {', '.join(sorted(missing))}"
             )
-        for row in reader:
+        for index, row in enumerate(reader):
             draft_id = str(row.get("draft_id") or "").strip()
+            rank = str(row.get(RANK_COLUMN) or "").strip()
             games = str(row.get(EXPERIENCE_COLUMN) or "").strip()
-            if draft_id and games:
-                observations[draft_id][games] += 1
+            if not draft_id or not rank or not games:
+                continue
+            order = _game_order(row, index)
+            current = earliest.get(draft_id)
+            if current is None or order < current[0]:
+                earliest[draft_id] = (order, {"rank": rank, "games": games})
 
-    buckets: dict[str, str] = {}
-    for draft_id, counts in observations.items():
-        if counts:
-            buckets[draft_id] = counts.most_common(1)[0][0]
-    if not buckets:
-        raise ValueError("Legacy game_data contained no usable prior-games buckets.")
-    return buckets
+    history = {draft_id: values for draft_id, (_, values) in earliest.items()}
+    if not history:
+        raise ValueError("Legacy game_data contained no usable earliest-game rank/experience rows.")
+    return history
 
 
 def augment_draft_with_rank_proxy(
@@ -187,8 +212,8 @@ def augment_draft_with_rank_proxy(
     game_path: Path,
     destination: Path,
 ) -> dict:
-    """Add prior-games history and a temporary Arena-rank selection score."""
-    experience = read_experience_buckets(game_path)
+    """Add earliest-game rank/experience history and a temporary rank score."""
+    history = read_legacy_player_history(game_path)
     seen_drafts: set[str] = set()
     covered_drafts: set[str] = set()
     tier_by_draft: dict[str, str] = {}
@@ -197,12 +222,11 @@ def augment_draft_with_rank_proxy(
     with open_text(draft_path) as source:
         reader = csv.DictReader(source)
         fieldnames = list(reader.fieldnames or [])
-        structural = {"draft_id", "pick", "pack_number", "pick_number", RANK_COLUMN}
+        structural = {"draft_id", "pick", "pack_number", "pick_number"}
         missing_structural = structural - set(fieldnames)
         if missing_structural:
             raise ValueError(
-                "Legacy draft_data cannot supply the Arena-rank cohort; "
-                f"missing columns: {', '.join(sorted(missing_structural))}"
+                f"Legacy draft_data is missing structural columns: {', '.join(sorted(missing_structural))}"
             )
         for column in (TEMP_RATE_COLUMN, EXPERIENCE_COLUMN):
             if column not in fieldnames:
@@ -216,15 +240,16 @@ def augment_draft_with_rank_proxy(
                 draft_id = str(row.get("draft_id") or "").strip()
                 if draft_id:
                     seen_drafts.add(draft_id)
-                    games = experience.get(draft_id)
-                    rank = row.get(RANK_COLUMN)
-                    tier = arena_rank_tier(rank)
-                    proxy = arena_rank_proxy(rank, draft_id)
-                    if games and proxy is not None and tier:
-                        row[EXPERIENCE_COLUMN] = games
-                        row[TEMP_RATE_COLUMN] = f"{proxy:.9f}"
-                        covered_drafts.add(draft_id)
-                        tier_by_draft.setdefault(draft_id, tier)
+                    player = history.get(draft_id)
+                    if player:
+                        rank = player["rank"]
+                        tier = arena_rank_tier(rank)
+                        proxy = arena_rank_proxy(rank, draft_id)
+                        if proxy is not None and tier:
+                            row[EXPERIENCE_COLUMN] = player["games"]
+                            row[TEMP_RATE_COLUMN] = f"{proxy:.9f}"
+                            covered_drafts.add(draft_id)
+                            tier_by_draft.setdefault(draft_id, tier)
                 writer.writerow(row)
 
     if not seen_drafts:
@@ -232,14 +257,14 @@ def augment_draft_with_rank_proxy(
     coverage = len(covered_drafts) / len(seen_drafts)
     if len(covered_drafts) < 100:
         raise ValueError(
-            f"Only {len(covered_drafts)} drafts had both Arena rank and prior-games history; "
+            f"Only {len(covered_drafts)} drafts had earliest-game Arena rank and prior-games history; "
             "refusing to train a degraded cohort."
         )
     rank_tiers = Counter(tier_by_draft.values())
     return {
         "draft_rows": row_count,
         "drafts": len(seen_drafts),
-        "experience_drafts": len(experience),
+        "history_drafts": len(history),
         "covered_drafts": len(covered_drafts),
         "coverage": coverage,
         "rank_tiers": {tier: int(rank_tiers.get(tier, 0)) for tier in RANK_ORDER},
@@ -291,32 +316,28 @@ def annotate_legacy_provenance(
     cohort.update({
         "definition": (
             f"drafts with a {minimum_games}+ prior-games bucket in the top {top_fraction:.0%} "
-            "of available Arena rank tiers; stable draft-id tie-break within a tier"
+            "of earliest-game Arena rank tiers; stable draft-id tie-break within a tier"
         ),
-        "selection_metric": "arena_rank",
+        "selection_metric": "earliest_game_arena_rank",
         "top_fraction": top_fraction,
         "arena_rank_cutoff_tier": cutoff_tier,
         "skill_join_coverage": round(float(join_stats["coverage"]), 6),
         "rank_tiers": join_stats["rank_tiers"],
         "selection_note": (
-            "Legacy cohort uses pre-draft Arena rank plus anonymized prior-games history. "
-            "Game outcomes and event records are not used for cohort selection."
+            "Legacy cohort uses Arena rank and anonymized prior-games history from each draft's "
+            "earliest game row. That row is selected before reading any game outcome; wins, losses, "
+            "event records, and later rank changes are excluded from cohort selection."
         ),
         "skill_sources": [
-            {
-                "provider": "17Lands",
-                "dataset_kind": "draft_data",
-                "field": RANK_COLUMN,
-                "purpose": "Arena rank tier",
-            },
             {
                 "provider": "17Lands",
                 "dataset_kind": "game_data",
                 "data_date": game_source_date,
                 "join_key": "draft_id",
-                "field": EXPERIENCE_COLUMN,
-                "purpose": "anonymized prior-games experience bucket",
-            },
+                "row_selection": "earliest game_time per draft; file order fallback",
+                "fields": [RANK_COLUMN, EXPERIENCE_COLUMN],
+                "purpose": "Arena rank tier and anonymized prior-games experience bucket",
+            }
         ],
     })
     manifest_path.write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
@@ -326,11 +347,11 @@ def annotate_legacy_provenance(
     training = model.setdefault("training", {})
     training.pop("win_rate_cutoff", None)
     training.update({
-        "selection_metric": "arena_rank",
+        "selection_metric": "earliest_game_arena_rank",
         "top_fraction": top_fraction,
         "arena_rank_cutoff_tier": cutoff_tier,
         "skill_join_coverage": round(float(join_stats["coverage"]), 6),
-        "selection_note": "Legacy Arena-rank cohort; game outcomes are excluded from cohort selection.",
+        "selection_note": "Legacy earliest-game Arena-rank cohort; game outcomes are excluded.",
     })
     path_model_path.write_text(json.dumps(model, separators=(",", ":")) + "\n", encoding="utf-8")
 
@@ -342,7 +363,7 @@ def annotate_legacy_provenance(
             continue
         found = True
         entry.pop("win_rate_cutoff", None)
-        entry["cohort_selection"] = "arena_rank"
+        entry["cohort_selection"] = "earliest_game_arena_rank"
         entry["cohort_label"] = "Experienced Arena-rank cohort"
         entry["arena_rank_cutoff_tier"] = cutoff_tier
         break
@@ -356,7 +377,7 @@ def annotate_legacy_provenance(
 def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
     code = remote.code
     lower = code.lower()
-    print(f"\n=== Legacy Arena-rank backfill {code} {remote.format} ===", flush=True)
+    print(f"\n=== Legacy earliest-game Arena-rank backfill {code} {remote.format} ===", flush=True)
 
     with tempfile.TemporaryDirectory(prefix=f"pack1-legacy-{lower}-") as tmp:
         stage_root = Path(tmp)
@@ -378,8 +399,8 @@ def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
         game_source_date = download_dataset(game_remote(remote), game_path)
         join_stats = augment_draft_with_rank_proxy(draft_path, game_path, augmented_path)
         print(
-            f"Legacy rank/experience join: {join_stats['covered_drafts']}/{join_stats['drafts']} drafts "
-            f"({join_stats['coverage']:.1%}) covered; tiers={join_stats['rank_tiers']}",
+            f"Legacy earliest-game rank/experience join: {join_stats['covered_drafts']}/{join_stats['drafts']} "
+            f"drafts ({join_stats['coverage']:.1%}) covered; tiers={join_stats['rank_tiers']}",
             flush=True,
         )
 
@@ -444,7 +465,7 @@ def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
         manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
         if manifest.get("model", {}).get("model_version") != "strong-player-pool-context-v2":
             raise ValueError("Legacy backfill changed the replay model version unexpectedly.")
-        if manifest.get("cohort", {}).get("selection_metric") != "arena_rank":
+        if manifest.get("cohort", {}).get("selection_metric") != "earliest_game_arena_rank":
             raise ValueError("Legacy backfill did not replace the temporary selection metadata.")
         if "win_rate_cutoff" in manifest.get("cohort", {}):
             raise ValueError("Synthetic win-rate metadata survived legacy publication.")
@@ -457,7 +478,7 @@ def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
         result = {
             "code": code,
             "source_date": source_date,
-            "game_experience_source_date": game_source_date,
+            "game_skill_source_date": game_source_date,
             "replay_count": int(manifest["replay_count"]),
             "training_drafts": int(manifest["cohort"]["training_drafts"]),
             "arena_rank_cutoff_tier": selection["arena_rank_cutoff_tier"],
@@ -508,12 +529,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             result = build_legacy_one(remote, args)
             successes.append(result)
             existing.add(code)
-        except Exception as exc:  # Preserve successful sets and report the exact blocker.
+        except Exception as exc:
             print(f"ERROR legacy backfill {code}: {type(exc).__name__}: {exc}", file=sys.stderr, flush=True)
             failures.append({"code": code, "error": f"{type(exc).__name__}: {exc}"})
 
     report = {
-        "mode": "legacy-arena-rank-cohort",
+        "mode": "legacy-earliest-game-arena-rank-cohort",
         "sets": codes,
         "successes": successes,
         "failures": failures,
