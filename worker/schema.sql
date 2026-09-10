@@ -6,9 +6,15 @@ CREATE TABLE IF NOT EXISTS settings (
 CREATE TABLE IF NOT EXISTS players (
   id uuid PRIMARY KEY,
   display_name text NOT NULL CHECK (char_length(display_name) BETWEEN 2 AND 24),
+  profile_key text NOT NULL DEFAULT substr(md5(random()::text || clock_timestamp()::text), 1, 16),
+  profile_public boolean NOT NULL DEFAULT false,
+  favorite_set_id text,
+  showcase_achievement text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );
+CREATE UNIQUE INDEX IF NOT EXISTS players_profile_key_uq ON players(profile_key);
+CREATE INDEX IF NOT EXISTS players_public_profile_idx ON players(profile_key) WHERE profile_public = true;
 
 CREATE TABLE IF NOT EXISTS scores (
   id bigserial PRIMARY KEY,

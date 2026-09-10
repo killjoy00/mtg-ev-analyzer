@@ -69,6 +69,36 @@ export async function linkAccount(authSessionToken = loadAuthToken()) {
   return data;
 }
 
+export async function loadMyProfile() {
+  return api('/v1/profile/me', { auth:true });
+}
+export async function loadPublicProfile(profileKey) {
+  return api(`/v1/profile/${encodeURIComponent(profileKey)}`, { auth:false });
+}
+export async function updateProfile({ profilePublic, favoriteSetId, showcaseAchievement } = {}) {
+  const body = {};
+  if (typeof profilePublic === 'boolean') body.profilePublic = profilePublic;
+  if (favoriteSetId !== undefined) body.favoriteSetId = favoriteSetId;
+  if (showcaseAchievement !== undefined) body.showcaseAchievement = showcaseAchievement;
+  return api('/v1/profile', { method:'PATCH', body, auth:true });
+}
+export async function loadProfileHistory({ profileKey=null, cursor=null, limit=25 } = {}) {
+  const params = new URLSearchParams({ limit:String(limit) });
+  if (cursor) params.set('cursor', String(cursor));
+  const path = profileKey
+    ? `/v1/profile/${encodeURIComponent(profileKey)}/history?${params}`
+    : `/v1/profile/history?${params}`;
+  return api(path, { auth:!profileKey });
+}
+export async function lookupPublicProfiles(names) {
+  const unique = [...new Set((names || []).map((name)=>String(name||'').trim()).filter(Boolean))].slice(0,100);
+  if (!unique.length || !packApiConfigured()) return {};
+  try {
+    const data = await api('/v1/profile-lookup', { method:'POST', body:{ names:unique }, auth:false });
+    return data?.profiles && typeof data.profiles === 'object' ? data.profiles : {};
+  } catch { return {}; }
+}
+
 export async function authRequest(path, { method='GET', body } = {}) {
   const response = await fetch(`${AUTH_BASE}${path}`, {
     method,
