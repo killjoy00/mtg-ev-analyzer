@@ -1,0 +1,654 @@
+{
+  "schema_version": 2,
+  "set_id": "vow",
+  "name": "VOW",
+  "format": "PremierDraft",
+  "is_fixture": false,
+  "source": {
+    "provider": "17Lands",
+    "dataset_kind": "draft_data",
+    "data_date": "2024-01-11",
+    "license": "CC BY 4.0 unless otherwise noted by 17Lands"
+  },
+  "cohort": {
+    "definition": "drafts with a 100+ prior-games bucket in the top 15% of earliest-game Arena rank tiers; stable draft-id tie-break within a tier",
+    "minimum_games_bucket_lower_bound": 100,
+    "experienced_drafts": 45499,
+    "training_drafts": 5000,
+    "training_picks": 208959,
+    "selection_metric": "earliest_game_arena_rank",
+    "top_fraction": 0.15,
+    "arena_rank_cutoff_tier": "diamond",
+    "skill_join_coverage": 0.823033,
+    "rank_tiers": {
+      "mythic": 4744,
+      "diamond": 12771,
+      "platinum": 36852,
+      "gold": 17917,
+      "silver": 9481,
+      "bronze": 0
+    },
+    "selection_note": "Legacy cohort uses Arena rank and anonymized prior-games history from each draft's earliest game row. That row is selected before reading any game outcome; wins, losses, event records, and later rank changes are excluded from cohort selection.",
+    "skill_sources": [
+      {
+        "provider": "17Lands",
+        "dataset_kind": "game_data",
+        "data_date": "2024-01-11",
+        "join_key": "draft_id",
+        "row_selection": "earliest game_time per draft; file order fallback",
+        "fields": [
+          "rank",
+          "user_n_games_bucket"
+        ],
+        "purpose": "Arena rank tier and anonymized prior-games experience bucket"
+      }
+    ]
+  },
+  "model": {
+    "model_version": "strong-player-pool-context-v2",
+    "holdout": "5-fold by draft_id",
+    "probabilities_are_calibrated": false,
+    "description": "Hierarchical strong-player pick tendency adjusted by shrinkage-weighted card/pool co-pick lift; normalized within each pack.",
+    "pool_conditioned": true
+  },
+  "replay_count": 298,
+  "shard_size": 2,
+  "shards": [
+    {
+      "path": "./data/vow/shards/000.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/001.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/002.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/003.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/004.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/005.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/006.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/007.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/008.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/009.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/010.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/011.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/012.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/013.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/014.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/015.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/016.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/017.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/018.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/019.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/020.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/021.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/022.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/023.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/024.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/025.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/026.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/027.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/028.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/029.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/030.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/031.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/032.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/033.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/034.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/035.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/036.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/037.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/038.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/039.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/040.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/041.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/042.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/043.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/044.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/045.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/046.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/047.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/048.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/049.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/050.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/051.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/052.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/053.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/054.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/055.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/056.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/057.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/058.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/059.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/060.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/061.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/062.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/063.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/064.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/065.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/066.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/067.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/068.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/069.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/070.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/071.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/072.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/073.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/074.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/075.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/076.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/077.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/078.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/079.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/080.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/081.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/082.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/083.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/084.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/085.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/086.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/087.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/088.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/089.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/090.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/091.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/092.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/093.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/094.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/095.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/096.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/097.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/098.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/099.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/100.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/101.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/102.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/103.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/104.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/105.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/106.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/107.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/108.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/109.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/110.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/111.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/112.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/113.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/114.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/115.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/116.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/117.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/118.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/119.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/120.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/121.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/122.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/123.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/124.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/125.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/126.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/127.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/128.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/129.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/130.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/131.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/132.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/133.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/134.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/135.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/136.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/137.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/138.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/139.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/140.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/141.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/142.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/143.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/144.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/145.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/146.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/147.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/vow/shards/148.json",
+      "replay_count": 2
+    }
+  ]
+}

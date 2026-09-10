@@ -1,5 +1,8 @@
 {
   "catalog_signature": [
+    "stx:2024-01-11:299",
+    "mid:2024-01-11:272",
+    "vow:2024-01-11:298",
     "neo:2022-03-13:296",
     "snc:2022-07-07:296",
     "hbg:2022-07-29:295",
@@ -32,6 +35,35 @@
     "powered-cube:2025-12-01:300"
   ],
   "datasets": [
+    {
+      "data_date": "2024-01-11",
+      "error_codes": [],
+      "id": "stx",
+      "name": "STX",
+      "replay_count": 299,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2024-01-11",
+      "error_codes": [],
+      "id": "mid",
+      "name": "MID",
+      "replay_count": 272,
+      "status": "warning",
+      "warning_codes": [
+        "low_replay_count"
+      ]
+    },
+    {
+      "data_date": "2024-01-11",
+      "error_codes": [],
+      "id": "vow",
+      "name": "VOW",
+      "replay_count": 298,
+      "status": "healthy",
+      "warning_codes": []
+    },
     {
       "data_date": "2022-03-13",
       "error_codes": [],
@@ -422,13 +454,11 @@
     },
     {
       "code": "VOW",
-      "reason": "CalledProcessError: Command '['/opt/hostedtoolcache/Python/3.12.14/x64/bin/python', 'scripts/build_replays.py', '--input', '/tmp/pack1-vow-o6l68tmx/draft_data_public.VOW.PremierDraft.csv.gz', '--output-dir', '/tmp/pack1-vow-o6l68tmx/data/vow', '--catalog', '/tmp/pack1-vow-o6l68tmx/data/catalog.json', '--expansion', 'VOW', '--format', 'PremierDraft', '--source-date', '2024-01-11', '--minimum-games', '100', '--top-fraction', '0.15', '--max-training-drafts', '5000', '--max-output-drafts', '300', '--minimum-picks', '30', '--folds', '5', '--shard-size', '2', '--card-metadata', '/tmp/pack1-vow-o6l68tmx/vow-cards.json']' returned non-zero exit status 1.",
-      "status": "blocked"
+      "status": "live"
     },
     {
       "code": "MID",
-      "reason": "CalledProcessError: Command '['/opt/hostedtoolcache/Python/3.12.14/x64/bin/python', 'scripts/build_replays.py', '--input', '/tmp/pack1-mid-aqgmpam5/draft_data_public.MID.PremierDraft.csv.gz', '--output-dir', '/tmp/pack1-mid-aqgmpam5/data/mid', '--catalog', '/tmp/pack1-mid-aqgmpam5/data/catalog.json', '--expansion', 'MID', '--format', 'PremierDraft', '--source-date', '2024-01-11', '--minimum-games', '100', '--top-fraction', '0.15', '--max-training-drafts', '5000', '--max-output-drafts', '300', '--minimum-picks', '30', '--folds', '5', '--shard-size', '2', '--card-metadata', '/tmp/pack1-mid-aqgmpam5/mid-cards.json']' returned non-zero exit status 1.",
-      "status": "blocked"
+      "status": "live"
     },
     {
       "code": "AFR",
@@ -437,21 +467,20 @@
     },
     {
       "code": "STX",
-      "reason": "CalledProcessError: Command '['/opt/hostedtoolcache/Python/3.12.14/x64/bin/python', 'scripts/build_replays.py', '--input', '/tmp/pack1-stx-pr6izsj4/draft_data_public.STX.PremierDraft.csv.gz', '--output-dir', '/tmp/pack1-stx-pr6izsj4/data/stx', '--catalog', '/tmp/pack1-stx-pr6izsj4/data/catalog.json', '--expansion', 'STX', '--format', 'PremierDraft', '--source-date', '2024-01-11', '--minimum-games', '100', '--top-fraction', '0.15', '--max-training-drafts', '5000', '--max-output-drafts', '300', '--minimum-picks', '30', '--folds', '5', '--shard-size', '2', '--card-metadata', '/tmp/pack1-stx-pr6izsj4/stx-cards.json']' returned non-zero exit status 1.",
-      "status": "blocked"
+      "status": "live"
     }
   ],
   "normal_queue_counts": {
-    "blocked": 4,
-    "live": 29,
+    "blocked": 1,
+    "live": 32,
     "pending": 0
   },
-  "overall": "healthy",
-  "published_dataset_count": 30,
+  "overall": "warning",
+  "published_dataset_count": 33,
   "quality_counts": {
     "error": 0,
-    "healthy": 30,
-    "warning": 0
+    "healthy": 32,
+    "warning": 1
   },
   "schema_version": 1,
   "special_modes": [

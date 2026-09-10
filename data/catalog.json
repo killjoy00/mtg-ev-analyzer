@@ -2,6 +2,48 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "stx",
+      "name": "STX",
+      "format": "PremierDraft",
+      "manifest_path": "./data/stx/manifest.json",
+      "replay_count": 299,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2024-01-11",
+      "is_fixture": false,
+      "training_drafts": 5000,
+      "cohort_selection": "earliest_game_arena_rank",
+      "cohort_label": "Experienced Arena-rank cohort",
+      "arena_rank_cutoff_tier": "diamond"
+    },
+    {
+      "id": "mid",
+      "name": "MID",
+      "format": "PremierDraft",
+      "manifest_path": "./data/mid/manifest.json",
+      "replay_count": 272,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2024-01-11",
+      "is_fixture": false,
+      "training_drafts": 5000,
+      "cohort_selection": "earliest_game_arena_rank",
+      "cohort_label": "Experienced Arena-rank cohort",
+      "arena_rank_cutoff_tier": "diamond"
+    },
+    {
+      "id": "vow",
+      "name": "VOW",
+      "format": "PremierDraft",
+      "manifest_path": "./data/vow/manifest.json",
+      "replay_count": 298,
+      "model_version": "strong-player-pool-context-v2",
+      "data_date": "2024-01-11",
+      "is_fixture": false,
+      "training_drafts": 5000,
+      "cohort_selection": "earliest_game_arena_rank",
+      "cohort_label": "Experienced Arena-rank cohort",
+      "arena_rank_cutoff_tier": "diamond"
+    },
+    {
       "id": "neo",
       "name": "NEO",
       "format": "PremierDraft",
