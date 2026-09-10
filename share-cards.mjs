@@ -213,7 +213,7 @@ export async function shareResultCard(profile, result, environmentName = null) {
   const percentileText = Number.isFinite(percentile) && percentile > 0 ? `Top ${percentile}%` : null;
   const blob = await cardBlob({
     eyebrow: result?.is_daily || result?.date ? 'Daily result' : 'Game result',
-    title: result?.mode === 'draft_run' ? 'Draft Run' : `${env} · ${result?.mode === 'top3' ? 'Top 3' : result?.set_id === 'powered-cube' ? 'Cube Pack Run' : 'Full Pack'}`,
+    title: result?.mode === 'draft_run' ? (result?.set_id === 'powered-cube' ? 'Powered Cube Run' : 'Draft Run') : `${env} · ${result?.mode === 'top3' ? 'Top 3' : result?.set_id === 'powered-cube' ? 'Cube Pack Run' : 'Full Pack'}`,
     bigValue: `${Number(result?.score || 0)}/100`,
     subtitle: `${name} · ${result?.grade || ''}`,
     pills: [percentileText, result?.date].filter(Boolean),
@@ -233,7 +233,8 @@ export async function shareResultCard(profile, result, environmentName = null) {
 export async function shareDraftRunCard(run,url,{challenge=false}={}) {
   const matches=run.answers.filter(a=>a.historicalMatch).length;
   const percentile=run.standing?.percentile;
-  const text=`${run.score}/100 on Pack One’s ${run.day?'Daily ':''}Draft Run. ${matches}/10 trophy picks matched.${percentile?` Top ${percentile}% ${run.standing.final?'finish':'so far'}.`:''} Can you beat it?`;
-  const blob=await cardBlob({eyebrow:run.day?'Daily Draft Run':'Draft Run',title:'Ten picks. Your call.',bigValue:`${run.score}/100`,subtitle:`${matches} trophy picks matched`,pills:[run.day,percentile?`Top ${percentile}% ${run.standing.final?'finish':'so far'}`:null].filter(Boolean),rows:[{label:'The challenge',value:'10 decisions across Magic sets'},{label:'Your target',value:'Real picks from trophy drafters'}]});
+  const cube=run.environment==='powered-cube',label=cube?'Powered Cube Run':'Draft Run';
+  const text=`${run.score}/100 on Pack One’s ${run.day?'Daily ':''}${label}. ${matches}/10 trophy picks matched.${percentile?` Top ${percentile}% ${run.standing.final?'finish':'so far'}.`:''} Can you beat it?`;
+  const blob=await cardBlob({eyebrow:`${run.day?'Daily ':''}${label}`,title:'Ten picks. Your call.',bigValue:`${run.score}/100`,subtitle:`${matches} trophy picks matched`,pills:[run.day,percentile?`Top ${percentile}% ${run.standing.final?'finish':'so far'}`:null].filter(Boolean),rows:[{label:'The challenge',value:cube?'10 Powered Cube trophy decisions':'10 decisions across Magic sets'},{label:'Your target',value:'Real picks from trophy drafters'}]});
   return shareBlob(blob,{text,url,filename:'pack-one-draft-run.png',context:challenge?'draft_run_challenge':'draft_run_result'});
 }

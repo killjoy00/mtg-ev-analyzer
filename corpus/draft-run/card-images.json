@@ -1,386 +1,530 @@
 {
+  "arcbound-ravager": {
+    "image_url": "https://cards.scryfall.io/normal/front/c/0/c0c33a92-5621-40b4-a3a2-b67893edbc01.jpg?1783939963",
+    "mana_cost": "{2}",
+    "rarity": "rare",
+    "type_line": "Artifact Creature \u2014 Beast"
+  },
   "arid-mesa": {
-    "name": "Arid Mesa",
-    "image_url": "https://cards.scryfall.io/normal/front/2/5/25ac5405-df7b-4097-914a-022cb18e20d4.jpg?1783926797"
+    "image_url": "https://cards.scryfall.io/normal/front/2/5/25ac5405-df7b-4097-914a-022cb18e20d4.jpg?1783926797",
+    "name": "Arid Mesa"
   },
   "atraxa-grand-unifier": {
-    "name": "Atraxa, Grand Unifier",
-    "image_url": "https://cards.scryfall.io/normal/front/4/a/4a1f905f-1d55-4d02-9d24-e58070793d3f.jpg?1783918003"
+    "image_url": "https://cards.scryfall.io/normal/front/4/a/4a1f905f-1d55-4d02-9d24-e58070793d3f.jpg?1783918003",
+    "name": "Atraxa, Grand Unifier"
   },
   "bedlam": {
-    "name": "Bedlam",
-    "image_url": "https://cards.scryfall.io/normal/front/2/7/2788ec1a-930e-4a19-ad69-ea456c1390fd.jpg?1783945474"
+    "image_url": "https://cards.scryfall.io/normal/front/2/7/2788ec1a-930e-4a19-ad69-ea456c1390fd.jpg?1783945474",
+    "name": "Bedlam"
   },
   "black-panther-wakandan-king": {
-    "name": "Black Panther, Wakandan King",
-    "image_url": "https://cards.scryfall.io/normal/front/a/1/a1b11ef2-2285-40eb-b11c-223c159e3d1f.jpg?1783903308"
+    "image_url": "https://cards.scryfall.io/normal/front/a/1/a1b11ef2-2285-40eb-b11c-223c159e3d1f.jpg?1783903308",
+    "name": "Black Panther, Wakandan King"
   },
   "blast-zone": {
-    "name": "Blast Zone",
-    "image_url": "https://cards.scryfall.io/normal/front/c/5/c5e911be-8166-4263-8c57-e86358b8ceb8.jpg?1783920007"
+    "image_url": "https://cards.scryfall.io/normal/front/c/5/c5e911be-8166-4263-8c57-e86358b8ceb8.jpg?1783920007",
+    "name": "Blast Zone"
   },
   "blinkmoth-nexus": {
-    "name": "Blinkmoth Nexus",
-    "image_url": "https://cards.scryfall.io/normal/front/3/a/3ac535c1-9ef3-45b5-8959-7e79589d47ad.jpg?1783930087"
+    "image_url": "https://cards.scryfall.io/normal/front/3/a/3ac535c1-9ef3-45b5-8959-7e79589d47ad.jpg?1783930087",
+    "name": "Blinkmoth Nexus"
   },
   "bonders-enclave": {
-    "name": "Bonders' Enclave",
-    "image_url": "https://cards.scryfall.io/normal/front/d/1/d174f42c-dcf2-4da9-812b-7e1d0991d466.jpg?1783911885"
+    "image_url": "https://cards.scryfall.io/normal/front/d/1/d174f42c-dcf2-4da9-812b-7e1d0991d466.jpg?1783911885",
+    "name": "Bonders' Enclave"
   },
   "brainstorm": {
-    "name": "Brainstorm",
-    "image_url": "https://cards.scryfall.io/normal/front/b/5/b5545882-6963-4729-b2c6-fb4bdc75ffcc.jpg?1783904806"
+    "image_url": "https://cards.scryfall.io/normal/front/b/5/b5545882-6963-4729-b2c6-fb4bdc75ffcc.jpg?1783904806",
+    "name": "Brainstorm"
   },
   "captain-america-first-avenger": {
-    "name": "Captain America, First Avenger",
-    "image_url": "https://cards.scryfall.io/normal/front/0/6/0669ffcf-30c1-4d90-ae5f-3deca0f82526.jpg?1783903308"
+    "image_url": "https://cards.scryfall.io/normal/front/0/6/0669ffcf-30c1-4d90-ae5f-3deca0f82526.jpg?1783903308",
+    "name": "Captain America, First Avenger"
   },
   "captain-lannery-storm": {
-    "name": "Captain Lannery Storm",
-    "image_url": "https://cards.scryfall.io/normal/front/6/0/60a457e2-6cc7-47f0-9a24-df5459395358.jpg?1783911922"
+    "image_url": "https://cards.scryfall.io/normal/front/6/0/60a457e2-6cc7-47f0-9a24-df5459395358.jpg?1783911922",
+    "name": "Captain Lannery Storm"
   },
   "cascading-cataracts": {
-    "name": "Cascading Cataracts",
-    "image_url": "https://cards.scryfall.io/normal/front/2/f/2f3fbd9b-91ab-4691-a916-e20db8ebc513.jpg?1783921390"
+    "image_url": "https://cards.scryfall.io/normal/front/2/f/2f3fbd9b-91ab-4691-a916-e20db8ebc513.jpg?1783921390",
+    "name": "Cascading Cataracts"
   },
   "cathedral-of-war": {
-    "name": "Cathedral of War",
-    "image_url": "https://cards.scryfall.io/normal/front/d/d/dd222c07-0b28-41cb-9237-ad7991ab078f.jpg?1783940455"
+    "image_url": "https://cards.scryfall.io/normal/front/d/d/dd222c07-0b28-41cb-9237-ad7991ab078f.jpg?1783940455",
+    "name": "Cathedral of War"
   },
   "cavalier-of-dawn": {
-    "name": "Cavalier of Dawn",
-    "image_url": "https://cards.scryfall.io/normal/front/f/7/f7b1919e-c0c1-4ac7-9061-a337b6fe7273.jpg?1783933033"
+    "image_url": "https://cards.scryfall.io/normal/front/f/7/f7b1919e-c0c1-4ac7-9061-a337b6fe7273.jpg?1783933033",
+    "name": "Cavalier of Dawn"
   },
   "chandra-s-ignition": {
-    "name": "Chandra's Ignition",
-    "image_url": "https://cards.scryfall.io/normal/front/9/6/960f45a3-f9cf-41e6-b813-f3dee620a944.jpg?1783913867"
+    "image_url": "https://cards.scryfall.io/normal/front/9/6/960f45a3-f9cf-41e6-b813-f3dee620a944.jpg?1783913867",
+    "name": "Chandra's Ignition"
   },
   "chrome-mox": {
-    "name": "Chrome Mox",
-    "image_url": "https://cards.scryfall.io/normal/front/f/3/f340cbf7-5bbe-45b9-a4bf-d1caa500ff93.jpg?1783930116"
+    "image_url": "https://cards.scryfall.io/normal/front/f/3/f340cbf7-5bbe-45b9-a4bf-d1caa500ff93.jpg?1783930116",
+    "name": "Chrome Mox"
   },
   "command-beacon": {
-    "name": "Command Beacon",
-    "image_url": "https://cards.scryfall.io/normal/front/4/3/435e9678-9ff3-4e5d-8061-3f806e1c2ed2.jpg?1783906993"
+    "image_url": "https://cards.scryfall.io/normal/front/4/3/435e9678-9ff3-4e5d-8061-3f806e1c2ed2.jpg?1783906993",
+    "name": "Command Beacon"
+  },
+  "conqueror-s-flail": {
+    "image_url": "https://cards.scryfall.io/normal/front/d/5/d5f5399a-26c6-4ecd-9715-f6440f6958f1.jpg?1783921792",
+    "mana_cost": "{2}",
+    "rarity": "rare",
+    "type_line": "Artifact \u2014 Equipment"
   },
   "contested-war-zone": {
-    "name": "Contested War Zone",
-    "image_url": "https://cards.scryfall.io/normal/front/b/e/bee9b696-5203-4235-9bdd-f2a389d69813.jpg?1783941360"
+    "image_url": "https://cards.scryfall.io/normal/front/b/e/bee9b696-5203-4235-9bdd-f2a389d69813.jpg?1783941360",
+    "name": "Contested War Zone"
   },
   "counterspell": {
-    "name": "Counterspell",
-    "image_url": "https://cards.scryfall.io/normal/front/4/f/4f616706-ec97-4923-bb1e-11a69fbaa1f8.jpg?1783909630"
+    "image_url": "https://cards.scryfall.io/normal/front/4/f/4f616706-ec97-4923-bb1e-11a69fbaa1f8.jpg?1783909630",
+    "name": "Counterspell"
   },
   "crystal-quarry": {
-    "name": "Crystal Quarry",
-    "image_url": "https://cards.scryfall.io/normal/front/5/5/55999d8e-50f8-4c8b-a0c3-f3256af62491.jpg?1783921389"
+    "image_url": "https://cards.scryfall.io/normal/front/5/5/55999d8e-50f8-4c8b-a0c3-f3256af62491.jpg?1783921389",
+    "name": "Crystal Quarry"
   },
   "danitha-capashen-paragon": {
-    "name": "Danitha Capashen, Paragon",
-    "image_url": "https://cards.scryfall.io/normal/front/a/1/a11f77e4-edb6-43c6-b8ca-d4f62d26d0c0.jpg?1783915725"
+    "image_url": "https://cards.scryfall.io/normal/front/a/1/a11f77e4-edb6-43c6-b8ca-d4f62d26d0c0.jpg?1783915725",
+    "name": "Danitha Capashen, Paragon"
   },
   "dark-ritual": {
-    "name": "Dark Ritual",
-    "image_url": "https://cards.scryfall.io/normal/front/1/1/11e12a84-e7be-4afc-a230-c2e644743fa8.jpg?1783903013"
+    "image_url": "https://cards.scryfall.io/normal/front/1/1/11e12a84-e7be-4afc-a230-c2e644743fa8.jpg?1783903013",
+    "name": "Dark Ritual"
   },
   "darkness": {
-    "name": "Darkness",
-    "image_url": "https://cards.scryfall.io/normal/front/5/8/584834fb-b7b6-40eb-9fec-8df17172ce5f.jpg?1783943276"
+    "image_url": "https://cards.scryfall.io/normal/front/5/8/584834fb-b7b6-40eb-9fec-8df17172ce5f.jpg?1783943276",
+    "name": "Darkness"
   },
   "daze": {
-    "name": "Daze",
-    "image_url": "https://cards.scryfall.io/normal/front/f/0/f05e9a3e-8a35-4687-85cb-e31b3927a5e2.jpg?1783937617"
+    "image_url": "https://cards.scryfall.io/normal/front/f/0/f05e9a3e-8a35-4687-85cb-e31b3927a5e2.jpg?1783937617",
+    "name": "Daze"
   },
   "deadly-dispute": {
-    "name": "Deadly Dispute",
-    "image_url": "https://cards.scryfall.io/normal/front/0/8/08bda846-99ac-4516-9dd0-3e22e437599b.jpg?1783922050"
+    "image_url": "https://cards.scryfall.io/normal/front/0/8/08bda846-99ac-4516-9dd0-3e22e437599b.jpg?1783922050",
+    "name": "Deadly Dispute"
   },
   "deafening-silence": {
-    "name": "Deafening Silence",
-    "image_url": "https://cards.scryfall.io/normal/front/6/0/6072d9b0-d3c7-46f4-bd24-095bb13c4dea.jpg?1783932677"
+    "image_url": "https://cards.scryfall.io/normal/front/6/0/6072d9b0-d3c7-46f4-bd24-095bb13c4dea.jpg?1783932677",
+    "name": "Deafening Silence"
   },
   "deduce": {
-    "name": "Deduce",
-    "image_url": "https://cards.scryfall.io/normal/front/7/c/7cbb17af-e17e-438a-ad72-0c942e6706b6.jpg?1783912912"
+    "image_url": "https://cards.scryfall.io/normal/front/7/c/7cbb17af-e17e-438a-ad72-0c942e6706b6.jpg?1783912912",
+    "name": "Deduce"
   },
   "deflecting-palm": {
-    "name": "Deflecting Palm",
-    "image_url": "https://cards.scryfall.io/normal/front/3/2/32374918-1bcb-4516-96af-f27da752517e.jpg?1783939059"
+    "image_url": "https://cards.scryfall.io/normal/front/3/2/32374918-1bcb-4516-96af-f27da752517e.jpg?1783939059",
+    "name": "Deflecting Palm"
   },
   "deserted-temple": {
-    "name": "Deserted Temple",
-    "image_url": "https://cards.scryfall.io/normal/front/f/d/fd51f8f0-779b-40bb-b65c-5907f816676e.jpg?1783911208"
+    "image_url": "https://cards.scryfall.io/normal/front/f/d/fd51f8f0-779b-40bb-b65c-5907f816676e.jpg?1783911208",
+    "name": "Deserted Temple"
   },
   "don-t-move": {
-    "name": "Don't Move",
-    "image_url": "https://cards.scryfall.io/normal/front/c/5/c55e5f0d-8a4b-4b6f-ab43-1268b6fac74e.jpg?1783903322"
+    "image_url": "https://cards.scryfall.io/normal/front/c/5/c55e5f0d-8a4b-4b6f-ab43-1268b6fac74e.jpg?1783903322",
+    "name": "Don't Move"
   },
   "dovin-s-veto": {
-    "name": "Dovin's Veto",
-    "image_url": "https://cards.scryfall.io/normal/front/5/d/5d6b5054-2224-4f68-9d82-3ed17c5dacc4.jpg?1783933400"
+    "image_url": "https://cards.scryfall.io/normal/front/5/d/5d6b5054-2224-4f68-9d82-3ed17c5dacc4.jpg?1783933400",
+    "name": "Dovin's Veto"
   },
   "dust-bowl": {
-    "name": "Dust Bowl",
-    "image_url": "https://cards.scryfall.io/normal/front/7/5/75b03c30-c2b8-4207-b675-26c59c40a7e5.jpg?1783945908"
+    "image_url": "https://cards.scryfall.io/normal/front/7/5/75b03c30-c2b8-4207-b675-26c59c40a7e5.jpg?1783945908",
+    "name": "Dust Bowl"
   },
   "endless-sands": {
-    "name": "Endless Sands",
-    "image_url": "https://cards.scryfall.io/normal/front/f/4/f436df63-41b9-416d-8e41-035261d4d0cc.jpg?1783931127"
+    "image_url": "https://cards.scryfall.io/normal/front/f/4/f436df63-41b9-416d-8e41-035261d4d0cc.jpg?1783931127",
+    "name": "Endless Sands"
   },
   "ephemerate": {
-    "name": "Ephemerate",
-    "image_url": "https://cards.scryfall.io/normal/front/2/d/2da5f3f8-5eef-498f-ba2c-2f3fbc3745aa.jpg?1783933164"
+    "image_url": "https://cards.scryfall.io/normal/front/2/d/2da5f3f8-5eef-498f-ba2c-2f3fbc3745aa.jpg?1783933164",
+    "name": "Ephemerate"
   },
   "escape-to-the-wilds": {
-    "name": "Escape to the Wilds",
-    "image_url": "https://cards.scryfall.io/normal/front/8/8/889cdc42-fae3-4dda-9cf0-697730ef00e3.jpg?1783906028"
+    "image_url": "https://cards.scryfall.io/normal/front/8/8/889cdc42-fae3-4dda-9cf0-697730ef00e3.jpg?1783906028",
+    "name": "Escape to the Wilds"
+  },
+  "faerie-macabre": {
+    "image_url": "https://cards.scryfall.io/normal/front/6/2/62103ceb-b16d-48ea-af42-d3df88d1ee4c.jpg?1783938752",
+    "mana_cost": "{1}{B}{B}",
+    "rarity": "common",
+    "type_line": "Creature \u2014 Faerie Rogue"
   },
   "farseek": {
-    "name": "Farseek",
-    "image_url": "https://cards.scryfall.io/normal/front/c/1/c1aac0f5-1d01-4673-b8d3-878d9a1d423c.jpg?1783903231"
+    "image_url": "https://cards.scryfall.io/normal/front/c/1/c1aac0f5-1d01-4673-b8d3-878d9a1d423c.jpg?1783903231",
+    "name": "Farseek"
   },
   "fatal-push": {
-    "name": "Fatal Push",
-    "image_url": "https://cards.scryfall.io/normal/front/6/e/6e9d8fe4-fd9b-4923-92bf-7dd6b8fa02e7.jpg?1783930180"
+    "image_url": "https://cards.scryfall.io/normal/front/6/e/6e9d8fe4-fd9b-4923-92bf-7dd6b8fa02e7.jpg?1783930180",
+    "name": "Fatal Push"
   },
   "force-of-vigor": {
-    "name": "Force of Vigor",
-    "image_url": "https://cards.scryfall.io/normal/front/0/1/017c415b-d635-43c6-92b8-8c95d1c4ff8d.jpg?1783933099"
+    "image_url": "https://cards.scryfall.io/normal/front/0/1/017c415b-d635-43c6-92b8-8c95d1c4ff8d.jpg?1783933099",
+    "name": "Force of Vigor"
   },
   "fynn-the-fangbearer": {
-    "name": "Fynn, the Fangbearer",
-    "image_url": "https://cards.scryfall.io/normal/front/6/9/699efb9e-2649-432b-8b2d-10775114c314.jpg?1783908919"
+    "image_url": "https://cards.scryfall.io/normal/front/6/9/699efb9e-2649-432b-8b2d-10775114c314.jpg?1783908919",
+    "name": "Fynn, the Fangbearer"
+  },
+  "goblin-bushwhacker": {
+    "image_url": "https://cards.scryfall.io/normal/front/4/0/4085a5bf-a71b-4c73-9b39-0dcc328fe11b.jpg?1783942145",
+    "mana_cost": "{R}",
+    "rarity": "common",
+    "type_line": "Creature \u2014 Goblin Warrior"
+  },
+  "goblin-charbelcher": {
+    "image_url": "https://cards.scryfall.io/normal/front/2/4/240344ff-404d-4894-a6e9-4401cd68cf50.jpg?1783935597",
+    "mana_cost": "{4}",
+    "rarity": "rare",
+    "type_line": "Artifact"
   },
   "greater-auramancy": {
-    "name": "Greater Auramancy",
-    "image_url": "https://cards.scryfall.io/normal/front/1/1/1177787f-bf1e-438b-9615-97d03b04128c.jpg?1783942768"
+    "image_url": "https://cards.scryfall.io/normal/front/1/1/1177787f-bf1e-438b-9615-97d03b04128c.jpg?1783942768",
+    "name": "Greater Auramancy"
   },
   "griffin-aerie": {
-    "name": "Griffin Aerie",
-    "image_url": "https://cards.scryfall.io/normal/front/6/e/6ea1ee60-5644-4f78-913d-32c36065957f.jpg?1783930740"
+    "image_url": "https://cards.scryfall.io/normal/front/6/e/6ea1ee60-5644-4f78-913d-32c36065957f.jpg?1783930740",
+    "name": "Griffin Aerie"
   },
   "grove-of-the-burnwillows": {
-    "name": "Grove of the Burnwillows",
-    "image_url": "https://cards.scryfall.io/normal/front/d/e/de4b75ad-7539-4184-a940-6014a0327b3a.jpg?1783935502"
+    "image_url": "https://cards.scryfall.io/normal/front/d/e/de4b75ad-7539-4184-a940-6014a0327b3a.jpg?1783935502",
+    "name": "Grove of the Burnwillows"
   },
   "harbinger-of-the-seas": {
-    "name": "Harbinger of the Seas",
-    "image_url": "https://cards.scryfall.io/normal/front/0/0/00212714-a410-4cbc-bf1c-f90d7d77378c.jpg?1783911289"
+    "image_url": "https://cards.scryfall.io/normal/front/0/0/00212714-a410-4cbc-bf1c-f90d7d77378c.jpg?1783911289",
+    "name": "Harbinger of the Seas"
+  },
+  "heartless-pillage": {
+    "image_url": "https://cards.scryfall.io/normal/front/5/b/5b705cd6-da20-4f0a-bb94-2acd1cecd64c.jpg?1783930177",
+    "mana_cost": "{2}{B}",
+    "rarity": "common",
+    "type_line": "Sorcery"
+  },
+  "high-alert": {
+    "image_url": "https://cards.scryfall.io/normal/front/c/e/ce124f6e-ef0c-4d01-a876-e34d3e445108.jpg?1783933647",
+    "mana_cost": "{1}{W}{U}",
+    "rarity": "uncommon",
+    "type_line": "Enchantment"
   },
   "high-market": {
-    "name": "High Market",
-    "image_url": "https://cards.scryfall.io/normal/front/8/9/894aa6b6-0d08-4c43-8734-9cb7b31359c6.jpg?1783903727"
+    "image_url": "https://cards.scryfall.io/normal/front/8/9/894aa6b6-0d08-4c43-8734-9cb7b31359c6.jpg?1783903727",
+    "name": "High Market"
+  },
+  "hindering-light": {
+    "image_url": "https://cards.scryfall.io/normal/front/9/8/98e43870-4bed-4d76-a633-a6326c736d22.jpg?1783942544",
+    "mana_cost": "{W}{U}",
+    "rarity": "common",
+    "type_line": "Instant"
   },
   "hissing-quagmire": {
-    "name": "Hissing Quagmire",
-    "image_url": "https://cards.scryfall.io/normal/front/e/9/e9cbb639-69c4-4600-bc1e-3da738dfbb09.jpg?1783908283"
+    "image_url": "https://cards.scryfall.io/normal/front/e/9/e9cbb639-69c4-4600-bc1e-3da738dfbb09.jpg?1783908283",
+    "name": "Hissing Quagmire"
+  },
+  "howling-mine": {
+    "image_url": "https://cards.scryfall.io/normal/front/c/d/cdae9939-03a4-4561-92cd-01f498d29a7a.jpg?1783937037",
+    "mana_cost": "{2}",
+    "rarity": "rare",
+    "type_line": "Artifact"
   },
   "inkmoth-nexus": {
-    "name": "Inkmoth Nexus",
-    "image_url": "https://cards.scryfall.io/normal/front/e/c/ec50c1c3-885e-47d3-ada7-cc0edbf09df1.jpg?1783941359"
+    "image_url": "https://cards.scryfall.io/normal/front/e/c/ec50c1c3-885e-47d3-ada7-cc0edbf09df1.jpg?1783941359",
+    "name": "Inkmoth Nexus"
   },
   "inventors-fair": {
-    "name": "Inventors' Fair",
-    "image_url": "https://cards.scryfall.io/normal/front/2/7/275471e3-ded1-40ac-91ef-369dce5764d9.jpg?1783937144"
+    "image_url": "https://cards.scryfall.io/normal/front/2/7/275471e3-ded1-40ac-91ef-369dce5764d9.jpg?1783937144",
+    "name": "Inventors' Fair"
   },
   "ishai-ojutai-dragonspeaker": {
-    "name": "Ishai, Ojutai Dragonspeaker",
-    "image_url": "https://cards.scryfall.io/normal/front/2/e/2e89ce6a-6bc9-427f-a8b2-c07a9fc3218f.jpg?1783934777"
+    "image_url": "https://cards.scryfall.io/normal/front/2/e/2e89ce6a-6bc9-427f-a8b2-c07a9fc3218f.jpg?1783934777",
+    "name": "Ishai, Ojutai Dragonspeaker"
   },
   "k-rrik-son-of-yawgmoth": {
-    "name": "K'rrik, Son of Yawgmoth",
-    "image_url": "https://cards.scryfall.io/normal/front/4/f/4f087b1c-97e0-4379-a94d-beac53685314.jpg?1783911216"
+    "image_url": "https://cards.scryfall.io/normal/front/4/f/4f087b1c-97e0-4379-a94d-beac53685314.jpg?1783911216",
+    "name": "K'rrik, Son of Yawgmoth"
   },
   "kinnan-bonder-prodigy": {
-    "name": "Kinnan, Bonder Prodigy",
-    "image_url": "https://cards.scryfall.io/normal/front/6/3/63cda4a0-0dff-4edb-ae67-a2b7e2971350.jpg?1783931023"
+    "image_url": "https://cards.scryfall.io/normal/front/6/3/63cda4a0-0dff-4edb-ae67-a2b7e2971350.jpg?1783931023",
+    "name": "Kinnan, Bonder Prodigy"
+  },
+  "kinsbaile-cavalier": {
+    "image_url": "https://cards.scryfall.io/normal/front/b/c/bcda21e6-f423-4dd9-a4a3-bacfa83612d0.jpg?1783941347",
+    "mana_cost": "{3}{W}",
+    "rarity": "rare",
+    "type_line": "Creature \u2014 Kithkin Knight"
   },
   "kraum-ludevic-s-opus": {
-    "name": "Kraum, Ludevic's Opus",
-    "image_url": "https://cards.scryfall.io/normal/front/5/5/557fcd17-6cb3-414a-b2b1-ea9ae32e5aec.jpg?1783937084"
+    "image_url": "https://cards.scryfall.io/normal/front/5/5/557fcd17-6cb3-414a-b2b1-ea9ae32e5aec.jpg?1783937084",
+    "name": "Kraum, Ludevic's Opus"
   },
   "laboratory-maniac": {
-    "name": "Laboratory Maniac",
-    "image_url": "https://cards.scryfall.io/normal/front/7/a/7a5be94c-08b8-4964-a79d-e22ea6e94be8.jpg?1783908162"
+    "image_url": "https://cards.scryfall.io/normal/front/7/a/7a5be94c-08b8-4964-a79d-e22ea6e94be8.jpg?1783908162",
+    "name": "Laboratory Maniac"
   },
   "lavaclaw-reaches": {
-    "name": "Lavaclaw Reaches",
-    "image_url": "https://cards.scryfall.io/normal/front/4/0/409fcd0c-8449-4623-8bf0-cd7ca0937a4a.jpg?1783933755"
+    "image_url": "https://cards.scryfall.io/normal/front/4/0/409fcd0c-8449-4623-8bf0-cd7ca0937a4a.jpg?1783933755",
+    "name": "Lavaclaw Reaches"
   },
   "light-up-the-stage": {
-    "name": "Light Up the Stage",
-    "image_url": "https://cards.scryfall.io/normal/front/9/1/912b94c9-7200-452d-940f-df0a7cceb377.jpg?1783909612"
+    "image_url": "https://cards.scryfall.io/normal/front/9/1/912b94c9-7200-452d-940f-df0a7cceb377.jpg?1783909612",
+    "name": "Light Up the Stage"
   },
   "lightning-bolt": {
-    "name": "Lightning Bolt",
-    "image_url": "https://cards.scryfall.io/normal/front/a/f/affaaa8c-49aa-4c9a-8ec4-74fde49a9ea2.jpg?1783927625"
+    "image_url": "https://cards.scryfall.io/normal/front/a/f/affaaa8c-49aa-4c9a-8ec4-74fde49a9ea2.jpg?1783927625",
+    "name": "Lightning Bolt"
   },
   "lumbering-falls": {
-    "name": "Lumbering Falls",
-    "image_url": "https://cards.scryfall.io/normal/front/e/3/e3c4e109-2aa7-4f5f-8b59-7b89c03de2df.jpg?1783908283"
+    "image_url": "https://cards.scryfall.io/normal/front/e/3/e3c4e109-2aa7-4f5f-8b59-7b89c03de2df.jpg?1783908283",
+    "name": "Lumbering Falls"
   },
   "magus-of-the-moon": {
-    "name": "Magus of the Moon",
-    "image_url": "https://cards.scryfall.io/normal/front/7/c/7c9bd75c-9606-4607-bfa6-d6acdee12820.jpg?1783927794"
+    "image_url": "https://cards.scryfall.io/normal/front/7/c/7c9bd75c-9606-4607-bfa6-d6acdee12820.jpg?1783927794",
+    "name": "Magus of the Moon"
   },
   "mangara-the-diplomat": {
-    "name": "Mangara, the Diplomat",
-    "image_url": "https://cards.scryfall.io/normal/front/4/9/49d0d7ec-4bee-47d3-91a6-43510be65402.jpg?1783903806"
+    "image_url": "https://cards.scryfall.io/normal/front/4/9/49d0d7ec-4bee-47d3-91a6-43510be65402.jpg?1783903806",
+    "name": "Mangara, the Diplomat"
   },
   "marsh-flats": {
-    "name": "Marsh Flats",
-    "image_url": "https://cards.scryfall.io/normal/front/9/d/9db3ba6d-eb7f-4f5b-9a3b-c6239c3baa42.jpg?1783926796"
+    "image_url": "https://cards.scryfall.io/normal/front/9/d/9db3ba6d-eb7f-4f5b-9a3b-c6239c3baa42.jpg?1783926796",
+    "name": "Marsh Flats"
+  },
+  "metallic-mimic": {
+    "image_url": "https://cards.scryfall.io/normal/front/2/6/2623640e-51bb-4aba-a31f-1b6d170f58f6.jpg?1783903217",
+    "mana_cost": "{2}",
+    "rarity": "rare",
+    "type_line": "Artifact Creature \u2014 Shapeshifter"
   },
   "mirrorpool": {
-    "name": "Mirrorpool",
-    "image_url": "https://cards.scryfall.io/normal/front/0/4/0441cd2c-3646-4c69-ae97-ad3bcea7466f.jpg?1783915386"
+    "image_url": "https://cards.scryfall.io/normal/front/0/4/0441cd2c-3646-4c69-ae97-ad3bcea7466f.jpg?1783915386",
+    "name": "Mirrorpool"
   },
   "misty-rainforest": {
-    "name": "Misty Rainforest",
-    "image_url": "https://cards.scryfall.io/normal/front/8/8/88231c0d-0cc8-44ec-bf95-81d1710ac141.jpg?1783926795"
+    "image_url": "https://cards.scryfall.io/normal/front/8/8/88231c0d-0cc8-44ec-bf95-81d1710ac141.jpg?1783926795",
+    "name": "Misty Rainforest"
   },
   "mizzix-s-mastery": {
-    "name": "Mizzix's Mastery",
-    "image_url": "https://cards.scryfall.io/normal/front/4/f/4fa2d7f2-05b3-468f-9f2c-a61b46bad88e.jpg?1783911917"
+    "image_url": "https://cards.scryfall.io/normal/front/4/f/4fa2d7f2-05b3-468f-9f2c-a61b46bad88e.jpg?1783911917",
+    "name": "Mizzix's Mastery"
   },
   "mutavault": {
-    "name": "Mutavault",
-    "image_url": "https://cards.scryfall.io/normal/front/5/2/52cc2f10-142d-4e6a-984e-b25f566cc960.jpg?1783922371"
+    "image_url": "https://cards.scryfall.io/normal/front/5/2/52cc2f10-142d-4e6a-984e-b25f566cc960.jpg?1783922371",
+    "name": "Mutavault"
   },
   "mystifying-maze": {
-    "name": "Mystifying Maze",
-    "image_url": "https://cards.scryfall.io/normal/front/f/a/faeeb2f8-0aa1-4f3e-848d-f4233996055b.jpg?1783935849"
+    "image_url": "https://cards.scryfall.io/normal/front/f/a/faeeb2f8-0aa1-4f3e-848d-f4233996055b.jpg?1783935849",
+    "name": "Mystifying Maze"
   },
   "najeela-the-blade-blossom": {
-    "name": "Najeela, the Blade-Blossom",
-    "image_url": "https://cards.scryfall.io/normal/front/2/c/2cb1d1da-6077-46b5-8c63-39882b8016f2.jpg?1783934856"
+    "image_url": "https://cards.scryfall.io/normal/front/2/c/2cb1d1da-6077-46b5-8c63-39882b8016f2.jpg?1783934856",
+    "name": "Najeela, the Blade-Blossom"
   },
   "nature-s-claim": {
-    "name": "Nature's Claim",
-    "image_url": "https://cards.scryfall.io/normal/front/d/2/d24b6640-ef2f-4c92-beb3-afdf78f9c2d5.jpg?1783935517"
+    "image_url": "https://cards.scryfall.io/normal/front/d/2/d24b6640-ef2f-4c92-beb3-afdf78f9c2d5.jpg?1783935517",
+    "name": "Nature's Claim"
   },
   "nesting-grounds": {
-    "name": "Nesting Grounds",
-    "image_url": "https://cards.scryfall.io/normal/front/7/f/7f1d8a22-e730-4344-bba9-7c495500f065.jpg?1783911206"
+    "image_url": "https://cards.scryfall.io/normal/front/7/f/7f1d8a22-e730-4344-bba9-7c495500f065.jpg?1783911206",
+    "name": "Nesting Grounds"
   },
   "nyxbloom-ancient": {
-    "name": "Nyxbloom Ancient",
-    "image_url": "https://cards.scryfall.io/normal/front/a/3/a391da36-0b40-46ea-b771-50d2b920207e.jpg?1783931531"
+    "image_url": "https://cards.scryfall.io/normal/front/a/3/a391da36-0b40-46ea-b771-50d2b920207e.jpg?1783931531",
+    "name": "Nyxbloom Ancient"
   },
   "paradox-haze": {
-    "name": "Paradox Haze",
-    "image_url": "https://cards.scryfall.io/normal/front/a/7/a7c74def-83e5-4420-989d-2304bf4743ae.jpg?1783943242"
+    "image_url": "https://cards.scryfall.io/normal/front/a/7/a7c74def-83e5-4420-989d-2304bf4743ae.jpg?1783943242",
+    "name": "Paradox Haze"
   },
   "pathbreaker-ibex": {
-    "name": "Pathbreaker Ibex",
-    "image_url": "https://cards.scryfall.io/normal/front/4/6/4608ea44-e1b2-42de-a0a2-e6d6d24d89d0.jpg?1783936252"
+    "image_url": "https://cards.scryfall.io/normal/front/4/6/4608ea44-e1b2-42de-a0a2-e6d6d24d89d0.jpg?1783936252",
+    "name": "Pathbreaker Ibex"
   },
   "petrified-field": {
-    "name": "Petrified Field",
-    "image_url": "https://cards.scryfall.io/normal/front/e/a/eaeaf9f2-d196-4607-a704-06f2315d8cc5.jpg?1783945198"
+    "image_url": "https://cards.scryfall.io/normal/front/e/a/eaeaf9f2-d196-4607-a704-06f2315d8cc5.jpg?1783945198",
+    "name": "Petrified Field"
   },
   "phyrexian-unlife": {
-    "name": "Phyrexian Unlife",
-    "image_url": "https://cards.scryfall.io/normal/front/b/4/b4a1e16a-39f0-47ab-aba8-73e82ba9ab18.jpg?1783941325"
+    "image_url": "https://cards.scryfall.io/normal/front/b/4/b4a1e16a-39f0-47ab-aba8-73e82ba9ab18.jpg?1783941325",
+    "name": "Phyrexian Unlife"
+  },
+  "plague-of-vermin": {
+    "image_url": "https://cards.scryfall.io/normal/front/2/3/231613d6-d3b8-4b41-bc93-4d5da3fec5d0.jpg?1783942753",
+    "mana_cost": "{6}{B}",
+    "rarity": "rare",
+    "type_line": "Sorcery"
+  },
+  "platinum-angel": {
+    "image_url": "https://cards.scryfall.io/normal/front/c/a/ca7f4fd6-e268-4d15-bfbf-d9f0f95864fc.jpg?1783937281",
+    "mana_cost": "{7}",
+    "rarity": "mythic",
+    "type_line": "Artifact Creature \u2014 Angel"
   },
   "power-depot": {
-    "name": "Power Depot",
-    "image_url": "https://cards.scryfall.io/normal/front/0/3/032eba04-0a63-4823-85e1-64861330a8d7.jpg?1783926795"
+    "image_url": "https://cards.scryfall.io/normal/front/0/3/032eba04-0a63-4823-85e1-64861330a8d7.jpg?1783926795",
+    "name": "Power Depot"
+  },
+  "precursor-golem": {
+    "image_url": "https://cards.scryfall.io/normal/front/d/c/dc90d632-fc78-4ae6-83c6-314ee5744de5.jpg?1783938380",
+    "mana_cost": "{5}",
+    "rarity": "rare",
+    "type_line": "Artifact Creature \u2014 Golem"
   },
   "primal-vigor": {
-    "name": "Primal Vigor",
-    "image_url": "https://cards.scryfall.io/normal/front/d/a/dafea0d1-6986-46b3-affc-1337ef564947.jpg?1783939657"
+    "image_url": "https://cards.scryfall.io/normal/front/d/a/dafea0d1-6986-46b3-affc-1337ef564947.jpg?1783939657",
+    "name": "Primal Vigor"
   },
   "prismatic-ending": {
-    "name": "Prismatic Ending",
-    "image_url": "https://cards.scryfall.io/normal/front/8/2/825969b9-3c70-4fca-8cab-696e9ca7cdb2.jpg?1783926888"
+    "image_url": "https://cards.scryfall.io/normal/front/8/2/825969b9-3c70-4fca-8cab-696e9ca7cdb2.jpg?1783926888",
+    "name": "Prismatic Ending"
+  },
+  "pristine-talisman": {
+    "image_url": "https://cards.scryfall.io/normal/front/6/b/6b6307f3-bc63-463c-8ffc-a8b8b829e5d7.jpg?1783927507",
+    "mana_cost": "{3}",
+    "rarity": "common",
+    "type_line": "Artifact"
   },
   "purphoros-god-of-the-forge": {
-    "name": "Purphoros, God of the Forge",
-    "image_url": "https://cards.scryfall.io/normal/front/9/6/967a4bb8-53ea-4d31-ab52-f4b9c00171b4.jpg?1783908265"
+    "image_url": "https://cards.scryfall.io/normal/front/9/6/967a4bb8-53ea-4d31-ab52-f4b9c00171b4.jpg?1783908265",
+    "name": "Purphoros, God of the Forge"
   },
   "pyretic-ritual": {
-    "name": "Pyretic Ritual",
-    "image_url": "https://cards.scryfall.io/normal/front/1/e/1e577638-a7ed-4bcc-90fb-0cffe87d5a28.jpg?1783941802"
+    "image_url": "https://cards.scryfall.io/normal/front/1/e/1e577638-a7ed-4bcc-90fb-0cffe87d5a28.jpg?1783941802",
+    "name": "Pyretic Ritual"
   },
   "raging-ravine": {
-    "name": "Raging Ravine",
-    "image_url": "https://cards.scryfall.io/normal/front/3/9/3964c3a5-3ce7-4b73-89ec-ed1b9799aef8.jpg?1783904521"
+    "image_url": "https://cards.scryfall.io/normal/front/3/9/3964c3a5-3ce7-4b73-89ec-ed1b9799aef8.jpg?1783904521",
+    "name": "Raging Ravine"
   },
   "reflecting-pool": {
-    "name": "Reflecting Pool",
-    "image_url": "https://cards.scryfall.io/normal/front/1/8/18a1b3f5-473d-45ca-be0d-e67e77ba30ce.jpg?1783922656"
+    "image_url": "https://cards.scryfall.io/normal/front/1/8/18a1b3f5-473d-45ca-be0d-e67e77ba30ce.jpg?1783922656",
+    "name": "Reflecting Pool"
+  },
+  "renata-called-to-the-hunt": {
+    "image_url": "https://cards.scryfall.io/normal/front/2/b/2b27e6b2-13ad-42b2-a121-70935913723d.jpg?1783931530",
+    "mana_cost": "{2}{G}{G}",
+    "rarity": "uncommon",
+    "type_line": "Legendary Enchantment Creature \u2014 Demigod"
+  },
+  "rending-volley": {
+    "image_url": "https://cards.scryfall.io/normal/front/8/2/8234090e-9df1-4915-90ef-8a4bc6212655.jpg?1783938587",
+    "mana_cost": "{R}",
+    "rarity": "uncommon",
+    "type_line": "Instant"
   },
   "repel-calamity": {
-    "name": "Repel Calamity",
-    "image_url": "https://cards.scryfall.io/normal/front/d/0/d068192a-6270-4981-819d-4945fa4a2b83.jpg?1783910857"
+    "image_url": "https://cards.scryfall.io/normal/front/d/0/d068192a-6270-4981-819d-4945fa4a2b83.jpg?1783910857",
+    "name": "Repel Calamity"
   },
   "return-to-the-ranks": {
-    "name": "Return to the Ranks",
-    "image_url": "https://cards.scryfall.io/normal/front/9/f/9fccce64-abac-4b90-bbe5-dbba8434b3b4.jpg?1783939198"
+    "image_url": "https://cards.scryfall.io/normal/front/9/f/9fccce64-abac-4b90-bbe5-dbba8434b3b4.jpg?1783939198",
+    "name": "Return to the Ranks"
+  },
+  "reyav-master-smith": {
+    "image_url": "https://cards.scryfall.io/normal/front/9/0/90307dd6-196d-4d51-9b3f-6ff339882d31.jpg?1783928769",
+    "mana_cost": "{R}{W}",
+    "rarity": "uncommon",
+    "type_line": "Legendary Creature \u2014 Dwarf Artificer"
+  },
+  "rhythm-of-the-wild": {
+    "image_url": "https://cards.scryfall.io/normal/front/c/2/c2a6453e-a373-44ec-807a-15c0c8b1af57.jpg?1783913277",
+    "mana_cost": "{1}{R}{G}",
+    "rarity": "uncommon",
+    "type_line": "Enchantment"
   },
   "robe-of-stars": {
-    "name": "Robe of Stars",
-    "image_url": "https://cards.scryfall.io/normal/front/b/2/b2992175-5499-4a83-9ff2-03c7c34819c3.jpg?1783926256"
+    "image_url": "https://cards.scryfall.io/normal/front/b/2/b2992175-5499-4a83-9ff2-03c7c34819c3.jpg?1783926256",
+    "name": "Robe of Stars"
   },
   "sacrifice": {
-    "name": "Sacrifice",
-    "image_url": "https://cards.scryfall.io/normal/front/6/5/652bd781-1a48-42c1-9aff-f9050a9285d6.jpg?1783947992"
+    "image_url": "https://cards.scryfall.io/normal/front/6/5/652bd781-1a48-42c1-9aff-f9050a9285d6.jpg?1783947992",
+    "name": "Sacrifice"
   },
   "scavenger-grounds": {
-    "name": "Scavenger Grounds",
-    "image_url": "https://cards.scryfall.io/normal/front/9/f/9fbe68ba-ffe5-4fe0-ac0a-0b3221e4f395.jpg?1783903197"
+    "image_url": "https://cards.scryfall.io/normal/front/9/f/9fbe68ba-ffe5-4fe0-ac0a-0b3221e4f395.jpg?1783903197",
+    "name": "Scavenger Grounds"
+  },
+  "searing-blood": {
+    "image_url": "https://cards.scryfall.io/normal/front/b/b/bb43fd07-d281-447d-88bf-c53498c2cf20.jpg?1783939539",
+    "mana_cost": "{R}{R}",
+    "rarity": "uncommon",
+    "type_line": "Instant"
   },
   "stirring-wildwood": {
-    "name": "Stirring Wildwood",
-    "image_url": "https://cards.scryfall.io/normal/front/2/2/22f40dfc-a35d-4094-9805-0de8b7f61cb0.jpg?1783933754"
+    "image_url": "https://cards.scryfall.io/normal/front/2/2/22f40dfc-a35d-4094-9805-0de8b7f61cb0.jpg?1783933754",
+    "name": "Stirring Wildwood"
   },
   "strixhaven-stadium": {
-    "name": "Strixhaven Stadium",
-    "image_url": "https://cards.scryfall.io/normal/front/4/2/421674ee-4b85-4942-b166-952598165826.jpg?1783927278"
+    "image_url": "https://cards.scryfall.io/normal/front/4/2/421674ee-4b85-4942-b166-952598165826.jpg?1783927278",
+    "name": "Strixhaven Stadium"
   },
   "stroke-of-midnight": {
-    "name": "Stroke of Midnight",
-    "image_url": "https://cards.scryfall.io/normal/front/2/8/289ba7ec-e30e-436f-b8d4-c88b65ecd137.jpg?1783915126"
+    "image_url": "https://cards.scryfall.io/normal/front/2/8/289ba7ec-e30e-436f-b8d4-c88b65ecd137.jpg?1783915126",
+    "name": "Stroke of Midnight"
   },
   "sundering-growth": {
-    "name": "Sundering Growth",
-    "image_url": "https://cards.scryfall.io/normal/front/9/6/96feebe2-0a6b-4df8-8e7d-ee0bb82ac0c1.jpg?1783932733"
+    "image_url": "https://cards.scryfall.io/normal/front/9/6/96feebe2-0a6b-4df8-8e7d-ee0bb82ac0c1.jpg?1783932733",
+    "name": "Sundering Growth"
+  },
+  "sundial-of-the-infinite": {
+    "image_url": "https://cards.scryfall.io/normal/front/3/6/36d3da9c-cb7a-4cea-b6e6-6722bd16c73c.jpg?1783941047",
+    "mana_cost": "{2}",
+    "rarity": "rare",
+    "type_line": "Artifact"
   },
   "sunken-citadel": {
-    "name": "Sunken Citadel",
-    "image_url": "https://cards.scryfall.io/normal/front/3/e/3e1c9b1a-e306-47bb-9f68-2083660319c0.jpg?1783913712"
+    "image_url": "https://cards.scryfall.io/normal/front/3/e/3e1c9b1a-e306-47bb-9f68-2083660319c0.jpg?1783913712",
+    "name": "Sunken Citadel"
   },
   "swarmyard": {
-    "name": "Swarmyard",
-    "image_url": "https://cards.scryfall.io/normal/front/b/8/b89329f2-d386-40a7-9098-6d80beeb8843.jpg?1783927748"
+    "image_url": "https://cards.scryfall.io/normal/front/b/8/b89329f2-d386-40a7-9098-6d80beeb8843.jpg?1783927748",
+    "name": "Swarmyard"
   },
   "syr-konrad-the-grim": {
-    "name": "Syr Konrad, the Grim",
-    "image_url": "https://cards.scryfall.io/normal/front/4/4/443a4eac-f972-4027-aed4-552d4edc2ce1.jpg?1783909613"
+    "image_url": "https://cards.scryfall.io/normal/front/4/4/443a4eac-f972-4027-aed4-552d4edc2ce1.jpg?1783909613",
+    "name": "Syr Konrad, the Grim"
   },
   "terrain-generator": {
-    "name": "Terrain Generator",
-    "image_url": "https://cards.scryfall.io/normal/front/f/4/f40e9f0f-8c0d-4bfd-9872-370ce3763006.jpg?1783922360"
+    "image_url": "https://cards.scryfall.io/normal/front/f/4/f40e9f0f-8c0d-4bfd-9872-370ce3763006.jpg?1783922360",
+    "name": "Terrain Generator"
   },
   "thespian-s-stage": {
-    "name": "Thespian's Stage",
-    "image_url": "https://cards.scryfall.io/normal/front/2/6/269a926d-7788-4668-8bd8-7572dbf5f5eb.jpg?1783930080"
+    "image_url": "https://cards.scryfall.io/normal/front/2/6/269a926d-7788-4668-8bd8-7572dbf5f5eb.jpg?1783930080",
+    "name": "Thespian's Stage"
   },
   "thoughtcast": {
-    "name": "Thoughtcast",
-    "image_url": "https://cards.scryfall.io/normal/front/4/6/466a0be8-31b9-4ea0-9a96-b09a76f4ec69.jpg?1783917163"
+    "image_url": "https://cards.scryfall.io/normal/front/4/6/466a0be8-31b9-4ea0-9a96-b09a76f4ec69.jpg?1783917163",
+    "name": "Thoughtcast"
+  },
+  "trouble-in-pairs": {
+    "image_url": "https://cards.scryfall.io/normal/front/0/f/0f61e93f-5f97-4c7d-b3d5-0e05242faeb3.jpg?1783913050",
+    "mana_cost": "{2}{W}{W}",
+    "rarity": "rare",
+    "type_line": "Enchantment"
   },
   "unholy-heat": {
-    "name": "Unholy Heat",
-    "image_url": "https://cards.scryfall.io/normal/front/4/e/4e879386-b1f8-4f2a-9820-6e1291746f88.jpg?1783911915"
+    "image_url": "https://cards.scryfall.io/normal/front/4/e/4e879386-b1f8-4f2a-9820-6e1291746f88.jpg?1783911915",
+    "name": "Unholy Heat"
   },
   "wall-of-omens": {
-    "name": "Wall of Omens",
-    "image_url": "https://cards.scryfall.io/normal/front/3/d/3d134bb2-17ec-4e65-976e-f06fa983f3fb.jpg?1783907116"
+    "image_url": "https://cards.scryfall.io/normal/front/3/d/3d134bb2-17ec-4e65-976e-f06fa983f3fb.jpg?1783907116",
+    "name": "Wall of Omens"
   },
   "wandering-fumarole": {
-    "name": "Wandering Fumarole",
-    "image_url": "https://cards.scryfall.io/normal/front/1/7/1703d037-2083-4027-b379-14f9c9d74ddc.jpg?1783908277"
+    "image_url": "https://cards.scryfall.io/normal/front/1/7/1703d037-2083-4027-b379-14f9c9d74ddc.jpg?1783908277",
+    "name": "Wandering Fumarole"
+  },
+  "zada-hedron-grinder": {
+    "image_url": "https://cards.scryfall.io/normal/front/4/5/4520cdcc-a10f-4b39-9c6f-ba86f6aa2c87.jpg?1783915638",
+    "mana_cost": "{3}{R}",
+    "rarity": "uncommon",
+    "type_line": "Legendary Creature \u2014 Goblin Ally"
+  },
+  "zirda-the-dawnwaker": {
+    "image_url": "https://cards.scryfall.io/normal/front/1/b/1bd8e61c-2ee8-4243-a848-7008810db8a0.jpg?1783931007",
+    "mana_cost": "{1}{R/W}{R/W}",
+    "rarity": "rare",
+    "type_line": "Legendary Creature \u2014 Elemental Fox"
   }
 }

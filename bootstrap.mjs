@@ -2,6 +2,12 @@ import { installRenderLifecycle } from './render-lifecycle.mjs';
 import { installReplayDataWarmup } from './replay-data.mjs';
 
 const params = new URLSearchParams(window.location.search);
+// Older Cube launch links now enter the dedicated trophy game. Stored legacy
+// friend links remain readable through their original challenge contract.
+if(params.get('set')==='powered-cube' && !params.has('challenge') && params.get('game')!=='draft-run') {
+  params.set('game','draft-run');params.delete('mode');params.delete('seed');
+  history.replaceState({},'',`${location.pathname}?${params}`);
+}
 const challengeMode = params.has('challenge');
 
 installRenderLifecycle();

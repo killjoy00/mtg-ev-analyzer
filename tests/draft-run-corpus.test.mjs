@@ -3,15 +3,19 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import {validateDraftRunPuzzle,interestingDraftRunPuzzle,gradeDraftRunPick,selectDraftRun,selectDraftRunReroll,eligiblePickForRound,publicDraftRunPuzzle,summarizeDraftRun} from '../draft-run.mjs';
+import {validateDraftRunPuzzle,interestingDraftRunPuzzle,gradeDraftRunPick,selectDraftRun,selectDraftRunReroll,eligiblePickForRound,publicDraftRunPuzzle,summarizeDraftRun,poolForEnvironment} from '../draft-run.mjs';
 
 const catalog=JSON.parse(fs.readFileSync(new URL('../corpus/draft-run/catalog.json',import.meta.url)));
 const all=catalog.sets.flatMap(s=>{
+  const evidence=fs.readFileSync(new URL(`../corpus/draft-run/evidence/${s.id}.json.gz`,import.meta.url));
+  assert.equal(createHash('sha256').update(evidence).digest('hex'),s.evidence_sha256);
   const bytes=fs.readFileSync(new URL(`../corpus/draft-run/${s.id}.json.gz`,import.meta.url));
   assert.equal(createHash('sha256').update(bytes).digest('hex'),s.sha256);
   return JSON.parse(gunzipSync(bytes));
 });
 const pool=all.filter(interestingDraftRunPuzzle);
+const registry=JSON.parse(fs.readFileSync(new URL('../data/catalog.json',import.meta.url)));
+
 
 test('every playable decision has trophy, skill, complete history and valid scoring evidence',()=>{
   assert.ok(all.length>=5000);
@@ -57,4 +61,41 @@ test('missing scoring evidence and incomplete runs fail closed',()=>{
   const p=all[0];assert.throws(()=>gradeDraftRunPick({...p,historical_pick_id:'missing'},p.candidates[0].id));
   assert.throws(()=>gradeDraftRunPick({...p,candidates:p.candidates.map(c=>({...c,model_probability:0}))},p.candidates[0].id));
   assert.throws(()=>summarizeDraftRun([p],[p.historical_pick_id]));
+});
+
+
+test('trophy coverage matches every loaded environment and preserves true opening availability',()=>{
+  assert.deepEqual(catalog.sets.map(s=>s.id).sort(),registry.sets.map(s=>s.id).sort());
+  for(const set of catalog.sets){
+    const rows=pool.filter(p=>p.set_id===set.id),environment=set.id==='powered-cube'?set.id:'mixed';
+    assert.ok(new Set(rows.map(p=>p.source_draft_hash)).size>=12,set.id);
+    for(let round=0;round<10;round++){
+      const choices=rows.filter(p=>eligiblePickForRound(round,p.pick_number,environment));
+      if(round===0 && set.first_pick===2 && environment==='mixed') {assert.equal(choices.length,0);continue;}
+      assert.ok(choices.length>=12,`${set.id} round ${round+1}`);
+      const source=choices[0];
+      const replacement=selectDraftRunReroll(pool,source,{type:'pack',round,seed:'all-sets',environment});
+      assert.ok(replacement,`${set.id} needs a same-set reroll at round ${round+1}`);
+      assert.equal(replacement.set_id,set.id);
+    }
+  }
+  assert.ok(poolForEnvironment(pool).every(p=>p.set_id!=='powered-cube'));
+});
+
+test('Cube has ten independent trophy decisions and two sequential pack replacements without expansion leakage',()=>{
+  for(let i=0;i<30;i++){
+    const seed='cube-'+i,environment='powered-cube',run=selectDraftRun(pool,seed,environment);
+    assert.equal(run.length,10);assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,10);
+    assert.equal(run[0].pick_number,2);assert.equal(run[1].pick_number,3);
+    for(let round=0;round<10;round++){
+      let current=run[round],seen=run.map(p=>p.source_draft_hash);
+      assert.equal(current.set_id,environment);assert.ok(eligiblePickForRound(round,current.pick_number,environment));
+      for(let reroll=0;reroll<2;reroll++){
+        const replacement=selectDraftRunReroll(pool,current,{type:'pack',round,seed,environment,excludedSources:seen});
+        assert.ok(replacement);assert.equal(replacement.set_id,environment);assert.ok(!seen.includes(replacement.source_draft_hash));
+        seen.push(replacement.source_draft_hash);current=replacement;
+      }
+    }
+    assert.throws(()=>selectDraftRunReroll(pool,run[0],{type:'set',round:0,seed,environment}),/stay within Powered Cube/);
+  }
 });

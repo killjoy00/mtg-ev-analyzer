@@ -1,6 +1,6 @@
 # Pack 1
 
-Pack One is a Limited draft game built from historical 17Lands Premier Draft decisions. Its primary game is **Draft Run**: ten independent choices from verified trophy drafts, two one-use rerolls, and contextual partial credit. Play the Eastern-time Daily or unlimited practice, then send the same ten packs to a friend.
+Pack One is a Limited draft game built from historical 17Lands Premier Draft decisions. Its primary game is **Draft Run**: ten independent choices from verified trophy drafts, two one-use rerolls, and contextual partial credit. Play the Eastern-time Daily or unlimited practice, then send the same ten packs to a friend. Powered Cube has its own trophy-only ten-decision Daily and practice flow with two pack rerolls.
 
 Live site: `https://magic.planitnow.us`
 
@@ -8,7 +8,7 @@ Live site: `https://magic.planitnow.us`
 
 - Historical replay study, **not** a counterfactual draft simulator.
 - High 17Lands win rate is the primary definition of player strength.
-- Draft Run awards 100 for the trophy pick and up to 95 from relative contextual support for alternatives. Other modes retain their existing scoring.
+- The product owner’s settled design is to match the trophy drafter. Draft Run awards 100 for that pick and up to 95 from relative contextual support for alternatives. Other modes retain their existing scoring.
 - Historical drafter picks are shown separately from consensus.
 - No model/LLM API is used for runtime scoring.
 - Raw 17Lands archives are never committed or shipped to the browser.

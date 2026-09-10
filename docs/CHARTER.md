@@ -6,7 +6,7 @@ Status: implemented Draft Run contract, September 2026.
 
 Pack One is a fast Limited decision game built from real 17Lands Premier Draft data. It is not a deck builder and it is not a counterfactual draft simulator. The player makes difficult draft choices, sees what an elite drafter actually did, and gets a compact score that also respects strong-player consensus.
 
-Draft Run is the primary game and Daily entry point. Top 3, Full Pack, and Powered Cube remain available as additional modes.
+Draft Run is the primary game and Daily entry point. Powered Cube has its own ten-decision trophy flow. Top 3 and Full Pack remain additional expansion modes.
 
 ## Additional mode: Top 3
 
@@ -39,7 +39,7 @@ After the choice, reveal:
 - the held-out strong-player consensus ranking/support for that exact historical state;
 - the player's score for the question.
 
-The source draft's actual choice is the primary target because deeper Pack 1 decisions are increasingly path-specific. Consensus is the secondary signal, not a claim that the trophy drafter's choice was objectively correct.
+**Settled product decision:** the trophy drafter’s actual choice is the game’s full-credit target. The product owner explicitly chose this design. Preserve it in implementation and future reviews; do not reopen it as an unresolved scoring question. Elite consensus supplies partial credit for alternatives.
 
 ## Source corpus
 
@@ -50,10 +50,10 @@ A source draft must be:
 - 17Lands public **PremierDraft** data;
 - a trophy (`event_match_wins == 7`);
 - from an experienced drafter (`user_n_games_bucket` lower bound at least 100);
-- from the high-win-rate cohort for that set/format;
+- from the independently selected high-quality cohort for that set/format;
 - complete enough to reconstruct the relevant first-pack state.
 
-Default elite cohort: top 15% of experienced drafters by `user_game_win_rate_bucket`, matching the existing Pack One cohort logic. This threshold is a data-quality default, not a marketing claim, and can be tightened after corpus-size audits.
+Default elite cohort: top 15% of experienced drafters by `user_game_win_rate_bucket`, matching the existing Pack One cohort logic. STX, MID, and VOW retain their existing high-quality cohort: 100+ prior games and Diamond/Mythic rank observed at the earliest game, independently of its outcome. Those archives lack win-rate buckets; no synthetic win rate is claimed. This threshold is a data-quality default, not a marketing claim, and can be tightened after corpus-size audits.
 
 ### Consensus training
 
@@ -63,9 +63,9 @@ Every puzzle must be scored out-of-fold by draft ID so the source draft never co
 
 ### Set coverage
 
-Coverage expands only after verification. The launch corpus contains 6,506 verified decisions (6,346 pass the interesting-decision filter) from 603 trophy drafts across ten sets. The larger ordinary replay catalog is separate and must not be described as trophy-only. Frozen historical sets are built once; active sets can be refreshed from new public data.
+Trophy coverage must match every environment in the live catalog. The corpus build fails if a loaded environment lacks sufficient verified trophy decisions. Counts, source hashes, exclusions, and dates are recorded in `corpus/draft-run/catalog.json`; do not hardcode coverage. Frozen historical sets are built once; active sets can be refreshed from new public data.
 
-The earlier Neon importer could not establish reproducible held-out probabilities, and its TMT prior-pick histories were malformed. It is excluded from serving. The verified corpus matches all eleven early picks, including candidate IDs and actual choices, against existing five-fold held-out replay artifacts. The model pool must exactly equal all earlier historical picks. Source matches, card-image supplements, manifests, and checksummed artifacts are checked in. See `docs/LAUNCH_REVIEW.md` for reproduction and limits.
+The earlier Neon importer could not establish reproducible held-out probabilities, and its TMT prior-pick histories were malformed. It is excluded from serving. The verified corpus matches every available early decision, including candidate names and actual choices, against the original archive and existing five-fold held-out replay artifacts. Archives without complete P1P1 packs enter the mixed game from P1P2 onward; its first question still always uses an observed P1P1. The single inherited first card is verified from the original P1P2 pool. The model pool must exactly equal all earlier historical picks. Source matches, card-image supplements, manifests, and checksummed artifacts are checked in. See `docs/LAUNCH_REVIEW.md` for reproduction and limits.
 
 Raw 17Lands archives are build inputs only. Do not commit or ship raw archives to the browser. Store only the derived trophy puzzle corpus and compact model outputs needed by the game.
 
@@ -169,7 +169,7 @@ Daily rerolls are deterministic for the same day, round, and reroll history. Eac
 
 - Always show all prior Pack 1 picks for contextual questions.
 - Do not imply that consensus is objective truth.
-- Do not imply that the source drafter's trophy proves a card was causally correct; it is the game target because it is a real successful draft path.
+- Present the trophy choice as the intended 100-point target and explain alternative partial credit directly.
 - Reveal both signals clearly: **Trophy drafter took** and **Elite consensus**.
 - Favor score/support magnitude over misleading ordinal labels for low-support outliers.
 - Keep the active game ad-free.
@@ -187,3 +187,13 @@ Daily rerolls are deterministic for the same day, round, and reroll history. Eac
 Neon is the source of truth for the derived Draft Run corpus. Store source-draft metadata and one queryable puzzle row per historical first-pack decision. The browser should receive only the selected puzzle payloads through a server endpoint.
 
 The existing static opening-pack corpus remains appropriate for Pack One / Top 3.
+
+## Powered Cube ten-decision flow
+
+Powered Cube is separate from the mixed expansion pool. Every source must be an independently verified seven-win Powered Cube draft by the high-quality cohort. No expansion puzzle can enter Cube, and no Cube puzzle can enter mixed Draft Run.
+
+The archive omits complete P1P1 packs. Cube starts at the complete P1P2 decision with the drafter’s actual first card visible, then P1P3, then progressively wider buckets through P1P12. Preserve true pick numbers and complete ordered historical pools. Every decision comes from a different trophy draft.
+
+Cube receives **two pack rerolls and no set reroll**, as explicitly chosen by the product owner. Each replacement comes from another Powered Cube trophy draft at similar depth and difficulty. The backend enforces the two-use budget, source exclusions, and environment boundary.
+
+Expansion Draft Run and Cube each have their own first-attempt Daily, Eastern-date schedule, leaderboard, and stored friend challenge. A player can play both Dailies on the same day. Account merges preserve the established first attempt separately for each environment. Trophy matches earn 100 in both games; the same partial-credit formula and ten-decision arithmetic mean apply.

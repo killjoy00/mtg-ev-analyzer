@@ -31,7 +31,7 @@ export function poweredCubeUrl({
   if (!MODES.has(mode)) throw new Error(`Unsupported Powered Cube mode: ${mode}`);
   const url = new URL(origin);
   url.searchParams.set('set', POWERED_CUBE_ID);
-  url.searchParams.set('mode', mode);
+  url.searchParams.set('game', 'draft-run');
   if (daily) url.searchParams.set('daily', String(daily));
   else url.searchParams.set('seed', seed || freshSeed());
   return url.toString();
@@ -60,20 +60,20 @@ function cubeSectionMarkup() {
     <section class="mode-section cube-mode-section" data-powered-cube-section="1" aria-labelledby="powered-cube-heading">
       <div class="mode-section-heading">
         <div><p class="eyebrow">Special format</p><h2 id="powered-cube-heading">Powered Cube</h2></div>
-        <p>A separate Pack One game built from real 17Lands Powered Cube seats. Arena omits the full P1P1 pack, so your run inherits that drafter’s first card and starts at the complete 14-card P1P2.</p>
+        <p>Ten decisions from high-quality drafters who trophied in Powered Cube. The source omits full P1P1 packs, so start at P1P2 with the drafter’s real first pick visible.</p>
       </div>
       <div class="mode-grid cube-single-mode" aria-label="Powered Cube mode">
         <article class="mode-card game-mode-row cube-mode-card">
-          <div class="mode-topline"><p class="eyebrow">14 real decisions</p><span class="best-chip">Powered Cube</span></div>
-          <h3>Cube Pack Run</h3>
-          <p>Start with the real P1P1 card already in your pool, then make every fully observed Pack One choice from P1P2 through P1P15. Later support adapts to the cards you take.</p>
+          <div class="mode-topline"><p class="eyebrow">10 trophy decisions</p><span class="best-chip">Powered Cube</span></div>
+          <h3>Powered Cube Run</h3>
+          <p>Read a different trophy drafter’s pool at each decision. Match their pick for 100 points. You get two pack rerolls, both from other Powered Cube trophy runs.</p>
           <div class="button-row">
             <button class="button primary" type="button" data-cube-href="${esc(daily)}">Today’s Cube</button>
             <button class="button secondary" type="button" data-cube-href="${esc(run)}">New Cube Run</button>
           </div>
         </article>
       </div>
-      <p class="set-meta">Powered Cube is scored and ranked separately from expansion drafts. The current public training corpus is the 2025 Arena Powered Cube dataset; a newer public dump can replace it without changing the mode.</p>
+      <p class="set-meta">A separate Daily, leaderboard, and friend challenge flow. Every pack stays inside Powered Cube.</p>
     </section>`;
 }
 

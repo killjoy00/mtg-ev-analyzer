@@ -4,7 +4,8 @@ import { seededRandom } from './gameplay.mjs';
 const SUPPORT_EXPONENT = 1;
 const EPSILON = 1e-9;
 export const DRAFT_RUN_SCORING_VERSION = 'trophy-consensus-v2';
-export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-verified-v5';
+export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-verified-v6';
+export const POWERED_CUBE_ENVIRONMENT = 'powered-cube';
 
 export const DRAFT_RUN_LENGTH = 10;
 export const DRAFT_RUN_PICK_WINDOWS = Object.freeze([
@@ -19,6 +20,21 @@ export const DRAFT_RUN_PICK_WINDOWS = Object.freeze([
   [7, 10],
   [8, 11],
 ]);
+// Cube's archive omits complete P1P1 packs. Keep true pick positions and show
+// the actual inherited first pick instead of inventing an opening pack.
+export const CUBE_PICK_WINDOWS = Object.freeze([
+  [2,2], [3,3], [4,4], [4,6], [5,7], [6,8], [6,9], [7,10], [8,11], [9,12],
+]);
+
+export function draftRunEnvironment(value = 'mixed') {
+  if (!['mixed', POWERED_CUBE_ENVIRONMENT].includes(value)) throw new Error('Invalid Draft Run environment.');
+  return value;
+}
+
+export function poolForEnvironment(pool, environment = 'mixed') {
+  draftRunEnvironment(environment);
+  return pool.filter(p => environment === POWERED_CUBE_ENVIRONMENT ? p.set_id === environment : p.set_id !== POWERED_CUBE_ENVIRONMENT);
+}
 
 export function draftRunConsensusCap() {
   // Pick depth is already an input to the contextual model. Penalizing an
@@ -129,8 +145,8 @@ export function draftRunRerollDistance(source, candidate) {
   return (pickDistance * 0.35) + (countDistance * 0.15) + (gapDistance * 0.25) + (entropyDistance * 0.15) + (poolDistance * 0.10);
 }
 
-export function eligiblePickForRound(roundIndex, pickNumber) {
-  const window = DRAFT_RUN_PICK_WINDOWS[Number(roundIndex)];
+export function eligiblePickForRound(roundIndex, pickNumber, environment = 'mixed') {
+  const window = (environment === POWERED_CUBE_ENVIRONMENT ? CUBE_PICK_WINDOWS : DRAFT_RUN_PICK_WINDOWS)[Number(roundIndex)];
   if (!window) return false;
   const pick = Number(pickNumber);
   return Number.isInteger(pick) && pick >= window[0] && pick <= window[1];
@@ -140,10 +156,16 @@ export function validateDraftRunPuzzle(puzzle) {
   const cards = puzzle?.candidates || [];
   const prior = puzzle?.prior_picks || [];
   const pick = Number(puzzle?.pick_number);
+  const legacySkill = ['stx','mid','vow'].includes(puzzle?.set_id) &&
+    puzzle?.skill_evidence === 'earliest_game_arena_rank' &&
+    ['diamond','mythic'].includes(puzzle?.player_rank_tier) && puzzle?.player_win_rate_bucket == null;
+  const rateSkill = puzzle?.skill_evidence === 'win_rate_bucket' &&
+    Number(puzzle?.player_win_rate_bucket) >= 0.6 && Number(puzzle?.player_win_rate_bucket) <= 1;
   return puzzle?.corpus_version === DRAFT_RUN_CORPUS_VERSION &&
     Number(puzzle.event_match_wins) === 7 && Number(puzzle.player_games_lower_bound) >= 100 &&
-    Number(puzzle.player_win_rate_bucket) >= 0.6 && Number(puzzle.player_win_rate_bucket) <= 1 &&
-    Number.isInteger(pick) && pick >= 1 && pick <= 11 && prior.length === pick - 1 &&
+    (legacySkill || rateSkill) && puzzle.source_evidence === 'official_archive_trajectory' &&
+    Number.isInteger(pick) && pick >= (puzzle.set_id === POWERED_CUBE_ENVIRONMENT ? 2 : 1) &&
+    pick <= (puzzle.set_id === POWERED_CUBE_ENVIRONMENT ? 12 : 11) && prior.length === pick - 1 &&
     prior.every(c => c.id && c.name && c.order_known !== false) && cards.length >= 4 &&
     new Set(cards.map(c => c.id)).size === cards.length &&
     cards.every(c => c.id && c.name && Number.isFinite(Number(c.model_probability)) && Number(c.model_probability) >= 0) &&
@@ -159,12 +181,12 @@ export function interestingDraftRunPuzzle(puzzle) {
   return ranked.length >= 4 && a > 0 && a <= 0.75 && b / a >= 0.2;
 }
 
-export function selectDraftRun(pool, seed) {
+export function selectDraftRun(pool, seed, environment = 'mixed') {
   const random = seededRandom(seed);
-  const sorted = [...pool].sort((a,b) => a.puzzle_id.localeCompare(b.puzzle_id));
+  const sorted = poolForEnvironment(pool, environment).sort((a,b) => a.puzzle_id.localeCompare(b.puzzle_id));
   const selected = [], sources = new Set(), sets = new Set();
   for (let round = 0; round < DRAFT_RUN_LENGTH; round++) {
-    let available = sorted.filter(p => eligiblePickForRound(round,p.pick_number) && !sources.has(p.source_draft_hash));
+    let available = sorted.filter(p => eligiblePickForRound(round,p.pick_number,environment) && !sources.has(p.source_draft_hash));
     const fresh = available.filter(p => !sets.has(p.set_id));
     if (fresh.length) available = fresh;
     else {
@@ -182,12 +204,13 @@ export function selectDraftRun(pool, seed) {
   return selected;
 }
 
-export function selectDraftRunReroll(pool, source, { type, round, seed, excludedSources = [] }) {
+export function selectDraftRunReroll(pool, source, { type, round, seed, excludedSources = [], environment = 'mixed' }) {
   if (!['set','pack'].includes(type)) throw new Error('Invalid reroll.');
+  if (environment === POWERED_CUBE_ENVIRONMENT && type === 'set') throw new Error('Cube rerolls stay within Powered Cube.');
   const excluded = new Set([...excludedSources,source.source_draft_hash]);
-  const eligible = pool.filter(p => !excluded.has(p.source_draft_hash) &&
+  const eligible = poolForEnvironment(pool, environment).filter(p => !excluded.has(p.source_draft_hash) &&
     (type === 'set' ? p.set_id !== source.set_id : p.set_id === source.set_id) &&
-    eligiblePickForRound(round,p.pick_number) && Math.abs(p.pick_number-source.pick_number) <= 1)
+    eligiblePickForRound(round,p.pick_number,environment) && Math.abs(p.pick_number-source.pick_number) <= 1)
     .map(p => ({ puzzle:p, distance:draftRunRerollDistance(source,p) }))
     .filter(p => Number.isFinite(p.distance) && p.distance <= 0.16)
     .sort((a,b) => a.distance-b.distance || a.puzzle.puzzle_id.localeCompare(b.puzzle.puzzle_id));

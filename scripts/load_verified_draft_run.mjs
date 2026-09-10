@@ -18,11 +18,17 @@ if (process.argv.includes('--schema')) {
   console.log('Additive schema applied.');
 }
 const catalog=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json','utf8'));
-for(const set of catalog.sets) {
+const registry=JSON.parse(fs.readFileSync('data/catalog.json','utf8'));
+if(JSON.stringify(catalog.sets.map(s=>s.id).sort())!==JSON.stringify(registry.sets.map(s=>s.id).sort()))throw new Error('Trophy coverage must match the complete loaded catalog.');
+// Validate every artifact before making any database changes.
+const prepared=catalog.sets.map(set=>{
   const bytes=fs.readFileSync(`corpus/draft-run/${set.id}.json.gz`);
   if(createHash('sha256').update(bytes).digest('hex')!==set.sha256) throw new Error('Corpus checksum mismatch.');
   const rows=JSON.parse(zlib.gunzipSync(bytes));
-  if(rows.some(p=>!validateDraftRunPuzzle(p))) throw new Error('Invalid puzzle in '+set.id);
+  if(rows.length!==set.puzzles||rows.some(p=>!validateDraftRunPuzzle(p)||p.set_id!==set.id||[...p.candidates,...p.prior_picks].some(c=>!c.image_url?.startsWith('https://')))) throw new Error('Invalid puzzle in '+set.id);
+  return {set,rows};
+});
+async function loadSet({set,rows}) {
   await query(`INSERT INTO draft_run_verified_sets(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb) ON CONFLICT(set_id) DO UPDATE SET corpus_version=EXCLUDED.corpus_version,manifest=EXCLUDED.manifest`,[set.id,catalog.corpus_version,JSON.stringify(set)]);
   for(let i=0;i<rows.length;i+=250) {
     const batch=rows.slice(i,i+250).map(p=>({puzzle_id:p.puzzle_id,set_id:p.set_id,source_draft_hash:p.source_draft_hash,corpus_version:p.corpus_version,pick_number:p.pick_number,candidate_count:p.candidates.length,consensus_top_gap:draftRunDifficulty(p).topGap,support_entropy:draftRunDifficulty(p).entropy,interesting:interestingDraftRunPuzzle(p),payload:p}));
@@ -30,4 +36,12 @@ for(const set of catalog.sets) {
   }
   console.log(set.id,rows.length,'verified puzzles');
 }
+// Independent set uploads use a bounded worker pool. Each set manifest precedes
+// its own puzzle batches; reruns remain idempotent and preserve old versions.
+let next=0;
+await Promise.all(Array.from({length:4},async()=>{
+  while(next<prepared.length)await loadSet(prepared[next++]);
+}));
+const actual=await query('SELECT set_id,count(*)::int puzzles FROM draft_run_verified_puzzles WHERE corpus_version=$1 GROUP BY set_id',[catalog.corpus_version]);
+if(catalog.sets.some(s=>Number(actual.rows.find(r=>r.set_id===s.id)?.puzzles)!==s.puzzles))throw new Error('Loaded corpus count mismatch.');
 console.log('Verified corpus loaded.');

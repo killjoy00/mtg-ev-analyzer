@@ -33,7 +33,7 @@ export function environmentProgress(catalog, bySet = []) {
 export function modeName(mode, { cube = false } = {}) {
   if (mode === 'top3') return 'Top 3';
   if (mode === 'full') return cube ? 'Cube Pack Run' : 'Full Pack';
-  if (mode === 'draft_run') return 'Draft Run';
+  if (mode === 'draft_run') return cube ? 'Powered Cube Run' : 'Draft Run';
   return String(mode || 'Game');
 }
 
