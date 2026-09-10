@@ -461,17 +461,12 @@
       "status": "live"
     },
     {
-      "code": "AFR",
-      "reason": "CalledProcessError: Command '['/opt/hostedtoolcache/Python/3.12.14/x64/bin/python', 'scripts/build_replays.py', '--input', '/tmp/pack1-afr-nq476vpf/draft_data_public.AFR.PremierDraft.csv.gz', '--output-dir', '/tmp/pack1-afr-nq476vpf/data/afr', '--catalog', '/tmp/pack1-afr-nq476vpf/data/catalog.json', '--expansion', 'AFR', '--format', 'PremierDraft', '--source-date', '2024-01-11', '--minimum-games', '100', '--top-fraction', '0.15', '--max-training-drafts', '5000', '--max-output-drafts', '300', '--minimum-picks', '30', '--folds', '5', '--shard-size', '2', '--card-metadata', '/tmp/pack1-afr-nq476vpf/afr-cards.json']' returned non-zero exit status 1.",
-      "status": "blocked"
-    },
-    {
       "code": "STX",
       "status": "live"
     }
   ],
   "normal_queue_counts": {
-    "blocked": 1,
+    "blocked": 0,
     "live": 32,
     "pending": 0
   },
