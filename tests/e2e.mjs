@@ -91,7 +91,7 @@ async function home() {
   assert.match(consensusCopy, /high-win-rate 17Lands drafters/i);
   assert.doesNotMatch(consensusCopy, /not win rates|not win probability|card grades|objective truth/i);
   assert.doesNotMatch((await page.locator('.home-intro').textContent()) || '', /defend it/i);
-  assert.equal(await page.getByRole('heading', { name: 'Today’s Pack One', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('heading', { name: 'Today’s opening pack', exact: true }).count(), 1);
   assert.equal(await page.locator('.daily-main').count(), 1);
   assert.match((await page.locator('.daily-main').textContent()) || '', /Play today’s Top 3/i);
   assert.equal(await page.locator('#home-editorial').isVisible(), true, 'editorial shell should be visible on home');
