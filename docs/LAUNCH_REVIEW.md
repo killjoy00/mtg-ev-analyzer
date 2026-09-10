@@ -63,6 +63,8 @@ History uses indexed keyset pagination. Public lookup uses a partial lowercase-n
 
 Profile aggregation is proportional to one player's history; board counting grows with that player's historical board participation. Current tests use real development-branch data. For much larger histories, measure p95 latency and consider versioned closed-board aggregates with explicit invalidation on identity merges. No speculative cache or background infrastructure was introduced.
 
+Measured development queries: 126 historical board comparisons took 1.45 ms; ten per-environment contributions took 0.13 ms. These are small-data query checks, not a load-test claim. End-to-end development requests alternated between 124–236 ms when warm and roughly 10–12 seconds after idle gaps. That points to startup/transport overhead rather than SQL execution. The home page begins a read-only game warmup, but production first-interaction latency still needs checking during the blocked live rollout.
+
 Required gates: complete JavaScript/Python suites, production data audit, legacy and Draft Run browser regressions, mobile/desktop screenshot inspection, and `tests/draft-run-backend-smoke.mjs` against an isolated development branch. The integration test covers concurrency, account linking/merges, profile privacy, percentile ties, persistent events, and forged-score rejection. Apply additive migrations and load verified corpus before deploying the new functions; publish Pages only after CI succeeds and verify the exact merge commit live.
 
 ## Monetization decision

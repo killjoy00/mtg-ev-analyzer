@@ -136,6 +136,8 @@ export async function installDraftRunPage() {
 }
 export function installDraftRunHome() {
   styles();
+  // Start the read-only corpus warmup while the player reads the landing page.
+  if(base())void api('/health',undefined,false).catch(()=>{});
   if(!new URLSearchParams(location.search).has('legacy-board')) {
     for(const [id,url] of [['daily-nav','?game=draft-run&daily=1'],['leaderboard-nav','?game=draft-run&board=daily']])
       document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();location.href=url;},true);

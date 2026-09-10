@@ -3,7 +3,8 @@
 SELECT *,round(started::numeric/nullif(visitors,0),3) visitor_to_start,
   round(completed_first::numeric/nullif(visitors,0),3) visitor_to_result,
   round(played_second::numeric/nullif(completed_first,0),3) result_to_second_game,
-  round(claimed_after_result::numeric/nullif(completed_first,0),3) result_to_claim
+  round(claimed_after_result::numeric/nullif(completed_first,0),3) result_to_claim,
+  round(published_after_claim::numeric/nullif(claimed_accounts,0),3) claim_to_public_profile
 FROM analytics_retention_cohorts ORDER BY cohort_day DESC;
 
 SELECT *,round(returned_next_day::numeric/nullif(completed_players,0),3) next_day_return_rate

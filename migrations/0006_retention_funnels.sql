@@ -22,9 +22,10 @@ SELECT (first_visit_at AT TIME ZONE 'America/New_York')::date cohort_day,
   count(*) visitors,
   count(*) FILTER(WHERE first_start_at>=first_visit_at) started,
   count(*) FILTER(WHERE first_result_at>=first_visit_at) completed_first,
-  count(*) FILTER(WHERE second_result_at>=first_result_at) played_second,
-  count(*) FILTER(WHERE claimed_at>=first_result_at) claimed_after_result,
-  count(*) FILTER(WHERE public_enabled_at>=claimed_at) published_after_claim
+  count(*) FILTER(WHERE first_result_at>=first_visit_at AND second_result_at>=first_result_at) played_second,
+  count(*) FILTER(WHERE first_result_at>=first_visit_at AND claimed_at>=first_result_at) claimed_after_result,
+  count(*) FILTER(WHERE claimed_at>=first_visit_at AND public_enabled_at>=claimed_at) published_after_claim,
+  count(*) FILTER(WHERE claimed_at>=first_visit_at) claimed_accounts
 FROM analytics_player_career_funnel WHERE first_visit_at IS NOT NULL
 GROUP BY cohort_day;
 -- statement
