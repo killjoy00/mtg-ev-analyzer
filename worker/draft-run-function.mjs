@@ -159,8 +159,9 @@ async function leaderboard(request) {
   const today=gameDateKey();
   const start=period==='daily'?today:period==='month'?today.slice(0,8)+'01':period==='week'?(()=>{const d=new Date(today+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);})():'2000-01-01';
   const r=await query(`WITH results AS (
-    SELECT player_id,round(avg(score),1) score,count(*) days FROM scores WHERE mode='draft_run' AND challenge_date BETWEEN $1::date AND $2::date GROUP BY player_id
-  ) SELECT rank() OVER(ORDER BY r.score DESC) rank,r.score,r.days,p.display_name,CASE WHEN p.profile_public THEN p.profile_key END profile_key
+    SELECT player_id,round(avg(score),1) score,count(*) days FROM scores WHERE mode='draft_run' AND set_id='mixed' AND challenge_date BETWEEN $1::date AND $2::date GROUP BY player_id
+  ) SELECT rank() OVER(ORDER BY r.score DESC) rank,r.score,r.days,p.display_name,CASE WHEN p.profile_public AND
+      (SELECT count(*) FROM players x WHERE x.profile_public AND lower(x.display_name)=lower(p.display_name))=1 THEN p.profile_key END profile_key
     FROM results r JOIN players p ON p.id=r.player_id ORDER BY r.score DESC,r.days DESC,p.display_name LIMIT 100`,[start,today]);
   return json({period,start,today,rows:r.rows.map(r=>({...r,rank:Number(r.rank),score:Number(r.score),days:Number(r.days)}))});
 }
