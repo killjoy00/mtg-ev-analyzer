@@ -51,6 +51,7 @@ try{
   assert.notEqual(puzzles[0].set_id,originalSet);const replacementSet=puzzles[0].set_id;
   await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'New pack · 0',exact:true}).waitFor();
   assert.equal(puzzles[0].set_id,replacementSet);await noOverflow();
+  await page.waitForFunction(()=>[...document.querySelectorAll('.run-cards img')].every(img=>img.complete&&img.naturalWidth>0),null,{timeout:30000});
   await page.locator('.run-zoom').first().click();await page.locator('.run-card-dialog').waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();
   await page.screenshot({path:'artifacts/ui-draft-run-mobile.png',fullPage:true});
   await page.setViewportSize({width:1440,height:1000});await noOverflow();await page.screenshot({path:'artifacts/ui-draft-run-desktop.png',fullPage:true});await page.setViewportSize({width:390,height:844});

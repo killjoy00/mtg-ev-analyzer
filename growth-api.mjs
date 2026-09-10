@@ -46,7 +46,7 @@ async function api(path, { method='GET', body, auth=true, authSession=null } = {
   const headers = new Headers({ 'content-type': 'application/json' });
   if (auth) headers.set('authorization', `Bearer ${await ensurePackSession()}`);
   if (authSession) headers.set('x-pack1-auth-session', authSession);
-  const response = await fetch(`${baseUrl()}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(`${baseUrl()}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body),keepalive:path==='/v1/events' });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || `Pack 1 API failed (${response.status}).`);
   return data;

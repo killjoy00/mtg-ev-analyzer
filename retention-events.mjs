@@ -18,3 +18,4 @@ export async function flushEvents() {
   const events=queue.splice(0,20);await sendEvents(events);if(queue.length)void flushEvents();
 }
 if(typeof document!=='undefined') document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden')void flushEvents();});
+if(typeof window!=='undefined')window.addEventListener('pagehide',()=>void flushEvents());

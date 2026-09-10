@@ -7,14 +7,19 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const tag=crypto.randomUUID().slice(0,8),timings=[];
+const httpPrefix=process.env.PACK1_QA_FUNCTION_PREFIX;
+if(httpPrefix&&!/^https:\/\/br-[a-z0-9-]+-$/.test(httpPrefix))throw new Error('Invalid development function prefix');
 async function call(service,path,body,token,status=200,extra={}) {
   const started=performance.now();
-  const r=await service.fetch(new Request('https://magic.planitnow.us'+path,{method:extra.method||(body===undefined?'GET':'POST'),headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...extra.headers},body:body===undefined?undefined:JSON.stringify(body)}));
+  const url=httpPrefix?httpPrefix+(service===growth?'pack1growth':'draftrunapi')+'.compute.c-5.us-east-2.aws.neon.tech'+path:'https://magic.planitnow.us'+path;
+  const request=new Request(url,{method:extra.method||(body===undefined?'GET':'POST'),headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...extra.headers},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});
+  const r=await(httpPrefix?fetch(request):service.fetch(request));
   const data=await r.json();timings.push({path,ms:Math.round(performance.now()-started)});
   assert.equal(r.status,status,`${path}: ${JSON.stringify(data)}`);return data;
 }
 const guest=await call(growth,'/v1/session',{displayName:'QA guest '+tag});
 const owner=await call(growth,'/v1/session',{displayName:'QA owner '+tag});
+console.log('Created isolated guest and owner fixtures',tag);
 let original=await call(runApi,'/v1/runs',{daily:true},owner.token);
 let duplicate=await call(runApi,'/v1/runs',{daily:true},guest.token);
 let s=await call(runApi,'/v1/runs',{},guest.token);
@@ -31,6 +36,7 @@ for(let round=0;round<10;round++) {
   s=await call(runApi,`/v1/runs/${s.id}/pick`,body,guest.token);
   assert.equal((await call(runApi,`/v1/runs/${s.id}/pick`,body,guest.token)).revision,s.revision);
   await call(runApi,`/v1/runs/${s.id}/pick`,{...body,cardId:other},guest.token,409);
+  console.log('Locked decision and retries verified',round+1);
 }
 assert.equal(s.complete,true);
 await call(growth,'/v1/results',{mode:'draft_run',score:100,clientResultId:'forged-'+tag},guest.token,403);
@@ -62,15 +68,17 @@ const publicProfile=await call(growth,'/v1/profile/'+history.player.profile_key)
 assert.doesNotMatch(JSON.stringify(publicProfile),/auth_user_id|player_id|@example|token|email|claimed/);
 await call(growth,'/v1/profile',{profilePublic:false},owner.token,200,{method:'PATCH'});
 await call(growth,'/v1/profile/'+history.player.profile_key,undefined,undefined,404);
+console.log('Account merge, Daily priority and public profile privacy verified');
 
 // Ties count people, and old qualifying results still earn milestones beyond the UI's 120 rows.
 const board='qa-'+tag,peers=[];
-for(let i=0;i<9;i++){const id=crypto.randomUUID();await query('INSERT INTO players(id,display_name) VALUES($1::uuid,$2)',[id,'QA tie '+tag]);peers.push(id);}
-for(const [i,id] of [owner.playerId,...peers].entries())await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade) VALUES($1::uuid,($2::date-1),$3,'top3',$4::int,'B')",[id,gameDateKey(),board,[90,95,95,90,90,90,10,10,10,10][i]]);
+for(let i=0;i<9;i++)peers.push(crypto.randomUUID());
+await query('INSERT INTO players(id,display_name) SELECT value::uuid,$2 FROM jsonb_array_elements_text($1::jsonb)',[JSON.stringify(peers),'QA tie '+tag]);
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade) SELECT p.id::uuid,$2::date-1,$3,'top3',p.score,'B' FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:[90,95,95,90,90,90,10,10,10,10][i]}))),gameDateKey(),board]);
 let p=await call(growth,'/v1/profile/me',undefined,owner.token),finish=p.daily_history.find(r=>r.set_id===board);
 assert.equal(finish.rank,3);assert.equal(finish.percentile,60);assert.equal(finish.final,true);
 const old=board+'old';
-for(const [i,id] of [owner.playerId,...peers].entries())await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade) VALUES($1::uuid,($2::date-500),$3,'top3',$4::int,'B')",[id,gameDateKey(),old,i?50:90]);
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade) SELECT p.id::uuid,$2::date-500,$3,'top3',p.score,'B' FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),old]);
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade) SELECT $1::uuid,$2::date-n,$3,'full',40,'D' FROM generate_series(2,125) n",[owner.playerId,gameDateKey(),board]);
 p=await call(growth,'/v1/profile/me',undefined,owner.token);assert.equal(p.daily_history.length,120);assert.equal(p.best_final_percentile,10);assert.ok(p.achievements.find(a=>a.id==='top10').unlocked);
 const achievementsBefore=(await query("SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='achievement_unlocked'",[owner.playerId])).rows[0].n;
