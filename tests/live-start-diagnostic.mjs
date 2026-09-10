@@ -5,7 +5,7 @@ import { chromium } from 'playwright';
 const base = process.env.PACK1_LIVE_URL || 'https://magic.planitnow.us';
 await mkdir('artifacts', { recursive:true });
 const browser = await chromium.launch(process.env.CI ? { headless:true, channel:'chrome' } : { headless:true });
-const context = await browser.newContext({ viewport:{width:390,height:844}, extraHTTPHeaders:{'cache-control':'no-cache',pragma:'no-cache'} });
+const context = await browser.newContext({ viewport:{width:390,height:844} });
 const page = await context.newPage();
 page.setDefaultTimeout(60000);
 const events=[];
