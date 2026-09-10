@@ -15,6 +15,7 @@ const leaderboardProduct = await import('./leaderboard-product.mjs');
 const flow = await import('./flow-fixes.mjs');
 const growth = await import('./growth.mjs');
 const retention = await import('./retention.mjs');
+const profiles = await import('./profile-product.mjs');
 
 if (challengeMode) {
   await import('./social.mjs');
@@ -26,6 +27,7 @@ if (challengeMode) {
   flow.installFlowFixes();
   await growth.installGrowthLayer();
   retention.installRetentionLayer();
+  profiles.installProfileProductLayer();
 } else {
   const seed = params.get('seed');
   if (seed) product.seedGameRandom(seed);
@@ -39,4 +41,5 @@ if (challengeMode) {
   flow.installFlowFixes();
   await growth.installGrowthLayer();
   retention.installRetentionLayer();
+  profiles.installProfileProductLayer();
 }
