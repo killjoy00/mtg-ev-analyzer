@@ -31,7 +31,8 @@ function steps() {
 }
 function pool(p) {
   if(!p.prior_picks.length) return '<p class="run-context-empty">Pack 1, pick 1. A fresh start.</p>';
-  return `<section class="run-pool" aria-label="Original drafter’s earlier picks"><h2>Their earlier picks <small>${p.prior_picks.length} cards · in pick order</small></h2><p>Choose for this drafter’s pool.</p><div class="run-pool-cards">${p.prior_picks.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)}</span></button>`).join('')}</div></section>`;
+  const cardLabel=`${p.prior_picks.length} card${p.prior_picks.length===1?'':'s'} · in pick order`;
+  return `<section class="run-pool" aria-label="Original drafter’s earlier picks"><h2>Their earlier picks <small>${cardLabel}</small></h2><p>Choose for this drafter’s pool.</p><div class="run-pool-cards">${p.prior_picks.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)}</span></button>`).join('')}</div></section>`;
 }
 function cardGrid(p,answer=null) {
   return `<div class="run-cards">${p.candidates.map(c=>`<article class="run-card ${selection===c.id?'selected':''} ${answer?.historicalId===c.id?'trophy-pick':''}"><button class="run-card-select" type="button" data-pick="${esc(c.id)}" aria-label="Pick ${esc(c.name)}" aria-pressed="${selection===c.id}" ${answer?'disabled':''}>${image(c)}<span>${esc(c.name)}</span></button><button class="run-zoom" type="button" data-zoom="${esc(c.id)}" aria-label="Enlarge ${esc(c.name)}">Enlarge</button>${answer?`<span class="run-card-score">${answer.historicalId===c.id?'Trophy pick · ':answer.selectedId===c.id?'Your pick · ':''}${answer.ranking.find(r=>r.id===c.id)?.score??0} pts</span>`:''}</article>`).join('')}</div>`;
