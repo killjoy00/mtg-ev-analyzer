@@ -51,7 +51,7 @@ export function practiceLaunchUrl({ origin = 'https://magic.planitnow.us/', setI
 
 function placePracticeSelector(select) {
   const bar = select.closest('.set-bar');
-  const section = document.querySelector('.mode-section');
+  const section = document.querySelector('.mode-section:not(.cube-mode-section)');
   const heading = section?.querySelector('.mode-section-heading');
   if (!bar || !section || !heading) return;
   bar.classList.add('practice-set-bar');
@@ -102,7 +102,7 @@ function updateHomeCopy(select) {
     daily.appendChild(chip);
   }
 
-  const practiceHeading = document.querySelector('.mode-section-heading > p');
+  const practiceHeading = document.querySelector('.mode-section:not(.cube-mode-section) .mode-section-heading > p');
   const practiceCopy = selected.value === featured.value
     ? 'Unlimited practice. Leave the featured set selected, or lock practice to one environment below.'
     : `Unlimited practice locked to ${selectedName}.`;

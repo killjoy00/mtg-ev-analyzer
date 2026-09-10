@@ -1,5 +1,6 @@
 import { getAuthSession, linkAccount, loadRemoteStats, saveGameResult, sendEvents, signInAccount, signOutAccount, signUpAccount } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
+import { trackEvent } from './retention-events.mjs';
 
 const HISTORY_KEY = 'pack1-game-history-v2';
 const RESULT_SEEN = new WeakSet();
@@ -8,7 +9,7 @@ let challengeStartTracked = false;
 
 function esc(value) { return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
 function params() { return new URLSearchParams(location.search); }
-function event(name, props={}) { void sendEvents([{ name, props:{ ...props, path:location.pathname, set:params().get('set')||undefined, mode:params().get('mode')||undefined, seed:params().get('seed')||undefined } }]); }
+function event(name, props={}) { trackEvent(name, props); }
 function readHistory() { try { const v=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]'); return Array.isArray(v)?v:[]; } catch { return []; } }
 function writeHistory(items) { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(-500))); } catch {} }
 function resultId() { return `r:${Date.now().toString(36)}:${crypto.randomUUID?.().slice(0,8) || Math.random().toString(36).slice(2,10)}`; }
@@ -47,9 +48,12 @@ function captureResult(root) {
     grade:parseGrade(root), seed:params().get('seed')||null, isDaily:params().has('daily'), ...context,
   };
   const history=readHistory(); history.push(item); writeHistory(history);
-  void saveGameResult(item);
+  void saveGameResult(item).then(()=>document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:item.clientResultId,score:item.score,mode:item.mode,daily:item.isDaily}})));
+  document.dispatchEvent(new CustomEvent('pack1:result-completed',{detail:{id:item.clientResultId,score:item.score,mode:item.mode,daily:item.isDaily}}));
   event('game_reveal',{ score:item.score, grade:item.grade, daily:item.isDaily, challenge:Boolean(item.challengeId||item.opponentScore!=null), outcome:item.outcome||undefined });
   if(item.challengeId||item.opponentScore!=null) event('challenge_complete',{ outcome:item.outcome, score:item.score, opponent_score:item.opponentScore });
+  if(item.isDaily)event('daily_completed',{mode:item.mode,score:item.score});
+  if(item.setId==='powered-cube')event('cube_completed',{score:item.score});
 }
 function findResults() {
   document.querySelectorAll('.result-page,.reveal-panel').forEach((root)=>{
@@ -99,6 +103,7 @@ function group(items,key) {
 }
 function statsRows(rows,labelKey='name') { return rows.map((row)=>`<tr><th>${esc(String(row[labelKey]||'').toUpperCase())}</th><td>${Number(row.games||0)}</td><td>${Number(row.average_score||0).toFixed(1)}</td><td>${Number(row.best_score||0)}</td></tr>`).join(''); }
 async function renderStats() {
+  document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
   const local=readHistory(); const localData={summary:localSummary(local),bySet:group(local,'setId'),byMode:group(local,'mode'),recent:[...local].reverse().slice(0,30)};
   const remote=await loadRemoteStats(); const data=remote?.summary ? remote : localData;
@@ -116,9 +121,10 @@ function formMarkup(kind) {
 }
 async function claimCurrentSession() {
   const session=await getAuthSession(); if(!session?.session?.token || !session?.user) return null;
-  const linked=await linkAccount(session.session.token); currentAccount=session; event('account_claimed'); return linked;
+  const linked=await linkAccount(session.session.token); currentAccount=session; return linked;
 }
 async function renderAccount() {
+  document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
   currentAccount=await getAuthSession();
   if(currentAccount?.session?.token && currentAccount?.user) {
@@ -128,7 +134,7 @@ async function renderAccount() {
     document.querySelector('#account-signout')?.addEventListener('click',async()=>{await signOutAccount();currentAccount=null;event('auth_sign_out');void renderAccount();});
     return;
   }
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Optional account</p><h1>Keep playing as a guest—or save your record.</h1><p>No login wall. Create an account only if you want cross-device stats and a persistent Pack One identity.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><button class="text-button" id="account-home">Keep playing as guest</button></section>`;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Your player record</p><h1>Save your progress.</h1><p>Keep your games, streaks, and milestones across devices. Playing is always free, with or without an account.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><button class="text-button" id="account-home">Keep playing as guest</button></section>`;
   document.querySelector('#account-home')?.addEventListener('click',()=>document.querySelector('#brand-home')?.click());
   document.querySelector('#account-signup')?.addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget,err=f.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(f));await signUpAccount(data);await claimCurrentSession();event('auth_sign_up');await renderAccount();}catch(x){err.textContent=x.message;}});
   document.querySelector('#account-signin')?.addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget,err=f.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(f));await signInAccount(data);await claimCurrentSession();event('auth_sign_in');await renderAccount();}catch(x){err.textContent=x.message;}});
@@ -144,6 +150,7 @@ function clickAnalytics(eventObject) {
     }
   }
   else if(target.matches('[data-daily-mode]')) event('game_start',{ daily:true, mode:target.dataset.dailyMode });
+  else if(target.matches('[data-cube-href]')) event('cube_started',{mode:'full'});
   else if(target.matches('#reveal-top3,#reveal-challenge')) event('reveal_click');
   else if(target.matches('#share-top3,#share-full,.challenge-return,#reshare-challenge')) event('share_click',{ challenge:true, surface:target.id||'challenge_return' });
   else if(target.matches('#daily-leaders,#leaderboard-nav')) event('leaderboard_view');
@@ -161,5 +168,6 @@ export async function installGrowthLayer() {
   event('page_view',{ account:Boolean(currentAccount?.user), challenge:params().has('challenge')||params().has('vs') });
   document.addEventListener('click',clickAnalytics,true);
   document.addEventListener('pack1:share-completed',shareCompletedAnalytics);
+  document.addEventListener('change',e=>{if(e.target?.id==='set-select')event('practice_set_selected',{set:e.target.value});});
   onAppRender(enhance);
 }

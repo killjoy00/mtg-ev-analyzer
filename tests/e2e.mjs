@@ -91,7 +91,7 @@ async function home() {
   assert.match(consensusCopy, /high-win-rate 17Lands drafters/i);
   assert.doesNotMatch(consensusCopy, /not win rates|not win probability|card grades|objective truth/i);
   assert.doesNotMatch((await page.locator('.home-intro').textContent()) || '', /defend it/i);
-  assert.equal(await page.getByRole('heading', { name: 'Today’s Pack One', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('heading', { name: 'Today’s opening pack', exact: true }).count(), 1);
   assert.equal(await page.locator('.daily-main').count(), 1);
   assert.match((await page.locator('.daily-main').textContent()) || '', /Play today’s Top 3/i);
   assert.equal(await page.locator('#home-editorial').isVisible(), true, 'editorial shell should be visible on home');
@@ -136,6 +136,20 @@ async function assertMobileTapScrollStable() {
   await page.waitForTimeout(50);
   const after = await page.evaluate(() => window.scrollY);
   assert.ok(Math.abs(after - before) <= 24, `card tap moved page ${Math.round(after - before)}px (${before} → ${after})`);
+}
+async function finishFullPack() {
+  let decisions=0;
+  while(!await page.locator('.full-result-page,.scorecard').count()&&decisions<20) {
+    await page.locator('.study-main .card-choice').first().click();
+    await page.locator('#submit-pick').click();
+    await page.locator('#next-pick').click();
+    decisions++;
+  }
+  await page.locator('.full-result-page').waitFor();
+  assert.ok(decisions>=10&&decisions<=15,`Expected a full first pack, saw ${decisions}`);
+  const score=Number(await page.locator('.full-result-page .score-orb strong').textContent());
+  assert.ok(Number.isFinite(score)&&score>=0&&score<=100);
+  await assertNoHorizontalOverflow();
 }
 
 try {
@@ -215,20 +229,21 @@ try {
   assert.equal(cleanHomeUrl.searchParams.get('set'), null);
   assert.equal(cleanHomeUrl.searchParams.get('daily'), null);
 
-  // Powered Cube is a separate Full mode and never exposes Top 3.
+  // Full Pack remains available; Cube launchers enter the separately tested trophy flow.
+  await home();
+  await page.locator('#set-select').selectOption('msh');
+  await page.locator('[data-mode="full"]').click();
+  await finishFullPack();
+  await page.screenshot({path:'artifacts/ui-full-pack-result-mobile.png',fullPage:true});
   await home();
   if (await page.locator('[data-powered-cube-section="1"]').count()) {
     const cubeLaunchers = page.locator('[data-powered-cube-section="1"] [data-cube-href]');
     assert.equal(await cubeLaunchers.count(), 2);
     const cubeHrefs = await cubeLaunchers.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-cube-href')));
-    assert.ok(cubeHrefs.every((href) => href && new URL(href).searchParams.get('mode') === 'full'));
+    assert.ok(cubeHrefs.every((href) => href && new URL(href).searchParams.get('game') === 'draft-run'));
     assert.ok(cubeHrefs.every((href) => href && new URL(href).searchParams.get('set') === 'powered-cube'));
-    await page.getByRole('button', { name: 'New Cube Run', exact: true }).click();
-    await page.locator('.study-main .card-choice').first().waitFor({ timeout: 10000 });
-    const cubeUrl = new URL(page.url());
-    assert.equal(cubeUrl.searchParams.get('set'), 'powered-cube');
-    assert.equal(cubeUrl.searchParams.get('mode'), 'full');
-    assert.ok(cubeUrl.searchParams.get('seed'));
+    // Full Cube interaction is verified against its dedicated API in draft-run-e2e.
+
   }
 
   assert.ok(capturedEvents.length > 0, 'expected at least one analytics event');

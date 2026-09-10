@@ -33,7 +33,7 @@ export function environmentProgress(catalog, bySet = []) {
 export function modeName(mode, { cube = false } = {}) {
   if (mode === 'top3') return 'Top 3';
   if (mode === 'full') return cube ? 'Cube Pack Run' : 'Full Pack';
-  if (mode === 'draft_run') return 'Draft Run';
+  if (mode === 'draft_run') return cube ? 'Powered Cube Run' : 'Draft Run';
   return String(mode || 'Game');
 }
 
@@ -42,7 +42,9 @@ export function unlockedAchievements(profile) {
 }
 
 export function bestPercentile(profile) {
+  if(Number(profile?.best_final_percentile)>0) return Number(profile.best_final_percentile);
   const values = (profile?.daily_history || [])
+    .filter(row=>row.final!==false)
     .map((row) => Number(row.percentile))
     .filter((value) => Number.isFinite(value) && value > 0);
   return values.length ? Math.min(...values) : null;

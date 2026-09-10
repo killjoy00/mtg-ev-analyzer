@@ -8,6 +8,8 @@ import {
 } from './growth-api.mjs';
 import { loadReplayJson } from './replay-data.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
+import { trackEvent } from './retention-events.mjs';
+import { nextMilestones } from './progression.mjs';
 import {
   bestPercentile,
   environmentProgress,
@@ -38,7 +40,7 @@ function esc(value) {
 }
 
 function track(name, props = {}) {
-  void sendEvents([{ name, props }]);
+  trackEvent(name,props);
 }
 
 function ensureProfileStyles() {
@@ -52,7 +54,7 @@ function ensureProfileStyles() {
 
 async function loadCatalog() {
   if (!catalogPromise) {
-    catalogPromise = loadReplayJson('./data/catalog.json', 'catalog').catch(() => ({ sets: [] }));
+    catalogPromise = loadReplayJson('./data/catalog.json', 'catalog').catch(() => {catalogPromise=null;return {sets:[]};});
   }
   return catalogPromise;
 }
@@ -87,16 +89,17 @@ function environmentCard(entry, favoriteId) {
     <h3>${esc(entry.name)}</h3>
     ${entry.played
       ? `<p><strong>${entry.games}</strong> games · <strong>${entry.averageScore.toFixed(1)}</strong> avg · <strong>${entry.bestScore}</strong> best</p>`
-      : '<p>Open this environment in Set Practice to add it to your archive.</p>'}
+      : '<p>Ready for your first game.</p>'}
+    <a class="text-button" href="?set=${encodeURIComponent(entry.id)}&mode=${entry.isCube?'full':'top3'}&seed=${encodeURIComponent(crypto.randomUUID())}">${entry.played?'Play again':'Try this set'}</a>
   </article>`;
 }
 
 function modeCards(profile) {
   const rows = profile.by_mode || [];
-  const wanted = ['top3', 'full'];
+  const wanted = ['draft_run', 'top3', 'full'];
   return wanted.map((mode) => {
     const row = rows.find((item) => item.mode === mode) || { games: 0, average_score: 0, best_score: 0 };
-    return `<article class="profile-mode-card"><span>${modeName(mode)}</span><strong>${Number(row.average_score || 0).toFixed(1)}</strong><small>${Number(row.games || 0)} games · ${Number(row.best_score || 0)} best</small></article>`;
+    return `<article class="profile-mode-card"><span>${modeName(mode)}</span><strong>${row.games?Number(row.average_score || 0).toFixed(1):'—'}</strong><small>${Number(row.games || 0)} games${row.games?` · ${Number(row.best_score || 0)} best`:''}</small></article>`;
   }).join('');
 }
 
@@ -121,12 +124,12 @@ function historyRow(row, names) {
 function dailyRow(row, names, index) {
   const setName = names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase();
   const pct = Number(row.percentile);
-  return `<li><div><strong>${esc(setName)} · ${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}</strong><span>${esc(row.date || '')}</span></div><b>${Number(row.score || 0)}</b><em>${pct ? `Top ${pct}% · #${Number(row.rank || 0)} of ${Number(row.total || 0)}` : `${Number(row.total || 0)} ranked players`}</em><button type="button" class="text-button" data-share-daily="${index}">Share</button></li>`;
+  return `<li><div><strong>${esc(setName)} · ${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}</strong><span>${esc(row.date || '')}${row.final===false?' · Still open':''}</span></div><b>${Number(row.score || 0)}</b><em>${pct ? `Top ${pct}%${row.final===false?' so far':''} · #${Number(row.rank || 0)} of ${Number(row.total || 0)}` : `${Number(row.total || 0)} ranked players`}</em><button type="button" class="text-button" data-share-daily="${index}">Share</button></li>`;
 }
 
 function settingsMarkup(profile, progress) {
   if (!profile.player.claimed) {
-    return `<aside class="profile-claim"><div><span>Private guest profile</span><strong>Claim an account to publish this profile.</strong><p>Your games already count here. Claiming makes the identity portable and lets you share a stable public profile URL.</p></div><button type="button" class="button primary" id="profile-claim-account">Claim account</button></aside>`;
+    return `<aside class="profile-claim"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="button secondary" id="profile-claim-account">Save my progress</button></aside>`;
   }
   const unlocked = unlockedAchievements(profile);
   return `<details class="profile-settings">
@@ -148,6 +151,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
   const showcased = (profile.achievements || []).find((item) => item.id === profile.player.showcase_achievement && item.unlocked);
   const bestPct = bestPercentile(profile);
   const form = recentForm(profile);
+  const next = nextMilestones(profile,2);
   const bestRows = (profile.best_environments || []).slice(0, 5);
   const daily = (profile.daily_history || []).slice(0, 12);
   const recent = (profile.recent || []).slice(0, 20);
@@ -157,7 +161,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
     <header class="profile-hero">
       <div><p class="eyebrow">${own ? 'My Profile' : 'Player Profile'}</p><h1>${esc(profile.player.display_name)}</h1><p>${own ? 'Your Pack One career across the Limited archive.' : 'A public Pack One career across the Limited archive.'}</p></div>
       <div class="profile-hero-actions">
-        <button type="button" class="button primary" id="profile-share" ${profile.player.profile_public ? '' : 'disabled'}>${profile.player.profile_public ? 'Share profile' : 'Publish to share'}</button>
+        <button type="button" class="button primary" id="profile-share">${profile.player.profile_public ? 'Share profile' : 'Share my record'}</button>
         <button type="button" class="button secondary" id="profile-share-progress">Share ${progress.played}/${progress.total}</button>
         ${own ? '<button type="button" class="button secondary" id="profile-home">Back to game</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}
       </div>
@@ -172,6 +176,9 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
       <div><span>Environments</span><strong>${progress.played}/${progress.total}</strong></div>
     </div>
 
+    ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Your first ten picks start here.</h2><p>Play a Draft Run to begin your record. Your games count as a guest.</p><a class="button primary" href="?game=draft-run">Play your first Draft Run</a></section>':''}
+    ${own&&next.length?`<section class="profile-next"><h2>Within reach</h2>${next.map(a=>`<div><strong>${esc(a.label)}</strong><span>${esc(a.progress_text)}</span><p>${esc(a.description)}</p><progress value="${Number(a.current)}" max="${Number(a.target)}" aria-label="${esc(a.label)} progress"></progress></div>`).join('')}</section>`:''}
+
     ${favorite || showcased || bestPct ? `<section class="profile-identity-strip">
       ${favorite ? `<div><span>Favorite environment</span><strong>${esc(favorite.name)}</strong></div>` : ''}
       ${showcased ? `<div><span>Showcase</span><strong>${esc(showcased.label)}</strong></div>` : ''}
@@ -185,7 +192,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
     <section class="profile-section archive-progress-section">
       <div class="profile-section-heading"><div><p class="eyebrow">Archive progress</p><h2>${progress.played}/${progress.total} environments played</h2></div><strong>${progress.total ? Math.round((progress.played / progress.total) * 100) : 0}%</strong></div>
       <div class="archive-progress-track"><i style="width:${progress.total ? (progress.played / progress.total) * 100 : 0}%"></i></div>
-      <div class="environment-progress-grid">${progress.environments.map((entry) => environmentCard(entry, profile.player.favorite_set_id)).join('')}</div>
+      <details class="profile-disclosure" data-profile-section="archive"><summary>Explore the archive</summary><div class="environment-progress-grid">${progress.environments.map((entry) => environmentCard(entry, profile.player.favorite_set_id)).join('')}</div></details>
     </section>
 
     <section class="profile-grid-two">
@@ -198,10 +205,10 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
       <div class="profile-section"><p class="eyebrow">Ranked history</p><h2>Daily percentile trend</h2>${sparkline((profile.daily_history || []).filter((row) => row.percentile).slice(0, 30).reverse().map((row) => 101 - Number(row.percentile)), { empty: 'A Daily leaderboard needs at least 10 players before percentile is shown.' })}<small class="profile-chart-note">Higher on the line is a stronger final percentile.</small></div>
     </section>
 
-    <section class="profile-section achievements-section"><div class="profile-section-heading"><div><p class="eyebrow">Progression</p><h2>Achievements</h2></div><strong>${unlockedAchievements(profile).length}/${(profile.achievements || []).length}</strong></div><div class="achievement-grid">${(profile.achievements || []).map((item) => achievementCard(item, { own, showcaseId: profile.player.showcase_achievement })).join('')}</div></section>
+    <section class="profile-section achievements-section"><div class="profile-section-heading"><div><p class="eyebrow">Progression</p><h2>Achievements</h2></div><strong>${unlockedAchievements(profile).length}/${(profile.achievements || []).length}</strong></div><details class="profile-disclosure" data-profile-section="achievements"><summary>View earned achievements and milestones</summary><div class="achievement-grid">${[...(profile.achievements || [])].sort((a,b)=>Number(b.unlocked)-Number(a.unlocked)).map((item) => achievementCard(item, { own:own&&profile.player.claimed, showcaseId: profile.player.showcase_achievement })).join('')}</div></details></section>
 
     <section class="profile-grid-two">
-      <div class="profile-section"><p class="eyebrow">Daily history</p><h2>Final percentiles</h2>${daily.length ? `<ol class="profile-daily-list">${daily.map((row, index) => dailyRow(row, names, index)).join('')}</ol>` : '<p class="profile-empty">No ranked Daily history yet.</p>'}</div>
+      <div class="profile-section"><p class="eyebrow">Daily history</p><h2>Your finishes</h2><p class="profile-chart-note">Open boards are provisional. Final percentiles include everyone tied at your score.</p>${daily.length ? `<ol class="profile-daily-list">${daily.map((row, index) => dailyRow(row, names, index)).join('')}</ol>` : '<p class="profile-empty">No ranked Daily history yet.</p>'}</div>
       <div class="profile-section"><p class="eyebrow">Game history</p><h2>Recent games</h2>${recent.length ? `<ol class="profile-history-list" id="profile-history-list">${recent.map((row) => historyRow(row, names)).join('')}</ol><button type="button" class="button secondary" id="profile-load-more" ${recent.length < 20 ? 'hidden' : ''}>Load more</button>` : '<p class="profile-empty">No scored games yet.</p>'}</div>
     </section>
   </section>`;
@@ -213,25 +220,33 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   const profileKey = publicKey || profile.player.profile_key || null;
 
   document.querySelector('#profile-home')?.addEventListener('click', () => { window.location.href = './'; });
+  document.querySelectorAll('[data-profile-section]').forEach(d=>d.addEventListener('toggle',()=>{if(d.open)track(d.dataset.profileSection==='achievements'?'achievement_viewed':'archive_viewed',{source:'profile'});}));
   document.querySelector('#profile-claim-account')?.addEventListener('click', () => document.querySelector('#account-nav')?.click());
   document.querySelector('#profile-copy-link')?.addEventListener('click', async (event) => {
     const url = `${location.origin}${location.pathname}?profile=${encodeURIComponent(profile.player.profile_key)}`;
     try { await navigator.clipboard.writeText(url); event.currentTarget.textContent = 'Copied'; } catch {}
   });
   document.querySelector('#profile-share')?.addEventListener('click', async (event) => {
-    const button = event.currentTarget;
-    const original = button.textContent;
-    button.disabled = true;
-    button.textContent = 'Making card…';
-    await shareProfileCard(profile, progress, names);
-    track('profile_share', { public: profile.player.profile_public, environments: progress.played });
-    button.disabled = false;
-    button.textContent = original;
+    await performShare(event.currentTarget,()=>shareProfileCard(profile, progress, names),'profile_share',{public:profile.player.profile_public,environments:progress.played});
   });
-  document.querySelector('#profile-share-progress')?.addEventListener('click', async () => {
-    await shareProgressCard(profile, progress);
-    track('profile_progress_share', { environments: progress.played, total: progress.total });
+  document.querySelector('#profile-share-progress')?.addEventListener('click', async (event) => {
+    await performShare(event.currentTarget,()=>shareProgressCard(profile, progress),'profile_progress_share',{environments:progress.played,total:progress.total});
   });
+  async function performShare(button,makeCard,name,props) {
+    const original=button.textContent;button.disabled=true;button.textContent='Making card…';
+    let status=document.querySelector('#profile-share-status');
+    if(!status){status=document.createElement('p');status.id='profile-share-status';status.setAttribute('role','status');button.parentElement.after(status);}
+    status.textContent='';
+    try {
+      const result=await makeCard();
+      if(result?.failed) {
+        status.textContent='Copy this link: ';const a=document.createElement('a');
+        a.href=profile.player.profile_public?`${location.origin}${location.pathname}?profile=${encodeURIComponent(profile.player.profile_key)}`:`${location.origin}${location.pathname}`;
+        a.textContent=a.href;status.append(a);
+      } else if(!result?.cancelled) {track(name,{...props,method:result?.method});status.textContent=result?.method==='copy_fallback'?'Link copied.':'Ready to share.';}
+    } catch {status.textContent='Couldn’t make the share card. Please try again.';}
+    finally {button.disabled=false;button.textContent=original;}
+  }
 
   document.querySelector('#profile-settings-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
@@ -254,22 +269,24 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   });
 
   document.querySelectorAll('[data-showcase-achievement]').forEach((button) => button.addEventListener('click', async () => {
+    button.disabled=true;
     const id = button.dataset.showcaseAchievement;
-    const updated = await updateProfile({ showcaseAchievement: id });
-    track('achievement_showcase', { achievement: id });
-    await renderProfile(updated, { own: true });
+    try {
+      const updated = await updateProfile({ showcaseAchievement: id });
+      track('achievement_showcase', { achievement: id });
+      await renderProfile(updated, { own: true });
+    } catch {button.textContent='Try showcasing again';}
+    finally {button.disabled=false;}
   }));
   document.querySelectorAll('[data-share-achievement]').forEach((button) => button.addEventListener('click', async () => {
     const achievement = (profile.achievements || []).find((item) => item.id === button.dataset.shareAchievement);
     if (!achievement?.unlocked) return;
-    await shareAchievementCard(profile, achievement);
-    track('achievement_share', { achievement: achievement.id });
+    await performShare(button,()=>shareAchievementCard(profile, achievement),'achievement_share',{achievement:achievement.id});
   }));
   document.querySelectorAll('[data-share-daily]').forEach((button) => button.addEventListener('click', async () => {
     const row = (profile.daily_history || [])[Number(button.dataset.shareDaily)];
     if (!row) return;
-    await shareResultCard(profile, row, names.get(String(row.set_id || '').toLowerCase()));
-    track('daily_result_share', { set: row.set_id, mode: row.mode, percentile: row.percentile || undefined });
+    await performShare(button,()=>shareResultCard(profile, row, names.get(String(row.set_id || '').toLowerCase())),'daily_result_share',{set:row.set_id,mode:row.mode,percentile:row.percentile||undefined});
   }));
 
   const loadMore = document.querySelector('#profile-load-more');
@@ -300,6 +317,7 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
   if (profileRendering) return;
   profileRendering = true;
   try {
+    document.body.classList.remove('is-game');
     ensureProfileStyles();
     const catalog = await loadCatalog();
     const app = document.querySelector('#app');

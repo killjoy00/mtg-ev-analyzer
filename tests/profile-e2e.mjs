@@ -142,6 +142,12 @@ try {
   assert.equal(await page.locator('.achievement-card').count(), fixture.achievements.length);
   assert.equal(await page.locator('.achievement-card.locked').count(), 1);
   assert.equal(await page.locator('.achievement-card.showcase').count(), 1);
+  assert.equal(await page.locator('[data-profile-section="archive"]').getAttribute('open'), null, 'large archive starts collapsed');
+  await page.locator('[data-profile-section="archive"] summary').click();
+  assert.ok(await page.locator('[data-environment-id="neo"] a').isVisible(), 'archive entries are directly playable');
+  await page.locator('[data-profile-section="archive"] summary').click();
+  await page.locator('[data-profile-section="achievements"] summary').click();
+  assert.equal(await page.locator('.achievement-card.unlocked').first().isVisible(), true);
   assert.equal(await page.locator('#profile-settings-form').count(), 1);
   await noOverflow();
   await page.screenshot({ path:'artifacts/ui-profile-mobile.png', fullPage:true });

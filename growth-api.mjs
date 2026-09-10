@@ -3,6 +3,7 @@ const AUTH_TOKEN_KEY = 'pack1-auth-session-v1';
 const AUTH_USER_KEY = 'pack1-auth-user-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 const AUTH_BASE = 'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+let sessionPromise = null;
 
 function baseUrl() { return String(window.PACK1_API?.growthUrl || window.PACK1_API?.url || '').replace(/\/$/, ''); }
 function loadPackToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
@@ -23,6 +24,12 @@ export function packApiConfigured() { return /^https:\/\//.test(baseUrl()); }
 export async function ensurePackSession() {
   const existing = loadPackToken();
   if (existing) return existing;
+  if (sessionPromise) return sessionPromise;
+  sessionPromise = createPackSession().finally(() => { sessionPromise = null; });
+  return sessionPromise;
+}
+
+async function createPackSession() {
   if (!packApiConfigured()) throw new Error('Pack 1 API unavailable.');
   const response = await fetch(`${baseUrl()}/v1/session`, {
     method:'POST',
@@ -39,7 +46,7 @@ async function api(path, { method='GET', body, auth=true, authSession=null } = {
   const headers = new Headers({ 'content-type': 'application/json' });
   if (auth) headers.set('authorization', `Bearer ${await ensurePackSession()}`);
   if (authSession) headers.set('x-pack1-auth-session', authSession);
-  const response = await fetch(`${baseUrl()}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body) });
+  const response = await fetch(`${baseUrl()}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body),keepalive:path==='/v1/events' });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || `Pack 1 API failed (${response.status}).`);
   return data;
@@ -133,5 +140,8 @@ export async function signOutAccount() {
     try { await api('/v1/account/signout', { method:'POST', body:{}, auth:false, authSession:token }); } catch {}
   }
   clearAuth();
+  try {
+    for (const key of [TOKEN_KEY, 'pack1-game-history-v2', 'pack1-daily-history-v1']) localStorage.removeItem(key);
+  } catch {}
   return { ok:true };
 }

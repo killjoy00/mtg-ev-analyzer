@@ -8,6 +8,7 @@ const TOKEN_PREFIX = 'p1_';
 const STATIC_ORIGIN = 'https://magic.planitnow.us';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 let catalogCache = { at: 0, data: null };
+let signingKeyCache = { at: 0, key: null };
 
 function json(value, status = 200) {
   return new Response(JSON.stringify(value), {
@@ -69,7 +70,9 @@ async function readJson(request) {
   if (!(request.headers.get('content-type') || '').includes('application/json')) {
     throw Object.assign(new Error('JSON body required.'), { status: 415 });
   }
-  return request.json();
+  const text=await request.text();
+  if(text.length>131072) throw Object.assign(new Error('Request too large.'),{status:413});
+  try{return JSON.parse(text);}catch{throw Object.assign(new Error('Invalid JSON.'),{status:400});}
 }
 
 function normalizeName(value) {
@@ -97,15 +100,19 @@ async function secret() {
   return result.rows[0].value;
 }
 
-async function signature(id) {
-  const key = await crypto.subtle.importKey(
+async function signingKey() {
+  if(signingKeyCache.key&&Date.now()-signingKeyCache.at<60000)return signingKeyCache.key;
+  const key=await crypto.subtle.importKey(
     'raw',
     new TextEncoder().encode(await secret()),
     { name: 'HMAC', hash: 'SHA-256' },
     false,
-    ['sign'],
+    ['sign','verify'],
   );
-  return base64Url(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(id)));
+  signingKeyCache={at:Date.now(),key};return key;
+}
+async function signature(id) {
+  return base64Url(await crypto.subtle.sign('HMAC', await signingKey(), new TextEncoder().encode(id)));
 }
 
 async function tokenFor(id) {
@@ -116,8 +123,8 @@ async function verifyToken(value) {
   const raw = String(value || '');
   if (!raw.startsWith(TOKEN_PREFIX)) return null;
   const [id, supplied] = raw.slice(TOKEN_PREFIX.length).split('.');
-  if (!id || !supplied) return null;
-  return (await signature(id)) === supplied ? id : null;
+  if (!/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(id || '') || !/^[A-Za-z0-9_-]{43}$/.test(supplied||'')) return null;
+  return await crypto.subtle.verify('HMAC',await signingKey(),Buffer.from(supplied,'base64url'),new TextEncoder().encode(id))?id:null;
 }
 
 async function player(request, required = true) {
@@ -154,8 +161,9 @@ async function authSession(request) {
 function props(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const output = {};
+  const allowed=new Set(['mode','set','seed','daily','challenge','outcome','score','grade','period','type','round','surface','method','context','kind','own','public','achievement','environments','total','percentile','source','account','run_id','session_id','target_score','opponent_score','card','affiliate']);
   for (const [key, item] of Object.entries(value).slice(0, 20)) {
-    if (!/^[a-zA-Z0-9_.-]{1,40}$/.test(key)) continue;
+    if (!allowed.has(key)) continue;
     if (['string', 'number', 'boolean'].includes(typeof item) || item == null) {
       output[key] = typeof item === 'string' ? item.slice(0, 240) : item;
     }
@@ -254,7 +262,8 @@ function buildAchievements({ summary, bySet, byMode, streak, dailyHistory, envir
   const cube = bySet.find((row) => row.set_id === 'powered-cube');
   const top3 = byMode.find((row) => row.mode === 'top3');
   const full = byMode.find((row) => row.mode === 'full');
-  const percentiles = dailyHistory.map((row) => num(row.percentile, 0)).filter((value) => value > 0);
+  const draftRun = byMode.find((row) => row.mode === 'draft_run');
+  const percentiles = dailyHistory.filter(row=>row.final!==false).map((row) => num(row.percentile, 0)).filter((value) => value > 0);
   const bestPercentile = percentiles.length ? Math.min(...percentiles) : null;
   const archiveComplete = environmentTotal > 0
     ? countAchievement('archive_complete', 'Archive Complete', 'Play every environment currently available in Pack One.', environmentsPlayed, environmentTotal)
@@ -265,6 +274,9 @@ function buildAchievements({ summary, bySet, byMode, streak, dailyHistory, envir
     countAchievement('ten_games', 'Settling In', 'Complete 10 scored games.', games, 10),
     countAchievement('fifty_games', 'Draft Regular', 'Complete 50 scored games.', games, 50),
     countAchievement('hundred_games', 'Century', 'Complete 100 scored games.', games, 100),
+    countAchievement('first_run','First Draft Run','Finish all ten decisions in a Draft Run.',num(draftRun?.games),1),
+    countAchievement('ten_runs','Ten by Ten','Finish ten Draft Runs.',num(draftRun?.games),10),
+    flagAchievement('run_specialist','Draft Run Specialist','Average 80+ across at least 20 Draft Runs.',num(draftRun?.games)>=20&&num(draftRun?.average_score)>=80,`${Math.min(num(draftRun?.games),20)}/20 runs · ${num(draftRun?.average_score).toFixed(1)} avg`),
     flagAchievement('perfect', 'Perfect 100', 'Post a 100-point result.', bestScore >= 100, `${bestScore}/100 best`),
     countAchievement('streak3', 'Three in a Row', 'Complete ranked Daily Challenges on three consecutive game days.', streak, 3),
     countAchievement('streak7', 'One-Week Heater', 'Reach a seven-day Daily streak.', streak, 7),
@@ -310,15 +322,15 @@ async function dailyHistoryFor(playerId) {
        SELECT challenge_date,set_id,mode,score,grade,created_at
        FROM scores
        WHERE player_id=$1::uuid
-       ORDER BY challenge_date DESC,created_at DESC
-       LIMIT 120
      )
      SELECT m.challenge_date::text date,m.set_id,m.mode,m.score,m.grade,m.created_at,
-            (SELECT count(*) FROM scores x
-             WHERE x.challenge_date=m.challenge_date AND x.set_id=m.set_id AND x.mode=m.mode) total,
-            1 + (SELECT count(DISTINCT x.score) FROM scores x
-                 WHERE x.challenge_date=m.challenge_date AND x.set_id=m.set_id AND x.mode=m.mode AND x.score>m.score) rank
+            b.total,b.rank,b.through_ties
      FROM mine m
+     CROSS JOIN LATERAL (
+       SELECT count(*) total,1+count(*) FILTER(WHERE x.score>m.score) rank,
+              count(*) FILTER(WHERE x.score>=m.score) through_ties
+       FROM scores x WHERE x.challenge_date=m.challenge_date AND x.set_id=m.set_id AND x.mode=m.mode
+     ) b
      ORDER BY m.challenge_date DESC,m.created_at DESC`,
     [playerId],
   );
@@ -333,7 +345,8 @@ async function dailyHistoryFor(playerId) {
       grade: row.grade,
       rank,
       total,
-      percentile: total >= 10 ? Math.max(1, Math.ceil((rank / total) * 100)) : null,
+      percentile: total >= 10 ? Math.max(1, Math.ceil((num(row.through_ties) / total) * 100)) : null,
+      final: row.date < gameDateKey(),
     };
   });
 }
@@ -362,7 +375,7 @@ async function profileMetaByKey(profileKey) {
 }
 
 async function buildProfile(playerId, meta, { own = false } = {}) {
-  const [summaryResult, bySetResult, byModeResult, recentResult, dailyHistory, catalog] = await Promise.all([
+  const [summaryResult, bySetResult, byModeResult, recentResult, dailyHistory, catalog, streakDates] = await Promise.all([
     query(
       `SELECT count(*) games,round(avg(score),1) average_score,max(score) best_score,
               count(*) FILTER (WHERE outcome='win') challenge_wins,
@@ -374,19 +387,24 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
       [playerId],
     ),
     query(
-      `SELECT set_id,count(*) games,round(avg(score),1) average_score,max(score) best_score,
+      `WITH environment_results AS (
+         SELECT g.id,g.played_at,g.is_daily,e.set_id,e.score
+         FROM game_results g JOIN LATERAL (
+           SELECT e.set_id,e.score FROM game_result_environments e WHERE e.game_result_id=g.id
+           UNION ALL SELECT g.set_id,g.score WHERE g.mode<>'draft_run'
+         ) e ON true WHERE g.player_id=$1::uuid
+       ) SELECT set_id,count(*) games,round(avg(score),1) average_score,max(score) best_score,
               count(*) FILTER (WHERE is_daily) daily_games,max(played_at) last_played_at
-       FROM game_results
-       WHERE player_id=$1::uuid
+       FROM environment_results
        GROUP BY set_id
        ORDER BY games DESC,set_id`,
       [playerId],
     ),
     query(
-      `SELECT mode,count(*) games,round(avg(score),1) average_score,max(score) best_score
+      `SELECT CASE WHEN set_id='powered-cube' THEN 'cube' ELSE mode END mode,count(*) games,round(avg(score),1) average_score,max(score) best_score
        FROM game_results
        WHERE player_id=$1::uuid
-       GROUP BY mode
+       GROUP BY CASE WHEN set_id='powered-cube' THEN 'cube' ELSE mode END
        ORDER BY mode`,
       [playerId],
     ),
@@ -400,6 +418,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     ),
     dailyHistoryFor(playerId),
     loadCatalog(),
+    query('SELECT DISTINCT challenge_date::text date FROM scores WHERE player_id=$1::uuid ORDER BY date',[playerId]),
   ]);
 
   const summary = summaryResult.rows[0] || {};
@@ -427,8 +446,10 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     is_daily: bool(row.is_daily),
     outcome: row.outcome || null,
   }));
-  const dates = [...new Set(dailyHistory.map((row) => row.date).filter(Boolean))];
+  const dates = streakDates.rows.map(row=>row.date);
   const streak = computeStreak(dates);
+  let longestStreak=0,chain=0,previous=null;
+  for(const date of dates){chain=previous===previousDateKey(date)?chain+1:1;longestStreak=Math.max(longestStreak,chain);previous=date;}
   const catalogSets = (catalog.sets || []).filter((entry) => entry?.id && !entry.is_fixture);
   const environmentTotal = catalogSets.length;
   const reportedEnvironmentTotal = environmentTotal || Math.max(num(summary.environments_played), 0);
@@ -440,22 +461,35 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     challenge_losses: num(summary.challenge_losses),
     challenge_ties: num(summary.challenge_ties),
     daily_games: num(summary.daily_games),
-    environments_played: num(summary.environments_played),
+    environments_played: bySet.filter(row=>catalogSets.some(set=>set.id===row.set_id)).length,
     current_streak: streak,
+    best_streak:longestStreak,
   };
   const achievements = buildAchievements({
     summary: normalizedSummary,
     bySet,
     byMode,
-    streak,
+    streak:longestStreak,
     dailyHistory,
     environmentTotal,
   });
+  const newlyEarned=achievements.filter(a=>a.unlocked).map(a=>a.id);
+  if(newlyEarned.length) await query(`WITH earned AS (
+    INSERT INTO player_achievements(player_id,achievement_id) SELECT $1::uuid,value FROM jsonb_array_elements_text($2::jsonb)
+    ON CONFLICT DO NOTHING RETURNING achievement_id
+  ) INSERT INTO analytics_events(player_id,event_name,event_props)
+    SELECT $1::uuid,n.name,jsonb_build_object('achievement',achievement_id) FROM earned
+    CROSS JOIN LATERAL (SELECT 'achievement_unlocked' name UNION ALL
+      SELECT CASE WHEN achievement_id LIKE 'streak%' THEN 'streak_milestone_reached' ELSE 'archive_milestone_reached' END
+      WHERE achievement_id LIKE 'streak%' OR achievement_id LIKE 'explorer%' OR achievement_id='archive_complete') n`,[playerId,JSON.stringify(newlyEarned)]);
+  const earned=await query('SELECT achievement_id,earned_at FROM player_achievements WHERE player_id=$1::uuid',[playerId]);
+  for(const a of achievements){const saved=earned.rows.find(r=>r.achievement_id===a.id);if(saved){a.unlocked=true;a.earned_at=saved.earned_at;a.current=a.target;a.progress_text='Unlocked';}}
   const bestEnvironments = bySet
     .filter((row) => row.games >= 3)
     .sort((a, b) => b.average_score - a.average_score || b.games - a.games || a.set_id.localeCompare(b.set_id))
     .slice(0, 5);
   const cube = bySet.find((row) => row.set_id === 'powered-cube') || null;
+  const finalPercentiles=dailyHistory.filter(r=>r.final&&r.percentile).map(r=>r.percentile);
 
   return {
     player: {
@@ -472,7 +506,8 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     by_mode: byMode,
     best_environments: bestEnvironments,
     cube,
-    daily_history: dailyHistory,
+    best_final_percentile: finalPercentiles.length?Math.min(...finalPercentiles):null,
+    daily_history: dailyHistory.slice(0,120),
     recent,
     trend: [...recent].slice(0, 40).reverse().map((row) => ({
       played_at: row.played_at,
@@ -528,22 +563,20 @@ async function handleEvents(request) {
   const id = await player(request, false);
   const payload = await readJson(request);
   const events = (Array.isArray(payload.events) ? payload.events : [payload]).slice(0, 20);
-  let accepted = 0;
+  const clean=[];
   for (const event of events) {
     const name = String(event?.name || '').trim().slice(0, 64);
     if (!/^[a-z0-9_.-]{2,64}$/i.test(name)) continue;
-    await query(
-      'INSERT INTO analytics_events(player_id,event_name,event_props) VALUES($1::uuid,$2,$3::jsonb)',
-      [id, name, JSON.stringify(props(event.props))],
-    );
-    accepted += 1;
+    clean.push({name,props:props(event.props)});
   }
-  return json({ ok: true, accepted });
+  if(clean.length)await query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,e.name,e.props FROM jsonb_to_recordset($2::jsonb) e(name text,props jsonb)',[id,JSON.stringify(clean)]);
+  return json({ ok: true, accepted:clean.length });
 }
 
 async function handleResult(request) {
   const id = await player(request);
   const payload = await readJson(request);
+  if(payload.mode==='draft_run') throw Object.assign(new Error('Draft Run results are saved by the game server.'),{status:403});
   const score = Math.max(0, Math.min(100, Math.round(Number(payload.score))));
   if (!Number.isFinite(score)) throw Object.assign(new Error('Invalid score.'), { status: 400 });
   const resultId = String(payload.clientResultId || '').slice(0, 80);
@@ -612,12 +645,15 @@ async function handleLink(request) {
 
   if (!old.rows.length) {
     await query(
-      'INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid) ON CONFLICT(auth_user_id) DO NOTHING',
+      `WITH claimed AS (INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)
+        ON CONFLICT(auth_user_id) DO NOTHING RETURNING player_id)
+       INSERT INTO analytics_events(player_id,event_name) SELECT player_id,'account_claimed' FROM claimed`,
       [auth.user_id, current],
     );
     const resolved = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
     id = resolved.rows[0]?.player_id || current;
-  } else if (id !== current) {
+  }
+  if (id !== current) {
     const currentLink = await query('SELECT auth_user_id FROM account_links WHERE player_id=$1::uuid LIMIT 1', [current]);
     if (!currentLink.rows.length) {
       await query('SELECT merge_pack1_player($1::uuid,$2::uuid)', [current, id]);
@@ -698,9 +734,10 @@ async function handleProfileUpdate(request) {
   if (showcase && !unlocked.has(showcase)) throw Object.assign(new Error('Showcase an achievement you have unlocked.'), { status: 400 });
 
   await query(
-    `UPDATE players
+    `WITH previous AS MATERIALIZED (SELECT profile_public FROM players WHERE id=$1::uuid FOR UPDATE), changed AS (UPDATE players
      SET profile_public=$2::boolean,favorite_set_id=$3,showcase_achievement=$4,updated_at=now()
-     WHERE id=$1::uuid`,
+     FROM previous WHERE id=$1::uuid RETURNING previous.profile_public was_public)
+     INSERT INTO analytics_events(player_id,event_name) SELECT $1::uuid,'public_profile_enabled' FROM changed WHERE NOT was_public AND $2::boolean`,
     [id, profilePublic, favorite, showcase],
   );
   const updatedMeta = await profileMetaByPlayer(id);
@@ -752,7 +789,7 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, service: 'pack1-growth', version: 2, profiles: true });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, service: 'pack1-growth', version: 3, profiles: true });
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/events') return handleEvents(request);
   if (request.method === 'POST' && url.pathname === '/v1/results') return handleResult(request);
@@ -779,7 +816,10 @@ export default {
       return withCors(await route(request), request);
     } catch (error) {
       console.error(error);
-      return withCors(json({ error: error?.message || 'Request failed.' }, Number(error?.status || 500)), request);
+      const status=Number(error?.status||500);
+      return withCors(json({ error: status===500?'Request failed. Please try again.':error.message },status), request);
     }
   },
 };
+
+export { query, player, readJson, json, withCors, gameDateKey };
