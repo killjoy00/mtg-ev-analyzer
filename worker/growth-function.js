@@ -256,7 +256,9 @@ function buildAchievements({ summary, bySet, byMode, streak, dailyHistory, envir
   const full = byMode.find((row) => row.mode === 'full');
   const percentiles = dailyHistory.map((row) => num(row.percentile, 0)).filter((value) => value > 0);
   const bestPercentile = percentiles.length ? Math.min(...percentiles) : null;
-  const completeTarget = Math.max(num(environmentTotal), environmentsPlayed, 1);
+  const archiveComplete = environmentTotal > 0
+    ? countAchievement('archive_complete', 'Archive Complete', 'Play every environment currently available in Pack One.', environmentsPlayed, environmentTotal)
+    : flagAchievement('archive_complete', 'Archive Complete', 'Play every environment currently available in Pack One.', false, 'Catalog temporarily unavailable');
 
   return [
     countAchievement('first', 'First Pack', 'Complete your first scored Pack One game.', games, 1),
@@ -270,7 +272,7 @@ function buildAchievements({ summary, bySet, byMode, streak, dailyHistory, envir
     countAchievement('explorer5', 'Archive Explorer', 'Play five different environments.', environmentsPlayed, 5),
     countAchievement('explorer10', 'Format Traveler', 'Play ten different environments.', environmentsPlayed, 10),
     countAchievement('explorer20', 'Deep Archive', 'Play twenty different environments.', environmentsPlayed, 20),
-    countAchievement('archive_complete', 'Archive Complete', 'Play every environment currently available in Pack One.', environmentsPlayed, completeTarget),
+    archiveComplete,
     countAchievement('cube_first', 'Power Nine', 'Complete a Powered Cube Pack Run.', num(cube?.games), 1),
     countAchievement('cube_ten', 'Cube Regular', 'Complete ten Powered Cube Pack Runs.', num(cube?.games), 10),
     countAchievement('challenge5', 'Five Up', 'Win five friend challenges.', challengeWins, 5),
@@ -428,7 +430,8 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
   const dates = [...new Set(dailyHistory.map((row) => row.date).filter(Boolean))];
   const streak = computeStreak(dates);
   const catalogSets = (catalog.sets || []).filter((entry) => entry?.id && !entry.is_fixture);
-  const environmentTotal = Math.max(catalogSets.length, num(summary.environments_played));
+  const environmentTotal = catalogSets.length;
+  const reportedEnvironmentTotal = environmentTotal || Math.max(num(summary.environments_played), 0);
   const normalizedSummary = {
     games: num(summary.games),
     average_score: num(summary.average_score),
@@ -464,7 +467,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
       ...(own ? { claimed: bool(meta.claimed) } : {}),
     },
     summary: normalizedSummary,
-    environment_total: environmentTotal,
+    environment_total: reportedEnvironmentTotal,
     by_set: bySet,
     by_mode: byMode,
     best_environments: bestEnvironments,
@@ -688,8 +691,8 @@ async function handleProfileUpdate(request) {
   const unlocked = new Set(current.achievements.filter((item) => item.unlocked).map((item) => item.id));
 
   const profilePublic = typeof payload.profilePublic === 'boolean' ? payload.profilePublic : bool(meta.profile_public);
-  let favorite = payload.favoriteSetId === undefined ? meta.favorite_set_id || null : String(payload.favoriteSetId || '').trim().toLowerCase() || null;
-  let showcase = payload.showcaseAchievement === undefined ? meta.showcase_achievement || null : String(payload.showcaseAchievement || '').trim().toLowerCase() || null;
+  const favorite = payload.favoriteSetId === undefined ? meta.favorite_set_id || null : String(payload.favoriteSetId || '').trim().toLowerCase() || null;
+  const showcase = payload.showcaseAchievement === undefined ? meta.showcase_achievement || null : String(payload.showcaseAchievement || '').trim().toLowerCase() || null;
 
   if (favorite && !allowedSets.has(favorite)) throw Object.assign(new Error('Choose a playable environment.'), { status: 400 });
   if (showcase && !unlocked.has(showcase)) throw Object.assign(new Error('Showcase an achievement you have unlocked.'), { status: 400 });
