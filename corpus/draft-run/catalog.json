@@ -1,0 +1,87 @@
+{
+  "corpus_version": "elite-trophy-verified-v5",
+  "model_version": "strong-player-pool-context-v2",
+  "holdout": "5-fold by draft_id",
+  "sets": [
+    {
+      "id": "blb",
+      "name": "BLB",
+      "puzzles": 536,
+      "trophy_drafts": 54,
+      "source_date": "2024-10-08",
+      "sha256": "81ded62204dce25727f9fda9e672c79e105ee1e1736473574a9d83a2b94b3d43"
+    },
+    {
+      "id": "dft",
+      "name": "DFT",
+      "puzzles": 660,
+      "trophy_drafts": 60,
+      "source_date": "2025-03-23",
+      "sha256": "0d29d4db25b35316dabe2949cdb561956878b0b07e13727446bda4cc31e6e2ad"
+    },
+    {
+      "id": "dsk",
+      "name": "DSK",
+      "puzzles": 605,
+      "trophy_drafts": 55,
+      "source_date": "2024-10-30",
+      "sha256": "de29ca7a077faadfb9ea8b014a2412bbb7a050173dc16cdad0d6caa5ea4cf9ac"
+    },
+    {
+      "id": "eoe",
+      "name": "EOE",
+      "puzzles": 690,
+      "trophy_drafts": 69,
+      "source_date": "2025-09-03",
+      "sha256": "380dcc10b1e14012520c9c0846b228ba2f0dc8ad208d7364a3602a4f39604b42"
+    },
+    {
+      "id": "fin",
+      "name": "FIN",
+      "puzzles": 649,
+      "trophy_drafts": 59,
+      "source_date": "2025-07-19",
+      "sha256": "fee5922f1fe35c707dac8d766cad888d259645e2ca8871555eb406e335455574"
+    },
+    {
+      "id": "mh3",
+      "name": "MH3",
+      "puzzles": 627,
+      "trophy_drafts": 57,
+      "source_date": "2024-07-17",
+      "sha256": "cce41b78299e4814515e6dab7559a7f6192b032a10489baeb536259617f2d122"
+    },
+    {
+      "id": "msh",
+      "name": "MSH",
+      "puzzles": 803,
+      "trophy_drafts": 73,
+      "source_date": "2026-07-26",
+      "sha256": "b28f586ec8b95c28e6688e1978d53737abda80ac514e46a6d6f964e03f5cee26"
+    },
+    {
+      "id": "sos",
+      "name": "SOS",
+      "puzzles": 704,
+      "trophy_drafts": 64,
+      "source_date": "2026-06-05",
+      "sha256": "edd400d2a3cae42980755a3725a5d5fe61f39ed5eb10898d83be688a905223c3"
+    },
+    {
+      "id": "tdm",
+      "name": "TDM",
+      "puzzles": 572,
+      "trophy_drafts": 52,
+      "source_date": "2025-05-20",
+      "sha256": "97255d1d9c292a127000e0737261e58d0063742e8626eaeaddb6bfc524114abc"
+    },
+    {
+      "id": "woe",
+      "name": "WOE",
+      "puzzles": 660,
+      "trophy_drafts": 60,
+      "source_date": "2023-10-18",
+      "sha256": "579b2d685df5258c7654aff4c39bcfc4cbcdba1a2abb412f5b671d8f55837cb3"
+    }
+  ]
+}

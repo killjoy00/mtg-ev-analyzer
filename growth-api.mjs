@@ -3,6 +3,7 @@ const AUTH_TOKEN_KEY = 'pack1-auth-session-v1';
 const AUTH_USER_KEY = 'pack1-auth-user-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 const AUTH_BASE = 'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+let sessionPromise = null;
 
 function baseUrl() { return String(window.PACK1_API?.growthUrl || window.PACK1_API?.url || '').replace(/\/$/, ''); }
 function loadPackToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
@@ -23,6 +24,12 @@ export function packApiConfigured() { return /^https:\/\//.test(baseUrl()); }
 export async function ensurePackSession() {
   const existing = loadPackToken();
   if (existing) return existing;
+  if (sessionPromise) return sessionPromise;
+  sessionPromise = createPackSession().finally(() => { sessionPromise = null; });
+  return sessionPromise;
+}
+
+async function createPackSession() {
   if (!packApiConfigured()) throw new Error('Pack 1 API unavailable.');
   const response = await fetch(`${baseUrl()}/v1/session`, {
     method:'POST',
@@ -69,6 +76,36 @@ export async function linkAccount(authSessionToken = loadAuthToken()) {
   return data;
 }
 
+export async function loadMyProfile() {
+  return api('/v1/profile/me', { auth:true });
+}
+export async function loadPublicProfile(profileKey) {
+  return api(`/v1/profile/${encodeURIComponent(profileKey)}`, { auth:false });
+}
+export async function updateProfile({ profilePublic, favoriteSetId, showcaseAchievement } = {}) {
+  const body = {};
+  if (typeof profilePublic === 'boolean') body.profilePublic = profilePublic;
+  if (favoriteSetId !== undefined) body.favoriteSetId = favoriteSetId;
+  if (showcaseAchievement !== undefined) body.showcaseAchievement = showcaseAchievement;
+  return api('/v1/profile', { method:'PATCH', body, auth:true });
+}
+export async function loadProfileHistory({ profileKey=null, cursor=null, limit=25 } = {}) {
+  const params = new URLSearchParams({ limit:String(limit) });
+  if (cursor) params.set('cursor', String(cursor));
+  const path = profileKey
+    ? `/v1/profile/${encodeURIComponent(profileKey)}/history?${params}`
+    : `/v1/profile/history?${params}`;
+  return api(path, { auth:!profileKey });
+}
+export async function lookupPublicProfiles(names) {
+  const unique = [...new Set((names || []).map((name)=>String(name||'').trim()).filter(Boolean))].slice(0,100);
+  if (!unique.length || !packApiConfigured()) return {};
+  try {
+    const data = await api('/v1/profile-lookup', { method:'POST', body:{ names:unique }, auth:false });
+    return data?.profiles && typeof data.profiles === 'object' ? data.profiles : {};
+  } catch { return {}; }
+}
+
 export async function authRequest(path, { method='GET', body } = {}) {
   const response = await fetch(`${AUTH_BASE}${path}`, {
     method,
@@ -103,5 +140,8 @@ export async function signOutAccount() {
     try { await api('/v1/account/signout', { method:'POST', body:{}, auth:false, authSession:token }); } catch {}
   }
   clearAuth();
+  try {
+    for (const key of [TOKEN_KEY, 'pack1-game-history-v2', 'pack1-daily-history-v1']) localStorage.removeItem(key);
+  } catch {}
   return { ok:true };
 }

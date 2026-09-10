@@ -1,5 +1,6 @@
 import { getAuthSession, linkAccount, loadRemoteStats, saveGameResult, sendEvents, signInAccount, signOutAccount, signUpAccount } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
+import { trackEvent } from './retention-events.mjs';
 
 const HISTORY_KEY = 'pack1-game-history-v2';
 const RESULT_SEEN = new WeakSet();
@@ -8,7 +9,7 @@ let challengeStartTracked = false;
 
 function esc(value) { return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
 function params() { return new URLSearchParams(location.search); }
-function event(name, props={}) { void sendEvents([{ name, props:{ ...props, path:location.pathname, set:params().get('set')||undefined, mode:params().get('mode')||undefined, seed:params().get('seed')||undefined } }]); }
+function event(name, props={}) { trackEvent(name, props); }
 function readHistory() { try { const v=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]'); return Array.isArray(v)?v:[]; } catch { return []; } }
 function writeHistory(items) { try { localStorage.setItem(HISTORY_KEY, JSON.stringify(items.slice(-500))); } catch {} }
 function resultId() { return `r:${Date.now().toString(36)}:${crypto.randomUUID?.().slice(0,8) || Math.random().toString(36).slice(2,10)}`; }
@@ -48,8 +49,11 @@ function captureResult(root) {
   };
   const history=readHistory(); history.push(item); writeHistory(history);
   void saveGameResult(item);
+  document.dispatchEvent(new CustomEvent('pack1:result-completed',{detail:{id:item.clientResultId,score:item.score,mode:item.mode,daily:item.isDaily}}));
   event('game_reveal',{ score:item.score, grade:item.grade, daily:item.isDaily, challenge:Boolean(item.challengeId||item.opponentScore!=null), outcome:item.outcome||undefined });
   if(item.challengeId||item.opponentScore!=null) event('challenge_complete',{ outcome:item.outcome, score:item.score, opponent_score:item.opponentScore });
+  if(item.isDaily)event('daily_completed',{mode:item.mode,score:item.score});
+  if(item.setId==='powered-cube')event('cube_completed',{score:item.score});
 }
 function findResults() {
   document.querySelectorAll('.result-page,.reveal-panel').forEach((root)=>{
@@ -144,6 +148,7 @@ function clickAnalytics(eventObject) {
     }
   }
   else if(target.matches('[data-daily-mode]')) event('game_start',{ daily:true, mode:target.dataset.dailyMode });
+  else if(target.matches('[data-cube-href]')) event('cube_started',{mode:'full'});
   else if(target.matches('#reveal-top3,#reveal-challenge')) event('reveal_click');
   else if(target.matches('#share-top3,#share-full,.challenge-return,#reshare-challenge')) event('share_click',{ challenge:true, surface:target.id||'challenge_return' });
   else if(target.matches('#daily-leaders,#leaderboard-nav')) event('leaderboard_view');
@@ -161,5 +166,6 @@ export async function installGrowthLayer() {
   event('page_view',{ account:Boolean(currentAccount?.user), challenge:params().has('challenge')||params().has('vs') });
   document.addEventListener('click',clickAnalytics,true);
   document.addEventListener('pack1:share-completed',shareCompletedAnalytics);
+  document.addEventListener('change',e=>{if(e.target?.id==='set-select')event('practice_set_selected',{set:e.target.value});});
   onAppRender(enhance);
 }

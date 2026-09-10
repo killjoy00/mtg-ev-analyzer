@@ -1,0 +1,43 @@
+{
+  "data_date": "2023-06-14",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 106920,
+      "image_metadata_coverage": 0.9913,
+      "rarity_metadata_coverage": 0.9913,
+      "unique_candidates": 346
+    },
+    "consensus": {
+      "historical_pack_score_p10": 76.0,
+      "historical_pack_score_p50": 86.9,
+      "historical_pack_score_p90": 95.27,
+      "opening_top_support_p10": 0.35,
+      "opening_top_support_p50": 0.55,
+      "opening_top_support_p90": 0.74
+    },
+    "path_model": {
+      "bytes": 1695317,
+      "candidate_card_coverage": 1.0,
+      "cards": 346,
+      "excluded_replay_drafts": 297,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 104175,
+      "present": true
+    },
+    "replays": {
+      "actual": 297,
+      "declared": 297
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 223338,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "MOM",
+  "schema_version": 1,
+  "set_id": "mom",
+  "status": "healthy",
+  "warnings": []
+}

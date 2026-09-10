@@ -56,25 +56,20 @@ test('consensus leader is the highest-scoring non-historical answer', () => {
   assert.ok(second.score > third.score);
 });
 
-test('consensus partial-credit ceiling tapers as the source pick gets deeper', () => {
-  assert.equal(draftRunConsensusCap(1), 96);
-  assert.equal(draftRunConsensusCap(3), 94);
-  assert.equal(draftRunConsensusCap(8), 89);
-  assert.equal(draftRunConsensusCap(11), 88);
-  assert.equal(draftRunConsensusCap(14), 88);
+test('equal contextual support receives equal credit at different depths', () => {
+  assert.equal(draftRunConsensusCap(1),95);
+  assert.equal(draftRunConsensusCap(11),95);
+  assert.equal(gradeDraftRunPick(puzzle({pick:1}),'c').score,gradeDraftRunPick(puzzle({pick:9}),'c').score);
 });
 
 test('overall Draft Run score is an equal-weight arithmetic mean', () => {
-  const puzzles = [
-    puzzle({ historical: 'a', pick: 1, set: 'a1' }),
-    puzzle({ historical: 'd', pick: 2, set: 'a2' }),
-  ];
+  const puzzles = Array.from({length:10},(_,i)=>puzzle({historical:i===0?'a':'d',pick:Math.max(1,i),set:'a'+i}));
   const first = gradeDraftRunPick(puzzles[0], 'a').score;
   const second = gradeDraftRunPick(puzzles[1], 'a').score;
-  const run = summarizeDraftRun(puzzles, ['a', 'a']);
-  assert.equal(run.score, Math.round((first + second) / 2));
+  const run = summarizeDraftRun(puzzles, Array(10).fill('a'));
+  assert.equal(run.score, Math.round((first + 9*second) / 10));
   assert.equal(run.historicalMatches, 1);
-  assert.equal(run.consensusLeaders, 2);
+  assert.equal(run.consensusLeaders, 10);
 });
 
 test('reroll matching favors similar depth and decision shape', () => {

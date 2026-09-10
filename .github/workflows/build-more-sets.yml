@@ -1,27 +1,147 @@
-name: build-more-sets
+name: import-set-backlog
 
 on:
   workflow_dispatch:
+    inputs:
+      sets:
+        description: 'Optional comma-separated set codes. Leave blank to consume the explicit backlog queue.'
+        required: false
+        default: ''
+        type: string
+      limit:
+        description: 'Maximum successful queued imports this run'
+        required: true
+        default: '3'
+        type: string
+      earliest:
+        description: 'Legacy discovery fallback cutoff if the queue file is unavailable'
+        required: true
+        default: '2021-01-01'
+        type: string
   push:
-    branches: [fix/daily-reveal-and-more-sets]
+    branches: [main]
     paths:
       - '.github/workflows/build-more-sets.yml'
+      - 'data/import-queue.json'
+      - 'data/catalog.json'
+      - 'scripts/import_sets.py'
       - 'scripts/build_replays.py'
       - 'scripts/build_path_model.py'
       - 'scripts/fetch_card_metadata.py'
       - 'scripts/validate_dataset.py'
+      - 'scripts/audit_datasets.py'
+      - 'tests/test_import_sets.py'
+      - 'tests/test_data_health.py'
+      - 'tests/test_card_metadata.py'
+      - 'tests/test_data_pipeline_workflows.py'
+  schedule:
+    - cron: '17 10 * * *'
 
 permissions:
   contents: write
+  actions: write
 
 jobs:
-  build-sets:
+  # Do not enter the shared catalog concurrency group until we know Powered Cube
+  # is already published. GitHub keeps only one pending item per concurrency
+  # group, so a newly queued backlog job can otherwise evict a pending Cube job
+  # even when cancel-in-progress is false.
+  route:
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    outputs:
+      should_import: ${{ steps.route.outputs.should_import }}
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Fast-forward routing view to latest main
+        if: github.ref_name == 'main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          git reset --hard "origin/$GITHUB_REF_NAME"
+
+      - name: Route catalog ownership
+        id: route
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SETS: ${{ inputs.sets || '' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'should_import=false' >> "$GITHUB_OUTPUT"
+
+          read -r pending cube_live < <(python - <<'PY'
+          import json
+          from pathlib import Path
+
+          status_path = Path('data/status.json')
+          if status_path.exists():
+              status = json.loads(status_path.read_text())
+              pending = int((status.get('normal_queue_counts') or {}).get('pending') or 0)
+              cube_live = any(
+                  item.get('id') == 'powered-cube' and item.get('status') == 'live'
+                  for item in status.get('special_modes', [])
+              )
+          else:
+              pending = 1
+              cube_live = False
+
+          print(pending, 1 if cube_live else 0)
+          PY
+          )
+
+          if [[ "$cube_live" != '1' ]]; then
+            echo "Powered Cube is not live; backlog will not enter the shared catalog lock."
+            active_cube="$(gh run list \
+              --workflow build-powered-cube.yml \
+              --limit 30 \
+              --json status \
+              --jq '[.[] | select(.status == "in_progress" or .status == "queued" or .status == "pending" or .status == "waiting" or .status == "requested")] | length')"
+
+            if [[ "$active_cube" -eq 0 ]]; then
+              echo 'No active Cube run found; dispatching one now.'
+              gh workflow run build-powered-cube.yml --ref "$GITHUB_REF_NAME"
+            else
+              echo "Cube already has ${active_cube} active or queued run(s); leaving them undisturbed."
+            fi
+            exit 0
+          fi
+
+          if [[ -z "$SETS" && "$pending" -le 0 ]]; then
+            echo 'Normal import queue is already complete.'
+            exit 0
+          fi
+
+          echo 'Powered Cube is live; this backlog run may acquire the shared catalog lock.'
+          echo 'should_import=true' >> "$GITHUB_OUTPUT"
+
+  import-sets:
+    needs: route
+    if: needs.route.outputs.should_import == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    concurrency:
+      group: set-data-import-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      # A data job can sit behind the shared import lock for a long time. The
+      # event SHA may be stale by the time the job starts, so move to the latest
+      # main before generating anything that will later be committed.
+      - name: Fast-forward to latest main under import lock
+        if: github.ref_name == 'main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          git reset --hard "origin/$GITHUB_REF_NAME"
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
@@ -32,91 +152,212 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: Build recent Premier Draft sets
+      - name: Repair published metadata warnings
+        id: metadata_repair
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p raw-data generated
+          if [[ ! -f data/status.json ]]; then
+            echo 'No data-health snapshot yet; nothing to repair.'
+            exit 0
+          fi
 
-          while read -r SET SOURCE_DATE; do
-            lower="$(printf '%s' "$SET" | tr '[:upper:]' '[:lower:]')"
-            echo "=== Building $SET ($SOURCE_DATE) ==="
-            mkdir -p "data/$lower"
+          mapfile -t repair_sets < <(python - <<'PY'
+          import json
+          from pathlib import Path
+          status = json.loads(Path('data/status.json').read_text())
+          wanted = {'image_metadata_coverage', 'rarity_metadata_coverage'}
+          rows = []
+          for item in status.get('datasets', []):
+              if wanted.intersection(item.get('warning_codes') or []):
+                  rows.append(str(item.get('id') or '').upper())
+          for code in rows[:2]:
+              if code:
+                  print(code)
+          PY
+          )
 
-            curl --fail --location --retry 5 --retry-delay 3 \
-              --output "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz" \
-              "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.${SET}.PremierDraft.csv.gz"
+          if [[ ${#repair_sets[@]} -eq 0 ]]; then
+            echo 'No published metadata coverage warnings.'
+            exit 0
+          fi
 
-            if ! python scripts/fetch_card_metadata.py --set "$SET" --output "generated/${lower}-cards.json"; then
-              echo "Scryfall metadata unavailable for $SET; continuing with placeholders."
-              printf '{}\n' > "generated/${lower}-cards.json"
-            fi
-
-            python scripts/build_replays.py \
-              --input "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz" \
-              --output-dir "data/$lower" \
-              --catalog data/catalog.json \
-              --expansion "$SET" \
+          for code in "${repair_sets[@]}"; do
+            echo "Rebuilding ${code} to repair card metadata coverage."
+            python scripts/import_sets.py \
+              --sets "$code" \
               --format PremierDraft \
-              --source-date "$SOURCE_DATE" \
-              --minimum-games 100 \
-              --top-fraction 0.15 \
+              --limit 1 \
               --max-training-drafts 5000 \
               --max-output-drafts 300 \
+              --minimum-replays 100 \
               --minimum-picks 30 \
               --folds 5 \
               --shard-size 2 \
-              --card-metadata "generated/${lower}-cards.json"
+              --max-path-bytes 4000000 \
+              --report "generated/metadata-repair-${code}.json"
+          done
 
-            python scripts/build_path_model.py \
-              --input "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz" \
-              --output-dir "data/$lower" \
-              --expansion "$SET" \
-              --source-date "$SOURCE_DATE" \
-              --minimum-games 100 \
-              --top-fraction 0.15 \
-              --max-training-drafts 5000 \
-              --max-bytes 4000000
+      - name: Import public Premier Draft backlog
+        id: importer
+        continue-on-error: true
+        env:
+          SETS: ${{ inputs.sets || '' }}
+          LIMIT: ${{ inputs.limit || '3' }}
+          EARLIEST: ${{ inputs.earliest || '2021-01-01' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          args=(
+            --format PremierDraft
+            --queue data/import-queue.json
+            --limit "$LIMIT"
+            --earliest "$EARLIEST"
+            --max-training-drafts 5000
+            --max-output-drafts 300
+            --minimum-replays 100
+            --minimum-picks 30
+            --folds 5
+            --shard-size 2
+            --max-path-bytes 4000000
+          )
+          if [[ -n "$SETS" ]]; then
+            args+=(--sets "$SETS")
+          fi
+          python scripts/import_sets.py "${args[@]}"
 
-            python scripts/validate_dataset.py "data/$lower/manifest.json" --minimum-replays 100
-            python - "$lower" <<'PY'
-          import json, sys
-          from pathlib import Path
-          path = Path('data') / sys.argv[1] / 'path-model.json'
-          model = json.loads(path.read_text())
-          assert model['model_version'] == 'strong-player-counterfactual-path-v3'
-          assert model['training']['excluded_replay_drafts'] >= 250
-          assert len(model['cards']) > 100
-          assert len(model['pairs']) > 100
-          assert path.stat().st_size < 4_000_000
-          PY
-            rm -f "raw-data/draft_data_public.${SET}.PremierDraft.csv.gz"
-          done <<'SETS'
-          SOS 2026-06-02
-          TMT 2026-04-08
-          ECL 2026-02-08
-          SETS
+      - name: Audit datasets and refresh data health
+        id: audit
+        if: always()
+        continue-on-error: true
+        shell: bash
+        run: |
+          args=(--fail-on-error)
+          if [[ -f generated/import-report.json ]]; then
+            args+=(--import-report generated/import-report.json)
+          fi
+          python scripts/audit_datasets.py "${args[@]}"
 
-      - name: Upload generated replay data
+      - name: Publish import report to job summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f generated/import-report.json ]]; then
+            echo '## Set import report' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat generated/import-report.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if compgen -G 'generated/metadata-repair-*.json' > /dev/null; then
+            echo '## Metadata repair reports' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat generated/metadata-repair-*.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -f data/status.json ]]; then
+            echo '## Data health' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat data/status.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload import report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: recent-replay-data
+          name: set-import-report-${{ github.run_id }}
           path: |
-            data/catalog.json
-            data/sos/
-            data/tmt/
-            data/ecl/
-          retention-days: 14
+            generated/import-report.json
+            generated/metadata-repair-*.json
+            data/status.json
+          retention-days: 30
+          if-no-files-found: ignore
 
-      - name: Commit generated data to branch
+      - name: Commit successful imports
+        id: publish
+        if: always() && steps.audit.outcome == 'success'
+        shell: bash
         run: |
+          set -euo pipefail
+          echo 'published=false' >> "$GITHUB_OUTPUT"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add data/catalog.json data/sos data/tmt data/ecl
+          git add data/catalog.json data/status.json data/
           if git diff --cached --quiet; then
-            echo 'Generated data is unchanged.'
+            echo 'No generated set data changed. Queue chain stops here.'
             exit 0
           fi
-          git commit -m 'Add SOS TMT and ECL replay data [data-generated]'
-          git pull --rebase origin "${GITHUB_REF_NAME}"
-          git push origin HEAD:${GITHUB_REF_NAME}
+
+          git commit -m 'Import 17Lands set backlog [data-generated]'
+          for attempt in 1 2 3; do
+            echo "Publish attempt ${attempt}/3"
+            if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
+              echo 'published=true' >> "$GITHUB_OUTPUT"
+              exit 0
+            fi
+            git rebase --abort >/dev/null 2>&1 || true
+            sleep $((attempt * 5))
+          done
+          echo 'Could not publish generated set data after three attempts.' >&2
+          exit 1
+
+      # GITHUB_TOKEN pushes do not recursively launch push workflows. Explicit
+      # workflow_dispatch does. If Powered Cube somehow becomes unpublished
+      # again, yield rather than enqueue another backlog writer ahead of it.
+      - name: Continue data migration
+        if: steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SETS: ${{ inputs.sets || '' }}
+          LIMIT: ${{ inputs.limit || '3' }}
+          EARLIEST: ${{ inputs.earliest || '2021-01-01' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "$SETS" ]]; then
+            echo 'Explicit set import requested; not chaining the normal backlog.'
+            exit 0
+          fi
+
+          read -r pending cube_live < <(python - <<'PY'
+          import json
+          from pathlib import Path
+          status = json.loads(Path('data/status.json').read_text())
+          pending = int((status.get('normal_queue_counts') or {}).get('pending') or 0)
+          cube_live = any(
+              item.get('id') == 'powered-cube' and item.get('status') == 'live'
+              for item in status.get('special_modes', [])
+          )
+          print(pending, 1 if cube_live else 0)
+          PY
+          )
+
+          if [[ "$pending" -le 0 ]]; then
+            echo 'Normal import queue is complete.'
+            exit 0
+          fi
+
+          if [[ "$cube_live" != '1' ]]; then
+            echo "Powered Cube is not live; yielding the next catalog slot to Cube before ${pending} remaining environments."
+            gh workflow run build-powered-cube.yml --ref "$GITHUB_REF_NAME"
+            exit 0
+          fi
+
+          echo "Dispatching the next backlog batch; ${pending} environments remain."
+          gh workflow run build-more-sets.yml \
+            --ref "$GITHUB_REF_NAME" \
+            -f limit="$LIMIT" \
+            -f earliest="$EARLIEST"
+
+      - name: Surface data-health gate failure
+        if: always() && steps.audit.outcome == 'failure'
+        run: |
+          echo 'Dataset health audit failed. Newly generated data was not published.' >&2
+          exit 1
+
+      - name: Surface importer failure after preserving successful sets
+        if: steps.importer.outcome == 'failure' && steps.audit.outcome == 'success'
+        run: |
+          echo 'One or more queued sets failed. Healthy successful sets were committed and the data migration can continue past the failure; see the import report artifact.' >&2
+          exit 1

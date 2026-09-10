@@ -27,4 +27,5 @@ function loadGoogleAds(slots) {
 
 const slots = [...document.querySelectorAll('[data-ad-slot]')];
 if (new URLSearchParams(location.search).get('adpreview') === '1') slots.forEach(previewCreative);
-else loadGoogleAds(slots);
+else if (!globalThis.PACKONE_ADSENSE?.enabled) slots.forEach(slot=>slot.hidden=true);
+else if (!new URLSearchParams(location.search).has('game') && !new URLSearchParams(location.search).has('mode')) loadGoogleAds(slots);

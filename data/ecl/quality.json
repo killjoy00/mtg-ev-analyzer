@@ -1,0 +1,43 @@
+{
+  "data_date": "2026-02-08",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 77999,
+      "image_metadata_coverage": 0.9991,
+      "rarity_metadata_coverage": 0.9991,
+      "unique_candidates": 286
+    },
+    "consensus": {
+      "historical_pack_score_p10": 75.58,
+      "historical_pack_score_p50": 87.03,
+      "historical_pack_score_p90": 94.81,
+      "opening_top_support_p10": 0.26,
+      "opening_top_support_p50": 0.37,
+      "opening_top_support_p90": 0.54
+    },
+    "path_model": {
+      "bytes": 1138362,
+      "candidate_card_coverage": 1.0,
+      "cards": 288,
+      "excluded_replay_drafts": 300,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 70034,
+      "present": true
+    },
+    "replays": {
+      "actual": 300,
+      "declared": 300
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 190000,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "ECL",
+  "schema_version": 1,
+  "set_id": "ecl",
+  "status": "healthy",
+  "warnings": []
+}

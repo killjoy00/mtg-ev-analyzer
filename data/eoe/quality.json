@@ -1,0 +1,43 @@
+{
+  "data_date": "2025-09-03",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 81900,
+      "image_metadata_coverage": 0.9887,
+      "rarity_metadata_coverage": 0.9887,
+      "unique_candidates": 316
+    },
+    "consensus": {
+      "historical_pack_score_p10": 75.69,
+      "historical_pack_score_p50": 86.94,
+      "historical_pack_score_p90": 95.35,
+      "opening_top_support_p10": 0.29,
+      "opening_top_support_p50": 0.46,
+      "opening_top_support_p90": 0.67
+    },
+    "path_model": {
+      "bytes": 1307297,
+      "candidate_card_coverage": 1.0,
+      "cards": 316,
+      "excluded_replay_drafts": 300,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 81161,
+      "present": true
+    },
+    "replays": {
+      "actual": 300,
+      "declared": 300
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 195000,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "EOE",
+  "schema_version": 1,
+  "set_id": "eoe",
+  "status": "healthy",
+  "warnings": []
+}

@@ -1,0 +1,133 @@
+name: backfill-legacy-sets
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'scripts/backfill_legacy_sets.py'
+      - 'tests/test_legacy_skill_backfill.py'
+      - '.github/workflows/backfill-legacy-sets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    concurrency:
+      group: set-data-import-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward to latest main under import lock
+        if: github.ref_name == 'main'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin "$GITHUB_REF_NAME"
+          git reset --hard "origin/$GITHUB_REF_NAME"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run regression tests
+        run: npm test
+
+      - name: Backfill legacy Premier Draft sets
+        id: backfill
+        continue-on-error: true
+        run: >-
+          python scripts/backfill_legacy_sets.py
+          --sets VOW,MID,STX
+          --format PremierDraft
+          --minimum-games 100
+          --top-fraction 0.15
+          --max-training-drafts 5000
+          --max-output-drafts 300
+          --minimum-replays 100
+          --minimum-picks 30
+          --folds 5
+          --shard-size 2
+          --max-path-bytes 4000000
+
+      - name: Audit datasets and refresh health
+        id: audit
+        if: always()
+        continue-on-error: true
+        run: python scripts/audit_datasets.py --fail-on-error
+
+      - name: Publish legacy backfill report
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f generated/legacy-backfill-report.json ]]; then
+            echo '## Legacy 17Lands backfill' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat generated/legacy-backfill-report.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+          if [[ -f data/status.json ]]; then
+            echo '## Data health' >> "$GITHUB_STEP_SUMMARY"
+            echo '```json' >> "$GITHUB_STEP_SUMMARY"
+            cat data/status.json >> "$GITHUB_STEP_SUMMARY"
+            echo '```' >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload legacy backfill report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: legacy-set-backfill-${{ github.run_id }}
+          path: |
+            generated/legacy-backfill-report.json
+            data/status.json
+          retention-days: 30
+          if-no-files-found: ignore
+
+      - name: Commit validated legacy set data
+        id: publish
+        if: always() && steps.audit.outcome == 'success'
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A -- data/
+          if git diff --cached --quiet; then
+            echo 'No legacy set data changed.'
+            exit 0
+          fi
+
+          git commit -m 'Backfill legacy 17Lands sets [data-generated]'
+          for attempt in 1 2 3; do
+            echo "Publish attempt ${attempt}/3"
+            if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
+              exit 0
+            fi
+            git rebase --abort >/dev/null 2>&1 || true
+            sleep $((attempt * 5))
+          done
+          echo 'Could not publish legacy set data after three attempts.' >&2
+          exit 1
+
+      - name: Surface data-health failure
+        if: always() && steps.audit.outcome == 'failure'
+        run: |
+          echo 'Dataset audit failed; legacy data were not published.' >&2
+          exit 1
+
+      - name: Surface partial legacy backfill failure
+        if: always() && steps.backfill.outcome == 'failure'
+        run: |
+          echo 'One or more legacy sets failed. Any healthy successful sets were preserved; see the report artifact.' >&2
+          exit 1

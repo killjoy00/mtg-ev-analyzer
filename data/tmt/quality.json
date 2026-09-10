@@ -1,0 +1,43 @@
+{
+  "data_date": "2026-04-08",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 89717,
+      "image_metadata_coverage": 0.9962,
+      "rarity_metadata_coverage": 0.9962,
+      "unique_candidates": 214
+    },
+    "consensus": {
+      "historical_pack_score_p10": 75.7,
+      "historical_pack_score_p50": 88.53,
+      "historical_pack_score_p90": 96.06,
+      "opening_top_support_p10": 0.26,
+      "opening_top_support_p50": 0.36,
+      "opening_top_support_p90": 0.53
+    },
+    "path_model": {
+      "bytes": 609529,
+      "candidate_card_coverage": 1.0,
+      "cards": 215,
+      "excluded_replay_drafts": 300,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 37366,
+      "present": true
+    },
+    "replays": {
+      "actual": 300,
+      "declared": 300
+    },
+    "training": {
+      "drafts": 3126,
+      "picks": 128166,
+      "win_rate_cutoff": 0.62
+    }
+  },
+  "name": "TMT",
+  "schema_version": 1,
+  "set_id": "tmt",
+  "status": "healthy",
+  "warnings": []
+}

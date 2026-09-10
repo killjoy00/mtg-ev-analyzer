@@ -40,8 +40,9 @@ CORPUS_VERSION = "elite-trophy-first-pack-v1"
 
 def parse_int(value: object) -> int | None:
     try:
-        return int(float(str(value).strip()))
-    except (TypeError, ValueError):
+        number=float(str(value).strip())
+        return int(number) if math.isfinite(number) and number.is_integer() else None
+    except (TypeError, ValueError, OverflowError):
         return None
 
 
@@ -149,6 +150,8 @@ def puzzle_rows(
     skill,
     trophy_meta: Mapping[str, object],
 ) -> Iterable[dict]:
+    if trophy_meta.get('event_match_wins') != 7 or skill.games_lower_bound < 100 or skill.rate < 0.6:
+        return
     picks = sorted(rendered.get("picks") or [], key=lambda pick: int(pick["pick_number"]))
     prior: List[dict] = []
     source_hash = stable_hash(f"pack-one|{expansion}|{draft_id}", 32)
@@ -169,6 +172,8 @@ def puzzle_rows(
         leader_support = float(leader.get("model_probability") or 0)
         second_support = float(second.get("model_probability") or 0) if second else 0.0
         pick_number = int(pick["pick_number"])
+        if pick_number != len(prior) + 1:
+            return
         puzzle_id = stable_hash(f"{expansion}|{draft_id}|{pick_number}", 32)
 
         yield {
@@ -192,7 +197,7 @@ def puzzle_rows(
             "prior_pool_size": len(prior),
             "player_win_rate_bucket": round(float(skill.rate), 4),
             "player_games_lower_bound": int(skill.games_lower_bound),
-            "event_match_wins": int(trophy_meta.get("event_match_wins") or 7),
+            "event_match_wins": 7,
             "event_match_losses": trophy_meta.get("event_match_losses"),
             "source_rank": trophy_meta.get("rank"),
             "source_draft_time": trophy_meta.get("draft_time"),
@@ -225,12 +230,16 @@ def build(args: argparse.Namespace) -> dict:
         raise ValueError("At least two elite drafts are required for held-out consensus grading.")
 
     strong_set = set(strong_ids)
+    strong_set = {draft_id for draft_id in strong_set if skills[draft_id].rate >= 0.6}
+    strong_ids = [draft_id for draft_id in strong_ids if draft_id in strong_set]
     trophy_ids, trophy_meta = scan_trophy_ids(input_path, strong_set)
     if args.max_trophy_drafts and len(trophy_ids) > args.max_trophy_drafts:
         trophy_ids = trophy_ids[: args.max_trophy_drafts]
     if not trophy_ids:
         raise ValueError("No elite trophy drafts were found for this set.")
 
+    if args.folds < 2 or len(strong_ids) < 2:
+        raise ValueError('Held-out scoring requires at least two folds and two elite drafts.')
     folds = min(args.folds, len(strong_ids))
     raw_first_pack = first_pack_number(input_path)
     all_counts, fold_counts, collected, min_pick, parsed_examples = train_first_pack(

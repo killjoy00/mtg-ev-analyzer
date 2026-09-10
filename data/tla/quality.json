@@ -1,0 +1,43 @@
+{
+  "data_date": "2026-01-10",
+  "errors": [],
+  "metrics": {
+    "cards": {
+      "candidate_occurrences": 90297,
+      "image_metadata_coverage": 0.9983,
+      "rarity_metadata_coverage": 0.9983,
+      "unique_candidates": 336
+    },
+    "consensus": {
+      "historical_pack_score_p10": 76.03,
+      "historical_pack_score_p50": 86.94,
+      "historical_pack_score_p90": 96.02,
+      "opening_top_support_p10": 0.24,
+      "opening_top_support_p50": 0.36,
+      "opening_top_support_p90": 0.53
+    },
+    "path_model": {
+      "bytes": 1362769,
+      "candidate_card_coverage": 1.0,
+      "cards": 347,
+      "excluded_replay_drafts": 300,
+      "model_version": "strong-player-counterfactual-path-v3",
+      "pairs": 82833,
+      "present": true
+    },
+    "replays": {
+      "actual": 300,
+      "declared": 300
+    },
+    "training": {
+      "drafts": 5000,
+      "picks": 205000,
+      "win_rate_cutoff": 0.6
+    }
+  },
+  "name": "TLA",
+  "schema_version": 1,
+  "set_id": "tla",
+  "status": "healthy",
+  "warnings": []
+}

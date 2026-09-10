@@ -1,0 +1,624 @@
+{
+  "schema_version": 2,
+  "set_id": "snc",
+  "name": "SNC",
+  "format": "PremierDraft",
+  "is_fixture": false,
+  "source": {
+    "provider": "17Lands",
+    "dataset_kind": "draft_data",
+    "data_date": "2022-07-07",
+    "license": "CC BY 4.0 unless otherwise noted by 17Lands"
+  },
+  "cohort": {
+    "definition": "experienced drafts in top 15% of parsed 17Lands user win-rate buckets",
+    "minimum_games_bucket_lower_bound": 100,
+    "win_rate_cutoff": 0.6,
+    "experienced_drafts": 93329,
+    "training_drafts": 5000,
+    "training_picks": 205897
+  },
+  "model": {
+    "model_version": "strong-player-pool-context-v2",
+    "holdout": "5-fold by draft_id",
+    "probabilities_are_calibrated": false,
+    "description": "Hierarchical strong-player pick tendency adjusted by shrinkage-weighted card/pool co-pick lift; normalized within each pack.",
+    "pool_conditioned": true
+  },
+  "replay_count": 296,
+  "shard_size": 2,
+  "shards": [
+    {
+      "path": "./data/snc/shards/000.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/001.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/002.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/003.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/004.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/005.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/006.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/007.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/008.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/009.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/010.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/011.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/012.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/013.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/014.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/015.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/016.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/017.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/018.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/019.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/020.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/021.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/022.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/023.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/024.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/025.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/026.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/027.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/028.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/029.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/030.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/031.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/032.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/033.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/034.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/035.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/036.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/037.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/038.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/039.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/040.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/041.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/042.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/043.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/044.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/045.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/046.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/047.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/048.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/049.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/050.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/051.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/052.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/053.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/054.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/055.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/056.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/057.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/058.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/059.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/060.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/061.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/062.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/063.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/064.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/065.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/066.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/067.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/068.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/069.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/070.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/071.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/072.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/073.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/074.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/075.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/076.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/077.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/078.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/079.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/080.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/081.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/082.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/083.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/084.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/085.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/086.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/087.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/088.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/089.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/090.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/091.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/092.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/093.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/094.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/095.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/096.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/097.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/098.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/099.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/100.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/101.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/102.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/103.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/104.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/105.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/106.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/107.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/108.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/109.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/110.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/111.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/112.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/113.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/114.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/115.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/116.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/117.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/118.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/119.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/120.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/121.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/122.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/123.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/124.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/125.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/126.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/127.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/128.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/129.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/130.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/131.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/132.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/133.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/134.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/135.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/136.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/137.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/138.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/139.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/140.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/141.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/142.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/143.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/144.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/145.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/146.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/snc/shards/147.json",
+      "replay_count": 2
+    }
+  ]
+}

@@ -1,0 +1,638 @@
+{
+  "schema_version": 2,
+  "set_id": "powered-cube",
+  "name": "Powered Cube",
+  "format": "PremierDraft",
+  "is_fixture": false,
+  "source": {
+    "provider": "17Lands",
+    "dataset_kind": "draft_data",
+    "data_date": "2025-12-01",
+    "license": "CC BY 4.0 unless otherwise noted by 17Lands",
+    "expansion_label": "Powered Cube",
+    "archive_expansion": "Cube_-_Powered",
+    "first_playable_pick": "P1P2 when P1P1 contents are unavailable",
+    "stored_pick_numbers": "true Pack One positions"
+  },
+  "cohort": {
+    "definition": "experienced drafts in top 15% of parsed 17Lands user win-rate buckets",
+    "minimum_games_bucket_lower_bound": 100,
+    "win_rate_cutoff": 0.6,
+    "experienced_drafts": 31574,
+    "training_drafts": 5000,
+    "training_picks": 219999
+  },
+  "model": {
+    "model_version": "strong-player-pool-context-v2",
+    "holdout": "5-fold by draft_id",
+    "probabilities_are_calibrated": false,
+    "description": "Hierarchical strong-player pick tendency adjusted by shrinkage-weighted card/pool co-pick lift; normalized within each pack.",
+    "pool_conditioned": true
+  },
+  "replay_count": 300,
+  "shard_size": 2,
+  "shards": [
+    {
+      "path": "./data/powered-cube/shards/000.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/001.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/002.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/003.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/004.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/005.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/006.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/007.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/008.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/009.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/010.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/011.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/012.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/013.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/014.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/015.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/016.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/017.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/018.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/019.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/020.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/021.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/022.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/023.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/024.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/025.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/026.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/027.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/028.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/029.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/030.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/031.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/032.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/033.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/034.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/035.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/036.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/037.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/038.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/039.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/040.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/041.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/042.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/043.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/044.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/045.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/046.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/047.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/048.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/049.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/050.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/051.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/052.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/053.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/054.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/055.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/056.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/057.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/058.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/059.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/060.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/061.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/062.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/063.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/064.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/065.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/066.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/067.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/068.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/069.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/070.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/071.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/072.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/073.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/074.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/075.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/076.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/077.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/078.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/079.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/080.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/081.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/082.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/083.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/084.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/085.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/086.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/087.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/088.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/089.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/090.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/091.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/092.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/093.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/094.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/095.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/096.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/097.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/098.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/099.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/100.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/101.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/102.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/103.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/104.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/105.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/106.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/107.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/108.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/109.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/110.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/111.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/112.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/113.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/114.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/115.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/116.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/117.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/118.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/119.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/120.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/121.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/122.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/123.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/124.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/125.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/126.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/127.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/128.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/129.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/130.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/131.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/132.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/133.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/134.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/135.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/136.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/137.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/138.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/139.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/140.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/141.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/142.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/143.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/144.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/145.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/146.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/147.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/148.json",
+      "replay_count": 2
+    },
+    {
+      "path": "./data/powered-cube/shards/149.json",
+      "replay_count": 2
+    }
+  ],
+  "category": "special_mode",
+  "product_mode": "powered-cube"
+}
