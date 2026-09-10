@@ -51,7 +51,7 @@ await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES(
 await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[authToken,authId]);
 const authHeaders={'x-pack1-auth-session':authToken};
 // Even an unfinished established Daily takes priority over a guest's finished score.
-await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade) VALUES($1::uuid,$2::date,'mixed','draft_run',100,'A')",[guest.playerId,gameDateKey()]);
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) VALUES($1::uuid,$2::date,'mixed','draft_run',100,'A','[]'::jsonb)",[guest.playerId,gameDateKey()]);
 await call(growth,'/v1/account/link',{},owner.token,200,{headers:authHeaders});
 const linked=await call(growth,'/v1/account/link',{},guest.token,200,{headers:authHeaders});
 assert.equal(linked.token,owner.token);
@@ -74,12 +74,12 @@ console.log('Account merge, Daily priority and public profile privacy verified')
 const board='qa-'+tag,peers=[];
 for(let i=0;i<9;i++)peers.push(crypto.randomUUID());
 await query('INSERT INTO players(id,display_name) SELECT value::uuid,$2 FROM jsonb_array_elements_text($1::jsonb)',[JSON.stringify(peers),'QA tie '+tag]);
-await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade) SELECT p.id::uuid,$2::date-1,$3,'top3',p.score,'B' FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:[90,95,95,90,90,90,10,10,10,10][i]}))),gameDateKey(),board]);
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date-1,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:[90,95,95,90,90,90,10,10,10,10][i]}))),gameDateKey(),board]);
 let p=await call(growth,'/v1/profile/me',undefined,owner.token),finish=p.daily_history.find(r=>r.set_id===board);
 assert.equal(finish.rank,3);assert.equal(finish.percentile,60);assert.equal(finish.final,true);
 const old=board+'old';
-await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade) SELECT p.id::uuid,$2::date-500,$3,'top3',p.score,'B' FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),old]);
-await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade) SELECT $1::uuid,$2::date-n,$3,'full',40,'D' FROM generate_series(2,125) n",[owner.playerId,gameDateKey(),board]);
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date-500,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),old]);
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT $1::uuid,$2::date-n,$3,'full',40,'D','[]'::jsonb FROM generate_series(2,125) n",[owner.playerId,gameDateKey(),board]);
 p=await call(growth,'/v1/profile/me',undefined,owner.token);assert.equal(p.daily_history.length,120);assert.equal(p.best_final_percentile,10);assert.ok(p.achievements.find(a=>a.id==='top10').unlocked);
 const achievementsBefore=(await query("SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='achievement_unlocked'",[owner.playerId])).rows[0].n;
 await call(growth,'/v1/profile/me',undefined,owner.token);

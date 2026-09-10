@@ -137,6 +137,20 @@ async function assertMobileTapScrollStable() {
   const after = await page.evaluate(() => window.scrollY);
   assert.ok(Math.abs(after - before) <= 24, `card tap moved page ${Math.round(after - before)}px (${before} → ${after})`);
 }
+async function finishFullPack() {
+  let decisions=0;
+  while(!await page.locator('.full-result-page,.scorecard').count()&&decisions<20) {
+    await page.locator('.study-main .card-choice').first().click();
+    await page.locator('#submit-pick').click();
+    await page.locator('#next-pick').click();
+    decisions++;
+  }
+  await page.locator('.full-result-page').waitFor();
+  assert.ok(decisions>=10&&decisions<=15,`Expected a full first pack, saw ${decisions}`);
+  const score=Number(await page.locator('.full-result-page .score-orb strong').textContent());
+  assert.ok(Number.isFinite(score)&&score>=0&&score<=100);
+  await assertNoHorizontalOverflow();
+}
 
 try {
   // Rendered design checks at desktop and mobile sizes.
@@ -217,6 +231,11 @@ try {
 
   // Powered Cube is a separate Full mode and never exposes Top 3.
   await home();
+  await page.locator('#set-select').selectOption('msh');
+  await page.locator('[data-mode="full"]').click();
+  await finishFullPack();
+  await page.screenshot({path:'artifacts/ui-full-pack-result-mobile.png',fullPage:true});
+  await home();
   if (await page.locator('[data-powered-cube-section="1"]').count()) {
     const cubeLaunchers = page.locator('[data-powered-cube-section="1"] [data-cube-href]');
     assert.equal(await cubeLaunchers.count(), 2);
@@ -229,6 +248,8 @@ try {
     assert.equal(cubeUrl.searchParams.get('set'), 'powered-cube');
     assert.equal(cubeUrl.searchParams.get('mode'), 'full');
     assert.ok(cubeUrl.searchParams.get('seed'));
+    await finishFullPack();
+    await page.screenshot({path:'artifacts/ui-cube-result-mobile.png',fullPage:true});
   }
 
   assert.ok(capturedEvents.length > 0, 'expected at least one analytics event');

@@ -31,7 +31,7 @@ Rank the three cards you would most want to start a draft with. The result compa
 
 ### Full Pack
 
-Play every decision in Pack 1 of a historical draft seat. Your hypothetical selections do not alter the later historical packs/pool. The final score summarizes the per-pick model-support scores.
+Play every decision in Pack 1 of a historical draft seat. Your hypothetical selections do not alter the later historical packs. Later support reconditions on the cards you chose; replay-bound wheels receive feedback without ranked score weight. The final score summarizes the per-pick model-support scores.
 
 ## Production data
 
