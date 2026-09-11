@@ -1,0 +1,84 @@
+name: production smoke
+
+on:
+  workflow_run:
+    workflows: ["pages build and deployment"]
+    types: [completed]
+  workflow_dispatch:
+  schedule:
+    - cron: '17 12 * * *'
+
+permissions:
+  contents: read
+
+jobs:
+  production-contract:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      PACKONE_ORIGIN: https://packone.pro
+    steps:
+      - name: Verify Pack One frontend and backend browser contract
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          declare -A services=(
+            [pack1api]="https://br-orange-feather-ayps8kep-pack1api.compute.c-5.us-east-2.aws.neon.tech"
+            [pack1growth]="https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech"
+            [draftrunapi]="https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech"
+          )
+
+          frontend="$(mktemp)"
+          curl --fail --silent --show-error --location --max-time 20 "$PACKONE_ORIGIN/" -o "$frontend"
+          grep -q 'Pack One' "$frontend" || { echo 'packone.pro did not return the Pack One app'; exit 1; }
+
+          for name in pack1api pack1growth draftrunapi; do
+            base="${services[$name]}"
+            preflight_headers="$(mktemp)"
+            preflight_status="$(curl --silent --show-error --max-time 20 -o /dev/null -D "$preflight_headers" -w '%{http_code}' \
+              -X OPTIONS "$base/health" \
+              -H "Origin: $PACKONE_ORIGIN" \
+              -H 'Access-Control-Request-Method: GET' \
+              -H 'Access-Control-Request-Headers: authorization,content-type')"
+
+            if [ "$preflight_status" != "204" ]; then
+              echo "$name preflight returned HTTP $preflight_status, expected 204"
+              cat "$preflight_headers"
+              exit 1
+            fi
+
+            preflight_origin="$(awk 'BEGIN{IGNORECASE=1} /^access-control-allow-origin:/ {sub(/^[^:]*:[[:space:]]*/, ""); gsub(/\r/, ""); print; exit}' "$preflight_headers")"
+            if [ "$preflight_origin" != "$PACKONE_ORIGIN" ]; then
+              echo "$name preflight did not allow $PACKONE_ORIGIN (got: ${preflight_origin:-missing})"
+              cat "$preflight_headers"
+              exit 1
+            fi
+
+            get_headers="$(mktemp)"
+            get_body="$(mktemp)"
+            get_status="$(curl --silent --show-error --max-time 20 -o "$get_body" -D "$get_headers" -w '%{http_code}' \
+              "$base/health" -H "Origin: $PACKONE_ORIGIN")"
+
+            if [ "$get_status" != "200" ]; then
+              echo "$name health returned HTTP $get_status, expected 200"
+              cat "$get_body"
+              exit 1
+            fi
+
+            get_origin="$(awk 'BEGIN{IGNORECASE=1} /^access-control-allow-origin:/ {sub(/^[^:]*:[[:space:]]*/, ""); gsub(/\r/, ""); print; exit}' "$get_headers")"
+            if [ "$get_origin" != "$PACKONE_ORIGIN" ]; then
+              echo "$name health response did not allow $PACKONE_ORIGIN (got: ${get_origin:-missing})"
+              cat "$get_headers"
+              exit 1
+            fi
+
+            grep -Eq '"ok"[[:space:]]*:[[:space:]]*true' "$get_body" || {
+              echo "$name health response was not healthy"
+              cat "$get_body"
+              exit 1
+            }
+
+            echo "$name: preflight + GET contract OK"
+          done
