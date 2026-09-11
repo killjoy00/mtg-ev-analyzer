@@ -19,6 +19,7 @@ on:
       - 'scripts/powered_cube_shape.py'
       - 'scripts/diagnose_powered_cube_raw.py'
       - 'scripts/audit_datasets.py'
+      - 'scripts/r2_replay_shards.sh'
 
 permissions:
   contents: write
@@ -116,6 +117,12 @@ jobs:
     if: always() && needs.cube-route.outputs.should_build == 'true' && needs.cube-preflight.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
     # Only the data-producing job needs the shared catalog lock. The cheap raw
     # preflight above can run while normal-set imports are using the catalog.
     concurrency:
@@ -183,6 +190,10 @@ jobs:
         with:
           node-version: 24
 
+      - name: Hydrate replay shards from R2
+        if: steps.cube_gate.outputs.should_build == 'true'
+        run: bash scripts/r2_replay_shards.sh hydrate
+
       - name: Run unit tests
         if: steps.cube_gate.outputs.should_build == 'true'
         run: npm test
@@ -212,6 +223,10 @@ jobs:
             args+=(--cube-report generated/powered-cube-report.json)
           fi
           python scripts/audit_datasets.py "${args[@]}"
+
+      - name: Publish validated replay shards to R2
+        if: steps.cube_builder.outcome == 'success' && steps.audit.outcome == 'success'
+        run: bash scripts/r2_replay_shards.sh upload
 
       - name: Publish build report to job summary
         if: always() && steps.cube_gate.outputs.should_build == 'true'
