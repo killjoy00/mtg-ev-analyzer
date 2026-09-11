@@ -1,0 +1,91 @@
+name: Finalize R2 replay shard migration
+
+on:
+  push:
+    branches: [r2-corpus-migration]
+    paths:
+      - '.github/workflows/r2-finalize-migration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Run complete test suite before removal
+        run: npm test
+
+      - name: Audit complete local dataset before removal
+        run: python scripts/audit_datasets.py --fail-on-error
+
+      - name: Re-verify R2 inventory and public access
+        shell: bash
+        run: |
+          set -euo pipefail
+          find data -type f -path '*/shards/*.json' -printf '%s\t%p\n' | sort -k2 > /tmp/local.tsv
+          local_count="$(wc -l < /tmp/local.tsv | tr -d ' ')"
+          local_bytes="$(awk '{sum += $1} END {printf "%.0f", sum}' /tmp/local.tsv)"
+          aws s3api list-objects-v2 --bucket "$R2_BUCKET" --prefix data/ --endpoint-url "$R2_ENDPOINT" --output json > /tmp/r2.json
+          python - "$local_count" "$local_bytes" <<'PY'
+          import json, sys
+          expected_count=int(sys.argv[1]); expected_bytes=int(sys.argv[2])
+          payload=json.load(open('/tmp/r2.json'))
+          objects=[o for o in payload.get('Contents',[]) if '/shards/' in o.get('Key','') and o.get('Key','').endswith('.json')]
+          count=len(objects); size=sum(int(o.get('Size') or 0) for o in objects)
+          print(f'Local shards: {expected_count} files / {expected_bytes} bytes')
+          print(f'R2 shards: {count} files / {size} bytes')
+          if (count,size)!=(expected_count,expected_bytes):
+              raise SystemExit('R2 inventory does not exactly match GitHub shard inventory')
+          PY
+          sample="$(sed -n '1p' /tmp/local.tsv | cut -f2-)"
+          test -n "$sample"
+          status="$(curl --silent --show-error --output /tmp/sample.json --write-out '%{http_code}' --header 'Origin: https://packone.pro' "https://data.packone.pro/$sample")"
+          test "$status" = 200
+          python -m json.tool /tmp/sample.json >/dev/null
+
+      - name: Remove R2-owned shards and temporary migration helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          find data -type f -path '*/shards/*.json' -delete
+          rm -f \
+            .github/workflows/r2-corpus-audit.yml \
+            .github/workflows/r2-initial-sync.yml \
+            .github/workflows/r2-patch-migration.yml \
+            .github/workflows/r2-patch-backend.yml \
+            .github/workflows/r2-pack1api-bundle.yml \
+            .github/workflows/r2-pack1api-dev-smoke.yml \
+            .github/workflows/r2-finalize-migration.yml
+          test "$(find data -type f -path '*/shards/*.json' | wc -l)" -eq 0
+          echo "Remaining data directory size: $(du -sh data | cut -f1)"
+          echo "Corpus directory size (untouched): $(du -sh corpus | cut -f1)"
+
+      - name: Commit finalized migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Move replay shards from GitHub Pages to R2'
+          git pull --rebase origin "$GITHUB_REF_NAME"
+          git push origin "HEAD:$GITHUB_REF_NAME"
