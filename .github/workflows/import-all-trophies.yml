@@ -1,0 +1,45 @@
+name: Import all Premier trophies
+on:
+  workflow_dispatch:
+    inputs:
+      sets:
+        description: 'all discovers every official PremierDraft archive; or comma-separated IDs'
+        default: all
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: trophy-import-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: python -m unittest discover -s tests -p test_all_trophies.py
+      - name: Import every qualifying trophy
+        env:
+          IMPORT_SETS: ${{ inputs.sets }}
+        run: python -u scripts/import_all_trophies.py --sets "$IMPORT_SETS" --workers 2
+      - name: Validate all outputs and accounting
+        run: node scripts/load_all_trophies.mjs unused generated/trophy-import --validate-only
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verified-premier-trophies-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            generated/trophy-import/catalog.json
+            generated/trophy-import/discovery.json
+            generated/trophy-import/*/manifest.json
+            generated/trophy-import/*/images.json
+            generated/trophy-import/*/puzzles.jsonl.gz
+            generated/trophy-import/*/trophies.jsonl.gz

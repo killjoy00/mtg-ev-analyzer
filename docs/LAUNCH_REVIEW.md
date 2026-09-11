@@ -20,7 +20,9 @@ Modern sets require at least 100 prior games and the existing elite win-rate cut
 
 Powered Cube contains only Powered Cube trophy drafts. It starts at P1P2 because the source omits the complete opening pack, and shows the actual P1P1 card. It has ten independent decisions, two same-Cube pack rerolls, and no set reroll. Its schedules, first attempts, boards, and friend links are independent of expansion Draft Run.
 
-Reproduce the checked-in artifacts:
+For complete trophy coverage, use [the full Premier importer](ALL_TROPHY_IMPORT.md). The commands below reproduce only the frozen baseline; their 300-replay source sample must not constrain further trophy imports.
+
+Reproduce the baseline artifacts:
 
 1. Run `python scripts/extract_trophy_evidence.py --sets all --refresh` to audit the official archives, or use the checked-in compact evidence.
 2. Run `python scripts/build_verified_trophy_corpus.py` to verify every loaded environment and regenerate serving artifacts.
