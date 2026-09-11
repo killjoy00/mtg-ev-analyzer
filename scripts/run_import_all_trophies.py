@@ -30,19 +30,23 @@ def _error_text(exc):
 
 
 def resilient_request(url, method='GET'):
-    """Retry transient source failures and never leak HTTPError response handles."""
+    """Retry transient source failures without changing caller-visible 4xx semantics."""
     for attempt in range(4):
         try:
             return _RAW_REQUEST(url, method)
         except urllib.error.HTTPError as exc:
             code = exc.code
             reason = str(getattr(exc, 'reason', '') or '')
-            retry_after = None
+            retry_after = exc.headers.get('Retry-After') if exc.headers else None
             try:
-                retry_after = exc.headers.get('Retry-After') if exc.headers else None
-            finally:
                 exc.close()
-            if code not in _TRANSIENT_HTTP or attempt == 3:
+            except Exception:
+                pass
+            if code not in _TRANSIENT_HTTP:
+                # resolve_images intentionally treats an exact Scryfall 404 as an
+                # unresolved image rather than a fatal import. Preserve that API.
+                raise
+            if attempt == 3:
                 raise RuntimeError(f'HTTP {code} for {url}: {reason}') from None
             try:
                 delay = float(retry_after) if retry_after is not None else 2 ** attempt
