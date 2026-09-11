@@ -466,10 +466,27 @@ body .run-review-list li {
 
 @media (max-width: 700px) {
   .topbar {
-    min-height: 66px;
-    padding: 8px 10px;
-    align-items: flex-start;
+    min-height: 0;
+    padding: 7px 10px 0;
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 7px;
+    align-items: center;
     border-top-width: 3px;
+  }
+
+  .brand {
+    width: max-content;
+  }
+
+  .brand-mark {
+    width: 28px;
+    height: 28px;
+    font-size: 10px;
+  }
+
+  .brand-copy strong {
+    font-size: 15px;
   }
 
   .brand-copy small,
@@ -478,13 +495,28 @@ body .run-review-list li {
   }
 
   .top-actions {
-    gap: 2px 7px;
+    width: 100%;
+    display: flex;
+    align-items: stretch;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+    gap: 0;
+    border-top: 1px solid var(--line);
   }
 
   .top-nav-button {
-    min-height: 26px;
-    padding: 4px 2px;
-    font-size: 10px;
+    flex: 0 0 auto;
+    min-height: 32px;
+    padding: 7px 5px 8px;
+    font-size: 9px;
+    line-height: 1;
+    white-space: nowrap;
+  }
+
+  .top-actions #stats-nav {
+    margin-left: auto;
+    padding-left: 9px;
+    border-left: 1px solid var(--line);
   }
 
   .app {
