@@ -1,0 +1,83 @@
+name: Import all Premier trophies
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/import_all_trophies.py
+      - .github/workflows/import-all-trophies.yml
+  workflow_dispatch:
+    inputs:
+      sets:
+        description: 'all discovers every official PremierDraft archive; or comma-separated IDs'
+        default: all
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: trophy-import-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DEV_IMPORT_API: https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
+      PROD_IMPORT_API: https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm test
+      - name: Verify workload identity on both databases
+        run: |
+          node scripts/actions-import-auth.mjs "$DEV_IMPORT_API"
+          node scripts/actions-import-auth.mjs "$PROD_IMPORT_API"
+      - uses: actions/cache/restore@v4
+        with:
+          path: generated/trophy-import
+          key: trophies-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/build_replays.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            trophies-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/build_replays.py') }}-
+            trophies-
+      - name: Import every qualifying trophy
+        env:
+          IMPORT_SETS: ${{ inputs.sets || 'all' }}
+        run: python -u scripts/import_all_trophies.py --sets "$IMPORT_SETS" --workers 2
+      - name: Validate all outputs and accounting
+        run: node scripts/load_all_trophies.mjs unused generated/trophy-import --validate-only
+      - name: Load development
+        run: node scripts/load_all_trophies.mjs "$DEV_IMPORT_API" generated/trophy-import
+      - name: Verify expanded development gameplay
+        run: node tests/trophy-import-http-smoke.mjs "$DEV_IMPORT_API"
+      - name: Load production after development passes
+        run: node scripts/load_all_trophies.mjs "$PROD_IMPORT_API" generated/trophy-import
+      - name: Verify production gameplay
+        run: node tests/trophy-import-http-smoke.mjs "$PROD_IMPORT_API"
+      - name: Write coverage summary
+        if: always()
+        run: python scripts/summarize_trophy_import.py generated/trophy-import
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: generated/trophy-import
+          key: trophies-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/build_replays.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verified-premier-trophies-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            generated/trophy-import/catalog.json
+            generated/trophy-import/discovery.json
+            generated/trophy-import/*/manifest.json
+            generated/trophy-import/*/images.json
+            generated/trophy-import/*/puzzles.jsonl.gz
+            generated/trophy-import/*/trophies.jsonl.gz
