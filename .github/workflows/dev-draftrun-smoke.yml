@@ -1,0 +1,52 @@
+name: dev draftrun smoke
+
+on:
+  push:
+    branches: ["deploy-draftrun-cors"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      BASE: https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
+      ORIGIN: https://packone.pro
+    steps:
+      - name: Verify dev Draft Run browser contract and starts
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          headers="$(mktemp)"
+          code="$(curl --silent --show-error --max-time 20 -o /dev/null -D "$headers" -w '%{http_code}' \
+            -X OPTIONS "$BASE/health" \
+            -H "Origin: $ORIGIN" \
+            -H 'Access-Control-Request-Method: GET' \
+            -H 'Access-Control-Request-Headers: authorization,content-type')"
+          test "$code" = 204
+          grep -iq "^access-control-allow-origin: $ORIGIN" "$headers"
+
+          health="$(curl --fail --silent --show-error --max-time 20 "$BASE/health" -H "Origin: $ORIGIN")"
+          echo "$health" | jq -e '.ok == true and .service == "draft-run"' >/dev/null
+
+          session="$(curl --fail --silent --show-error --max-time 20 -X POST "$BASE/v1/session" \
+            -H "Origin: $ORIGIN" -H 'Content-Type: application/json' \
+            --data '{"displayName":"QA dev smoke"}')"
+          token="$(echo "$session" | jq -r '.token')"
+          test -n "$token" && test "$token" != null
+
+          mixed="$(curl --fail --silent --show-error --max-time 30 -X POST "$BASE/v1/runs" \
+            -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
+            --data '{"environment":"mixed"}')"
+          echo "$mixed" | jq -e '.id and .current.pick_number == 1 and .current.set_id != "powered-cube"' >/dev/null
+
+          cube="$(curl --fail --silent --show-error --max-time 30 -X POST "$BASE/v1/runs" \
+            -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
+            --data '{"environment":"powered-cube"}')"
+          echo "$cube" | jq -e '.id and .current.pick_number == 2 and .current.set_id == "powered-cube"' >/dev/null
+
+          echo 'Dev Draft Run CORS, health, session, mixed run, and Powered Cube run all passed.'
