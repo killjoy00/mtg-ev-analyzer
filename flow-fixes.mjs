@@ -1,7 +1,7 @@
 import { gameDateKey } from './engagement.mjs';
 import { gameShareUrl, makeGameSeed } from './gameplay.mjs';
 
-const SHARE_ORIGIN = 'https://magic.planitnow.us/';
+const SHARE_ORIGIN = 'https://packone.pro/';
 const HISTORY_KEY = 'pack1-daily-history-v1';
 const DAILY_MIGRATION_KEY = 'pack1-daily-selector-v2-migrated';
 
