@@ -5,7 +5,7 @@ import { POWERED_CUBE_ID, poweredCubeUrl } from '../cube-product.mjs';
 
 test('Powered Cube practice URL is a dedicated ten-decision trophy run', () => {
   const url = new URL(poweredCubeUrl({
-    origin: 'https://magic.planitnow.us/',
+    origin: 'https://packone.pro/',
     seed: 'abc123',
   }));
   assert.equal(url.searchParams.get('set'), POWERED_CUBE_ID);
@@ -16,7 +16,7 @@ test('Powered Cube practice URL is a dedicated ten-decision trophy run', () => {
 
 test('Powered Cube Daily uses its separate environment on the ranked route', () => {
   const url = new URL(poweredCubeUrl({
-    origin: 'https://magic.planitnow.us/',
+    origin: 'https://packone.pro/',
     mode: 'full',
     daily: '2026-09-08',
   }));

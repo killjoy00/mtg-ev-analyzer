@@ -36,4 +36,4 @@ After AdSense approval:
 
 ## Domain move
 
-Do not change canonicals or `CNAME` until `packone.pro` DNS is ready. The editorial pages currently canonicalize to the live `magic.planitnow.us` domain. Move those canonicals, sitemap origin, worker CORS allowlists, share origins, and CNAME together in the domain migration release.
+Do not change canonicals or `CNAME` until `packone.pro` DNS is ready. The editorial pages currently canonicalize to the live `packone.pro` domain. Move those canonicals, sitemap origin, worker CORS allowlists, share origins, and CNAME together in the domain migration release.

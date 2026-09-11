@@ -9,7 +9,7 @@ const app = document.querySelector('#app');
 const brandHome = document.querySelector('#brand-home');
 const dailyNav = document.querySelector('#daily-nav');
 const leaderboardNav = document.querySelector('#leaderboard-nav');
-const SHARE_URL = 'https://magic.planitnow.us/';
+const SHARE_URL = 'https://packone.pro/';
 const HISTORY_KEY = 'pack1-daily-history-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 

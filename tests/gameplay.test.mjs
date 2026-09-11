@@ -21,7 +21,7 @@ test('cleanSeed strips unsafe characters', () => {
 
 test('gameShareUrl preserves the replay seed and challenge score', () => {
   const url = new URL(gameShareUrl({
-    origin: 'https://magic.planitnow.us/',
+    origin: 'https://packone.pro/',
     setId: 'msh',
     mode: 'full',
     seed: 'Seed-42',
@@ -37,7 +37,7 @@ test('gameShareUrl preserves the replay seed and challenge score', () => {
 
 test('gameShareUrl does not invent a zero-score challenge', () => {
   const url = new URL(gameShareUrl({
-    origin: 'https://magic.planitnow.us/',
+    origin: 'https://packone.pro/',
     setId: 'ecl',
     mode: 'top3',
     seed: 'normal-game',
