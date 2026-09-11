@@ -6,8 +6,12 @@ function currentParams() {
 
 function setHidden(selector, hidden) {
   document.querySelectorAll(selector).forEach((node) => {
-    node.hidden = hidden;
+    if (node.hidden !== hidden) node.hidden = hidden;
   });
+}
+
+function setText(node, value) {
+  if (node && node.textContent !== value) node.textContent = value;
 }
 
 function ensureTabs(home, moreModes) {
@@ -44,14 +48,14 @@ function enhanceHome() {
   setHidden('.cube-mode-section', moreModes);
 
   const editorial = document.querySelector('#home-editorial');
-  if (editorial) editorial.hidden = !moreModes;
+  if (editorial && editorial.hidden !== !moreModes) editorial.hidden = !moreModes;
 
-  const lede = home.querySelector('.lede');
-  if (lede) {
-    lede.textContent = moreModes
+  setText(
+    home.querySelector('.lede'),
+    moreModes
       ? 'Daily opening-pack play, Top 3, Full Pack, and set-by-set practice live here.'
-      : 'Choose a ten-decision Draft Run across real trophy drafts, or stay inside Powered Cube.';
-  }
+      : 'Choose a ten-decision Draft Run across real trophy drafts, or stay inside Powered Cube.',
+  );
 }
 
 export function installHomeProductLayer() {
