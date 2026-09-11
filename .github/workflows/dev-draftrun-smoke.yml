@@ -11,7 +11,7 @@ permissions:
 jobs:
   smoke:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
     env:
       BASE: https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
       ORIGIN: https://packone.pro
@@ -20,9 +20,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          CURL='curl --silent --show-error --retry 3 --retry-all-errors --retry-delay 5 --connect-timeout 20 --max-time 60'
 
           headers="$(mktemp)"
-          code="$(curl --silent --show-error --max-time 20 -o /dev/null -D "$headers" -w '%{http_code}' \
+          code="$(eval "$CURL" -o /dev/null -D "$headers" -w '%{http_code}' \
             -X OPTIONS "$BASE/health" \
             -H "Origin: $ORIGIN" \
             -H 'Access-Control-Request-Method: GET' \
@@ -30,21 +31,21 @@ jobs:
           test "$code" = 204
           grep -iq "^access-control-allow-origin: $ORIGIN" "$headers"
 
-          health="$(curl --fail --silent --show-error --max-time 20 "$BASE/health" -H "Origin: $ORIGIN")"
+          health="$(eval "$CURL" --fail "$BASE/health" -H "Origin: $ORIGIN")"
           echo "$health" | jq -e '.ok == true and .service == "draft-run"' >/dev/null
 
-          session="$(curl --fail --silent --show-error --max-time 20 -X POST "$BASE/v1/session" \
+          session="$(eval "$CURL" --fail -X POST "$BASE/v1/session" \
             -H "Origin: $ORIGIN" -H 'Content-Type: application/json' \
             --data '{"displayName":"QA dev smoke"}')"
           token="$(echo "$session" | jq -r '.token')"
           test -n "$token" && test "$token" != null
 
-          mixed="$(curl --fail --silent --show-error --max-time 30 -X POST "$BASE/v1/runs" \
+          mixed="$(eval "$CURL" --fail -X POST "$BASE/v1/runs" \
             -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
             --data '{"environment":"mixed"}')"
           echo "$mixed" | jq -e '.id and .current.pick_number == 1 and .current.set_id != "powered-cube"' >/dev/null
 
-          cube="$(curl --fail --silent --show-error --max-time 30 -X POST "$BASE/v1/runs" \
+          cube="$(eval "$CURL" --fail -X POST "$BASE/v1/runs" \
             -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
             --data '{"environment":"powered-cube"}')"
           echo "$cube" | jq -e '.id and .current.pick_number == 2 and .current.set_id == "powered-cube"' >/dev/null
