@@ -2,7 +2,7 @@ import { gameShareUrl, makeGameSeed, seededRandom, cleanSeed } from './gameplay.
 import { onAppRender } from './render-lifecycle.mjs';
 import { preloadSeededReplay } from './replay-data.mjs';
 
-const SHARE_ORIGIN = 'https://magic.planitnow.us/';
+const SHARE_ORIGIN = 'https://packone.pro/';
 const LOW_SUPPORT_THRESHOLD = 0.08;
 const LOW_SUPPORT_COPY = 'Low support: under 8% modeled strong-player support. A card can still sit near the top when support below the leader is thin.';
 let autoStarting = false;
@@ -149,7 +149,7 @@ async function scoreImage({ score, grade, mode, setId }) {
   ctx.font = '700 26px Arial, sans-serif';
   ctx.fillText('Same pack. Your picks. Beat my score.', 60, 532);
   ctx.font = '600 20px Arial, sans-serif';
-  ctx.fillText('magic.planitnow.us', 60, 576);
+  ctx.fillText('packone.pro', 60, 576);
   return new Promise((resolve) => canvas.toBlob(resolve, 'image/png', .94));
 }
 

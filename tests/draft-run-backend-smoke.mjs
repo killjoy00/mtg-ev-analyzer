@@ -11,7 +11,7 @@ const httpPrefix=process.env.PACK1_QA_FUNCTION_PREFIX;
 if(httpPrefix&&!/^https:\/\/br-[a-z0-9-]+-$/.test(httpPrefix))throw new Error('Invalid development function prefix');
 async function call(service,path,body,token,status=200,extra={}) {
   const started=performance.now();
-  const url=httpPrefix?httpPrefix+(service===growth?'pack1growth':'draftrunapi')+'.compute.c-5.us-east-2.aws.neon.tech'+path:'https://magic.planitnow.us'+path;
+  const url=httpPrefix?httpPrefix+(service===growth?'pack1growth':'draftrunapi')+'.compute.c-5.us-east-2.aws.neon.tech'+path:'https://packone.pro'+path;
   const request=new Request(url,{method:extra.method||(body===undefined?'GET':'POST'),headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...extra.headers},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});
   const r=await(httpPrefix?fetch(request):service.fetch(request));
   const data=await r.json();timings.push({path,ms:Math.round(performance.now()-started)});

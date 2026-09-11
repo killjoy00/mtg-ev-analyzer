@@ -9,7 +9,7 @@ const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const prefix=process.env.PACK1_QA_FUNCTION_PREFIX;
 const tag=crypto.randomUUID().slice(0,8);
 async function call(service,path,body,token,status=200,headers={}) {
-  const url=prefix?prefix+(service===growth?'pack1growth':'draftrunapi')+'.compute.c-5.us-east-2.aws.neon.tech'+path:'https://magic.planitnow.us'+path;
+  const url=prefix?prefix+(service===growth?'pack1growth':'draftrunapi')+'.compute.c-5.us-east-2.aws.neon.tech'+path:'https://packone.pro'+path;
   const request=new Request(url,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...headers},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});
   const response=await(prefix?fetch(request):service.fetch(request));
   const result=await response.json();assert.equal(response.status,status,`${path}: ${JSON.stringify(result)}`);return result;

@@ -1,7 +1,7 @@
 import { challengeIndex, featuredSetId, firstPackPicks, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from './core.mjs';
 
-const STATIC_ORIGIN = 'https://magic.planitnow.us';
-const ALLOWED_ORIGINS = new Set(['https://magic.planitnow.us', 'https://killjoy00.github.io']);
+const STATIC_ORIGIN = 'https://packone.pro';
+const ALLOWED_ORIGINS = new Set(['https://packone.pro', 'https://killjoy00.github.io']);
 const TOKEN_PREFIX = 'p1_';
 
 function json(value, status = 200) {

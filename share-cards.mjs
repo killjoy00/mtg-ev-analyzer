@@ -1,6 +1,6 @@
 import { profileShareSummary } from './profile-core.mjs';
 
-const SHARE_ORIGIN = 'https://magic.planitnow.us/';
+const SHARE_ORIGIN = 'https://packone.pro/';
 
 function cardUrl(profile) {
   const key = profile?.player?.profile_key;
@@ -39,7 +39,7 @@ function drawPill(ctx, text, x, y) {
   return width;
 }
 
-async function cardBlob({ eyebrow, title, bigValue, subtitle, pills = [], rows = [], footer = 'Play Pack One · magic.planitnow.us' }) {
+async function cardBlob({ eyebrow, title, bigValue, subtitle, pills = [], rows = [], footer = 'Play Pack One · packone.pro' }) {
   const canvas = document.createElement('canvas');
   canvas.width = 1200;
   canvas.height = 630;

@@ -6,7 +6,7 @@ let warmupInstalled = false;
 
 function urlOf(input) {
   try {
-    return new URL(String(input), globalThis.location?.href || 'https://magic.planitnow.us/');
+    return new URL(String(input), globalThis.location?.href || 'https://packone.pro/');
   } catch {
     return null;
   }

@@ -39,7 +39,7 @@ function setText(node, value) {
   if (node && node.textContent !== value) node.textContent = value;
 }
 
-export function practiceLaunchUrl({ origin = 'https://magic.planitnow.us/', setId, mode, seed = null } = {}) {
+export function practiceLaunchUrl({ origin = 'https://packone.pro/', setId, mode, seed = null } = {}) {
   if (!setId) throw new Error('Set Practice requires a set.');
   if (!['top3', 'full'].includes(mode)) throw new Error(`Unsupported practice mode: ${mode}`);
   const url = new URL(origin);

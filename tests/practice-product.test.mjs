@@ -5,7 +5,7 @@ import { practiceLaunchUrl } from '../practice-product.mjs';
 
 test('Set Practice launches a seeded run locked to one expansion', () => {
   const url = new URL(practiceLaunchUrl({
-    origin: 'https://magic.planitnow.us/',
+    origin: 'https://packone.pro/',
     setId: 'msh',
     mode: 'top3',
     seed: 'practice-seed',

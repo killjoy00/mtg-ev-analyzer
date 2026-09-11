@@ -1,11 +1,11 @@
 const ALLOWED_ORIGINS = new Set([
-  'https://magic.planitnow.us',
+  'https://packone.pro',
   'https://killjoy00.github.io',
   'http://127.0.0.1:4173',
   'http://localhost:4173',
 ]);
 const TOKEN_PREFIX = 'p1_';
-const STATIC_ORIGIN = 'https://magic.planitnow.us';
+const STATIC_ORIGIN = 'https://packone.pro';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 let catalogCache = { at: 0, data: null };
 let signingKeyCache = { at: 0, key: null };

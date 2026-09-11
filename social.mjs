@@ -3,7 +3,7 @@ import { createShareChallenge, isLeaderboardConfigured, loadCommunityDistributio
 import { loadReplayJson } from './replay-data.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 
-const SHARE_URL = 'https://magic.planitnow.us/';
+const SHARE_URL = 'https://packone.pro/';
 let fullPackSelections = [];
 window.PACK1_CAPTURED_PICKS = fullPackSelections;
 
@@ -96,7 +96,7 @@ async function resultPng(result, compare = null) {
   const consensus = rankCandidates(result.cards).slice(0,3);
   ctx.font='600 20px system-ui'; ctx.fillText('CONSENSUS', 60, 320);
   consensus.forEach((card,index)=>{ ctx.font='600 21px system-ui'; ctx.fillText(`${index+1}. ${card.name}`, 60, 360 + index*38); });
-  ctx.font='600 22px system-ui'; ctx.fillText('Beat my Pack 1 → magic.planitnow.us', 60, 570);
+  ctx.font='600 22px system-ui'; ctx.fillText('Beat my Pack 1 → packone.pro', 60, 570);
   return new Promise((resolve)=>canvas.toBlob(resolve,'image/png',0.94));
 }
 
@@ -147,9 +147,6 @@ function enhanceResult() {
   const result = scrapeTop3();
   if (!result) return;
   const button = document.querySelector('#share-top3');
-  // Assigning textContent creates a child-list mutation even when the text is
-  // unchanged. Guard it so this MutationObserver cannot recursively trigger
-  // itself forever on the result screen.
   if (button && button.textContent !== 'Challenge a friend') button.textContent = 'Challenge a friend';
   const reveal = document.querySelector('.reveal-panel');
   if (reveal && !reveal.querySelector('.bold-take')) {
