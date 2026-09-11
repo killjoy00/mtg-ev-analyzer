@@ -1,0 +1,114 @@
+name: R2 migration patch
+
+on:
+  push:
+    branches: [r2-corpus-migration]
+    paths:
+      - '.github/workflows/r2-patch-migration.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Patch backend and large workflows
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path, old, new):
+              p = Path(path)
+              text = p.read_text()
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f'{path}: expected one replacement target, found {count}')
+              p.write_text(text.replace(old, new, 1))
+
+          replace_once(
+              'worker/index.js',
+              "const STATIC_ORIGIN = 'https://packone.pro';\n",
+              "const STATIC_ORIGIN = 'https://packone.pro';\nconst REPLAY_SHARD_ORIGIN = 'https://data.packone.pro';\n",
+          )
+          replace_once(
+              'worker/index.js',
+              "async function staticJson(path) {\n  const response = await fetch(new URL(String(path).replace(/^\\.\\//, ''), `${STATIC_ORIGIN}/`));\n  if (!response.ok) throw new Error(`Static data request failed (${response.status}).`);\n  return response.json();\n}\n",
+              "async function staticJson(path) {\n  const relative = String(path).replace(/^\\.\\//, '');\n  const origin = /^data\\/[^/]+\\/shards\\/[^/]+\\.json$/.test(relative)\n    ? REPLAY_SHARD_ORIGIN\n    : STATIC_ORIGIN;\n  const response = await fetch(new URL(relative, `${origin}/`));\n  if (!response.ok) throw new Error(`Static data request failed (${response.status}).`);\n  return response.json();\n}\n",
+          )
+
+          replace_once(
+              '.github/workflows/build-more-sets.yml',
+              "    timeout-minutes: 180\n    concurrency:\n",
+              "    timeout-minutes: 180\n    env:\n      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}\n      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}\n      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}\n      R2_BUCKET: ${{ secrets.R2_BUCKET }}\n      AWS_DEFAULT_REGION: auto\n    concurrency:\n",
+          )
+          replace_once(
+              '.github/workflows/build-more-sets.yml',
+              "      - uses: actions/setup-node@v4\n        with:\n          node-version: 24\n\n      - name: Run unit tests\n",
+              "      - uses: actions/setup-node@v4\n        with:\n          node-version: 24\n\n      - name: Hydrate replay shards from R2\n        run: bash scripts/r2_replay_shards.sh hydrate\n\n      - name: Run unit tests\n",
+          )
+          replace_once(
+              '.github/workflows/build-more-sets.yml',
+              "          python scripts/audit_datasets.py \"${args[@]}\"\n\n      - name: Publish import report to job summary\n",
+              "          python scripts/audit_datasets.py \"${args[@]}\"\n\n      - name: Publish validated replay shards to R2\n        if: steps.audit.outcome == 'success'\n        run: bash scripts/r2_replay_shards.sh upload\n\n      - name: Publish import report to job summary\n",
+          )
+          replace_once(
+              '.github/workflows/build-more-sets.yml',
+              "      - 'scripts/audit_datasets.py'\n",
+              "      - 'scripts/audit_datasets.py'\n      - 'scripts/r2_replay_shards.sh'\n",
+          )
+
+          replace_once(
+              '.github/workflows/build-powered-cube.yml',
+              "    timeout-minutes: 180\n    # Only the data-producing job needs the shared catalog lock.",
+              "    timeout-minutes: 180\n    env:\n      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}\n      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}\n      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}\n      R2_BUCKET: ${{ secrets.R2_BUCKET }}\n      AWS_DEFAULT_REGION: auto\n    # Only the data-producing job needs the shared catalog lock.",
+          )
+          replace_once(
+              '.github/workflows/build-powered-cube.yml',
+              "      - uses: actions/setup-node@v4\n        if: steps.cube_gate.outputs.should_build == 'true'\n        with:\n          node-version: 24\n\n      - name: Run unit tests\n",
+              "      - uses: actions/setup-node@v4\n        if: steps.cube_gate.outputs.should_build == 'true'\n        with:\n          node-version: 24\n\n      - name: Hydrate replay shards from R2\n        if: steps.cube_gate.outputs.should_build == 'true'\n        run: bash scripts/r2_replay_shards.sh hydrate\n\n      - name: Run unit tests\n",
+          )
+          replace_once(
+              '.github/workflows/build-powered-cube.yml',
+              "          python scripts/audit_datasets.py \"${args[@]}\"\n\n      - name: Publish build report to job summary\n",
+              "          python scripts/audit_datasets.py \"${args[@]}\"\n\n      - name: Publish validated replay shards to R2\n        if: steps.cube_builder.outcome == 'success' && steps.audit.outcome == 'success'\n        run: bash scripts/r2_replay_shards.sh upload\n\n      - name: Publish build report to job summary\n",
+          )
+          replace_once(
+              '.github/workflows/build-powered-cube.yml',
+              "      - 'scripts/audit_datasets.py'\n",
+              "      - 'scripts/audit_datasets.py'\n      - 'scripts/r2_replay_shards.sh'\n",
+          )
+          PY
+
+      - name: Validate patched source
+        run: |
+          node --check worker/index.js
+          npm test
+          git diff --check
+
+      - name: Commit migration patches
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git diff --quiet; then
+            echo 'No patch changes required.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add worker/index.js .github/workflows/build-more-sets.yml .github/workflows/build-powered-cube.yml
+          git commit -m 'Route replay shard dependencies through R2'
+          git push origin "HEAD:$GITHUB_REF_NAME"
