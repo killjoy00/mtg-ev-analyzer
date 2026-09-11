@@ -2,6 +2,7 @@ import { seededRandom } from './gameplay.mjs';
 
 const responseCache = new Map();
 const REPLAY_SHARD_ORIGIN = 'https://data.packone.pro';
+const REMOTE_REPLAY_HOSTS = new Set(['packone.pro', 'www.packone.pro', 'killjoy00.github.io']);
 let catalogSnapshot = null;
 let warmupInstalled = false;
 
@@ -19,7 +20,7 @@ function isReplayShard(url) {
 
 export function replayResourceUrl(input) {
   const url = urlOf(input);
-  if (!url || !isReplayShard(url)) return url;
+  if (!url || !isReplayShard(url) || !REMOTE_REPLAY_HOSTS.has(url.hostname)) return url;
   const remote = new URL(REPLAY_SHARD_ORIGIN);
   remote.pathname = url.pathname;
   remote.search = url.search;
