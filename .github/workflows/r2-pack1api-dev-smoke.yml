@@ -1,0 +1,116 @@
+name: R2 pack1api dev score smoke
+
+on:
+  push:
+    branches: [r2-corpus-migration]
+    paths:
+      - '.github/workflows/r2-pack1api-dev-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      API: https://br-twilight-hill-ayffyd2b-pack1api.compute.c-5.us-east-2.aws.neon.tech
+      ORIGIN: https://packone.pro
+      SET_ID: hob
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Exercise Daily Challenge through R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > /tmp/smoke.mjs <<'JS'
+          const api = process.env.API;
+          const origin = process.env.ORIGIN;
+          const setId = process.env.SET_ID;
+          const headers = { origin };
+
+          function hashText(value) {
+            let hash = 2166136261;
+            for (let i = 0; i < String(value).length; i += 1) {
+              hash ^= String(value).charCodeAt(i);
+              hash = Math.imul(hash, 16777619);
+            }
+            return hash >>> 0;
+          }
+          function dateOrdinal(dateKey) {
+            const [year, month, day] = String(dateKey).split('-').map(Number);
+            return Math.floor(Date.UTC(year, month - 1, day) / 86400000);
+          }
+          function challengeIndex(dateKey, set, mode, replayCount) {
+            const count = Math.max(0, Number(replayCount) || 0);
+            if (!count) return 0;
+            if (count === 1) return 0;
+            const base = hashText(`${set}|${mode}|pack1-daily-base-v2`) % count;
+            const step = 1 + (hashText(`${set}|${mode}|pack1-daily-step-v2`) % (count - 1));
+            return (base + (dateOrdinal(dateKey) * step)) % count;
+          }
+          async function getJson(url, extra = {}) {
+            const response = await fetch(url, { headers: { ...headers, ...extra } });
+            if (!response.ok) throw new Error(`${url} -> ${response.status}: ${await response.text()}`);
+            return { response, data: await response.json() };
+          }
+
+          const healthResult = await getJson(`${api}/health`);
+          if (healthResult.response.headers.get('access-control-allow-origin') !== origin) throw new Error('health CORS mismatch');
+          const date = healthResult.data.date;
+          if (!healthResult.data.ok || !date) throw new Error('bad health payload');
+
+          const catalog = await (await fetch('https://packone.pro/data/catalog.json')).json();
+          const entry = catalog.sets.find((row) => row.id === setId);
+          if (!entry) throw new Error(`set ${setId} missing from catalog`);
+          const manifestUrl = new URL(entry.manifest_path || entry.data_path, 'https://packone.pro/');
+          const manifest = await (await fetch(manifestUrl)).json();
+          const total = manifest.shards.reduce((sum, shard) => sum + Number(shard.replay_count || 0), 0);
+          let index = challengeIndex(date, setId, 'top3', total);
+          let selectedShard = null;
+          let offset = 0;
+          for (const shard of manifest.shards) {
+            const count = Number(shard.replay_count || 0);
+            if (index < count) { selectedShard = shard; offset = index; break; }
+            index -= count;
+          }
+          if (!selectedShard) throw new Error('could not resolve daily shard');
+
+          const shardPath = new URL(selectedShard.path, 'https://packone.pro/').pathname;
+          const shardResponse = await fetch(`https://data.packone.pro${shardPath}`, { headers });
+          if (!shardResponse.ok) throw new Error(`R2 shard -> ${shardResponse.status}`);
+          if (shardResponse.headers.get('access-control-allow-origin') !== origin) throw new Error('R2 shard CORS mismatch');
+          const shard = await shardResponse.json();
+          const replay = shard.replays?.[offset];
+          if (!replay) throw new Error('daily replay missing');
+          const picks = replay.picks || [];
+          const firstPackNumber = Math.min(...picks.map((p) => Number(p.pack_number)).filter(Number.isFinite));
+          const firstPick = picks.filter((p) => Number(p.pack_number) === firstPackNumber).sort((a,b) => Number(a.pick_number)-Number(b.pick_number))[0];
+          const selections = [...new Set((firstPick?.candidates || []).map((c) => String(c.id)))].slice(0, 3);
+          if (selections.length !== 3) throw new Error('could not select three candidate ids');
+
+          const sessionResponse = await fetch(`${api}/v1/session`, {
+            method: 'POST',
+            headers: { origin, 'content-type': 'application/json' },
+            body: JSON.stringify({ displayName: 'R2 dev smoke' }),
+          });
+          if (!sessionResponse.ok) throw new Error(`session -> ${sessionResponse.status}: ${await sessionResponse.text()}`);
+          const session = await sessionResponse.json();
+          if (!session.token) throw new Error('session token missing');
+
+          const scoreResponse = await fetch(`${api}/v1/scores`, {
+            method: 'POST',
+            headers: { origin, 'content-type': 'application/json', authorization: `Bearer ${session.token}` },
+            body: JSON.stringify({ challengeDate: date, setId, mode: 'top3', selections, displayName: 'R2 dev smoke' }),
+          });
+          const scoreText = await scoreResponse.text();
+          if (!scoreResponse.ok) throw new Error(`score -> ${scoreResponse.status}: ${scoreText}`);
+          if (scoreResponse.headers.get('access-control-allow-origin') !== origin) throw new Error('score CORS mismatch');
+          const score = JSON.parse(scoreText);
+          if (!Number.isFinite(Number(score.score))) throw new Error('numeric score missing');
+          console.log(`R2 daily-score smoke passed: ${setId} ${date}, score ${score.score}.`);
+          JS
+          node /tmp/smoke.mjs
