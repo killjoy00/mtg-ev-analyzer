@@ -1,0 +1,45 @@
+name: build draftrun neon bundle
+
+on:
+  push:
+    branches: ["deploy-draftrun-cors"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Bundle current Draft Run function
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          npx --yes esbuild@0.25.9 worker/draft-run-function.mjs \
+            --bundle \
+            --platform=node \
+            --format=esm \
+            --target=node24 \
+            --minify \
+            --outfile=dist/index.mjs
+          node --check dist/index.mjs
+          wc -c dist/index.mjs
+          sha256sum dist/index.mjs
+      - name: Package Neon function
+        run: |
+          set -euo pipefail
+          (cd dist && zip -9 ../draftrun-function.zip index.mjs)
+          ls -lh draftrun-function.zip
+          sha256sum draftrun-function.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: draftrun-neon-bundle
+          path: draftrun-function.zip
+          if-no-files-found: error
+          retention-days: 1
