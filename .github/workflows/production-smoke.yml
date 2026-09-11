@@ -48,13 +48,14 @@ jobs:
           payload=json.load(open(sys.argv[1]))
           shards=payload.get('shards') or []
           assert shards and shards[0].get('path'), 'MSH manifest has no replay shard'
-          from urllib.parse import urlparse
-          print(urlparse(shards[0]['path']).path or shards[0]['path'].replace('./','/data/msh/'))
+          path=str(shards[0]['path'])
+          if path.startswith('./'):
+              path='/' + path[2:]
+          elif not path.startswith('/'):
+              path='/data/msh/' + path
+          print(path)
           PY
           )"
-          if [[ "$shard_path" != /data/* ]]; then
-            shard_path="/data/msh/${shard_path#./}"
-          fi
           shard_headers="$(mktemp)"
           shard_body="$(mktemp)"
           shard_status="$(curl --silent --show-error --max-time 20 -o "$shard_body" -D "$shard_headers" -w '%{http_code}' \
