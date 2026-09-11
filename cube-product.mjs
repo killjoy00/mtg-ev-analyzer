@@ -23,7 +23,7 @@ function freshSeed() {
 }
 
 export function poweredCubeUrl({
-  origin = 'https://magic.planitnow.us/',
+  origin = 'https://packone.pro/',
   mode = 'full',
   daily = null,
   seed = null,
