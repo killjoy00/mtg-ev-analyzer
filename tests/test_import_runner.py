@@ -33,11 +33,12 @@ class ImportRunnerTests(unittest.TestCase):
         self.assertEqual(request.call_count, 2)
         sleep.assert_called_once_with(1)
 
-    def test_nontransient_http_error_becomes_plain_runtime_error(self):
+    def test_nontransient_http_error_remains_caller_visible(self):
         error = urllib.error.HTTPError('https://example.invalid', 404, 'missing', {}, None)
         with mock.patch.object(runner, '_RAW_REQUEST', side_effect=error):
-            with self.assertRaisesRegex(RuntimeError, 'HTTP 404'):
+            with self.assertRaises(urllib.error.HTTPError) as caught:
                 runner.resilient_request('https://example.invalid')
+        self.assertEqual(caught.exception.code, 404)
 
 
 if __name__ == '__main__':
