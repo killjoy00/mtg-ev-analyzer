@@ -1,4 +1,4 @@
-name: dev draftrun smoke
+name: production draftrun gameplay smoke
 
 on:
   push:
@@ -13,10 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 8
     env:
-      BASE: https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
+      BASE: https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
       ORIGIN: https://packone.pro
     steps:
-      - name: Verify dev Draft Run browser contract and starts
+      - name: Verify production Draft Run browser contract and gameplay
         shell: bash
         run: |
           set -euo pipefail
@@ -36,7 +36,7 @@ jobs:
 
           session="$("${CURL[@]}" --fail -X POST "$BASE/v1/session" \
             -H "Origin: $ORIGIN" -H 'Content-Type: application/json' \
-            --data '{"displayName":"QA dev smoke"}')"
+            --data '{"displayName":"QA production smoke"}')"
           token="$(echo "$session" | jq -r '.token')"
           test -n "$token" && test "$token" != null
 
@@ -58,4 +58,4 @@ jobs:
             --data "$cube_action")"
           echo "$rerolled" | jq -e --arg old "$old_puzzle" '.rerolls.pack == 1 and .current.set_id == "powered-cube" and .current.puzzle_id != $old' >/dev/null
 
-          echo 'Dev Draft Run CORS, health, session, mixed run, Powered Cube run, and Cube reroll all passed.'
+          echo 'Production Draft Run CORS, health, session, mixed run, Powered Cube run, and Cube reroll all passed.'
