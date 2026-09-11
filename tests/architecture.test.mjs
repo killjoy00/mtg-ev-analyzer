@@ -48,5 +48,5 @@ test('the page has one stylesheet entrypoint and no inline style block', () => {
   const html = source('index.html');
   assert.doesNotMatch(html, /<style(?:\s|>)/i);
   const stylesheets = [...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/gi)].map((match) => match[1]);
-  assert.deepEqual(stylesheets, ['pack1.css?v=5']);
+  assert.deepEqual(stylesheets, ['visual-c.css?v=1']);
 });
