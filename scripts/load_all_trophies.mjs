@@ -6,7 +6,7 @@ import zlib from 'node:zlib';
 import readline from 'node:readline';
 import {createHash} from 'node:crypto';
 import {validateDraftRunPuzzle, interestingDraftRunPuzzle, draftRunDifficulty, DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
-const directory=process.argv[3]||'corpus/draft-run/full';
+const directory=process.argv[3]||'generated/trophy-import';
 const catalog=JSON.parse(fs.readFileSync(path.join(directory,'catalog.json')));
 const registry=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json'));
 const allowed=new Set(registry.sets.map(s=>s.id));
@@ -37,8 +37,10 @@ for(const s of catalog.sets) {
   console.log(s.id,count,'additional decisions validated');
 }
 if(process.argv.includes('--validate-only'))process.exit(0);
-const connection=fs.readFileSync(process.argv[2],'utf8').trim();const db=new URL(connection);
-const endpoint=`https://api.${db.hostname.split('.').slice(1).join('.')}/sql`;
+const remote=process.argv[2]?.startsWith('https://')?process.argv[2]:null;
+const {importRequest}=await import('./actions-import-auth.mjs');
+const connection=remote?null:fs.readFileSync(process.argv[2],'utf8').trim();const db=remote?null:new URL(connection);
+const endpoint=remote?null:`https://api.${db.hostname.split('.').slice(1).join('.')}/sql`;
 async function query(sql,params=[]) {
   for(let attempt=0;attempt<3;attempt++) {
     const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','Neon-Connection-String':connection},body:JSON.stringify({query:sql,params}),signal:AbortSignal.timeout(120000)});
@@ -48,21 +50,22 @@ async function query(sql,params=[]) {
   }
 }
 async function batchInsert(puzzles) {
-  const batch=puzzles.map(p=>({puzzle_id:p.puzzle_id,set_id:p.set_id,source_draft_hash:p.source_draft_hash,corpus_version:p.corpus_version,pick_number:p.pick_number,candidate_count:p.candidates.length,consensus_top_gap:draftRunDifficulty(p).topGap,support_entropy:draftRunDifficulty(p).entropy,interesting:interestingDraftRunPuzzle(p),payload:p}));
-  const r=await query(`WITH incoming AS (SELECT * FROM jsonb_to_recordset($1::jsonb) AS p(puzzle_id text,set_id text,source_draft_hash text,corpus_version text,pick_number smallint,candidate_count smallint,consensus_top_gap real,support_entropy real,interesting boolean,payload jsonb)), conflicts AS (SELECT i.puzzle_id FROM incoming i JOIN draft_run_verified_puzzles e USING(puzzle_id) WHERE e.payload IS DISTINCT FROM i.payload), added AS (INSERT INTO draft_run_verified_puzzles SELECT * FROM incoming WHERE NOT EXISTS(SELECT 1 FROM conflicts) ON CONFLICT(puzzle_id) DO NOTHING RETURNING puzzle_id) SELECT (SELECT count(*) FROM conflicts)::int conflicts,(SELECT count(*) FROM added)::int added`,[JSON.stringify(batch)]);
-  if(Number(r.rows[0].conflicts))throw Error('Existing puzzle differs; no payload was overwritten');
-  return Number(r.rows[0].added);
+  if(remote)return Number((await importRequest(remote,{action:'batch',puzzles})).added);
+  const {insertTrophyBatch}=await import('../worker/trophy-import.mjs');
+  return insertTrophyBatch(query,puzzles);
 }
-for(const s of catalog.sets) {
-  if(!s.total_puzzles)continue;
-  const existing=(await query('SELECT corpus_version FROM draft_run_verified_sets WHERE set_id=$1',[s.id])).rows[0];
+async function loadSet(s) {
+  if(!s.total_puzzles)return;
+  const existing=remote?await importRequest(remote,{action:'status',setId:s.id}):(await query('SELECT corpus_version FROM draft_run_verified_sets WHERE set_id=$1',[s.id])).rows[0];
   if(existing?.corpus_version!==DRAFT_RUN_CORPUS_VERSION)throw Error('Baseline environment missing: '+s.id);
   let batch=[],added=0;
-  for await(const p of records(fileFor(s,'puzzle_file'))) {batch.push(p);if(batch.length===100){added+=await batchInsert(batch);batch=[];}}
+  for await(const p of records(fileFor(s,'puzzle_file'))) {batch.push(p);if(batch.length===250){added+=await batchInsert(batch);batch=[];}}
   if(batch.length)added+=await batchInsert(batch);
-  const actual=(await query('SELECT count(*)::int puzzles FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2',[s.id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
+  const actual=remote?await importRequest(remote,{action:'finish-set',manifest:s}):(await query('SELECT count(*)::int puzzles FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2',[s.id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
   if(Number(actual.puzzles)<s.total_puzzles)throw Error('Database count below verified import: '+s.id);
-  await query("UPDATE draft_run_verified_sets SET manifest=jsonb_set(manifest,'{full_import}',$2::jsonb) WHERE set_id=$1",[s.id,JSON.stringify(s)]);
+  if(!remote)await query("UPDATE draft_run_verified_sets SET manifest=jsonb_set(manifest,'{full_import}',$2::jsonb) WHERE set_id=$1",[s.id,JSON.stringify(s)]);
   console.log(s.id,added,'inserted;',actual.puzzles,'available');
 }
+let next=0;
+await Promise.all(Array.from({length:4},async()=>{while(next<catalog.sets.length)await loadSet(catalog.sets[next++]);}));
 console.log('All verified supplements loaded; prior payloads preserved.');

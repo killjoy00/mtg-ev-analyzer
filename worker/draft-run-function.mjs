@@ -1,5 +1,6 @@
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import growth, { query, player, readJson, json, withCors, gameDateKey } from './growth-function.js';
+import { handleTrophyImport } from './trophy-import.mjs';
 import { loadVerifiedPool } from './draft-run-pool.mjs';
 import {
   DRAFT_RUN_CORPUS_VERSION, DRAFT_RUN_SCORING_VERSION, gradeDraftRunPick,
@@ -183,6 +184,7 @@ async function leaderboard(request) {
 
 async function route(request) {
   const url=new URL(request.url),path=url.pathname;
+  if(path==='/v1/trophy-import') return json(await handleTrophyImport(request,query));
   if(request.method==='OPTIONS') return new Response(null,{status:204});
   if(request.method==='GET'&&path==='/health') { const p=await pool();return json({ok:true,service:'draft-run',scoring_version:DRAFT_RUN_SCORING_VERSION,corpus_version:DRAFT_RUN_CORPUS_VERSION,puzzles:p.length,sets:new Set(p.map(p=>p.set_id)).size,expansion_sets:new Set(poolForEnvironment(p).map(p=>p.set_id)).size,cube_puzzles:poolForEnvironment(p,'powered-cube').length}); }
   if(request.method==='POST'&&path==='/v1/session') return growth.fetch(request);

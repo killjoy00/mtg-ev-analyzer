@@ -247,7 +247,7 @@ def metadata(root):
 
 def resolve_images(names, known, cache_path):
     import urllib.parse
-    cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    cache = {k:v for k,v in json.loads(cache_path.read_text()).items() if v} if cache_path.exists() else {}
     known = {**known, **{k:v for k,v in cache.items() if v}}
     for name in sorted(names - known.keys() - cache.keys()):
         # Exact identities only. A fuzzy card with a similar name is not a substitute.
@@ -265,8 +265,10 @@ def resolve_images(names, known, cache_path):
 
 
 def write_gzip_jsonl(path, values):
-    with path.open('wb') as raw, gzip.GzipFile(fileobj=raw, mode='wb', mtime=0, filename='') as f:
+    temp = path.with_suffix(path.suffix+'.tmp')
+    with temp.open('wb') as raw, gzip.GzipFile(fileobj=raw, mode='wb', mtime=0, filename='') as f:
         for value in values: f.write(encoded(value)+b'\n')
+    temp.replace(path)
 
 
 def build_set(sid, output_dir, refresh=False, discovered_expansion=None):
@@ -319,7 +321,7 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None):
             included=0; new=0; skipped=Counter()
             for p in rendered:
                 n=p['pick_number'];pid=hashlib.sha256(f'{VERSION}|{sid}|{did}|{n}'.encode()).hexdigest()[:32]
-                cards=p['candidates'];history=[{'id':slugify(name),'name':name,**known.get(name,{})} for name in prior]
+                cards=p['candidates'];history=[{**known.get(name,{}),'id':slugify(name),'name':name} for name in prior]
                 pick_name=next(c['name'] for c in cards if c['id']==p['historical_pick_id'])
                 prior.append(pick_name)
                 if pid in old_by_id:
