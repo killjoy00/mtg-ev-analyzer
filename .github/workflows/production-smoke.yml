@@ -1,6 +1,8 @@
 name: production smoke
 
 on:
+  push:
+    branches: [main]
   workflow_run:
     workflows: ["pages build and deployment"]
     types: [completed]
@@ -30,6 +32,10 @@ jobs:
             [draftrunapi]="https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech"
           )
 
+          header_value() {
+            grep -i '^access-control-allow-origin:' "$1" | head -n 1 | sed 's/^[^:]*:[[:space:]]*//; s/\r$//' || true
+          }
+
           frontend="$(mktemp)"
           curl --fail --silent --show-error --location --max-time 20 "$PACKONE_ORIGIN/" -o "$frontend"
           grep -q 'Pack One' "$frontend" || { echo 'packone.pro did not return the Pack One app'; exit 1; }
@@ -49,7 +55,7 @@ jobs:
               exit 1
             fi
 
-            preflight_origin="$(awk 'BEGIN{IGNORECASE=1} /^access-control-allow-origin:/ {sub(/^[^:]*:[[:space:]]*/, ""); gsub(/\r/, ""); print; exit}' "$preflight_headers")"
+            preflight_origin="$(header_value "$preflight_headers")"
             if [ "$preflight_origin" != "$PACKONE_ORIGIN" ]; then
               echo "$name preflight did not allow $PACKONE_ORIGIN (got: ${preflight_origin:-missing})"
               cat "$preflight_headers"
@@ -67,7 +73,7 @@ jobs:
               exit 1
             fi
 
-            get_origin="$(awk 'BEGIN{IGNORECASE=1} /^access-control-allow-origin:/ {sub(/^[^:]*:[[:space:]]*/, ""); gsub(/\r/, ""); print; exit}' "$get_headers")"
+            get_origin="$(header_value "$get_headers")"
             if [ "$get_origin" != "$PACKONE_ORIGIN" ]; then
               echo "$name health response did not allow $PACKONE_ORIGIN (got: ${get_origin:-missing})"
               cat "$get_headers"
