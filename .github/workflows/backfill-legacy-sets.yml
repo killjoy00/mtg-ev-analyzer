@@ -6,9 +6,7 @@ on:
     branches: [main]
     paths:
       - 'scripts/backfill_legacy_sets.py'
-      - 'scripts/r2_replay_shards.sh'
       - 'tests/test_legacy_skill_backfill.py'
-      - '.github/workflows/backfill-legacy-sets.yml'
 
 permissions:
   contents: write
