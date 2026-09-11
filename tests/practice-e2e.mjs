@@ -25,9 +25,10 @@ await page.route('https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-
 });
 
 async function openHome() {
-  await page.goto(base, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${base}/?modes=1`, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
   await page.waitForFunction(() => document.querySelector('#set-select')?.closest('.mode-section'));
+  assert.match(await page.locator('[data-home-tab="more"]').getAttribute('class') || '', /active/);
 }
 
 try {
