@@ -41,9 +41,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm test
       - name: Hydrate replay shards from R2
         run: bash scripts/r2_replay_shards.sh hydrate
+      - run: npm test
       - name: Verify workload identity on both databases
         run: |
           node scripts/actions-import-auth.mjs "$DEV_IMPORT_API"
