@@ -4,9 +4,9 @@ Status: implemented Draft Run contract, September 2026.
 
 ## Product promise
 
-Pack One is a fast Limited decision game built from real 17Lands Premier Draft data. It is not a deck builder and it is not a counterfactual draft simulator. The player makes difficult draft choices, sees what an elite drafter actually did, and gets a compact score that also respects strong-player consensus.
+Pack One is a fast Limited decision game built from real 17Lands Premier Draft data. It is not a deck builder and it does not simulate a full draft table or claim to know how seven other seats would react to alternate choices. The player makes difficult draft choices, sees what an elite drafter actually did, and gets a compact score that also respects strong-player consensus.
 
-Draft Run is the primary game and Daily entry point. Powered Cube has its own ten-decision trophy flow. Top 3 and Full Pack remain additional expansion modes.
+Draft Run is the primary game and Daily entry point. Powered Cube has its own ten-decision trophy flow. Those two games are the primary homepage products. The opening-pack Daily, Top 3, Full Pack, and Set Practice remain available together under the secondary **More modes** tab.
 
 ## Additional mode: Top 3
 
@@ -19,6 +19,18 @@ The existing opening-pack game stays intact.
 - Unlimited seeded friend challenges and Daily can continue to use the same opening pack for everyone.
 
 This mode is the quick, low-context version of Pack One.
+
+## Additional mode: Full Pack
+
+Full Pack is an adaptive first-pack study mode built on a real historical replay. It is intentionally different from Draft Run's ten independent puzzles.
+
+- The available candidate cards come from the observed historical first-pack sequence.
+- For picks before the wheel, the real candidate pack stays fixed. The player's earlier choices cannot change which unopened pack reaches the seat.
+- Later-pick support is reconditioned on the cards the player actually selected, using held-out strong-player co-pick statistics. This makes the recommendation path respond to the player's pool instead of pretending the historical drafter's pool is still theirs.
+- Pack One does **not** simulate the decisions of the other seven seats.
+- Once packs wheel, an earlier divergent choice could have changed what survived. Those replay-bound wheel decisions can still receive feedback, but they do not receive final-score weight when the counterfactual contents are unknowable.
+
+The adaptive support model is therefore a scoring and recommendation layer over observed packs, not a claim that Pack One has reconstructed a literal alternate draft history.
 
 ## Core game: Draft Run
 
@@ -167,26 +179,27 @@ Daily rerolls are deterministic for the same day, round, and reroll history. Eac
 
 ## Presentation principles
 
-- Always show all prior Pack 1 picks for contextual questions.
+- The default homepage should present only the two primary game families: **Draft Run** and **Powered Cube**. Daily opening-pack play, Top 3, Full Pack, and Set Practice belong under **More modes**.
+- Always show all prior Pack 1 picks for contextual Draft Run questions.
 - Do not imply that consensus is objective truth.
-- Present the trophy choice as the intended 100-point target and explain alternative partial credit directly.
-- Reveal both signals clearly: **Trophy drafter took** and **Elite consensus**.
+- Present the trophy choice as the intended 100-point Draft Run target and explain alternative partial credit directly.
+- Reveal both Draft Run signals clearly: **Trophy drafter took** and **Elite consensus**.
 - Favor score/support magnitude over misleading ordinal labels for low-support outliers.
 - Keep the active game ad-free.
 
 ## Non-goals
 
-- Simulating the other seven seats.
-- Reconstructing a counterfactual pack after the player makes a different choice.
+- Simulating the other seven seats or their reactions to the player's alternate choices.
+- Claiming that Full Pack reconstructs unobserved counterfactual pack contents or a literal alternate draft history.
 - Building a 40-card deck.
-- Letting one question's choice alter the next question.
+- Letting one **Draft Run** question's choice alter the next independent Draft Run question.
 - Using live model/LLM calls for scoring.
 
 ## Data architecture direction
 
 Neon is the source of truth for the derived Draft Run corpus. Store source-draft metadata and one queryable puzzle row per historical first-pack decision. The browser should receive only the selected puzzle payloads through a server endpoint.
 
-The existing static opening-pack corpus remains appropriate for Pack One / Top 3.
+The existing static replay corpus remains appropriate for Top 3 and Full Pack while those secondary study modes remain supported. Its publication/storage mechanism should not constrain growth of the site shell; large immutable replay artifacts may be served independently from the frontend.
 
 ## Powered Cube ten-decision flow
 
