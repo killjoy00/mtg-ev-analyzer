@@ -24,6 +24,7 @@ const retention = await import('./retention.mjs');
 const profiles = await import('./profile-product.mjs');
 const draftRun = await import('./draft-run-product.mjs');
 const progression = await import('./progression.mjs');
+const homeProduct = await import('./home-product.mjs');
 
 if (params.get('game') === 'draft-run') {
   await growth.installGrowthLayer();
@@ -58,4 +59,5 @@ if (params.get('game') === 'draft-run') {
   profiles.installProfileProductLayer();
   draftRun.installDraftRunHome();
   progression.installProgression();
+  homeProduct.installHomeProductLayer();
 }
