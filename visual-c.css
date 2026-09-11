@@ -1,0 +1,539 @@
+@import url("./pack1.css?v=5");
+
+/* Candidate C — restrained, structured, card-first visual system. */
+:root {
+  --page: #f1f0ec;
+  --surface: #ffffff;
+  --surface-soft: #e9e9e5;
+  --ink: #101820;
+  --muted: #5f6770;
+  --faint: #959ba1;
+  --line: #cfd3d4;
+  --line-strong: #9ca5ac;
+  --green: #1e4d7a;
+  --green-dark: #15395b;
+  --green-soft: #e5edf4;
+  --blue: #1e4d7a;
+  --blue-soft: #e5edf4;
+  --radius: 0px;
+  --radius-sm: 0px;
+  --shadow: none;
+  --sans: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
+  --serif: var(--sans);
+  --content: 1188px;
+}
+
+html,
+body {
+  background: var(--page);
+}
+
+body {
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.topbar {
+  min-height: 60px;
+  padding-top: 8px;
+  padding-bottom: 8px;
+  border-top: 4px solid var(--green);
+  border-bottom: 1px solid var(--line);
+  background: #fff;
+  backdrop-filter: none;
+}
+
+.brand {
+  gap: 10px;
+}
+
+.brand-mark {
+  width: 32px;
+  height: 32px;
+  border-radius: 0;
+  background: var(--green);
+  font-size: 11px;
+  letter-spacing: .04em;
+}
+
+.brand-copy strong {
+  font-size: 16px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+
+.brand-copy small {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: .08em;
+}
+
+.top-actions {
+  gap: 8px;
+}
+
+.top-nav-button {
+  min-height: 32px;
+  padding: 6px 5px;
+  border-radius: 0;
+  color: #444d55;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.top-nav-button:hover {
+  background: transparent;
+  color: var(--green);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.source-note {
+  color: var(--faint);
+  font-size: 10px;
+}
+
+.app {
+  padding-top: 40px;
+}
+
+h1 {
+  font-size: clamp(36px, 4.5vw, 54px);
+  line-height: 1;
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+
+h2 {
+  font-weight: 800;
+  letter-spacing: -.02em;
+}
+
+h3 {
+  font-weight: 800;
+}
+
+.eyebrow {
+  color: var(--green);
+  font-size: 10px;
+  letter-spacing: .14em;
+}
+
+.message-card,
+.mode-card,
+.daily-card,
+.daily-mode,
+.card-choice,
+.card-image-wrap,
+.action-dock,
+.reveal-panel,
+.pick-feedback,
+.scorecard,
+.score-stamp,
+.sidebar-card,
+.ad-slot {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.message-card,
+.mode-card,
+.reveal-panel,
+.pick-feedback,
+.scorecard,
+.sidebar-card {
+  background: #fff;
+}
+
+.mode-card {
+  border-color: var(--line);
+  border-top: 2px solid var(--line-strong);
+}
+
+.mode-card.featured {
+  border-color: var(--line);
+  border-top-color: var(--green);
+}
+
+.mode-number {
+  color: #b8bdc1;
+}
+
+.best-chip,
+.streak-chip,
+.milestone-chip,
+.grade-badge,
+.new-best,
+.verdict,
+.user-rank-badge,
+.consensus-badge {
+  border-radius: 0;
+}
+
+.mode-points li::before {
+  color: var(--green);
+}
+
+.select,
+.player-name-edit input,
+.account-form input {
+  border-radius: 0;
+}
+
+.select:focus,
+.player-name-edit input:focus,
+.account-form input:focus {
+  border-color: var(--green);
+  box-shadow: 0 0 0 2px var(--green-soft);
+}
+
+.button {
+  border-radius: 0;
+  font-weight: 800;
+}
+
+.button:hover:not(:disabled) {
+  transform: none;
+}
+
+.button.primary {
+  border-color: var(--green);
+  background: var(--green);
+}
+
+.button.primary:hover:not(:disabled) {
+  background: var(--green-dark);
+}
+
+.button.secondary {
+  border-color: var(--line-strong);
+  background: #fff;
+}
+
+.button.secondary:hover:not(:disabled) {
+  border-color: var(--green);
+  background: #fff;
+  color: var(--green-dark);
+}
+
+.share-button {
+  border-color: var(--line-strong);
+  background: #fff;
+  color: var(--green-dark);
+}
+
+.daily-card {
+  border-color: var(--line);
+  border-top: 3px solid var(--green);
+  background: #fff;
+}
+
+.daily-kicker {
+  color: var(--green);
+}
+
+.live-dot {
+  border-radius: 0;
+  background: var(--green);
+}
+
+.streak-chip,
+.milestone-chip {
+  border-color: var(--line);
+  background: var(--surface-soft);
+  color: var(--muted);
+}
+
+.daily-mode {
+  border-color: var(--line-strong);
+  background: #fff;
+}
+
+.daily-mode:hover:not(:disabled) {
+  border-color: var(--green);
+  transform: none;
+}
+
+.daily-mode strong {
+  color: var(--green);
+}
+
+.progress-track {
+  height: 2px;
+  border-radius: 0;
+  background: #c9ced1;
+}
+
+.progress-fill {
+  background: var(--green);
+}
+
+.card-image-wrap {
+  border-color: #c5c9ca;
+  background: #e6e8e7;
+}
+
+.card-choice:hover:not(:disabled) .card-image-wrap {
+  transform: none;
+  box-shadow: none;
+  outline: 1px solid var(--line-strong);
+  outline-offset: 2px;
+}
+
+.card-choice.selected .card-image-wrap,
+.card-choice.ranked-choice .card-image-wrap {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+}
+
+.action-dock {
+  border-color: #8c959b;
+  background: #fff;
+  backdrop-filter: none;
+}
+
+.rank-row > span {
+  border-radius: 0;
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+.verdict.consensus {
+  background: var(--green-soft);
+  color: var(--green-dark);
+}
+
+/* Draft Run: preserve the existing interaction model, replace only its visual grammar. */
+body .draft-run-page,
+body .run-result-page,
+body .run-board,
+body .run-invite {
+  max-width: 1188px;
+}
+
+body .run-result-page,
+body .run-board,
+body .run-invite {
+  max-width: 790px;
+}
+
+body .run-heading h1 {
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -.025em;
+}
+
+body .run-heading h1 span {
+  color: var(--muted);
+  font-size: 16px;
+  font-weight: 450;
+}
+
+body .run-steps {
+  gap: 6px;
+  margin: 26px 0 20px;
+}
+
+body .run-steps li {
+  padding: 8px 0 7px;
+  border-bottom: 1px solid #c9ced1;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+body .run-steps .done {
+  border-color: var(--green);
+  color: var(--green);
+}
+
+body .run-steps .current {
+  border-bottom: 3px solid var(--green);
+  color: var(--ink);
+}
+
+body .run-pool {
+  border-bottom-color: var(--line);
+}
+
+body .run-pool-cards img {
+  border-radius: 0;
+}
+
+body .run-tools {
+  margin-bottom: 18px;
+}
+
+body .run-tools p,
+body .run-context-empty {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+body .run-tools .button.secondary {
+  min-height: 38px;
+  padding: 8px 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  font-size: 11px;
+}
+
+body .run-cards {
+  gap: 20px 12px;
+}
+
+body .run-card {
+  padding: 6px 0 0;
+  border: 0;
+  border-top: 1px solid #c5c9ca;
+  border-radius: 0;
+  background: transparent;
+}
+
+body .run-card.selected {
+  padding-top: 4px;
+  border-top: 3px solid var(--green);
+  background: transparent;
+}
+
+body .run-card.trophy-pick {
+  padding-top: 4px;
+  border-top: 3px solid var(--gold);
+  background: transparent;
+}
+
+body .run-card-select img {
+  border-radius: 0;
+}
+
+body .run-card-select > span {
+  margin-top: 7px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: -.01em;
+}
+
+body .run-zoom {
+  padding-top: 5px;
+  color: var(--muted);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: .06em;
+}
+
+body .run-lock {
+  border: 0;
+  border-top: 1px solid #8c959b;
+  border-radius: 0;
+  background: #fff;
+  box-shadow: none;
+}
+
+body .run-lock > span {
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: .05em;
+}
+
+body .run-feedback {
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--green);
+  border-radius: 0;
+  background: #fff;
+}
+
+body .run-friend {
+  border: 1px solid var(--line);
+  background: #fff;
+}
+
+body .run-card-dialog {
+  border: 1px solid var(--line-strong);
+  border-radius: 0;
+}
+
+body .run-board nav a.active {
+  border-color: var(--green);
+  color: var(--green-dark);
+}
+
+body .run-review-list li {
+  border-color: var(--line);
+}
+
+@media (max-width: 700px) {
+  .topbar {
+    min-height: 66px;
+    padding: 8px 10px;
+    align-items: flex-start;
+    border-top-width: 3px;
+  }
+
+  .brand-copy small,
+  .source-note {
+    display: none;
+  }
+
+  .top-actions {
+    gap: 2px 7px;
+  }
+
+  .top-nav-button {
+    min-height: 26px;
+    padding: 4px 2px;
+    font-size: 10px;
+  }
+
+  .app {
+    padding: 22px 10px 80px;
+  }
+
+  body .run-heading h1 {
+    font-size: 28px;
+  }
+
+  body .run-heading h1 span {
+    margin-top: 5px;
+    font-size: 15px;
+  }
+
+  body .run-steps {
+    gap: 3px;
+    margin: 18px 0;
+  }
+
+  body .run-steps li {
+    padding: 6px 0;
+    font-size: 9px;
+  }
+
+  body .run-tools .button.secondary {
+    padding: 8px 10px;
+    font-size: 10px;
+  }
+
+  body .run-cards {
+    gap: 18px 8px;
+  }
+
+  body .run-card {
+    padding-top: 5px;
+  }
+
+  body .run-card-select > span {
+    margin-top: 6px;
+    font-size: 11px;
+  }
+
+  body .run-zoom {
+    font-size: 9px;
+  }
+
+  body .run-lock {
+    padding-left: 10px;
+    padding-right: 10px;
+  }
+}
