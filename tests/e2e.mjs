@@ -64,9 +64,10 @@ async function assertPrimaryResultActions(root = '.result-page') {
 }
 
 async function home() {
-  await page.goto(base, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${base}/?modes=1`, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
   await page.getByRole('heading', { name: 'Pack One', exact: true }).waitFor({ timeout: 5000 });
+  assert.match(await page.locator('[data-home-tab="more"]').getAttribute('class') || '', /active/);
 
   const catalog = await page.evaluate(async () => {
     const response = await fetch('/data/catalog.json', { cache: 'no-store' });
@@ -76,8 +77,10 @@ async function home() {
   const cubeEntry = (catalog.sets || []).find((set) => set.id === 'powered-cube');
   if (cubeEntry) {
     await page.waitForFunction(() => ![...document.querySelectorAll('#set-select option')].some((option) => option.value === 'powered-cube'));
-    await page.locator('[data-powered-cube-section="1"]').waitFor({ timeout: 5000 });
+    await page.locator('[data-powered-cube-section="1"]').waitFor({ state: 'attached', timeout: 5000 });
+    assert.equal(await page.locator('[data-powered-cube-section="1"]').isVisible(), false, 'Powered Cube belongs on the primary home tab');
   }
+  assert.equal(await page.locator('.draft-run-feature').isVisible(), false, 'Draft Run belongs on the primary home tab');
   const expectedSetIds = (catalog.sets || [])
     .filter((set) => !set.hide_from_set_picker && set.category !== 'special_mode')
     .map((set) => set.id)
@@ -85,7 +88,7 @@ async function home() {
   const setIds = (await page.locator('#set-select option').evaluateAll((nodes) => nodes.map((node) => node.value))).sort();
   assert.deepEqual(setIds, expectedSetIds, 'Set picker must contain every standard production set and exclude special modes');
   assert.equal(setIds.includes('powered-cube'), false, 'Powered Cube must never appear as a normal expansion set');
-  assert.equal(await page.locator('[data-powered-cube-section="1"]').count(), cubeEntry ? 1 : 0, 'Powered Cube section must appear only when validated Cube data is registered');
+  assert.equal(await page.locator('[data-powered-cube-section="1"]').count(), cubeEntry ? 1 : 0, 'Powered Cube section must remain registered but hidden on More modes');
 
   const consensusCopy = (await page.locator('.data-note').textContent()) || '';
   assert.match(consensusCopy, /high-win-rate 17Lands drafters/i);
@@ -94,7 +97,7 @@ async function home() {
   assert.equal(await page.getByRole('heading', { name: 'Today’s opening pack', exact: true }).count(), 1);
   assert.equal(await page.locator('.daily-main').count(), 1);
   assert.match((await page.locator('.daily-main').textContent()) || '', /Play today’s Top 3/i);
-  assert.equal(await page.locator('#home-editorial').isVisible(), true, 'editorial shell should be visible on home');
+  assert.equal(await page.locator('#home-editorial').isVisible(), true, 'editorial shell should be visible on More modes');
   await assertNoHorizontalOverflow();
 }
 
@@ -158,7 +161,7 @@ try {
   await home();
   await assertModeCardsAligned();
   await page.screenshot({ path: 'artifacts/ui-home-desktop.png', fullPage: true });
-  await page.goto(`${base}/?adpreview=1`, { waitUntil: 'domcontentloaded' });
+  await page.goto(`${base}/?modes=1&adpreview=1`, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
   await page.locator('.ad-preview-creative').waitFor({ timeout: 5000 });
   await page.screenshot({ path: 'artifacts/ui-monetization-preview-desktop.png', fullPage: true });
@@ -221,15 +224,16 @@ try {
   assert.equal(nextPracticeUrl.searchParams.get('set'), 'sos');
   assert.ok(nextPracticeUrl.searchParams.get('seed'));
 
-  // Leaving seeded practice restores clean Daily/home state rather than sticking to the seeded URL.
+  // Leaving seeded practice restores the clean primary home rather than sticking to the seeded URL.
   await page.locator('#brand-home').click();
-  await page.locator('#set-select').waitFor({ timeout: 10000 });
+  await page.locator('.draft-run-feature').waitFor({ timeout: 10000 });
   const cleanHomeUrl = new URL(page.url());
   assert.equal(cleanHomeUrl.searchParams.get('seed'), null);
   assert.equal(cleanHomeUrl.searchParams.get('set'), null);
   assert.equal(cleanHomeUrl.searchParams.get('daily'), null);
+  assert.equal(cleanHomeUrl.searchParams.get('modes'), null);
 
-  // Full Pack remains available; Cube launchers enter the separately tested trophy flow.
+  // Full Pack remains available on More modes; Cube launch URLs remain valid but are surfaced on primary home.
   await home();
   await page.locator('#set-select').selectOption('msh');
   await page.locator('[data-mode="full"]').click();
@@ -237,13 +241,12 @@ try {
   await page.screenshot({path:'artifacts/ui-full-pack-result-mobile.png',fullPage:true});
   await home();
   if (await page.locator('[data-powered-cube-section="1"]').count()) {
+    assert.equal(await page.locator('[data-powered-cube-section="1"]').isVisible(), false);
     const cubeLaunchers = page.locator('[data-powered-cube-section="1"] [data-cube-href]');
     assert.equal(await cubeLaunchers.count(), 2);
     const cubeHrefs = await cubeLaunchers.evaluateAll((nodes) => nodes.map((node) => node.getAttribute('data-cube-href')));
     assert.ok(cubeHrefs.every((href) => href && new URL(href).searchParams.get('game') === 'draft-run'));
     assert.ok(cubeHrefs.every((href) => href && new URL(href).searchParams.get('set') === 'powered-cube'));
-    // Full Cube interaction is verified against its dedicated API in draft-run-e2e.
-
   }
 
   assert.ok(capturedEvents.length > 0, 'expected at least one analytics event');

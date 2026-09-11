@@ -1,0 +1,6 @@
+.home-mode-tabs{display:flex;gap:22px;align-items:center;margin:18px 0 28px;border-bottom:1px solid var(--line)}
+.home-mode-tabs a{display:inline-block;padding:10px 0 9px;color:var(--muted);font-size:13px;font-weight:700;text-decoration:none;border-bottom:2px solid transparent;margin-bottom:-1px}
+.home-mode-tabs a.active{color:var(--ink);border-bottom-color:var(--ink)}
+.home-mode-tabs a:focus-visible{outline:2px solid currentColor;outline-offset:4px}
+.home-page .set-bar[hidden],.home-page .daily-feature[hidden],.home-page .mode-section[hidden],.home-page .data-note[hidden],.home-page .draft-run-feature[hidden],.home-page .cube-mode-section[hidden],#home-editorial[hidden]{display:none!important}
+@media(max-width:600px){.home-mode-tabs{gap:18px;margin:12px 0 22px}.home-mode-tabs a{font-size:12px}}
