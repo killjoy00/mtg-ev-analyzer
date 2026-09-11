@@ -19,6 +19,15 @@ export async function verifyImportToken(token,getKeys=keys,now=Math.floor(Date.n
   if(h.alg!=='RS256'||h.typ!=='JWT'||typeof h.kid!=='string')denied();
   const key=(await getKeys()).find(k=>k.kid===h.kid&&k.kty==='RSA'&&(!k.use||k.use==='sig'));
   if(!key||!verify('RSA-SHA256',Buffer.from(parts.slice(0,2).join('.')),createPublicKey({key,format:'jwk'}),Buffer.from(parts[2],'base64url')))denied();
-  if(c.iss!==ISSUER||c.aud!==IMPORT_AUDIENCE||!SUBJECTS.has(c.sub)||c.repository!==REPO||c.repository_id!=='1201587098'||c.repository_owner_id!=='211694413'||c.ref!=='refs/heads/main'||c.workflow_ref!==WORKFLOW||c.job_workflow_ref||!['push','workflow_dispatch'].includes(c.event_name)||!Number.isFinite(c.exp)||!Number.isFinite(c.nbf)||!Number.isFinite(c.iat)||c.exp<=now||c.nbf>now+30||c.iat>now+30||c.exp-c.iat>900)denied();
+  const checks={
+    issuer:c.iss===ISSUER,audience:c.aud===IMPORT_AUDIENCE,subject:SUBJECTS.has(c.sub),
+    repository:c.repository===REPO,repositoryId:c.repository_id==='1201587098',ownerId:c.repository_owner_id==='211694413',
+    branch:c.ref==='refs/heads/main',workflow:c.workflow_ref===WORKFLOW,
+    reusableWorkflow:!c.job_workflow_ref||c.job_workflow_ref===WORKFLOW,
+    event:['push','workflow_dispatch'].includes(c.event_name),
+    time:Number.isFinite(c.exp)&&Number.isFinite(c.nbf)&&Number.isFinite(c.iat)&&c.exp>now&&c.nbf<=now+30&&c.iat<=now+30&&c.exp-c.iat<=900,
+  };
+  const rejected=Object.keys(checks).filter(k=>!checks[k]);
+  if(rejected.length){console.warn('Trophy import identity rejected',rejected.join(','));denied();}
   return {run_id:c.run_id,sha:c.sha};
 }

@@ -8,6 +8,7 @@ const claims={iss:'https://token.actions.githubusercontent.com',aud:'pack-one-tr
 function token(c=claims,alg='RS256'){const body=[{alg,typ:'JWT',kid:'test'},c].map(x=>Buffer.from(JSON.stringify(x)).toString('base64url')).join('.');return body+'.'+sign('RSA-SHA256',Buffer.from(body),privateKey).toString('base64url');}
 test('only the signed main import workflow is authorized',async()=>{
   assert.deepEqual(await verifyImportToken(token(),async()=>[jwk],1000),{run_id:'123',sha:'abc'});
+  assert.deepEqual(await verifyImportToken(token({...claims,job_workflow_ref:claims.workflow_ref}),async()=>[jwk],1000),{run_id:'123',sha:'abc'});
   for(const changed of [{repository:'attacker/repo'},{repository_id:'2'},{repository_owner_id:'3'},{ref:'refs/heads/other'},{workflow_ref:claims.workflow_ref.replace('import-all-trophies','other')},{event_name:'pull_request'},{sub:'repo:killjoy00/mtg-ev-analyzer:pull_request'},{aud:'other'},{iss:'https://attacker.example'},{exp:999},{nbf:1100},{iat:1100},{exp:2000},{job_workflow_ref:'reusable'}])await assert.rejects(verifyImportToken(token({...claims,...changed}),async()=>[jwk],1000),/denied/);
   await assert.rejects(verifyImportToken(token(claims,'HS256'),async()=>[jwk],1000),/denied/);
   const parts=token().split('.');parts[2]=Buffer.alloc(256).toString('base64url');await assert.rejects(verifyImportToken(parts.join('.'),async()=>[jwk],1000),/denied/);
