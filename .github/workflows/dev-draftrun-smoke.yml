@@ -48,6 +48,14 @@ jobs:
           cube="$("${CURL[@]}" --fail -X POST "$BASE/v1/runs" \
             -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
             --data '{"environment":"powered-cube"}')"
-          echo "$cube" | jq -e '.id and .current.pick_number == 2 and .current.set_id == "powered-cube"' >/dev/null
+          echo "$cube" | jq -e '.id and .current.pick_number == 2 and .current.set_id == "powered-cube" and .rerolls.pack == 2' >/dev/null
 
-          echo 'Dev Draft Run CORS, health, session, mixed run, and Powered Cube run all passed.'
+          cube_id="$(echo "$cube" | jq -r '.id')"
+          old_puzzle="$(echo "$cube" | jq -r '.current.puzzle_id')"
+          cube_action="$(echo "$cube" | jq -c '{revision:.revision,round:(.answers|length),puzzleId:.current.puzzle_id,type:"pack"}')"
+          rerolled="$("${CURL[@]}" --fail -X POST "$BASE/v1/runs/$cube_id/reroll" \
+            -H "Origin: $ORIGIN" -H 'Content-Type: application/json' -H "Authorization: Bearer $token" \
+            --data "$cube_action")"
+          echo "$rerolled" | jq -e --arg old "$old_puzzle" '.rerolls.pack == 1 and .current.set_id == "powered-cube" and .current.puzzle_id != $old' >/dev/null
+
+          echo 'Dev Draft Run CORS, health, session, mixed run, Powered Cube run, and Cube reroll all passed.'
