@@ -21,7 +21,6 @@ on:
   push:
     branches: [main]
     paths:
-      - '.github/workflows/build-more-sets.yml'
       - 'data/import-queue.json'
       - 'data/catalog.json'
       - 'scripts/import_sets.py'
@@ -30,7 +29,6 @@ on:
       - 'scripts/fetch_card_metadata.py'
       - 'scripts/validate_dataset.py'
       - 'scripts/audit_datasets.py'
-      - 'scripts/r2_replay_shards.sh'
       - 'tests/test_import_sets.py'
       - 'tests/test_data_health.py'
       - 'tests/test_card_metadata.py'
