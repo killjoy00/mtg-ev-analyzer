@@ -5,8 +5,6 @@ on:
     paths:
       - scripts/import_all_trophies.py
       - scripts/run_import_all_trophies.py
-      - scripts/r2_replay_shards.sh
-      - .github/workflows/import-all-trophies.yml
   workflow_dispatch:
     inputs:
       sets:
