@@ -62,6 +62,8 @@ jobs:
           [[ "$SOURCE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo 'Invalid source date'; exit 1; }
           [[ "$MAX_TRAINING" =~ ^[0-9]+$ ]] || exit 1
           [[ "$MAX_OUTPUT" =~ ^[0-9]+$ ]] || exit 1
+      - name: Hydrate replay shards from R2
+        run: bash scripts/r2_replay_shards.sh hydrate
       - name: Run unit tests
         run: npm test
       - name: Download public draft data
