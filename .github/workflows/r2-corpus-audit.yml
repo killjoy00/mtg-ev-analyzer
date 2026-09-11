@@ -45,7 +45,7 @@ jobs:
           echo '### Largest tracked payload files' | tee -a "$GITHUB_STEP_SUMMARY"
           find data corpus -type f -printf '%s\t%p\n' 2>/dev/null \
             | sort -nr \
-            | head -40 \
+            | sed -n '1,40p' \
             | awk '{printf "%.2f MiB\t%s\n", $1/1048576, $2}' \
             | tee -a "$GITHUB_STEP_SUMMARY"
           echo '' | tee -a "$GITHUB_STEP_SUMMARY"
