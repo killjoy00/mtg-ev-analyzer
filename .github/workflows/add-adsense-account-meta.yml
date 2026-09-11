@@ -1,0 +1,51 @@
+name: Add AdSense account meta
+
+on:
+  push:
+    branches:
+      - adsense/account-verification
+
+permissions:
+  contents: write
+
+jobs:
+  add-meta:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: adsense/account-verification
+      - name: Add AdSense account meta to HTML heads
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          tag = '<meta name="google-adsense-account" content="ca-pub-1217971050094766">'
+          changed = []
+          for path in Path('.').rglob('*.html'):
+              if any(part in {'.git', 'node_modules'} for part in path.parts):
+                  continue
+              text = path.read_text(encoding='utf-8')
+              if 'google-adsense-account' in text:
+                  continue
+              match = re.search(r'<head(?:\s[^>]*)?>', text, flags=re.IGNORECASE)
+              if not match:
+                  continue
+              insertion = '\n    ' + tag
+              text = text[:match.end()] + insertion + text[match.end():]
+              path.write_text(text, encoding='utf-8')
+              changed.append(str(path))
+          print(f'Updated {len(changed)} HTML files')
+          for path in changed:
+              print(path)
+          PY
+      - name: Remove one-time workflow and commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/add-adsense-account-meta.yml
+          git add '*.html' ':**/*.html'
+          git commit -m "Add AdSense account verification meta"
+          git push origin HEAD:adsense/account-verification
