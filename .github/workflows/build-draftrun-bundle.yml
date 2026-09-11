@@ -17,6 +17,7 @@ jobs:
         with:
           sparse-checkout: |
             worker/draft-run-function.mjs
+            worker/draft-run-runtime.mjs
             worker/growth-function.js
             worker/trophy-import.mjs
             worker/trophy-import-auth.mjs
@@ -29,10 +30,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Bundle current Draft Run function
+      - name: Bundle Draft Run with isolated equivalent runtime
         run: |
           set -euo pipefail
           mkdir -p dist
+          cp worker/draft-run-runtime.mjs worker/growth-function.js
           npx --yes esbuild@0.25.9 worker/draft-run-function.mjs \
             --bundle \
             --platform=node \
