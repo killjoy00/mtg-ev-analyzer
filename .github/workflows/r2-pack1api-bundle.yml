@@ -1,0 +1,47 @@
+name: Build R2 pack1api bundle
+
+on:
+  push:
+    branches: [r2-corpus-migration]
+    paths:
+      - 'worker/index.js'
+      - 'worker/core.mjs'
+      - '.github/workflows/r2-pack1api-bundle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Build exact Neon function bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p generated/pack1api-bundle
+          npx --yes esbuild@0.25.6 worker/index.js \
+            --bundle \
+            --format=esm \
+            --platform=neutral \
+            --target=es2022 \
+            --outfile=generated/pack1api-bundle/index.js
+          node --check generated/pack1api-bundle/index.js
+          grep -q 'https://data.packone.pro' generated/pack1api-bundle/index.js
+          grep -q 'https://packone.pro' generated/pack1api-bundle/index.js
+          (cd generated/pack1api-bundle && zip -q ../pack1api-function.zip index.js)
+          sha256sum generated/pack1api-function.zip | tee generated/pack1api-function.sha256
+          ls -lh generated/pack1api-bundle/index.js generated/pack1api-function.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack1api-r2-bundle
+          path: |
+            generated/pack1api-function.zip
+            generated/pack1api-function.sha256
+          retention-days: 7
