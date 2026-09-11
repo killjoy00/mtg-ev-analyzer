@@ -1,6 +1,7 @@
 import { seededRandom } from './gameplay.mjs';
 
 const responseCache = new Map();
+const REPLAY_SHARD_ORIGIN = 'https://data.packone.pro';
 let catalogSnapshot = null;
 let warmupInstalled = false;
 
@@ -10,6 +11,19 @@ function urlOf(input) {
   } catch {
     return null;
   }
+}
+
+function isReplayShard(url) {
+  return Boolean(url && /\/data\/[^/]+\/shards\/[^/]+\.json$/.test(url.pathname));
+}
+
+export function replayResourceUrl(input) {
+  const url = urlOf(input);
+  if (!url || !isReplayShard(url)) return url;
+  const remote = new URL(REPLAY_SHARD_ORIGIN);
+  remote.pathname = url.pathname;
+  remote.search = url.search;
+  return remote;
 }
 
 export function rarityBucket(rarity) {
@@ -69,17 +83,18 @@ function isReplayResource(url) {
 }
 
 export async function loadReplayJson(path, label = 'data') {
-  const url = urlOf(path);
-  if (!url) throw new Error(`Could not load ${label}: invalid URL.`);
-  const key = url.href;
-  if (!isReplayResource(url)) throw new Error(`Could not load ${label}: unsupported replay resource.`);
+  const requestedUrl = urlOf(path);
+  if (!requestedUrl) throw new Error(`Could not load ${label}: invalid URL.`);
+  if (!isReplayResource(requestedUrl)) throw new Error(`Could not load ${label}: unsupported replay resource.`);
 
+  const url = replayResourceUrl(requestedUrl);
+  const key = url.href;
   if (!responseCache.has(key)) {
     const request = fetch(url.href, { cache: 'default' })
       .then(async (response) => {
         if (!response.ok) throw new Error(`Could not load ${label} (${response.status}).`);
         const data = normalizeReplayPayload(url.pathname, await response.json());
-        if (isCatalog(url)) {
+        if (isCatalog(requestedUrl)) {
           catalogSnapshot = data;
           scheduleWarm();
         }
