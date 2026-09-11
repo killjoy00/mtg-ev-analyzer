@@ -1,0 +1,73 @@
+name: R2 corpus audit
+
+on:
+  push:
+    branches: [r2-corpus-migration]
+    paths:
+      - '.github/workflows/r2-corpus-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Verify required R2 secrets are present
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$AWS_ACCESS_KEY_ID"
+          test -n "$AWS_SECRET_ACCESS_KEY"
+          test -n "$R2_ENDPOINT"
+          test -n "$R2_BUCKET"
+          echo 'All required R2 secrets are present.'
+
+      - name: Audit repository payload sizes
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo '## Repository payload sizes' | tee -a "$GITHUB_STEP_SUMMARY"
+          du -sh data corpus 2>/dev/null | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '' | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '### Largest tracked payload files' | tee -a "$GITHUB_STEP_SUMMARY"
+          find data corpus -type f -printf '%s\t%p\n' 2>/dev/null \
+            | sort -nr \
+            | head -40 \
+            | awk '{printf "%.2f MiB\t%s\n", $1/1048576, $2}' \
+            | tee -a "$GITHUB_STEP_SUMMARY"
+          echo '' | tee -a "$GITHUB_STEP_SUMMARY"
+          printf 'data files: ' | tee -a "$GITHUB_STEP_SUMMARY"
+          find data -type f 2>/dev/null | wc -l | tee -a "$GITHUB_STEP_SUMMARY"
+          printf 'corpus files: ' | tee -a "$GITHUB_STEP_SUMMARY"
+          find corpus -type f 2>/dev/null | wc -l | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Verify R2 S3 credentials and bucket access
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws s3api head-bucket --bucket "$R2_BUCKET" --endpoint-url "$R2_ENDPOINT"
+          echo 'R2 API credentials and bucket access OK.'
+
+      - name: Verify public custom domain resolves
+        shell: bash
+        run: |
+          set -euo pipefail
+          status="$(curl --silent --show-error --location --output /dev/null --write-out '%{http_code}' --connect-timeout 15 --max-time 30 https://data.packone.pro/)"
+          echo "data.packone.pro returned HTTP ${status}."
+          if [[ "$status" == '000' ]]; then
+            echo 'Custom domain did not resolve or complete TLS.' >&2
+            exit 1
+          fi
