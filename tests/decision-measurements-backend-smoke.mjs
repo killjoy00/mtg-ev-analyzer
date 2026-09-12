@@ -11,6 +11,7 @@ let guest,run,repeat;
 const httpBase=process.env.PACK1_MEASUREMENT_HTTP;
 if(httpBase&&!/^https:\/\/br-twilight-hill-ayffyd2b-draftrunapi\.compute\.c-5\.us-east-2\.aws\.neon\.tech$/.test(httpBase))throw Error('HTTP integration is restricted to development.');
 async function call(path,body,token,account,status=200){
+  console.log('Checking',path.replace(/[a-f0-9-]{32,}/g,'<fixture>'));
   const request=new Request((httpBase||'https://packone.pro')+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...(account?{'x-pack1-auth-session':account}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(90000)});
   const response=await (httpBase?fetch(request):api.fetch(request));
   const data=await response.json();assert.equal(response.status,status,JSON.stringify(data));return data;
