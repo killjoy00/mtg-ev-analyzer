@@ -2,6 +2,18 @@ import { installRenderLifecycle } from './render-lifecycle.mjs';
 import { installReplayDataWarmup } from './replay-data.mjs';
 
 const params = new URLSearchParams(window.location.search);
+// Retire the old Top 3 / Full Pack board without breaking saved bookmarks.
+// An old Cube-board URL keeps its Cube environment; every other old board
+// lands on Draft Run.
+if (params.has('legacy-board')) {
+  params.set('game', 'draft-run');
+  params.set('board', 'daily');
+  params.delete('legacy-board');
+  params.delete('mode');
+  params.delete('seed');
+  params.delete('daily');
+  history.replaceState({}, '', `${location.pathname}?${params}`);
+}
 // Older Cube launch links now enter the dedicated trophy game. Stored legacy
 // friend links remain readable through their original challenge contract.
 if(params.get('set')==='powered-cube' && !params.has('challenge') && params.get('game')!=='draft-run') {

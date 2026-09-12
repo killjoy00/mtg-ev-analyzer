@@ -87,7 +87,15 @@ try{
   const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.url,new RegExp('challenge='+shareId));assert.doesNotMatch(shared.url,/profile|token/);
   await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Can you beat 88/);await noOverflow();
   await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
-  await page.goto(base+'/?game=draft-run&board=daily'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();assert.equal(await page.locator('.run-board-actions .button').count(),4);assert.ok(await page.getByRole('link',{name:'Set Practice',exact:true}).getAttribute('href'));await noOverflow();
+  await page.goto(base+'/?game=draft-run&board=daily'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
+  assert.equal(await page.locator('.run-board-games a').count(),2);
+  assert.equal((await page.locator('.run-board-games a.active').innerText()).trim(),cube?'Cube':'Draft Run');
+  assert.equal(await page.locator('.run-board-actions .button').count(),cube?2:3);
+  assert.equal(await page.getByRole('link',{name:'Top 3 practice',exact:true}).count(),cube?0:1);
+  assert.doesNotMatch(await page.locator('.run-board').innerText(),/Full Pack|Top 3, Full Pack|Cube boards/i);
+  await noOverflow();
+  await page.goto(base+'/?legacy-board=1'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
+  const retiredBoardUrl=new URL(page.url());assert.equal(retiredBoardUrl.searchParams.get('game'),'draft-run');assert.equal(retiredBoardUrl.searchParams.get('board'),'daily');assert.equal(retiredBoardUrl.searchParams.has('legacy-board'),false);
   assert.deepEqual(errors,[]);
   console.log(environment+' browser regression passed: 10 rounds, rerolls, resume, zoom, desktop/mobile, result, share, recipient and leaderboard.');
 }finally{await browser.close();}
