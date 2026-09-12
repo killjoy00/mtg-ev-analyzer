@@ -17,5 +17,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify development Draft Run gameplay
-        run: node tests/trophy-import-http-smoke.mjs https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
+      - name: Verify production Draft Run gameplay
+        run: node tests/trophy-import-http-smoke.mjs https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
