@@ -113,5 +113,12 @@ jobs:
             exit 0
           fi
           git commit -m 'Refresh Powered Cube to standard card images [cube-images-refreshed]'
-          git pull --rebase origin main
-          git push origin HEAD:main
+          # Hydration and image normalization leave generated files modified.
+          # Publish only the explicit commit from a clean worktree; preserve
+          # those runtime files in the original checkout for diagnostics.
+          publish_dir="$(mktemp -d "${RUNNER_TEMP}/cube-image-publish.XXXXXX")"
+          trap 'git worktree remove --force "$publish_dir"' EXIT
+          git worktree add --detach "$publish_dir" HEAD
+          git fetch origin main
+          git -C "$publish_dir" rebase origin/main
+          git -C "$publish_dir" push origin HEAD:main
