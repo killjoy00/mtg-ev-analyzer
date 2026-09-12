@@ -141,9 +141,7 @@
       "exclusions": {
         "image_metadata_incomplete": 2
       },
-      "unresolved_image_names": [
-        "A-Monster Manual"
-      ],
+      "unresolved_image_names": [],
       "sha256": "823c05db03fbb9c76025bbc086de80b0219a7ce982420726b854cf37742a5599"
     },
     {
@@ -720,9 +718,7 @@
       "exclusions": {
         "image_metadata_incomplete": 20
       },
-      "unresolved_image_names": [
-        "Bespoke B?"
-      ],
+      "unresolved_image_names": [],
       "sha256": "ccc37709081b388da046660d7d79c758e6056258969a31336489b9a3081fbd6a"
     },
     {
@@ -770,15 +766,8 @@
       "exclusions": {
         "image_metadata_incomplete": 182
       },
-      "unresolved_image_names": [
-        "Ademi of the Silkchutes",
-        "Goben, Gene-Splice Savant",
-        "Luis, Pompous Pillager",
-        "Makdee and Itla, Skysnarers",
-        "Nia, Skysail Storyteller",
-        "Yera and Oski, Weaver and Guide"
-      ],
-      "sha256": "f19930170ec3fca8b2c6c04fa1802861cc6f901400af6dfe1ffef92711f56efb"
+      "unresolved_image_names": [],
+      "sha256": "15689eb52d859921fc404678e64966f052145b6c9140a1c23ccfd95a9288c090"
     }
   ]
 }
