@@ -116,8 +116,12 @@ function enhanceHome() {
 
   if (select.dataset.practiceOnly !== '1') {
     select.dataset.practiceOnly = '1';
-    const selected = readPracticeSet(select);
+    const requested = params().get('set');
+    const selected = standardOptions(select).some((option) => option.value === requested)
+      ? requested
+      : readPracticeSet(select);
     if (selected && select.value !== selected) select.value = selected;
+    if (selected === requested) writePracticeSet(selected);
   }
   placePracticeSelector(select);
   updateHomeCopy(select);

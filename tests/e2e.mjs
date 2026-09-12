@@ -158,6 +158,25 @@ async function finishFullPack() {
 try {
   // Rendered design checks at desktop and mobile sizes.
   await page.setViewportSize({ width: 1440, height: 1000 });
+  await page.goto(`${base}/methodology/`, { waitUntil: 'domcontentloaded' });
+  await page.locator('.method-directory').waitFor();
+  assert.equal(await page.locator('.method-directory a').count(), 3);
+  assert.equal(await page.locator('.site-nav-menu').count(), 0);
+  assert.equal(await page.locator('.site-brand .brand-mark').count(), 1);
+
+  await page.goto(`${base}/sets/`, { waitUntil: 'domcontentloaded' });
+  await page.locator('.set-catalog-card').first().waitFor();
+  const standardSets = await page.evaluate(async () => {
+    const catalog = await fetch('/data/catalog.json', { cache: 'no-store' }).then((response) => response.json());
+    return (catalog.sets || []).filter((entry) => !entry.is_fixture && entry.category !== 'special_mode' && !entry.hide_from_set_picker);
+  });
+  assert.equal(await page.locator('#set-archive-grid .set-catalog-card').count(), standardSets.length);
+  const newest = [...standardSets].sort((a,b) => Date.parse(b.data_date) - Date.parse(a.data_date))[0];
+  assert.equal(await page.locator('#set-archive-grid .set-catalog-card').first().getAttribute('data-set-id'), newest.id);
+  await page.locator('#set-archive-grid .set-catalog-card').first().getByRole('link', { name:'Practice this set' }).click();
+  await page.locator('#set-select').waitFor();
+  assert.equal(await page.locator('#set-select').inputValue(), newest.id, 'set archive launches the selected practice environment');
+
   await home();
   await assertModeCardsAligned();
   await page.screenshot({ path: 'artifacts/ui-home-desktop.png', fullPage: true });

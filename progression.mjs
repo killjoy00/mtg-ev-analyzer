@@ -1,4 +1,5 @@
 import { loadMyProfile } from './growth-api.mjs';
+import { renderAccount } from './growth.mjs';
 import { trackEvent } from './retention-events.mjs';
 
 export function nextMilestones(profile,limit=3) {
@@ -35,8 +36,8 @@ async function enhance(detail={}) {
     }
     box.innerHTML=`${unlocked.length?`<p><strong>${esc(unlocked[0].label)}</strong> unlocked.</p>`:''}${next?`<p><strong>Up next: ${esc(next.label)}</strong><br><span>${esc(next.progress_text)} · ${esc(next.description)}</span></p>`:''}<div><button class="text-button" data-open-career>View your career</button>${reason?'<button class="text-button" data-claim-progress>Save my progress</button>':''}</div>${reason?`<small>${esc(reason)}</small>`:''}`;
     if(box!==root)root.append(box);
-    box.querySelector('[data-open-career]').onclick=()=>document.querySelector('#profile-nav')?.click();
-    box.querySelector('[data-claim-progress]')?.addEventListener('click',()=>{trackEvent('account_claim_prompt_clicked',{source:'result'});document.querySelector('#account-nav')?.click();});
+    box.querySelector('[data-open-career]').onclick=()=>document.querySelector('#account-nav')?.click();
+    box.querySelector('[data-claim-progress]')?.addEventListener('click',()=>{trackEvent('account_claim_prompt_clicked',{source:'result'});void renderAccount();});
     if(reason)trackEvent('account_claim_prompt_viewed',{source:'result'});
   } catch { /* Progression never blocks the game or its result. */ }
 }

@@ -10,6 +10,7 @@ import { loadReplayJson } from './replay-data.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs';
+import { renderAccount } from './growth.mjs';
 import {
   bestPercentile,
   environmentProgress,
@@ -159,11 +160,11 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
 
   return `<section class="player-profile-page growth-page" data-profile-key="${esc(publicKey || profile.player.profile_key || '')}">
     <header class="profile-hero">
-      <div><p class="eyebrow">${own ? 'My Profile' : 'Player Profile'}</p><h1>${esc(profile.player.display_name)}</h1><p>${own ? 'Your Pack One career across the Limited archive.' : 'A public Pack One career across the Limited archive.'}</p></div>
+      <div><p class="eyebrow">${own ? 'Account' : 'Player Profile'}</p><h1>${esc(profile.player.display_name)}</h1><p>${own ? 'Your Pack One career, achievements, and account in one place.' : 'A public Pack One career across the Limited archive.'}</p></div>
       <div class="profile-hero-actions">
         <button type="button" class="button primary" id="profile-share">${profile.player.profile_public ? 'Share profile' : 'Share my record'}</button>
         <button type="button" class="button secondary" id="profile-share-progress">Share ${progress.played}/${progress.total}</button>
-        ${own ? '<button type="button" class="button secondary" id="profile-home">Back to game</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}
+        ${own ? '<button type="button" class="button secondary" id="profile-manage-account">Manage account</button><button type="button" class="button secondary" id="profile-home">Back to game</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}
       </div>
     </header>
 
@@ -220,8 +221,9 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   const profileKey = publicKey || profile.player.profile_key || null;
 
   document.querySelector('#profile-home')?.addEventListener('click', () => { window.location.href = './'; });
+  document.querySelector('#profile-manage-account')?.addEventListener('click', () => void renderAccount());
   document.querySelectorAll('[data-profile-section]').forEach(d=>d.addEventListener('toggle',()=>{if(d.open)track(d.dataset.profileSection==='achievements'?'achievement_viewed':'archive_viewed',{source:'profile'});}));
-  document.querySelector('#profile-claim-account')?.addEventListener('click', () => document.querySelector('#account-nav')?.click());
+  document.querySelector('#profile-claim-account')?.addEventListener('click', () => void renderAccount());
   document.querySelector('#profile-copy-link')?.addEventListener('click', async (event) => {
     const url = `${location.origin}${location.pathname}?profile=${encodeURIComponent(profile.player.profile_key)}`;
     try { await navigator.clipboard.writeText(url); event.currentTarget.textContent = 'Copied'; } catch {}
@@ -335,12 +337,12 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
 export async function renderMyProfile() {
   ensureProfileStyles();
   const app = document.querySelector('#app');
-  if (app) app.innerHTML = '<section class="message-card"><p class="eyebrow">Profile</p><h1>Loading your record…</h1></section>';
+  if (app) app.innerHTML = '<section class="message-card"><p class="eyebrow">Account</p><h1>Loading your record…</h1></section>';
   try {
     const profile = await loadMyProfile();
     await renderProfile(profile, { own: true });
   } catch (error) {
-    if (app) app.innerHTML = `<section class="message-card"><p class="eyebrow">Profile</p><h1>Couldn’t load your profile.</h1><p>${esc(error.message)}</p><button class="button primary" id="profile-retry">Try again</button></section>`;
+    if (app) app.innerHTML = `<section class="message-card"><p class="eyebrow">Account</p><h1>Couldn’t load your record.</h1><p>${esc(error.message)}</p><button class="button primary" id="profile-retry">Try again</button></section>`;
     document.querySelector('#profile-retry')?.addEventListener('click', () => void renderMyProfile());
   }
 }
@@ -359,15 +361,14 @@ export async function renderPublicProfile(profileKey) {
 
 function enhanceNav() {
   const top = document.querySelector('.top-actions');
-  if (!top || top.querySelector('#profile-nav')) return;
+  if (!top || top.querySelector('#account-nav')) return;
   const button = document.createElement('button');
   button.className = 'top-nav-button';
-  button.id = 'profile-nav';
+  button.id = 'account-nav';
   button.type = 'button';
-  button.textContent = 'Profile';
-  button.addEventListener('click', () => void renderMyProfile());
-  const account = top.querySelector('#account-nav');
-  top.insertBefore(button, account || top.querySelector('.source-note'));
+  button.textContent = 'Account';
+  button.addEventListener('click', () => { track('account_view'); void renderMyProfile(); });
+  top.append(button);
 }
 
 async function enhanceLeaderboardProfiles() {

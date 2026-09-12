@@ -85,11 +85,6 @@ function resultChallengeActions() {
   button.addEventListener('click',()=>{ if(share) share.click(); else navigator.share?.({title:'Pack One',url:location.href}); event('challenge_reshare'); });
   actions.prepend(button);
 }
-function nav() {
-  const top=document.querySelector('.top-actions'); if(!top || top.querySelector('#account-nav')) return;
-  const account=document.createElement('button'); account.className='top-nav-button'; account.id='account-nav'; account.type='button'; account.textContent='Account'; account.addEventListener('click',()=>{event('account_view'); void renderAccount();});
-  top.append(account);
-}
 function localSummary(items) {
   const scores=items.map((x)=>Number(x.score)).filter(Number.isFinite);
   const avg=scores.length?scores.reduce((a,b)=>a+b,0)/scores.length:0;
@@ -121,19 +116,19 @@ async function claimCurrentSession() {
   const session=await getAuthSession(); if(!session?.session?.token || !session?.user) return null;
   const linked=await linkAccount(session.session.token); currentAccount=session; return linked;
 }
-async function renderAccount() {
+export async function renderAccount() {
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
   currentAccount=await getAuthSession();
   if(currentAccount?.session?.token && currentAccount?.user) {
     await linkAccount(currentAccount.session.token).catch(()=>null);
-    app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account</p><h1>Stats saved.</h1><p>Signed in as <strong>${esc(currentAccount.user.email)}</strong>. Your Pack One identity now follows you across devices.</p></header><div class="account-actions"><button class="button primary" id="account-stats">View My Stats</button><button class="button secondary" id="account-signout">Sign out</button></div><p class="account-note">Playing never requires an account. Signing out returns this browser to guest-first play.</p></section>`;
-    document.querySelector('#account-stats')?.addEventListener('click',()=>void renderStats());
+    app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>Your record is saved.</h1><p>Signed in as <strong>${esc(currentAccount.user.email)}</strong>. Your Pack One identity follows you across devices.</p></header><div class="account-actions"><button class="button primary" id="account-career">Back to my career</button><button class="button secondary" id="account-signout">Sign out</button></div><p class="account-note">Playing never requires an account. Signing out returns this browser to guest-first play.</p></section>`;
+    document.querySelector('#account-career')?.addEventListener('click',()=>document.querySelector('#account-nav')?.click());
     document.querySelector('#account-signout')?.addEventListener('click',async()=>{await signOutAccount();currentAccount=null;event('auth_sign_out');void renderAccount();});
     return;
   }
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Your player record</p><h1>Save your progress.</h1><p>Keep your games, streaks, and milestones across devices. Playing is always free, with or without an account.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><div class="account-actions"><button class="button secondary" id="account-stats">View My Stats</button><button class="text-button" id="account-home">Keep playing as guest</button></div></section>`;
-  document.querySelector('#account-stats')?.addEventListener('click',()=>void renderStats());
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>Save your progress.</h1><p>Keep your games, streaks, achievements, and career across devices. Playing is always free, with or without an account.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><div class="account-actions"><button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">Keep playing as guest</button></div></section>`;
+  document.querySelector('#account-career')?.addEventListener('click',()=>document.querySelector('#account-nav')?.click());
   document.querySelector('#account-home')?.addEventListener('click',()=>document.querySelector('#brand-home')?.click());
   document.querySelector('#account-signup')?.addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget,err=f.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(f));await signUpAccount(data);await claimCurrentSession();event('auth_sign_up');await renderAccount();}catch(x){err.textContent=x.message;}});
   document.querySelector('#account-signin')?.addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget,err=f.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(f));await signInAccount(data);await claimCurrentSession();event('auth_sign_in');await renderAccount();}catch(x){err.textContent=x.message;}});
@@ -158,10 +153,9 @@ function shareCompletedAnalytics(eventObject) {
   const detail=eventObject.detail||{};
   event('share_completed',{ method:String(detail.method||'unknown').slice(0,40), context:String(detail.context||'unknown').slice(0,40), challenge:Boolean(detail.challenge) });
 }
-function enhance() { nav(); challengeBanner(); resultChallengeActions(); findResults(); }
+function enhance() { challengeBanner(); resultChallengeActions(); findResults(); }
 
 export async function installGrowthLayer() {
-  nav();
   currentAccount=await getAuthSession();
   if(currentAccount?.session?.token) await linkAccount(currentAccount.session.token).catch(()=>null);
   event('page_view',{ account:Boolean(currentAccount?.user), challenge:params().has('challenge')||params().has('vs') });

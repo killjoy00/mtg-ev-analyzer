@@ -53,7 +53,7 @@ body {
   width: 32px;
   height: 32px;
   display: flex;
-  align-items: baseline;
+  align-items: center;
   justify-content: center;
   gap: 1px;
   border: 1px solid var(--green);
@@ -71,7 +71,7 @@ body {
 
 .brand-mark > sup {
   position: relative;
-  top: -.25em;
+  top: -3px;
   font-family: var(--sans);
   font-size: 9px;
   font-weight: 900;
@@ -97,12 +97,15 @@ body {
 }
 
 .top-nav-button {
+  display: inline-flex;
+  align-items: center;
   min-height: 32px;
   padding: 6px 5px;
   border-radius: 0;
   color: #444d55;
   font-size: 11px;
   font-weight: 700;
+  text-decoration: none;
 }
 
 .top-nav-button:hover {
@@ -111,44 +114,6 @@ body {
   text-decoration: underline;
   text-underline-offset: 4px;
 }
-
-.top-nav-menu {
-  position: relative;
-}
-
-.top-nav-menu > summary {
-  display: flex;
-  align-items: center;
-  list-style: none;
-  cursor: pointer;
-}
-
-.top-nav-menu > summary::-webkit-details-marker { display: none; }
-.top-nav-menu > summary::after { content: "⌄"; margin-left: 4px; color: var(--faint); font-size: 9px; }
-.top-nav-menu[open] > summary { color: var(--green); }
-
-.top-nav-submenu {
-  position: absolute;
-  z-index: 30;
-  top: calc(100% + 8px);
-  right: 0;
-  min-width: 150px;
-  padding: 6px;
-  border: 1px solid var(--line-strong);
-  background: #fff;
-  box-shadow: 0 12px 28px rgba(16,24,32,.12);
-}
-
-.top-nav-submenu a {
-  display: block;
-  padding: 9px 10px;
-  color: var(--ink);
-  font-size: 11px;
-  font-weight: 700;
-  text-decoration: none;
-}
-
-.top-nav-submenu a:hover { background: var(--green-soft); color: var(--green-dark); }
 
 .source-note {
   color: var(--faint);
@@ -588,13 +553,11 @@ body .run-review-list li {
     white-space: nowrap;
   }
 
-  .top-actions #profile-nav {
+  .top-actions #account-nav {
     margin-left: auto;
     padding-left: 9px;
     border-left: 1px solid var(--line);
   }
-
-  .top-nav-submenu { right: auto; left: 0; }
 
   .app {
     padding: 22px 10px 80px;
