@@ -1,6 +1,7 @@
 import unittest
 
 from scripts import refresh_powered_cube_images as images
+from scripts.fetch_card_metadata import aliases
 
 
 class PoweredCubeImageRefreshTests(unittest.TestCase):
@@ -63,6 +64,11 @@ class PoweredCubeImageRefreshTests(unittest.TestCase):
         metadata = images.metadata_for_alias(card, "Back")
         self.assertEqual(metadata["image_url"], "https://cards.example/back.jpg")
         self.assertEqual(metadata["type_line"], "Land")
+
+    def test_flavor_names_are_resolved_as_card_aliases(self):
+        card = self.card(name="Spectacular Spider-Man", flavor_name="Ademi of the Silkchutes")
+        self.assertIn("Spectacular Spider-Man", set(aliases(card)))
+        self.assertIn("Ademi of the Silkchutes", set(aliases(card)))
 
     def test_patch_changes_display_fields_without_touching_gameplay_metadata(self):
         original = {
