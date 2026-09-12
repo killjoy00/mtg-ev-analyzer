@@ -70,6 +70,7 @@ body {
 }
 
 .brand-mark > sup {
+  position: relative;
   top: -.25em;
   font-family: var(--sans);
   font-size: 9px;
