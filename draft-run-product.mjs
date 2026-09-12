@@ -167,9 +167,9 @@ export function installDraftRunHome() {
       document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();location.href=url;},true);
   }
   onAppRender(()=>{
-    const intro=document.querySelector('.home-intro');if(!intro||document.querySelector('.draft-run-feature'))return;
+    const intro=document.querySelector('.home-intro');if(!intro||document.querySelector('[data-draft-run-home="1"]'))return;
     const copy=intro.querySelector('p:last-child');if(copy)copy.textContent='Ten tough choices from trophy drafts. Read the drafter’s pool, make your pick, and see how you did.';
-    intro.insertAdjacentHTML('afterend',`<section class="draft-run-feature"><div><p class="eyebrow">The Daily Draft Run</p><h2>Ten picks.<br>Your call.</h2><p>Different sets. Real trophy drafts.<span class="feature-new-line">One set reroll and one pack reroll when you need them.</span></p></div><div class="draft-run-feature-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a Draft Run</a><a class="text-button" href="${gameUrl('board=daily')}">See the Draft Run board</a><small>Free to play · No account needed</small></div></section>`);
+    intro.insertAdjacentHTML('afterend',`<section class="draft-run-feature" data-draft-run-home="1"><div><p class="eyebrow">The Daily Draft Run</p><h2>Ten picks.<br>Your call.</h2><p>Different sets. Real trophy drafts.<span class="feature-new-line">One set reroll and one pack reroll when you need them.</span></p></div><div class="draft-run-feature-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a Draft Run</a><a class="text-button" href="${gameUrl('board=daily')}">See the Draft Run board</a><small>Free to play · No account needed</small></div></section>`);
   });
   if(new URLSearchParams(location.search).has('legacy-board')) queueMicrotask(()=>document.querySelector('#leaderboard-nav')?.click());
 }
