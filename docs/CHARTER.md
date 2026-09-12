@@ -210,3 +210,8 @@ The archive omits complete P1P1 packs. Cube starts at the complete P1P2 decision
 Cube receives **two pack rerolls and no set reroll**, as explicitly chosen by the product owner. Each replacement comes from another Powered Cube trophy draft at similar depth and difficulty. The backend enforces the two-use budget, source exclusions, and environment boundary.
 
 Expansion Draft Run and Cube each have their own first-attempt Daily, Eastern-date schedule, leaderboard, and stored friend challenge. A player can play both Dailies on the same day. Account merges preserve the established first attempt separately for each environment. Trophy matches earn 100 in both games; the same partial-credit formula and ten-decision arithmetic mean apply.
+
+
+## Versioned difficulty policy
+
+See [SCORING-AND-DIFFICULTY.md](SCORING-AND-DIFFICULTY.md) for the unchanged trophy/partial-credit rules and `support-ratio-v1` difficulty. New ten-pick runs contain at most one easy pick, normally six medium and three hard picks; rerolls retain the band and stay within ten rating points of the original round. Existing schedules and friend packs retain their versioned behavior.
