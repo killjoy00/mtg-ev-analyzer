@@ -2,12 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const [migration, worker, bootstrap, api, product] = await Promise.all([
+const [migration, worker, bootstrap, api, product, growth] = await Promise.all([
   readFile(new URL('../migrations/0003_player_profiles.sql', import.meta.url), 'utf8'),
   readFile(new URL('../worker/growth-function.js', import.meta.url), 'utf8'),
   readFile(new URL('../bootstrap.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../growth-api.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../profile-product.mjs', import.meta.url), 'utf8'),
+  readFile(new URL('../growth.mjs', import.meta.url), 'utf8'),
 ]);
 
 test('identity merge preserves authoritative Daily attempt and moves guest history', () => {
@@ -32,11 +33,13 @@ test('public profile is opt-in and profile API supports history and lookup', () 
   assert.match(api, /lookupPublicProfiles/);
 });
 
-test('progression UI is installed without replacing the existing Stats surface', () => {
+test('progression UI keeps stats inside Account and preserves the career surface', () => {
   assert.match(bootstrap, /profile-product\.mjs/);
   assert.match(bootstrap, /installProfileProductLayer/);
   assert.match(product, /id = 'profile-nav'/);
   assert.doesNotMatch(product, /stats-nav.*remove/);
+  assert.doesNotMatch(growth, /id='stats-nav'/);
+  assert.match(growth, /id="account-stats"/);
   assert.match(product, /environmentProgress/);
   assert.match(product, /data-share-achievement/);
   assert.match(product, /data-share-daily/);

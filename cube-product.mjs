@@ -57,23 +57,17 @@ function cubeSectionMarkup() {
   const daily = poweredCubeUrl({ origin, mode: 'full', daily: today });
 
   return `
-    <section class="mode-section cube-mode-section" data-powered-cube-section="1" aria-labelledby="powered-cube-heading">
-      <div class="mode-section-heading">
-        <div><p class="eyebrow">Special format</p><h2 id="powered-cube-heading">Powered Cube</h2></div>
-        <p>Ten decisions from high-quality drafters who trophied in Powered Cube. The source omits full P1P1 packs, so start at P1P2 with the drafter’s real first pick visible.</p>
+    <section class="draft-run-feature cube-run-feature mode-section cube-mode-section" data-powered-cube-section="1" aria-labelledby="powered-cube-heading">
+      <div>
+        <p class="eyebrow">Powered Cube</p>
+        <h2 id="powered-cube-heading">Ten cube picks.<br>Your call.</h2>
+        <p>Real trophy drafts. Two pack rerolls, with every decision staying inside Powered Cube.</p>
       </div>
-      <div class="mode-grid cube-single-mode" aria-label="Powered Cube mode">
-        <article class="mode-card game-mode-row cube-mode-card">
-          <div class="mode-topline"><p class="eyebrow">10 trophy decisions</p><span class="best-chip">Powered Cube</span></div>
-          <h3>Powered Cube Run</h3>
-          <p>Read a different trophy drafter’s pool at each decision. Match their pick for 100 points. You get two pack rerolls, both from other Powered Cube trophy runs.</p>
-          <div class="button-row">
-            <button class="button primary" type="button" data-cube-href="${esc(daily)}">Today’s Cube</button>
-            <button class="button secondary" type="button" data-cube-href="${esc(run)}">New Cube Run</button>
-          </div>
-        </article>
+      <div class="draft-run-feature-actions" aria-label="Powered Cube runs">
+        <button class="button primary" type="button" data-cube-href="${esc(daily)}">Play today’s Cube</button>
+        <button class="button secondary" type="button" data-cube-href="${esc(run)}">Practice a Cube Run</button>
+        <small>Starts at P1P2 with the trophy drafter’s real first pick visible</small>
       </div>
-      <p class="set-meta">A separate Daily, leaderboard, and friend challenge flow. Every pack stays inside Powered Cube.</p>
     </section>`;
 }
 

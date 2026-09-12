@@ -369,9 +369,8 @@ function renderHome() {
 
   app.innerHTML = `
     <section class="home-intro">
-      <p class="eyebrow">LIMITED DRAFT GAME</p>
       <h1>Pack One</h1>
-      <p class="lede">One real opening pack. Make your picks, see how you line up with strong-player consensus, then put the same pack in front of a friend.</p>
+      <p class="lede">Ten pack one choices for you to make across real trophy drafts.</p>
     </section>
 
     <section class="set-bar" aria-label="Set selection">

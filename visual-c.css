@@ -49,12 +49,33 @@ body {
 }
 
 .brand-mark {
+  position: relative;
   width: 32px;
   height: 32px;
-  border-radius: 0;
-  background: var(--green);
-  font-size: 11px;
-  letter-spacing: .04em;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 1px;
+  border: 1px solid var(--green);
+  background: linear-gradient(135deg, #fff 0 54%, var(--green-soft) 54% 100%);
+  color: var(--green-dark);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.brand-mark > span {
+  font-size: 18px;
+  font-style: italic;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.brand-mark > sup {
+  position: relative;
+  top: -.25em;
+  font-family: var(--sans);
+  font-size: 9px;
+  font-weight: 900;
+  line-height: 1;
 }
 
 .brand-copy strong {
@@ -90,6 +111,44 @@ body {
   text-decoration: underline;
   text-underline-offset: 4px;
 }
+
+.top-nav-menu {
+  position: relative;
+}
+
+.top-nav-menu > summary {
+  display: flex;
+  align-items: center;
+  list-style: none;
+  cursor: pointer;
+}
+
+.top-nav-menu > summary::-webkit-details-marker { display: none; }
+.top-nav-menu > summary::after { content: "⌄"; margin-left: 4px; color: var(--faint); font-size: 9px; }
+.top-nav-menu[open] > summary { color: var(--green); }
+
+.top-nav-submenu {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 150px;
+  padding: 6px;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  box-shadow: 0 12px 28px rgba(16,24,32,.12);
+}
+
+.top-nav-submenu a {
+  display: block;
+  padding: 9px 10px;
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.top-nav-submenu a:hover { background: var(--green-soft); color: var(--green-dark); }
 
 .source-note {
   color: var(--faint);
@@ -464,6 +523,22 @@ body .run-review-list li {
   border-color: var(--line);
 }
 
+.app-footer {
+  width: min(var(--content), 100%);
+  margin: 0 auto;
+  padding: 30px 24px 42px;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 24px;
+  border-top: 1px solid var(--line);
+}
+
+.app-footer nav { display: flex; flex-wrap: wrap; gap: 18px; }
+.app-footer a { color: var(--muted); font-size: 11px; font-weight: 700; text-decoration: none; }
+.app-footer a:hover { color: var(--green-dark); text-decoration: underline; text-underline-offset: 4px; }
+.is-game .app-footer { display: none; }
+
 @media (max-width: 700px) {
   .topbar {
     min-height: 0;
@@ -513,11 +588,13 @@ body .run-review-list li {
     white-space: nowrap;
   }
 
-  .top-actions #stats-nav {
+  .top-actions #profile-nav {
     margin-left: auto;
     padding-left: 9px;
     border-left: 1px solid var(--line);
   }
+
+  .top-nav-submenu { right: auto; left: 0; }
 
   .app {
     padding: 22px 10px 80px;
@@ -558,6 +635,13 @@ body .run-review-list li {
   body .run-card-select > span {
     margin-top: 6px;
     font-size: 11px;
+  }
+
+  .app-footer {
+    padding: 24px 10px 34px;
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
   }
 
   body .run-zoom {

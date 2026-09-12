@@ -86,11 +86,9 @@ function resultChallengeActions() {
   actions.prepend(button);
 }
 function nav() {
-  const top=document.querySelector('.top-actions'); if(!top || top.querySelector('#stats-nav')) return;
-  const stats=document.createElement('button'); stats.className='top-nav-button'; stats.id='stats-nav'; stats.type='button'; stats.textContent='Stats'; stats.addEventListener('click',()=>{event('stats_view'); void renderStats();});
+  const top=document.querySelector('.top-actions'); if(!top || top.querySelector('#account-nav')) return;
   const account=document.createElement('button'); account.className='top-nav-button'; account.id='account-nav'; account.type='button'; account.textContent='Account'; account.addEventListener('click',()=>{event('account_view'); void renderAccount();});
-  top.insertBefore(stats, top.querySelector('.source-note'));
-  top.insertBefore(account, top.querySelector('.source-note'));
+  top.append(account);
 }
 function localSummary(items) {
   const scores=items.map((x)=>Number(x.score)).filter(Number.isFinite);
@@ -134,7 +132,8 @@ async function renderAccount() {
     document.querySelector('#account-signout')?.addEventListener('click',async()=>{await signOutAccount();currentAccount=null;event('auth_sign_out');void renderAccount();});
     return;
   }
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Your player record</p><h1>Save your progress.</h1><p>Keep your games, streaks, and milestones across devices. Playing is always free, with or without an account.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><button class="text-button" id="account-home">Keep playing as guest</button></section>`;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Your player record</p><h1>Save your progress.</h1><p>Keep your games, streaks, and milestones across devices. Playing is always free, with or without an account.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><div class="account-actions"><button class="button secondary" id="account-stats">View My Stats</button><button class="text-button" id="account-home">Keep playing as guest</button></div></section>`;
+  document.querySelector('#account-stats')?.addEventListener('click',()=>void renderStats());
   document.querySelector('#account-home')?.addEventListener('click',()=>document.querySelector('#brand-home')?.click());
   document.querySelector('#account-signup')?.addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget,err=f.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(f));await signUpAccount(data);await claimCurrentSession();event('auth_sign_up');await renderAccount();}catch(x){err.textContent=x.message;}});
   document.querySelector('#account-signin')?.addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget,err=f.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(f));await signInAccount(data);await claimCurrentSession();event('auth_sign_in');await renderAccount();}catch(x){err.textContent=x.message;}});
