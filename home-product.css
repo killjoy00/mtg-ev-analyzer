@@ -3,4 +3,5 @@
 .home-mode-tabs a.active{color:var(--ink);border-bottom-color:var(--ink)}
 .home-mode-tabs a:focus-visible{outline:2px solid currentColor;outline-offset:4px}
 .home-page .set-bar[hidden],.home-page .daily-feature[hidden],.home-page .mode-section[hidden],.home-page .data-note[hidden],.home-page .draft-run-feature[hidden],.home-page .cube-mode-section[hidden],#home-editorial[hidden]{display:none!important}
+.mode-grid[aria-label="Opening pack practice"] .mode-card:nth-child(2){order:-1}
 @media(max-width:600px){.home-mode-tabs{gap:18px;margin:12px 0 22px}.home-mode-tabs a{font-size:12px}}
