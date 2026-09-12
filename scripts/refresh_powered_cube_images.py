@@ -5,6 +5,11 @@ This is display-only. It updates the static replay shards hydrated from R2, the
 checked-in verified Cube baseline corpus, and the supplemental card-image map.
 Puzzle identity, source evidence, scoring, candidate identity, probabilities,
 and pick trajectories are asserted unchanged.
+
+Printing selection intentionally uses Scryfall's bulk ``default_cards`` export
+rather than per-card API searches. That gives us every printing in one download,
+avoids rate-limit-sensitive lookup loops, and makes the selected image fully
+deterministic for a given Scryfall bulk snapshot.
 """
 from __future__ import annotations
 
@@ -12,14 +17,28 @@ import gzip
 import hashlib
 import json
 from pathlib import Path
+import tempfile
 import time
+import urllib.error
 from typing import Iterable, Optional
 
 try:
-    from import_powered_cube import _bulk_cards, _named_card, request, JSON_ACCEPT
+    from import_powered_cube import (
+        SCRYFALL_BULK_URL,
+        _named_card,
+        iter_oracle_bulk,
+        request,
+        JSON_ACCEPT,
+    )
     from fetch_card_metadata import aliases
 except ModuleNotFoundError:
-    from scripts.import_powered_cube import _bulk_cards, _named_card, request, JSON_ACCEPT
+    from scripts.import_powered_cube import (
+        SCRYFALL_BULK_URL,
+        _named_card,
+        iter_oracle_bulk,
+        request,
+        JSON_ACCEPT,
+    )
     from scripts.fetch_card_metadata import aliases
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,7 +132,6 @@ def printing_rank(card: dict, alias: str) -> tuple[int, int, int]:
     effects = set(card.get("frame_effects") or [])
     if effects & BAD_FRAME_EFFECTS:
         penalty += 2_000
-    # Prefer a paper printing when the exact card exists in both paper and Arena.
     if card.get("digital"):
         penalty += 250
     frame = str(card.get("frame") or "")
@@ -126,47 +144,82 @@ def printing_rank(card: dict, alias: str) -> tuple[int, int, int]:
     return (penalty, frame_rank, release_rank)
 
 
-def printings(card: dict, alias: str) -> Iterable[dict]:
-    url = str(card.get("prints_search_uri") or "")
-    if not url.startswith("https://api.scryfall.com/"):
-        return []
-    result: list[dict] = []
-    while url:
-        with request(url, accept=JSON_ACCEPT, timeout=60) as response:
-            payload = json.load(response)
-        for candidate in payload.get("data") or []:
-            if alias in set(aliases(candidate)) and image_url(candidate, alias):
-                result.append(candidate)
-        url = str(payload.get("next_page") or "") if payload.get("has_more") else ""
-        if url:
-            time.sleep(0.12)
-    return result
+def bulk_download_uri(payload: dict, bulk_type: str) -> str:
+    entries = payload.get("data") if isinstance(payload, dict) else None
+    if not isinstance(entries, list):
+        raise ValueError("Scryfall bulk-data discovery returned no data list.")
+    entry = next(
+        (item for item in entries if isinstance(item, dict) and item.get("type") == bulk_type),
+        None,
+    )
+    if entry is None:
+        raise ValueError(f"Scryfall bulk-data discovery did not include {bulk_type}.")
+    url = str(entry.get("jsonl_download_uri") or entry.get("download_uri") or "")
+    if not url.startswith("https://"):
+        raise ValueError(f"Scryfall {bulk_type} metadata had no HTTPS bulk download URI.")
+    return url
 
 
-def preferred_print(card: dict, alias: str) -> dict:
-    if not special_flags(card) and image_url(card, alias):
-        return card
-    candidates = [card, *printings(card, alias)]
-    return min(candidates, key=lambda candidate: printing_rank(candidate, alias))
+def all_printings() -> Iterable[dict]:
+    """Yield every Scryfall printing from one bulk download."""
+    with request(SCRYFALL_BULK_URL, accept=JSON_ACCEPT, timeout=60) as response:
+        discovery = json.load(response)
+    url = bulk_download_uri(discovery, "default_cards")
+    with tempfile.TemporaryDirectory(prefix="pack1-scryfall-printings-") as tmp:
+        path = Path(tmp) / "default-cards.bulk"
+        with request(
+            url,
+            accept="application/x-ndjson,application/json;q=0.9,application/gzip;q=0.8,*/*;q=0.7",
+            timeout=300,
+        ) as response:
+            with path.open("wb") as handle:
+                while True:
+                    chunk = response.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    handle.write(chunk)
+        if path.stat().st_size < 1024:
+            raise ValueError("Scryfall default_cards bulk download was unexpectedly small.")
+        yield from iter_oracle_bulk(path)
+
+
+def named_card_with_retry(name: str, attempts: int = 5) -> Optional[dict]:
+    """Small fallback only for aliases absent from the bulk printing export."""
+    for attempt in range(attempts):
+        try:
+            return _named_card(name)
+        except urllib.error.HTTPError as exc:
+            if exc.code != 429 or attempt + 1 >= attempts:
+                raise
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            try:
+                delay = max(1.0, float(retry_after)) if retry_after else 1.0 + attempt
+            except ValueError:
+                delay = 1.0 + attempt
+            time.sleep(delay)
+    return None
 
 
 def resolve_standard_metadata(names: set[str]) -> tuple[dict[str, dict], list[str], dict[str, list[str]]]:
-    source_cards: dict[str, dict] = {}
-    for card in _bulk_cards():
-        for alias in aliases(card):
-            if alias in names and alias not in source_cards:
-                source_cards[alias] = card
+    candidates: dict[str, list[dict]] = {name: [] for name in names}
+    for card in all_printings():
+        card_aliases = set(aliases(card)) & names
+        for alias in card_aliases:
+            if image_url(card, alias):
+                candidates[alias].append(card)
 
     records: dict[str, dict] = {}
     remaining_flags: dict[str, list[str]] = {}
     for name in sorted(names):
-        card = source_cards.get(name)
-        if card is None:
-            card = _named_card(name)
-            time.sleep(0.12)
-        if card is None:
+        options = candidates.get(name) or []
+        if not options:
+            fallback = named_card_with_retry(name)
+            if fallback and image_url(fallback, name):
+                options = [fallback]
+                time.sleep(0.15)
+        if not options:
             continue
-        chosen = preferred_print(card, name)
+        chosen = min(options, key=lambda candidate: printing_rank(candidate, name))
         metadata = metadata_for_alias(chosen, name)
         if metadata:
             records[name] = metadata
@@ -259,9 +312,9 @@ def main() -> int:
             "candidates": [{k: v for k, v in card.items() if k not in DISPLAY_FIELDS} for card in puzzle.get("candidates") or []],
             "prior_picks": [{k: v for k, v in card.items() if k not in DISPLAY_FIELDS} for card in puzzle.get("prior_picks") or []],
         }
-        candidates, changed = patch_card_list(puzzle.get("candidates") or [], records, ids_by_name)
+        candidates_list, changed = patch_card_list(puzzle.get("candidates") or [], records, ids_by_name)
         prior, prior_changed = patch_card_list(puzzle.get("prior_picks") or [], records, ids_by_name)
-        puzzle["candidates"] = candidates
+        puzzle["candidates"] = candidates_list
         puzzle["prior_picks"] = prior
         corpus_card_changes += changed + prior_changed
         refreshed = {
@@ -271,7 +324,7 @@ def main() -> int:
         }
         if original != refreshed:
             raise ValueError(f"Puzzle {puzzle.get('puzzle_id')} changed outside display metadata.")
-        if any(not str(card.get("image_url") or "").startswith("https://") for card in candidates + prior):
+        if any(not str(card.get("image_url") or "").startswith("https://") for card in candidates_list + prior):
             raise ValueError(f"Puzzle {puzzle.get('puzzle_id')} lost an image URL.")
 
     corpus_sha = write_corpus(corpus)
@@ -297,7 +350,7 @@ def main() -> int:
     mapping = [{"name": name, **records[name]} for name in sorted(records)]
     MAP_PATH.write_text(json.dumps(mapping, indent=2) + "\n", encoding="utf-8")
     report = {
-        "policy": "standard-readable-v1",
+        "policy": "standard-readable-v2-bulk",
         "card_names": len(names),
         "resolved_names": len(records),
         "unresolved_names": unresolved,
