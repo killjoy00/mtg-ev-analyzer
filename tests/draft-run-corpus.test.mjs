@@ -26,7 +26,7 @@ test('unanswered payloads contain neither the answer nor model rankings, support
   const p=all.find(p=>p.pick_number===2);const visible=publicDraftRunPuzzle(p);
   assert.equal(visible.prior_picks.length,1);
   assert.doesNotMatch(JSON.stringify(visible),/model_probability|historical_pick|source_draft|consensus|win_rate/);
-  assert.deepEqual(Object.keys(visible).sort(),['candidates','difficulty','pick_number','prior_picks','puzzle_id','set_id']);
+  assert.deepEqual(Object.keys(visible).sort(),['candidates','difficulty','pack_number','pick_number','prior_picks','puzzle_id','set_id']);
 });
 test('seeded runs and preserved legacy rerolls obey early picks, buckets and source exclusions',()=>{
   for(let i=0;i<40;i++){
@@ -39,7 +39,7 @@ test('seeded runs and preserved legacy rerolls obey early picks, buckets and sou
       assert.ok(eligiblePickForRound(round,source.pick_number));
       for(const order of [['set','pack'],['pack','set']]){
         let current=source,seen=run.map(p=>p.source_draft_hash);
-        for(const type of order){const p=selectDraftRunReroll(pool,current,{type,round,seed,excludedSources:seen,difficultyVersion:'legacy'});assert.ok(p);assert.ok(eligiblePickForRound(round,p.pick_number));assert.ok(!seen.includes(p.source_draft_hash));assert.equal(p.set_id===current.set_id,type==='pack');seen.push(p.source_draft_hash);current=p;}
+        for(const type of order){const p=selectDraftRunReroll(pool,current,{type,round,seed,excludedSources:seen,difficultyVersion:'legacy',selectionVersion:'balanced-v1'});assert.ok(p);assert.ok(eligiblePickForRound(round,p.pick_number));assert.ok(!seen.includes(p.source_draft_hash));assert.equal(p.set_id===current.set_id,type==='pack');seen.push(p.source_draft_hash);current=p;}
       }
     });
   }
@@ -70,11 +70,11 @@ test('trophy coverage matches every loaded environment and preserves true openin
     const rows=pool.filter(p=>p.set_id===set.id),environment=set.id==='powered-cube'?set.id:'mixed';
     assert.ok(new Set(rows.map(p=>p.source_draft_hash)).size>=12,set.id);
     for(let round=0;round<10;round++){
-      const choices=rows.filter(p=>eligiblePickForRound(round,p.pick_number,environment));
+      const choices=rows.filter(p=>eligiblePickForRound(round,p.pick_number,environment,'balanced-v1'));
       if(round===0 && set.first_pick===2 && environment==='mixed') {assert.equal(choices.length,0);continue;}
       assert.ok(choices.length>=12,`${set.id} round ${round+1}`);
       const source=choices[0];
-      const replacement=selectDraftRunReroll(pool,source,{type:'pack',round,seed:'all-sets',environment});
+      const replacement=selectDraftRunReroll(pool,source,{type:'pack',round,seed:'all-sets',environment,selectionVersion:'balanced-v1'});
       assert.ok(replacement,`${set.id} needs a same-set reroll at round ${round+1}`);
       assert.equal(replacement.set_id,set.id);
     }

@@ -1,0 +1,58 @@
+{
+  "selection_version": "first-pack-v2",
+  "source_pack": 1,
+  "max_pick": {
+    "mixed": 10,
+    "powered-cube": 11
+  },
+  "selectable_only_sets": [
+    "hbg",
+    "sir",
+    "pio"
+  ],
+  "regular_sets_newest_first": [
+    "hob",
+    "msh",
+    "sos",
+    "tmt",
+    "ecl",
+    "tla",
+    "eoe",
+    "fin",
+    "tdm",
+    "dft",
+    "fdn",
+    "dsk",
+    "blb",
+    "mh3",
+    "otj",
+    "mkm",
+    "ktk",
+    "lci",
+    "woe",
+    "ltr",
+    "mom",
+    "one",
+    "bro",
+    "dmu",
+    "snc",
+    "neo",
+    "vow",
+    "mid",
+    "stx"
+  ],
+  "daily_weight_tiers": [
+    {
+      "count": 6,
+      "weight": 1.25
+    },
+    {
+      "count": 6,
+      "weight": 1.1
+    }
+  ],
+  "retired_set_fingerprints": [
+    "f8272fb2c87fbdf3e6c933649a30f2663ba60983247b85ec223fc22b08358988",
+    "79b159b843b0aaba706b57fc165afa2d49c3680c43503ed36af6b4f66cbade5b"
+  ]
+}

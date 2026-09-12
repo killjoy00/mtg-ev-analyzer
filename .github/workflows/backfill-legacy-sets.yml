@@ -2,11 +2,6 @@ name: backfill-legacy-sets
 
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths:
-      - 'scripts/backfill_legacy_sets.py'
-      - 'tests/test_legacy_skill_backfill.py'
 
 permissions:
   contents: write

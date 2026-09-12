@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Backfill legacy 17Lands draft sets whose draft_data lacks skill history.
 
-VOW, MID, AFR, and STX predate the draft-data schema that exposes both
+VOW, MID, and STX predate the draft-data schema that exposes both
 ``user_game_win_rate_bucket`` and ``rank``. Their matching legacy game_data
 still carries Arena rank plus ``user_n_games_bucket``. For these frozen sets we
 select an experienced, high-ranked Arena cohort instead of inventing a win rate
@@ -68,7 +68,7 @@ except ImportError:  # Script execution from scripts/.
     )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SETS = ("VOW", "MID", "AFR", "STX")
+DEFAULT_SETS = ("VOW", "MID", "STX")
 PUBLIC_GAME_URL = (
     "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/"
     "game_data_public.{code}.{format}.csv.gz"

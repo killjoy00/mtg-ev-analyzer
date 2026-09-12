@@ -4,7 +4,7 @@
 
 Import run [34563202962](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/34563202962) completed archive validation, development loading/gameplay, and production loading/gameplay. Production has 1,024,873 verified decisions from 95,730 trophy drafts across 32 expansion environments and Powered Cube; 1,003,025 decisions pass the interesting-decision filter, including 11,091 Cube decisions. Every serving set's count matches its completed import manifest.
 
-The complete official Premier archive inventory was scanned, independently of the replay sample. The 33 serving archives' ETags and byte sizes still matched their import manifests during this review. This is complete processing of available public archives, not every draft ever played or every recent 17Lands draft. KHM has no public draft archive; AFR cannot establish the required quality joins. Of 95,748 quality-qualified trophies, 18 have no renderable decisions because of unresolved images (15 Cube, two TMT, one HBG). Those drafts remain explicitly excluded. Partial-prefix exclusions can also remove later decisions from an included draft.
+The complete official Premier archive inventory was scanned, independently of the replay sample. The 33 serving archives' ETags and byte sizes still matched their import manifests during this review. This is complete processing of available public archives, not every draft ever played or every recent 17Lands draft. Of 95,748 quality-qualified trophies, 18 have no renderable decisions because of unresolved images (15 Cube, two TMT, one HBG). Those drafts remain explicitly excluded. Partial-prefix exclusions can also remove later decisions from an included draft.
 
 ## Partial credit: trophy-consensus-v2 (retained)
 
@@ -48,7 +48,7 @@ Normalized support entropy (spread across the whole pack), top support gap, cand
 
 ## Ten-question composition and rerolls
 
-New schedules and ordinary practice runs target **one easy, six medium, three hard**, with their order deterministically shuffled. If an easy slot has no eligible puzzle, it becomes medium. Medium/hard shortages fail explicitly rather than silently creating an all-hard or easy-heavy game. Existing pick-depth windows, distinct source drafts, and preference for distinct expansion environments still apply. Sets are selected uniformly among eligible sets before selecting a puzzle, so a large archive does not dominate.
+New schedules and ordinary practice runs target **one easy, six medium, three hard**. Selection policy `first-pack-v2` puts the easy slot in the first six rounds and two of the hard slots in the final four. Each segment is deterministically shuffled. If an easy slot has no eligible puzzle, it becomes medium. Medium/hard shortages fail explicitly rather than silently creating an all-hard or easy-heavy game. Existing pick-depth windows, distinct source drafts, and preference for distinct expansion environments still apply. Practice selects uniformly among eligible sets; the Daily uses the modest recency weights documented in DATA-MANAGEMENT.md. A large archive does not dominate.
 
 For each reroll:
 
@@ -70,3 +70,5 @@ Sessions store `difficulty_version` and ten `difficulty_anchors`; daily schedule
 Deploy sequence: apply migration on development, complete the rating backfill, check SQL/JavaScript rating parity and coverage, and test real gameplay. Then apply/backfill production before deploying the same backend code. The frontend tolerates older responses without a difficulty field. Rollback may restore the prior backend and frontend while leaving additive rating tables and columns in place.
 
 Next calibration should use first-attempt human results: trophy-match rate, mean earned score, response time, reroll rate, and completion by difficulty band, pick depth, and environment. Separate QA/guest test sessions and model-target disagreement. Any future threshold or formula change gets a new version; historical scores are not silently rewritten.
+
+Current source caps, set roles, retirement controls and the full per-set audit are documented in [DATA-MANAGEMENT.md](DATA-MANAGEMENT.md).
