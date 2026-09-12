@@ -72,6 +72,7 @@ Apply `0011_decision_measurements.sql` in development, then run:
 
 ```
 node tests/decision-measurements-backend-smoke.mjs /path/to/dev.connection --dev-fixtures
+node tests/measurement-report-math.mjs /path/to/dev.connection --dev-fixtures
 ```
 
 The integration test verifies account/admin separation, invitation claim,
@@ -79,6 +80,9 @@ idempotent views and answers, repeated encounters, reload timing, rerolls,
 inactivity/resume and QA exclusions. Fixtures are marked QA and their temporary
 admin access/session is removed. Unit tests cover timing and input validation;
 CI's admin browser contract covers mobile layout, filters, details and CSV.
+The arithmetic fixture checks a known five-answer cohort: 40% trophy matches,
+50 average partial credit, 3-second median, 4.6-second P90, one review decision
+and five choices in its detail report.
 
 Apply the additive migration in production before deploying the updated API,
 then deploy the frontend. Verify public report requests return 401 and ordinary
