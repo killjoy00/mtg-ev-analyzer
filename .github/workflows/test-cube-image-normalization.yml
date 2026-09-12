@@ -1,0 +1,44 @@
+name: test Cube image normalization
+
+on:
+  push:
+    branches: [fix-cube-standard-images]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  normalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Hydrate replay shards from R2
+        run: bash scripts/r2_replay_shards.sh hydrate
+      - name: Normalize Cube images without publishing
+        run: python scripts/refresh_powered_cube_images.py
+      - name: Run tests
+        run: npm test
+      - name: Audit datasets
+        run: python scripts/audit_datasets.py --fail-on-error
+      - name: Upload diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: cube-image-normalization-diagnostics
+          retention-days: 1
+          path: |
+            generated/powered-cube-standard-images.json
+            generated/powered-cube-image-refresh-report.json
