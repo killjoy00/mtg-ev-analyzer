@@ -32,8 +32,9 @@ test('Draft Run is ten questions with progressively wider first-pack windows', (
   assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[0], [1, 1]);
   assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[1], [2, 2]);
   assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[2], [3, 3]);
-  assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[9], [8, 11]);
-  assert.equal(eligiblePickForRound(3, 3), true);
+  assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[9], [8, 10]);
+  assert.equal(eligiblePickForRound(3, 3), false);
+  assert.equal(eligiblePickForRound(3, 4), true);
   assert.equal(eligiblePickForRound(3, 5), true);
   assert.equal(eligiblePickForRound(3, 6), false);
 });

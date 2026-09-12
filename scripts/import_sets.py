@@ -72,6 +72,11 @@ class ImportResult:
 
 
 def normalize_code(value: str) -> str:
+    try:
+        from .set_policy import require_supported_set
+    except ImportError:
+        from set_policy import require_supported_set
+    require_supported_set(value)
     code = value.strip().upper()
     if not CODE_RE.fullmatch(code):
         raise ValueError(f"Invalid expansion code: {value!r}")
@@ -222,7 +227,11 @@ def discover_missing_sets(
     if limit < 1:
         raise ValueError("limit must be at least 1")
     existing = catalog_codes(catalog)
-    scryfall_sets = fetch_sets(earliest)
+    try:
+        from .set_policy import supported_set
+    except ImportError:
+        from set_policy import supported_set
+    scryfall_sets = [(code,date) for code,date in fetch_sets(earliest) if supported_set(code)]
 
     # Confirm that archive probing works before interpreting 403 as "missing".
     for known_code, known_release in scryfall_sets:

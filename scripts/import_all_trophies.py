@@ -27,6 +27,7 @@ from build_replays import (CountStore, OutOfFoldModel, DraftSkill, stable_fold,
     render_replay, parse_rate_bucket, parse_games_lower_bound, slugify)
 from backfill_legacy_sets import arena_rank_proxy, arena_rank_tier, _game_order
 from fetch_card_metadata import compact_card, aliases
+from set_policy import supported_set, require_supported_set
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = 'elite-trophy-verified-v6'
@@ -63,6 +64,7 @@ def premier_sources(document):
     for row in document['results'][0]['data']['datasets']:
         if ''.join(x.get('text','') for x in row['format']) != 'PremierDraft': continue
         label = ''.join(x.get('text','') for x in row['expansion'])
+        if not supported_set(label): continue
         links = [s['data']['url'] for x in row['draft_data'] for s in x.get('spans',[]) if s.get('type')=='hyperlink']
         if not links:
             unavailable.append({'expansion':label,'reason':'no_public_draft_archive'}); continue
@@ -70,6 +72,7 @@ def premier_sources(document):
         match = re.fullmatch(re.escape(BASE) + r'/draft_data/draft_data_public\.([\w-]+)\.PremierDraft\.csv\.gz',links[0])
         if not match: raise ValueError('Unexpected Premier archive URL')
         expansion = match[1]; sid = 'powered-cube' if expansion=='Cube_-_Powered' else expansion.lower()
+        if not supported_set(sid): continue
         if sid in result and result[sid]!=expansion: raise ValueError('Duplicate environment identity')
         result[sid]=expansion
     if not result: raise ValueError('No Premier archives discovered')
@@ -211,6 +214,7 @@ def collect(path, training_ids, output_ids, header):
 
 def trajectory(examples, last_pick):
     """Return only a contiguous, source-verified prefix; never invent a missing card."""
+    if any(p.raw_pack_number != 0 for p in examples): return [], [], 'non_first_pack'
     ordered = sorted(examples, key=lambda p:p.raw_pick_number)
     if not ordered: return [], [], 'missing_opening_trajectory'
     first = ordered[0].raw_pick_number
@@ -272,6 +276,8 @@ def write_gzip_jsonl(path, values):
 
 
 def build_set(sid, output_dir, refresh=False, discovered_expansion=None):
+    require_supported_set(sid)
+    if discovered_expansion: require_supported_set(discovered_expansion)
     started = time.monotonic(); root = ROOT; directory = Path(output_dir)/sid; directory.mkdir(parents=True, exist_ok=True)
     catalog = json.loads((root/'corpus/draft-run/catalog.json').read_text())
     base_entry = next((s for s in catalog['sets'] if s['id']==sid), None)

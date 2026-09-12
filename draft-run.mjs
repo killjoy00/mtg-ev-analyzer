@@ -1,6 +1,7 @@
 import { rankCandidates } from './scoring.mjs';
 import { seededRandom } from './gameplay.mjs';
 import {rateDraftRunPuzzle,publicDifficulty,DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from './draft-run-difficulty.mjs';
+import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,eligibleRunPuzzle,regularRunSet,chooseRunSet,runDifficultyBands} from './draft-run-policy.mjs';
 
 const SUPPORT_EXPONENT = 1;
 const EPSILON = 1e-9;
@@ -9,7 +10,7 @@ export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-verified-v6';
 export const POWERED_CUBE_ENVIRONMENT = 'powered-cube';
 
 export const DRAFT_RUN_LENGTH = 10;
-export const DRAFT_RUN_PICK_WINDOWS = Object.freeze([
+const PREVIOUS_PICK_WINDOWS = Object.freeze([
   [1, 1],
   [2, 2],
   [3, 3],
@@ -23,9 +24,11 @@ export const DRAFT_RUN_PICK_WINDOWS = Object.freeze([
 ]);
 // Cube's archive omits complete P1P1 packs. Keep true pick positions and show
 // the actual inherited first pick instead of inventing an opening pack.
-export const CUBE_PICK_WINDOWS = Object.freeze([
+const PREVIOUS_CUBE_WINDOWS = Object.freeze([
   [2,2], [3,3], [4,4], [4,6], [5,7], [6,8], [6,9], [7,10], [8,11], [9,12],
 ]);
+export const DRAFT_RUN_PICK_WINDOWS = Object.freeze([[1,1],[2,2],[3,3],[4,5],[5,6],[6,7],[7,8],[8,9],[8,10],[8,10]]);
+export const CUBE_PICK_WINDOWS = Object.freeze(DRAFT_RUN_PICK_WINDOWS.map(([a,b])=>[a+1,b+1]));
 
 export function draftRunEnvironment(value = 'mixed') {
   if (!['mixed', POWERED_CUBE_ENVIRONMENT].includes(value)) throw new Error('Invalid Draft Run environment.');
@@ -149,8 +152,9 @@ export function draftRunRerollDistance(source, candidate) {
   return (pickDistance * 0.35) + (countDistance * 0.15) + (gapDistance * 0.25) + (entropyDistance * 0.15) + (poolDistance * 0.10);
 }
 
-export function eligiblePickForRound(roundIndex, pickNumber, environment = 'mixed') {
-  const window = (environment === POWERED_CUBE_ENVIRONMENT ? CUBE_PICK_WINDOWS : DRAFT_RUN_PICK_WINDOWS)[Number(roundIndex)];
+export function eligiblePickForRound(roundIndex, pickNumber, environment = 'mixed', selectionVersion=DRAFT_RUN_SELECTION_VERSION) {
+  const previous=selectionVersion===PREVIOUS_SELECTION_VERSION;
+  const window = (environment === POWERED_CUBE_ENVIRONMENT ? (previous?PREVIOUS_CUBE_WINDOWS:CUBE_PICK_WINDOWS) : (previous?PREVIOUS_PICK_WINDOWS:DRAFT_RUN_PICK_WINDOWS))[Number(roundIndex)];
   if (!window) return false;
   const pick = Number(pickNumber);
   return Number.isInteger(pick) && pick >= window[0] && pick <= window[1];
@@ -166,6 +170,7 @@ export function validateDraftRunPuzzle(puzzle) {
   const rateSkill = puzzle?.skill_evidence === 'win_rate_bucket' &&
     Number(puzzle?.player_win_rate_bucket) >= 0.6 && Number(puzzle?.player_win_rate_bucket) <= 1;
   return puzzle?.corpus_version === DRAFT_RUN_CORPUS_VERSION &&
+    Number(puzzle.pack_number??1)===1 &&
     Number(puzzle.event_match_wins) === 7 && Number(puzzle.player_games_lower_bound) >= 100 &&
     (legacySkill || rateSkill) && puzzle.source_evidence === 'official_archive_trajectory' &&
     Number.isInteger(pick) && pick >= (puzzle.set_id === POWERED_CUBE_ENVIRONMENT ? 2 : 1) &&
@@ -185,14 +190,13 @@ export function interestingDraftRunPuzzle(puzzle) {
   return ranked.length >= 4 && a > 0 && a <= 0.75 && b / a >= 0.2;
 }
 
-export function selectDraftRun(pool, seed, environment = 'mixed') {
+export function selectDraftRun(pool, seed, environment = 'mixed', {daily=false}={}) {
   const random = seededRandom(seed);
-  const sorted = poolForEnvironment(pool, environment).sort((a,b) => a.puzzle_id.localeCompare(b.puzzle_id));
+  const sorted = poolForEnvironment(pool, environment).filter(p=>eligibleRunPuzzle(p)&&(environment==='powered-cube'||regularRunSet(p.set_id))).sort((a,b) => a.puzzle_id.localeCompare(b.puzzle_id));
   const bandsByPuzzle = new Map(sorted.map(p=>[p.puzzle_id,rateDraftRunPuzzle(p).band]));
   // Shuffle the composition, so difficulty does not disclose the round's role.
   // An unavailable easy slot can become medium; never exceed one easy choice.
-  const bands = ['easy',...Array(6).fill('medium'),...Array(3).fill('hard')];
-  for(let i=bands.length-1;i>0;i--) {const j=Math.floor(random()*(i+1));[bands[i],bands[j]]=[bands[j],bands[i]];}
+  const bands = runDifficultyBands(random);
   const selected = [], sources = new Set(), sets = new Set();
   for (let round = 0; round < DRAFT_RUN_LENGTH; round++) {
     let available = sorted.filter(p => eligiblePickForRound(round,p.pick_number,environment) && !sources.has(p.source_draft_hash));
@@ -208,7 +212,7 @@ export function selectDraftRun(pool, seed, environment = 'mixed') {
     }
     // Equal chance per environment: large sets must not crowd out small sets.
     const setIds = [...new Set(available.map(p => p.set_id))].sort();
-    const setId = setIds[Math.floor(random() * setIds.length)];
+    const setId = chooseRunSet(setIds,random,daily);
     available = available.filter(p => p.set_id === setId);
     if (!available.length) throw new Error('Not enough verified puzzles for a balanced run.');
     const chosen = available[Math.floor(random() * available.length)];
@@ -217,16 +221,17 @@ export function selectDraftRun(pool, seed, environment = 'mixed') {
   return selected;
 }
 
-export function selectDraftRunReroll(pool, source, { type, round, seed, excludedSources = [], environment = 'mixed', difficultyVersion = DRAFT_RUN_DIFFICULTY_VERSION, anchor = null }) {
+export function selectDraftRunReroll(pool, source, { type, round, seed, excludedSources = [], environment = 'mixed', difficultyVersion = DRAFT_RUN_DIFFICULTY_VERSION, selectionVersion=DRAFT_RUN_SELECTION_VERSION,daily=false, anchor = null }) {
   if (!['set','pack'].includes(type)) throw new Error('Invalid reroll.');
   if (environment === POWERED_CUBE_ENVIRONMENT && type === 'set') throw new Error('Cube rerolls stay within Powered Cube.');
   const excluded = new Set([...excludedSources,source.source_draft_hash]);
   const sourceRating = rateDraftRunPuzzle(source);
   const origin = anchor || sourceRating;
   if (![LEGACY_DIFFICULTY_VERSION,DRAFT_RUN_DIFFICULTY_VERSION].includes(difficultyVersion)) throw Error('Unsupported difficulty version.');
-  const eligible = poolForEnvironment(pool, environment).filter(p => !excluded.has(p.source_draft_hash) &&
+  const previous=selectionVersion===PREVIOUS_SELECTION_VERSION;
+  const eligible = poolForEnvironment(pool, environment).filter(p=>previous||(eligibleRunPuzzle(p)&&(environment==='powered-cube'||regularRunSet(p.set_id))&&(round<6||rateDraftRunPuzzle(p).band!=='easy'))).filter(p => !excluded.has(p.source_draft_hash) &&
     (type === 'set' ? p.set_id !== source.set_id : p.set_id === source.set_id) &&
-    eligiblePickForRound(round,p.pick_number,environment) && Math.abs(p.pick_number-source.pick_number) <= 1)
+    eligiblePickForRound(round,p.pick_number,environment,selectionVersion) && Math.abs(p.pick_number-source.pick_number) <= 1)
     .filter(p => {
       if(difficultyVersion===LEGACY_DIFFICULTY_VERSION)return true;
       const rating=rateDraftRunPuzzle(p);
@@ -239,13 +244,17 @@ export function selectDraftRunReroll(pool, source, { type, round, seed, excluded
     .sort((a,b) => a.distance-b.distance || a.puzzle.puzzle_id.localeCompare(b.puzzle.puzzle_id));
   if (!eligible.length) return null; // Never spend a token on a failed reroll.
   const best = eligible.slice(0,20);
-  return best[Math.floor(seededRandom(`${seed}:${round}:${type}:${source.puzzle_id}`)() * best.length)].puzzle;
+  const random=seededRandom(`${seed}:${round}:${type}:${source.puzzle_id}`);
+  if(previous||!daily||type==='pack')return best[Math.floor(random()*best.length)].puzzle;
+  const setId=chooseRunSet([...new Set(best.map(p=>p.puzzle.set_id))].sort(),random,true);
+  const sameSet=best.filter(p=>p.puzzle.set_id===setId);
+  return sameSet[Math.floor(random()*sameSet.length)].puzzle;
 }
 
 export function publicDraftRunPuzzle(puzzle) {
   const card = c => Object.fromEntries(['id','name','image_url','mana_cost','rarity','type_line'].filter(k => c[k]).map(k => [k,c[k]]));
   return {
-    puzzle_id:puzzle.puzzle_id, set_id:puzzle.set_id, pick_number:Number(puzzle.pick_number),
+    puzzle_id:puzzle.puzzle_id, set_id:puzzle.set_id, pack_number:1, pick_number:Number(puzzle.pick_number),
     prior_picks:puzzle.prior_picks.map(card), candidates:puzzle.candidates.map(card),
     difficulty:publicDifficulty(puzzle),
   };

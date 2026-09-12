@@ -2,7 +2,7 @@
   "schema_version": 1,
   "format": "PremierDraft",
   "source": "17Lands public Draft Data",
-  "notes": "Newest-first queue of normal draft environments with public 17Lands PremierDraft Draft Data. Powered Cube is intentionally excluded and built by its dedicated workflow. KHM is excluded because 17Lands does not publish Draft Data for it. AFR is intentionally excluded because its frozen legacy archives do not contain enough pre-draft skill metadata to build Pack One's leakage-safe replay/path models to production quality.",
+  "notes": "Newest-first queue of supported normal draft environments with public Premier Draft data. Powered Cube uses its dedicated workflow. Permanently retired environments are excluded before source requests.",
   "sets": [
     "HOB",
     "MSH",
