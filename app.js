@@ -549,11 +549,18 @@ function openingPick() {
   return state.packPicks[0];
 }
 
+// The headline follows the score, not set overlap. They measure different
+// things — overlap counts membership, the score weighs support — so keying the
+// headline to overlap let one line ("One big hit.") sit above anything from an
+// F to a B-. Overlap still appears in the note below the comparison.
 function topThreeResultCopy(result) {
-  if (result.score === 100) return 'Perfect pack.';
-  if (result.overlap === 3) return 'You found the cards.';
-  if (result.overlap === 2) return 'Strong read.';
-  if (result.overlap === 1) return 'One big hit.';
+  const score = Math.max(0, Math.min(100, Math.round(Number(result.score) || 0)));
+  if (score === 100) return 'Perfect pack.';
+  if (score >= 90) return 'You found the cards.';
+  if (score >= 80) return 'Strong read.';
+  if (score >= 70) return 'Solid shortlist.';
+  if (score >= 60) return 'Close in places.';
+  if (score >= 50) return 'Different read.';
   return 'Run this one back.';
 }
 

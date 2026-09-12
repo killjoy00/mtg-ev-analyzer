@@ -44,6 +44,18 @@ function pool(p) {
   const cardLabel=`${p.prior_picks.length} card${p.prior_picks.length===1?'':'s'} · in pick order`;
   return `<section class="run-pool" aria-label="Original drafter’s earlier picks"><h2>Their earlier picks <small>${cardLabel}</small></h2><p>Choose for this drafter’s pool.</p><div class="run-pool-cards">${p.prior_picks.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)}</span></button>`).join('')}</div></section>`;
 }
+// The reveal names two cards, but in the grid below they sit wherever the pack
+// put them — often a screen or more apart, and never both visible alongside the
+// verdict. Put the pair in the panel itself so the comparison is one glance.
+function revealComparison(p,answer) {
+  const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
+  const mine=byId.get(answer.selectedId),trophy=byId.get(answer.historicalId);
+  if(!mine) return '';
+  const cell=(card,label,cls)=>`<figure class="run-compare-card ${cls}"><span>${label}</span>${image(card)}<figcaption>${esc(card.name)}</figcaption></figure>`;
+  if(answer.historicalMatch||!trophy||trophy.id===mine.id)
+    return `<div class="run-compare is-match">${cell(mine,'Your pick · trophy pick','is-mine')}</div>`;
+  return `<div class="run-compare">${cell(mine,'Your pick','is-mine')}${cell(trophy,'Trophy pick','is-trophy')}</div>`;
+}
 function cardGrid(p,answer=null) {
   const candidates=sortPackByRarity(p.candidates);
   return `<div class="run-cards">${candidates.map(c=>`<article class="run-card ${selection===c.id?'selected':''} ${answer?.historicalId===c.id?'trophy-pick':''}"><button class="run-card-select" type="button" data-pick="${esc(c.id)}" aria-label="Pick ${esc(c.name)}" aria-pressed="${selection===c.id}" ${answer?'disabled':''}>${image(c)}<span>${esc(c.name)}</span></button><button class="run-zoom" type="button" data-zoom="${esc(c.id)}" aria-label="Enlarge ${esc(c.name)}">Enlarge</button>${answer&&(answer.historicalId===c.id||answer.selectedId===c.id)?`<span class="run-card-outcome">${answer.historicalId===c.id?'Trophy pick':'Your pick'}</span>`:''}</article>`).join('')}</div>`;
@@ -54,10 +66,10 @@ function render() {
   if(run.complete&&!answer) {renderResult();return;}
   const p=answer?.puzzle||run.current;
   document.body.classList.add('is-game');
-  app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Pack 1 · Pick ${p.pick_number}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
+  app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
     ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?'You’re playing the same ten packs.':'Packs changed — this result counts as practice.'}</aside>`:''}
     ${pool(p)}
-    ${answer?`<section class="run-feedback" aria-live="polite"><strong>${answer.score}<small>/100</small></strong><div><h2>${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2><p>${answer.historicalMatch?'Full points.':`You chose ${esc(answer.selectedName)}. ${answer.score>=85?'A strongly supported alternative.':answer.score>=60?'A plausible alternative.':'The model found less support for this choice.'}`}</p>${answer.modelTargetDisagreement?'<p>The trophy drafter made an unusual choice relative to the model. Strong alternatives still receive their normal credit.</p>':''}</div><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></section>`:
+    ${answer?`<section class="run-feedback" aria-live="polite"><strong>${answer.score}<small>/100</small></strong><div><h2>${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2><p>${answer.historicalMatch?'Full points.':`You chose ${esc(answer.selectedName)}. ${answer.score>=85?'A strongly supported alternative.':answer.score>=60?'A plausible alternative.':'The model found less support for this choice.'}`}</p>${answer.modelTargetDisagreement?'<p>The trophy drafter made an unusual choice relative to the model. Strong alternatives still receive their normal credit.</p>':''}</div>${revealComparison(p,answer)}<button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></section>`:
     `<div class="run-tools"><p>Pick ${run.round} of 10</p><div>${cube()?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div>${run.comparison?.exact?'<small>Using a reroll continues as practice rather than a head-to-head result.</small>':''}</div>`}
     ${cardGrid(p,answer)}
     ${answer?'<p class="run-note">Trophy pick: 100. Other choices earn up to 95 from contextual strong-player support. Matching the trophy drafter is the goal of this game. Difficulty estimates how closely the leading choices compare.</p>':`<div class="run-lock"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>`}
@@ -69,7 +81,19 @@ function zoom(card) {
   const dialog=document.createElement('dialog');dialog.className='run-card-dialog';dialog.innerHTML=`<button class="button secondary" autofocus>Close</button>${image(card)}<p>${esc(card.name)}</p>`;
   document.body.append(dialog);dialog.querySelector('button').onclick=()=>dialog.close();dialog.addEventListener('close',()=>dialog.remove());dialog.showModal();
 }
+// The earlier-picks strip scrolls horizontally with no visible cue, so the
+// cards past the right edge read as clipped rather than scrollable. Mark it
+// only when it actually overflows.
+function markPoolOverflow() {
+  const strip=app().querySelector('.run-pool-cards');
+  if(!strip) return;
+  const update=()=>strip.classList.toggle('is-scrollable',strip.scrollWidth>strip.clientWidth+1);
+  update();
+  strip.addEventListener('scroll',()=>strip.classList.toggle('is-scrolled-end',strip.scrollLeft+strip.clientWidth>=strip.scrollWidth-1),{passive:true});
+  if(typeof ResizeObserver==='function') new ResizeObserver(update).observe(strip);
+}
 function bind(p,answer) {
+  markPoolOverflow();
   app().querySelectorAll('[data-zoom]').forEach(b=>b.onclick=()=>zoom(p.candidates.find(c=>c.id===b.dataset.zoom)));
   app().querySelectorAll('[data-zoom-prior]').forEach(b=>b.onclick=()=>zoom(p.prior_picks[Number(b.dataset.zoomPrior)]));
   if(answer) {document.querySelector('#run-next').onclick=()=>{review=null;selection=null;render();window.scrollTo({top:0,behavior:'instant'});};return;}
