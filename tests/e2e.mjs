@@ -35,9 +35,10 @@ async function assertNoHorizontalOverflow() {
 
 async function assertMoreModesFocused() {
   const cards = page.locator('.mode-grid[aria-label="Opening pack practice"] .mode-card');
-  assert.equal(await cards.count(), 1, 'More Modes should contain one opening-pack game');
-  assert.match((await cards.first().innerText()) || '', /Opening pack[\s\S]*Top 3/i);
-  assert.equal(await page.locator('[data-mode="full"]').count(), 0, 'Full Pack must not be offered on More Modes');
+  assert.equal(await cards.count(), 2, 'More Modes should contain Top 3 and Full Pack');
+  assert.match((await cards.nth(0).innerText()) || '', /Opening pack[\s\S]*Top 3/i);
+  assert.match((await cards.nth(1).innerText()) || '', /Full first pack[\s\S]*Full Pack/i);
+  assert.equal(await page.locator('[data-mode="full"]').count(), 1, 'Full Pack must remain available on More Modes');
   assert.equal(await page.locator('#daily-challenge,[data-daily-mode]').count(), 0, 'Daily opening-pack play must not be offered on More Modes');
 }
 
@@ -99,6 +100,7 @@ async function home() {
   assert.doesNotMatch(consensusCopy, /not win rates|not win probability|card grades|objective truth/i);
   assert.doesNotMatch((await page.locator('.home-intro').textContent()) || '', /defend it/i);
   assert.equal(await page.getByRole('heading', { name: 'Top 3', exact: true }).count(), 1);
+  assert.equal(await page.getByRole('heading', { name: 'Full Pack', exact: true }).count(), 1);
   await assertMoreModesFocused();
   assert.equal(await page.locator('#home-editorial').isVisible(), true, 'editorial shell should be visible on More modes');
   await assertNoHorizontalOverflow();
@@ -225,7 +227,7 @@ try {
   assert.equal(cleanHomeUrl.searchParams.get('daily'), null);
   assert.equal(cleanHomeUrl.searchParams.get('modes'), null);
 
-  // More Modes stays focused on Top 3; Cube launch URLs remain valid but are surfaced on primary home.
+  // More Modes keeps Top 3 and Full Pack; Cube launch URLs remain valid but are surfaced on primary home.
   await home();
   await assertMoreModesFocused();
   if (await page.locator('[data-powered-cube-section="1"]').count()) {
