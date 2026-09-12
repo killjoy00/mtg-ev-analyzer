@@ -45,7 +45,7 @@ export async function verifyImportToken(token,getKeys=keys,now=Math.floor(Date.n
     branch:c.ref==='refs/heads/main',
     workflow:WORKFLOWS.has(workflow),
     reusableWorkflow:!c.job_workflow_ref||c.job_workflow_ref===workflow,
-    event:['push','workflow_dispatch'].includes(c.event_name),
+    event:['push','workflow_dispatch','workflow_run'].includes(c.event_name),
     time:Number.isFinite(c.exp)&&Number.isFinite(c.nbf)&&Number.isFinite(c.iat)&&c.exp>now&&c.nbf<=now+30&&c.iat<=now+30&&c.exp-c.iat<=900,
   };
   const rejected=Object.keys(checks).filter(k=>!checks[k]);
