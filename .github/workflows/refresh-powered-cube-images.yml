@@ -1,0 +1,117 @@
+name: refresh Powered Cube card images
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/refresh_powered_cube_images.py
+      - scripts/refresh_powered_cube_backend_images.mjs
+      - scripts/fetch_card_metadata.py
+      - worker/trophy-import.mjs
+      - worker/trophy-import-auth.mjs
+      - tests/test_powered_cube_images.py
+      - tests/trophy-import-auth.test.mjs
+      - .github/workflows/refresh-powered-cube-images.yml
+  workflow_run:
+    workflows: ["build-powered-cube"]
+    types: [completed]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  id-token: write
+
+concurrency:
+  group: set-data-import-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      DEV_IMPORT_API: https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
+      PROD_IMPORT_API: https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward to latest main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Hydrate replay shards from R2
+        run: bash scripts/r2_replay_shards.sh hydrate
+
+      - name: Normalize Powered Cube to readable standard printings
+        run: python scripts/refresh_powered_cube_images.py
+
+      - name: Run full test suite
+        run: npm test
+
+      - name: Audit all production datasets
+        run: python scripts/audit_datasets.py --fail-on-error
+
+      - name: Upload refresh diagnostics
+        uses: actions/upload-artifact@v4
+        with:
+          name: powered-cube-image-refresh-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            generated/powered-cube-standard-images.json
+            generated/powered-cube-image-refresh-report.json
+
+      - name: Publish normalized Cube shards to R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          aws s3 sync data/powered-cube/shards "s3://${R2_BUCKET}/data/powered-cube/shards" \
+            --endpoint-url "$R2_ENDPOINT" \
+            --content-type 'application/json; charset=utf-8' \
+            --cache-control 'public, max-age=3600'
+
+      - name: Refresh development Draft Run image metadata
+        run: node scripts/refresh_powered_cube_backend_images.mjs "$DEV_IMPORT_API"
+
+      - name: Verify development gameplay
+        run: node tests/trophy-import-http-smoke.mjs "$DEV_IMPORT_API"
+
+      - name: Refresh production Draft Run image metadata
+        run: node scripts/refresh_powered_cube_backend_images.mjs "$PROD_IMPORT_API"
+
+      - name: Verify production gameplay
+        run: node tests/trophy-import-http-smoke.mjs "$PROD_IMPORT_API"
+
+      - name: Commit refreshed Cube image source of truth
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add corpus/draft-run/powered-cube.json.gz corpus/draft-run/catalog.json corpus/draft-run/card-images.json
+          if git diff --cached --quiet; then
+            echo 'Powered Cube display metadata is already normalized.'
+            exit 0
+          fi
+          git commit -m 'Refresh Powered Cube to standard card images [cube-images-refreshed]'
+          git pull --rebase origin main
+          git push origin HEAD:main

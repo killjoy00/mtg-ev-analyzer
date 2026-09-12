@@ -47,13 +47,19 @@ def compact_card(card: dict) -> dict:
 
 
 def aliases(card: dict) -> Iterable[str]:
-    name = card.get("name")
-    if name:
-        yield name
+    """Yield Oracle, face, and alternate printed/flavor names for a card."""
+    seen: set[str] = set()
+    for value in (card.get("name"), card.get("flavor_name"), card.get("printed_name")):
+        name = str(value or "").strip()
+        if name and name not in seen:
+            seen.add(name)
+            yield name
     for face in card.get("card_faces") or []:
-        face_name = face.get("name")
-        if face_name:
-            yield face_name
+        for value in (face.get("name"), face.get("flavor_name"), face.get("printed_name")):
+            name = str(value or "").strip()
+            if name and name not in seen:
+                seen.add(name)
+                yield name
 
 
 def request_json(url: str, retries: int = 4) -> dict:
