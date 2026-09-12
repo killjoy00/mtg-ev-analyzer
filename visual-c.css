@@ -301,6 +301,99 @@ h3 {
   color: var(--green-dark);
 }
 
+/* Shared site footer. Matches the editorial pages so the app and the content
+   site share one chrome, and so Privacy/Terms are reachable from the game. */
+.site-footer {
+  width: min(var(--content), 100%);
+  margin: 0 auto;
+  padding: 34px 24px 46px;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 30px;
+  border-top: 1px solid var(--line);
+}
+.site-footer p {
+  max-width: 560px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.site-footer nav {
+  display: flex;
+  gap: 18px;
+  flex-wrap: wrap;
+}
+.site-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.site-footer a:hover {
+  color: var(--green-dark);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+@media (max-width: 760px) {
+  .site-footer { flex-direction: column; gap: 18px; }
+}
+
+/* A visible focus ring. The browser default is a 1px near-black outline, which
+   disappears against the dark primary buttons. */
+:focus-visible {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+}
+.button.primary:focus-visible,
+.card-choice:focus-visible {
+  outline-color: var(--ink);
+}
+
+/* Powered Cube shows a single mode card. The two-column mode grid left an
+   empty right-hand column with the section captions stranded against it, so
+   this section lays out as one column with left-aligned supporting copy. */
+.cube-mode-section .mode-grid.cube-single-mode {
+  grid-template-columns: minmax(0, 1fr);
+}
+.cube-mode-section .mode-section-heading {
+  display: block;
+}
+.cube-mode-section .mode-section-heading > p,
+.cube-mode-section .set-meta {
+  max-width: 68ch;
+  margin-top: 8px;
+  text-align: left;
+}
+
+/* Reveal rows carry the card art so the comparison stays visual. */
+.rank-row {
+  grid-template-columns: 28px 34px minmax(0, 1fr) auto;
+}
+.rank-thumb {
+  width: 34px;
+  aspect-ratio: 63 / 88;
+  object-fit: cover;
+  object-position: top center;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+.rank-thumb-blank {
+  display: block;
+}
+@media (max-width: 700px) {
+  .rank-row {
+    grid-template-columns: 22px 28px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+  .rank-thumb {
+    width: 28px;
+  }
+}
+
 .verdict.consensus {
   background: var(--green-soft);
   color: var(--green-dark);
@@ -502,6 +595,15 @@ body .run-review-list li {
     flex-wrap: nowrap;
     gap: 0;
     border-top: 1px solid var(--line);
+    /* The nav strip scrolls on its own rather than widening the page; without
+       this the extra items push the whole document into horizontal scroll. */
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .top-actions::-webkit-scrollbar {
+    display: none;
   }
 
   .top-nav-button {

@@ -114,6 +114,7 @@ async function shareResult(challenge) {
   finally {button.disabled=false;}
 }
 async function showBoard(period='daily') {
+  app().innerHTML='<section class="message-card"><h1>Loading the board…</h1></section>';
   const data=await api(`/v1/leaderboard?period=${encodeURIComponent(period)}&environment=${environment}`,undefined,false);
   document.body.classList.remove('is-game');
   app().innerHTML=`<section class="run-board"><p class="eyebrow">${title()}</p><h1>The leaderboard</h1><nav aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s ten decisions.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><p><a href="?legacy-board=1">Top 3, Full Pack & Cube boards</a></p></section>`;
@@ -126,6 +127,26 @@ async function launch(options={}) {
   const url=new URL(location.href);if(cube())url.searchParams.set('set','powered-cube');else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.set('run',run.id);history.replaceState({},'',url);
   selection=null;review=null;render();
 }
+// Raw exception text ("Failed to fetch") is developer output, not an
+// explanation. Say what happened, and offer the action that actually retries
+// the thing that failed.
+function failureMessage(error) {
+  const raw=String(error?.message||'');
+  if(/fetch|network|load failed|connection/i.test(raw)) return 'We couldn’t reach Pack One’s servers. This is usually a brief hiccup or a dropped connection.';
+  if(/^5\d\d|server|unavailable|temporarily/i.test(raw)) return 'Pack One’s servers are busy right now. Give it a moment and try again.';
+  return 'Something went wrong on our side while loading this page.';
+}
+
+function renderLoadFailure(error,isBoard) {
+  console.warn('Draft Run page failed to load',error?.message);
+  const retry=`<button class="button primary" type="button" data-run-retry="1">Try again</button>`;
+  const secondary=isBoard
+    ? `<a class="button secondary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>`
+    : `<a class="button secondary" href="${gameUrl()}">Start a fresh run</a>`;
+  app().innerHTML=`<section class="message-card"><h1>${isBoard?'Couldn’t load the leaderboard.':'Couldn’t start that run.'}</h1><p>${esc(failureMessage(error))}</p><div class="button-row">${retry}${secondary}</div><p><a class="text-button" href="./">Back home</a></p></section>`;
+  app().querySelector('[data-run-retry]').onclick=()=>location.reload();
+}
+
 export async function installDraftRunPage() {
   styles();document.querySelector('#brand-home').onclick=()=>location.href='./';
   document.querySelector('#daily-nav').onclick=()=>location.href=gameUrl('daily=1');
@@ -138,9 +159,9 @@ export async function installDraftRunPage() {
       environment=info.environment||'mixed';
       app().innerHTML=`<section class="run-invite"><p class="eyebrow">A friend’s ${title()}</p><h1>Can you beat ${info.score}?</h1><p>${esc(info.name)} sent you ten real decisions from trophy drafts. You’ll see the same packs and the same earlier picks.</p><button class="button primary" id="accept-run-challenge">Play this challenge</button><p>No account needed. About five minutes.</p><p id="run-error" role="alert"></p></section>`;
       trackEvent('challenge_open',{mode:'draft_run',kind:'stored'});
-      document.querySelector('#accept-run-challenge').onclick=async()=>{try{trackEvent('challenge_start',{mode:'draft_run'});await launch({challenge:info.id});}catch(e){app().innerHTML=`<section class="message-card"><h1>Couldn’t start that challenge.</h1><p>${esc(e.message)}</p><a href="${esc(location.href)}">Try again</a></section>`;}};
+      document.querySelector('#accept-run-challenge').onclick=async()=>{try{trackEvent('challenge_start',{mode:'draft_run'});await launch({challenge:info.id});}catch(e){console.warn('Draft Run challenge failed to start',e?.message);app().innerHTML=`<section class="message-card"><h1>Couldn’t start that challenge.</h1><p>${esc(failureMessage(e))}</p><a class="button primary" href="${esc(location.href)}">Try again</a></section>`;}};
     } else await launch({id:params.get('run'),daily:params.has('daily')});
-  } catch(e) {app().innerHTML=`<section class="message-card"><h1>Let’s try that again.</h1><p>${esc(e.message)}</p><a class="button primary" href="${gameUrl()}">Start a fresh run</a><a class="text-button" href="./">Back home</a></section>`;}
+  } catch(e) {renderLoadFailure(e,params.has('board'));}
 }
 export function installDraftRunHome() {
   styles();
