@@ -33,8 +33,9 @@ jobs:
         run: bash scripts/r2_replay_shards.sh hydrate
       - name: Start static site
         run: |
-          python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
+          nohup python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
           echo $! > /tmp/pack1-http.pid
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ -o /dev/null
       - name: Run browser regression
         run: node tests/e2e.mjs
       - name: Run Daily / Set Practice regression
@@ -47,6 +48,8 @@ jobs:
         run: PACK1_TEST_ENVIRONMENT=powered-cube node tests/draft-run-e2e.mjs
       - name: Run account browser contract
         run: node tests/account-e2e.mjs
+      - name: Run admin reporting browser contract
+        run: node tests/admin-e2e.mjs
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4

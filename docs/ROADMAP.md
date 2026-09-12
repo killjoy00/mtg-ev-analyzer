@@ -2,7 +2,7 @@
 
 ## Do next
 
-1. **Measure real-player difficulty and scoring fairness.** Report first-attempt trophy matches, average partial credit, response time, rerolls and abandonment by difficulty, pick depth and environment. Exclude QA activity. Review model/historical-choice disagreements separately; keep the settled trophy-only and 100-point rules.
+1. **Review real-player difficulty and scoring fairness.** Collection and the private `/admin/` console now report first-encounter trophy matches, partial credit, foreground decision time, rerolls and likely abandonment by difficulty, pick depth and environment, excluding QA. See [measurement definitions](DECISION-MEASUREMENTS.md). Collect sufficient real-player samples before tuning, review model/historical-choice disagreements separately, and keep the settled trophy-only and 100-point rules.
 2. **Make source freshness and accounting routine.** Run inexpensive supported-archive version checks, trigger imports only for changed sources, retain a per-draft/per-pick disposition ledger and reconcile production IDs and counts after every load. Register a new environment through one policy/catalog process. Keep retired sources permanently blocked.
 3. **Reduce cold-start and cache-refresh delays.** Move selection metadata toward a compact indexed serving representation; benchmark cold and warm starts and concurrency against the full corpus before changing architecture. Preserve exhaustive eligibility and set weighting.
 4. **Finish real-device product verification.** Test iPhone authentication, native sharing, resume and Daily rollover; prioritize observed completion and retention friction. Existing narrow-browser checks do not establish native-device behavior.

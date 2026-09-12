@@ -2,10 +2,18 @@ import { ensurePackSession } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { shareDraftRunCard } from './share-cards.mjs';
 import { trackEvent } from './retention-events.mjs';
+import {decisionClock} from './decision-clock.mjs';
 
 const esc = value => String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 let run=null,selection=null,review=null,busy=false;
+const clock=decisionClock();let viewPromise=Promise.resolve(),viewKey=null;
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clock.pause();else if(run?.current&&review==null&&!busy)recordView(true);});
+function recordView(touch=false) {
+  if(document.hidden)return;
+  const key=`${run.id}:${run.revision}`,viewId=clock.show(key);
+  if(viewKey!==key||touch){viewKey=key;viewPromise=api(`/v1/runs/${run.id}/view`,{revision:run.revision,puzzleId:run.current.puzzle_id,viewId}).catch(()=>null);}
+}
 let environment=new URLSearchParams(location.search).get('set')==='powered-cube'?'powered-cube':'mixed';
 const cube=()=> (run?.environment||environment)==='powered-cube';
 const title=()=>cube()?'Powered Cube Run':'Draft Run';
@@ -39,6 +47,7 @@ function cardGrid(p,answer=null) {
 }
 function render() {
   const answer=review==null?null:run.answers[review];
+  if(answer||run.complete){clock.clear();viewKey=null;}
   if(run.complete&&!answer) {renderResult();return;}
   const p=answer?.puzzle||run.current;
   document.body.classList.add('is-game');
@@ -51,6 +60,7 @@ function render() {
     ${answer?'<p class="run-note">Trophy pick: 100. Other choices earn up to 95 from contextual strong-player support. Matching the trophy drafter is the goal of this game. Difficulty estimates how closely the leading choices compare.</p>':`<div class="run-lock"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
+  if(!answer) recordView();
 }
 function zoom(card) {
   const dialog=document.createElement('dialog');dialog.className='run-card-dialog';dialog.innerHTML=`<button class="button secondary" autofocus>Close</button>${image(card)}<p>${esc(card.name)}</p>`;
@@ -70,10 +80,13 @@ function bind(p,answer) {
 }
 async function mutate(action,body) {
   if(busy)return;busy=true;
+  clock.pause();const measurement=clock.sample();
   app().querySelectorAll('button:not(.run-zoom)').forEach(b=>b.disabled=true);
   const round=run.answers.length;
   try {
-    run=await api(`/v1/runs/${run.id}/${action}`,{...body,revision:run.revision,round,puzzleId:run.current.puzzle_id});
+    // Measurement delivery must not hold a player's pick behind a slow request.
+    await Promise.race([viewPromise,new Promise(resolve=>setTimeout(resolve,1500))]);
+    run=await api(`/v1/runs/${run.id}/${action}`,{...body,...measurement,revision:run.revision,round,puzzleId:run.current.puzzle_id});
     review=action==='pick'?round:null;selection=null;render();
     if(action==='reroll') trackEvent('draft_run_rerolled',{type:body.type,round:round+1,daily:Boolean(run.day)});
     if(run.complete) document.dispatchEvent(new CustomEvent('pack1:result-completed',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));

@@ -8,7 +8,7 @@ const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).flatMap(f=>JSON.parse(gunzipSync(fs.readFileSync('corpus/draft-run/'+f)))).filter(interestingDraftRunPuzzle);
 const environment=process.env.PACK1_TEST_ENVIRONMENT||'mixed',cube=environment==='powered-cube';
 let puzzles=selectDraftRun(corpus,'browser-contract',environment),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
-const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[];
+const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
 const snapshot=()=>({id,environment,day:'2026-09-10',revision,round:answers.length+1,answers,rerolls,complete:answers.length===10,score:answers.length===10?Math.round(answers.reduce((n,a)=>n+a.score,0)/10):null,current:answers.length===10?null:publicDraftRunPuzzle(puzzles[answers.length]),standing:answers.length===10?{rank:1,total:20,percentile:5,final:false}:null});
 const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
@@ -25,6 +25,7 @@ await page.route('**/*-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async
 await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
   const path=new URL(route.request().url()).pathname;let body;
   if(path.endsWith('/share'))body={id:shareId};
+  else if(path.endsWith('/view')){const req=route.request().postDataJSON();assert.equal(req.revision,revision);assert.equal(req.puzzleId,puzzles[answers.length].puzzle_id);views.push(req);body={ok:true};}
   else if(path.includes('/challenges/'))body={id:shareId,name:'Your friend',score:88,environment};
   else if(path.endsWith('/reroll')){
     const req=route.request().postDataJSON(),round=answers.length,old=puzzles[round];
@@ -32,6 +33,7 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
     puzzles[round]=selectDraftRunReroll(corpus,old,{type:req.type,round,seed:'browser-contract',excludedSources:sources,environment});sources.push(puzzles[round].source_draft_hash);rerolls[req.type]-=1;revision++;body=snapshot();
   }else if(path.endsWith('/pick')){
     const req=route.request().postDataJSON(),p=puzzles[answers.length];assert.equal(req.revision,revision);assert.equal(req.puzzleId,p.puzzle_id);
+    assert.equal(req.viewId,views.at(-1).viewId);assert.ok(Number.isInteger(req.activeMs)&&req.activeMs>=0);
     answers.push({...gradeDraftRunPick(p,req.cardId),puzzle:publicDraftRunPuzzle(p),ranking:p.candidates.map(c=>({id:c.id,name:c.name,score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
   }else if(path==='/v1/leaderboard')body={rows:[],period:'daily'};
   else body=snapshot();
@@ -72,6 +74,7 @@ try{
   for(let round=0;round<10;round++){
     const p=puzzles[round];if(cube)assert.equal(p.set_id,'powered-cube');assert.equal(await page.locator('.run-pool-cards>button').count(),p.pick_number-1);
     await page.locator(`[data-pick="${p.historical_pick_id}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
+    assert.equal(views.at(-1).puzzleId,p.puzzle_id,'Feedback must not record the next decision as viewed');
     assert.match(await page.locator('.run-feedback').innerText(),/100/);assert.equal(answers.length,round+1);
     await page.locator('#run-next').click();
     if(round===0){assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
