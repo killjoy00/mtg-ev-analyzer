@@ -44,10 +44,10 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: generated/trophy-import
-          key: trophies-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: supported-trophies-v1-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            trophies-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py') }}-
-            trophies-
+            supported-trophies-v1-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py') }}-
+            supported-trophies-v1-
       - name: Import every qualifying trophy
         env:
           IMPORT_SETS: ${{ inputs.sets || 'all' }}
@@ -71,7 +71,7 @@ jobs:
         if: always()
         with:
           path: generated/trophy-import
-          key: trophies-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: supported-trophies-v1-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
