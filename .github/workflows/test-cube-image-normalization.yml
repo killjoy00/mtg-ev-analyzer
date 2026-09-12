@@ -29,16 +29,26 @@ jobs:
       - name: Hydrate replay shards from R2
         run: bash scripts/r2_replay_shards.sh hydrate
       - name: Normalize Cube images without publishing
-        run: python scripts/refresh_powered_cube_images.py
+        shell: bash
+        run: |
+          set +e
+          mkdir -p generated
+          python scripts/refresh_powered_cube_images.py > generated/powered-cube-image-normalization.log 2>&1
+          status=$?
+          cat generated/powered-cube-image-normalization.log
+          exit "$status"
       - name: Run tests
         run: npm test
       - name: Audit datasets
         run: python scripts/audit_datasets.py --fail-on-error
       - name: Upload diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: cube-image-normalization-diagnostics
           retention-days: 1
+          if-no-files-found: warn
           path: |
             generated/powered-cube-standard-images.json
             generated/powered-cube-image-refresh-report.json
+            generated/powered-cube-image-normalization.log
