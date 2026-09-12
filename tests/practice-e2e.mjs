@@ -34,15 +34,18 @@ async function openHome() {
 try {
   await openHome();
 
-  // More Modes is one set-by-set opening-pack practice surface.
+  // More Modes keeps both opening-pack practice modes and no Daily pack.
   assert.equal(
     await page.locator('.mode-section #set-select').count(),
     1,
     'Practice set selector must live inside the practice section',
   );
-  assert.equal(await page.locator('.mode-card').count(), 1);
-  assert.match((await page.locator('.mode-card').innerText()) || '', /Opening pack[\s\S]*Top 3/i);
-  assert.equal(await page.locator('#daily-challenge,[data-daily-mode],[data-mode="full"]').count(), 0);
+  assert.equal(await page.locator('.mode-card').count(), 2);
+  const modeCopy = await page.locator('.mode-card').allTextContents();
+  assert.ok(modeCopy.some((text) => /Opening pack[\s\S]*Top 3/i.test(text)));
+  assert.ok(modeCopy.some((text) => /Full first pack[\s\S]*Full Pack/i.test(text)));
+  assert.equal(await page.locator('[data-mode="full"]').count(), 1);
+  assert.equal(await page.locator('#daily-challenge,[data-daily-mode]').count(), 0);
 
   const catalog = await page.evaluate(async () => {
     const response = await fetch('/data/catalog.json', { cache: 'no-store' });
@@ -60,10 +63,22 @@ try {
   await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
   const practiceUrl = new URL(page.url());
   assert.equal(practiceUrl.searchParams.get('set'), practice);
+  assert.equal(practiceUrl.searchParams.get('mode'), 'top3');
   assert.ok(practiceUrl.searchParams.get('seed'));
   assert.equal(practiceUrl.searchParams.has('daily'), false);
 
-  console.log(`Focused Top 3 practice passed: set=${practice}`);
+  // Full Pack practice uses the same set picker and must remain available.
+  await openHome();
+  await page.locator('#set-select').selectOption(practice);
+  await page.locator('[data-mode="full"]').click();
+  await page.locator('.full-pack-layout .card-choice').first().waitFor({ timeout: 10000 });
+  const fullUrl = new URL(page.url());
+  assert.equal(fullUrl.searchParams.get('set'), practice);
+  assert.equal(fullUrl.searchParams.get('mode'), 'full');
+  assert.ok(fullUrl.searchParams.get('seed'));
+  assert.equal(fullUrl.searchParams.has('daily'), false);
+
+  console.log(`Opening-pack practice passed: set=${practice}, modes=top3/full`);
 } finally {
   await browser.close();
 }

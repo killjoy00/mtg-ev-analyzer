@@ -357,21 +357,27 @@ function renderHome() {
     <section class="mode-section" aria-labelledby="more-pack-one">
       <div class="mode-section-heading">
         <div><p class="eyebrow">More modes</p><h2 id="more-pack-one">Opening pack</h2></div>
-        <p>Choose the three best starts from a real opening pack. Pick a set and play as many packs as you want.</p>
+        <p>Play Top 3 or draft the full first pack from a real trophy draft. Pick a set and play as many packs as you want.</p>
       </div>
-      <div class="mode-grid single-mode" aria-label="Opening pack practice">
+      <div class="mode-grid" aria-label="Opening pack practice">
         <article class="mode-card game-mode-row">
           <div class="mode-topline"><p class="eyebrow">Opening pack</p>${bestChip('top3')}</div>
           <h3>Top 3</h3>
           <p>Rank your three best starts from a fresh opening pack.</p>
           <button class="button secondary mode-button" data-mode="top3">New Top 3</button>
         </article>
+        <article class="mode-card game-mode-row">
+          <div class="mode-topline"><p class="eyebrow">Full first pack</p>${bestChip('full')}</div>
+          <h3>Full Pack</h3>
+          <p>Make every pick in Pack One. Later choices adapt to the cards you actually took.</p>
+          <button class="button secondary mode-button" data-mode="full">New Full Pack</button>
+        </article>
       </div>
     </section>
 
     <section class="data-note">
       <strong>What “consensus” means</strong>
-      <span>Consensus is a model of experienced, high-win-rate 17Lands drafters. Your score measures how closely your Top 3 tracks that model. Practice scores stay personal and do not affect the Draft Run or Cube leaderboards.</span>
+      <span>Consensus is a model of experienced, high-win-rate 17Lands drafters. Opening-pack support starts from the current pack; in Full Pack, later support also follows the cards you actually chose. Practice scores stay personal and do not affect the Draft Run or Cube leaderboards.</span>
     </section>`;
 
   document.querySelector('#set-select').addEventListener('change', (event) => {
