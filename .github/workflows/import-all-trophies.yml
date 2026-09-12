@@ -5,7 +5,6 @@ on:
     paths:
       - scripts/import_all_trophies.py
       - scripts/run_import_all_trophies.py
-      - .github/workflows/import-all-trophies.yml
   workflow_dispatch:
     inputs:
       sets:
@@ -27,6 +26,11 @@ jobs:
     env:
       DEV_IMPORT_API: https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
       PROD_IMPORT_API: https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -35,6 +39,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Hydrate replay shards from R2
+        run: bash scripts/r2_replay_shards.sh hydrate
       - run: npm test
       - name: Verify workload identity on both databases
         run: |

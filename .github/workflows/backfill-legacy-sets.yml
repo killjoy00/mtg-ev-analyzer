@@ -7,7 +7,6 @@ on:
     paths:
       - 'scripts/backfill_legacy_sets.py'
       - 'tests/test_legacy_skill_backfill.py'
-      - '.github/workflows/backfill-legacy-sets.yml'
 
 permissions:
   contents: write
@@ -16,6 +15,12 @@ jobs:
   backfill:
     runs-on: ubuntu-latest
     timeout-minutes: 240
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
     concurrency:
       group: set-data-import-${{ github.ref }}
       cancel-in-progress: false
@@ -39,6 +44,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+
+      - name: Hydrate replay shards from R2
+        run: bash scripts/r2_replay_shards.sh hydrate
 
       - name: Run regression tests
         run: npm test
@@ -65,6 +73,10 @@ jobs:
         if: always()
         continue-on-error: true
         run: python scripts/audit_datasets.py --fail-on-error
+
+      - name: Publish validated replay shards to R2
+        if: steps.audit.outcome == 'success'
+        run: bash scripts/r2_replay_shards.sh upload
 
       - name: Publish legacy backfill report
         if: always()
@@ -94,7 +106,7 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
 
-      - name: Commit validated legacy set data
+      - name: Commit validated legacy set metadata
         id: publish
         if: always() && steps.audit.outcome == 'success'
         shell: bash
@@ -104,7 +116,7 @@ jobs:
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add -A -- data/
           if git diff --cached --quiet; then
-            echo 'No legacy set data changed.'
+            echo 'No legacy set metadata changed.'
             exit 0
           fi
 

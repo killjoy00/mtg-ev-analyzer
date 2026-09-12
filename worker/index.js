@@ -1,6 +1,7 @@
 import { challengeIndex, featuredSetId, firstPackPicks, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from './core.mjs';
 
 const STATIC_ORIGIN = 'https://packone.pro';
+const REPLAY_SHARD_ORIGIN = 'https://data.packone.pro';
 const ALLOWED_ORIGINS = new Set(['https://packone.pro', 'https://killjoy00.github.io']);
 const TOKEN_PREFIX = 'p1_';
 
@@ -128,7 +129,11 @@ async function upsertPlayer(playerId, displayName) {
 }
 
 async function staticJson(path) {
-  const response = await fetch(new URL(String(path).replace(/^\.\//, ''), `${STATIC_ORIGIN}/`));
+  const relative = String(path).replace(/^\.\//, '');
+  const origin = /^data\/[^/]+\/shards\/[^/]+\.json$/.test(relative)
+    ? REPLAY_SHARD_ORIGIN
+    : STATIC_ORIGIN;
+  const response = await fetch(new URL(relative, `${origin}/`));
   if (!response.ok) throw new Error(`Static data request failed (${response.status}).`);
   return response.json();
 }

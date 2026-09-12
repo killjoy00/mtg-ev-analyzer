@@ -7,3 +7,4 @@ raw-data/
 generated/
 node_modules/
 artifacts/
+data/*/shards/

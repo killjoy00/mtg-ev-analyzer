@@ -20,8 +20,9 @@ jobs:
     timeout-minutes: 5
     env:
       PACKONE_ORIGIN: https://packone.pro
+      REPLAY_ORIGIN: https://data.packone.pro
     steps:
-      - name: Verify Pack One frontend and backend browser contract
+      - name: Verify Pack One frontend, replay storage, and backend browser contract
         shell: bash
         run: |
           set -euo pipefail
@@ -39,6 +40,35 @@ jobs:
           frontend="$(mktemp)"
           curl --fail --silent --show-error --location --max-time 20 "$PACKONE_ORIGIN/" -o "$frontend"
           grep -q 'Pack One' "$frontend" || { echo 'packone.pro did not return the Pack One app'; exit 1; }
+
+          manifest="$(mktemp)"
+          curl --fail --silent --show-error --location --max-time 20 "$PACKONE_ORIGIN/data/msh/manifest.json" -o "$manifest"
+          shard_path="$(python - "$manifest" <<'PY'
+          import json, sys
+          payload=json.load(open(sys.argv[1]))
+          shards=payload.get('shards') or []
+          assert shards and shards[0].get('path'), 'MSH manifest has no replay shard'
+          path=str(shards[0]['path'])
+          if path.startswith('./'):
+              path='/' + path[2:]
+          elif not path.startswith('/'):
+              path='/data/msh/' + path
+          print(path)
+          PY
+          )"
+          shard_headers="$(mktemp)"
+          shard_body="$(mktemp)"
+          shard_status="$(curl --silent --show-error --max-time 20 -o "$shard_body" -D "$shard_headers" -w '%{http_code}' \
+            "$REPLAY_ORIGIN$shard_path" -H "Origin: $PACKONE_ORIGIN")"
+          test "$shard_status" = '200' || { echo "R2 replay shard returned HTTP $shard_status"; exit 1; }
+          shard_origin="$(header_value "$shard_headers")"
+          test "$shard_origin" = "$PACKONE_ORIGIN" || { echo "R2 replay shard CORS mismatch: ${shard_origin:-missing}"; exit 1; }
+          python - "$shard_body" <<'PY'
+          import json, sys
+          payload=json.load(open(sys.argv[1]))
+          assert isinstance(payload.get('replays'), list) and payload['replays'], 'R2 shard has no replays'
+          PY
+          echo 'R2 replay shard: GET + CORS + JSON contract OK'
 
           for name in pack1api pack1growth draftrunapi; do
             base="${services[$name]}"
