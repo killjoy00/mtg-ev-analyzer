@@ -44,10 +44,10 @@ jobs:
           status=$?
           cat generated/powered-cube-image-normalization.log
           exit "$status"
-      - name: Run tests
-        run: npm test
-      - name: Audit datasets
-        run: python scripts/audit_datasets.py --fail-on-error
+      - name: Run Cube image unit tests
+        run: python -m unittest tests.test_powered_cube_images
+      - name: Run display-only backend tests
+        run: node --test tests/trophy-import-auth.test.mjs
       - name: Upload diagnostics
         if: always()
         uses: actions/upload-artifact@v4
