@@ -6,6 +6,7 @@ import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from './trophy
 const allowed=new Set(catalog.sets.map(s=>s.id));
 const error=(message,status=400)=>Object.assign(Error(message),{status});
 const DISPLAY_FIELDS=new Set(['image_url','mana_cost','rarity','type_line']);
+const LEGACY_IMAGE_MARKER_SETS=new Set(['powered-cube','hbg','tmt']);
 
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 
@@ -104,6 +105,43 @@ export async function refreshTrophyImages(query,setId,rawMapping) {
   return {set_id:setId,mapping_entries:mapping.size,puzzles:seen,updated_puzzles:updatedPuzzles,updated_cards:updatedCards};
 }
 
+export async function normalizeResolvedImageMarkers(query,rawSetIds) {
+  if(!Array.isArray(rawSetIds)||!rawSetIds.length||rawSetIds.length>LEGACY_IMAGE_MARKER_SETS.size)throw error('Invalid image-marker set list');
+  const setIds=rawSetIds.map(value=>String(value||'').trim());
+  if(new Set(setIds).size!==setIds.length||setIds.some(setId=>!LEGACY_IMAGE_MARKER_SETS.has(setId)||!allowed.has(setId)))throw error('Image-marker normalization is limited to verified legacy sets');
+  const normalized=[];
+  for(const setId of setIds) {
+    const status=(await query(
+      `SELECT s.corpus_version,
+        (SELECT count(*)::int FROM draft_run_verified_puzzles p WHERE p.set_id=s.set_id AND p.corpus_version=$2) puzzles,
+        (SELECT count(*)::int
+          FROM draft_run_verified_puzzles p
+          CROSS JOIN LATERAL jsonb_array_elements(
+            COALESCE(p.payload->'candidates','[]'::jsonb) || COALESCE(p.payload->'prior_picks','[]'::jsonb)
+          ) card
+          WHERE p.set_id=s.set_id AND p.corpus_version=$2
+            AND COALESCE(card->>'image_url','') NOT LIKE 'https://%') missing_images
+       FROM draft_run_verified_sets s WHERE s.set_id=$1`,
+      [setId,VERSION],
+    )).rows[0];
+    if(status?.corpus_version!==VERSION||Number(status.puzzles)<1)throw error(`Verified set unavailable for image-marker normalization: ${setId}`,409);
+    if(Number(status.missing_images)!==0)throw error(`Cannot clear unresolved image markers while images are missing: ${setId}`,409);
+    const result=await query(
+      `UPDATE draft_run_verified_sets
+       SET manifest=jsonb_set(
+         jsonb_set(manifest,'{unresolved_image_names}','[]'::jsonb,true),
+         '{full_import,missing_image_names}','[]'::jsonb,true
+       )
+       WHERE set_id=$1 AND corpus_version=$2
+       RETURNING set_id`,
+      [setId,VERSION],
+    );
+    if(result.rows.length!==1)throw error(`Image-marker normalization update failed: ${setId}`,409);
+    normalized.push({set_id:setId,puzzles:Number(status.puzzles),missing_images:0});
+  }
+  return {normalized};
+}
+
 export async function insertTrophyBatch(query,puzzles) {
   if(!Array.isArray(puzzles)||!puzzles.length||puzzles.length>250||new Set(puzzles.map(p=>p.puzzle_id)).size!==puzzles.length)throw error('Invalid batch');
   const batch=puzzles.map(p=>{
@@ -129,9 +167,10 @@ export async function handleTrophyImport(request,query) {
   let body;
   try{body=JSON.parse(Buffer.concat(chunks));}catch{throw error('Invalid JSON');}
 
-  if(body.action==='refresh-images') {
+  if(body.action==='refresh-images'||body.action==='normalize-image-markers') {
     if(identity.workflow_ref!==IMAGE_REFRESH_WORKFLOW)throw error('Image refresh identity denied',403);
-    return refreshTrophyImages(query,body.setId,body.mapping);
+    if(body.action==='refresh-images')return refreshTrophyImages(query,body.setId,body.mapping);
+    return normalizeResolvedImageMarkers(query,body.setIds);
   }
   if(identity.workflow_ref!==IMPORT_WORKFLOW)throw error('Trophy import identity denied',403);
 
