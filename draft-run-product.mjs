@@ -19,6 +19,7 @@ let environment=new URLSearchParams(location.search).get('set')==='powered-cube'
 const cube=()=> (run?.environment||environment)==='powered-cube';
 const title=()=>cube()?'Powered Cube Run':'Draft Run';
 const gameUrl=(params='')=>`?game=draft-run${cube()?'&set=powered-cube':''}${params?'&'+params:''}`;
+const boardUrl=(target,period='daily')=>`?game=draft-run${target==='powered-cube'?'&set=powered-cube':''}&board=${period}`;
 const setName=id=>id==='powered-cube'?'Powered Cube':id.toUpperCase();
 const app=()=>document.querySelector('#app');
 function styles() {
@@ -132,7 +133,8 @@ async function shareResult(challenge) {
 async function showBoard(period='daily') {
   const data=await api(`/v1/leaderboard?period=${encodeURIComponent(period)}&environment=${environment}`,undefined,false);
   document.body.classList.remove('is-game');
-  app().innerHTML=`<section class="run-board"><p class="eyebrow">${title()}</p><h1>The leaderboard</h1><nav aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s ten decisions.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a ${title()}</a><a class="button secondary" href="?modes=1#more-pack-one">Set Practice</a><a class="button secondary" href="?legacy-board=1">Top 3, Full Pack & Cube boards</a></div></section>`;
+  const environmentActions=cube()?'':`<a class="button secondary" href="?modes=1#more-pack-one">Top 3 practice</a>`;
+  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${cube()?'':'active'}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s ten decisions.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a ${title()}</a>${environmentActions}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period});
 }
 async function launch(options={}) {
@@ -162,14 +164,11 @@ export function installDraftRunHome() {
   styles();
   // Start the read-only corpus warmup while the player reads the landing page.
   if(base())void api('/health',undefined,false).catch(()=>{});
-  if(!new URLSearchParams(location.search).has('legacy-board')) {
-    for(const [id,url] of [['daily-nav','?game=draft-run&daily=1'],['leaderboard-nav','?game=draft-run&board=daily']])
-      document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();location.href=url;},true);
-  }
+  for(const [id,url] of [['daily-nav','?game=draft-run&daily=1'],['leaderboard-nav','?game=draft-run&board=daily']])
+    document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();location.href=url;},true);
   onAppRender(()=>{
     const intro=document.querySelector('.home-intro');if(!intro||document.querySelector('[data-draft-run-home="1"]'))return;
     const copy=intro.querySelector('p:last-child');if(copy)copy.textContent='Ten tough choices from trophy drafts. Read the drafter’s pool, make your pick, and see how you did.';
     intro.insertAdjacentHTML('afterend',`<section class="draft-run-feature" data-draft-run-home="1"><div><p class="eyebrow">The Daily Draft Run</p><h2>Ten picks.<br>Your call.</h2><p>Different sets. Real trophy drafts.<span class="feature-new-line">One set reroll and one pack reroll when you need them.</span></p></div><div class="draft-run-feature-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a Draft Run</a><a class="text-button" href="${gameUrl('board=daily')}">See the Draft Run board</a><small>Free to play · No account needed</small></div></section>`);
   });
-  if(new URLSearchParams(location.search).has('legacy-board')) queueMicrotask(()=>document.querySelector('#leaderboard-nav')?.click());
 }

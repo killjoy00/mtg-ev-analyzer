@@ -7,6 +7,9 @@ await mkdir('artifacts', { recursive: true });
 const browser = await chromium.launch(process.env.CI ? { headless: true, channel: 'chrome' } : { headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const capturedEvents = [];
+const browserErrors = [];
+page.on('pageerror', (error) => browserErrors.push(error.message));
+page.on('console', (message) => { if (message.type() === 'error') browserErrors.push(message.text()); });
 
 // Exercise the client contract without polluting production analytics/results.
 await page.route('https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**', async (route) => {
@@ -30,14 +33,12 @@ async function assertNoHorizontalOverflow() {
   assert.ok(metrics.scrollWidth <= metrics.clientWidth + 1, `horizontal overflow: ${metrics.scrollWidth}px > ${metrics.clientWidth}px`);
 }
 
-async function assertModeCardsAligned() {
-  const boxes = await page.locator('.mode-grid[aria-label="Choose a practice mode"] .mode-card').evaluateAll((nodes) => nodes.slice(0, 2).map((node) => {
-    const r = node.getBoundingClientRect();
-    return { x: r.x, y: r.y, width: r.width, height: r.height };
-  }));
-  assert.equal(boxes.length, 2);
-  assert.ok(Math.abs(boxes[0].y - boxes[1].y) <= 1, 'mode cards must share a top edge');
-  assert.ok(Math.abs(boxes[0].height - boxes[1].height) <= 1, 'mode cards must have equal height');
+async function assertMoreModesFocused() {
+  const cards = page.locator('.mode-grid[aria-label="Opening pack practice"] .mode-card');
+  assert.equal(await cards.count(), 1, 'More Modes should contain one opening-pack game');
+  assert.match((await cards.first().innerText()) || '', /Opening pack[\s\S]*Top 3/i);
+  assert.equal(await page.locator('[data-mode="full"]').count(), 0, 'Full Pack must not be offered on More Modes');
+  assert.equal(await page.locator('#daily-challenge,[data-daily-mode]').count(), 0, 'Daily opening-pack play must not be offered on More Modes');
 }
 
 async function assertPackAligned() {
@@ -67,6 +68,9 @@ async function home() {
   await page.goto(`${base}/?modes=1`, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
   await page.getByRole('heading', { name: 'Pack One', exact: true }).waitFor({ timeout: 5000 });
+  await page.locator('[data-home-tab="more"]').waitFor({ state: 'attached', timeout: 10000 }).catch(async () => {
+    console.error('More Modes render diagnostics:', JSON.stringify({ url: page.url(), errors: browserErrors, body: (await page.locator('body').innerText()).slice(0, 2000) }));
+  });
   assert.match(await page.locator('[data-home-tab="more"]').getAttribute('class') || '', /active/);
 
   const catalog = await page.evaluate(async () => {
@@ -94,9 +98,8 @@ async function home() {
   assert.match(consensusCopy, /high-win-rate 17Lands drafters/i);
   assert.doesNotMatch(consensusCopy, /not win rates|not win probability|card grades|objective truth/i);
   assert.doesNotMatch((await page.locator('.home-intro').textContent()) || '', /defend it/i);
-  assert.equal(await page.getByRole('heading', { name: 'Today’s opening pack', exact: true }).count(), 1);
-  assert.equal(await page.locator('.daily-main').count(), 1);
-  assert.match((await page.locator('.daily-main').textContent()) || '', /Play today’s Top 3/i);
+  assert.equal(await page.getByRole('heading', { name: 'Top 3', exact: true }).count(), 1);
+  await assertMoreModesFocused();
   assert.equal(await page.locator('#home-editorial').isVisible(), true, 'editorial shell should be visible on More modes');
   await assertNoHorizontalOverflow();
 }
@@ -140,21 +143,6 @@ async function assertMobileTapScrollStable() {
   const after = await page.evaluate(() => window.scrollY);
   assert.ok(Math.abs(after - before) <= 24, `card tap moved page ${Math.round(after - before)}px (${before} → ${after})`);
 }
-async function finishFullPack() {
-  let decisions=0;
-  while(!await page.locator('.full-result-page,.scorecard').count()&&decisions<20) {
-    await page.locator('.study-main .card-choice').first().click();
-    await page.locator('#submit-pick').click();
-    await page.locator('#next-pick').click();
-    decisions++;
-  }
-  await page.locator('.full-result-page').waitFor();
-  assert.ok(decisions>=10&&decisions<=15,`Expected a full first pack, saw ${decisions}`);
-  const score=Number(await page.locator('.full-result-page .score-orb strong').textContent());
-  assert.ok(Number.isFinite(score)&&score>=0&&score<=100);
-  await assertNoHorizontalOverflow();
-}
-
 try {
   // Rendered design checks at desktop and mobile sizes.
   await page.setViewportSize({ width: 1440, height: 1000 });
@@ -178,7 +166,7 @@ try {
   assert.equal(await page.locator('#set-select').inputValue(), newest.id, 'set archive launches the selected practice environment');
 
   await home();
-  await assertModeCardsAligned();
+  await assertMoreModesFocused();
   await page.screenshot({ path: 'artifacts/ui-home-desktop.png', fullPage: true });
   await page.goto(`${base}/?modes=1&adpreview=1`, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
@@ -214,21 +202,6 @@ try {
     if (setId === 'ecl') await page.screenshot({ path: 'artifacts/ui-result-mobile.png', fullPage: true });
   }
 
-  // Daily is independent from practice set selection and starts from the featured environment.
-  await home();
-  await page.locator('#set-select').selectOption('msh');
-  await page.locator('[data-daily-mode="top3"]').click();
-  const dailyUrl = new URL(page.url());
-  const dailySet = dailyUrl.searchParams.get('set');
-  assert.ok(dailySet);
-  assert.notEqual(dailySet, 'msh');
-  assert.match(dailyUrl.searchParams.get('daily') || '', /^\d{4}-\d{2}-\d{2}$/);
-  assert.equal(dailyUrl.searchParams.get('mode'), 'top3');
-  await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
-  await revealTop3();
-  assert.equal(await page.locator('.friend-comparison').count(), 0);
-  await assertPrimaryResultActions('.top3-result-page');
-
   // Seeded practice remains in practice mode after a game, and New Pack preserves the chosen set.
   await home();
   await page.locator('#set-select').selectOption('sos');
@@ -252,13 +225,9 @@ try {
   assert.equal(cleanHomeUrl.searchParams.get('daily'), null);
   assert.equal(cleanHomeUrl.searchParams.get('modes'), null);
 
-  // Full Pack remains available on More modes; Cube launch URLs remain valid but are surfaced on primary home.
+  // More Modes stays focused on Top 3; Cube launch URLs remain valid but are surfaced on primary home.
   await home();
-  await page.locator('#set-select').selectOption('msh');
-  await page.locator('[data-mode="full"]').click();
-  await finishFullPack();
-  await page.screenshot({path:'artifacts/ui-full-pack-result-mobile.png',fullPage:true});
-  await home();
+  await assertMoreModesFocused();
   if (await page.locator('[data-powered-cube-section="1"]').count()) {
     assert.equal(await page.locator('[data-powered-cube-section="1"]').isVisible(), false);
     const cubeLaunchers = page.locator('[data-powered-cube-section="1"] [data-cube-href]');

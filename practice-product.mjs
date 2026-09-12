@@ -3,7 +3,6 @@ import { onAppRender } from './render-lifecycle.mjs';
 
 const PRACTICE_SET_KEY = 'pack1-practice-set-v1';
 const CUBE_ID = 'powered-cube';
-const narrowHome = typeof matchMedia === 'function' ? matchMedia('(max-width: 760px)') : null;
 
 function freshSeed() {
   return makeGameSeed(globalThis.crypto?.randomUUID ? () => crypto.randomUUID() : null);
@@ -60,16 +59,6 @@ function placePracticeSelector(select) {
   }
 }
 
-function fixResponsiveHomeLayout() {
-  const daily = document.querySelector('.daily-feature');
-  if (!daily) return;
-  if (narrowHome?.matches) {
-    if (daily.style.gridTemplateColumns !== '1fr') daily.style.gridTemplateColumns = '1fr';
-  } else if (daily.style.gridTemplateColumns) {
-    daily.style.removeProperty('grid-template-columns');
-  }
-}
-
 function updateHomeCopy(select) {
   const featured = featuredOption(select);
   if (!featured) return;
@@ -77,7 +66,7 @@ function updateHomeCopy(select) {
   const fieldLabel = document.querySelector('label[for="set-select"]');
   setText(fieldLabel, 'Practice set');
 
-  // Make the default choice explicit without turning the Daily Challenge into a set picker.
+  // Make the default choice explicit in the opening-pack practice picker.
   for (const option of standardOptions(select)) {
     const original = option.dataset.practiceOriginalLabel || option.textContent.replace(/^Featured\s*[—-]\s*/i, '');
     if (!option.dataset.practiceOriginalLabel) option.dataset.practiceOriginalLabel = original;
@@ -86,26 +75,16 @@ function updateHomeCopy(select) {
   }
 
   const selectedName = selected.dataset.practiceOriginalLabel || selected.textContent;
-  const featuredName = featured.dataset.practiceOriginalLabel || featured.textContent;
   const meta = document.querySelector('#set-meta');
   const metaCopy = selected.value === featured.value
-    ? 'Use the featured environment, or choose one set to stay locked there for Set Practice.'
-    : `Set Practice locked to ${selectedName}. Change this only when you want a different practice environment.`;
+    ? 'Use the featured set, or choose another set for Top 3 practice.'
+    : `Top 3 practice locked to ${selectedName}.`;
   setText(meta, metaCopy);
-
-  const daily = document.querySelector('#daily-challenge .daily-kicker');
-  if (daily && !daily.querySelector('[data-featured-environment]')) {
-    const chip = document.createElement('span');
-    chip.className = 'best-chip';
-    chip.dataset.featuredEnvironment = '1';
-    chip.textContent = `Featured · ${featuredName}`;
-    daily.appendChild(chip);
-  }
 
   const practiceHeading = document.querySelector('.mode-section:not(.cube-mode-section) .mode-section-heading > p');
   const practiceCopy = selected.value === featured.value
-    ? 'Unlimited practice. Leave the featured set selected, or lock practice to one environment below.'
-    : `Unlimited practice locked to ${selectedName}.`;
+    ? 'Choose the three best starts from a real opening pack. Pick a set and play as many packs as you want.'
+    : `Choose the three best starts from ${selectedName} opening packs.`;
   setText(practiceHeading, practiceCopy);
 }
 
@@ -125,7 +104,6 @@ function enhanceHome() {
   }
   placePracticeSelector(select);
   updateHomeCopy(select);
-  fixResponsiveHomeLayout();
 }
 
 function cleanHomeUrl() {
@@ -135,8 +113,8 @@ function cleanHomeUrl() {
 function capturePractice(event) {
   const select = document.querySelector('#set-select');
 
-  // The visible set control is practice-only. Prevent app.js from changing the
-  // featured Daily state when someone selects a practice environment.
+  // The visible set control is practice-only. Preserve the selected environment
+  // without making app.js rebuild the whole More Modes surface.
   if (event.type === 'change' && event.target?.id === 'set-select' && document.querySelector('.home-intro')) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -148,13 +126,6 @@ function capturePractice(event) {
   if (event.type !== 'click') return;
 
   const query = params();
-  const daily = event.target.closest?.('[data-daily-mode]');
-  if (daily && select) {
-    const featured = featuredOption(select);
-    if (featured && select.value !== featured.value) select.value = featured.value;
-    return; // Existing Daily handlers now see the featured environment.
-  }
-
   const modeButton = event.target.closest?.('[data-mode]');
   const cleanHomeLaunch = !query.get('seed') && !query.get('daily') && !query.get('mode');
   if (modeButton && cleanHomeLaunch && document.querySelector('.home-intro') && select) {
@@ -174,8 +145,8 @@ function capturePractice(event) {
   }
 
   // A seeded non-Daily run is practice (including shared exact-pack links).
-  // Returning home should always reconstruct the featured Daily state instead
-  // of leaving app.js pointed at the practice set.
+  // Returning home should clear the replay-specific URL instead of leaving
+  // app.js pointed at the practice set.
   if (query.get('seed') && !query.get('daily')) {
     const exit = event.target.closest?.('#brand-home, #quit-game, #top3-home, #summary-home');
     if (exit) {
@@ -189,6 +160,5 @@ function capturePractice(event) {
 export function installPracticeProductLayer() {
   document.addEventListener('change', capturePractice, true);
   document.addEventListener('click', capturePractice, true);
-  narrowHome?.addEventListener?.('change', enhanceHome);
   onAppRender(enhanceHome);
 }

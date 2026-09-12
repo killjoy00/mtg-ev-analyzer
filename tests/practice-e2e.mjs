@@ -34,27 +34,15 @@ async function openHome() {
 try {
   await openHome();
 
-  // Set selection belongs to practice, not the ranked Daily card.
+  // More Modes is one set-by-set opening-pack practice surface.
   assert.equal(
     await page.locator('.mode-section #set-select').count(),
     1,
     'Practice set selector must live inside the practice section',
   );
-  assert.equal(
-    await page.locator('#daily-challenge #set-select').count(),
-    0,
-    'Daily Challenge must not contain a set selector',
-  );
-
-  // The Daily card must actually stack on a phone, not merely avoid horizontal overflow.
-  const widths = await page.locator('#daily-challenge').evaluate((card) => {
-    const cardBox = card.getBoundingClientRect();
-    const copyBox = card.querySelector('.daily-copy')?.getBoundingClientRect();
-    const actionsBox = card.querySelector('.daily-actions')?.getBoundingClientRect();
-    return { card: cardBox.width, copy: copyBox?.width || 0, actions: actionsBox?.width || 0 };
-  });
-  assert.ok(widths.copy >= widths.card * 0.75, `Daily copy is still squeezed on mobile: ${JSON.stringify(widths)}`);
-  assert.ok(widths.actions >= widths.card * 0.75, `Daily actions are still squeezed on mobile: ${JSON.stringify(widths)}`);
+  assert.equal(await page.locator('.mode-card').count(), 1);
+  assert.match((await page.locator('.mode-card').innerText()) || '', /Opening pack[\s\S]*Top 3/i);
+  assert.equal(await page.locator('#daily-challenge,[data-daily-mode],[data-mode="full"]').count(), 0);
 
   const catalog = await page.evaluate(async () => {
     const response = await fetch('/data/catalog.json', { cache: 'no-store' });
@@ -64,20 +52,9 @@ try {
     .filter((set) => set?.id && !set.hide_from_set_picker && set.category !== 'special_mode')
     .sort((a, b) => String(b.data_date || '').localeCompare(String(a.data_date || '')) || String(a.id).localeCompare(String(b.id)));
   assert.ok(standards.length >= 2, 'Practice isolation regression requires at least two standard environments');
-  const featured = standards[0].id;
-  const practice = standards.find((set) => set.id !== featured).id;
+  const practice = standards[1].id;
 
-  // Pick a different practice environment, then prove Daily ignores it.
-  await page.locator('#set-select').selectOption(practice);
-  assert.equal(await page.locator('#set-select').inputValue(), practice);
-  await page.locator('[data-daily-mode="top3"]').click();
-  await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
-  const dailyUrl = new URL(page.url());
-  assert.equal(dailyUrl.searchParams.get('set'), featured, 'Daily must always launch the featured environment');
-  assert.ok(dailyUrl.searchParams.get('daily'));
-
-  // Set Practice, by contrast, deliberately stays on the chosen set.
-  await openHome();
+  // Top 3 practice deliberately stays on the chosen set.
   await page.locator('#set-select').selectOption(practice);
   await page.locator('[data-mode="top3"]').click();
   await page.locator('.opening-pack .card-choice').first().waitFor({ timeout: 10000 });
@@ -86,7 +63,7 @@ try {
   assert.ok(practiceUrl.searchParams.get('seed'));
   assert.equal(practiceUrl.searchParams.has('daily'), false);
 
-  console.log(`Practice isolation passed: featured=${featured}, practice=${practice}`);
+  console.log(`Focused Top 3 practice passed: set=${practice}`);
 } finally {
   await browser.close();
 }
