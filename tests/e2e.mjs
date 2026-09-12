@@ -7,6 +7,9 @@ await mkdir('artifacts', { recursive: true });
 const browser = await chromium.launch(process.env.CI ? { headless: true, channel: 'chrome' } : { headless: true });
 const page = await browser.newPage({ viewport: { width: 390, height: 844 } });
 const capturedEvents = [];
+const browserErrors = [];
+page.on('pageerror', (error) => browserErrors.push(error.message));
+page.on('console', (message) => { if (message.type() === 'error') browserErrors.push(message.text()); });
 
 // Exercise the client contract without polluting production analytics/results.
 await page.route('https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**', async (route) => {
@@ -65,6 +68,9 @@ async function home() {
   await page.goto(`${base}/?modes=1`, { waitUntil: 'domcontentloaded' });
   await page.locator('#set-select').waitFor({ timeout: 10000 });
   await page.getByRole('heading', { name: 'Pack One', exact: true }).waitFor({ timeout: 5000 });
+  await page.locator('[data-home-tab="more"]').waitFor({ state: 'attached', timeout: 10000 }).catch(async () => {
+    console.error('More Modes render diagnostics:', JSON.stringify({ url: page.url(), errors: browserErrors, body: (await page.locator('body').innerText()).slice(0, 2000) }));
+  });
   assert.match(await page.locator('[data-home-tab="more"]').getAttribute('class') || '', /active/);
 
   const catalog = await page.evaluate(async () => {
