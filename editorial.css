@@ -10,7 +10,9 @@
   --green-dark: #15395b;
   --gold: #946824;
   --sans: "Arial Narrow", "Helvetica Neue", Arial, sans-serif;
-  --content: 1120px;
+  /* Matches the app shell so the container does not jump width when a reader
+     crosses between the game and the content pages. */
+  --content: 1188px;
 }
 
 * { box-sizing: border-box; }
@@ -93,6 +95,10 @@ a { color: inherit; }
 
 .site-header nav a,
 .site-footer a {
+  /* WCAG 2.2 asks for a 24px minimum target; these links were 19px tall. */
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
   color: var(--muted);
   font-size: 12px;
   font-weight: 700;
@@ -104,6 +110,12 @@ a { color: inherit; }
   color: var(--green-dark);
   text-decoration: underline;
   text-underline-offset: 4px;
+}
+
+/* A visible focus ring, matching the app shell. */
+:focus-visible {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
 }
 
 .editorial-main {
@@ -179,7 +191,9 @@ a { color: inherit; }
 }
 .method-directory strong { font-size: 15px; line-height: 1.25; }
 
-.prose { font-size: 17px; }
+/* Long-form reading measure. Without this the column runs past 100 characters
+   on a wide screen, which is well beyond comfortable for body copy. */
+.prose { font-size: 17px; max-width: 68ch; }
 .prose h2 {
   margin: 48px 0 12px;
   font-size: 28px;

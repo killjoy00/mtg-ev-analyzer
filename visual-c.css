@@ -325,6 +325,49 @@ h3 {
   color: var(--green-dark);
 }
 
+/* The app footer's links were below the 24px WCAG 2.2 target minimum. */
+.app-footer a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+}
+
+/* A visible focus ring. The browser default is a 1px near-black outline, which
+   disappears against the dark primary buttons. */
+:focus-visible {
+  outline: 3px solid var(--green);
+  outline-offset: 2px;
+}
+.button.primary:focus-visible,
+.card-choice:focus-visible {
+  outline-color: var(--ink);
+}
+
+/* Reveal rows carry the card art so the comparison stays visual. */
+.rank-row {
+  grid-template-columns: 28px 34px minmax(0, 1fr) auto;
+}
+.rank-thumb {
+  width: 34px;
+  aspect-ratio: 63 / 88;
+  object-fit: cover;
+  object-position: top center;
+  border: 1px solid var(--line);
+  background: var(--surface-soft);
+}
+.rank-thumb-blank {
+  display: block;
+}
+@media (max-width: 700px) {
+  .rank-row {
+    grid-template-columns: 22px 28px minmax(0, 1fr) auto;
+    gap: 8px;
+  }
+  .rank-thumb {
+    width: 28px;
+  }
+}
+
 .verdict.consensus {
   background: var(--green-soft);
   color: var(--green-dark);

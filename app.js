@@ -208,11 +208,22 @@ function getBestScore(mode) {
   }
 }
 
+// A first game has nothing to beat, and celebrating a weak score reads as
+// mockery. Only call it a personal best once there is a real score to improve
+// on and the new one is worth showing off.
+const BEST_CELEBRATION_FLOOR = 75;
+
 function recordBestScore(mode, score) {
   const previous = getBestScore(mode);
   const best = previous === null ? score : Math.max(previous, score);
   try { window.localStorage.setItem(bestKey(mode), String(best)); } catch { /* optional */ }
-  return { best, previous, isNewBest: previous === null || score > previous };
+  const improved = previous === null || score > previous;
+  return {
+    best,
+    previous,
+    improved,
+    isNewBest: improved && previous !== null && score >= BEST_CELEBRATION_FLOOR,
+  };
 }
 
 function bestChip(mode) {
@@ -416,11 +427,67 @@ async function startMode(mode, options = {}) {
     state.challengeRanked = daily && date === utcDateKey() && !challengeRecord(date, entry.id, mode);
     state.challengeSubmitStatus = null;
     state.challengeRank = null;
-    if (mode === 'top3') renderTopThree();
-    else renderFullPack();
+    if (mode === 'top3') {
+      restoreTopThreeReveal();
+      renderTopThree();
+    } else renderFullPack();
   } catch (error) {
     renderError(error);
   }
+}
+
+// The reveal is a distinct step, so it gets its own history entry: Back returns
+// to the player's picks instead of leaving the site, and a reload on the reveal
+// URL restores the score instead of resetting the pack.
+function revealStorageKey() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('reveal');
+  return `pack1-reveal:${url.pathname}${url.search}`;
+}
+
+function isRevealUrl() {
+  return new URLSearchParams(window.location.search).get('reveal') === '1';
+}
+
+function pushRevealState(selectedIds) {
+  try {
+    window.sessionStorage.setItem(revealStorageKey(), JSON.stringify(selectedIds));
+  } catch { /* optional */ }
+  if (isRevealUrl()) return;
+  try {
+    const url = new URL(window.location.href);
+    url.searchParams.set('reveal', '1');
+    window.history.pushState({ packOneReveal: true }, '', url);
+  } catch { /* optional */ }
+}
+
+function restoreTopThreeReveal() {
+  if (!isRevealUrl()) return;
+  let stored = null;
+  try { stored = JSON.parse(window.sessionStorage.getItem(revealStorageKey()) || 'null'); } catch { /* optional */ }
+  if (!Array.isArray(stored) || stored.length !== 3) return;
+  const pick = openingPick();
+  const available = new Set((pick?.candidates || []).map((card) => card.id));
+  if (!stored.every((id) => available.has(id))) return;
+  state.topThreeIds = [...stored];
+  state.quickResult = gradeTopThree(pick.candidates, state.topThreeIds, pick.historical_pick_id);
+  state.scoreMeta = recordBestScore('top3', state.quickResult.score);
+  state.revealed = true;
+}
+
+function handleRevealPopState() {
+  if (state.mode !== 'top3' || !state.packPicks.length) return;
+  if (isRevealUrl()) {
+    if (state.revealed) return;
+    restoreTopThreeReveal();
+    if (state.revealed) renderTopThree();
+    return;
+  }
+  if (!state.revealed) return;
+  state.revealed = false;
+  state.quickResult = null;
+  state.scoreMeta = null;
+  renderTopThree();
 }
 
 function rankedInfo(pick, cardId) {
@@ -436,35 +503,64 @@ function renderCard(card, pick, context = {}) {
   const isConsensus = reveal && consensusRank <= (mode === 'top3' ? 3 : 1);
   const isHistorical = reveal && card.id === pick.historical_pick_id;
   const classes = ['card-choice', fullSelected ? 'selected' : '', userRank ? 'ranked-choice' : '', isConsensus ? 'consensus' : ''].filter(Boolean).join(' ');
+  const chosen = fullSelected || userRank > 0;
+  // The tile is a toggle: clicking a chosen card removes it. Say so in the
+  // caption and in ARIA so the state is not carried by the badge alone.
+  const action = userRank
+    ? `Ranked #${userRank} · choose again to remove`
+    : fullSelected
+      ? 'Selected · choose again to remove'
+      : 'Choose this card';
 
   return `
-    <button class="${classes}" type="button" data-card-id="${esc(card.id)}" ${reveal ? 'disabled' : ''}>
+    <button class="${classes}" type="button" data-card-id="${esc(card.id)}"${reveal ? ' disabled' : ` aria-pressed="${chosen}"`}>
       <div class="card-image-wrap">
-        <div class="card-art-placeholder">${esc(card.name)}</div>
-        ${card.image_url ? `<img class="card-image" src="${esc(card.image_url)}" alt="${esc(card.name)}" loading="lazy" />` : ''}
-        ${userRank ? `<span class="user-rank-badge">${userRank}</span>` : ''}
-        ${reveal && consensusRank <= 3 ? `<span class="consensus-badge">C${consensusRank}</span>` : ''}
+        <div class="card-art-placeholder" aria-hidden="true">${esc(card.name)}</div>
+        ${card.image_url ? `<img class="card-image" src="${esc(card.image_url)}" alt="" loading="lazy" />` : ''}
+        ${userRank ? `<span class="user-rank-badge" aria-hidden="true">${userRank}</span>` : ''}
+        ${reveal && consensusRank <= 3 ? `<span class="consensus-badge" aria-hidden="true">C${consensusRank}</span>` : ''}
       </div>
       <div class="card-footer">
         <strong>${esc(card.name)}</strong>
-        ${reveal ? `<span>${pct(card.model_probability, 1)} · consensus #${consensusRank}${isHistorical ? ' · drafter pick' : ''}</span>` : '<span>Choose this card</span>'}
+        ${reveal ? `<span>${pct(card.model_probability, 1)} · consensus #${consensusRank}${isHistorical ? ' · drafter pick' : ''}</span>` : `<span>${action}</span>`}
       </div>
     </button>`;
 }
 
+// Cards are visual objects; a reveal that only lists names loses the thing the
+// player was actually reading. The name is already beside it, so the art is
+// decorative to assistive tech.
+function rankThumb(card) {
+  return card?.image_url
+    ? `<img class="rank-thumb" src="${esc(card.image_url)}" alt="" loading="lazy" />`
+    : '<span class="rank-thumb rank-thumb-blank" aria-hidden="true"></span>';
+}
+
 function attachCardImageFallbacks() {
   document.querySelectorAll('.card-image').forEach((image) => image.addEventListener('error', () => image.remove(), { once: true }));
+  // Reveal rows are a fixed grid: a thumbnail that fails leaves its slot empty
+  // rather than disappearing, so the rows stay aligned.
+  document.querySelectorAll('img.rank-thumb').forEach((image) => image.addEventListener('error', () => {
+    image.replaceWith(Object.assign(document.createElement('span'), { className: 'rank-thumb rank-thumb-blank' }));
+  }, { once: true }));
 }
 
 function openingPick() {
   return state.packPicks[0];
 }
 
+// The headline follows the score, not set overlap. They measure different
+// things — overlap counts membership, the score weighs support — so keying the
+// headline to overlap let one line ("One big hit.") sit above anything from an
+// F to a B-. Overlap still appears in the note below the comparison.
 function topThreeResultCopy(result) {
-  if (result.score === 100) return 'Perfect pack.';
-  if (result.overlap === 3) return 'You found the cards.';
-  if (result.overlap === 2) return 'Strong read.';
-  if (result.overlap === 1) return 'One big hit.';
+  const score = Math.max(0, Math.min(100, Math.round(Number(result.score) || 0)));
+  if (score === 100) return 'Perfect pack.';
+  if (score >= 90) return 'You found the cards.';
+  if (score >= 80) return 'Strong read.';
+  if (score >= 70) return 'Solid shortlist.';
+  if (score >= 60) return 'Close in places.';
+  if (score >= 50) return 'Different read.';
   return 'Run this one back.';
 }
 
@@ -481,7 +577,7 @@ function renderScoreHero(score, grade, label, meta) {
       <div class="score-copy">
         <div class="grade-row"><span class="grade-badge">${esc(grade)}</span>${meta?.isNewBest ? '<span class="new-best">New personal best</span>' : ''}</div>
         <h2>${esc(label)}</h2>
-        ${meta && !meta.isNewBest ? `<p>Personal best: <strong>${meta.best}</strong></p>` : ''}
+        ${meta && !meta.isNewBest && meta.previous !== null ? `<p>Personal best: <strong>${meta.best}</strong></p>` : ''}
         <p class="score-context">Consensus alignment score — not win probability or an objective card grade.</p>
       </div>
     </div>`;
@@ -507,8 +603,8 @@ function renderTopThreeReveal() {
       ${renderScoreHero(result.score, result.grade, topThreeResultCopy(result), state.scoreMeta)}
       ${dailySubmissionMarkup()}
       <div class="top3-comparison">
-        <div><h3>Your ranking</h3>${result.selected.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong></div>`).join('')}</div>
-        <div><h3>Consensus</h3>${result.consensusTop.map((card, index) => `<div class="rank-row"><span>${index + 1}</span><strong>${esc(card.name)}</strong><small>${pct(card.model_probability, 1)}</small><a class="market-link" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-link="1" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-set="${esc(state.selectedSetId)}" data-tcgplayer-surface="top3_consensus">TCGplayer</a></div>`).join('')}</div>
+        <div><h3>Your ranking</h3>${result.selected.map((card, index) => `<div class="rank-row"><span>${index + 1}</span>${rankThumb(card)}<strong>${esc(card.name)}</strong></div>`).join('')}</div>
+        <div><h3>Consensus</h3>${result.consensusTop.map((card, index) => `<div class="rank-row"><span>${index + 1}</span>${rankThumb(card)}<strong>${esc(card.name)}</strong><small>${pct(card.model_probability, 1)}</small><a class="market-link" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-link="1" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-set="${esc(state.selectedSetId)}" data-tcgplayer-surface="top3_consensus">TCGplayer</a></div>`).join('')}</div>
       </div>
       <p class="reveal-note">${result.overlap}/3 consensus cards · ${result.exactPositions} exact ${result.exactPositions === 1 ? 'position' : 'positions'}. ${result.historicalRank ? `The historical drafter's first pick was #${result.historicalRank} on your list.` : `The historical drafter's first pick was outside your top three.`}</p>
       <div class="button-row result-actions">
@@ -554,6 +650,7 @@ function submitTopThree() {
   state.quickResult = gradeTopThree(pick.candidates, state.topThreeIds, pick.historical_pick_id);
   state.scoreMeta = recordBestScore('top3', state.quickResult.score);
   state.revealed = true;
+  pushRevealState(state.topThreeIds);
   if (state.isDailyChallenge && state.challengeRanked) {
     recordChallengeCompletion({ date: state.challengeDate, setId: state.selectedSetId, mode: 'top3', score: state.quickResult.score, grade: state.quickResult.grade });
     state.challengeSubmitStatus = 'pending';
@@ -764,6 +861,7 @@ function refreshChallengeStatus() {
 }
 
 async function init() {
+  window.addEventListener('popstate', handleRevealPopState);
   app.innerHTML = document.querySelector('#loading-template').innerHTML;
   try {
     state.catalog = await loadCatalog();
