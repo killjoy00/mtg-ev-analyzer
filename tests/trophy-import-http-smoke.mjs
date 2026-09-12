@@ -31,6 +31,11 @@ for(const environment of ['mixed','powered-cube']) {
   }
   assert.equal(s.complete,true);assert.equal(s.answers.length,10);
   assert.ok(bands.easy<=1);assert.equal(bands.hard,3);assert.equal(bands.medium,7-bands.easy);
+  const invitation=await call(`/v1/runs/${s.id}/share`,{},guest.token);
+  const friend=await call('/v1/runs',{challenge:invitation.id},guest.token);
+  assert.equal(friend.difficulty_version,s.difficulty_version);
+  assert.equal(friend.current.puzzle_id,s.answers[0].puzzle.puzzle_id);
+  assert.deepEqual(friend.current.difficulty,s.answers[0].puzzle.difficulty);
   console.log(environment,'practice start, rerolls, ten picks and completion passed');
 }
 console.log(JSON.stringify(health));
