@@ -41,7 +41,7 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
 });
 async function noOverflow(){const r=await page.evaluate(()=>({w:document.documentElement.clientWidth,s:document.documentElement.scrollWidth}));assert.ok(r.s<=r.w+1,`overflow ${r.s}>${r.w}`);}
 try{
-  await page.goto(base);await page.locator('.draft-run-feature').waitFor();
+  await page.goto(base);await page.locator('[data-draft-run-home="1"]').waitFor();
   assert.ok(await page.getByRole('link',{name:'Play today’s Draft Run',exact:true}).isVisible());
   assert.equal(await page.locator('.cube-mode-section #set-select').count(),0);
   assert.equal(await page.locator('.mode-section:not(.cube-mode-section) #set-select').count(),1);

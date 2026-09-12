@@ -80,7 +80,7 @@ async function home() {
     await page.locator('[data-powered-cube-section="1"]').waitFor({ state: 'attached', timeout: 5000 });
     assert.equal(await page.locator('[data-powered-cube-section="1"]').isVisible(), false, 'Powered Cube belongs on the primary home tab');
   }
-  assert.equal(await page.locator('.draft-run-feature').isVisible(), false, 'Draft Run belongs on the primary home tab');
+  assert.equal(await page.locator('[data-draft-run-home="1"]').isVisible(), false, 'Draft Run belongs on the primary home tab');
   const expectedSetIds = (catalog.sets || [])
     .filter((set) => !set.hide_from_set_picker && set.category !== 'special_mode')
     .map((set) => set.id)
@@ -226,7 +226,7 @@ try {
 
   // Leaving seeded practice restores the clean primary home rather than sticking to the seeded URL.
   await page.locator('#brand-home').click();
-  await page.locator('.draft-run-feature').waitFor({ timeout: 10000 });
+  await page.locator('[data-draft-run-home="1"]').waitFor({ timeout: 10000 });
   const cleanHomeUrl = new URL(page.url());
   assert.equal(cleanHomeUrl.searchParams.get('seed'), null);
   assert.equal(cleanHomeUrl.searchParams.get('set'), null);
