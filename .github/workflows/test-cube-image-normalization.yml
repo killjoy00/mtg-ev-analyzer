@@ -26,8 +26,15 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Hydrate replay shards from R2
-        run: bash scripts/r2_replay_shards.sh hydrate
+      - name: Hydrate Powered Cube shards from R2
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p data/powered-cube/shards
+          aws s3 sync "s3://${R2_BUCKET}/data/powered-cube/shards" data/powered-cube/shards \
+            --endpoint-url "$R2_ENDPOINT" \
+            --exclude '*' \
+            --include '*.json'
       - name: Normalize Cube images without publishing
         shell: bash
         run: |
