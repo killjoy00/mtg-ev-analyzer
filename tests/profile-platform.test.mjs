@@ -36,10 +36,12 @@ test('public profile is opt-in and profile API supports history and lookup', () 
 test('progression UI keeps stats inside Account and preserves the career surface', () => {
   assert.match(bootstrap, /profile-product\.mjs/);
   assert.match(bootstrap, /installProfileProductLayer/);
-  assert.match(product, /id = 'profile-nav'/);
+  assert.match(product, /id = 'account-nav'/);
+  assert.doesNotMatch(product, /id = 'profile-nav'/);
   assert.doesNotMatch(product, /stats-nav.*remove/);
   assert.doesNotMatch(growth, /id='stats-nav'/);
-  assert.match(growth, /id="account-stats"/);
+  assert.match(product, /profile-manage-account/);
+  assert.match(growth, /Back to my career/);
   assert.match(product, /environmentProgress/);
   assert.match(product, /data-share-achievement/);
   assert.match(product, /data-share-daily/);

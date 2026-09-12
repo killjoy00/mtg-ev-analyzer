@@ -20,7 +20,9 @@ await page.route('https://**-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**'
   await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 });
 try {
-  await page.goto(base);await page.locator('#account-nav').click();await page.locator('#account-signin').waitFor();
+  await page.goto(base);await page.locator('#account-nav').click();await page.locator('.player-profile-page').waitFor();
+  assert.equal(await page.locator('#profile-nav').count(),0);
+  await page.locator('#profile-claim-account').click();await page.locator('#account-signin').waitFor();
   await page.screenshot({path:'artifacts/ui-account-mobile.png',fullPage:true});
   for(const kind of ['signin','signup']) {
     const form=page.locator('#account-'+kind);

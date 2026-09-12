@@ -124,8 +124,9 @@ async function noOverflow() {
 
 try {
   await page.goto(base, { waitUntil:'domcontentloaded' });
-  await page.locator('#profile-nav').waitFor({ timeout:10000 });
-  await page.locator('#profile-nav').click();
+  await page.locator('#account-nav').waitFor({ timeout:10000 });
+  assert.equal(await page.locator('#profile-nav').count(), 0, 'Profile and Account share one navigation destination');
+  await page.locator('#account-nav').click();
   await page.locator('.player-profile-page').waitFor({ timeout:10000 });
   assert.equal((await page.locator('.profile-hero h1').textContent())?.trim(), 'Profile Tester');
 

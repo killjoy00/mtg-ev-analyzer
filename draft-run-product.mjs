@@ -113,7 +113,7 @@ function renderResult() {
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult(false);
   document.querySelector('#run-challenge').onclick=()=>shareResult(true);
-  document.querySelector('#run-career').onclick=()=>document.querySelector('#profile-nav')?.click();
+  document.querySelector('#run-career').onclick=()=>document.querySelector('#account-nav')?.click();
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
 async function shareResult(challenge) {
