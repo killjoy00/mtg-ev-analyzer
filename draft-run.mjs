@@ -1,5 +1,6 @@
 import { rankCandidates } from './scoring.mjs';
 import { seededRandom } from './gameplay.mjs';
+import { sortPackByRarity } from './replay-data.mjs';
 import {rateDraftRunPuzzle,publicDifficulty,DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from './draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,eligibleRunPuzzle,regularRunSet,chooseRunSet,runDifficultyBands} from './draft-run-policy.mjs';
 
@@ -255,7 +256,7 @@ export function publicDraftRunPuzzle(puzzle) {
   const card = c => Object.fromEntries(['id','name','image_url','mana_cost','rarity','type_line'].filter(k => c[k]).map(k => [k,c[k]]));
   return {
     puzzle_id:puzzle.puzzle_id, set_id:puzzle.set_id, pack_number:1, pick_number:Number(puzzle.pick_number),
-    prior_picks:puzzle.prior_picks.map(card), candidates:puzzle.candidates.map(card),
+    prior_picks:puzzle.prior_picks.map(card), candidates:sortPackByRarity(puzzle.candidates.map(card)),
     difficulty:publicDifficulty(puzzle),
   };
 }

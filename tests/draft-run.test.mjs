@@ -8,6 +8,7 @@ import {
   draftRunRerollDistance,
   eligiblePickForRound,
   gradeDraftRunPick,
+  publicDraftRunPuzzle,
   summarizeDraftRun,
 } from '../draft-run.mjs';
 
@@ -71,6 +72,16 @@ test('overall Draft Run score is an equal-weight arithmetic mean', () => {
   assert.equal(run.score, Math.round((first + 9*second) / 10));
   assert.equal(run.historicalMatches, 1);
   assert.equal(run.consensusLeaders, 10);
+});
+
+test('public Draft Run packs display the rare slot before uncommons and commons', () => {
+  const item = puzzle();
+  item.candidates = [
+    { ...card('c', .2), rarity: 'common' },
+    { ...card('u', .3), rarity: 'uncommon' },
+    { ...card('r', .5), rarity: 'rare' },
+  ];
+  assert.deepEqual(publicDraftRunPuzzle(item).candidates.map((candidate) => candidate.id), ['r', 'u', 'c']);
 });
 
 test('reroll matching favors similar depth and decision shape', () => {

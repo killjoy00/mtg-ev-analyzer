@@ -28,6 +28,11 @@ async function enhance(detail={}) {
     const next=nextMilestones(profile,1)[0],reason=claimReason(profile);
     if(!next&&!reason&&!unlocked.length)return;
     const box=root.id==='post-game-progress'?root:document.createElement('aside');box.className='post-game-progress';
+    if(root.id==='post-game-progress') {
+      if(!next&&!unlocked.length)return;
+      box.innerHTML=`<p class="post-game-progress-label">Achievements</p>${unlocked.length?`<p><strong>${esc(unlocked[0].label)}</strong> unlocked.</p>`:''}${next?`<p><strong>Up next: ${esc(next.label)}</strong><br><span>${esc(next.progress_text)} · ${esc(next.description)}</span></p>`:''}`;
+      return;
+    }
     box.innerHTML=`${unlocked.length?`<p><strong>${esc(unlocked[0].label)}</strong> unlocked.</p>`:''}${next?`<p><strong>Up next: ${esc(next.label)}</strong><br><span>${esc(next.progress_text)} · ${esc(next.description)}</span></p>`:''}<div><button class="text-button" data-open-career>View your career</button>${reason?'<button class="text-button" data-claim-progress>Save my progress</button>':''}</div>${reason?`<small>${esc(reason)}</small>`:''}`;
     if(box!==root)root.append(box);
     box.querySelector('[data-open-career]').onclick=()=>document.querySelector('#profile-nav')?.click();

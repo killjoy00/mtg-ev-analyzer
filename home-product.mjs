@@ -54,7 +54,7 @@ function enhanceHome() {
     home.querySelector('.lede'),
     moreModes
       ? 'Daily opening-pack play, Top 3, Full Pack, and set-by-set practice live here.'
-      : 'Choose a ten-decision Draft Run across real trophy drafts, or stay inside Powered Cube.',
+      : 'Ten pack one choices for you to make across real trophy drafts.',
   );
 }
 

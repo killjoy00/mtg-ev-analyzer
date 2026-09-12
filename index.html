@@ -29,18 +29,21 @@
   <div class="app-shell">
     <header class="topbar">
       <button class="brand" id="brand-home" type="button" aria-label="Return to Pack One home">
-        <span class="brand-mark">P1</span>
+        <span class="brand-mark" aria-hidden="true"><span>P</span><sup>1</sup></span>
         <span class="brand-copy">
           <strong>Pack One</strong>
-          <small>Limited draft game</small>
         </span>
       </button>
       <div class="top-actions">
-        <button class="top-nav-button" id="daily-nav" type="button">Daily</button>
+        <button class="top-nav-button" id="daily-nav" type="button">Daily Run</button>
         <button class="top-nav-button" id="leaderboard-nav" type="button">Leaders</button>
-        <a class="top-nav-button top-nav-link" href="/learn/">Learn</a>
-        <a class="top-nav-button top-nav-link" href="/methodology/">Method</a>
-        <span class="source-note">Built from real 17Lands draft data</span>
+        <details class="top-nav-menu">
+          <summary class="top-nav-button">Method</summary>
+          <div class="top-nav-submenu">
+            <a href="/methodology/">Methodology</a>
+            <a href="/learn/">Learn</a>
+          </div>
+        </details>
       </div>
     </header>
 
@@ -63,6 +66,11 @@
       <p class="impact-site-verification" hidden>Impact-Site-Verification: 3e227a68-dfc4-4be8-a619-b13df4f67e25</p>
     </section>
   </div>
+
+  <footer class="site-footer app-footer">
+    <div><strong>Pack One</strong></div>
+    <nav aria-label="Footer"><a href="/about/">About</a><a href="/contact/">Contact</a><a href="/disclosure/">Disclosure</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></nav>
+  </footer>
 
   <template id="loading-template">
     <section class="message-card">
