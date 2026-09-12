@@ -21,6 +21,9 @@ Older clients can continue playing. Their outcome rows have `observed=false`
 and are excluded from the primary report. Historical response times are never
 fabricated. A browser view is evidence the page rendered a decision, not proof
 that a human read every card or that every image finished loading.
+View delivery is best-effort: locking a pick waits at most 1.5 seconds for its
+view request, then proceeds. If the outcome wins that race, it remains explicitly
+unobserved rather than being counted as a timed exposure.
 
 The client reports foreground milliseconds, bounded to 30 minutes and checked
 against server elapsed time with a five-second allowance. Reloads or multiple

@@ -8,11 +8,11 @@ const esc = value => String(value??'').replaceAll('&','&amp;').replaceAll('<','&
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 let run=null,selection=null,review=null,busy=false;
 const clock=decisionClock();let viewPromise=Promise.resolve(),viewKey=null;
-document.addEventListener('visibilitychange',()=>{if(document.hidden)clock.pause();else if(run?.current&&review==null&&!busy)recordView();});
-function recordView() {
+document.addEventListener('visibilitychange',()=>{if(document.hidden)clock.pause();else if(run?.current&&review==null&&!busy)recordView(true);});
+function recordView(touch=false) {
   if(document.hidden)return;
   const key=`${run.id}:${run.revision}`,viewId=clock.show(key);
-  if(viewKey!==key){viewKey=key;viewPromise=api(`/v1/runs/${run.id}/view`,{revision:run.revision,puzzleId:run.current.puzzle_id,viewId}).catch(()=>null);}
+  if(viewKey!==key||touch){viewKey=key;viewPromise=api(`/v1/runs/${run.id}/view`,{revision:run.revision,puzzleId:run.current.puzzle_id,viewId}).catch(()=>null);}
 }
 let environment=new URLSearchParams(location.search).get('set')==='powered-cube'?'powered-cube':'mixed';
 const cube=()=> (run?.environment||environment)==='powered-cube';
@@ -84,7 +84,8 @@ async function mutate(action,body) {
   app().querySelectorAll('button:not(.run-zoom)').forEach(b=>b.disabled=true);
   const round=run.answers.length;
   try {
-    await viewPromise;
+    // Measurement delivery must not hold a player's pick behind a slow request.
+    await Promise.race([viewPromise,new Promise(resolve=>setTimeout(resolve,1500))]);
     run=await api(`/v1/runs/${run.id}/${action}`,{...body,...measurement,revision:run.revision,round,puzzleId:run.current.puzzle_id});
     review=action==='pick'?round:null;selection=null;render();
     if(action==='reroll') trackEvent('draft_run_rerolled',{type:body.type,round:round+1,daily:Boolean(run.day)});
