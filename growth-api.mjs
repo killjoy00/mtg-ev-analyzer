@@ -8,6 +8,7 @@ let sessionPromise = null;
 function baseUrl() { return String(window.PACK1_API?.growthUrl || window.PACK1_API?.url || '').replace(/\/$/, ''); }
 function loadPackToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
 function loadAuthToken() { try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch { return null; } }
+export const storedAccountToken = () => loadAuthToken();
 function displayName() { try { return localStorage.getItem(NAME_KEY) || 'Pack Player'; } catch { return 'Pack Player'; } }
 function saveAuth(data) {
   if (!data?.token) return data;

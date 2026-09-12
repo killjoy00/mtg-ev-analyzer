@@ -13,6 +13,10 @@ import re
 import urllib.request
 from datetime import datetime, timezone
 from typing import Iterable
+try:
+    from .set_policy import supported_set
+except ImportError:
+    from set_policy import supported_set
 
 PUBLIC_DATASETS_URL = "https://www.17lands.com/public_datasets"
 DRAFT_URL_RE = re.compile(
@@ -26,6 +30,7 @@ def discover(html: str) -> list[dict]:
     rows = []
     for match in DRAFT_URL_RE.finditer(html):
         set_id = match.group(1).upper()
+        if not supported_set(set_id): continue
         if set_id in seen:
             continue
         seen.add(set_id)

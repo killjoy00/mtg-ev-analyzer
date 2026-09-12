@@ -9,6 +9,9 @@ import {validateDraftRunPuzzle, interestingDraftRunPuzzle, draftRunDifficulty, D
 const directory=process.argv[3]||'generated/trophy-import';
 const catalog=JSON.parse(fs.readFileSync(path.join(directory,'catalog.json')));
 const registry=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json'));
+const policy=JSON.parse(fs.readFileSync('data/selection-policy.json'));
+const supported=s=>!policy.retired_set_fingerprints.includes(createHash('sha256').update(String(s).toLowerCase()).digest('hex'));
+if(catalog.requested_sets.some(s=>!supported(s))||catalog.sets.some(s=>!supported(s.id)))throw Error('Import contains a permanently retired environment');
 const allowed=new Set(registry.sets.map(s=>s.id));
 if(!catalog.complete || Object.keys(catalog.errors).length || catalog.corpus_version!==DRAFT_RUN_CORPUS_VERSION) throw Error('Incomplete or incompatible import');
 if(new Set(catalog.requested_sets).size!==catalog.sets.length || catalog.sets.some(s=>!catalog.requested_sets.includes(s.id)))throw Error('Set accounting mismatch');
@@ -62,7 +65,7 @@ async function loadSet(s) {
   for await(const p of records(fileFor(s,'puzzle_file'))) {batch.push(p);if(batch.length===250){added+=await batchInsert(batch);batch=[];}}
   if(batch.length)added+=await batchInsert(batch);
   const actual=remote?await importRequest(remote,{action:'finish-set',manifest:s}):(await query('SELECT count(*)::int puzzles FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2',[s.id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
-  if(Number(actual.puzzles)<s.total_puzzles)throw Error('Database count below verified import: '+s.id);
+  if(Number(actual.puzzles)!==s.total_puzzles)throw Error('Database count does not match verified import: '+s.id);
   if(!remote)await query("UPDATE draft_run_verified_sets SET manifest=jsonb_set(manifest,'{full_import}',$2::jsonb) WHERE set_id=$1",[s.id,JSON.stringify(s)]);
   console.log(s.id,added,'inserted;',actual.puzzles,'available');
 }

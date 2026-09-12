@@ -92,13 +92,13 @@ Target windows:
 | 1 | P1P1 |
 | 2 | P1P2 |
 | 3 | P1P3 |
-| 4 | P1P3-P1P5 |
-| 5 | P1P4-P1P6 |
-| 6 | P1P5-P1P7 |
-| 7 | P1P5-P1P8 |
-| 8 | P1P6-P1P9 |
-| 9 | P1P7-P1P10 |
-| 10 | P1P8-P1P11 |
+| 4 | P1P4–P1P5 |
+| 5 | P1P5–P1P6 |
+| 6 | P1P6–P1P7 |
+| 7 | P1P7–P1P8 |
+| 8 | P1P8–P1P9 |
+| 9 | P1P8–P1P10 |
+| 10 | P1P8–P1P10 |
 
 Sampling should reject trivially forced questions. Within the round window, prioritize useful decisions and corpus diversity rather than always choosing the latest possible pick.
 
@@ -205,8 +205,17 @@ The existing static replay corpus remains appropriate for Top 3 and Full Pack wh
 
 Powered Cube is separate from the mixed expansion pool. Every source must be an independently verified seven-win Powered Cube draft by the high-quality cohort. No expansion puzzle can enter Cube, and no Cube puzzle can enter mixed Draft Run.
 
-The archive omits complete P1P1 packs. Cube starts at the complete P1P2 decision with the drafter’s actual first card visible, then P1P3, then progressively wider buckets through P1P12. Preserve true pick numbers and complete ordered historical pools. Every decision comes from a different trophy draft.
+The archive omits complete P1P1 packs. Cube starts at the complete P1P2 decision with the drafter’s actual first card visible, then P1P3, then progressively wider buckets through P1P11. Preserve true pick numbers and complete ordered historical pools. Every decision comes from a different trophy draft.
 
 Cube receives **two pack rerolls and no set reroll**, as explicitly chosen by the product owner. Each replacement comes from another Powered Cube trophy draft at similar depth and difficulty. The backend enforces the two-use budget, source exclusions, and environment boundary.
 
 Expansion Draft Run and Cube each have their own first-attempt Daily, Eastern-date schedule, leaderboard, and stored friend challenge. A player can play both Dailies on the same day. Account merges preserve the established first attempt separately for each environment. Trophy matches earn 100 in both games; the same partial-credit formula and ten-decision arithmetic mean apply.
+
+
+## Versioned difficulty policy
+
+See [SCORING-AND-DIFFICULTY.md](SCORING-AND-DIFFICULTY.md) for the unchanged trophy/partial-credit rules and `support-ratio-v1` difficulty. New ten-pick runs contain at most one easy pick, normally six medium and three hard picks; rerolls retain the band and stay within ten rating points of the original round. Existing schedules and friend packs retain their versioned behavior.
+
+## Current corpus selection policy — first-pack-v2
+
+New random runs use only Pack 1, through pick 10 for regular sets or pick 11 for Powered Cube. HBG, SIR and PIO remain selectable-mode data and are excluded from random mixed/Daily draws. Easy decisions are confined to rounds 1–6, with two hard decisions in rounds 7–10. Daily weights are 1.25 for the newest six regular sets, 1.10 for the next six and 1.00 otherwise. The versioned policy, audit, retirement controls and rollout are specified in DATA-MANAGEMENT.md; choose-your-sets ten-pick runs are roadmap work only.

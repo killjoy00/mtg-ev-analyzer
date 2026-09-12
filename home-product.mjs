@@ -38,10 +38,8 @@ function enhanceHome() {
   ensureTabs(home, moreModes);
 
   // The landing page is deliberately focused: Draft Run and Powered Cube only.
-  // The existing opening-pack Daily, Top 3, Full Pack, and Set Practice UI is
-  // preserved intact behind the secondary tab rather than deleted or forked.
+  // More Modes is the set-by-set opening-pack Top 3 and Full Pack practice surface.
   setHidden('.set-bar', !moreModes);
-  setHidden('.daily-feature', !moreModes);
   setHidden('.mode-section:not(.cube-mode-section)', !moreModes);
   setHidden('.data-note', !moreModes);
   setHidden('.draft-run-feature', moreModes);
@@ -53,8 +51,8 @@ function enhanceHome() {
   setText(
     home.querySelector('.lede'),
     moreModes
-      ? 'Daily opening-pack play, Top 3, Full Pack, and set-by-set practice live here.'
-      : 'Choose a ten-decision Draft Run across real trophy drafts, or stay inside Powered Cube.',
+      ? 'Play Top 3 or draft the full first pack across every supported set.'
+      : 'Ten pack one choices for you to make across real trophy drafts.',
   );
 }
 

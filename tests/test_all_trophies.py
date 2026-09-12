@@ -66,9 +66,33 @@ class FullTrophyTests(unittest.TestCase):
     def test_discovery_does_not_depend_on_local_catalog(self):
         def record(exp,fmt,link=True):
             return {'expansion':[{'text':exp}],'format':[{'text':fmt}],'draft_data':[{'spans':[{'type':'hyperlink','data':{'url':f'{BASE}/draft_data/draft_data_public.{exp}.{fmt}.csv.gz'}}] if link else []}]}
-        doc={'results':[{'data':{'datasets':[record('NEW','PremierDraft'),record('KHM','PremierDraft',False),record('OM1','PickTwoDraft'),record('Cube_-_Powered','PremierDraft')]}}]}
+        doc={'results':[{'data':{'datasets':[record('NEW','PremierDraft'),record('MISSING','PremierDraft',False),record('OM1','PickTwoDraft'),record('Cube_-_Powered','PremierDraft')]}}]}
         sources,missing=premier_sources(doc)
         self.assertEqual(sources,{'new':'NEW','powered-cube':'Cube_-_Powered'})
-        self.assertEqual(missing,[{'expansion':'KHM','reason':'no_public_draft_archive'}])
+        self.assertEqual(missing,[{'expansion':'MISSING','reason':'no_public_draft_archive'}])
+
+    def test_later_packs_cannot_enter_trophy_output(self):
+        example=PickExample('d',1,0,'A',['A','B','C','D'],{})
+        self.assertEqual(trajectory([example],10),([],[],'non_first_pack'))
+        header=['draft_id','pack_number','pick_number','pick','pack_card_A','pack_card_B','pack_card_C','pack_card_D','pool_A']
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'first-pack.gz'
+            with gzip.open(p,'wt',newline='') as f:
+                w=csv.writer(f);w.writerow(header)
+                for pack in (0,1,2):w.writerow(['trophy',pack,0,'A',1,1,1,1,0])
+            *_,output,invalid,n=collect(p,set(),{'trophy'},header)
+            self.assertEqual(len(output['trophy']),1)
+            self.assertEqual(output['trophy'][0].raw_pack_number,0)
+
+    def test_retired_environment_is_rejected_before_network_or_files(self):
+        import hashlib
+        from unittest.mock import patch
+        import set_policy
+        from import_all_trophies import build_set
+        fake=hashlib.sha256(b'retired').hexdigest()
+        with patch.dict(set_policy.POLICY,{'retired_set_fingerprints':[fake]}):
+            with patch('import_all_trophies.request',side_effect=AssertionError('Network must not be called')):
+                with self.assertRaisesRegex(ValueError,'permanently retired'):
+                    build_set('retired','unused')
 
 if __name__=='__main__':unittest.main()

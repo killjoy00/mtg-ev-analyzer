@@ -8,7 +8,7 @@ const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).flatMap(f=>JSON.parse(gunzipSync(fs.readFileSync('corpus/draft-run/'+f)))).filter(interestingDraftRunPuzzle);
 const environment=process.env.PACK1_TEST_ENVIRONMENT||'mixed',cube=environment==='powered-cube';
 let puzzles=selectDraftRun(corpus,'browser-contract',environment),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
-const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[];
+const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
 const snapshot=()=>({id,environment,day:'2026-09-10',revision,round:answers.length+1,answers,rerolls,complete:answers.length===10,score:answers.length===10?Math.round(answers.reduce((n,a)=>n+a.score,0)/10):null,current:answers.length===10?null:publicDraftRunPuzzle(puzzles[answers.length]),standing:answers.length===10?{rank:1,total:20,percentile:5,final:false}:null});
 const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
@@ -25,6 +25,7 @@ await page.route('**/*-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async
 await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
   const path=new URL(route.request().url()).pathname;let body;
   if(path.endsWith('/share'))body={id:shareId};
+  else if(path.endsWith('/view')){const req=route.request().postDataJSON();assert.equal(req.revision,revision);assert.equal(req.puzzleId,puzzles[answers.length].puzzle_id);views.push(req);body={ok:true};}
   else if(path.includes('/challenges/'))body={id:shareId,name:'Your friend',score:88,environment};
   else if(path.endsWith('/reroll')){
     const req=route.request().postDataJSON(),round=answers.length,old=puzzles[round];
@@ -32,6 +33,7 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
     puzzles[round]=selectDraftRunReroll(corpus,old,{type:req.type,round,seed:'browser-contract',excludedSources:sources,environment});sources.push(puzzles[round].source_draft_hash);rerolls[req.type]-=1;revision++;body=snapshot();
   }else if(path.endsWith('/pick')){
     const req=route.request().postDataJSON(),p=puzzles[answers.length];assert.equal(req.revision,revision);assert.equal(req.puzzleId,p.puzzle_id);
+    assert.equal(req.viewId,views.at(-1).viewId);assert.ok(Number.isInteger(req.activeMs)&&req.activeMs>=0);
     answers.push({...gradeDraftRunPick(p,req.cardId),puzzle:publicDraftRunPuzzle(p),ranking:p.candidates.map(c=>({id:c.id,name:c.name,score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
   }else if(path==='/v1/leaderboard')body={rows:[],period:'daily'};
   else body=snapshot();
@@ -39,26 +41,27 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
 });
 async function noOverflow(){const r=await page.evaluate(()=>({w:document.documentElement.clientWidth,s:document.documentElement.scrollWidth}));assert.ok(r.s<=r.w+1,`overflow ${r.s}>${r.w}`);}
 try{
-  await page.goto(base);await page.locator('.draft-run-feature').waitFor();
+  await page.goto(base);await page.locator('[data-draft-run-home="1"]').waitFor();
   assert.ok(await page.getByRole('link',{name:'Play today’s Draft Run',exact:true}).isVisible());
   assert.equal(await page.locator('.cube-mode-section #set-select').count(),0);
   assert.equal(await page.locator('.mode-section:not(.cube-mode-section) #set-select').count(),1);
   assert.equal(await page.locator('[data-ad-slot="home"]').isVisible(),false);
   await noOverflow();await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-home-mobile.png`,fullPage:true});
-  if(cube)await page.getByRole('button',{name:'Today’s Cube',exact:true}).click();else await page.getByRole('link',{name:'Play today’s Draft Run',exact:true}).click();await page.locator('.run-cards').waitFor();
+  if(cube)await page.getByRole('button',{name:'Play today’s Cube',exact:true}).click();else await page.getByRole('link',{name:'Play today’s Draft Run',exact:true}).click();await page.locator('.run-cards').waitFor();
   assert.equal(await page.locator('.run-pool').count(),cube?1:0);assert.equal(await page.locator('.run-card-score').count(),0);
+  assert.doesNotMatch(await page.locator('.run-heading').innerText(),/difficulty/i);
   assert.equal(await page.locator('#home-editorial').isVisible(),false);
   const originalSet=puzzles[0].set_id;
   if(cube){
     assert.equal(originalSet,'powered-cube');assert.equal(puzzles[0].pick_number,2);
     assert.equal(await page.locator('[data-reroll="set"]').count(),0);
-    await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'New pack · 1',exact:true}).waitFor();
+    await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'Reroll pack · 1',exact:true}).waitFor();
   }else{
-    await page.locator('[data-reroll="set"]').click();await page.getByRole('button',{name:'New set · 0',exact:true}).waitFor();
+    await page.locator('[data-reroll="set"]').click();await page.getByRole('button',{name:'Reroll set · 0',exact:true}).waitFor();
     assert.notEqual(puzzles[0].set_id,originalSet);
   }
   const replacementSet=puzzles[0].set_id;
-  await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'New pack · 0',exact:true}).waitFor();
+  await page.locator('[data-reroll="pack"]').click();await page.getByRole('button',{name:'Reroll pack · 0',exact:true}).waitFor();
   assert.equal(puzzles[0].set_id,replacementSet);await noOverflow();
   await page.waitForFunction(()=>[...document.querySelectorAll('.run-cards img')].every(img=>img.complete&&img.naturalWidth>0),null,{timeout:30000});
   await page.locator('.run-zoom').first().click();await page.locator('.run-card-dialog').waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();
@@ -72,17 +75,27 @@ try{
   for(let round=0;round<10;round++){
     const p=puzzles[round];if(cube)assert.equal(p.set_id,'powered-cube');assert.equal(await page.locator('.run-pool-cards>button').count(),p.pick_number-1);
     await page.locator(`[data-pick="${p.historical_pick_id}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
+    assert.equal(views.at(-1).puzzleId,p.puzzle_id,'Feedback must not record the next decision as viewed');
     assert.match(await page.locator('.run-feedback').innerText(),/100/);assert.equal(answers.length,round+1);
+    assert.equal(await page.locator('.run-card-score').count(),0);
     await page.locator('#run-next').click();
     if(round===0){assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
-  await page.locator('.run-result-page').waitFor();assert.match(await page.locator('.run-final-score').innerText(),/100/);await noOverflow();
+  await page.locator('.run-result-page').waitFor();assert.match(await page.locator('.run-final-score').innerText(),/100/);assert.equal(await page.locator('.run-result-actions .button').count(),5);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());await noOverflow();
   await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
   await page.locator('#run-challenge').click();await page.waitForFunction(()=>Boolean(window.__runShare));
   const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.url,new RegExp('challenge='+shareId));assert.doesNotMatch(shared.url,/profile|token/);
   await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Can you beat 88/);await noOverflow();
   await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
-  await page.goto(base+'/?game=draft-run&board=daily'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();await noOverflow();
+  await page.goto(base+'/?game=draft-run&board=daily'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
+  assert.equal(await page.locator('.run-board-games a').count(),2);
+  assert.equal((await page.locator('.run-board-games a.active').innerText()).trim(),cube?'Cube':'Draft Run');
+  assert.equal(await page.locator('.run-board-actions .button').count(),cube?2:3);
+  assert.equal(await page.getByRole('link',{name:'Top 3 practice',exact:true}).count(),cube?0:1);
+  assert.doesNotMatch(await page.locator('.run-board').innerText(),/Full Pack|Top 3, Full Pack|Cube boards/i);
+  await noOverflow();
+  await page.goto(base+'/?legacy-board=1'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
+  const retiredBoardUrl=new URL(page.url());assert.equal(retiredBoardUrl.searchParams.get('game'),'draft-run');assert.equal(retiredBoardUrl.searchParams.get('board'),'daily');assert.equal(retiredBoardUrl.searchParams.has('legacy-board'),false);
   assert.deepEqual(errors,[]);
   console.log(environment+' browser regression passed: 10 rounds, rerolls, resume, zoom, desktop/mobile, result, share, recipient and leaderboard.');
 }finally{await browser.close();}
