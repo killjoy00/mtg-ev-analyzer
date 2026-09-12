@@ -25,7 +25,14 @@ jobs:
       - name: Hydrate replay shards from R2
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: bash scripts/r2_replay_shards.sh hydrate
-      - run: npm test
+      - name: Run tests with replay shards required
+        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          REQUIRE_REPLAY_SHARDS: '1'
+        run: npm test
+      - name: Run fork tests without private replay shards
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository
+        run: npm test
       - name: Audit production datasets
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: python scripts/audit_datasets.py --fail-on-error
