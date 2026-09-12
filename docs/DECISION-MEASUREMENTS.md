@@ -49,6 +49,8 @@ never zero. Client timing is descriptive and cannot affect game scores.
   model/target disagreement then sample size, up to 30 decisions. Details expose
   cards, previous picks, actual player choice counts and average awarded credit
   only to admins. Fewer than 30 answers is explicitly marked as early evidence.
+  Model disagreement means the trophy card has less than 20% of the strongest
+  candidate's model support, matching the existing scoring explanation flag.
 
 Filters cover UTC date range (up to one year), environment, run type, set,
 difficulty band, real pick number and selection version. Groups show difficulty,

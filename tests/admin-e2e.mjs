@@ -1,7 +1,8 @@
 // Browser contract runs in CI against the local static site and synthetic data.
 import {chromium} from 'playwright';
 import assert from 'node:assert/strict';
-const browser=await chromium.launch({headless:true});
+import fs from 'node:fs';
+const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
 try {
   const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];
   page.on('pageerror',e=>errors.push(e.message));
@@ -27,7 +28,8 @@ try {
   await page.getByText('Alternative card',{exact:true}).waitFor();
   const download=page.waitForEvent('download');await page.getByRole('button',{name:'Export CSV'}).click();assert.ok((await download).suggestedFilename().endsWith('.csv'));
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Mobile page must not overflow horizontally');
-  await page.screenshot({path:'/tmp/pack1-admin-mobile.png',fullPage:true});
+  fs.mkdirSync('artifacts',{recursive:true});
+  await page.screenshot({path:'artifacts/ui-admin-mobile.png',fullPage:true});
   assert.deepEqual(errors,[]);
   console.log('Admin mobile layout, locked state, filters, review details and CSV export passed.');
 } finally {await browser.close();}
