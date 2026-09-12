@@ -1,6 +1,8 @@
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import growth, { query, player, readJson, json, withCors, gameDateKey } from './growth-function.js';
 import { handleTrophyImport } from './trophy-import.mjs';
+import {observeDecision,measurementInput,MEASUREMENT_CTE} from './decision-measurements.mjs';
+import {handleAdmin} from './measurement-admin.mjs';
 import { loadVerifiedPool } from './draft-run-pool.mjs';
 import { summarizeDraftRunPool } from './draft-run-health.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,publicDifficulty,rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
@@ -125,8 +127,10 @@ async function start(request) {
   if(sources.some(s=>!s)) fail('This challenge uses an unavailable corpus.',409);
   const anchors=ids.map(id=>publicDifficulty(choices.find(p=>p.puzzle_id===id)));
   const rerolls=environment==='powered-cube'?{set:0,pack:2}:{set:1,pack:1};
-  const inserted=await query(`INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version)
-    VALUES($1::uuid,$2::date,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12::jsonb,$13) ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_SCORING_VERSION,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion]);
+  const inserted=await query(`INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version,measurement_qa)
+    VALUES($1::uuid,$2::date,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12::jsonb,$13,
+      $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false))
+    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_SCORING_VERSION,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true]);
   let s=inserted.rows[0];
   if(!s && day) s=(await query('SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date AND environment=$3',[owner,day,environment])).rows[0];
   if(!s) fail('Could not start your run. Please retry.',409);
@@ -161,7 +165,9 @@ async function change(request,id,action) {
     if(!replacement) fail('No comparable replacement is available. Your reroll is still yours.',409);
     s.puzzle_ids[round]=replacement.puzzle_id;s.seen_sources.push(replacement.source_draft_hash);s.rerolls[type]-=1;
   }
-  const updated=await query(`UPDATE draft_run_sessions SET puzzle_ids=$3::jsonb,answers=$4::jsonb,rerolls=$5::jsonb,seen_sources=$6::jsonb,score=$7::int,revision=revision+1,updated_at=now() WHERE id=$1::uuid AND revision=$2::int AND player_id=$8::uuid RETURNING *`,[id,s.revision,JSON.stringify(s.puzzle_ids),JSON.stringify(s.answers),JSON.stringify(s.rerolls),JSON.stringify(s.seen_sources),s.score,owner]);
+  const answer=action==='pick'?s.answers.at(-1):null,{viewId,activeMs}=measurementInput(body);
+  const updated=await query(`WITH changed AS (UPDATE draft_run_sessions SET puzzle_ids=$3::jsonb,answers=$4::jsonb,rerolls=$5::jsonb,seen_sources=$6::jsonb,score=$7::int,revision=revision+1,updated_at=now() WHERE id=$1::uuid AND revision=$2::int AND player_id=$8::uuid RETURNING *),
+    ${MEASUREMENT_CTE} SELECT * FROM changed`,[id,s.revision,JSON.stringify(s.puzzle_ids),JSON.stringify(s.answers),JSON.stringify(s.rerolls),JSON.stringify(s.seen_sources),s.score,owner,round+1,body.puzzleId,action==='pick'?'pick':body.type,answer?.selectedId||null,answer?.score??null,answer?.historicalMatch??null,viewId,activeMs]);
   if(!updated.rows[0]) fail('Your run changed in another tab. Reload to continue.',409);
   return json(await responseFor(decode(updated.rows[0])));
 }
@@ -193,6 +199,7 @@ async function route(request) {
   const url=new URL(request.url),path=url.pathname;
   if(path==='/v1/trophy-import') return json(await handleTrophyImport(request,query));
   if(request.method==='OPTIONS') return new Response(null,{status:204});
+  if(path.startsWith('/v1/admin/')) return json(await handleAdmin(request,query,readJson));
   if(request.method==='GET'&&path==='/health') {
     const p=await pool();
     const eligible=p.filter(eligibleRunPuzzle),mixed=eligible.filter(p=>regularRunSet(p.set_id));
@@ -203,8 +210,13 @@ async function route(request) {
   if(request.method==='POST'&&path==='/v1/session') return growth.fetch(request);
   if(request.method==='POST'&&path==='/v1/runs') return start(request);
   if(request.method==='GET'&&path==='/v1/leaderboard') return leaderboard(request);
-  const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share))?$/);
+  const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view))?$/);
   if(match) {
+    if(request.method==='POST'&&match[2]==='view') {
+      const owner=await player(request),body=await readJson(request),s=await session(match[1],owner);
+      if(body.revision!==s.revision||body.puzzleId!==s.puzzle_ids[s.answers.length])fail('Run changed.',409);
+      return json(await observeDecision(query,s,body));
+    }
     if(request.method==='GET'&&!match[2]) return json(await responseFor(await session(match[1],await player(request))));
     if(request.method==='POST'&&match[2]==='share') return createShare(request,match[1]);
     if(request.method==='POST'&&['pick','reroll'].includes(match[2])) return change(request,match[1],match[2]);

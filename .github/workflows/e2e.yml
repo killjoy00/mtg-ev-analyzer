@@ -47,6 +47,8 @@ jobs:
         run: PACK1_TEST_ENVIRONMENT=powered-cube node tests/draft-run-e2e.mjs
       - name: Run account browser contract
         run: node tests/account-e2e.mjs
+      - name: Run admin reporting browser contract
+        run: node tests/admin-e2e.mjs
       - name: Upload UI screenshots
         if: always()
         uses: actions/upload-artifact@v4

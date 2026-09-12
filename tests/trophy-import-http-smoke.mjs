@@ -8,7 +8,7 @@ async function call(path,body,token){const r=await fetch(base+path,{method:body?
 const health=await call('/health');assert.equal(health.sets,33);assert.equal(health.expansion_sets,32);assert.ok(health.puzzles>20000);
 const guest=await call('/v1/session',{displayName:'Import check'});
 for(const environment of ['mixed','powered-cube']) {
-  let s=await call('/v1/runs',{environment},guest.token);
+  let s=await call('/v1/runs',{environment,qa:true},guest.token);
   assert.equal(s.difficulty_version,DRAFT_RUN_DIFFICULTY_VERSION);
   assert.equal(s.selection_version,DRAFT_RUN_SELECTION_VERSION);
   assert.equal(s.current.pick_number,environment==='mixed'?1:2);
