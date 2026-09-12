@@ -77,14 +77,14 @@ function updateHomeCopy(select) {
   const selectedName = selected.dataset.practiceOriginalLabel || selected.textContent;
   const meta = document.querySelector('#set-meta');
   const metaCopy = selected.value === featured.value
-    ? 'Use the featured set, or choose another set for Top 3 practice.'
-    : `Top 3 practice locked to ${selectedName}.`;
+    ? 'Use the featured set, or choose another set for Top 3 or Full Pack practice.'
+    : `Top 3 and Full Pack practice locked to ${selectedName}.`;
   setText(meta, metaCopy);
 
   const practiceHeading = document.querySelector('.mode-section:not(.cube-mode-section) .mode-section-heading > p');
   const practiceCopy = selected.value === featured.value
-    ? 'Choose the three best starts from a real opening pack. Pick a set and play as many packs as you want.'
-    : `Choose the three best starts from ${selectedName} opening packs.`;
+    ? 'Play Top 3 or draft the full first pack from a real trophy draft. Pick a set and play as many packs as you want.'
+    : `Play Top 3 or Full Pack with ${selectedName}.`;
   setText(practiceHeading, practiceCopy);
 }
 
