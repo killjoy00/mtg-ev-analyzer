@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from '../worker/trophy-import-auth.mjs';
-import {insertTrophyBatch,handleTrophyImport,refreshTrophyImages} from '../worker/trophy-import.mjs';
+import {insertTrophyBatch,handleTrophyImport,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
 
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwk={...publicKey.export({format:'jwk'}),kid:'test',use:'sig'};
@@ -107,4 +107,32 @@ test('Cube image refresh changes display metadata only',async()=>{
   );
   await assert.rejects(refreshTrophyImages(query,'msh',mapping),/limited to Powered Cube/);
   await assert.rejects(refreshTrophyImages(query,'powered-cube',[{name:target.name,image_url:'http://bad.example/card.jpg'}]),/Invalid image mapping/);
+});
+
+test('legacy image markers clear only after every served card has an HTTPS image',async()=>{
+  const updates=[];
+  const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT s.corpus_version'))return {rows:[{corpus_version:'elite-trophy-verified-v6',puzzles:123,missing_images:0}]};
+    if(sql.includes('UPDATE draft_run_verified_sets')){
+      assert.match(sql,/unresolved_image_names/);
+      assert.match(sql,/full_import,missing_image_names/);
+      assert.equal(params[1],'elite-trophy-verified-v6');
+      updates.push(params[0]);
+      return {rows:[{set_id:params[0]}]};
+    }
+    throw new Error('Unexpected SQL in image-marker test: '+sql);
+  };
+  const result=await normalizeResolvedImageMarkers(query,['powered-cube','hbg','tmt']);
+  assert.deepEqual(updates,['powered-cube','hbg','tmt']);
+  assert.deepEqual(result.normalized.map(item=>item.set_id),updates);
+
+  let wrote=false;
+  const missingQuery=async sql=>{
+    if(sql.includes('SELECT s.corpus_version'))return {rows:[{corpus_version:'elite-trophy-verified-v6',puzzles:123,missing_images:1}]};
+    wrote=true;
+    return {rows:[]};
+  };
+  await assert.rejects(normalizeResolvedImageMarkers(missingQuery,['hbg']),/images are missing/);
+  assert.equal(wrote,false);
+  await assert.rejects(normalizeResolvedImageMarkers(query,['msh']),/limited to verified legacy sets/);
 });
