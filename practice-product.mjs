@@ -113,8 +113,8 @@ function cleanHomeUrl() {
 function capturePractice(event) {
   const select = document.querySelector('#set-select');
 
-  // The visible set control is practice-only. Prevent app.js from changing the
-  // featured Daily state when someone selects a practice environment.
+  // The visible set control is practice-only. Preserve the selected environment
+  // without making app.js rebuild the whole More Modes surface.
   if (event.type === 'change' && event.target?.id === 'set-select' && document.querySelector('.home-intro')) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -145,8 +145,8 @@ function capturePractice(event) {
   }
 
   // A seeded non-Daily run is practice (including shared exact-pack links).
-  // Returning home should always reconstruct the featured Daily state instead
-  // of leaving app.js pointed at the practice set.
+  // Returning home should clear the replay-specific URL instead of leaving
+  // app.js pointed at the practice set.
   if (query.get('seed') && !query.get('daily')) {
     const exit = event.target.closest?.('#brand-home, #quit-game, #top3-home, #summary-home');
     if (exit) {
@@ -160,6 +160,5 @@ function capturePractice(event) {
 export function installPracticeProductLayer() {
   document.addEventListener('change', capturePractice, true);
   document.addEventListener('click', capturePractice, true);
-  narrowHome?.addEventListener?.('change', enhanceHome);
   onAppRender(enhanceHome);
 }
