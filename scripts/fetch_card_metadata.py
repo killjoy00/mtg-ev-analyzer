@@ -46,15 +46,32 @@ def compact_card(card: dict) -> dict:
     return result
 
 
+def is_preparation_card(card: dict) -> bool:
+    keywords = {str(value).lower() for value in card.get("keywords") or []}
+    if "prepared" in keywords or "prepare" in keywords:
+        return True
+    return any("prepared" in str(face.get("oracle_text") or "").lower() for face in card.get("card_faces") or [])
+
+
 def aliases(card: dict) -> Iterable[str]:
-    """Yield Oracle, face, and alternate printed/flavor names for a card."""
+    """Yield Oracle, face, and alternate printed/flavor names for a card.
+
+    Preparation cards are a special case: their embedded spell name is not the
+    identity of the creature card. Treating it as a generic face alias can make
+    a newer Prepare card steal display metadata from a distinct standalone card
+    with the same name (for example Harmonized Trio // Brainstorm). Keep the
+    creature face alias, but do not expose the prepared spell face as an alias.
+    """
     seen: set[str] = set()
     for value in (card.get("name"), card.get("flavor_name"), card.get("printed_name")):
         name = str(value or "").strip()
         if name and name not in seen:
             seen.add(name)
             yield name
-    for face in card.get("card_faces") or []:
+    faces = card.get("card_faces") or []
+    if is_preparation_card(card) and faces:
+        faces = faces[:1]
+    for face in faces:
         for value in (face.get("name"), face.get("flavor_name"), face.get("printed_name")):
             name = str(value or "").strip()
             if name and name not in seen:
