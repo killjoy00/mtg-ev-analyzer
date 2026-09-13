@@ -35,9 +35,9 @@ async function assertNoHorizontalOverflow() {
 
 async function assertMoreModesFocused() {
   const cards = page.locator('.mode-grid[aria-label="Opening pack practice"] .mode-card');
-  assert.equal(await cards.count(), 2, 'More Modes should contain Top 3 and Full Pack');
-  assert.match((await cards.nth(0).innerText()) || '', /Opening pack[\s\S]*Top 3/i);
-  assert.match((await cards.nth(1).innerText()) || '', /Full first pack[\s\S]*Full Pack/i);
+  assert.equal(await cards.count(), 2, 'More Modes should contain Full Pack and Top 3');
+  assert.match((await cards.nth(0).innerText()) || '', /Full first pack[\s\S]*Full Pack/i, 'Full Pack must be first in DOM and visual order');
+  assert.match((await cards.nth(1).innerText()) || '', /Opening pack[\s\S]*Top 3/i);
   assert.equal(await page.locator('[data-mode="full"]').count(), 1, 'Full Pack must remain available on More Modes');
   assert.equal(await page.locator('#daily-challenge,[data-daily-mode]').count(), 0, 'Daily opening-pack play must not be offered on More Modes');
 }
@@ -62,7 +62,9 @@ async function assertPrimaryResultActions(root = '.result-page') {
   assert.match((await buttons.nth(0).textContent()) || '', /New pack/i);
   assert.match((await buttons.nth(1).textContent()) || '', /Challenge a friend/i);
   assert.match((await buttons.nth(0).getAttribute('class')) || '', /primary/);
-  assert.match((await buttons.nth(1).getAttribute('class')) || '', /primary/);
+  assert.match((await buttons.nth(1).getAttribute('class')) || '', /secondary/);
+  assert.doesNotMatch((await buttons.nth(1).getAttribute('class')) || '', /primary/);
+  assert.equal(await page.locator(`${root} .result-actions > .button.primary`).count(), 1, 'ordinary result should have one primary action');
 }
 
 async function home() {
@@ -103,6 +105,12 @@ async function home() {
   assert.equal(await page.getByRole('heading', { name: 'Full Pack', exact: true }).count(), 1);
   await assertMoreModesFocused();
   assert.equal(await page.locator('#home-editorial').isVisible(), true, 'editorial shell should be visible on More modes');
+  const editorialGap = await page.evaluate(() => {
+    const note = document.querySelector('.data-note')?.getBoundingClientRect();
+    const rule = document.querySelector('#home-editorial .editorial-rule')?.getBoundingClientRect();
+    return note && rule ? Math.round(rule.top - note.bottom) : Infinity;
+  });
+  assert.ok(editorialGap <= 72, `More Modes should flow into editorial content without a large dead zone; gap=${editorialGap}px`);
   await assertNoHorizontalOverflow();
 }
 
@@ -123,6 +131,13 @@ async function revealTop3() {
   const revealedFooters = await page.locator('.opening-pack .card-footer span').allTextContents();
   assert.ok(revealedFooters.some((text) => /consensus support/i.test(text)), 'reveal should label modeled support directly');
   assert.ok(revealedFooters.every((text) => !/consensus #\d+/i.test(text)), 'reveal must not turn low support into a misleading ordinal rank');
+  const supportRows = page.locator('.top3-comparison > div:nth-child(2) .rank-row');
+  for (let index = 0; index < await supportRows.count(); index += 1) {
+    const row = supportRows.nth(index);
+    const link = row.locator('.market-link');
+    const [rowBox, linkBox] = await Promise.all([row.boundingBox(), link.boundingBox()]);
+    assert.ok(rowBox && linkBox && linkBox.y >= rowBox.y - 1 && linkBox.y + linkBox.height <= rowBox.y + rowBox.height + 1, 'TCGplayer link must stay deliberately inside its support row');
+  }
   if (await page.locator('.new-best').count()) {
     const duplicateBest = page.locator('.score-copy > p').filter({ hasText: /^Personal best:/ });
     if (await duplicateBest.count()) assert.equal(await duplicateBest.isVisible(), false, 'new-best result must not repeat the personal best value');
@@ -227,7 +242,7 @@ try {
   assert.equal(cleanHomeUrl.searchParams.get('daily'), null);
   assert.equal(cleanHomeUrl.searchParams.get('modes'), null);
 
-  // More Modes keeps Top 3 and Full Pack; Cube launch URLs remain valid but are surfaced on primary home.
+  // More Modes keeps Full Pack first with Top 3 beside it; Cube launch URLs remain valid but are surfaced on primary home.
   await home();
   await assertMoreModesFocused();
   if (await page.locator('[data-powered-cube-section="1"]').count()) {
