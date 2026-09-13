@@ -20,6 +20,7 @@
 .profile-settings form { padding:0 18px 18px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
 .profile-settings label > span { display:block; margin-bottom:6px; color:var(--muted); font-size:11px; font-weight:750; }
 .profile-settings .select { width:100%; }
+.profile-settings label > small { display:block; margin-top:6px; color:var(--muted); font-size:10px; font-weight:500; line-height:1.4; }
 .profile-toggle { grid-column:1 / -1; display:flex; gap:12px; align-items:flex-start; padding:14px; border-radius:9px; background:var(--surface-soft); }
 .profile-toggle input { margin-top:3px; }
 .profile-toggle span { margin:0!important; color:var(--ink)!important; }

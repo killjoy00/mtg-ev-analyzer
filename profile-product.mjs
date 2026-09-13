@@ -136,6 +136,7 @@ function settingsMarkup(profile, progress) {
   return `<details class="profile-settings">
     <summary>Profile settings</summary>
     <form id="profile-settings-form">
+      <label><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required><small>Shown on Draft Run and Cube leaderboards.</small></label>
       <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''}><span><strong>Public profile</strong><small>Allows leaderboard visitors and shared links to open your Pack One record.</small></span></label>
       <label><span>Favorite environment</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>
       <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
@@ -143,7 +144,6 @@ function settingsMarkup(profile, progress) {
     </form>
   </details>`;
 }
-
 function profileMarkup(profile, catalog, { own = false, publicKey = null } = {}) {
   const names = catalogNames(catalog);
   const progress = environmentProgress(catalog, profile.by_set || []);
@@ -152,6 +152,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
   const showcased = (profile.achievements || []).find((item) => item.id === profile.player.showcase_achievement && item.unlocked);
   const bestPct = bestPercentile(profile);
   const form = recentForm(profile);
+  const showLeaderboardName = own && Boolean(profile.player.claimed);
   const next = nextMilestones(profile,2);
   const bestRows = (profile.best_environments || []).slice(0, 5);
   const daily = (profile.daily_history || []).slice(0, 12);
@@ -180,7 +181,8 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
     ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Your first ten picks start here.</h2><p>Play a Draft Run to begin your record. Your games count as a guest.</p><a class="button primary" href="?game=draft-run">Play your first Draft Run</a></section>':''}
     ${own&&next.length?`<section class="profile-next"><h2>Within reach</h2>${next.map(a=>`<div><strong>${esc(a.label)}</strong><span>${esc(a.progress_text)}</span><p>${esc(a.description)}</p><progress value="${Number(a.current)}" max="${Number(a.target)}" aria-label="${esc(a.label)} progress"></progress></div>`).join('')}</section>`:''}
 
-    ${favorite || showcased || bestPct ? `<section class="profile-identity-strip">
+    ${showLeaderboardName || favorite || showcased || bestPct ? `<section class="profile-identity-strip">
+      ${showLeaderboardName ? `<div><span>Leaderboard name</span><strong>${esc(profile.player.display_name)}</strong></div>` : ''}
       ${favorite ? `<div><span>Favorite environment</span><strong>${esc(favorite.name)}</strong></div>` : ''}
       ${showcased ? `<div><span>Showcase</span><strong>${esc(showcased.label)}</strong></div>` : ''}
       ${bestPct ? `<div><span>Best Daily finish</span><strong>Top ${bestPct}%</strong></div>` : ''}
@@ -258,6 +260,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
     status.textContent = 'Saving…';
     try {
       const updated = await updateProfile({
+        displayName: data.get('displayName') || '',
         profilePublic: data.get('profilePublic') === 'on',
         favoriteSetId: data.get('favoriteSetId') || null,
         showcaseAchievement: data.get('showcaseAchievement') || null,

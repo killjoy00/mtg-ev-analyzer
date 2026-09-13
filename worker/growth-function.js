@@ -726,6 +726,7 @@ async function handleProfileUpdate(request) {
   const allowedSets = new Set((catalog.sets || []).map((entry) => String(entry?.id || '')).filter(Boolean));
   const unlocked = new Set(current.achievements.filter((item) => item.unlocked).map((item) => item.id));
 
+  const displayName = payload.displayName === undefined ? meta.display_name : normalizeName(payload.displayName);
   const profilePublic = typeof payload.profilePublic === 'boolean' ? payload.profilePublic : bool(meta.profile_public);
   const favorite = payload.favoriteSetId === undefined ? meta.favorite_set_id || null : String(payload.favoriteSetId || '').trim().toLowerCase() || null;
   const showcase = payload.showcaseAchievement === undefined ? meta.showcase_achievement || null : String(payload.showcaseAchievement || '').trim().toLowerCase() || null;
@@ -734,16 +735,20 @@ async function handleProfileUpdate(request) {
   if (showcase && !unlocked.has(showcase)) throw Object.assign(new Error('Showcase an achievement you have unlocked.'), { status: 400 });
 
   await query(
-    `WITH previous AS MATERIALIZED (SELECT profile_public FROM players WHERE id=$1::uuid FOR UPDATE), changed AS (UPDATE players
-     SET profile_public=$2::boolean,favorite_set_id=$3,showcase_achievement=$4,updated_at=now()
-     FROM previous WHERE id=$1::uuid RETURNING previous.profile_public was_public)
-     INSERT INTO analytics_events(player_id,event_name) SELECT $1::uuid,'public_profile_enabled' FROM changed WHERE NOT was_public AND $2::boolean`,
-    [id, profilePublic, favorite, showcase],
+    `WITH previous AS MATERIALIZED (SELECT profile_public,display_name FROM players WHERE id=$1::uuid FOR UPDATE), changed AS (UPDATE players
+     SET display_name=$2,profile_public=$3::boolean,favorite_set_id=$4,showcase_achievement=$5,updated_at=now()
+     FROM previous WHERE id=$1::uuid RETURNING previous.profile_public was_public,previous.display_name old_display_name),
+     events(event_name) AS (
+       SELECT 'public_profile_enabled' FROM changed WHERE NOT was_public AND $3::boolean
+       UNION ALL
+       SELECT 'leaderboard_name_changed' FROM changed WHERE old_display_name IS DISTINCT FROM $2
+     )
+     INSERT INTO analytics_events(player_id,event_name) SELECT $1::uuid,event_name FROM events`,
+    [id, displayName, profilePublic, favorite, showcase],
   );
   const updatedMeta = await profileMetaByPlayer(id);
   return json(await buildProfile(id, updatedMeta, { own: true }));
 }
-
 async function handleMyHistory(request) {
   const id = await player(request);
   const url = new URL(request.url);

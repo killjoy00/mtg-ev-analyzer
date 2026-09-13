@@ -83,12 +83,17 @@ export async function loadMyProfile() {
 export async function loadPublicProfile(profileKey) {
   return api(`/v1/profile/${encodeURIComponent(profileKey)}`, { auth:false });
 }
-export async function updateProfile({ profilePublic, favoriteSetId, showcaseAchievement } = {}) {
+export async function updateProfile({ displayName, profilePublic, favoriteSetId, showcaseAchievement } = {}) {
   const body = {};
+  if (displayName !== undefined) body.displayName = String(displayName ?? '');
   if (typeof profilePublic === 'boolean') body.profilePublic = profilePublic;
   if (favoriteSetId !== undefined) body.favoriteSetId = favoriteSetId;
   if (showcaseAchievement !== undefined) body.showcaseAchievement = showcaseAchievement;
-  return api('/v1/profile', { method:'PATCH', body, auth:true });
+  const data = await api('/v1/profile', { method:'PATCH', body, auth:true });
+  if (data?.player?.display_name) {
+    try { localStorage.setItem(NAME_KEY, data.player.display_name); } catch {}
+  }
+  return data;
 }
 export async function loadProfileHistory({ profileKey=null, cursor=null, limit=25 } = {}) {
   const params = new URLSearchParams({ limit:String(limit) });
