@@ -70,6 +70,30 @@ class PoweredCubeImageRefreshTests(unittest.TestCase):
         self.assertIn("Spectacular Spider-Man", set(aliases(card)))
         self.assertIn("Ademi of the Silkchutes", set(aliases(card)))
 
+    def test_prepare_spell_name_does_not_alias_over_standalone_card(self):
+        card = self.card(
+            name="Harmonized Trio // Brainstorm",
+            keywords=["Prepared"],
+            card_faces=[
+                {
+                    "name": "Harmonized Trio",
+                    "mana_cost": "{U}",
+                    "type_line": "Creature — Merfolk Bard Wizard",
+                    "oracle_text": "Tap two untapped creatures you control: This creature becomes prepared.",
+                },
+                {
+                    "name": "Brainstorm",
+                    "mana_cost": "{U}",
+                    "type_line": "Instant",
+                    "oracle_text": "Draw three cards, then put two cards from your hand on top of your library in any order.",
+                },
+            ],
+        )
+        names = set(aliases(card))
+        self.assertIn("Harmonized Trio // Brainstorm", names)
+        self.assertIn("Harmonized Trio", names)
+        self.assertNotIn("Brainstorm", names)
+
     def test_patch_changes_display_fields_without_touching_gameplay_metadata(self):
         original = {
             "id": "black-lotus",
