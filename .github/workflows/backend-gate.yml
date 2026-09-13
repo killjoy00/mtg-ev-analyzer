@@ -1,0 +1,121 @@
+name: backend schema gate
+
+on:
+  pull_request:
+    paths:
+      - 'worker/**'
+      - 'migrations/**'
+      - 'draft-run.mjs'
+      - 'tests/*backend-smoke.mjs'
+      - '.github/workflows/backend-gate.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-gate-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  backend-gate:
+    # Fork PRs do not receive repository secrets. Keep them skipped rather than
+    # failing or ever pointing the fixture suites at the production branch.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify Neon CI credential
+        shell: bash
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || {
+            echo '::error::NEON_API_KEY is not configured. Add the Neon GitHub Integration or a repository Actions secret before enabling this gate.'
+            exit 1
+          }
+
+      - name: Set emergency branch expiry
+        id: expiry
+        shell: bash
+        run: echo "expires_at=$(date -u --date '+4 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      - name: Create isolated Neon branch
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          database: pack1
+          role: pack1_owner
+          expires_at: ${{ steps.expiry.outputs.expires_at }}
+
+      - name: Prepare isolated connection
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL" || { echo 'Neon branch did not return a database URL.'; exit 1; }
+          connection_file="$RUNNER_TEMP/pack1-ci.connection"
+          printf '%s' "$DATABASE_URL" > "$connection_file"
+          chmod 600 "$connection_file"
+          echo "PACK1_CI_CONNECTION=$connection_file" >> "$GITHUB_ENV"
+
+      - name: Apply pending migrations
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+          mapfile -t migration_changes < <(git diff --name-status "$BASE_SHA" "$HEAD_SHA" -- 'migrations/*.sql')
+          for change in "${migration_changes[@]}"; do
+            status="${change%%$'\t'*}"
+            path="${change#*$'\t'}"
+            if [[ "$status" != 'A' ]]; then
+              echo "::error file=$path::Existing migration files are immutable in backend-gated PRs; add a new migration instead (status $status)."
+              exit 1
+            fi
+          done
+
+          mapfile -t pending < <(printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }' | sort)
+          if (( ${#pending[@]} == 0 )); then
+            echo 'No pending migrations in this PR.'
+          else
+            for migration in "${pending[@]}"; do
+              echo "Applying $migration"
+              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+            done
+          fi
+
+      - name: Run SQL-backed integration suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          node tests/draft-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/cube-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/decision-measurements-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+
+      - name: Delete isolated Neon branch
+        if: always() && steps.neon.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}
