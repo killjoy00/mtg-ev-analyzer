@@ -22,11 +22,11 @@ test('every playable decision has trophy, skill, complete history and valid scor
   for(const p of all){assert.ok(validateDraftRunPuzzle(p),p.puzzle_id);assert.equal(gradeDraftRunPick(p,p.historical_pick_id).score,100);for(const c of [...p.candidates,...p.prior_picks])assert.match(c.image_url,/^https:\/\//,c.name);}
   for(const patch of [{event_match_wins:6},{player_games_lower_bound:99},{player_win_rate_bucket:.55},{prior_picks:[{id:'extra',name:'Extra'}]},{historical_pick_id:'missing'}]) assert.equal(validateDraftRunPuzzle({...all.find(p=>p.pick_number===1),...patch}),false);
 });
-test('unanswered payloads contain neither the answer nor model rankings, support, or source identity',()=>{
+test('unanswered payloads contain neither the answer nor model rankings, support, source identity, or difficulty',()=>{
   const p=all.find(p=>p.pick_number===2);const visible=publicDraftRunPuzzle(p);
   assert.equal(visible.prior_picks.length,1);
-  assert.doesNotMatch(JSON.stringify(visible),/model_probability|historical_pick|source_draft|consensus|win_rate/);
-  assert.deepEqual(Object.keys(visible).sort(),['candidates','difficulty','pack_number','pick_number','prior_picks','puzzle_id','set_id']);
+  assert.doesNotMatch(JSON.stringify(visible),/model_probability|historical_pick|source_draft|consensus|win_rate|difficulty/);
+  assert.deepEqual(Object.keys(visible).sort(),['candidates','pack_number','pick_number','prior_picks','puzzle_id','set_id']);
 });
 test('seeded runs and preserved legacy rerolls obey early picks, buckets and source exclusions',()=>{
   for(let i=0;i<40;i++){
