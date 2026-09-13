@@ -100,6 +100,7 @@ await page.route(`${growthOrigin}/**`, async (route) => {
       ...fixture,
       player:{
         ...fixture.player,
+        display_name:updatePayload.displayName || fixture.player.display_name,
         profile_public:Boolean(updatePayload.profilePublic),
         favorite_set_id:updatePayload.favoriteSetId || null,
         showcase_achievement:updatePayload.showcaseAchievement || null,
@@ -150,6 +151,7 @@ try {
   await page.locator('[data-profile-section="achievements"] summary').click();
   assert.equal(await page.locator('.achievement-card.unlocked').first().isVisible(), true);
   assert.equal(await page.locator('#profile-settings-form').count(), 1);
+  assert.match((await page.locator('.profile-identity-strip').textContent()) || '', /Leaderboard name\s*Profile Tester/i);
   await noOverflow();
   await page.screenshot({ path:'artifacts/ui-profile-mobile.png', fullPage:true });
 
@@ -158,11 +160,15 @@ try {
   await page.locator('#profile-load-more').waitFor({ state:'hidden', timeout:5000 });
 
   await page.locator('.profile-settings summary').click();
+  assert.equal(await page.locator('input[name="displayName"]').inputValue(), 'Profile Tester');
+  await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
   await page.locator('select[name="favoriteSetId"]').selectOption('stx');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
   await page.locator('#profile-settings-form button[type="submit"]').click();
   await page.waitForFunction(() => document.querySelector('.player-profile-page') && document.querySelector('select[name="favoriteSetId"]')?.value === 'stx');
-  assert.deepEqual(updatePayload, { profilePublic:true, favoriteSetId:'stx', showcaseAchievement:'top10' });
+  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'stx', showcaseAchievement:'top10' });
+  assert.equal((await page.locator('.profile-hero h1').textContent())?.trim(), 'Leaderboard Ace');
+  assert.equal(await page.evaluate(() => localStorage.getItem('pack1-player-name-v1')), 'Leaderboard Ace');
 
   await page.locator('#profile-share-progress').click();
   await page.waitForFunction(() => (window.__pack1ShareCalls || 0) > 0, null, { timeout:5000 });

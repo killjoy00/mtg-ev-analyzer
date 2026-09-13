@@ -31,6 +31,9 @@ test('public profile is opt-in and profile API supports history and lookup', () 
   assert.match(api, /loadPublicProfile/);
   assert.match(api, /loadProfileHistory/);
   assert.match(api, /lookupPublicProfiles/);
+  assert.match(api, /displayName/);
+  assert.match(worker, /leaderboard_name_changed/);
+  assert.match(product, /Leaderboard name/);
 });
 
 test('progression UI keeps stats inside Account and preserves the career surface', () => {
