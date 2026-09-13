@@ -211,49 +211,11 @@ async function copySeededLink(button, mode) {
   setTimeout(() => { button.textContent = original; }, 1200);
 }
 
-function prioritizeResultActions(actions, share, another) {
-  if (!actions || !share || !another) return;
-
-  another.textContent = 'New pack';
-  another.classList.remove('secondary');
-  another.classList.add('primary', 'result-new-pack');
-
-  share.textContent = 'Challenge a friend';
-  share.classList.remove('share-button', 'secondary', 'challenge-primary');
-  share.classList.add('primary', 'result-challenge');
-
-  const leaderboard = actions.querySelector('#challenge-leaders');
-  if (leaderboard) {
-    leaderboard.classList.remove('primary');
-    leaderboard.classList.add('secondary');
-  }
-
-  // The two obvious next steps are deliberately first, in this order.
-  actions.prepend(share);
-  actions.prepend(another);
-}
-
-function addReplayButton(actions, mode) {
-  if (!currentSeed() || actions.querySelector('[data-replay-seed]')) return;
-  const replay = document.createElement('button');
-  replay.type = 'button';
-  replay.className = 'button secondary result-replay-button';
-  replay.dataset.replaySeed = '1';
-  replay.textContent = 'Replay this pack';
-  replay.addEventListener('click', () => {
-    const url = new URL(window.location.href);
-    url.searchParams.delete('vs');
-    url.searchParams.delete('by');
-    window.location.href = url.toString();
-  });
-  actions.appendChild(replay);
-
-  const copy = document.createElement('button');
-  copy.type = 'button';
-  copy.className = 'text-button result-copy-link';
-  copy.textContent = 'Copy challenge link';
-  copy.addEventListener('click', () => void copySeededLink(copy, mode));
-  actions.appendChild(copy);
+function replaySeededGame() {
+  const url = new URL(window.location.href);
+  url.searchParams.delete('vs');
+  url.searchParams.delete('by');
+  window.location.href = url.toString();
 }
 
 function enhanceTopThreeResult() {
@@ -275,15 +237,7 @@ function enhanceTopThreeResult() {
     if (comparison) hero?.insertAdjacentHTML('afterend', comparison);
   }
 
-  const actions = reveal.querySelector('.result-actions');
-  const another = reveal.querySelector('#another-top3');
-  const share = reveal.querySelector('#share-top3');
-  const home = reveal.querySelector('#top3-home');
-  if (home) home.textContent = 'Home';
-  prioritizeResultActions(actions, share, another);
-  if (actions && currentSeed()) addReplayButton(actions, 'top3');
   prepareNextGame('top3');
-
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
@@ -300,13 +254,6 @@ function enhanceFullResult() {
     const comparison = friendComparisonMarkup(score);
     if (comparison) hero?.insertAdjacentHTML('afterend', comparison);
   }
-  const another = scorecard.querySelector('#another-full');
-  const share = scorecard.querySelector('#share-full');
-  const home = scorecard.querySelector('#summary-home');
-  if (home) home.textContent = 'Home';
-  const actions = scorecard.querySelector('.result-actions');
-  prioritizeResultActions(actions, share, another);
-  if (actions && currentSeed()) addReplayButton(actions, 'full');
   prepareNextGame('full');
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
@@ -475,6 +422,23 @@ function captureGameClicks(event) {
     event.preventDefault();
     event.stopImmediatePropagation();
     void shareSeededGame(share, share.id === 'share-full' ? 'full' : 'top3');
+    return;
+  }
+
+  const replay = event.target.closest?.('[data-replay-seed]');
+  if (replay && currentSeed()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    replaySeededGame();
+    return;
+  }
+
+  const copy = event.target.closest?.('[data-copy-challenge-link]');
+  if (copy && currentSeed()) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const mode = copy.dataset.copyChallengeLink;
+    if (mode === 'top3' || mode === 'full') void copySeededLink(copy, mode);
   }
 }
 
