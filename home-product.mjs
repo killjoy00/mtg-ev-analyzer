@@ -30,12 +30,34 @@ function ensureTabs(home, moreModes) {
   tabs?.querySelector('[data-home-tab="more"]')?.setAttribute('aria-current', moreModes ? 'page' : 'false');
 }
 
+function normalizePracticeModeOrder() {
+  const grid = document.querySelector('.mode-grid[aria-label="Opening pack practice"]');
+  const fullPack = grid?.querySelector('[data-mode="full"]')?.closest('.mode-card');
+  const topThree = grid?.querySelector('[data-mode="top3"]')?.closest('.mode-card');
+  if (grid && fullPack && topThree && grid.firstElementChild !== fullPack) {
+    grid.insertBefore(fullPack, topThree);
+  }
+}
+
+function normalizeResultActions() {
+  const challenge = document.querySelector('.result-actions .result-challenge');
+  if (!challenge) return;
+  challenge.classList.remove('primary');
+  challenge.classList.add('secondary');
+}
+
 function enhanceHome() {
+  // Result surfaces render through the same lifecycle. Keep one primary action:
+  // New pack. Challenge/replay/home remain clearly available but secondary.
+  normalizeResultActions();
+
   const home = document.querySelector('.home-intro');
   if (!home) return;
 
   const moreModes = currentParams().get('modes') === '1';
+  document.querySelector('#app')?.classList.toggle('more-modes-home', moreModes);
   ensureTabs(home, moreModes);
+  normalizePracticeModeOrder();
 
   // The landing page is deliberately focused: Draft Run and Powered Cube only.
   // More Modes is the set-by-set opening-pack Top 3 and Full Pack practice surface.
