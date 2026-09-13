@@ -4,6 +4,7 @@ import { isLeaderboardConfigured, loadLeaderboard, submitLeaderboardScore } from
 import { loadReplayJson } from './replay-data.mjs';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 import { conditionCandidatesForPath, pathHasDiverged } from './path-model.mjs';
+import { cleanSeed } from './gameplay.mjs';
 
 const app = document.querySelector('#app');
 const brandHome = document.querySelector('#brand-home');
@@ -594,6 +595,23 @@ function dailySubmissionMarkup() {
   return '<div class="challenge-status pending">Saving your ranked score…</div>';
 }
 
+function resultActionsMarkup(mode, anotherId, shareId, homeId) {
+  const seeded = cleanSeed(new URLSearchParams(window.location.search).get('seed'));
+  const leaderboard = state.isDailyChallenge
+    ? '<a class="button secondary" id="challenge-leaders" href="?game=draft-run&board=daily">Draft Run leaderboard</a>'
+    : '';
+  const replay = seeded
+    ? `<button class="button secondary result-replay-button" type="button" data-replay-seed="1">Replay this pack</button><button class="text-button result-copy-link" type="button" data-copy-challenge-link="${mode}">Copy challenge link</button>`
+    : '';
+  return `<div class="button-row result-actions">
+    <button class="button primary result-new-pack" id="${anotherId}">New pack</button>
+    <button class="button secondary result-challenge" id="${shareId}">Challenge a friend</button>
+    ${leaderboard}
+    <button class="button secondary" id="${homeId}">Home</button>
+    ${replay}
+  </div>`;
+}
+
 function renderTopThreeReveal() {
   if (!state.revealed || !state.quickResult) return '';
   const result = state.quickResult;
@@ -607,11 +625,7 @@ function renderTopThreeReveal() {
         <div><h3>Consensus</h3>${result.consensusTop.map((card, index) => `<div class="rank-row"><span>${index + 1}</span>${rankThumb(card)}<strong>${esc(card.name)}</strong><small>${pct(card.model_probability, 1)}</small><a class="market-link" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-link="1" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-set="${esc(state.selectedSetId)}" data-tcgplayer-surface="top3_consensus">TCGplayer</a></div>`).join('')}</div>
       </div>
       <p class="reveal-note">${result.overlap}/3 consensus cards · ${result.exactPositions} exact ${result.exactPositions === 1 ? 'position' : 'positions'}. ${result.historicalRank ? `The historical drafter's first pick was #${result.historicalRank} on your list.` : `The historical drafter's first pick was outside your top three.`}</p>
-      <div class="button-row result-actions">
-        ${state.isDailyChallenge ? '<a class="button secondary" id="challenge-leaders" href="?game=draft-run&board=daily">Draft Run leaderboard</a><button class="button secondary" id="another-top3">Play another game</button>' : '<button class="button primary" id="another-top3">Play another</button>'}
-        <button class="button share-button" id="share-top3">Share score</button>
-        <button class="button secondary" id="top3-home">Choose a mode</button>
-      </div>
+      ${resultActionsMarkup('top3', 'another-top3', 'share-top3', 'top3-home')}
     </section>`;
 }
 
@@ -813,11 +827,7 @@ function renderSummary() {
       </div>
       <section class="review-section"><h2>Worth another look</h2><div class="miss-list">${summary.biggestMisses.length ? summary.biggestMisses.map((result) => `<div class="miss-row"><span class="pick-number">Pick ${esc(result.pick_number)}</span><div><strong>${esc(result.selectedName)}</strong><small>Consensus: ${esc(result.bestName)}</small></div><span class="gap-number">${result.score}</span></div>`).join('') : '<p class="empty-note">Nothing major. Your picks stayed close to consensus all pack.</p>'}</div></section>
       <details class="method-details"><summary>About the grading</summary><p>${esc(methodNote())}</p></details>
-      <div class="button-row result-actions">
-        ${state.isDailyChallenge ? '<a class="button secondary" id="challenge-leaders" href="?game=draft-run&board=daily">Draft Run leaderboard</a><button class="button secondary" id="another-full">Play another game</button>' : '<button class="button primary" id="another-full">New pack</button>'}
-        <button class="button share-button" id="share-full">Share score</button>
-        <button class="button secondary" id="summary-home">Choose a mode</button>
-      </div>
+      ${resultActionsMarkup('full', 'another-full', 'share-full', 'summary-home')}
     </section>`;
 
   document.querySelector('#another-full').addEventListener('click', () => startMode('full', state.isDailyChallenge ? { daily: true, date: state.challengeDate } : {}));

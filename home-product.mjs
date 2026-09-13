@@ -39,18 +39,7 @@ function normalizePracticeModeOrder() {
   }
 }
 
-function normalizeResultActions() {
-  const challenge = document.querySelector('.result-actions .result-challenge');
-  if (!challenge) return;
-  challenge.classList.remove('primary');
-  challenge.classList.add('secondary');
-}
-
 function enhanceHome() {
-  // Result surfaces render through the same lifecycle. Keep one primary action:
-  // New pack. Challenge/replay/home remain clearly available but secondary.
-  normalizeResultActions();
-
   const home = document.querySelector('.home-intro');
   if (!home) return;
 
