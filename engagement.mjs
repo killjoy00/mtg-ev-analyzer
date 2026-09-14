@@ -1,19 +1,7 @@
-export const GAME_TIME_ZONE = 'America/New_York';
-
-export function gameDateKey(date = new Date()) {
-  const value = date instanceof Date ? date : new Date(date);
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: GAME_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(value);
-  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${byType.year}-${byType.month}-${byType.day}`;
-}
-
-// Kept as a compatibility alias while the app migrates away from the old UTC name.
-export const utcDateKey = gameDateKey;
+import {gameDateKey} from './game-date.mjs';
+export {gameDateKey,GAME_TIME_ZONE} from './game-date.mjs';
+// Compatibility for previously cached clients; all current callers use gameDateKey.
+export {gameDateKey as utcDateKey} from './game-date.mjs';
 
 function hashText(value) {
   let hash = 2166136261;

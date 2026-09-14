@@ -42,6 +42,8 @@ jobs:
         run: node tests/practice-e2e.mjs
       - name: Run Player Profile / Progression regression
         run: node tests/profile-e2e.mjs
+      - name: Run Today refresh and Eastern rollover regression
+        run: node tests/home-today-e2e.mjs
       - name: Run ten-decision Draft Run regression
         run: node tests/draft-run-e2e.mjs
       - name: Run Powered Cube ten-decision regression

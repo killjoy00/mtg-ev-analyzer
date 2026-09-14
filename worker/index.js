@@ -1,3 +1,4 @@
+import {readJson} from './request-json.mjs';
 import { challengeIndex, featuredSetId, firstPackPicks, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from './core.mjs';
 
 const STATIC_ORIGIN = 'https://packone.pro';
@@ -75,7 +76,7 @@ function base64Url(buffer) {
 }
 
 async function playerSecret() {
-  await query("INSERT INTO settings(key,value) VALUES('player_secret',md5(random()::text||clock_timestamp()::text)||md5(random()::text||clock_timestamp()::text)) ON CONFLICT(key) DO NOTHING");
+  await query("INSERT INTO settings(key,value) VALUES('player_secret',$1) ON CONFLICT(key) DO NOTHING",[Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('hex')]);
   const result = await query("SELECT value FROM settings WHERE key='player_secret'");
   if (!result.rows[0]?.value) throw new Error('Player token secret unavailable.');
   return result.rows[0].value;
@@ -112,12 +113,6 @@ async function authPlayer(request, required = true) {
   return playerId;
 }
 
-async function readJson(request) {
-  if (!(request.headers.get('content-type') || '').includes('application/json')) {
-    throw Object.assign(new Error('JSON body required.'), { status: 415 });
-  }
-  return request.json();
-}
 
 async function upsertPlayer(playerId, displayName) {
   const name = normalizeName(displayName || 'Pack Player');
@@ -185,9 +180,9 @@ function sanitizeSelections(value, max = 50) {
 }
 
 async function handleSession(request) {
+  const payload = await readJson(request);
   const token = await issueToken();
   const playerId = await verifyToken(token);
-  const payload = await readJson(request).catch(() => ({}));
   const displayName = await upsertPlayer(playerId, payload.displayName || 'Pack Player');
   return json({ token, playerId, displayName });
 }
@@ -455,7 +450,8 @@ export default {
       return withCors(await route(request), request);
     } catch (error) {
       console.error(error);
-      return withCors(json({ error: error?.message || 'Request failed.' }, Number(error?.status || 500)), request);
+      const status=Number(error?.status||500);
+      return withCors(json({ error: status===500?'Request failed. Please try again.':error.message },status), request);
     }
   },
 };

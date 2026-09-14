@@ -1,15 +1,5 @@
-const EASTERN_TIME_ZONE = 'America/New_York';
-
-export function easternDateKey(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: EASTERN_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const value = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${value.year}-${value.month}-${value.day}`;
-}
+import {gameDateKey as easternDateKey} from './game-date.mjs';
+export {gameDateKey as easternDateKey} from './game-date.mjs';
 
 function completedDaily(profile, environment, dateKey) {
   return (profile?.daily_history || []).find((row) => (

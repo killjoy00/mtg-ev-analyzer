@@ -1,6 +1,6 @@
 import { escapeHtml as esc } from './html.mjs';
 import { makeGameSeed } from './gameplay.mjs';
-import { utcDateKey } from './engagement.mjs';
+import { gameDateKey } from './engagement.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 
 export const POWERED_CUBE_ID = 'powered-cube';
@@ -44,7 +44,7 @@ function homeOrigin() {
 }
 
 function cubeSectionMarkup() {
-  const today = utcDateKey();
+  const today = gameDateKey();
   const origin = homeOrigin();
   const run = poweredCubeUrl({ origin, mode: 'full' });
   const daily = poweredCubeUrl({ origin, mode: 'full', daily: today });

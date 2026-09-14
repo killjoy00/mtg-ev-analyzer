@@ -14,6 +14,8 @@ const lifecycleModules = [
   'growth.mjs',
   'retention.mjs',
   'social.mjs',
+  'home-today.mjs',
+  'profile-polish.mjs',
 ];
 
 test('one centralized render lifecycle owns DOM mutation observation', () => {

@@ -1,3 +1,4 @@
+import {consumePlayerLimit} from './request-limits.mjs';
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import growth, { query, player, readJson, json, withCors, gameDateKey } from './growth-function.js';
 import { handleTrophyImport } from './trophy-import.mjs';
@@ -96,6 +97,7 @@ async function start(request) {
     const old=await query('SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date AND environment=$3',[owner,day,environment]);
     if(old.rows[0]) return json(await responseFor(decode(old.rows[0])));
   }
+  await consumePlayerLimit(query,owner,'runs',{limit:30,seconds:600});
   const seed=day ? `daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}` : crypto.randomUUID();
   let ids,difficultyVersion=source?.difficulty_version||DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion=source?.selection_version||DRAFT_RUN_SELECTION_VERSION;
   if(source) ids=source.puzzle_ids;
@@ -223,5 +225,5 @@ async function route(request) {
 
 export default {async fetch(request) {
   try {const response=await route(request);response.headers.set('cache-control','no-store');return withCors(response,request);}
-  catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);return withCors(json({error:status===500?'Could not save your run. Please retry.':error.message},status),request);}
+  catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);const response=json({error:status===500?'Could not save your run. Please retry.':error.message},status);if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));return withCors(response,request);}
 }};
