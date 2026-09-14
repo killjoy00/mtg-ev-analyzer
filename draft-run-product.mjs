@@ -26,8 +26,8 @@ let catalogNames = new Map();
 const setName=id=>catalogNames.get(id) || (id==='powered-cube'?'Powered Cube':id.toUpperCase());
 async function loadSetNames() {
   try {
-    const response=await fetch('./data/catalog.json');
-    if(response.ok) catalogNames=new Map((await response.json()).sets.map(s=>[s.id,s.name]));
+    const response=await fetch('./data/set-display-names.json');
+    if(response.ok) catalogNames=new Map(Object.entries((await response.json()).names));
   } catch {} // Set codes remain a usable fallback when the catalog is unavailable.
 }
 const app=()=>document.querySelector('#app');

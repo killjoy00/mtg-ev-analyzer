@@ -50,6 +50,8 @@ try{
   if(cube)await page.getByRole('button',{name:'Play today’s Cube',exact:true}).click();else await page.getByRole('link',{name:'Play today’s Draft Run',exact:true}).click();await page.locator('.run-cards').waitFor();
   assert.equal(await page.locator('.run-pool').count(),cube?1:0);assert.equal(await page.locator('.run-card-score').count(),0);
   assert.doesNotMatch(await page.locator('.run-heading').innerText(),/difficulty/i);
+  const displayNames=JSON.parse(fs.readFileSync('data/set-display-names.json','utf8')).names;
+  assert.ok((await page.locator('.run-heading').innerText()).includes(displayNames[puzzles[0].set_id]));
   assert.equal(await page.locator('#home-editorial').isVisible(),false);
   const originalSet=puzzles[0].set_id;
   if(cube){

@@ -29,7 +29,7 @@ Difficulty is an internal run-composition and reroll-matching heuristic. Unanswe
 
 Locked Draft Run/Cube answers show the trophy choice and elite consensus separately, the player's relative support, the three leading alternatives, and an expandable comparison of every card. Relative support is not a correctness or win probability. The pack remains available in an expandable review, and card enlargement works in both the pack and feedback. Revealed comparison cards link to TCGplayer; commission tracking still requires the configured Impact template.
 
-Phone packs use three columns, compact ordered prior-pick thumbnails, and a sticky dock containing selection, lock, and rerolls. Progress always identifies rounds separately from earned points. Full set names come from the catalog, with set codes as a network-failure fallback.
+Phone packs use three columns, compact ordered prior-pick thumbnails, and a sticky dock containing selection, lock, and rerolls. Progress always identifies rounds separately from earned points. Full set names come from the checked-in `data/set-display-names.json` snapshot of [Scryfall set metadata](https://api.scryfall.com/sets), verified 2026-09-14, with set codes as a network-failure or new-set fallback. Refresh the display-name snapshot when registering a new environment; it does not control corpus eligibility or recency weighting.
 
 Result sharing defaults to spoiler-free text with ten score squares, trophy matches, game family and the actual Eastern Daily date. Image sharing remains an explicit secondary option. The date identifies the Daily without inventing a historical launch-based puzzle number. Native iPhone sharing still needs real-device verification.
 

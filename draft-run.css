@@ -71,3 +71,5 @@ body:has(.run-result-page) #home-editorial{display:none}
   .run-lock .run-tools .button{min-height:36px}.run-lock .run-tools>div{gap:8px}
   .run-compare-card{padding:8px}.run-compare-card>span{font-size:11px}
 }
+
+@media(max-width:600px){body .run-steps{margin:8px 0 12px}body .run-steps li{font-size:12px}body .run-card-select>span{font-size:12px}body .run-zoom{font-size:12px}body .run-tools .button.secondary{font-size:12px}}
