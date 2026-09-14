@@ -21,15 +21,40 @@ The workflow was useful but its original checks only identified a family of code
 
 ## Verification and release
 
-Local syntax, 119 JavaScript tests and 72 Python tests pass. Three distribution-dependent JavaScript files are checked in hydrated GitHub CI. New tests cover 100 deterministic Daily selections, release-date cutoffs, required-set shortages, historical weighting and eight/ten-pick scoring. The backend gate additionally exercises database/reference parity, guaranteed-set reroll protection, eight-pick completion/measurements and historical challenges on a disposable Neon branch. Browser gates cover both new flows and a historical ten-pick run.
+Local syntax, 119 JavaScript tests and 72 Python tests pass. Hydrated GitHub CI passed all 122 JavaScript tests, all 72 Python tests, dataset audits and all three deployment-bundle checks. New tests cover 100 deterministic Daily selections, release-date cutoffs, required-set shortages, historical weighting and eight/ten-pick scoring. The backend gate additionally exercises database/reference parity, guaranteed-set reroll protection, eight-pick completion/measurements and historical challenges on a disposable Neon branch. Browser gates cover both new flows and a historical ten-pick run.
 
-[PR 88](https://github.com/killjoy00/mtg-ev-analyzer/pull/88) passed all three gates and merged as `ba82d0b95b1c90ef89b039eb98191e9164c136a3`. The backend gate passed exact eight/ten-pick selector parity, both complete game flows, account merge, request integrity, guaranteed-set protection, scoring, measurements and friend compatibility. The browser gate passed both new eight-pick flows and a historical ten-pick run. Migration 0014 is applied on development and production. Live function promotion remains to be recorded. Apply migration 0014, deploy the compatible frontend, then activate the new backend. A pre-eight-pick implementation is not a safe rollback target once eight-pick sessions exist. One isolated practice creation took 13.424 seconds while a reserved Daily resume took 0.146 seconds; those different paths are not comparable cold/warm samples and do not establish a production latency target.
+[PR 88](https://github.com/killjoy00/mtg-ev-analyzer/pull/88) passed all three gates and merged as `ba82d0b95b1c90ef89b039eb98191e9164c136a3`. The backend gate passed exact eight/ten-pick selector parity, both complete game flows, account merge, request integrity, guaranteed-set protection, scoring, measurements and friend compatibility. The browser gate passed both new eight-pick flows and a historical ten-pick run. Migration 0014 is applied on development and production. [PR 89](https://github.com/killjoy00/mtg-ev-analyzer/pull/89) passed the same gates and merged as `76e9dca1c21f2122c051246476fdbc8c49aaf5ca`. The compatible Pages frontend was confirmed live before activating the eight-pick backend. Apply migration 0014, deploy the compatible frontend, then activate the new backend. A pre-eight-pick implementation is not a safe rollback target once eight-pick sessions exist. One isolated practice creation took 13.424 seconds while a reserved Daily resume took 0.146 seconds; those different paths are not comparable cold/warm samples and do not establish a production latency target.
+
+## Deployment evidence
+
+All three functions embed reviewed commit `76e9dca1c21f2122c051246476fdbc8c49aaf5ca`. The same prebuilt ZIP content was deployed in development and production through Neon. Migration 0014 is applied on both. No source data or historical schedule was rewritten.
+
+| Function | Development deployment | Production deployment |
+|---|---:|---:|
+| `draftrunapi` | 18 | 16 |
+| `pack1growth` | 4 | 7 |
+| `pack1api` | 3 | 10 |
+
+The isolated candidate and the merged development build each passed 34 HTTP checks: all three release markers, full corpus coverage, rejection of anonymous analytics, both complete eight-pick practice flows, pack rerolls, final-answer retries, correct averages and exact stored friend challenges. Production passed the same 34 HTTP checks. SQL confirms four private QA practice sessions: two completed runs, two unfinished friend starts, exactly two persisted career results and zero ranked sessions. Existing Daily schedules stayed untouched. The [release evidence and timings](audits/eight-pick-release-2026-09-14.json) retain the verification details.
+
+Both September 14 production Daily schedules remain `first-pack-v2` with ten picks because answered attempts already existed. New practice runs use eight immediately; newly generated Dailies use eight, beginning September 15 at midnight Eastern. Historical friend links keep the sender's length.
+
+| Acceptance environment | New mixed practice | Mixed friend | New Cube practice | Cube friend |
+|---|---:|---:|---:|---:|
+| Isolated | 17.49s | 6.99s | 7.32s | 6.92s |
+| Development | 19.11s | 5.72s | 6.40s | 5.44s |
+| Production | 20.52s | 6.35s | 7.53s | 6.09s |
+
+These are one-pass request times from the review environment, including client/proxy transit, function work and database work. They are not controlled cold/warm comparisons or a representative load test. Mixed creation remains the slow path; the bounded selector still scans eligibility groups. Do not claim sub-second starts or a proven retention improvement.
+
+The manual GitHub release workflow was reviewed and its bundle/schema components passed CI. This promotion used Neon's API; the revised manual workflow was not separately dispatched.
 
 ## Remaining work
 
-- Finish live promotion and record exact deployed revisions.
 - Validate native iPhone sharing, card legibility and authentication on real devices.
 - Trusted ingress/session-creation quotas and a first-party cookie/revocation design remain separate infrastructure work; per-player database quotas do not stop unlimited guest identities.
-- Use non-QA first-attempt observations for difficulty, timing and retention decisions. The previous report's retention hypotheses are not established by a code review.
+- Use non-QA first-attempt observations for difficulty, timing and retention decisions. The production inspection found 243 observed decisions from 21 non-QA player IDs; these are not verified unique humans and do not establish retention or support robust threshold calibration. The previous report's hypotheses remain unproven.
 - Refresh release dates, display names and eligible corpus coverage when adding a set. The guarantee uses registered released sets, not automatic discovery of unpublished data.
-- Choose-your-sets practice, verified competition policy and production load testing remain explicitly unimplemented. Existing modes and trophy scoring are fixed.
+- Investigate uneven new mixed-run start latency and perform representative load tests before claiming a latency target. The database selector is bounded, but it still performs corpus-wide group counts.
+- Choose-your-sets practice and verified competition policy remain explicitly unimplemented. Existing modes and trophy scoring are fixed.
+- The temporary Neon branch `review-eight-picks-20260914` (`br-old-base-aybckkbe`) holds disposable QA work and can be removed after confirmation. Neon's delete-branch tool explicitly requires user confirmation; it has not been deleted. CI branches use their existing automatic cleanup.
