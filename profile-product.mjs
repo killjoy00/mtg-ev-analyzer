@@ -85,13 +85,16 @@ function environmentCard(entry, favoriteId) {
   const classes = ['environment-progress-card', entry.played ? 'played' : 'unplayed'];
   if (entry.id === favoriteId) classes.push('favorite');
   if (entry.isCube) classes.push('cube');
+  const practiceHref = entry.isCube
+    ? '?game=draft-run&set=powered-cube'
+    : `?set=${encodeURIComponent(entry.id)}&mode=top3&seed=${encodeURIComponent(crypto.randomUUID())}`;
   return `<article class="${classes.join(' ')}" data-environment-id="${esc(entry.id)}">
     <div><span>${entry.isCube ? 'Special' : entry.played ? 'Played' : 'Unplayed'}</span>${entry.id === favoriteId ? '<b>Favorite</b>' : ''}</div>
     <h3>${esc(entry.name)}</h3>
     ${entry.played
       ? `<p><strong>${entry.games}</strong> games · <strong>${entry.averageScore.toFixed(1)}</strong> avg · <strong>${entry.bestScore}</strong> best</p>`
       : '<p>Ready for your first game.</p>'}
-    <a class="text-button" href="?set=${encodeURIComponent(entry.id)}&mode=${entry.isCube?'full':'top3'}&seed=${encodeURIComponent(crypto.randomUUID())}">${entry.played?'Play again':'Try this set'}</a>
+    <a class="text-button" href="${practiceHref}">${entry.played?'Play again':'Try this set'}</a>
   </article>`;
 }
 
