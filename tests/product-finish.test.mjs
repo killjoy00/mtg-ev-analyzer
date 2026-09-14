@@ -4,6 +4,7 @@ import fs from 'node:fs';
 
 const bootstrap = fs.readFileSync('bootstrap.mjs', 'utf8');
 const today = fs.readFileSync('home-today.mjs', 'utf8');
+const todayCss = fs.readFileSync('home-today.css', 'utf8');
 const profile = fs.readFileSync('profile-polish.mjs', 'utf8');
 const profileProduct = fs.readFileSync('profile-product.mjs', 'utf8');
 
@@ -19,6 +20,16 @@ test('home exposes one compact two-Daily status surface', () => {
   assert.match(today, /Draft Run/);
   assert.match(today, /Powered Cube/);
   assert.match(today, /loadMyProfile/);
+});
+
+test('Today board carries the approved progress, date, completion and action treatment', () => {
+  assert.match(today, /displayDate/);
+  assert.match(today, /today-game-state/);
+  assert.match(today, /role="progressbar"/);
+  assert.match(today, /Play \/ continue/);
+  assert.match(todayCss, /--today-green:/);
+  assert.match(todayCss, /font-family:Georgia/);
+  assert.match(todayCss, /border-radius:12px/);
 });
 
 test('profile polish adds only primary-mode career substance without another backend contract', () => {
