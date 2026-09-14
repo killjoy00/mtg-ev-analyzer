@@ -1,6 +1,6 @@
 # Pack 1
 
-Pack One is a Limited draft game built from historical 17Lands Premier Draft decisions. Its primary game is **Draft Run**: ten independent choices from verified trophy drafts, two one-use rerolls, and contextual partial credit. Play the Eastern-time Daily or unlimited practice, then send the same ten packs to a friend. Powered Cube has its own trophy-only ten-decision Daily and practice flow with two pack rerolls.
+Pack One is a Limited draft game built from historical 17Lands Premier Draft decisions. Its primary game is **Draft Run**: eight independent choices from verified trophy drafts, two one-use rerolls, and contextual partial credit. Play the Eastern-time Daily or unlimited practice, then send the same eight packs to a friend. Powered Cube has its own trophy-only eight-decision Daily and practice flow with two pack rerolls.
 
 Live site: [packone.pro](https://packone.pro). Start with the [current state and deployment status](docs/CURRENT-STATE.md) and the [independent review / completed and remaining work](docs/PRODUCT-REVIEW-2026-09-14.md).
 
@@ -73,7 +73,7 @@ Pack 1 uses a dedicated Neon project/database.
 
 Keeping ranking and growth endpoints separate means growth changes cannot silently alter Daily scoring semantics.
 
-`draftrunapi` is the server authority for the trophy-only corpus, ten-round sessions, deterministic Daily schedules, rerolls, grading, stored friend challenges, and Draft Run leaderboards. It writes a completed run once to career history and records its environment contributions separately.
+`draftrunapi` is the server authority for the trophy-only corpus, eight-round sessions, deterministic Daily schedules, rerolls, grading, stored friend challenges, and Draft Run leaderboards. It writes a completed run once to career history and records its environment contributions separately.
 
 ### Optional accounts
 

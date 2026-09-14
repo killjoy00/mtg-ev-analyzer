@@ -24,16 +24,16 @@ test('balanced runs enforce the easy cap and maintain a medium majority across s
   for(let i=0;i<100;i++) {
     const run=selectDraftRun(pool,`difficulty-${i}`),bands=run.map(p=>rateDraftRunPuzzle(p).band);
     assert.equal(bands.filter(b=>b==='easy').length,1);
-    assert.equal(bands.filter(b=>b==='medium').length,6);
-    assert.equal(bands.filter(b=>b==='hard').length,3);
-    assert.ok(bands.slice(6).every(b=>b!=='easy'));
-    assert.equal(bands.slice(6).filter(b=>b==='hard').length,2);
+    assert.equal(bands.filter(b=>b==='medium').length,5);
+    assert.equal(bands.filter(b=>b==='hard').length,2);
+    assert.ok(bands.slice(5).every(b=>b!=='easy'));
+    assert.equal(bands.slice(5).filter(b=>b==='hard').length,1);
     assert.ok(run.every(p=>p.pick_number<=10));
-    assert.ok(run.slice(8).every(p=>p.pick_number>=8));
-    assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,10);
+    assert.ok(run.slice(7).every(p=>p.pick_number>=8));
+    assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,8);
   }
   const noEasy=pool.filter(p=>p.top_two_ratio>=.5);
-  assert.equal(selectDraftRun(noEasy,'no-easy').filter(p=>rateDraftRunPuzzle(p).band==='medium').length,7);
+  assert.equal(selectDraftRun(noEasy,'no-easy').filter(p=>rateDraftRunPuzzle(p).band==='medium').length,6);
   assert.throws(()=>selectDraftRun(pool.filter(p=>p.top_two_ratio>=.8),'only-hard'),/balanced/);
 });
 
@@ -45,18 +45,18 @@ test('Powered Cube starts at the first fully observed decision P1P2 when P1P1 is
   for(let i=0;i<50;i++) {
     const run=selectDraftRun(pool,`cube-p1p2-${i}`,'powered-cube');
     const bands=run.map(p=>rateDraftRunPuzzle(p).band);
-    assert.equal(run.length,10);
+    assert.equal(run.length,8);
     assert.equal(run[0].pick_number,2);
     assert.ok(run.every(p=>p.pick_number>=2&&p.pick_number<=11));
-    assert.ok(run.slice(8).every(p=>p.pick_number>=9));
-    assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,10);
+    assert.ok(run.slice(7).every(p=>p.pick_number>=9));
+    assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,8);
     assert.equal(bands.filter(b=>b==='easy').length,1);
-    assert.equal(bands.filter(b=>b==='medium').length,6);
-    assert.equal(bands.filter(b=>b==='hard').length,3);
+    assert.equal(bands.filter(b=>b==='medium').length,5);
+    assert.equal(bands.filter(b=>b==='hard').length,2);
   }
 });
 
-test('set exclusions affect random runs and rerolls, with a small Daily-only recency bias',()=>{
+test('set exclusions affect random runs and rerolls, with a stronger Daily-only recency bias',()=>{
   const pool=[];
   for(let pick=1;pick<=12;pick++)for(const set of ['hbg','sir','pio',...REGULAR_SET_ORDER])for(const rating of [30,65,90])pool.push(meta(`${pick}-${set}-${rating}`,rating,{set,pick}));
   for(let i=0;i<30;i++)for(const daily of [false,true]) {
@@ -65,7 +65,7 @@ test('set exclusions affect random runs and rerolls, with a small Daily-only rec
   }
   assert.equal(selectDraftRunReroll([meta('excluded',65,{set:'hbg'})],meta('source',65),{type:'set',round:0,seed:'exclude'}),null);
   const ids=[REGULAR_SET_ORDER[0],REGULAR_SET_ORDER[6],REGULAR_SET_ORDER.at(-1)];
-  assert.deepEqual(ids.map(dailySetWeight),[1.25,1.1,1]);
+  assert.deepEqual(ids.map(id=>dailySetWeight(id)),[6,2,1]);
   for(const daily of [false,true]){
     const counts=Object.fromEntries(ids.map(id=>[id,0])),random=seededRandom('weight-check');
     for(let n=0;n<30000;n++)counts[chooseRunSet(ids,random,daily)]++;

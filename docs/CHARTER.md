@@ -8,7 +8,7 @@ Pack One is a fast Limited decision game built from real 17Lands Premier Draft d
 
 Owner confirmation, 2026-09-14: learning and competition are both goals. Trophy picks earning 100 and the existing game modes are fixed constraints. Other choices may be reconsidered with evidence; a model preference is not proof that a historical choice was wrong. See the [independent review](PRODUCT-REVIEW-2026-09-14.md).
 
-Draft Run is the primary game and Daily entry point. Powered Cube has its own ten-decision trophy flow. Those two games are the primary homepage products. The opening-pack Daily, Top 3, Full Pack, and Set Practice remain available together under the secondary **More modes** tab.
+Draft Run is the primary game and Daily entry point. Powered Cube has its own eight-decision trophy flow. Those two games are the primary homepage products. The opening-pack Daily, Top 3, Full Pack, and Set Practice remain available together under the secondary **More modes** tab.
 
 ## Additional mode: Top 3
 
@@ -24,7 +24,7 @@ This mode is the quick, low-context version of Pack One.
 
 ## Additional mode: Full Pack
 
-Full Pack is an adaptive first-pack study mode built on a real historical replay. It is intentionally different from Draft Run's ten independent puzzles.
+Full Pack is an adaptive first-pack study mode built on a real historical replay. It is intentionally different from Draft Run's eight independent puzzles.
 
 - The available candidate cards come from the observed historical first-pack sequence.
 - For picks before the wheel, the real candidate pack stays fixed. The player's earlier choices cannot change which unopened pack reaches the seat.
@@ -36,9 +36,9 @@ The adaptive support model is therefore a scoring and recommendation layer over 
 
 ## Core game: Draft Run
 
-**Draft Run** is the ten-decision game.
+**Draft Run** is the eight-decision game.
 
-A Draft Run is ten independent first-pack puzzles. Each puzzle comes from a different real Premier Draft trophy draft by a very strong, experienced 17Lands drafter. The ten questions do **not** pretend to be one continuous draft.
+A Draft Run is eight independent first-pack puzzles. Each puzzle comes from a different real Premier Draft trophy draft by a very strong, experienced 17Lands drafter. The eight questions do **not** pretend to be one continuous draft.
 
 Each question shows:
 
@@ -83,7 +83,7 @@ The earlier Neon importer could not establish reproducible held-out probabilitie
 
 Raw 17Lands archives are build inputs only. Do not commit or ship raw archives to the browser. Store only the derived trophy puzzle corpus and compact model outputs needed by the game.
 
-## Ten-question progression
+## Eight-question progression
 
 The run should feel progressively more contextual without mechanically forcing question N to equal P1PN.
 
@@ -96,17 +96,15 @@ Target windows:
 | 3 | P1P3 |
 | 4 | P1P4–P1P5 |
 | 5 | P1P5–P1P6 |
-| 6 | P1P6–P1P7 |
-| 7 | P1P7–P1P8 |
-| 8 | P1P8–P1P9 |
-| 9 | P1P8–P1P10 |
-| 10 | P1P8–P1P10 |
+| 6 | P1P6–P1P8 |
+| 7 | P1P7–P1P9 |
+| 8 | P1P8–P1P10 |
 
 Sampling should reject trivially forced questions. Within the round window, prioritize useful decisions and corpus diversity rather than always choosing the latest possible pick.
 
 ### Set diversity
 
-- A normal ten-question run should not repeat a set when at least ten eligible sets exist.
+- A normal eight-question run should not repeat a set when at least eight eligible sets exist.
 - Never use the same source draft twice in a run.
 - A replacement question must not collide with another question already in the run.
 
@@ -123,13 +121,13 @@ Version `trophy-consensus-v2` formula for a non-historical selection:
 
 `score = round(95 * selected_support / leader_support)`
 
-An alternative with 90% of the leader’s support earns 86; half the support earns 48. The former 0.75 exponent inflated uninformed choices; calibration tests now cover weak, random, runner-up, and historical-choice baselines. The ten decisions contribute equally.
+An alternative with 90% of the leader’s support earns 86; half the support earns 48. The former 0.75 exponent inflated uninformed choices; calibration tests now cover weak, random, runner-up, and historical-choice baselines. The eight decisions contribute equally.
 
 This guarantees that an idiosyncratic trophy pick can still be the game's full-credit answer while a strong consensus alternative receives substantial partial credit.
 
 ## Run scoring
 
-The main Draft Run score is the arithmetic mean of the ten question scores, rounded to an integer.
+The main Draft Run score is the arithmetic mean of the eight question scores, rounded to an integer.
 
 Why equal weighting:
 
@@ -168,14 +166,14 @@ Daily rerolls are deterministic for the same day, round, and reroll history. Eac
 
 ### Daily Draft Run
 
-- One shared ten-question run per Eastern game day.
+- One shared eight-question run per Eastern game day.
 - Same base questions and deterministic reroll replacements for every player.
 - The first attempt is reserved when the run starts; resuming returns that attempt. Its completed score is ranked. A second tab cannot reset it.
 - Global daily/weekly/monthly/all-time leaderboard treatment can mirror the current Daily framework.
 
 ### Unlimited Draft Run
 
-- Randomized ten-question runs from the same corpus.
+- Randomized eight-question runs from the same corpus.
 - Personal stats and friend challenges are allowed.
 - No global ranked leaderboard credit.
 
@@ -203,7 +201,7 @@ Neon is the source of truth for the derived Draft Run corpus. Store source-draft
 
 The existing static replay corpus remains appropriate for Top 3 and Full Pack while those secondary study modes remain supported. Its publication/storage mechanism should not constrain growth of the site shell; large immutable replay artifacts may be served independently from the frontend.
 
-## Powered Cube ten-decision flow
+## Powered Cube eight-decision flow
 
 Powered Cube is separate from the mixed expansion pool. Every source must be an independently verified seven-win Powered Cube draft by the high-quality cohort. No expansion puzzle can enter Cube, and no Cube puzzle can enter mixed Draft Run.
 
@@ -211,13 +209,13 @@ The archive omits complete P1P1 packs. Cube starts at the complete P1P2 decision
 
 Cube receives **two pack rerolls and no set reroll**, as explicitly chosen by the product owner. Each replacement comes from another Powered Cube trophy draft at similar depth and difficulty. The backend enforces the two-use budget, source exclusions, and environment boundary.
 
-Expansion Draft Run and Cube each have their own first-attempt Daily, Eastern-date schedule, leaderboard, and stored friend challenge. A player can play both Dailies on the same day. Account merges preserve the established first attempt separately for each environment. Trophy matches earn 100 in both games; the same partial-credit formula and ten-decision arithmetic mean apply.
+Expansion Draft Run and Cube each have their own first-attempt Daily, Eastern-date schedule, leaderboard, and stored friend challenge. A player can play both Dailies on the same day. Account merges preserve the established first attempt separately for each environment. Trophy matches earn 100 in both games; the same partial-credit formula and eight-decision arithmetic mean apply.
 
 
 ## Versioned difficulty policy
 
-See [SCORING-AND-DIFFICULTY.md](SCORING-AND-DIFFICULTY.md) for the unchanged trophy/partial-credit rules and `support-ratio-v1` difficulty. New ten-pick runs contain at most one easy pick, normally six medium and three hard picks; rerolls retain the band and stay within ten rating points of the original round. Existing schedules and friend packs retain their versioned behavior.
+See [SCORING-AND-DIFFICULTY.md](SCORING-AND-DIFFICULTY.md) for the unchanged trophy/partial-credit rules and `support-ratio-v1` difficulty. New eight-pick runs contain at most one easy pick, normally five medium and two hard picks; rerolls retain the band and stay within ten rating points of the original round. Existing schedules and friend packs retain their versioned behavior.
 
-## Current corpus selection policy — first-pack-v2
+## Current corpus selection policy — eight-pick-v3
 
-New random runs use only Pack 1, through pick 10 for regular sets or pick 11 for Powered Cube. HBG, SIR and PIO remain selectable-mode data and are excluded from random mixed/Daily draws. Easy decisions are confined to rounds 1–6, with two hard decisions in rounds 7–10. Daily weights are 1.25 for the newest six regular sets, 1.10 for the next six and 1.00 otherwise. The versioned policy, audit, retirement controls and rollout are specified in DATA-MANAGEMENT.md; choose-your-sets ten-pick runs are roadmap work only.
+New random runs use only Pack 1, through pick 10 for regular sets or pick 11 for Powered Cube. HBG, SIR and PIO remain selectable-mode data and are excluded from random mixed/Daily draws. Easy decisions are confined to rounds 1–5, with one hard decision in rounds 6–8. The expansion Daily guarantees the three latest released eligible sets. The remaining five draws weight the next three sets at 4, the next six at 2 and older sets at 1. Release dates, rather than archive timestamps, determine the order. Required sets are reserved for distinct feasible rounds and cannot be removed by a set reroll. Existing ten-pick sessions, schedules and friend packs retain their length and version. The versioned policy, audit, retirement controls and rollout are specified in DATA-MANAGEMENT.md; choose-your-sets eight-pick runs are roadmap work only.

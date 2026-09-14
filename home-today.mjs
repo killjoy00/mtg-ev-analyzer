@@ -56,8 +56,8 @@ function markup(status) {
     <div class="today-progress-label"><strong>${status.completed}/2 complete</strong><span>${progress}%</span></div>
     <div class="today-progress" role="progressbar" aria-valuemin="0" aria-valuemax="2" aria-valuenow="${status.completed}" aria-label="${status.completed} of 2 Daily games complete"><i style="width:${progress}%"></i></div>
     <div class="today-games">
-      ${gameCard({label:'Draft Run',description:'Ten trophy-draft decisions',status:status.draftRun,playHref:'?game=draft-run&daily=1',boardHref:'?game=draft-run&board=daily'})}
-      ${gameCard({label:'Powered Cube',description:'Ten Cube decisions · two pack rerolls',status:status.cube,playHref:'?game=draft-run&set=powered-cube&daily=1',boardHref:'?game=draft-run&set=powered-cube&board=daily'})}
+      ${gameCard({label:'Draft Run',description:'Eight trophy-draft decisions',status:status.draftRun,playHref:'?game=draft-run&daily=1',boardHref:'?game=draft-run&board=daily'})}
+      ${gameCard({label:'Powered Cube',description:'Eight Cube decisions · two pack rerolls',status:status.cube,playHref:'?game=draft-run&set=powered-cube&daily=1',boardHref:'?game=draft-run&set=powered-cube&board=daily'})}
     </div>
     <footer>
       <strong class="today-streak"><span aria-hidden="true">◆</span>${streak}</strong>

@@ -8,26 +8,28 @@ This file is the short reference for the product contract and merged implementat
 
 PRs [83](https://github.com/killjoy00/mtg-ev-analyzer/pull/83), [84](https://github.com/killjoy00/mtg-ev-analyzer/pull/84) and [85](https://github.com/killjoy00/mtg-ev-analyzer/pull/85) passed their applicable gates and are merged. The new frontend consensus module was confirmed live on September 14. Production acceptance of the complete revised flow remains open, including native-device checks.
 
-**Pending backend deployment:** migrations 0012/0013 and the revised Draft Run, growth and legacy API functions. This includes bounded SQL selection, completion markers, authenticated analytics and per-player quotas. See [backend release instructions](BACKEND-RELIABILITY.md), [request protections and remaining gaps](REQUEST-INTEGRITY.md) and the [full review/status report](PRODUCT-REVIEW-2026-09-14.md). Do not claim those protections or a production speedup solely from the Git merge.
+The follow-up review verified migrations 0012/0013 and the three function deployments live in Neon on September 14: `draftrunapi` 15, `pack1growth` 6 and `pack1api` 9. The public health response reports complete rating/set coverage; unauthenticated analytics submissions are rejected. The earlier pending-deployment statement is superseded.
+
+**Eight-pick release:** migration 0014 and the new frontend/backend require staged promotion. See the [follow-up review](EIGHT-PICK-REVIEW-2026-09-14.md), [backend instructions](BACKEND-RELIABILITY.md), and [remaining request/identity work](REQUEST-INTEGRITY.md). Deployment verification is separate from merging.
 
 ## Primary product
 
 Pack One has two primary games on the home page:
 
-- **Draft Run** — ten independent Pack 1 decisions from verified trophy drafts across eligible expansion sets.
-- **Powered Cube** — ten independent Powered Cube trophy decisions, beginning at P1P2 because the source does not contain a complete P1P1 pack.
+- **Draft Run** — eight independent Pack 1 decisions from verified trophy drafts across eligible expansion sets.
+- **Powered Cube** — eight independent Powered Cube trophy decisions, beginning at P1P2 because the source does not contain a complete P1P1 pack.
 
 Top 3 and Full Pack remain available under **More modes**. They are secondary study modes, not the default landing-page product.
 
 ## Daily loop
 
-Draft Run and Powered Cube each have an independent ranked Daily, leaderboard and first attempt. A player can complete both on the same Eastern game day.
+Draft Run and Powered Cube each have an independent ranked Daily, leaderboard and first attempt. A player can complete both on the same Eastern game day. New runs have eight picks. The expansion Daily guarantees its three latest released eligible sets, then draws five more with stronger recency weighting. Guaranteed sets allow pack rerolls but cannot be removed by a set reroll. Existing ten-pick schedules, attempts and friend links retain their original length. See [selection policy](DATA-MANAGEMENT.md).
 
 The home page now treats those two Dailies as one simple daily check-in: show whether each is finished, show the completed score/rank when available, and show progress toward finishing both. Reading the Today surface must never reserve or start a Daily; clicking Play / continue enters the normal Daily route, which resumes an existing attempt when one exists.
 
 ## Scoring and difficulty
 
-The historical trophy pick remains the full-credit target at 100. Other choices receive contextual partial credit capped at 95. The final score rounds the mean of ten pick scores; nine trophy matches and one 95 display 100. Trophy-match count remains a separate statistic.
+The historical trophy pick remains the full-credit target at 100. Other choices receive contextual partial credit capped at 95. New runs round the mean of eight pick scores: seven trophy matches and one 95 display 99. Historical ten-pick runs keep their denominator and results; nine trophy matches and one 95 still display 100. Trophy-match count remains a separate statistic.
 
 Difficulty is an internal run-composition and reroll-matching heuristic. Unanswered player-facing puzzles do not show difficulty ratings/bands or grading support before the choice is locked. Human calibration should come from non-QA first-attempt observations before any future threshold change.
 
@@ -37,7 +39,7 @@ Locked Draft Run/Cube answers show the trophy choice and elite consensus separat
 
 Phone packs use three columns, compact ordered prior-pick thumbnails, and a sticky dock containing selection, lock, and rerolls. Progress always identifies rounds separately from earned points. Full set names come from the checked-in `data/set-display-names.json` snapshot of [Scryfall set metadata](https://api.scryfall.com/sets), verified 2026-09-14, with set codes as a network-failure or new-set fallback. Refresh the display-name snapshot when registering a new environment; it does not control corpus eligibility or recency weighting.
 
-Result sharing defaults to spoiler-free text with ten score squares, trophy matches, game family and the actual Eastern Daily date. Image sharing remains an explicit secondary option. The date identifies the Daily without inventing a historical launch-based puzzle number. Native iPhone sharing still needs real-device verification.
+Result sharing defaults to spoiler-free text with one score square per decision, trophy matches, game family and the actual Eastern Daily date. Image sharing remains an explicit secondary option. The date identifies the Daily without inventing a historical launch-based puzzle number. Native iPhone sharing still needs real-device verification.
 
 ## Powered Cube contract
 

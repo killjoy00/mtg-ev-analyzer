@@ -30,16 +30,16 @@ test('unanswered payloads contain neither the answer nor model rankings, support
 });
 test('seeded runs and preserved legacy rerolls obey early picks, buckets and source exclusions',()=>{
   for(let i=0;i<40;i++){
-    const seed='corpus-check-'+i,run=selectDraftRun(pool,seed);
-    assert.deepEqual(selectDraftRun(pool,seed),run);
+    const seed='corpus-check-'+i,options={selectionVersion:'first-pack-v2'},run=selectDraftRun(pool,seed,'mixed',options);
+    assert.deepEqual(selectDraftRun(pool,seed,'mixed',options),run);
     assert.equal(run.length,10);assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,10);
     assert.equal(new Set(run.map(p=>p.set_id)).size,10);
     assert.equal(run[0].pick_number,1);assert.equal(run[1].pick_number,2);
     run.forEach((source,round)=>{
-      assert.ok(eligiblePickForRound(round,source.pick_number));
+      assert.ok(eligiblePickForRound(round,source.pick_number,'mixed','first-pack-v2'));
       for(const order of [['set','pack'],['pack','set']]){
         let current=source,seen=run.map(p=>p.source_draft_hash);
-        for(const type of order){const p=selectDraftRunReroll(pool,current,{type,round,seed,excludedSources:seen,difficultyVersion:'legacy',selectionVersion:'balanced-v1'});assert.ok(p);assert.ok(eligiblePickForRound(round,p.pick_number));assert.ok(!seen.includes(p.source_draft_hash));assert.equal(p.set_id===current.set_id,type==='pack');seen.push(p.source_draft_hash);current=p;}
+        for(const type of order){const p=selectDraftRunReroll(pool,current,{type,round,seed,excludedSources:seen,difficultyVersion:'legacy',selectionVersion:'balanced-v1'});assert.ok(p);assert.ok(eligiblePickForRound(round,p.pick_number,'mixed','balanced-v1'));assert.ok(!seen.includes(p.source_draft_hash));assert.equal(p.set_id===current.set_id,type==='pack');seen.push(p.source_draft_hash);current=p;}
       }
     });
   }
@@ -82,12 +82,12 @@ test('trophy coverage matches every loaded environment and preserves true openin
   assert.ok(poolForEnvironment(pool).every(p=>p.set_id!=='powered-cube'));
 });
 
-test('Cube has ten independent trophy decisions and two sequential pack replacements without expansion leakage',()=>{
+test('Cube has eight independent trophy decisions and two sequential pack replacements without expansion leakage',()=>{
   for(let i=0;i<30;i++){
     const seed='cube-'+i,environment='powered-cube',run=selectDraftRun(pool,seed,environment);
-    assert.equal(run.length,10);assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,10);
+    assert.equal(run.length,8);assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,8);
     assert.equal(run[0].pick_number,2);assert.equal(run[1].pick_number,3);
-    for(let round=0;round<10;round++){
+    for(let round=0;round<8;round++){
       let current=run[round],seen=run.map(p=>p.source_draft_hash);
       assert.equal(current.set_id,environment);assert.ok(eligiblePickForRound(round,current.pick_number,environment));
       for(let reroll=0;reroll<2;reroll++){

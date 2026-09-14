@@ -28,12 +28,12 @@ function puzzle({ pick = 1, historical = 'b', supports = [0.55, 0.30, 0.10, 0.05
   };
 }
 
-test('Draft Run is ten questions with progressively wider first-pack windows', () => {
-  assert.equal(DRAFT_RUN_LENGTH, 10);
+test('Draft Run is eight questions with progressively wider first-pack windows', () => {
+  assert.equal(DRAFT_RUN_LENGTH, 8);
   assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[0], [1, 1]);
   assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[1], [2, 2]);
   assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[2], [3, 3]);
-  assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[9], [8, 10]);
+  assert.deepEqual(DRAFT_RUN_PICK_WINDOWS[7], [8, 10]);
   assert.equal(eligiblePickForRound(3, 3), false);
   assert.equal(eligiblePickForRound(3, 4), true);
   assert.equal(eligiblePickForRound(3, 5), true);

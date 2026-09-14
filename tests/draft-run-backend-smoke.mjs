@@ -30,7 +30,7 @@ assert.equal(concurrent.filter(r=>!(r instanceof Error)).length,1,'Only one conc
 assert.match(concurrent.find(r=>r instanceof Error).message,/409|another tab|already/);
 s=await call(runApi,`/v1/runs/${s.id}`,undefined,guest.token);
 assert.equal(s.rerolls.pack,0);assert.notEqual(s.current.puzzle_id,initial);
-for(let round=0;round<10;round++) {
+for(let round=0;round<s.run_length;round++) {
   const body={revision:s.revision,round,puzzleId:s.current.puzzle_id,cardId:s.current.candidates[0].id};
   const other=s.current.candidates[1].id;
   s=await call(runApi,`/v1/runs/${s.id}/pick`,body,guest.token);
@@ -69,7 +69,7 @@ const transferred=await call(runApi,`/v1/runs/${duplicate.id}`,undefined,owner.t
 assert.equal((await call(runApi,`/v1/runs/${s.id}`,undefined,owner.token)).complete,true);
 await call(runApi,`/v1/runs/${s.id}`,undefined,guest.token,404);
 const history=await call(growth,'/v1/profile/me',undefined,owner.token);
-assert.equal(history.summary.games,1);assert.ok(history.by_set.length>=9);
+assert.equal(history.summary.games,1);assert.ok(history.by_set.length>=s.run_length-1);
 assert.equal(history.player.profile_key,(await call(growth,'/v1/profile/me',undefined,owner.token)).player.profile_key);
 const leaderboardName='AA Drafter '+tag;
 let renamed=await call(growth,'/v1/profile',{displayName:leaderboardName},owner.token,200,{method:'PATCH'});
@@ -105,4 +105,4 @@ assert.ok(analytics.every(r=>Number(r.n)===1));assert.equal(analytics.length,3);
 await query('SELECT * FROM analytics_retention_cohorts LIMIT 1');await query('SELECT * FROM analytics_daily_next_day_retention LIMIT 1');
 fs.mkdirSync('generated/review',{recursive:true});fs.writeFileSync('generated/review/backend-timings.json',JSON.stringify(timings,null,2));
 console.log('Run request timings (isolated database, ms):',JSON.stringify(timings.filter(t=>t.path==='/v1/runs')));
-console.log('Passed real database: concurrent writes, ten locked picks, retries, forged score rejection, guest privacy, account claim, merge, Daily conflicts, environment transfer, public opt-in, percentile ties, old milestones, event idempotency and funnel queries.');
+console.log('Passed real database: concurrent writes, versioned locked picks, retries, forged score rejection, guest privacy, account claim, merge, Daily conflicts, environment transfer, public opt-in, percentile ties, old milestones, event idempotency and funnel queries.');
