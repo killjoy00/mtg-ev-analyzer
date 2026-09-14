@@ -12,7 +12,7 @@ afterwards. The additive schema is backward compatible with the previously
 deployed function bundles, which ignore the new column, table and indexes, so
 the database and code halves of this release are decoupled.
 
-The follow-up review verified all three function deployments in production on September 14: `draftrunapi` 15, `pack1growth` 6 and `pack1api` 9. Health includes the new coverage fields, reports zero unrated/missing sets, and unauthenticated analytics submission returns 401. This supersedes the earlier pending-function statement. Eight-pick deployment is tracked in [the follow-up report](EIGHT-PICK-REVIEW-2026-09-14.md).
+The follow-up review verified the prior deployment, then promoted the eight-pick implementation after migration 0014 and compatible frontend publication. Production now runs `draftrunapi` 16, `pack1growth` 7 and `pack1api` 10, all with embedded commit `76e9dca1c21f2122c051246476fdbc8c49aaf5ca`. Development runs the same content in deployments 18, 4 and 3 respectively. Exact HTTP acceptance and timing evidence are in [the follow-up report](EIGHT-PICK-REVIEW-2026-09-14.md).
 
 ## Selection and data integrity
 

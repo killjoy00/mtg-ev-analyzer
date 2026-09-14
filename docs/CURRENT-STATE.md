@@ -6,11 +6,11 @@ This file is the short reference for the product contract and merged implementat
 
 ## Release status
 
-PRs [83](https://github.com/killjoy00/mtg-ev-analyzer/pull/83), [84](https://github.com/killjoy00/mtg-ev-analyzer/pull/84) and [85](https://github.com/killjoy00/mtg-ev-analyzer/pull/85) passed their applicable gates and are merged. The new frontend consensus module was confirmed live on September 14. Production acceptance of the complete revised flow remains open, including native-device checks.
+PRs [83](https://github.com/killjoy00/mtg-ev-analyzer/pull/83)–[86](https://github.com/killjoy00/mtg-ev-analyzer/pull/86) completed the initial review changes. The intervening [PR 87](https://github.com/killjoy00/mtg-ev-analyzer/pull/87) added a manual Neon deployment workflow; its earlier backend deployment was verified rather than assumed.
 
-The follow-up review verified migrations 0012/0013 and the three function deployments live in Neon on September 14: `draftrunapi` 15, `pack1growth` 6 and `pack1api` 9. The public health response reports complete rating/set coverage; unauthenticated analytics submissions are rejected. The earlier pending-deployment statement is superseded.
+[PR 88](https://github.com/killjoy00/mtg-ev-analyzer/pull/88) implements eight-pick runs and the Daily release guarantee. [PR 89](https://github.com/killjoy00/mtg-ev-analyzer/pull/89) strengthens release verification. Both passed unit, browser and isolated database gates and are merged. Migration 0014 is applied in development/production, the compatible Pages frontend is live, and all three Neon functions run reviewed revision `76e9dca1c21f2122c051246476fdbc8c49aaf5ca`.
 
-**Eight-pick release:** migration 0014 and the new frontend/backend require staged promotion. See the [follow-up review](EIGHT-PICK-REVIEW-2026-09-14.md), [backend instructions](BACKEND-RELIABILITY.md), and [remaining request/identity work](REQUEST-INTEGRITY.md). Deployment verification is separate from merging.
+See the [follow-up review and live acceptance evidence](EIGHT-PICK-REVIEW-2026-09-14.md), [backend instructions](BACKEND-RELIABILITY.md), and [remaining request/identity work](REQUEST-INTEGRITY.md). Native-device checks, representative performance testing and trusted ingress/session work remain open.
 
 ## Primary product
 
