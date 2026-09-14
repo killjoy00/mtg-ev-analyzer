@@ -6,7 +6,7 @@ Updated September 14, 2026. This follows the [initial detailed review](PRODUCT-R
 
 The intervening merged change was [PR 87](https://github.com/killjoy00/mtg-ev-analyzer/pull/87), a manual Neon deployment workflow and function manifest. The live Neon project confirms migrations 0012/0013 and production deployments `draftrunapi` 15, `pack1growth` 6 and `pack1api` 9. Health reports 920,629 eligible decisions across 33 environments, zero unrated decisions and no missing sets. Valid unauthenticated analytics submissions return 401. The old report's pending-deployment claim was stale and has been corrected.
 
-The workflow is useful but its original checks only identify a family of code, not an exact revision. It also installs floating tooling versions and allows development/production to deploy different main revisions. Those release controls need strengthening. A successful start alone does not validate grading, completion or old challenge compatibility. A full corpus health request took 15.64 seconds during inspection; it is no longer called merely to warm the homepage.
+The workflow was useful but its original checks only identified a family of code, not an exact revision. It installed floating tooling versions and allowed development/production to deploy different main revisions. The follow-up pins tools, embeds a reviewed Git SHA in every bundle, verifies schema prerequisites, checks all three deployed revisions and tests both complete practice flows before promotion. A successful start alone does not validate grading, completion or old challenge compatibility. A full corpus health request took 15.64 seconds during inspection; it is no longer called merely to warm the homepage.
 
 ## Implemented changes
 
@@ -23,11 +23,11 @@ The workflow is useful but its original checks only identify a family of code, n
 
 Local syntax, 119 JavaScript tests and 72 Python tests pass. Three distribution-dependent JavaScript files are checked in hydrated GitHub CI. New tests cover 100 deterministic Daily selections, release-date cutoffs, required-set shortages, historical weighting and eight/ten-pick scoring. The backend gate additionally exercises database/reference parity, guaranteed-set reroll protection, eight-pick completion/measurements and historical challenges on a disposable Neon branch. Browser gates cover both new flows and a historical ten-pick run.
 
-Promotion and final CI/deployment evidence will be recorded after gates pass. Apply migration 0014, deploy the compatible frontend, then activate the new backend. A pre-eight-pick implementation is not a safe rollback target once eight-pick sessions exist.
+[PR 88](https://github.com/killjoy00/mtg-ev-analyzer/pull/88) passed all three gates and merged as `ba82d0b95b1c90ef89b039eb98191e9164c136a3`. The backend gate passed exact eight/ten-pick selector parity, both complete game flows, account merge, request integrity, guaranteed-set protection, scoring, measurements and friend compatibility. The browser gate passed both new eight-pick flows and a historical ten-pick run. Migration 0014 is applied on development and production. Live function promotion remains to be recorded. Apply migration 0014, deploy the compatible frontend, then activate the new backend. A pre-eight-pick implementation is not a safe rollback target once eight-pick sessions exist. One isolated practice creation took 13.424 seconds while a reserved Daily resume took 0.146 seconds; those different paths are not comparable cold/warm samples and do not establish a production latency target.
 
 ## Remaining work
 
-- Verify the staged release and exact deployed revisions; update this report with the result.
+- Finish live promotion and record exact deployed revisions.
 - Validate native iPhone sharing, card legibility and authentication on real devices.
 - Trusted ingress/session-creation quotas and a first-party cookie/revocation design remain separate infrastructure work; per-player database quotas do not stop unlimited guest identities.
 - Use non-QA first-attempt observations for difficulty, timing and retention decisions. The previous report's retention hypotheses are not established by a code review.

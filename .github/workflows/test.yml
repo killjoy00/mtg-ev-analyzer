@@ -22,6 +22,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify deployment bundles and embedded revisions
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/release-tools" --no-audit --no-fund esbuild@0.28.2
+          ESBUILD_BIN="$RUNNER_TEMP/release-tools/node_modules/.bin/esbuild" node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
       - name: Hydrate replay shards from R2
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: bash scripts/r2_replay_shards.sh hydrate
