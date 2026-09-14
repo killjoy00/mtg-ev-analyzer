@@ -91,7 +91,7 @@ try{
   await page.locator('.run-result-page').waitFor();assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),5);assert.equal(await page.locator('#home-editorial').isVisible(),false);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());await noOverflow();
   await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
   await page.locator('#run-challenge').click();await page.waitForFunction(()=>Boolean(window.__runShare));
-  const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.text,/🟩{9}/);assert.equal(shared.files,undefined);assert.match(shared.url,new RegExp('challenge='+shareId));assert.doesNotMatch(shared.url,/profile|token/);
+  const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.text,/🟩{9}/u);assert.equal(shared.files,undefined);assert.match(shared.url,new RegExp('challenge='+shareId));assert.doesNotMatch(shared.url,/profile|token/);
   await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Can you beat 88/);await noOverflow();
   await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
   await page.goto(base+'/?game=draft-run&board=daily'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
