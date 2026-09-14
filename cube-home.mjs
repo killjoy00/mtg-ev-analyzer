@@ -3,8 +3,11 @@ import { onAppRender } from './render-lifecycle.mjs';
 const CUBE = 'powered-cube';
 
 function cubeHref(daily = false) {
-  const suffix = daily ? '&daily=1' : '';
-  return `?game=draft-run&set=${CUBE}${suffix}`;
+  const url = new URL(window.location.origin);
+  url.searchParams.set('game', 'draft-run');
+  url.searchParams.set('set', CUBE);
+  if (daily) url.searchParams.set('daily', '1');
+  return url.toString();
 }
 
 function bindCubeLaunchers(root = document) {
