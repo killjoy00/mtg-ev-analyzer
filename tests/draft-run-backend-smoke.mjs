@@ -39,6 +39,14 @@ for(let round=0;round<10;round++) {
   console.log('Locked decision and retries verified',round+1);
 }
 assert.equal(s.complete,true);
+const completedBefore=(await query('SELECT result_persisted_at FROM draft_run_sessions WHERE id=$1::uuid',[s.id])).rows[0].result_persisted_at;
+assert.ok(completedBefore);
+await call(runApi,`/v1/runs/${s.id}`,undefined,guest.token);
+assert.equal((await query('SELECT result_persisted_at FROM draft_run_sessions WHERE id=$1::uuid',[s.id])).rows[0].result_persisted_at,completedBefore,'Completed GET must not repeat persistence');
+await query('UPDATE draft_run_sessions SET result_persisted_at=NULL WHERE id=$1::uuid',[s.id]);
+await call(runApi,`/v1/runs/${s.id}`,undefined,guest.token);
+assert.ok((await query('SELECT result_persisted_at FROM draft_run_sessions WHERE id=$1::uuid',[s.id])).rows[0].result_persisted_at,'Unacknowledged completion is recoverable');
+assert.equal((await query('SELECT count(*) n FROM game_results WHERE player_id=$1::uuid AND client_result_id=$2',[guest.playerId,`draft-run:${s.id}`])).rows[0].n,'1');
 await call(growth,'/v1/results',{mode:'draft_run',score:100,clientResultId:'forged-'+tag},guest.token,403);
 const privateProfile=await call(growth,'/v1/profile/me',undefined,guest.token);
 assert.equal(privateProfile.player.profile_public,false);

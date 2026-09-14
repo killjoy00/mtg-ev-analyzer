@@ -10,7 +10,7 @@ export async function loadVerifiedPool(query, version, pageSize = 5000) {
       if (p.puzzle_id <= after) throw Error('Verified pool pagination did not advance');
       if(Number(p.pack_number??1)!==1)throw Error('Verified decision is not from pack one');
       if(p.difficulty_version!=='support-ratio-v1' || p.top_two_ratio==null || !Number.isFinite(Number(p.top_two_ratio))) throw Error('Verified puzzle is missing its difficulty rating');
-      rows.push({...p, rating:Number(p.rating),top_two_ratio:Number(p.top_two_ratio),target_support_ratio:Number(p.target_support_ratio),pick_number:Number(p.pick_number), candidate_count:Number(p.candidate_count), consensus_top_gap:Number(p.consensus_top_gap), support_entropy:Number(p.support_entropy)});
+      rows.push({...p, rating:Number(p.rating),top_two_ratio:Number(p.top_two_ratio),target_support_ratio:p.target_support_ratio==null?null:Number(p.target_support_ratio),pick_number:Number(p.pick_number), candidate_count:Number(p.candidate_count), consensus_top_gap:Number(p.consensus_top_gap), support_entropy:Number(p.support_entropy)});
       after = p.puzzle_id;
     }
     if (result.rows.length < pageSize) return rows;
