@@ -49,10 +49,10 @@
     "type_line": "Legendary Creature \u2014 Cat Warrior"
   },
   "ancestral-recall": {
-    "image_url": "https://cards.scryfall.io/normal/front/7/5/75961d36-acf6-425f-9698-0bf52af74f31.jpg?1783903694",
+    "image_url": "https://cards.scryfall.io/normal/front/2/d/2dd41293-d7c8-4422-9f0c-b3e96350f5c9.jpg?1783948580",
     "mana_cost": "{U}",
     "name": "Ancestral Recall",
-    "rarity": "mythic",
+    "rarity": "rare",
     "type_line": "Instant"
   },
   "ancient-tomb": {
@@ -320,10 +320,10 @@
     "type_line": "Instant"
   },
   "brainstorm": {
-    "image_url": "https://cards.scryfall.io/normal/front/6/1/617208ff-dd9b-44fd-a740-d3188081e5cc.jpg?1783903691",
+    "image_url": "https://cards.scryfall.io/normal/front/b/5/b5545882-6963-4729-b2c6-fb4bdc75ffcc.jpg?1783904806",
     "mana_cost": "{U}",
     "name": "Brainstorm",
-    "rarity": "rare",
+    "rarity": "common",
     "type_line": "Instant"
   },
   "brazen-borrower": {
@@ -442,10 +442,10 @@
     "type_line": "Legendary Planeswalker \u2014 Chandra"
   },
   "channel": {
-    "image_url": "https://cards.scryfall.io/normal/front/f/c/fc962e45-ab71-47e2-b736-644901ffe7d6.jpg?1783903851",
+    "image_url": "https://cards.scryfall.io/normal/front/c/e/ce54c7c1-3401-4414-8da0-5846cb0ae1b4.jpg?1783935522",
     "mana_cost": "{G}{G}",
     "name": "Channel",
-    "rarity": "rare",
+    "rarity": "mythic",
     "type_line": "Sorcery"
   },
   "chromatic-star": {
@@ -750,7 +750,7 @@
     "name": "Deflecting Palm"
   },
   "demonic-tutor": {
-    "image_url": "https://cards.scryfall.io/normal/front/7/e/7eb9e83d-515d-4911-a06b-9982200277b2.jpg?1783903682",
+    "image_url": "https://cards.scryfall.io/normal/front/a/2/a24b4cb6-cebb-428b-8654-74347a6a8d63.jpg?1783915679",
     "mana_cost": "{1}{B}",
     "name": "Demonic Tutor",
     "rarity": "mythic",
@@ -2796,7 +2796,7 @@
     "type_line": "Land"
   },
   "reanimate": {
-    "image_url": "https://cards.scryfall.io/normal/front/8/b/8b1e10e8-ea14-4761-910b-4072e2a18456.jpg?1783903680",
+    "image_url": "https://cards.scryfall.io/normal/front/5/8/58838b71-404f-41ad-9a9b-2c7f875bab06.jpg?1783906269",
     "mana_cost": "{B}",
     "name": "Reanimate",
     "rarity": "rare",
@@ -2828,10 +2828,10 @@
     "name": "Reflecting Pool"
   },
   "regrowth": {
-    "image_url": "https://cards.scryfall.io/normal/front/a/c/ac095763-6f4e-4d4e-9c99-414646368f8d.jpg?1783903660",
+    "image_url": "https://cards.scryfall.io/normal/front/e/d/ed560182-a9de-4e1e-b4dc-6b1db9de6737.jpg?1783920258",
     "mana_cost": "{1}{G}",
     "name": "Regrowth",
-    "rarity": "mythic",
+    "rarity": "uncommon",
     "type_line": "Sorcery"
   },
   "remand": {
@@ -4089,7 +4089,7 @@
     "type_line": "Land \u2014 Island Swamp"
   },
   "wheel-of-fortune": {
-    "image_url": "https://cards.scryfall.io/normal/front/a/c/acca1fd4-6384-460e-905f-118f01aa76ed.jpg?1783903856",
+    "image_url": "https://cards.scryfall.io/normal/front/3/f/3f3c77ad-fce8-4506-90e1-7ef71552a71c.jpg?1783947978",
     "mana_cost": "{2}{R}",
     "name": "Wheel of Fortune",
     "rarity": "rare",
