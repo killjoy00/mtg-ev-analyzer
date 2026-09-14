@@ -20,27 +20,47 @@ function standing(status) {
   return 'Daily complete';
 }
 
+function displayDate(dateKey) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(dateKey || ''));
+  if (!match) return '';
+  const date = new Date(Date.UTC(Number(match[1]), Number(match[2]) - 1, Number(match[3]), 12));
+  return new Intl.DateTimeFormat('en-US', {
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}
+
 function gameCard({ label, description, status, playHref, boardHref }) {
+  const actionHref = status.complete ? boardHref : playHref;
+  const actionLabel = status.complete ? 'View board' : 'Play / continue';
   return `<article class="today-game ${status.complete ? 'complete' : ''}">
+    <span class="today-game-state" aria-hidden="true">${status.complete ? '✓' : ''}</span>
     <div class="today-game-name"><span>${label}</span><small>${description}</small></div>
     <div class="today-game-score"><strong>${status.complete ? status.score : '—'}</strong><small>${standing(status)}</small></div>
-    <a class="button ${status.complete ? 'secondary' : 'primary'}" href="${status.complete ? boardHref : playHref}">${status.complete ? 'View board' : 'Play / continue'}</a>
+    <a class="button ${status.complete ? 'secondary' : 'primary'}" href="${actionHref}">${actionLabel}<span aria-hidden="true">›</span></a>
   </article>`;
 }
 
 function markup(status) {
   const progress = status.completed * 50;
   const streak = status.streak > 0 ? `${status.streak}-day Daily streak` : 'Start your Daily streak';
+  const dailyDate = displayDate(status.dateKey);
   return `<div class="today-status-heading">
       <div><p class="eyebrow">Today</p><h2>Your Daily board</h2><p>Finish Draft Run and Cube. That’s the whole check-in.</p></div>
-      <div class="today-complete"><strong>${status.completed}/2</strong><span>complete</span></div>
+      <time datetime="${status.dateKey}">${dailyDate}</time>
     </div>
-    <div class="today-progress" aria-label="${status.completed} of 2 Daily games complete"><i style="width:${progress}%"></i></div>
+    <div class="today-progress-label"><strong>${status.completed}/2 complete</strong><span>${progress}%</span></div>
+    <div class="today-progress" role="progressbar" aria-valuemin="0" aria-valuemax="2" aria-valuenow="${status.completed}" aria-label="${status.completed} of 2 Daily games complete"><i style="width:${progress}%"></i></div>
     <div class="today-games">
       ${gameCard({label:'Draft Run',description:'Ten trophy-draft decisions',status:status.draftRun,playHref:'?game=draft-run&daily=1',boardHref:'?game=draft-run&board=daily'})}
       ${gameCard({label:'Powered Cube',description:'Ten Cube decisions · two pack rerolls',status:status.cube,playHref:'?game=draft-run&set=powered-cube&daily=1',boardHref:'?game=draft-run&set=powered-cube&board=daily'})}
     </div>
-    <footer><strong>${streak}</strong><button class="text-button" type="button" data-today-career>View career</button></footer>`;
+    <footer>
+      <strong class="today-streak"><span aria-hidden="true">◆</span>${streak}</strong>
+      <button class="text-button" type="button" data-today-career>View career <span aria-hidden="true">›</span></button>
+    </footer>`;
 }
 
 async function hydrate(section) {
