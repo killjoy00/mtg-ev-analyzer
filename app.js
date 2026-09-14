@@ -1,6 +1,6 @@
 import { escapeHtml as esc } from './html.mjs';
 import { gradePick, gradeTopThree, rankCandidates, summarizeResults } from './scoring.mjs';
-import { challengeIndex, utcDateKey } from './engagement.mjs';
+import { challengeIndex, gameDateKey } from './engagement.mjs';
 import { isLeaderboardConfigured, loadLeaderboard, submitLeaderboardScore } from './leaderboard.mjs';
 import { loadReplayJson } from './replay-data.mjs';
 import { tcgplayerUrl } from './tcgplayer.mjs';
@@ -326,7 +326,7 @@ async function shareScore(button, text, url = SHARE_URL) {
 
 function challengeShareUrl(mode) {
   const url = new URL(SHARE_URL);
-  url.searchParams.set('daily', state.challengeDate || utcDateKey());
+  url.searchParams.set('daily', state.challengeDate || gameDateKey());
   url.searchParams.set('set', state.selectedSetId);
   url.searchParams.set('mode', mode);
   return url.toString();
@@ -397,7 +397,7 @@ async function startMode(mode, options = {}) {
   document.querySelectorAll('.mode-button, .daily-mode').forEach((button) => { button.disabled = true; });
   try {
     const daily = Boolean(options.daily);
-    const date = options.date || utcDateKey();
+    const date = options.date || gameDateKey();
     const [loaded, pathModel] = await Promise.all([
       daily ? loadChallengeReplay(entry, date, mode) : loadRandomReplay(entry),
       mode === 'full' ? loadPathModel(entry) : Promise.resolve(null),
@@ -418,7 +418,7 @@ async function startMode(mode, options = {}) {
     state.scoreMeta = null;
     state.isDailyChallenge = daily;
     state.challengeDate = daily ? date : null;
-    state.challengeRanked = daily && date === utcDateKey() && !challengeRecord(date, entry.id, mode);
+    state.challengeRanked = daily && date === gameDateKey() && !challengeRecord(date, entry.id, mode);
     state.challengeSubmitStatus = null;
     state.challengeRank = null;
     if (mode === 'top3') {
@@ -581,7 +581,7 @@ function dailySubmissionMarkup() {
   if (!state.isDailyChallenge) return '';
   const existing = challengeRecord(state.challengeDate, state.selectedSetId, state.mode);
   if (!state.challengeRanked && existing) return `<div class="challenge-status practice">Replay. Today's ranked score is already locked at <strong>${existing.score}/100</strong>.</div>`;
-  if (state.challengeDate !== utcDateKey()) return '<div class="challenge-status practice">Shared challenge replay. Only today’s challenge can enter the live board.</div>';
+  if (state.challengeDate !== gameDateKey()) return '<div class="challenge-status practice">Shared challenge replay. Only today’s challenge can enter the live board.</div>';
   if (state.challengeSubmitStatus === 'saved') return `<div class="challenge-status saved">On the board${state.challengeRank ? ` · <strong>#${state.challengeRank} today</strong>` : ''}.</div>`;
   if (state.challengeSubmitStatus === 'local') return '<div class="challenge-status practice">Ranked score saved on this device. Global sync is not configured yet.</div>';
   if (state.challengeSubmitStatus === 'error') return '<div class="challenge-status practice">Your ranked score is saved locally; global sync did not complete.</div>';
@@ -829,7 +829,7 @@ function renderSummary() {
 }
 
 async function syncDailyScore(mode, score, grade, details) {
-  if (!state.challengeRanked || state.challengeDate !== utcDateKey()) return;
+  if (!state.challengeRanked || state.challengeDate !== gameDateKey()) return;
   if (!isLeaderboardConfigured()) {
     state.challengeSubmitStatus = 'local';
     refreshChallengeStatus();

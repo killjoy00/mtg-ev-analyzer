@@ -1,6 +1,7 @@
+import {onAppRender} from './render-lifecycle.mjs';
 import { loadMyProfile } from './growth-api.mjs';
 
-let observer = null;
+let installed = false;
 let activePage = null;
 
 function ensureStyles() {
@@ -71,10 +72,6 @@ function scan() {
 }
 
 export function installProfilePolish() {
-  ensureStyles();
-  scan();
-  const root = document.querySelector('#app');
-  if (!root || observer) return;
-  observer = new MutationObserver(scan);
-  observer.observe(root, { childList: true, subtree: true });
+  if(installed)return;installed=true;
+  ensureStyles();onAppRender(scan);
 }

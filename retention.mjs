@@ -1,4 +1,4 @@
-import { computeStreak, utcDateKey } from './engagement.mjs';
+import { computeStreak, gameDateKey } from './engagement.mjs';
 import { ensurePackSession, loadAccountDailyDates, saveGameResult } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 
@@ -32,7 +32,7 @@ async function enhanceStats() {
   enhancing = true;
   try {
     const dates = await dailyDates();
-    const streak = computeStreak(dates, utcDateKey());
+    const streak = computeStreak(dates, gameDateKey());
     const item = document.createElement('div');
     item.dataset.dailyStreak = '1';
     item.innerHTML = `<span>Daily streak</span><strong>${streak}</strong>`;

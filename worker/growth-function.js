@@ -1,8 +1,10 @@
+import {consumePlayerLimit} from './request-limits.mjs';
+import {readJson} from './request-json.mjs';
+import {gameDateKey} from '../game-date.mjs';
 const ALLOWED_ORIGINS = new Set([
   'https://packone.pro',
   'https://killjoy00.github.io',
-  'http://127.0.0.1:4173',
-  'http://localhost:4173',
+  ...(process.env.PACK1_ALLOW_LOCALHOST==='1'?['http://127.0.0.1:4173','http://localhost:4173']:[]),
 ]);
 const TOKEN_PREFIX = 'p1_';
 const STATIC_ORIGIN = 'https://packone.pro';
@@ -13,7 +15,7 @@ let signingKeyCache = { at: 0, key: null };
 function json(value, status = 200) {
   return new Response(JSON.stringify(value), {
     status,
-    headers: { 'content-type': 'application/json; charset=utf-8' },
+    headers: { 'content-type': 'application/json; charset=utf-8', 'cache-control':'no-store' },
   });
 }
 
@@ -66,14 +68,6 @@ async function query(sql, params = []) {
   };
 }
 
-async function readJson(request) {
-  if (!(request.headers.get('content-type') || '').includes('application/json')) {
-    throw Object.assign(new Error('JSON body required.'), { status: 415 });
-  }
-  const text=await request.text();
-  if(text.length>131072) throw Object.assign(new Error('Request too large.'),{status:413});
-  try{return JSON.parse(text);}catch{throw Object.assign(new Error('Invalid JSON.'),{status:400});}
-}
 
 function normalizeName(value) {
   const cleaned = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 24);
@@ -184,16 +178,6 @@ function setId(value) {
   return cleaned;
 }
 
-function gameDateKey(date = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: 'America/New_York',
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(date);
-  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${byType.year}-${byType.month}-${byType.day}`;
-}
 
 function previousDateKey(dateKey, days = 1) {
   const date = new Date(`${dateKey}T12:00:00Z`);
@@ -551,24 +535,26 @@ async function historyPage(playerId, cursor, limit = 25) {
 }
 
 async function handleSession(request) {
+  const payload = await readJson(request);
   const id = crypto.randomUUID();
   const token = await tokenFor(id);
-  const payload = await readJson(request).catch(() => ({}));
   const displayName = await upsertPlayer(id, payload.displayName || 'Pack Player');
   const meta = await profileMetaByPlayer(id);
   return json({ token, playerId: id, displayName, profileKey: meta?.profile_key || null });
 }
 
+const SERVER_EVENTS=new Set(['account_claimed','public_profile_enabled','leaderboard_name_changed','achievement_unlocked','archive_milestone_reached','streak_milestone_reached','game_started','daily_started','game_completed']);
 async function handleEvents(request) {
-  const id = await player(request, false);
+  const id = await player(request);
   const payload = await readJson(request);
   const events = (Array.isArray(payload.events) ? payload.events : [payload]).slice(0, 20);
   const clean=[];
   for (const event of events) {
     const name = String(event?.name || '').trim().slice(0, 64);
-    if (!/^[a-z0-9_.-]{2,64}$/i.test(name)) continue;
+    if (!/^[a-z0-9_.-]{2,64}$/i.test(name) || SERVER_EVENTS.has(name.toLowerCase())) continue;
     clean.push({name,props:props(event.props)});
   }
+  if(clean.length)await consumePlayerLimit(query,id,'events',{limit:300,seconds:60,cost:clean.length});
   if(clean.length)await query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,e.name,e.props FROM jsonb_to_recordset($2::jsonb) e(name text,props jsonb)',[id,JSON.stringify(clean)]);
   return json({ ok: true, accepted:clean.length });
 }
@@ -583,6 +569,7 @@ async function handleResult(request) {
   if (!/^[a-zA-Z0-9:_-]{6,80}$/.test(resultId)) {
     throw Object.assign(new Error('Invalid result id.'), { status: 400 });
   }
+  await consumePlayerLimit(query,id,'results',{limit:60,seconds:600});
   const outcome = ['win', 'tie', 'loss'].includes(payload.outcome) ? payload.outcome : null;
   await query(
     `INSERT INTO game_results(player_id,set_id,mode,score,grade,seed,is_daily,challenge_id,opponent_name,opponent_score,outcome,client_result_id)
@@ -822,7 +809,9 @@ export default {
     } catch (error) {
       console.error(error);
       const status=Number(error?.status||500);
-      return withCors(json({ error: status===500?'Request failed. Please try again.':error.message },status), request);
+      const response=json({ error: status===500?'Request failed. Please try again.':error.message },status);
+      if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));
+      return withCors(response, request);
     }
   },
 };

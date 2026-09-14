@@ -1,20 +1,9 @@
+import {gameDateKey} from '../game-date.mjs';
 import { conditionCandidatesForPath, poolsEqual } from './path-model.mjs';
 
 const EPSILON = 1e-9;
 const SUPPORT_EXPONENT = 0.75;
-export const GAME_TIME_ZONE = 'America/New_York';
-
-export function gameDateKey(date = new Date()) {
-  const value = date instanceof Date ? date : new Date(date);
-  const parts = new Intl.DateTimeFormat('en-US', {
-    timeZone: GAME_TIME_ZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(value);
-  const byType = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  return `${byType.year}-${byType.month}-${byType.day}`;
-}
+export {gameDateKey,GAME_TIME_ZONE} from '../game-date.mjs';
 
 export function hashText(value) {
   let hash = 2166136261;

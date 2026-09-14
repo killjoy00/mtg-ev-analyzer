@@ -1,7 +1,9 @@
 import { loadMyProfile } from './growth-api.mjs';
-import { todayStatus } from './today-status.mjs';
+import { todayStatus, easternDateKey } from './today-status.mjs';
+import { onAppRender } from './render-lifecycle.mjs';
 
-let observer = null;
+let installed = false;
+let generation = 0;
 let profilePromise = null;
 
 function ensureStyles() {
@@ -64,12 +66,14 @@ function markup(status) {
 }
 
 async function hydrate(section) {
-  if (section.dataset.todayHydrated === 'loading' || section.dataset.todayHydrated === '1') return;
+  const day=easternDateKey(),version=generation;
+  if (section.dataset.todayDate===day && (section.dataset.todayHydrated==='loading'||section.dataset.todayHydrated==='1')) return;
+  section.dataset.todayDate=day;
   section.dataset.todayHydrated = 'loading';
   if (!profilePromise) profilePromise = loadMyProfile().catch(() => null);
   const profile = await profilePromise;
-  if (!section.isConnected) return;
-  section.innerHTML = markup(todayStatus(profile));
+  if (!section.isConnected || version!==generation || day!==easternDateKey()) return;
+  section.innerHTML = markup(todayStatus(profile,day))+(profile?'':'<p role="status">Daily progress is unavailable. Play / continue still resumes your saved attempt.</p>');
   section.dataset.todayHydrated = '1';
   section.querySelector('[data-today-career]')?.addEventListener('click', () => document.querySelector('#account-nav')?.click());
 }
@@ -90,11 +94,17 @@ function scan() {
   if (!moreModes) void hydrate(section);
 }
 
-export function installHomeToday() {
-  ensureStyles();
+function refresh() {
+  profilePromise=null;generation++;
+  const section=document.querySelector('[data-today-status="1"]');
+  if(section)section.dataset.todayHydrated='';
   scan();
-  const root = document.querySelector('#app');
-  if (!root || observer) return;
-  observer = new MutationObserver(scan);
-  observer.observe(root, { childList: true, subtree: true });
+}
+export function installHomeToday() {
+  if(installed)return;installed=true;
+  ensureStyles();onAppRender(scan);
+  document.addEventListener('pack1:result-completed',refresh);
+  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
+  window.addEventListener('focus',refresh);
+  setInterval(()=>{const section=document.querySelector('[data-today-status="1"]');if(section&&section.dataset.todayDate!==easternDateKey())refresh();},60000);
 }

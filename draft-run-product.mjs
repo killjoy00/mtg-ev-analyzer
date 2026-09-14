@@ -26,7 +26,7 @@ let catalogNames = new Map();
 const setName=id=>catalogNames.get(id) || (id==='powered-cube'?'Powered Cube':id.toUpperCase());
 async function loadSetNames() {
   try {
-    const response=await fetch('./data/set-display-names.json');
+    const response=await fetch('./data/set-display-names.json',{signal:AbortSignal.timeout(3000)});
     if(response.ok) catalogNames=new Map(Object.entries((await response.json()).names));
   } catch {} // Set codes remain a usable fallback when the catalog is unavailable.
 }
@@ -220,7 +220,7 @@ export async function installDraftRunPage() {
 }
 export function installDraftRunHome() {
   styles();
-  // Start the read-only corpus warmup while the player reads the landing page.
+  // Retain the deployed backend's warmup until SQL serving is released to Neon.
   if(base())void api('/health',undefined,false).catch(()=>{});
   for(const [id,url] of [['daily-nav','?game=draft-run&daily=1'],['leaderboard-nav','?game=draft-run&board=daily']])
     document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();location.href=url;},true);

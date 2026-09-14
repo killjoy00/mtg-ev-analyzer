@@ -9,6 +9,7 @@ on:
       - 'draft-run-policy.mjs'
       - 'draft-run-difficulty.mjs'
       - 'data/selection-policy.json'
+      - 'game-date.mjs'
       - 'tests/*backend-smoke.mjs'
       - '.github/workflows/backend-gate.yml'
 
@@ -115,6 +116,7 @@ jobs:
           node tests/draft-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/cube-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/decision-measurements-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/request-integrity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
 
       - name: Delete isolated Neon branch
         if: always() && steps.neon.outputs.branch_id != ''
