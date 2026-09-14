@@ -27,7 +27,7 @@ installReplayDataWarmup();
 
 const practice = await import('./practice-product.mjs');
 const product = await import('./product.mjs');
-const poweredCube = await import('./cube-product.mjs');
+const cubeHome = await import('./cube-home.mjs');
 const legacyCohort = await import('./legacy-product.mjs');
 const leaderboardProduct = await import('./leaderboard-product.mjs');
 const flow = await import('./flow-fixes.mjs');
@@ -50,7 +50,6 @@ if (params.get('game') === 'draft-run') {
   await import('./social.mjs');
   practice.installPracticeProductLayer();
   product.installProductLayer();
-  poweredCube.installPoweredCubeLayer();
   legacyCohort.installLegacyCohortLayer();
   leaderboardProduct.installLeaderboardProductLayer();
   flow.installFlowFixes();
@@ -66,7 +65,7 @@ if (params.get('game') === 'draft-run') {
   await import('./social.mjs');
   practice.installPracticeProductLayer();
   product.installProductLayer();
-  poweredCube.installPoweredCubeLayer();
+  cubeHome.installCubeHome();
   legacyCohort.installLegacyCohortLayer();
   leaderboardProduct.installLeaderboardProductLayer();
   flow.installFlowFixes();
