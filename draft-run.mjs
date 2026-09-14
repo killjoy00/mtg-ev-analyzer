@@ -4,7 +4,6 @@ import { sortPackByRarity } from './replay-data.mjs';
 import {rateDraftRunPuzzle,DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from './draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,eligibleRunPuzzle,regularRunSet,chooseRunSet,runDifficultyBands} from './draft-run-policy.mjs';
 
-const SUPPORT_EXPONENT = 1;
 const EPSILON = 1e-9;
 export const DRAFT_RUN_SCORING_VERSION = 'trophy-consensus-v2';
 export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-verified-v6';
@@ -65,12 +64,12 @@ export function gradeDraftRunPick(puzzle, selectedId) {
   const rank = ranked.findIndex((card) => card.id === selected.id) + 1;
   const selectedSupport = Math.max(0, Number(selected.model_probability || 0));
   const leaderSupport = Math.max(0, Number(leader.model_probability || 0));
-  const supportRatio = leaderSupport <= EPSILON ? 1 : Math.max(0, Math.min(1, selectedSupport / leaderSupport));
+  const supportRatio = Math.max(0, Math.min(1, selectedSupport / leaderSupport));
   const consensusCap = draftRunConsensusCap(puzzle.pick_number || puzzle.pickNumber);
   const historicalMatch = Boolean(historicalId && selected.id === historicalId);
   const score = historicalMatch
     ? 100
-    : Math.max(0, Math.min(99, Math.round(consensusCap * (supportRatio ** SUPPORT_EXPONENT))));
+    : Math.round(consensusCap * supportRatio);
 
   return {
     score,

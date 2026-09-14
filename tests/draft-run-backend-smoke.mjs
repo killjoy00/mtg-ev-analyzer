@@ -39,6 +39,14 @@ for(let round=0;round<10;round++) {
   console.log('Locked decision and retries verified',round+1);
 }
 assert.equal(s.complete,true);
+const completedBefore=(await query('SELECT result_persisted_at FROM draft_run_sessions WHERE id=$1::uuid',[s.id])).rows[0].result_persisted_at;
+assert.ok(completedBefore);
+await call(runApi,`/v1/runs/${s.id}`,undefined,guest.token);
+assert.equal((await query('SELECT result_persisted_at FROM draft_run_sessions WHERE id=$1::uuid',[s.id])).rows[0].result_persisted_at,completedBefore,'Completed GET must not repeat persistence');
+await query('UPDATE draft_run_sessions SET result_persisted_at=NULL WHERE id=$1::uuid',[s.id]);
+await call(runApi,`/v1/runs/${s.id}`,undefined,guest.token);
+assert.ok((await query('SELECT result_persisted_at FROM draft_run_sessions WHERE id=$1::uuid',[s.id])).rows[0].result_persisted_at,'Unacknowledged completion is recoverable');
+assert.equal((await query('SELECT count(*) n FROM game_results WHERE player_id=$1::uuid AND client_result_id=$2',[guest.playerId,`draft-run:${s.id}`])).rows[0].n,'1');
 await call(growth,'/v1/results',{mode:'draft_run',score:100,clientResultId:'forged-'+tag},guest.token,403);
 const privateProfile=await call(growth,'/v1/profile/me',undefined,guest.token);
 assert.equal(privateProfile.player.profile_public,false);
@@ -96,4 +104,5 @@ const analytics=(await query("SELECT event_name,count(*) n FROM analytics_events
 assert.ok(analytics.every(r=>Number(r.n)===1));assert.equal(analytics.length,3);
 await query('SELECT * FROM analytics_retention_cohorts LIMIT 1');await query('SELECT * FROM analytics_daily_next_day_retention LIMIT 1');
 fs.mkdirSync('generated/review',{recursive:true});fs.writeFileSync('generated/review/backend-timings.json',JSON.stringify(timings,null,2));
+console.log('Run request timings (isolated database, ms):',JSON.stringify(timings.filter(t=>t.path==='/v1/runs')));
 console.log('Passed real database: concurrent writes, ten locked picks, retries, forged score rejection, guest privacy, account claim, merge, Daily conflicts, environment transfer, public opt-in, percentile ties, old milestones, event idempotency and funnel queries.');
