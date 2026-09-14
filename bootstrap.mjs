@@ -38,6 +38,7 @@ const profilePolish = await import('./profile-polish.mjs');
 const draftRun = await import('./draft-run-product.mjs');
 const progression = await import('./progression.mjs');
 const homeProduct = await import('./home-product.mjs');
+const homeToday = await import('./home-today.mjs');
 
 if (params.get('game') === 'draft-run') {
   await growth.installGrowthLayer();
@@ -76,4 +77,5 @@ if (params.get('game') === 'draft-run') {
   draftRun.installDraftRunHome();
   progression.installProgression();
   homeProduct.installHomeProductLayer();
+  homeToday.installHomeToday();
 }
