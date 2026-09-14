@@ -34,7 +34,7 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
   }else if(path.endsWith('/pick')){
     const req=route.request().postDataJSON(),p=puzzles[answers.length];assert.equal(req.revision,revision);assert.equal(req.puzzleId,p.puzzle_id);
     assert.equal(req.viewId,views.at(-1).viewId);assert.ok(Number.isInteger(req.activeMs)&&req.activeMs>=0);
-    answers.push({...gradeDraftRunPick(p,req.cardId),puzzle:publicDraftRunPuzzle(p),ranking:p.candidates.map(c=>({id:c.id,name:c.name,score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
+    answers.push({...gradeDraftRunPick(p,req.cardId),puzzle:publicDraftRunPuzzle(p),ranking:p.candidates.map(c=>({id:c.id,name:c.name,support:c.model_probability,score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
   }else if(path==='/v1/leaderboard')body={rows:[],period:'daily'};
   else body=snapshot();
   await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
@@ -67,24 +67,31 @@ try{
   await page.locator('.run-zoom').first().click();await page.locator('.run-card-dialog').waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();
   // Offscreen images can finish loading before asynchronous decoding paints them.
   await page.evaluate(()=>Promise.all([...document.querySelectorAll('.run-cards img')].map(img=>img.decode())));
+  assert.equal(await page.locator('.run-cards').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),3);
   await page.locator('.run-card').last().scrollIntoViewIfNeeded();
+  const dock=await page.locator('.run-lock').boundingBox();assert.ok(dock.y+dock.height<=845,'Rerolls and lock remain within the viewport');
   await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-mobile-last-row.png`});
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-mobile.png`,fullPage:true});
   await page.setViewportSize({width:1440,height:1000});await noOverflow();await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-desktop.png`,fullPage:true});await page.setViewportSize({width:390,height:844});
   for(let round=0;round<10;round++){
     const p=puzzles[round];if(cube)assert.equal(p.set_id,'powered-cube');assert.equal(await page.locator('.run-pool-cards>button').count(),p.pick_number-1);
-    await page.locator(`[data-pick="${p.historical_pick_id}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
+    const selected=round===0?p.candidates.filter(c=>c.id!==p.historical_pick_id).sort((a,b)=>a.model_probability-b.model_probability)[0].id:p.historical_pick_id;
+    await page.locator(`[data-pick="${selected}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
     assert.equal(views.at(-1).puzzleId,p.puzzle_id,'Feedback must not record the next decision as viewed');
-    assert.match(await page.locator('.run-feedback').innerText(),/100/);assert.equal(answers.length,round+1);
+    assert.match(await page.locator('.run-feedback').innerText(),/100/);
+    await page.getByRole('heading',{name:'Elite consensus: '+gradeDraftRunPick(p,p.historical_pick_id).consensusName,exact:true}).waitFor();
+    assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
+    assert.equal(await page.locator('.run-pack-review').getAttribute('open'),null);assert.equal(answers.length,round+1);
     assert.equal(await page.locator('.run-card-score').count(),0);
+    if(round===0){await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-consensus-mobile.png`,fullPage:true});}
     await page.locator('#run-next').click();
-    if(round===0){assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
+    if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox();assert.ok(thumb.height<=73,'Prior picks stay compact');assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
-  await page.locator('.run-result-page').waitFor();assert.match(await page.locator('.run-final-score').innerText(),/100/);assert.equal(await page.locator('.run-result-actions .button').count(),5);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());await noOverflow();
+  await page.locator('.run-result-page').waitFor();assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),5);assert.equal(await page.locator('#home-editorial').isVisible(),false);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());await noOverflow();
   await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
   await page.locator('#run-challenge').click();await page.waitForFunction(()=>Boolean(window.__runShare));
-  const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.url,new RegExp('challenge='+shareId));assert.doesNotMatch(shared.url,/profile|token/);
+  const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.text,/🟩{9}/);assert.equal(shared.files,undefined);assert.match(shared.url,new RegExp('challenge='+shareId));assert.doesNotMatch(shared.url,/profile|token/);
   await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Can you beat 88/);await noOverflow();
   await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
   await page.goto(base+'/?game=draft-run&board=daily'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();

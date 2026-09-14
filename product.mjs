@@ -1,3 +1,4 @@
+import { escapeHtml as esc } from './html.mjs';
 import { gameShareUrl, makeGameSeed, seededRandom, cleanSeed } from './gameplay.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { preloadSeededReplay } from './replay-data.mjs';
@@ -9,14 +10,6 @@ let autoStarting = false;
 let autoStarted = false;
 let preparedNextGame = null;
 
-function esc(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
 
 function params() { return new URLSearchParams(window.location.search); }
 function currentSeed() { return cleanSeed(params().get('seed')); }

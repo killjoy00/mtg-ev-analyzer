@@ -1,3 +1,4 @@
+import { escapeHtml as esc } from './html.mjs';
 import { gradePick, gradeTopThree, rankCandidates, summarizeResults } from './scoring.mjs';
 import { challengeIndex, utcDateKey } from './engagement.mjs';
 import { isLeaderboardConfigured, loadLeaderboard, submitLeaderboardScore } from './leaderboard.mjs';
@@ -44,14 +45,6 @@ leaderboardNav?.addEventListener('click', () => {
   window.location.href = '?game=draft-run&board=daily';
 });
 
-function esc(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
 
 function pct(value, digits = 0) {
   return `${(Number(value || 0) * 100).toFixed(digits)}%`;

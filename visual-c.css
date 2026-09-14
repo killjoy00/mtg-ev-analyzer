@@ -7,7 +7,7 @@
   --surface-soft: #e9e9e5;
   --ink: #101820;
   --muted: #5f6770;
-  --faint: #959ba1;
+  --faint: #626b74;
   --line: #cfd3d4;
   --line-strong: #9ca5ac;
   --green: #1e4d7a;
@@ -658,4 +658,8 @@ body .run-review-list li {
     padding-left: 10px;
     padding-right: 10px;
   }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
