@@ -8,7 +8,7 @@ export async function observeDecision(query,s,body) {
   if(!viewId)throw Object.assign(Error('Valid view ID required.'),{status:400});
   const result=await query(`INSERT INTO draft_run_decision_observations(session_id,revision,round,puzzle_id,observed,view_id)
     SELECT id,revision,jsonb_array_length(answers)+1,puzzle_ids->>jsonb_array_length(answers),true,$4::uuid
-    FROM draft_run_sessions WHERE id=$1::uuid AND player_id=$2::uuid AND revision=$3::int AND jsonb_array_length(answers)<10
+    FROM draft_run_sessions WHERE id=$1::uuid AND player_id=$2::uuid AND revision=$3::int AND jsonb_array_length(answers)<jsonb_array_length(puzzle_ids)
     ON CONFLICT(session_id,revision) DO UPDATE SET last_seen_at=now(),
       timing_reliable=draft_run_decision_observations.timing_reliable AND draft_run_decision_observations.view_id=EXCLUDED.view_id
     WHERE draft_run_decision_observations.outcome IS NULL RETURNING session_id`,[s.id,s.player_id,s.revision,viewId]);

@@ -1,5 +1,6 @@
 # Draft Run launch review
 
+Historical report. For the current eight-pick contract and deployment status, see [CURRENT-STATE.md](CURRENT-STATE.md) and the [follow-up review](EIGHT-PICK-REVIEW-2026-09-14.md).
 ## Decisions and limits
 
 Draft Run is the main game. Ten independent puzzles use actual successful draft paths, starting at P1P1 and P1P2 and moving through contextual buckets. Choices in one puzzle do not affect the next. Each run gets one different-set reroll and one same-set pack reroll; both require a different source draft and similar model difficulty.

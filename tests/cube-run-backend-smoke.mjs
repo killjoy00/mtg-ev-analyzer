@@ -32,19 +32,19 @@ for(let i=0;i<2;i++){
   assert.equal(run.rerolls.pack,1-i);assert.equal(run.current.set_id,'powered-cube');assert.notEqual(run.current.puzzle_id,old);
 }
 await call(runApi,`/v1/runs/${run.id}/reroll`,action('pack'),guest.token,409);
-for(let round=0;round<10;round++){
+for(let round=0;round<run.run_length;round++){
   const p=run.current;assert.equal(p.set_id,'powered-cube');assert.equal(p.prior_picks.length,p.pick_number-1);
   assert.doesNotMatch(JSON.stringify(p),/historical_pick|model_probability|source_draft/);
   const historical=(await query("SELECT payload->>'historical_pick_id' id FROM draft_run_verified_puzzles WHERE puzzle_id=$1",[p.puzzle_id])).rows[0].id;
   const body={revision:run.revision,round,puzzleId:p.puzzle_id,cardId:historical};
   run=await call(runApi,`/v1/runs/${run.id}/pick`,body,guest.token);
   assert.equal(run.answers.at(-1).score,100);
-  if(round===9)assert.equal((await call(runApi,`/v1/runs/${run.id}/pick`,body,guest.token)).score,100);
+  if(round===run.run_length-1)assert.equal((await call(runApi,`/v1/runs/${run.id}/pick`,body,guest.token)).score,100);
 }
 assert.equal(run.complete,true);assert.equal(run.score,100);
 const stored=(await query('SELECT puzzle_ids,seen_sources FROM draft_run_sessions WHERE id=$1::uuid',[run.id])).rows[0];
 const unpack=v=>typeof v==='string'?JSON.parse(v):v;
-assert.equal(unpack(stored.puzzle_ids).length,10);assert.equal(new Set(unpack(stored.seen_sources)).size,12);
+assert.equal(unpack(stored.puzzle_ids).length,8);assert.equal(new Set(unpack(stored.seen_sources)).size,10);
 const share=await call(runApi,`/v1/runs/${run.id}/share`,{},guest.token);
 const invitation=await call(runApi,`/v1/challenges/${share.id}`);
 assert.equal(invitation.environment,'powered-cube');
@@ -73,4 +73,4 @@ assert.equal((await query("SELECT count(*) n FROM analytics_events WHERE player_
 const board=await call(runApi,'/v1/leaderboard?period=all&environment=powered-cube');
 assert.equal(board.environment,'powered-cube');
 await call(runApi,'/v1/runs',{environment:'neo'},owner.token,400);
-console.log('Cube HTTP/database regression passed: 10 trophy picks, both pack rerolls, environment isolation, Daily separation, same-pack sharing, retries, career attribution and account-merge priority.');
+console.log('Cube HTTP/database regression passed: 8 trophy picks, both pack rerolls, environment isolation, Daily separation, same-pack sharing, retries, career attribution and account-merge priority.');

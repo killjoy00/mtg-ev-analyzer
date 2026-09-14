@@ -1,5 +1,6 @@
 # Pack One independent product review and implementation report
 
+Historical report. For the current eight-pick contract and deployment status, see [CURRENT-STATE.md](CURRENT-STATE.md) and the [follow-up review](EIGHT-PICK-REVIEW-2026-09-14.md).
 Review date: 2026-09-14. Repository: `killjoy00/mtg-ev-analyzer`.
 
 ## Decision

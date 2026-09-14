@@ -1,3 +1,4 @@
+import {draftRunLength} from './draft-run-format.mjs';
 import { ensurePackSession } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { shareDraftRunCard } from './share-cards.mjs';
@@ -18,6 +19,7 @@ function recordView(touch=false) {
   if(viewKey!==key||touch){viewKey=key;viewPromise=api(`/v1/runs/${run.id}/view`,{revision:run.revision,puzzleId:run.current.puzzle_id,viewId}).catch(()=>null);}
 }
 let environment=new URLSearchParams(location.search).get('set')==='powered-cube'?'powered-cube':'mixed';
+const runLength=()=>draftRunLength(run);
 const cube=()=> (run?.environment||environment)==='powered-cube';
 const title=()=>cube()?'Powered Cube Run':'Draft Run';
 const gameUrl=(params='')=>`?game=draft-run${cube()?'&set=powered-cube':''}${params?'&'+params:''}`;
@@ -46,7 +48,7 @@ function image(card,extra='') {
   return url?`<img src="${esc(url)}" alt="${esc(card.name)}" decoding="async" ${extra}>`:`<span class="run-card-fallback">${esc(card.name)}</span>`;
 }
 function steps() {
-  return `<ol class="run-steps" aria-label="Run progress">${Array.from({length:10},(_,i)=>`<li class="${run.answers[i]?'done':i===run.answers.length?'current':''}" aria-label="Round ${i+1}${run.answers[i]?`, ${run.answers[i].score} points`:''}" ${i===run.answers.length?'aria-current="step"':''}><span>${i+1}</span>${run.answers[i]?`<small>${run.answers[i].score} pts</small>`:''}</li>`).join('')}</ol>`;
+  return `<ol class="run-steps" aria-label="Run progress">${Array.from({length:runLength()},(_,i)=>`<li class="${run.answers[i]?'done':i===run.answers.length?'current':''}" aria-label="Round ${i+1}${run.answers[i]?`, ${run.answers[i].score} points`:''}" ${i===run.answers.length?'aria-current="step"':''}><span>${i+1}</span>${run.answers[i]?`<small>${run.answers[i].score} pts</small>`:''}</li>`).join('')}</ol>`;
 }
 function pool(p) {
   if(!p.prior_picks.length) return '';
@@ -75,13 +77,13 @@ function render() {
   if(run.complete&&!answer) {renderResult();return;}
   const p=answer?.puzzle||run.current;
   document.body.classList.add('is-game');
-  app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/10 · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
-    ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?'You’re playing the same ten packs.':'Packs changed — this result counts as practice.'}</aside>`:''}
+  app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
+    ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed — this result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
     ${answer?`<section class="run-feedback" aria-live="polite"><strong>${answer.score}<small>/100</small></strong><div><h2>${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2><p>${answer.historicalMatch?'Full points.':`You chose ${esc(answer.selectedName)}. ${answer.score>=85?'A strongly supported alternative.':answer.score>=60?'A plausible alternative.':'The model found less support for this choice.'}`}</p>${answer.modelTargetDisagreement?'<p>The trophy drafter made an unusual choice relative to the model. Strong alternatives still receive their normal credit.</p>':''}</div>${revealComparison(p,answer)}${consensusFeedback(answer)}<button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></section>`:
     ''}
     ${answer?`<details class="run-pack-review"><summary>Review the pack and earlier picks</summary>${pool(p)}${cardGrid(p,answer)}</details>`:cardGrid(p)}
-    ${answer?'<p class="run-note">Trophy pick: 100. Other choices earn up to 95 from contextual strong-player support. Matching the trophy drafter is the goal of this game.</p>':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div><div class="run-tools"><div>${cube()?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div>${run.comparison?.exact?'<small>Rerolling makes this practice; your friend played different packs.</small>':''}</div></div>`}
+    ${answer?'<p class="run-note">Trophy pick: 100. Other choices earn up to 95 from contextual strong-player support. Matching the trophy drafter is the goal of this game.</p>':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div><div class="run-tools"><div>${cube()?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div>${run.set_reroll_allowed===false?'<small>This featured set stays in today’s Daily. You can still reroll its pack.</small>':''}${run.comparison?.exact?'<small>Rerolling makes this practice; your friend played different packs.</small>':''}</div></div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
   if(!answer) recordView();
@@ -145,8 +147,8 @@ function renderResult() {
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Eastern.'}</p>`:''}
     ${run.comparison?`<p class="run-friend">${run.comparison.exact?`${run.score>run.comparison.score?'You win':run.score===run.comparison.score?'A tie':'Your friend wins'} · ${run.score}–${run.comparison.score} against ${esc(run.comparison.name)}`:'Different packs played; no challenge win or loss recorded.'}</p>`:''}
     <div class="run-result-actions"><a class="button primary" href="${gameUrl()}">Play another run</a><button class="button secondary" id="run-challenge">Challenge a friend</button><button class="button secondary" id="run-share">Share result</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">View your career</button></div>
-    <details class="run-image-share"><summary>More sharing options</summary><button class="button secondary" id="run-share-image">Share result image</button></details><h2>Your ten picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
-    <p class="run-note">Your final score is the average of ten decisions. Trophy picks earn 100; alternatives earn up to 95 from held-out strong-player support.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
+    <details class="run-image-share"><summary>More sharing options</summary><button class="button secondary" id="run-share-image">Share result image</button></details><h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
+    <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; alternatives earn up to 95 from held-out strong-player support.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult(false);
   document.querySelector('#run-share-image').onclick=()=>shareResult(false,true);
@@ -172,11 +174,11 @@ async function showBoard(period='daily') {
   const data=await api(`/v1/leaderboard?period=${encodeURIComponent(period)}&environment=${environment}`,undefined,false);
   document.body.classList.remove('is-game');
   const environmentActions=cube()?'':`<a class="button secondary" href="?modes=1#more-pack-one">Top 3 practice</a>`;
-  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${cube()?'':'active'}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s ten decisions.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a ${title()}</a>${environmentActions}</div></section>`;
+  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${cube()?'':'active'}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s shared starting packs.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a ${title()}</a>${environmentActions}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period});
 }
 async function launch(options={}) {
-  app().innerHTML='<section class="message-card"><h1>Finding ten good decisions…</h1></section>';
+  app().innerHTML='<section class="message-card"><h1>Finding your packs…</h1></section>';
   run=options.id?await api(`/v1/runs/${options.id}`):await api('/v1/runs',{daily:options.daily===true,challenge:options.challenge,environment});
   environment=run.environment||environment;
   const url=new URL(location.href);if(cube())url.searchParams.set('set','powered-cube');else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.set('run',run.id);history.replaceState({},'',url);
@@ -212,7 +214,7 @@ export async function installDraftRunPage() {
     if(params.has('challenge')&&!params.has('run')) {
       const info=await api('/v1/challenges/'+encodeURIComponent(params.get('challenge')),undefined,false);
       environment=info.environment||'mixed';
-      app().innerHTML=`<section class="run-invite"><p class="eyebrow">A friend’s ${title()}</p><h1>Can you beat ${info.score}?</h1><p>${esc(info.name)} sent you ten real decisions from trophy drafts. You’ll see the same packs and the same earlier picks.</p><button class="button primary" id="accept-run-challenge">Play this challenge</button><p>No account needed. About five minutes.</p><p id="run-error" role="alert"></p></section>`;
+      app().innerHTML=`<section class="run-invite"><p class="eyebrow">A friend’s ${title()}</p><h1>Can you beat ${info.score}?</h1><p>${esc(info.name)} sent you ${draftRunLength(info)} real decisions from trophy drafts. You’ll see the same packs and the same earlier picks.</p><button class="button primary" id="accept-run-challenge">Play this challenge</button><p>No account needed. Play at your own pace.</p><p id="run-error" role="alert"></p></section>`;
       trackEvent('challenge_open',{mode:'draft_run',kind:'stored'});
       document.querySelector('#accept-run-challenge').onclick=async()=>{try{trackEvent('challenge_start',{mode:'draft_run'});await launch({challenge:info.id});}catch(e){console.warn('Draft Run challenge failed to start',e?.message);app().innerHTML=`<section class="message-card"><h1>Couldn’t start that challenge.</h1><p>${esc(failureMessage(e))}</p><a class="button primary" href="${esc(location.href)}">Try again</a></section>`;}};
     } else await launch({id:params.get('run'),daily:params.has('daily')});
@@ -220,13 +222,12 @@ export async function installDraftRunPage() {
 }
 export function installDraftRunHome() {
   styles();
-  // Retain the deployed backend's warmup until SQL serving is released to Neon.
-  if(base())void api('/health',undefined,false).catch(()=>{});
+  // Health performs a corpus audit; it is not a cheap homepage warmup.
   for(const [id,url] of [['daily-nav','?game=draft-run&daily=1'],['leaderboard-nav','?game=draft-run&board=daily']])
     document.getElementById(id)?.addEventListener('click',e=>{e.stopImmediatePropagation();location.href=url;},true);
   onAppRender(()=>{
     const intro=document.querySelector('.home-intro');if(!intro||document.querySelector('[data-draft-run-home="1"]'))return;
-    const copy=intro.querySelector('p:last-child');if(copy)copy.textContent='Ten tough choices from trophy drafts. Read the drafter’s pool, make your pick, and see how you did.';
-    intro.insertAdjacentHTML('afterend',`<section class="draft-run-feature" data-draft-run-home="1"><div><p class="eyebrow">The Daily Draft Run</p><h2>Ten picks.<br> Your call.</h2><p>Different sets. Real trophy drafts.<span class="feature-new-line">One set reroll and one pack reroll when you need them.</span></p></div><div class="draft-run-feature-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a Draft Run</a><a class="text-button" href="${gameUrl('board=daily')}">See the Draft Run board</a><small>Free to play · No account needed</small></div></section>`);
+    const copy=intro.querySelector('p:last-child');if(copy)copy.textContent='Eight choices from trophy drafts. Read the drafter’s pool, make your pick, and see how you did.';
+    intro.insertAdjacentHTML('afterend',`<section class="draft-run-feature" data-draft-run-home="1"><div><p class="eyebrow">The Daily Draft Run</p><h2>Eight picks.<br> Your call.</h2><p>The latest three released sets, guaranteed. Five more picks favor recent sets.<span class="feature-new-line">One set reroll and one pack reroll when you need them.</span></p></div><div class="draft-run-feature-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a Draft Run</a><a class="text-button" href="${gameUrl('board=daily')}">See the Draft Run board</a><small>Free to play · No account needed</small></div></section>`);
   });
 }

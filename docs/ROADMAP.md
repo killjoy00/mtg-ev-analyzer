@@ -12,7 +12,7 @@ The [independent review and completion report](PRODUCT-REVIEW-2026-09-14.md) rec
 
 ## Consider next
 
-- **Choose-your-sets Draft Run.** Let a player choose the environments for a ten-pick practice run, including HBG, SIR and PIO. Validate that the chosen pool can meet pick windows, difficulty mix and reroll requirements; persist the chosen-set list in friend links. Keep a separate custom/practice identity from the shared Daily leaderboard. Do not build this mode until separately prioritized.
+- **Choose-your-sets Draft Run.** Let a player choose the environments for a eight-pick practice run, including HBG, SIR and PIO. Validate that the chosen pool can meet pick windows, difficulty mix and reroll requirements; persist the chosen-set list in friend links. Keep a separate custom/practice identity from the shared Daily leaderboard. Do not build this mode until separately prioritized.
 - **Recover excluded image cases.** Recheck exact card identities and source images for remaining qualified trophies without weakening image or trajectory standards.
 - **Player-calibrated difficulty.** Once there is sufficient first-attempt data, compare the current ambiguity proxy with measured results; introduce new versions rather than silently changing historical ratings.
 - **Retention and distribution.** Measure the new text-share and return-to-Daily flows, then test targeted community promotion with explicit publication direction. Existing stored friend links already preserve exact packs and a display name. Keep any simulated benchmark separate from real leaderboard entries and compute it for the relevant packs. Put monetization behind demonstrated repeat play rather than unsupported DAU/revenue thresholds.

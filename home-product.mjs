@@ -63,7 +63,7 @@ function enhanceHome() {
     home.querySelector('.lede'),
     moreModes
       ? 'Play Top 3 or draft the full first pack across every supported set.'
-      : 'Practice ten real first-pack decisions from trophy drafts. Compare your picks with the drafter and elite consensus.',
+      : 'Practice eight real first-pack decisions from trophy drafts. Compare your picks with the drafter and elite consensus.',
   );
 }
 

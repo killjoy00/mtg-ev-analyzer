@@ -1,6 +1,6 @@
 # Corpus audit and selection policy
 
-Audit date: 2026-09-12. Selection version: `first-pack-v2`.
+Corpus audit date: 2026-09-12. Selection policy updated 2026-09-14: `eight-pick-v3`.
 
 ## Coverage and provenance
 
@@ -23,36 +23,42 @@ Current eligible totals:
 | HBG, SIR and PIO retained for selectable modes | 31,775 |
 | Total eligible across retained environments | 920,629 |
 
-HBG, SIR and PIO remain in the replay catalog for existing set practice. They are excluded from random mixed runs and new Daily schedules, including set rerolls. A user-selected collection of sets for a ten-pick run is roadmap work, not implemented by this release.
+HBG, SIR and PIO remain in the replay catalog for existing set practice. They are excluded from random mixed runs and new Daily schedules, including set rerolls. A user-selected collection of sets for an eight-pick run is roadmap work, not implemented by this release.
 
 The two permanently retired environments are removed from active local/source data, discovery, queues, and future imports. Fingerprints in the policy prevent accidental reintroduction without surfacing their names. Database constraints block their set identities. The cleanup workflow removes any matching R2 objects and clears pre-policy trophy caches; source data must never be downloaded again. Historical git revisions and previously published GitHub logs are not rewritten.
 
 ## Run construction
 
-Every run still contains one easy, six medium and three hard decisions (a missing easy slot becomes medium). The first six positions shuffle one easy, four medium and one hard. The final four shuffle two medium and two hard; an easy decision can never enter those positions through a reroll.
+New runs contain eight decisions: one easy, five medium and two hard (a missing easy slot becomes medium). The first five positions shuffle one easy, three medium and one hard. The final three shuffle two medium and one hard; an easy decision cannot enter those positions through a reroll.
 
-Regular pick windows by round are `1`, `2`, `3`, `4–5`, `5–6`, `6–7`, `7–8`, `8–9`, `8–10`, `8–10`. Cube uses the same windows shifted one pick later. The last two regular decisions therefore come only from picks 8, 9 or 10; Cube uses 9, 10 or 11.
+Regular pick windows by round are `1`, `2`, `3`, `4–5`, `5–6`, `6–8`, `7–9`, `8–10`. Cube uses the same windows shifted one pick later. The last regular decision therefore comes only from picks 8, 9 or 10; Cube uses 9, 10 or 11.
 
 Rerolls retain the difficulty band, stay within ten rating points of both the original and current decision, and obey source uniqueness, pick windows, and existing card/context distance limits. An unavailable replacement never consumes a token.
 
 ## Daily weighting
 
-The existing newest-first import queue supplies the explicit recency order in `data/selection-policy.json`; source archive modification times are not treated as release dates. For a new Daily, weight the newest six regular sets at 1.25, the next six at 1.10 and the remaining sets at 1.00. Current tiers:
+`data/selection-policy.json` records verified [Scryfall release dates](https://api.scryfall.com/sets), checked September 14, 2026. Sets must be released by the Eastern game date and registered as eligible. Archive modification/import dates do not determine recency. Refresh release dates and display names when registering a new eligible set; this is a checked-in snapshot, not live set discovery.
 
-- 1.25: HOB, MSH, SOS, TMT, ECL, TLA.
-- 1.10: EOE, FIN, TDM, DFT, FDN, DSK.
-- 1.00: remaining regular sets.
+Every new expansion Daily reserves its latest three released eligible sets for distinct rounds whose difficulty bands and pick windows have available puzzles. Optional rounds exclude those three sets. If a required set is unavailable or no feasible assignment exists, creation fails explicitly with 503 rather than substituting an older set. On September 14 the required sets are HOB, MSH and SOS.
 
-These are relative weights among currently eligible sets, not fixed quotas. Fresh-set preference remains, large archives do not receive more weight, and ordinary practice remains uniform by eligible set. Daily set rerolls apply the weights among their comparable candidates. Cube stays independent.
+The remaining five slots prefer distinct sets and use relative weights:
+
+- Next three releases (TMT, ECL, TLA): **4**.
+- Next six (EOE, FIN, TDM, DFT, FDN, DSK): **2**.
+- Older eligible releases: **1**.
+
+These are weighted draws without replacement when distinct sets are available, not fixed quotas or independent probabilities. Guaranteed sets have weight 6 for comparable Daily reroll candidates, but their inclusion in initial selection is guaranteed rather than probabilistic. Large archives receive no extra set weight. Ordinary practice remains uniform among eligible sets; Cube remains independent.
+
+Each schedule/session stores `daily_featured_sets`. Its guaranteed sets cannot be removed by a set reroll; a same-set pack reroll remains allowed. Other rounds retain the single different-set reroll, using versioned weights and the original game date. Old `first-pack-v2` runs retain ten slots and their original 1.25/1.10/1.00 weighting.
 
 ## Management and release controls
 
 - `draft_run_environment_policy` records each set's role, pick ceiling, weight and selection version. `draft_run_eligible_decisions` exposes current eligible IDs and their ratings for auditable counts.
-- Sessions and schedules preserve their selection version. Previously submitted answers, completed results and exact friend packs retain their original identities. Cutover replaces only today's unplayed schedules and zero-answer sessions; if anyone has submitted answers in an environment, its existing Daily is preserved for fairness until the next day.
+- Sessions and schedules preserve their selection version. Previously submitted answers, completed results and exact friend packs retain their original identities. The eight-pick release rewrites no schedules or sessions. Existing Dailies remain unchanged for everyone joining that day; newly generated schedules use eight picks.
 - Both loaders preserve existing puzzle payloads. Completed imports require exact database/manifest counts, rejecting unexplained extra or missing rows.
 - Full-trophy imports (`import-all-trophies.yml`) and legacy skill backfills (`backfill-legacy-sets.yml`) are explicitly dispatched; editing those importers does not start their multi-hour rebuilds. The separate legacy replay backlog (`build-more-sets.yml`, workflow name `import-set-backlog`) still runs on its schedule and matching code/catalog pushes. It does not define the full trophy population. Restored trophy caches are purged before use as specified by the release workflow.
-- Database changes run in development first. Release checks cover both real ten-pick games, caps, first-pack provenance, late-round difficulty, exclusions, rerolls and exact friend packs.
+- Database changes run in development first. Release checks cover both real eight-pick games and historical ten-pick compatibility, caps, first-pack provenance, late-round difficulty, exclusions, rerolls and exact friend packs.
 
 Per-set measured counts are in [JSON](audits/corpus-2026-09-12.json) and [CSV](audits/corpus-2026-09-12.csv). `stored` includes archived decisions; `eligible_decisions` applies image/interesting filters and the current pick cap; `eligible_trophy_drafts` counts only source drafts with at least one currently eligible decision.
 
-The September 14 [product review](PRODUCT-REVIEW-2026-09-14.md) rechecked public aggregate counts but did not repeat this full source/manifest audit. Its new serving code preserves this selection policy; deployment of the indexed selector is tracked separately in [BACKEND-RELIABILITY.md](BACKEND-RELIABILITY.md).
+The September 14 [product review](PRODUCT-REVIEW-2026-09-14.md) rechecked public aggregate counts but did not repeat this full source/manifest audit. Its initial serving change preserved the prior selection policy. The eight-pick follow-up changes selection under a new version; deployment is tracked separately in [BACKEND-RELIABILITY.md](BACKEND-RELIABILITY.md).

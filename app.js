@@ -346,7 +346,7 @@ function renderHome() {
   app.innerHTML = `
     <section class="home-intro">
       <h1>Pack One</h1>
-      <p class="lede">Ten pack one choices for you to make across real trophy drafts.</p>
+      <p class="lede">Eight pack one choices for you to make across real trophy drafts.</p>
     </section>
 
     <section class="set-bar" aria-label="Set selection">

@@ -174,7 +174,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
       <div><span>Environments</span><strong>${progress.played}/${progress.total}</strong></div>
     </div>
 
-    ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Your first ten picks start here.</h2><p>Play a Draft Run to begin your record. Your games count as a guest.</p><a class="button primary" href="?game=draft-run">Play your first Draft Run</a></section>':''}
+    ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Your first eight picks start here.</h2><p>Play a Draft Run to begin your record. Your games count as a guest.</p><a class="button primary" href="?game=draft-run">Play your first Draft Run</a></section>':''}
     ${own&&next.length?`<section class="profile-next"><h2>Within reach</h2>${next.map(a=>`<div><strong>${esc(a.label)}</strong><span>${esc(a.progress_text)}</span><p>${esc(a.description)}</p><progress value="${Number(a.current)}" max="${Number(a.target)}" aria-label="${esc(a.label)} progress"></progress></div>`).join('')}</section>`:''}
 
     ${showLeaderboardName || favorite || showcased || bestPct ? `<section class="profile-identity-strip">
