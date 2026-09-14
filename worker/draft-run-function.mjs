@@ -1,3 +1,4 @@
+import {releaseMetadata} from './release.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import growth, { query, player, readJson, json, withCors, gameDateKey } from './growth-function.js';
@@ -6,7 +7,7 @@ import {observeDecision,measurementInput,MEASUREMENT_CTE} from './decision-measu
 import {handleAdmin} from './measurement-admin.mjs';
 import {loadPuzzleMetadata,selectDatabaseRun,selectDatabaseReroll} from './draft-run-selection.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,publicDifficulty,rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
-import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,regularRunSet,dailySetWeight,dailyRequiredSets,DRAFT_RUN_LENGTH,isEightPickVersion} from '../draft-run-policy.mjs';
+import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,regularRunSet,dailySetWeight,dailyRequiredSets,DRAFT_RUN_LENGTH} from '../draft-run-policy.mjs';
 import {
   DRAFT_RUN_CORPUS_VERSION, DRAFT_RUN_SCORING_VERSION, gradeDraftRunPick,
   publicDraftRunPuzzle, validateDraftRunPuzzle, draftRunEnvironment,
@@ -194,6 +195,7 @@ async function route(request) {
   if(request.method==='OPTIONS') return new Response(null,{status:204});
   if(path.startsWith('/v1/admin/')) return json(await handleAdmin(request,query,readJson));
   if(request.method==='GET'&&path==='/health') {
+    if(url.searchParams.get('quick')==='1')return json({ok:true,service:'draft-run',...releaseMetadata()});
     const result=await query(`SELECT p.set_id,count(*)::int archived,
       count(*) FILTER(WHERE r.puzzle_id IS NULL)::int unrated,
       count(*) FILTER(WHERE r.puzzle_id IS NOT NULL AND p.pick_number<=CASE WHEN p.set_id='powered-cube' THEN 11 ELSE 10 END)::int decisions,
@@ -205,7 +207,7 @@ async function route(request) {
     const by_set=Object.fromEntries(rows.filter(p=>Number(p.decisions)>0).sort((a,b)=>a.set_id.localeCompare(b.set_id)).map(p=>[p.set_id,{drafts:Number(p.drafts),decisions:Number(p.decisions),regular_run:regularRunSet(p.set_id),daily_weight:regularRunSet(p.set_id)?dailySetWeight(p.set_id):null}]));
     const total=key=>rows.reduce((n,p)=>n+Number(p[key]),0),mixed=rows.filter(p=>regularRunSet(p.set_id));
     const ok=!unrated&&!missingSets.length&&sets.size===corpusCatalog.sets.length&&corpusCatalog.corpus_version===DRAFT_RUN_CORPUS_VERSION;
-    return json({ok,service:'draft-run',scoring_version:DRAFT_RUN_SCORING_VERSION,difficulty_version:DRAFT_RUN_DIFFICULTY_VERSION,selection_version:DRAFT_RUN_SELECTION_VERSION,corpus_version:DRAFT_RUN_CORPUS_VERSION,run_length:DRAFT_RUN_LENGTH,daily_featured_sets:dailyRequiredSets(),release_commit:process.env.PACK1_RELEASE_COMMIT||null,
+    return json({ok,service:'draft-run',scoring_version:DRAFT_RUN_SCORING_VERSION,difficulty_version:DRAFT_RUN_DIFFICULTY_VERSION,selection_version:DRAFT_RUN_SELECTION_VERSION,corpus_version:DRAFT_RUN_CORPUS_VERSION,run_length:DRAFT_RUN_LENGTH,daily_featured_sets:dailyRequiredSets(),...releaseMetadata(),
       puzzles:total('decisions'),archived_playable_puzzles:total('archived'),sets:sets.size,expansion_sets:rows.filter(p=>p.set_id!=='powered-cube').length,regular_sets:mixed.length,
       mixed_puzzles:mixed.reduce((n,p)=>n+Number(p.decisions),0),cube_puzzles:Number(rows.find(p=>p.set_id==='powered-cube')?.decisions||0),unrated_puzzles:unrated,missing_sets:missingSets,by_set},ok?200:503);
   }

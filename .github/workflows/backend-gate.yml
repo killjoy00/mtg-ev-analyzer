@@ -120,6 +120,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          DATABASE_URL="$(cat "$PACK1_CI_CONNECTION")" node scripts/verify-neon-schema.mjs
           node tests/selection-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/draft-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/cube-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures

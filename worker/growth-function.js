@@ -1,3 +1,4 @@
+import {releaseMetadata} from './release.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
@@ -781,7 +782,7 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, service: 'pack1-growth', version: 3, profiles: true });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true });
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/events') return handleEvents(request);
   if (request.method === 'POST' && url.pathname === '/v1/results') return handleResult(request);
