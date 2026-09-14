@@ -104,4 +104,5 @@ const analytics=(await query("SELECT event_name,count(*) n FROM analytics_events
 assert.ok(analytics.every(r=>Number(r.n)===1));assert.equal(analytics.length,3);
 await query('SELECT * FROM analytics_retention_cohorts LIMIT 1');await query('SELECT * FROM analytics_daily_next_day_retention LIMIT 1');
 fs.mkdirSync('generated/review',{recursive:true});fs.writeFileSync('generated/review/backend-timings.json',JSON.stringify(timings,null,2));
+console.log('Run request timings (isolated database, ms):',JSON.stringify(timings.filter(t=>t.path==='/v1/runs')));
 console.log('Passed real database: concurrent writes, ten locked picks, retries, forged score rejection, guest privacy, account claim, merge, Daily conflicts, environment transfer, public opt-in, percentile ties, old milestones, event idempotency and funnel queries.');

@@ -4,7 +4,7 @@ Implementation review: 2026-09-14. Production deployment is a separate release s
 
 ## Selection and data integrity
 
-`worker/draft-run-selection.mjs` queries eligible counts by set and band, then reads one deterministically selected metadata row per round. It keeps the existing seeded random draws, set weighting, pick windows, band mix, source exclusions and preference for distinct sets. It does not sample a fixed prefix of a large archive. Twenty bounded SQL responses replace the full-pool download for a new ten-pick schedule or practice run. Database work still depends on corpus size; no sub-second production latency is promised.
+`worker/draft-run-selection.mjs` queries eligible counts by set, pick and band once, then reads the deterministically selected puzzle and its source trajectory per round. Used-source trajectories are subtracted from the compact counts before the next draw. It keeps the existing seeded random draws, set weighting, pick windows, band mix, source exclusions and preference for distinct sets. It does not sample a fixed prefix of a large archive. Eleven bounded SQL responses replace the full-pool download for a new ten-pick schedule or practice run. Database work still depends on corpus size; no sub-second production latency is promised.
 
 Existing Daily schedules are read before selection. Friend challenges load their exact ten stored IDs, including eligible historical pick depths, without constructing a new run. Resumes keep their reserved session. Stored schedules are never rewritten by this release.
 

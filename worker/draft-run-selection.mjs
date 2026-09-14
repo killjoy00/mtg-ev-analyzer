@@ -4,7 +4,7 @@ import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_S
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from '../draft-run-difficulty.mjs';
 
 const columns = `p.puzzle_id,p.set_id,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,
-  p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio`;
+  p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band`;
 const from = `FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r
   ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'`;
 const base = `p.corpus_version=$1 AND p.interesting AND p.pack_number=1`;
@@ -35,18 +35,27 @@ function environmentFilter(environment,params,previous=false) {
   return sql;
 }
 
-// Return only per-set counts and one selected metadata row per round. Every
+// Return compact group counts once, then one source trajectory per round. Every
 // eligible puzzle participates: there is no random prefix or candidate cap.
 // This consumes the same PRNG draws and sorted candidate order as selectDraftRun.
 export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false}={}) {
   const random=seededRandom(seed),bands=runDifficultyBands(random),selected=[],sources=[],sets=new Set();
+  const groupParams=[version];
+  const groupWhere=`${base} AND ${environmentFilter(environment,groupParams)}`;
+  const groups=(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)}));
+  const key=p=>`${p.set_id}:${p.pick_number}:${p.band}`;
+  const remaining=new Map(groups.map(g=>[key(g),g]));
   for(let round=0;round<10;round++) {
     const window=(environment==='powered-cube'?CUBE_PICK_WINDOWS:DRAFT_RUN_PICK_WINDOWS)[round];
     const params=[version,window[0],window[1],toPgArray(sources)];
     const where=`${base} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params)}`;
-    const groups=await query(`SELECT p.set_id,r.band,count(*)::int n ${from} WHERE ${where} GROUP BY p.set_id,r.band`,params);
-    let band=bands[round],available=groups.rows.filter(g=>g.band===band);
-    if(!available.length&&band==='easy'){band='medium';available=groups.rows.filter(g=>g.band===band);}
+    const availableFor=band=>{
+      const counts=new Map();
+      for(const g of groups)if(g.band===band&&g.pick_number>=window[0]&&g.pick_number<=window[1]&&g.n>0)counts.set(g.set_id,(counts.get(g.set_id)||0)+g.n);
+      return [...counts].map(([set_id,n])=>({set_id,n}));
+    };
+    let band=bands[round],available=availableFor(band);
+    if(!available.length&&band==='easy'){band='medium';available=availableFor(band);}
     const fresh=available.filter(g=>!sets.has(g.set_id));
     if(fresh.length)available=fresh;
     else {const different=available.filter(g=>g.set_id!==selected.at(-1)?.set_id);if(different.length)available=different;}
@@ -54,10 +63,17 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     const count=Number(available.find(g=>g.set_id===setId)?.n||0);
     if(!count)throw Object.assign(new Error('Not enough verified puzzles for a balanced run.'),{status:503});
     params.push(setId,band,Math.floor(random()*count));
-    const row=await query(`SELECT ${columns} ${from} WHERE ${where} AND p.set_id=$${params.length-2} AND r.band=$${params.length-1}
-      ORDER BY p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${params.length}::int`,params);
-    if(!row.rows[0])throw Object.assign(new Error('The corpus changed while starting this run. Please retry.'),{status:503});
-    const p=decodePuzzleMetadata(row.rows[0]);selected.push(p);sources.push(p.source_draft_hash);sets.add(p.set_id);
+    const result=await query(`WITH chosen AS (
+      SELECT p.puzzle_id,p.source_draft_hash ${from} WHERE ${where} AND p.set_id=$${params.length-2} AND r.band=$${params.length-1}
+      ORDER BY p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${params.length}::int
+    ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${base}`,params);
+    const trajectory=result.rows.map(decodePuzzleMetadata),p=trajectory.find(p=>p.puzzle_id===p.selected_id);
+    if(!p)throw Object.assign(new Error('The corpus changed while starting this run. Please retry.'),{status:503});
+    selected.push(p);sources.push(p.source_draft_hash);sets.add(p.set_id);
+    // Once a source is used, every one of its decisions disappears from future
+    // counts. This preserves exact source exclusion without ten full recounts.
+    for(const sibling of trajectory){const group=remaining.get(key(sibling));if(group)group.n--;}
+
   }
   return selected;
 }
