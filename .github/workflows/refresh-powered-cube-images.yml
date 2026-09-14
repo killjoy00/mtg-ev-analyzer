@@ -89,6 +89,18 @@ jobs:
             --content-type 'application/json; charset=utf-8' \
             --cache-control 'public, max-age=3600'
 
+      - name: Deploy current Draft Run API to development
+        shell: bash
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY is required to keep the development smoke backend current.'; exit 1; }
+          npx --yes neon@4.10.0 functions deploy draftrunapi \
+            --src worker/draft-run-function.mjs \
+            --project-id patient-shadow-91417882 \
+            --branch br-twilight-hill-ayffyd2b
+
       - name: Refresh development Draft Run image metadata
         run: node scripts/refresh_powered_cube_backend_images.mjs "$DEV_IMPORT_API"
 
