@@ -2,6 +2,20 @@
 
 Implementation review: 2026-09-14. Production deployment is a separate release step; a merged backend PR does not deploy Neon Functions.
 
+## Release status, 2026-09-14
+
+Migrations **0012 and 0013 are applied on both Neon branches** (development
+`br-twilight-hill-ayffyd2b` and production `br-orange-feather-ayps8kep`) and
+verified: `result_persisted_at`, `player_request_limits` and the three serving
+indexes (373-375 MB) are present in each. Production was re-checked healthy
+afterwards. The additive schema is backward compatible with the previously
+deployed function bundles, which ignore the new column, table and indexes, so
+the database and code halves of this release are decoupled.
+
+**The function bundles are not deployed yet.** Until they are, the new indexes
+are unused and run-start latency is unchanged. Deploy with
+`.github/workflows/deploy-functions.yml` (below); no local tooling is needed.
+
 ## Selection and data integrity
 
 `worker/draft-run-selection.mjs` queries eligible counts by set, pick and band once, then reads the deterministically selected puzzle and its source trajectory per round. Used-source trajectories are subtracted from the compact counts before the next draw. It keeps the existing seeded random draws, set weighting, pick windows, band mix, source exclusions and preference for distinct sets. It does not sample a fixed prefix of a large archive. Eleven bounded SQL responses replace the full-pool download for a new ten-pick schedule or practice run. Database work still depends on corpus size; no sub-second production latency is promised.
@@ -20,8 +34,8 @@ The API no longer caches or downloads the million-row pool. `loadVerifiedPool` r
 
 1. Run the PR's backend schema gate. It applies the known additive release backlog (migrations 0012/0013) plus new PR migrations on an expiring isolated Neon branch, compares SQL selection/rerolls with the exhaustive reference, and runs mixed, Cube, measurement and request-integrity integration suites. The parent can lag Git main; [CI synchronization details](REQUEST-INTEGRITY.md) explain why a PR-only migration diff is insufficient.
 2. Inspect actual timings against the full copied production corpus. Compare cold and warm starts, existing Daily joins, friend starts, rerolls and concurrent starts. Statement-count reduction alone is not a latency result.
-3. Apply migrations 0012 and 0013 in order on development. Deploy the reviewed `draftrunapi`, `pack1growth` and `pack1api` bundles, and run their HTTP smoke suites. Then repeat migration and deployment in production with the exact reviewed commit. No corpus rebuild is required. The ordinary GitHub merge workflow does not perform this release; obtain Neon deployment access or use an approved owner-operated deployment path.
+3. Migrations 0012 and 0013 are already applied on development and production (see Release status above); a future migration must be applied before deploying code that needs it. Deploy the reviewed `draftrunapi`, `pack1growth` and `pack1api` bundles by running the **deploy neon functions** workflow with target `development`, checking its output, then running it again with target `production`. It can be started from the GitHub web UI or mobile app. The workflow bundles each entry point from `.github/neon-functions.txt` with esbuild (the runtime Neon's own CLI uses), refuses to upload a bundle that does not expose a default `fetch` handler, then asserts the new `/health` fields and times two practice run starts. No corpus rebuild is required. An ordinary merge still does not deploy anything.
 4. Verify health coverage, practice creation/rerolls and recovery. A production ranked Daily completion requires an explicit QA/data-cleanup plan; local and isolated database checks do not establish native-device or production behavior.
-5. If deployment regresses, restore the prior function bundle. Additive indexes/marker may remain. Old functions ignore the marker; a later redeployment repairs it safely.
+5. If deployment regresses, restore the prior function bundle from the deployment history in the Neon console — that history is the only rollback path, because the API exposes no bundle download. Additive indexes/marker may remain. Old functions ignore the marker; a later redeployment repairs it safely.
 
 Trusted ingress rate limiting and a first-party cookie architecture are separate work. Never treat a client-supplied forwarded-IP header as an authenticated network identity, or claim that an in-memory function-instance counter protects the whole service.

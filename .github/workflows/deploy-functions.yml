@@ -1,0 +1,137 @@
+name: deploy neon functions
+
+# Merging a backend PR does not deploy Neon Functions. This is the
+# owner-operated release path BACKEND-RELIABILITY.md asks for: run it against
+# development, verify, then run it again against production. It can be started
+# from the GitHub web UI or mobile app; no local tooling is required.
+#
+# Migrations are NOT applied here. 0012 and 0013 are already applied on both
+# branches; a future migration must be applied before running this.
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Neon branch to deploy'
+        type: choice
+        options:
+          - development
+          - production
+        default: development
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-neon-functions-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      PROJECT_ID: patient-shadow-91417882
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Resolve target branch
+        id: target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY secret is not configured.'; exit 1; }
+          case "${{ inputs.target }}" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production)  branch=br-orange-feather-ayps8kep ;;
+            *) echo "::error::Unknown target"; exit 1 ;;
+          esac
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "Deploying ${{ inputs.target }} ($branch) from $GITHUB_SHA"
+
+      - name: Install Neon CLI
+        run: npm install -g neon@latest
+
+      # Catch a bad bundle before anything is uploaded. Each entry point must
+      # bundle for node24 ESM and expose a default { fetch } handler.
+      - name: Pre-flight bundle check
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install -g esbuild
+          banner="import{createRequire as ___cr}from'module';import{fileURLToPath as ___f}from'url';import{dirname as ___d}from'path';const require=___cr(import.meta.url);const __filename=___f(import.meta.url);const __dirname=___d(__filename);"
+          mkdir -p /tmp/preflight
+          while IFS=: read -r slug entry; do
+            esbuild "$entry" --bundle --platform=node --target=node24 --format=esm \
+              --banner:js="$banner" --outfile="/tmp/preflight/$slug.mjs"
+            DATABASE_URL='postgresql://u:p@example.invalid/db' node --input-type=module -e "
+              const m = await import('/tmp/preflight/$slug.mjs');
+              if (!m.default || typeof m.default.fetch !== 'function') {
+                throw new Error('$slug does not export a default fetch handler');
+              }
+              console.log('$slug bundle OK');
+            "
+          done < .github/neon-functions.txt
+
+      - name: Deploy functions
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS=: read -r slug entry; do
+            echo "::group::deploy $slug"
+            neon functions deploy "$slug" \
+              --src "$entry" \
+              --project-id "$PROJECT_ID" \
+              --branch "${{ steps.target.outputs.branch }}" \
+              --runtime nodejs24 \
+              --wait
+            echo "::endgroup::"
+          done < .github/neon-functions.txt
+
+      # The new draftrunapi reports unrated_puzzles and missing_sets; the old
+      # build does not. Their presence proves the new bundle is actually live.
+      - name: Verify deployment
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://${{ steps.target.outputs.branch }}-draftrunapi.compute.c-5.us-east-2.aws.neon.tech"
+          echo "Waiting for the function to answer..."
+          for i in $(seq 1 10); do
+            if curl -fsS --max-time 90 "$base/health" -o /tmp/health.json; then break; fi
+            sleep 10
+          done
+          cat /tmp/health.json
+          node -e "
+            const h = require('/tmp/health.json');
+            if (!('unrated_puzzles' in h) || !('missing_sets' in h)) {
+              throw new Error('Health response lacks the new fields; the old bundle may still be live.');
+            }
+            if (h.unrated_puzzles) throw new Error('unrated_puzzles=' + h.unrated_puzzles);
+            if ((h.missing_sets || []).length) throw new Error('missing_sets=' + h.missing_sets.join(','));
+            if (!h.ok) throw new Error('health ok=false');
+            console.log('health OK  puzzles=' + h.puzzles + '  sets=' + h.sets);
+          "
+
+      - name: Timed practice run
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://${{ steps.target.outputs.branch }}-draftrunapi.compute.c-5.us-east-2.aws.neon.tech"
+          token=$(curl -fsS --max-time 60 -X POST "$base/v1/session" \
+            -H 'content-type: application/json' \
+            -d '{"displayName":"Release check"}' | node -e "
+              let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).token));")
+          # qa:true keeps this out of first-attempt player measurements. The run
+          # is practice and is never completed, so no ranked result is written.
+          for i in 1 2; do
+            curl -fsS --max-time 120 -o /dev/null -w "  run start $i: %{time_total}s http %{http_code}\n" \
+              -X POST "$base/v1/runs" -H 'content-type: application/json' \
+              -H "authorization: Bearer $token" \
+              -d '{"daily":false,"environment":"mixed","qa":true}'
+          done
