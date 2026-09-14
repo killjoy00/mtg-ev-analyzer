@@ -1,0 +1,13 @@
+.today-status{margin:0 0 26px;padding:20px;border:1px solid var(--line);border-radius:var(--radius);background:linear-gradient(135deg,var(--surface),var(--surface-soft))}
+.today-status[hidden]{display:none!important}
+.today-status-heading{display:flex;align-items:flex-end;justify-content:space-between;gap:24px}
+.today-status-heading h2{margin:2px 0 6px;font-size:clamp(24px,3vw,34px)}
+.today-status-heading>div:first-child>p:last-child{margin:0;color:var(--muted);font-size:13px}
+.today-complete{text-align:right;white-space:nowrap}.today-complete strong{display:block;font-size:30px;line-height:1;letter-spacing:-.04em}.today-complete span{display:block;margin-top:4px;color:var(--muted);font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.today-progress{height:6px;margin:16px 0;border-radius:999px;background:var(--line);overflow:hidden}.today-progress i{display:block;height:100%;background:var(--green);border-radius:inherit}
+.today-games{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.today-game{display:grid;grid-template-columns:minmax(0,1fr) auto;grid-template-areas:"name score" "action action";gap:12px;padding:16px;border:1px solid var(--line);background:var(--surface)}
+.today-game.complete{border-color:#b7cabc}.today-game-name{grid-area:name}.today-game-name span{display:block;font-weight:800}.today-game-name small,.today-game-score small{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.35}.today-game-score{grid-area:score;text-align:right}.today-game-score strong{display:block;font-size:28px;line-height:1;letter-spacing:-.04em}.today-game .button{grid-area:action;width:100%;text-decoration:none;text-align:center}
+.today-status footer{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-top:14px}.today-status footer strong{font-size:12px}.today-status footer .text-button{font-size:11px}
+@media(max-width:700px){.today-status{padding:16px;margin-bottom:22px}.today-status-heading{align-items:flex-start}.today-games{grid-template-columns:1fr}.today-game{grid-template-columns:1fr auto auto;grid-template-areas:"name score action";align-items:center}.today-game .button{width:auto;min-width:112px}.today-status footer{margin-top:12px}}
+@media(max-width:480px){.today-status-heading{display:block}.today-complete{margin-top:10px;text-align:left;display:flex;align-items:baseline;gap:6px}.today-complete strong{font-size:24px}.today-game{grid-template-columns:1fr auto;grid-template-areas:"name score" "action action"}.today-game .button{width:100%}}
