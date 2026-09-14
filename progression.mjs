@@ -1,3 +1,4 @@
+import { escapeHtml as esc } from './html.mjs';
 import { loadMyProfile } from './growth-api.mjs';
 import { renderAccount } from './growth.mjs';
 import { trackEvent } from './retention-events.mjs';
@@ -14,7 +15,6 @@ export function claimReason(profile) {
   if(s.best_score>=85)return `Keep that ${s.best_score}-point personal best.`;
   return null;
 }
-const esc=v=>String(v??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;');
 const seen=new Set();let latest=null;
 async function enhance(detail={}) {
   const root=document.querySelector('#post-game-progress')||document.querySelector('.result-page');

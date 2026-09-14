@@ -1,3 +1,4 @@
+import { escapeHtml as esc } from './html.mjs';
 import { makeGameSeed } from './gameplay.mjs';
 import { utcDateKey } from './engagement.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
@@ -5,14 +6,6 @@ import { onAppRender } from './render-lifecycle.mjs';
 export const POWERED_CUBE_ID = 'powered-cube';
 const MODES = new Set(['full']);
 
-function esc(value) {
-  return String(value ?? '')
-    .replaceAll('&', '&amp;')
-    .replaceAll('<', '&lt;')
-    .replaceAll('>', '&gt;')
-    .replaceAll('"', '&quot;')
-    .replaceAll("'", '&#039;');
-}
 
 function setText(node, value) {
   if (node && node.textContent !== value) node.textContent = value;

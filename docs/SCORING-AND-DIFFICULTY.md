@@ -65,7 +65,7 @@ This enforces at most one easy slot in the completed run, including replacements
 
 `draft_run_puzzle_ratings` stores `puzzle_id`, `difficulty_version`, integer `rating`, `top_two_ratio`, `target_support_ratio`, and generated `band`. Its primary key is `(puzzle_id,difficulty_version)`. Ratings are derived beside the immutable puzzle payload. Migration 0008 installs an insertion trigger so future imports automatically receive ratings; `scripts/backfill_draft_run_ratings.mjs` fills existing rows resumably in bounded batches.
 
-Sessions store `difficulty_version` and ten `difficulty_anchors`; daily schedules store `difficulty_version`. Unanswered puzzle API responses expose only `difficulty: {version,rating,band}` in addition to the existing public card data. They do not expose candidate supports, target-support ratio, source identity, or the answer.
+Sessions store `difficulty_version` and ten `difficulty_anchors`; daily schedules store `difficulty_version`. Unanswered puzzle API responses expose public card data and pick context only. They do not expose difficulty ratings/bands, candidate supports, target-support ratio, source identity, or the answer. Difficulty remains internal; the locked answer supplies the evidence used by the consensus comparison.
 
 Deploy sequence: apply migration on development, complete the rating backfill, check SQL/JavaScript rating parity and coverage, and test real gameplay. Then apply/backfill production before deploying the same backend code. The frontend tolerates older responses without a difficulty field. Rollback may restore the prior backend and frontend while leaving additive rating tables and columns in place.
 

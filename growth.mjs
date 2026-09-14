@@ -1,3 +1,4 @@
+import { escapeHtml as esc } from './html.mjs';
 import { getAuthSession, linkAccount, loadRemoteStats, saveGameResult, sendEvents, signInAccount, signOutAccount, signUpAccount } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
@@ -7,7 +8,6 @@ const RESULT_SEEN = new WeakSet();
 let currentAccount = null;
 let challengeStartTracked = false;
 
-function esc(value) { return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;'); }
 function params() { return new URLSearchParams(location.search); }
 function event(name, props={}) { trackEvent(name, props); }
 function readHistory() { try { const v=JSON.parse(localStorage.getItem(HISTORY_KEY)||'[]'); return Array.isArray(v)?v:[]; } catch { return []; } }

@@ -1,3 +1,4 @@
+import { escapeHtml as esc } from './html.mjs';
 import { gradeTopThree, rankCandidates } from './scoring.mjs';
 import { createShareChallenge, isLeaderboardConfigured, loadCommunityDistribution, loadShareChallenge } from './leaderboard.mjs';
 import { loadReplayJson } from './replay-data.mjs';
@@ -7,9 +8,6 @@ const SHARE_URL = 'https://packone.pro/';
 let fullPackSelections = [];
 window.PACK1_CAPTURED_PICKS = fullPackSelections;
 
-function esc(value) {
-  return String(value ?? '').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#039;');
-}
 
 async function resolveSetId(setName) {
   const fallback = String(setName || '').toLowerCase().replace(/[^a-z0-9_-]+/g, '-').slice(0, 24);

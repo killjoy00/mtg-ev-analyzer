@@ -230,11 +230,20 @@ export async function shareResultCard(profile, result, environmentName = null) {
   });
 }
 
-export async function shareDraftRunCard(run,url,{challenge=false}={}) {
+export function draftRunShareText(run) {
+  const matches=run.answers.filter(a=>a.historicalMatch).length;
+  const label=run.environment==='powered-cube'?'Powered Cube':'Draft Run';
+  const squares=run.answers.map(a=>a.historicalMatch?'🟩':a.score>=85?'🟦':a.score>=60?'🟨':a.score>=25?'🟧':'⬛').join('');
+  const date=run.day ? `Daily ${run.day}` : 'Practice';
+  return `Pack One · ${label} · ${date}\n${run.score}/100  ${squares}\n${matches}/10 trophy picks matched. Can you beat it?`;
+}
+
+export async function shareDraftRunCard(run,url,{challenge=false,asImage=false}={}) {
   const matches=run.answers.filter(a=>a.historicalMatch).length;
   const percentile=run.standing?.percentile;
   const cube=run.environment==='powered-cube',label=cube?'Powered Cube Run':'Draft Run';
-  const text=`${run.score}/100 on Pack One’s ${run.day?'Daily ':''}${label}. ${matches}/10 trophy picks matched.${percentile?` Top ${percentile}% ${run.standing.final?'finish':'so far'}.`:''} Can you beat it?`;
+  const text=draftRunShareText(run);
+  if(!asImage) return shareBlob(null,{text,url,context:challenge?'draft_run_challenge':'draft_run_result'});
   const blob=await cardBlob({eyebrow:`${run.day?'Daily ':''}${label}`,title:'Ten picks. Your call.',bigValue:`${run.score}/100`,subtitle:`${matches} trophy picks matched`,pills:[run.day,percentile?`Top ${percentile}% ${run.standing.final?'finish':'so far'}`:null].filter(Boolean),rows:[{label:'The challenge',value:cube?'10 Powered Cube trophy decisions':'10 decisions across Magic sets'},{label:'Your target',value:'Real picks from trophy drafters'}]});
   return shareBlob(blob,{text,url,filename:'pack-one-draft-run.png',context:challenge?'draft_run_challenge':'draft_run_result'});
 }
