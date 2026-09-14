@@ -24,6 +24,8 @@ The product owner's settled rule is that the actual trophy pick earns 100. The o
 
 The final result is the rounded arithmetic mean of ten integer pick scores. Every decision has equal weight. No depth penalty, square-root curve, or difficulty bonus applies. Near ties receive similar credit; card rank alone does not determine credit. When the trophy choice differs from the model leader, the leader still receives 95.
 
+A displayed 100 is not synonymous with ten trophy matches: nine 100s and one 95 average 99.5 and round to 100. Always keep the match count separate. A calculation such as `p^10` describes ten matches under an independence assumption, not the probability of a displayed 100.
+
 Support comes from `strong-player-pool-context-v2`: hierarchical card selection tendencies by pack/pick position, with shrinkage-adjusted co-pick context from the actual earlier pool. Training uses the broader elite cohort, not only trophy runs; the training limit is independent of trophy eligibility. Five-fold exclusion by draft ID prevents a source draft's own picks from training its grader. These are comparative model supports, not calibrated probabilities that a card is correct or estimates of win-rate loss.
 
 The review retained the linear formula because it separates weak and uninformed choices without the inflation of the earlier square-root/0.75-power curves. A reproducible production SYSTEM sample (seed 17, 0.5% of blocks) contained 4,786 mixed decisions: uniform random selection averaged 42.61 and model-leader selection 97.74. The 49 Cube decisions in that sample averaged 48.63 and 97.35 respectively; that Cube sample is too small for a robust calibration conclusion. The baseline-corpus tests also verify strategy separation over complete balanced games. These strategy checks are not a substitute for player feedback on fairness.
@@ -41,6 +43,8 @@ Per-answer fields include `score`, `historicalMatch`, `consensusRank`, `selected
 | 80–100 | hard | The leading options are closely matched |
 
 Higher means more ambiguity. This scale is independent of the absolute support scale and of which card the trophy drafter selected. It estimates decision difficulty; it is not a measured human solve rate. Equal leading support is 100 difficulty, even when both choices earn excellent credit. Choosing a well-supported alternative and guessing the exact trophy choice are distinct outcomes.
+
+Uniform-random score loss measures stakes under that random-choice assumption, not human difficulty. The [September 14 baseline audit](audits/product-review-baseline-2026-09-14.json) confirms higher random scores in ambiguous packs, but does not justify replacing composition with a stakes measure. Its unweighted frozen-puzzle statistics are not production balanced-run averages. See the [independent review](PRODUCT-REVIEW-2026-09-14.md) before using these figures as benchmarks.
 
 Normalized support entropy (spread across the whole pack), top support gap, candidate count, pick number, and prior-pool size remain secondary reroll matching dimensions. They are not hidden bonuses or penalties in the pick score.
 

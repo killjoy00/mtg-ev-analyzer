@@ -6,11 +6,11 @@ Keep advertising disabled while the new game establishes retention. Blank slots 
 
 The preferred first experiment is one clearly labeled Daily sponsorship on the home/result surface, followed by an optional supporter/ad-free account if demand warrants it. Keep career history useful for free players. A paid tier needs server-verified entitlements and a separate payment/privacy review before activation; no subscription or paywall has been enabled in this release.
 
-Measure completion, next-day return, second-game rate, account claims, and shares before optimizing ad revenue. `analytics/retention_funnel.sql` supplies these cohorts.
+Measure completion, next-day return, second-game rate, account claims, and shares before optimizing ad revenue. `analytics/retention_funnel.sql` supplies descriptive legacy cohorts, not a QA-excluded first-Daily retention metric: its Daily view counts all Daily completers by challenge date. Use mature observation windows and define first-completion cohorts/session exclusions before making retention decisions. Player IDs and public leaderboard rows are not verified unique people or total audience counts. See the [independent review](docs/PRODUCT-REVIEW-2026-09-14.md).
 
 ## TCGplayer / Impact
 
-TCGplayer's affiliate program currently operates through Impact. Apply through the TCGplayer campaign in Impact. New TCGplayer API developer access is not currently being granted, so this integration intentionally does **not** depend on API pricing access.
+The existing integration supports a configurable Impact deep-link template and does not depend on API pricing access. The owner must confirm campaign approval and supply the account's public template. Draft Run and Cube revealed-card comparisons now link to TCGplayer, as do legacy reveals. With `impactDeepLinkTemplate` empty, links use ordinary TCGplayer search destinations; no active commission tracking is claimed.
 
 After approval:
 
@@ -25,6 +25,8 @@ Pack One records `tcgplayer_click` analytics with card, set, surface, and whethe
 ## Google AdSense
 
 The code uses manual ad slots only; Auto Ads are intentionally not enabled. Active gameplay hides the entire editorial/monetization shell.
+
+Ads remain disabled and the client/slot configuration is empty. An existing `ads.txt` publisher entry or account meta tag does not establish account approval; confirm that in the publisher account before activation. Revenue, conversion and DAU thresholds in an external review are projections, not validated business results.
 
 After AdSense approval:
 

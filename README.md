@@ -2,7 +2,7 @@
 
 Pack One is a Limited draft game built from historical 17Lands Premier Draft decisions. Its primary game is **Draft Run**: ten independent choices from verified trophy drafts, two one-use rerolls, and contextual partial credit. Play the Eastern-time Daily or unlimited practice, then send the same ten packs to a friend. Powered Cube has its own trophy-only ten-decision Daily and practice flow with two pack rerolls.
 
-Live site: `https://packone.pro`
+Live site: [packone.pro](https://packone.pro). Start with the [current state and deployment status](docs/CURRENT-STATE.md) and the [independent review / completed and remaining work](docs/PRODUCT-REVIEW-2026-09-14.md).
 
 ## Product rules
 
@@ -35,9 +35,9 @@ Play every decision in Pack 1 of a historical draft seat. Your hypothetical sele
 
 ## Production data
 
-The production catalog is generated from eligible 17Lands Premier Draft public datasets. Each imported set has 300 target historical replays, a manifest, compact replay shards, and a separate counterfactual path model under `data/<set>/`. The browser loads only the shard required for the selected replay.
+The legacy replay catalog is generated from eligible 17Lands Premier Draft public datasets. Each imported set targets 300 historical replays, a manifest, compact replay shards, and a separate counterfactual path model under `data/<set>/`. Published replay shards are served from `data.packone.pro` through R2; the browser loads only the shard required for the selected replay. Local shard files are hydrated for full CI validation.
 
-The catalog-driven importer automatically works backward through missing public sets in small validated batches, so the set list is no longer maintained by hand. `data/catalog.json` is the source of truth for what is currently playable.
+The queued replay importer works through missing public sets in small validated batches. `data/catalog.json` registers replay environments. Draft Run/Cube use a separate verified trophy corpus in Neon; its full population is not limited to the replay sample. The checked-in `corpus/draft-run` files are a frozen baseline, while validated full imports expand the database. See [data management](docs/DATA-MANAGEMENT.md) and [full trophy importing](docs/ALL_TROPHY_IMPORT.md) for eligibility, counts and actual release controls.
 
 The consensus model is `strong-player-pool-context-v2`: hierarchical strong-player pick tendencies plus shrinkage-adjusted candidate/pool co-pick lift. Replays are scored out-of-fold by draft ID. Model probabilities are comparative choice support, not calibrated win probabilities.
 
@@ -45,14 +45,16 @@ The consensus model is `strong-player-pool-context-v2`: hierarchical strong-play
 
 ### Static game frontend
 
-GitHub Pages serves the application and compact replay data:
+GitHub Pages serves the application, catalogs and compact model metadata; large replay shards are served separately through R2:
 
 - `app.js` / `scoring.mjs`: core game and grading UI.
 - `product.mjs` / `flow-fixes.mjs`: seeded-game and dedicated-result flows.
 - `social.mjs`: challenge sharing, community picks, result cards.
 - `growth.mjs` / `retention.mjs`: analytics, My Stats, optional account surfaces, local/remote result sync.
 - `data/catalog.json`: production set catalog.
-- `data/<set>/manifest.json` + `shards/`: precomputed replay data.
+- `data/<set>/manifest.json` + R2 `data/<set>/shards/`: precomputed replay data.
+- `draft-run-product.mjs` / `draft-run-feedback.mjs`: primary game UI and locked consensus comparison.
+- `game-date.mjs` / `html.mjs`: shared Eastern game dates and HTML escaping.
 
 ### Neon backend
 
@@ -79,9 +81,11 @@ Neon Auth (managed Better Auth) supplies email/password accounts. The first sign
 
 The game never requires login. Auth session tokens are stored first-party by Pack 1 and validated server-side against Neon Auth; the flow does not depend on third-party cookies.
 
+Here, first-party storage means browser localStorage on the Pack One origin, not HttpOnly cookies. Session expiry/revocation and a first-party cookie route remain [account-hardening work](docs/REQUEST-INTEGRITY.md).
+
 ### Analytics
 
-`analytics_events` stores an event name, sanitized gameplay properties, optional Pack 1 player ID, and timestamp. Email/password data is not written to product analytics.
+`analytics_events` stores an event name, sanitized gameplay properties, Pack 1 player ID when available, and timestamp. Existing rows may be anonymous; the merged growth API requires a signed guest/player token for new client submissions and rejects server-owned milestone names. That protection requires backend deployment. Email/password data is not written to product analytics.
 
 The internal Neon view `analytics_funnel_daily` summarizes:
 
@@ -111,14 +115,18 @@ npm test
 
 The unit suite covers scoring, Daily selection, cohort/model logic, sharding, dataset validation, importer discovery, and JavaScript syntax.
 
+Three distribution test files skip locally without private replay shards. Same-repository CI hydrates R2 and sets `REQUIRE_REPLAY_SHARDS=1`; do not report a local pass as coverage of those files. Relevant backend PRs also run SQL integration suites on an expiring isolated Neon branch. Neither a Git merge nor that isolated database gate deploys production functions.
+
 `.github/workflows/e2e.yml` runs a mobile-width Chromium product matrix covering production sets, deterministic seeded friend challenges, hidden-before-reveal friend comparison, Daily Top 3, a complete Full Pack run, dedicated result screens, My Stats, and optional Account UI.
+
+It also covers Draft Run/Cube packs, locked consensus feedback, the phone dock and Today refresh/rollover. The standalone audit `node scripts/review-draft-run-baseline.mjs` recomputes frozen-corpus card scores; its puzzle-weighted summary is not a current production run benchmark.
 
 ## Importing sets
 
 `.github/workflows/build-more-sets.yml` is the automatic backlog importer. On a normal run it:
 
-1. makes one Scryfall set-catalog request and considers released sets newest-first;
-2. probes the official 17Lands public S3 draft archive for missing Premier Draft datasets;
+1. consumes the explicit newest-first queue in `data/import-queue.json` (Scryfall discovery is a fallback when the queue is unavailable);
+2. checks public Premier Draft archive availability for the queued or manually selected sets;
 3. imports up to three available missing sets;
 4. derives each 17Lands source date from the archive metadata;
 5. stages each set outside `data/`, builds replay shards plus the path model, and validates both;
@@ -126,6 +134,8 @@ The unit suite covers scoring, Daily selection, cohort/model logic, sharding, da
 7. makes one serialized Git commit with push/rebase retries.
 
 The workflow runs daily, and also runs when importer/model code lands on `main`, so a historical backlog fills itself without hand-editing YAML. A failed set does not contaminate the catalog or discard other successful sets from the same batch. Raw 17Lands CSV archives are temporary and never committed.
+
+This schedule applies to the **legacy replay backlog**. The full-trophy workflow `import-all-trophies.yml` and legacy skill backfill `backfill-legacy-sets.yml` are manually dispatched. Editing those importers does not trigger their full rebuilds. Preserve source freshness; a completed snapshot does not make future archive checks unnecessary.
 
 Manual discovery without building:
 

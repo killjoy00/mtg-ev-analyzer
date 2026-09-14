@@ -1,8 +1,14 @@
 # Pack One current state
 
-Updated: September 2026.
+Updated: 2026-09-14.
 
-This file is the short operational reference for the product as it exists now. Older launch and migration documents remain useful history, but this file should win when they describe an earlier rollout state.
+This file is the short reference for the product contract and merged implementation. Older launch and migration documents remain useful history, but this file should win when they describe an earlier rollout state. Merged backend code is not automatically deployed.
+
+## Release status
+
+PRs [83](https://github.com/killjoy00/mtg-ev-analyzer/pull/83), [84](https://github.com/killjoy00/mtg-ev-analyzer/pull/84) and [85](https://github.com/killjoy00/mtg-ev-analyzer/pull/85) passed their applicable gates and are merged. The new frontend consensus module was confirmed live on September 14. Production acceptance of the complete revised flow remains open, including native-device checks.
+
+**Pending backend deployment:** migrations 0012/0013 and the revised Draft Run, growth and legacy API functions. This includes bounded SQL selection, completion markers, authenticated analytics and per-player quotas. See [backend release instructions](BACKEND-RELIABILITY.md), [request protections and remaining gaps](REQUEST-INTEGRITY.md) and the [full review/status report](PRODUCT-REVIEW-2026-09-14.md). Do not claim those protections or a production speedup solely from the Git merge.
 
 ## Primary product
 
@@ -21,7 +27,7 @@ The home page now treats those two Dailies as one simple daily check-in: show wh
 
 ## Scoring and difficulty
 
-The historical trophy pick remains the full-credit target at 100. Other choices receive contextual partial credit capped at 95.
+The historical trophy pick remains the full-credit target at 100. Other choices receive contextual partial credit capped at 95. The final score rounds the mean of ten pick scores; nine trophy matches and one 95 display 100. Trophy-match count remains a separate statistic.
 
 Difficulty is an internal run-composition and reroll-matching heuristic. Unanswered player-facing puzzles do not show difficulty ratings/bands or grading support before the choice is locked. Human calibration should come from non-QA first-attempt observations before any future threshold change.
 
@@ -68,6 +74,6 @@ For the current product chapter, 'finished' does **not** mean adding another gam
 4. The Cube image identity audit stays clean and image refresh cannot alter gameplay data.
 5. Today/Profile surfaces use existing authoritative data rather than creating parallel state.
 6. Analytics cleanly separate QA from real first-attempt player behavior before calibration decisions are made.
-7. Remaining work is retention, challenge-loop polish, human difficulty calibration and distribution — not core-mechanics reconstruction.
+7. Merged backend changes are deployed and measured, remaining ingress/session risks are addressed, and retention/device/calibration evidence supports the next product changes. Keep all existing modes and the fixed trophy scoring rule.
 
 See `CHARTER.md`, `DATA-MANAGEMENT.md`, `SCORING-AND-DIFFICULTY.md` and `LAUNCH_REVIEW.md` for deeper history and contracts.
