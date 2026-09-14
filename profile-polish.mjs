@@ -1,5 +1,4 @@
 import { loadMyProfile } from './growth-api.mjs';
-import { bestPercentile, formatChallengeRecord, recentForm } from './profile-core.mjs';
 
 let observer = null;
 let activePage = null;
@@ -35,7 +34,7 @@ function ensureStrip(page) {
   if (!strip.querySelector('.profile-snapshot-heading')) {
     const heading = document.createElement('div');
     heading.className = 'profile-snapshot-heading';
-    heading.innerHTML = '<span>Career snapshot</span><small>The useful stuff, up front.</small>';
+    heading.innerHTML = '<span>Career snapshot</span><small>Primary play, up front.</small>';
     strip.prepend(heading);
   }
   return strip;
@@ -51,23 +50,12 @@ async function enhanceOwnProfile(page) {
     const strip = ensureStrip(page);
     const draftRun = (profile.by_mode || []).find((row) => row.mode === 'draft_run');
     const cube = profile.cube;
-    const best = bestPercentile(profile);
-    const form = recentForm(profile);
 
     if (Number(draftRun?.games || 0) > 0 && !hasLabel(strip, 'Draft Run')) {
       strip.append(stat('Draft Run', Number(draftRun.average_score || 0).toFixed(1), `${Number(draftRun.games)} games · ${Number(draftRun.best_score || 0)} best`));
     }
     if (Number(cube?.games || 0) > 0 && !hasLabel(strip, 'Powered Cube')) {
       strip.append(stat('Powered Cube', Number(cube.average_score || 0).toFixed(1), `${Number(cube.games)} runs · ${Number(cube.best_score || 0)} best`));
-    }
-    if (best && !hasLabel(strip, 'Best Daily')) {
-      strip.append(stat('Best Daily', `Top ${best}%`));
-    }
-    if (form != null && !hasLabel(strip, 'Recent form')) {
-      strip.append(stat('Recent form', form.toFixed(1), 'last 10 average'));
-    }
-    if (!hasLabel(strip, 'Challenges')) {
-      strip.append(stat('Challenges', formatChallengeRecord(profile.summary || {}), 'win · loss · tie'));
     }
     page.dataset.profilePolish = '1';
   } catch {
