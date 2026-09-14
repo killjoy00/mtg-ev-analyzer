@@ -37,6 +37,25 @@ test('balanced runs enforce the easy cap and maintain a medium majority across s
   assert.throws(()=>selectDraftRun(pool.filter(p=>p.top_two_ratio>=.8),'only-hard'),/balanced/);
 });
 
+test('Powered Cube starts at the first fully observed decision P1P2 when P1P1 is absent',()=>{
+  const pool=[];
+  for(let pick=2;pick<=12;pick++)for(let source=0;source<16;source++)for(const rating of [30,65,90]) {
+    pool.push(meta(`cube-${pick}-${source}-${rating}`,rating,{set:'powered-cube',pick}));
+  }
+  for(let i=0;i<50;i++) {
+    const run=selectDraftRun(pool,`cube-p1p2-${i}`,'powered-cube');
+    const bands=run.map(p=>rateDraftRunPuzzle(p).band);
+    assert.equal(run.length,10);
+    assert.equal(run[0].pick_number,2);
+    assert.ok(run.every(p=>p.pick_number>=2&&p.pick_number<=11));
+    assert.ok(run.slice(8).every(p=>p.pick_number>=9));
+    assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,10);
+    assert.equal(bands.filter(b=>b==='easy').length,1);
+    assert.equal(bands.filter(b=>b==='medium').length,6);
+    assert.equal(bands.filter(b=>b==='hard').length,3);
+  }
+});
+
 test('set exclusions affect random runs and rerolls, with a small Daily-only recency bias',()=>{
   const pool=[];
   for(let pick=1;pick<=12;pick++)for(const set of ['hbg','sir','pio',...REGULAR_SET_ORDER])for(const rating of [30,65,90])pool.push(meta(`${pick}-${set}-${rating}`,rating,{set,pick}));
