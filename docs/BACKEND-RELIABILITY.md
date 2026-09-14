@@ -18,9 +18,9 @@ The API no longer caches or downloads the million-row pool. `loadVerifiedPool` r
 
 ## Release and rollback
 
-1. Run the PR's backend schema gate. It applies additive migration `0012_draft_run_serving_indexes.sql` on an expiring isolated Neon branch, compares SQL selection/rerolls with the exhaustive reference, and runs mixed, Cube and measurement integration suites.
+1. Run the PR's backend schema gate. It applies the known additive release backlog (migrations 0012/0013) plus new PR migrations on an expiring isolated Neon branch, compares SQL selection/rerolls with the exhaustive reference, and runs mixed, Cube, measurement and request-integrity integration suites. The parent can lag Git main; [CI synchronization details](REQUEST-INTEGRITY.md) explain why a PR-only migration diff is insufficient.
 2. Inspect actual timings against the full copied production corpus. Compare cold and warm starts, existing Daily joins, friend starts, rerolls and concurrent starts. Statement-count reduction alone is not a latency result.
-3. Apply the migration on development, deploy the same reviewed function bundle, and run the HTTP smoke suites. Then repeat migration and deployment in production with the exact reviewed commit. No corpus rebuild is required.
+3. Apply migrations 0012 and 0013 in order on development. Deploy the reviewed `draftrunapi`, `pack1growth` and `pack1api` bundles, and run their HTTP smoke suites. Then repeat migration and deployment in production with the exact reviewed commit. No corpus rebuild is required. The ordinary GitHub merge workflow does not perform this release; obtain Neon deployment access or use an approved owner-operated deployment path.
 4. Verify health coverage, practice creation/rerolls and recovery. A production ranked Daily completion requires an explicit QA/data-cleanup plan; local and isolated database checks do not establish native-device or production behavior.
 5. If deployment regresses, restore the prior function bundle. Additive indexes/marker may remain. Old functions ignore the marker; a later redeployment repairs it safely.
 

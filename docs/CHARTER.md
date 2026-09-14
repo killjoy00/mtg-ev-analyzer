@@ -6,6 +6,8 @@ Status: implemented Draft Run contract, September 2026.
 
 Pack One is a fast Limited decision game built from real 17Lands Premier Draft data. It is not a deck builder and it does not simulate a full draft table or claim to know how seven other seats would react to alternate choices. The player makes difficult draft choices, sees what an elite drafter actually did, and gets a compact score that also respects strong-player consensus.
 
+Owner confirmation, 2026-09-14: learning and competition are both goals. Trophy picks earning 100 and the existing game modes are fixed constraints. Other choices may be reconsidered with evidence; a model preference is not proof that a historical choice was wrong. See the [independent review](PRODUCT-REVIEW-2026-09-14.md).
+
 Draft Run is the primary game and Daily entry point. Powered Cube has its own ten-decision trophy flow. Those two games are the primary homepage products. The opening-pack Daily, Top 3, Full Pack, and Set Practice remain available together under the secondary **More modes** tab.
 
 ## Additional mode: Top 3
