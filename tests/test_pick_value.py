@@ -125,6 +125,23 @@ class OutcomeAxisTests(unittest.TestCase):
         # push it down the way it would a coloured card.
         self.assertAlmostEqual(axis.pair("land", {"red": 12})[1], 0.9 * 0.01)
 
+    def test_cross_fitted_axis_uses_a_different_table_per_fold(self):
+        """Each fold's table is built without that fold's own games, so a draft
+        is never scored using the outcomes it helped produce."""
+        axis = OutcomeAxis(
+            [{"red": 0.01}, {"red": 0.09}],
+            [{"red": 0.02}, {"red": 0.08}],
+            self.fit(), folds=2)
+        self.assertTrue(axis.cross_fitted)
+        self.assertAlmostEqual(axis.pair("red", {}, 0)[0], 0.2 * 0.01)
+        self.assertAlmostEqual(axis.pair("red", {}, 1)[0], 0.2 * 0.09)
+        self.assertEqual(axis.measured(), 1)
+
+    def test_a_single_table_ignores_the_fold(self):
+        axis = OutcomeAxis({"red": 0.03}, {"red": 0.05}, self.fit())
+        self.assertFalse(axis.cross_fitted)
+        self.assertEqual(axis.pair("red", {}, 0), axis.pair("red", {}, 7))
+
     def test_a_card_missing_either_measure_has_no_value(self):
         axis = OutcomeAxis({"red": 0.03}, {"red": 0.05}, self.fit())
         self.assertIsNone(axis.pair("missing", {}))

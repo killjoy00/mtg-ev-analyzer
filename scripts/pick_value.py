@@ -43,7 +43,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from build_replays import logit, normalize_probabilities, open_text  # noqa: E402
+from build_replays import logit, normalize_probabilities, open_text, stable_fold  # noqa: E402
 from deck_fit import COLOURS, commit_bucket, commitment  # noqa: E402
 from eval_model import (  # noqa: E402
     VARIANTS,
@@ -129,10 +129,12 @@ class OutcomeAxis:
     the same thing on each.
     """
 
-    def __init__(self, gih: Dict[str, float], iwd: Dict[str, float],
-                 fit: Optional[dict] = None):
-        self.gih = gih
-        self.iwd = iwd
+    def __init__(self, gih, iwd, fit: Optional[dict] = None, folds: int = 1):
+        # gih/iwd are either one dict, or a list of per-fold dicts. With folds,
+        # a draft is scored from a table built without its own games.
+        self.folds = folds
+        self.gih_folds = gih if isinstance(gih, list) else [gih]
+        self.iwd_folds = iwd if isinstance(iwd, list) else [iwd]
         self.fit = fit
         self.colours: Dict[str, frozenset] = {}
         if fit:
@@ -144,8 +146,12 @@ class OutcomeAxis:
     def context_aware(self) -> bool:
         return self.fit is not None
 
+    @property
+    def cross_fitted(self) -> bool:
+        return self.folds > 1
+
     def measured(self) -> int:
-        return len(set(self.gih) & set(self.iwd))
+        return len(set(self.gih_folds[0]) & set(self.iwd_folds[0]))
 
     def play_probability(self, card: str, pool: Dict[str, int]) -> Optional[float]:
         if not self.fit:
@@ -156,10 +162,12 @@ class OutcomeAxis:
         bucket = commit_bucket(commitment(pool, self.colours, card))
         return row["by_commitment"].get(bucket, row["play_rate"])
 
-    def pair(self, card: str, pool: Dict[str, int]) -> Optional[Tuple[float, float]]:
+    def pair(self, card: str, pool: Dict[str, int],
+             fold: int = 0) -> Optional[Tuple[float, float]]:
         """(absolute strength, within-deck contribution), both play-weighted."""
-        gih = self.gih.get(card)
-        iwd = self.iwd.get(card)
+        index = fold if self.folds > 1 else 0
+        gih = self.gih_folds[index].get(card)
+        iwd = self.iwd_folds[index].get(card)
         if gih is None or iwd is None:
             return None
         played = self.play_probability(card, pool)
@@ -187,7 +195,8 @@ def behaviour_support(model: VariantModel, card: str, pack: int, pick: int) -> i
 
 def decision_values(model: VariantModel, example, outcome: OutcomeAxis,
                     combos: Sequence[Tuple[float, float]],
-                    adaptive: bool = False) -> Optional[Dict[str, Tuple[float, float]]]:
+                    adaptive: bool = False,
+                    fold: int = 0) -> Optional[Dict[str, Tuple[float, float]]]:
     """For each (lambda, weight), (value of the taken card, best available).
 
     A card with no outcome measurement contributes 0 on that axis rather than
@@ -202,7 +211,7 @@ def decision_values(model: VariantModel, example, outcome: OutcomeAxis,
     normalised = normalize_probabilities(raw)
     behaviour = standardise([logit(normalised[card]) for card in cards])
 
-    pairs = [outcome.pair(card, example.pool) for card in cards]
+    pairs = [outcome.pair(card, example.pool, fold) for card in cards]
     if sum(1 for value in pairs if value is not None) < 2:
         return None
 
@@ -268,7 +277,9 @@ def draft_regret(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
                 continue
             if pick_number > max_pick:
                 continue
-        values = decision_values(model, example, outcome, combos, adaptive)
+        fold = (stable_fold(example.draft_id, outcome.folds)
+                if outcome.cross_fitted else 0)
+        values = decision_values(model, example, outcome, combos, adaptive, fold)
         if values is None:
             continue
         for label, (taken, best) in values.items():
@@ -376,16 +387,25 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     max_pick = 11 if cache.set_id == "powered-cube" else 10
 
     payload = json.loads(outcomes.read_text(encoding="utf-8"))
-    baseline = float(payload.get("baseline_win_rate") or 0.5)
-    # GIH is centred on the set's own baseline so both measures sit around zero;
-    # otherwise multiplying by the play probability would mostly measure the
-    # play probability.
-    gih = {name: row["gih_wr_shrunk"] - baseline for name, row in payload["cards"].items()
-           if row.get("gih_wr_shrunk") is not None}
-    iwd = {name: row["iwd_shrunk"] for name, row in payload["cards"].items()
-           if row.get("iwd_shrunk") is not None}
+
+    def axes(table: dict) -> Tuple[Dict[str, float], Dict[str, float]]:
+        # GIH is centred on the set's own baseline so both measures sit around
+        # zero; otherwise multiplying by the play probability would mostly
+        # measure the play probability.
+        base = float(table.get("baseline_win_rate") or 0.5)
+        return ({n: r["gih_wr_shrunk"] - base for n, r in table["cards"].items()
+                 if r.get("gih_wr_shrunk") is not None},
+                {n: r["iwd_shrunk"] for n, r in table["cards"].items()
+                 if r.get("iwd_shrunk") is not None})
+
     fit = json.loads(deck_fit.read_text(encoding="utf-8")) if deck_fit else None
-    outcome = OutcomeAxis(gih, iwd, fit)
+    if payload.get("tables"):
+        folds = int(payload["folds"])
+        built = [axes(payload["tables"][str(f)]) for f in range(folds)]
+        outcome = OutcomeAxis([b[0] for b in built], [b[1] for b in built], fit, folds)
+    else:
+        gih, iwd = axes(payload)
+        outcome = OutcomeAxis(gih, iwd, fit)
 
     train_ids = cache.split_drafts("train")
     if cap:
@@ -426,6 +446,7 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
         "held_out_drafts": len(regrets),
         "cards_with_outcome": outcome.measured(),
         "outcome_axis": "play-weighted impact" if outcome.context_aware else "raw impact",
+        "cross_fitted_folds": outcome.folds,
         "weighting": "per-card by evidence" if adaptive else "fixed",
         "scored_picks": f"pack 1, picks {pick_range[0]}-{pick_range[1]}" if pick_range
         else "every pick in the draft" if all_picks
