@@ -58,8 +58,8 @@ def _fit_helpers():
     Bound once per model rather than looked up per call: card_tendency runs
     tens of millions of times in a sweep.
     """
-    from deck_fit import COLOURS, commit_bucket, commitment  # noqa: E402
-    return COLOURS, commit_bucket, commitment
+    from deck_fit import COLOURS, commit_bucket, commitment, stage_bucket  # noqa: E402
+    return COLOURS, commit_bucket, commitment, stage_bucket
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -278,6 +278,7 @@ class Variant:
     coverage: bool = False
     deck_fit: bool = False
     card_specific_fit: bool = True
+    fit_stage_matched: bool = False
     fit_strength: float = 0.75
     pair_min_seen: int = 8
     pair_prior_strength: float = 24.0
@@ -291,6 +292,7 @@ class Variant:
             "stage_matched": self.stage_matched, "coverage": self.coverage,
             "deck_fit": self.deck_fit, "fit_strength": self.fit_strength,
             "card_specific_fit": self.card_specific_fit,
+            "fit_stage_matched": self.fit_stage_matched,
             "pair_min_seen": self.pair_min_seen,
             "pair_prior_strength": self.pair_prior_strength,
             "context_strength": self.context_strength,
@@ -318,9 +320,12 @@ VARIANTS: Dict[str, Variant] = {
                 notes="stage-matched pair lift and colour-commitment context, additive"),
         Variant("v3-colour-only", context=False, deck_fit=True, card_specific_fit=False,
                 notes="one format-wide colour-commitment curve, no per-card play rates"),
+        Variant("v3-colour-stage", context=False, deck_fit=True, card_specific_fit=False,
+                fit_stage_matched=True,
+                notes="format-wide colour curve held at a fixed point in the draft"),
         Variant("v3-colour-and-pair", deck_fit=True, card_specific_fit=False,
-                stage_matched=True,
-                notes="stage-matched pair lift and the format-wide colour curve"),
+                stage_matched=True, fit_stage_matched=True,
+                notes="stage-matched pair lift and stage-matched colour curve"),
     ]
 }
 
@@ -358,7 +363,8 @@ class VariantModel(OutOfFoldModel):
         self.fit = fit
         self.fit_colours: Dict[str, frozenset] = {}
         if fit:
-            colours, self._commit_bucket, self._commitment = _fit_helpers()
+            (colours, self._commit_bucket, self._commitment,
+             self._stage_bucket) = _fit_helpers()
             for name, row in fit["cards"].items():
                 letters = row.get("colours") or "C"
                 self.fit_colours[name] = frozenset(c for c in letters if c in colours)
@@ -381,21 +387,29 @@ class VariantModel(OutOfFoldModel):
         """
         if not self.fit:
             return 0.0
-        # The colour-only variant still needs the card's colours to know which
-        # of the pool counts; what it drops is the card's own play rates.
+        # The colour-only variants still need the card's colours, to know which
+        # of the pool counts; what they drop is the card's own play rates.
         row = (self.fit["cards"].get(card) if self.variant.card_specific_fit
                else (self.fit if card in self.fit["cards"] else None))
         if row is None:
             return 0.0
-        unconditional = row.get("play_rate")
-        if not unconditional:
-            return 0.0
         bucket = self._commit_bucket(self._commitment(dict(pool), self.fit_colours, card))
-        conditioned = row["by_commitment"].get(bucket)
-        if conditioned is None:
+        conditioned = reference = None
+        if self.variant.fit_stage_matched:
+            # Commitment can never exceed the pool it is counted from, so the
+            # marginal curve reads draft stage as well as colour fit. Hold the
+            # stage and the shift is colour fit alone.
+            cell = self.fit.get("by_stage", {}).get(self._stage_bucket(sum(pool.values())))
+            if cell:
+                conditioned, reference = cell.get(bucket), cell.get("*")
+        if conditioned is None or reference is None:
+            # No usable stage cell: fall back to the marginal curve rather than
+            # to a cell too thin to report.
+            conditioned, reference = row["by_commitment"].get(bucket), row.get("play_rate")
+        if not conditioned or not reference:
             return 0.0
         clamp = lambda p: min(1 - 1e-6, max(1e-6, p))
-        return logit(clamp(conditioned)) - logit(clamp(unconditional))
+        return logit(clamp(conditioned)) - logit(clamp(reference))
 
     def card_tendency(self, card: str, pack_number: int, pick_number: int,
                       pool: Mapping[str, int]) -> float:

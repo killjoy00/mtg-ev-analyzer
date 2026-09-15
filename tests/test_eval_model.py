@@ -315,6 +315,58 @@ class VariantTests(unittest.TestCase):
         self.assertNotAlmostEqual(per_card.fit_shift("vanilla", blue_pool),
                                   per_card.fit_shift("mono", blue_pool), places=6)
 
+    def coloured_model(self, name, pools, by_stage=None):
+        """A model that knows the colours of the cards in `pools`.
+
+        The fit table only names the three cards under test, so a pool card's
+        colour has to be painted on or commitment silently counts zero - which
+        is a real trap, since every such test would then compare bucket "0"
+        against bucket "0" and pass for the wrong reason.
+        """
+        model = self.fit_model(name=name)
+        if by_stage is not None:
+            model.fit["by_stage"] = by_stage
+        for pool, letters in pools:
+            for card in pool:
+                model.fit_colours[card] = frozenset(letters)
+        return model
+
+    def test_holding_the_stage_strips_a_commitment_effect_that_is_only_stage(self):
+        """A pool of eight is both "your colours are settled" and "you are eight
+        picks in". Here the play rate depends only on the latter, so a term
+        that reads commitment must report nothing."""
+        pool = {f"blue{i}": 1 for i in range(8)}
+        stage = {  # every commitment level inside this stage plays at its rate
+            "s6-9": {"*": 0.70, "3-5": 0.70, "6-9": 0.70},
+            "s1-2": {"*": 0.45, "0": 0.45, "1-2": 0.45},
+        }
+        held = self.coloured_model("v3-colour-stage", [(pool, "U")], stage)
+        marginal = self.coloured_model("v3-colour-only", [(pool, "U")])
+        # The marginal curve reads this as a large lift; holding the stage
+        # leaves nothing, because nothing here is about colour.
+        self.assertGreater(marginal.fit_shift("mono", pool), 0.5)
+        self.assertAlmostEqual(held.fit_shift("mono", pool), 0.0, places=12)
+
+    def test_a_real_colour_effect_survives_holding_the_stage(self):
+        on_colour = {f"blue{i}": 1 for i in range(8)}
+        off_colour = {f"red{i}": 1 for i in range(8)}
+        model = self.coloured_model("v3-colour-stage",
+                                    [(on_colour, "U"), (off_colour, "R")],
+                                    {"s6-9": {"*": 0.60, "0": 0.30, "6-9": 0.85}})
+        self.assertGreater(model.fit_shift("mono", on_colour), 0)
+        self.assertLess(model.fit_shift("mono", off_colour), 0)
+
+    def test_a_missing_stage_cell_falls_back_to_the_marginal_curve(self):
+        """Thin cells are dropped upstream, so the consumer must land on the
+        marginal curve rather than on nothing."""
+        pool = {f"blue{i}": 1 for i in range(8)}
+        held = self.coloured_model("v3-colour-stage", [(pool, "U")],
+                                   {"s20+": {"*": 0.6, "10+": 0.9}})
+        marginal = self.coloured_model("v3-colour-only", [(pool, "U")])
+        self.assertAlmostEqual(held.fit_shift("mono", pool),
+                               marginal.fit_shift("mono", pool), places=12)
+        self.assertNotAlmostEqual(held.fit_shift("mono", pool), 0.0, places=6)
+
     def test_the_colour_only_variant_still_needs_to_know_the_card(self):
         """Colours come from the same table, so a card missing from it has no
         colours to match on and must not be given the curve anyway."""
