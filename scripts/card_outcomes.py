@@ -1,0 +1,224 @@
+#!/usr/bin/env python3
+"""Outcome-based card strength from 17Lands game data.
+
+The consensus model measures what strong players take. That is a strong signal
+and this does not replace it - it supplies a second, independent one, so the two
+can be weighed against each other instead of one being assumed to be the truth.
+
+Three measures per card, all computed here rather than taken from an aggregate:
+
+  GIH WR  win rate in games where the card was in hand (opening hand, drawn, or
+          tutored). The familiar number, but it flatters cards that sit in good
+          decks, because a better deck wins more whatever it draws.
+
+  GND WR  win rate in games where the card was in the deck and NOT drawn.
+
+  IWD     GIH WR - GND WR. The same decks, split by whether the card actually
+          showed up, so deck quality cancels. This is the measure closest to
+          "how much did this card itself do", and it is the one to weigh against
+          pick behaviour.
+
+Every rate is reported with its sample size and a shrunk estimate, because a
+mythic seen 200 times and a common seen 40,000 times are not equal evidence and
+must not be weighted as if they were.
+
+Reads a local archive, writes JSON. No database, no network.
+"""
+
+from __future__ import annotations
+
+import argparse
+import csv
+import gzip
+import json
+import math
+import sys
+from pathlib import Path
+from typing import Dict, List, Optional, Sequence, Tuple
+
+CARD_GROUPS = ("deck_", "opening_hand_", "drawn_", "tutored_", "sideboard_")
+# Shrinkage strength in "pseudo-games" toward the set's own average. Chosen to
+# leave a card with a few thousand games essentially unshrunk while pulling a
+# card with a few dozen most of the way back to the mean.
+PRIOR_GAMES = 400.0
+IWD_PRIOR_GAMES = 400.0
+
+
+def open_text(path: Path):
+    if str(path).endswith(".gz"):
+        return gzip.open(path, "rt", encoding="utf-8-sig", newline="")
+    return path.open("r", encoding="utf-8-sig", newline="")
+
+
+def count_of(value: str) -> int:
+    """Card columns hold small integers; '' and '0' are the common case."""
+    if not value or value == "0":
+        return 0
+    try:
+        return max(0, int(float(value)))
+    except ValueError:
+        return 0
+
+
+def column_index(header: Sequence[str]) -> Tuple[Dict[str, Dict[str, int]], Dict[str, int]]:
+    """card name -> {group: column index}, plus the plain columns we need."""
+    cards: Dict[str, Dict[str, int]] = {}
+    for position, name in enumerate(header):
+        for group in CARD_GROUPS:
+            if name.startswith(group):
+                cards.setdefault(name[len(group):], {})[group] = position
+                break
+    plain = {name: position for position, name in enumerate(header)
+             if name in {"won", "draft_id", "user_game_win_rate_bucket",
+                         "user_n_games_bucket", "main_colors", "rank"}}
+    missing = {"won"} - set(plain)
+    if missing:
+        raise ValueError(f"game data is missing required columns: {sorted(missing)}")
+    if not cards:
+        raise ValueError("game data has no per-card columns")
+    return cards, plain
+
+
+def tally(archive: Path) -> Tuple[Dict[str, Dict[str, int]], int]:
+    """One pass: per card, games in hand / not drawn / in deck, and wins of each."""
+    with open_text(archive) as handle:
+        reader = csv.reader(handle)
+        header = next(reader)
+        cards, plain = column_index(header)
+        won_at = plain["won"]
+
+        # Flatten to parallel lists so the hot loop avoids dict lookups.
+        names: List[str] = []
+        deck_at: List[int] = []
+        hand_at: List[Tuple[int, ...]] = []
+        for name, groups in cards.items():
+            if "deck_" not in groups:
+                continue
+            in_hand = tuple(groups[g] for g in ("opening_hand_", "drawn_", "tutored_")
+                            if g in groups)
+            if not in_hand:
+                continue
+            names.append(name)
+            deck_at.append(groups["deck_"])
+            hand_at.append(in_hand)
+
+        size = len(names)
+        gih_games = [0] * size
+        gih_wins = [0] * size
+        gnd_games = [0] * size
+        gnd_wins = [0] * size
+        deck_games = [0] * size
+        deck_wins = [0] * size
+        rows = 0
+
+        for values in reader:
+            if len(values) != len(header):
+                continue
+            won_value = values[won_at]
+            won = 1 if won_value in ("True", "true", "1") else 0
+            rows += 1
+            for index in range(size):
+                if not count_of(values[deck_at[index]]):
+                    continue
+                deck_games[index] += 1
+                deck_wins[index] += won
+                drawn = 0
+                for position in hand_at[index]:
+                    drawn += count_of(values[position])
+                if drawn:
+                    gih_games[index] += 1
+                    gih_wins[index] += won
+                else:
+                    gnd_games[index] += 1
+                    gnd_wins[index] += won
+
+    result = {}
+    for index, name in enumerate(names):
+        if not deck_games[index]:
+            continue
+        result[name] = {
+            "gih_games": gih_games[index], "gih_wins": gih_wins[index],
+            "gnd_games": gnd_games[index], "gnd_wins": gnd_wins[index],
+            "deck_games": deck_games[index], "deck_wins": deck_wins[index],
+        }
+    return result, rows
+
+
+def shrink(wins: int, games: int, mean: float, prior: float) -> float:
+    return (wins + prior * mean) / (games + prior) if games or prior else mean
+
+
+def summarise(counts: Dict[str, Dict[str, int]]) -> dict:
+    total_games = sum(c["deck_games"] for c in counts.values())
+    total_wins = sum(c["deck_wins"] for c in counts.values())
+    baseline = total_wins / total_games if total_games else 0.5
+
+    rows = {}
+    for name, c in counts.items():
+        gih = c["gih_wins"] / c["gih_games"] if c["gih_games"] else None
+        gnd = c["gnd_wins"] / c["gnd_games"] if c["gnd_games"] else None
+        shrunk_gih = shrink(c["gih_wins"], c["gih_games"], baseline, PRIOR_GAMES)
+        shrunk_gnd = shrink(c["gnd_wins"], c["gnd_games"], baseline, PRIOR_GAMES)
+        # Both halves shrink toward the same baseline, so an unsupported card's
+        # IWD collapses to zero rather than to a large spurious swing.
+        support = min(c["gih_games"], c["gnd_games"])
+        rows[name] = {
+            "gih_games": c["gih_games"],
+            "gnd_games": c["gnd_games"],
+            "deck_games": c["deck_games"],
+            "gih_wr": round(gih, 5) if gih is not None else None,
+            "gnd_wr": round(gnd, 5) if gnd is not None else None,
+            "gih_wr_shrunk": round(shrunk_gih, 5),
+            "iwd": round(gih - gnd, 5) if (gih is not None and gnd is not None) else None,
+            "iwd_shrunk": round((shrunk_gih - shrunk_gnd)
+                                * (support / (support + IWD_PRIOR_GAMES)), 5),
+            "support_games": support,
+        }
+    return {"baseline_win_rate": round(baseline, 5),
+            "deck_card_games": total_games, "cards": rows}
+
+
+def run(args: argparse.Namespace) -> int:
+    counts, rows = tally(Path(args.archive))
+    summary = summarise(counts)
+    summary["set_id"] = args.set_id
+    summary["archive"] = Path(args.archive).name
+    summary["game_rows"] = rows
+    Path(args.out).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
+
+    ranked = sorted((c for c in summary["cards"].items() if c[1]["iwd"] is not None),
+                    key=lambda item: -item[1]["iwd_shrunk"])
+    print(json.dumps({
+        "set_id": args.set_id, "game_rows": rows,
+        "cards": len(summary["cards"]),
+        "baseline_win_rate": summary["baseline_win_rate"],
+        "median_support_games": sorted(c["support_games"] for c in summary["cards"].values())
+        [len(summary["cards"]) // 2],
+        "out": args.out,
+    }, indent=2))
+    print("\nhighest measured impact (shrunk IWD):", file=sys.stderr)
+    for name, row in ranked[:8]:
+        print(f"  {name[:38]:<38} IWD {row['iwd_shrunk']:+.4f}  "
+              f"GIH {row['gih_wr']:.4f}  n={row['support_games']}", file=sys.stderr)
+    print("lowest:", file=sys.stderr)
+    for name, row in ranked[-5:]:
+        print(f"  {name[:38]:<38} IWD {row['iwd_shrunk']:+.4f}  "
+              f"GIH {row['gih_wr']:.4f}  n={row['support_games']}", file=sys.stderr)
+    return 0
+
+
+def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(description=__doc__,
+                                     formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--archive", required=True, help="game_data_public.<SET>.PremierDraft.csv.gz")
+    parser.add_argument("--set-id", required=True)
+    parser.add_argument("--out", required=True)
+    return parser.parse_args(argv)
+
+
+def main(argv: Optional[Sequence[str]] = None) -> int:
+    return run(parse_args(argv))
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
