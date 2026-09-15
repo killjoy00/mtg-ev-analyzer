@@ -103,32 +103,48 @@ def scan_skills(path: Path) -> Tuple[Dict[str, DraftSkill], List[str]]:
 
 
 def eligible_cohort(skills: Mapping[str, DraftSkill], minimum_games: int,
-                    top_fraction: float) -> Tuple[List[str], float, int]:
+                    top_fraction: float, cohort: str = "elite") -> Tuple[List[str], float, int]:
     """The full eligible population, uncapped and in production order.
 
     select_strong_drafts() truncates to max_training_drafts after this same
     hash ordering, so a prefix of this list is exactly what production trains
     on at any cap. Ties at the bucketed cutoff are admitted, which is why the
     eligible share lands above top_fraction.
+
+    cohort="control" inverts the filter: equally experienced drafters whose win
+    rate sits strictly below the same cutoff. They are never trained on. Scoring
+    their picks with a model built from the elite cohort is how a scoring curve
+    gets tested for what a game actually needs it to do - tell a strong drafter
+    from an ordinary one.
     """
     experienced = {d: s for d, s in skills.items() if s.games_lower_bound >= minimum_games}
     if not experienced:
         raise ValueError("No drafts met the minimum games requirement.")
     cutoff = quantile_cutoff([s.rate for s in experienced.values()], top_fraction)
-    eligible = [d for d, s in experienced.items() if s.rate >= cutoff]
-    eligible.sort(key=lambda draft_id: stable_score(f"train:{draft_id}"))
-    return eligible, cutoff, len(experienced)
+    if cohort == "control":
+        chosen = [d for d, s in experienced.items() if s.rate < cutoff]
+    elif cohort == "elite":
+        chosen = [d for d, s in experienced.items() if s.rate >= cutoff]
+    else:
+        raise ValueError(f"Unknown cohort '{cohort}'.")
+    chosen.sort(key=lambda draft_id: stable_score(f"train:{draft_id}"))
+    return chosen, cutoff, len(experienced)
 
 
 def extract(archive: Path, set_id: str, destination: Path, minimum_games: int,
-            top_fraction: float) -> dict:
-    """Archive -> compact cache of every eligible draft's picks.
+            top_fraction: float, cohort: str = "elite",
+            max_drafts: Optional[int] = None) -> dict:
+    """Archive -> compact cache of a cohort's picks.
 
-    The cache is uncapped on purpose: the training cap is a knob applied later,
-    so cap experiments reuse one extraction instead of re-reading the archive.
+    The elite cache is uncapped on purpose: the training cap is a knob applied
+    later, so cap experiments reuse one extraction instead of re-reading the
+    archive. A control cache is capped, because the cohort is far larger than
+    any analysis needs.
     """
     skills, header = scan_skills(archive)
-    eligible, cutoff, experienced = eligible_cohort(skills, minimum_games, top_fraction)
+    eligible, cutoff, experienced = eligible_cohort(skills, minimum_games, top_fraction, cohort)
+    if max_drafts and len(eligible) > max_drafts:
+        eligible = eligible[:max_drafts]
     wanted = set(eligible)
     order = {draft_id: position for position, draft_id in enumerate(eligible)}
 
@@ -182,6 +198,7 @@ def extract(archive: Path, set_id: str, destination: Path, minimum_games: int,
     meta = {
         "cache_version": CACHE_VERSION,
         "set_id": set_id,
+        "cohort": cohort,
         "archive": archive.name,
         "minimum_games": minimum_games,
         "top_fraction": top_fraction,
@@ -851,7 +868,7 @@ def cap_prefix(train_ids: Sequence[str], cap: Optional[int]) -> List[str]:
 
 def run_extract(args: argparse.Namespace) -> int:
     summary = extract(Path(args.archive), args.set_id, Path(args.cache),
-                      args.minimum_games, args.top_fraction)
+                      args.minimum_games, args.top_fraction, args.cohort, args.max_drafts)
     print(json.dumps(summary, indent=2))
     return 0
 
@@ -951,6 +968,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     extract_parser.add_argument("--cache", required=True)
     extract_parser.add_argument("--minimum-games", type=int, default=100)
     extract_parser.add_argument("--top-fraction", type=float, default=0.15)
+    extract_parser.add_argument("--cohort", default="elite", choices=["elite", "control"],
+                                help="elite: the drafters production trains on. "
+                                     "control: equally experienced drafters below the same cutoff")
+    extract_parser.add_argument("--max-drafts", type=int,
+                                help="cap the extracted cohort (control caches only need a sample)")
     extract_parser.set_defaults(func=run_extract)
 
     evaluate_parser = sub.add_parser("evaluate", help="Score variants on held-out drafts")
