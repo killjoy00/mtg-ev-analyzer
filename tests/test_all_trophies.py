@@ -84,6 +84,25 @@ class FullTrophyTests(unittest.TestCase):
             self.assertEqual(len(output['trophy']),1)
             self.assertEqual(output['trophy'][0].raw_pack_number,0)
 
+    def test_training_cap_default_matches_the_published_constant(self):
+        import inspect
+        from import_all_trophies import TRAINING_DRAFT_CAP, build_set
+        # The published corpus was scored at this cap. build_set must keep
+        # defaulting to it, or an ordinary import would silently re-score.
+        self.assertEqual(TRAINING_DRAFT_CAP, 5000)
+        self.assertEqual(inspect.signature(build_set).parameters['training_cap'].default,
+                         TRAINING_DRAFT_CAP)
+
+    def test_changing_the_cap_is_refused_once_a_set_has_published_puzzles(self):
+        from import_all_trophies import TRAINING_DRAFT_CAP, check_training_cap
+        with self.assertRaisesRegex(ValueError, 'differs from the published baseline cap'):
+            check_training_cap('blb', TRAINING_DRAFT_CAP * 2, 1200)
+
+    def test_cap_change_is_allowed_for_a_set_with_no_published_puzzles(self):
+        from import_all_trophies import TRAINING_DRAFT_CAP, check_training_cap
+        check_training_cap('brandnew', TRAINING_DRAFT_CAP * 2, 0)
+        check_training_cap('blb', TRAINING_DRAFT_CAP, 1200)
+
     def test_retired_environment_is_rejected_before_network_or_files(self):
         import hashlib
         from unittest.mock import patch
