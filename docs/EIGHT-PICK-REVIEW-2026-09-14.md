@@ -2,6 +2,8 @@
 
 Updated September 14, 2026. This follows the [initial detailed review](PRODUCT-REVIEW-2026-09-14.md). Trophy choices remain worth 100 and all existing game modes remain available.
 
+Historical release record. The [September 15 serving/release follow-up](SERVING-REVIEW-2026-09-15.md) supersedes its deployment and remaining-work status; the measurements below describe the earlier release.
+
 ## Review of the intervening implementation
 
 The intervening merged change was [PR 87](https://github.com/killjoy00/mtg-ev-analyzer/pull/87), a manual Neon deployment workflow and function manifest. At the start of this review, the live Neon project confirmed migrations 0012/0013 and production deployments `draftrunapi` 15, `pack1growth` 6 and `pack1api` 9. Health reported 920,629 eligible decisions across 33 environments, zero unrated decisions and no missing sets. Valid unauthenticated analytics submissions returned 401. The old report's pending-deployment claim was stale and has been corrected.
@@ -57,4 +59,4 @@ The manual GitHub release workflow was reviewed and its bundle/schema components
 - Refresh release dates, display names and eligible corpus coverage when adding a set. The guarantee uses registered released sets, not automatic discovery of unpublished data.
 - Investigate uneven new mixed-run start latency and perform representative load tests before claiming a latency target. The database selector is bounded, but it still performs corpus-wide group counts.
 - Choose-your-sets practice and verified competition policy remain explicitly unimplemented. Existing modes and trophy scoring are fixed.
-- The temporary Neon branch `review-eight-picks-20260914` (`br-old-base-aybckkbe`) holds disposable QA work and can be removed after confirmation. Neon's delete-branch tool explicitly requires user confirmation; it has not been deleted. CI branches use their existing automatic cleanup.
+- **Completed September 15:** the temporary Neon branch `review-eight-picks-20260914` (`br-old-base-aybckkbe`) was deleted after user confirmation, and its absence was verified. No restorable copy of its disposable QA data was retained. Production data and this report's saved evidence were unaffected. CI branches use their existing automatic cleanup.

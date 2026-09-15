@@ -2,7 +2,7 @@
 
 Pack One is a Limited draft game built from historical 17Lands Premier Draft decisions. Its primary game is **Draft Run**: eight independent choices from verified trophy drafts, two one-use rerolls, and contextual partial credit. Play the Eastern-time Daily or unlimited practice, then send the same eight packs to a friend. Powered Cube has its own trophy-only eight-decision Daily and practice flow with two pack rerolls.
 
-Live site: [packone.pro](https://packone.pro). Start with the [current state and deployment status](docs/CURRENT-STATE.md) and the [independent review / completed and remaining work](docs/PRODUCT-REVIEW-2026-09-14.md).
+Live site: [packone.pro](https://packone.pro). Start with the [current state and deployment status](docs/CURRENT-STATE.md) and the [latest review / completed and remaining work](docs/SERVING-REVIEW-2026-09-15.md). The [initial product review](docs/PRODUCT-REVIEW-2026-09-14.md) remains available as history.
 
 ## Product rules
 

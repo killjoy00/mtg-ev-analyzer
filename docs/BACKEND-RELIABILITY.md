@@ -1,18 +1,17 @@
 # Bounded Draft Run serving
 
-Implementation review: 2026-09-14. Production deployment is a separate release step; a merged backend PR does not deploy Neon Functions.
+Implementation review: 2026-09-15. Production deployment is a separate release step; a merged backend PR does not deploy Neon Functions.
 
-## Release status, 2026-09-14
+## Release status, 2026-09-15
 
-Migrations **0012 and 0013 are applied on both Neon branches** (development
+Migrations **0012–0015 are applied on both Neon branches** (development
 `br-twilight-hill-ayffyd2b` and production `br-orange-feather-ayps8kep`) and
-verified: `result_persisted_at`, `player_request_limits` and the three serving
-indexes (373-375 MB) are present in each. Production was re-checked healthy
-afterwards. The additive schema is backward compatible with the previously
-deployed function bundles, which ignore the new column, table and indexes, so
-the database and code halves of this release are decoupled.
+verified: completion markers, player request limits, the three serving indexes,
+eight/ten-pick constraints, measurement logic and serving-column statistics are
+present in each. Schema maintenance and function deployment remain separate
+release steps; a Git merge does not update either live database by itself.
 
-The follow-up review verified the prior deployment, then promoted the eight-pick implementation after migration 0014 and compatible frontend publication. Production now runs `draftrunapi` 16, `pack1growth` 7 and `pack1api` 10, all with embedded commit `76e9dca1c21f2122c051246476fdbc8c49aaf5ca`. Development runs the same content in deployments 18, 4 and 3 respectively. Exact HTTP acceptance and timing evidence are in [the follow-up report](EIGHT-PICK-REVIEW-2026-09-14.md).
+Production runs `draftrunapi` 17, `pack1growth` 8 and `pack1api` 11, all with embedded commit `ae0122f05a09de4972051cfa7350137f56eb3906`. Development runs the same content in deployments 21, 5 and 4 respectively. The eight/ten-pick compatible frontend remains live. See [current acceptance and timing evidence](SERVING-REVIEW-2026-09-15.md) and the [eight-pick release history](EIGHT-PICK-REVIEW-2026-09-14.md).
 
 ## Selection and data integrity
 
@@ -27,6 +26,8 @@ The API no longer caches or downloads the million-row pool. `loadVerifiedPool` r
 ## Planner statistics
 
 Migration 0015 explicitly analyzes the scalar serving metadata on both puzzle and rating tables. Existing auto-analyze timestamps are not proof that a newly defaulted column has statistics: `pack_number` was missing them in both development and production during the September 15 follow-up. The mixed eligibility query underestimated its input and performed hundreds of thousands of rating-index probes. Development-only refresh of that column changed the query to a parallel hash join and reduced two warm-query observations from 4.53 seconds before to 1.92/1.67 seconds after. These are SQL timings, not full HTTP response times or a load-test SLO.
+
+The complete metadata refresh subsequently measured 1.76/1.70 seconds on development and 1.69/1.72 seconds on production. The production pre-maintenance repeat was 3.79 seconds. The same query still returned 858 groups; no query, eligible population or selection policy was changed.
 
 `worker/serving-statistics.mjs` provides fixed, metadata-only `ANALYZE` statements shared by full trophy imports and rating backfills. They run only after successful import/backfill accounting, not on player requests. The readiness check requires every listed column's statistics and fails closed if any are absent. Deployments and the isolated backend gate run that check; the gate also verifies exact mixed/Cube Daily draws before and after a repeat refresh. Empty tables do not have statistics and cannot pass serving readiness; populate the verified baseline, apply the current schema, backfill ratings, then check readiness before release. The historical baseline loader's `--schema` flag installs only migration 0004 and is not a current production bootstrap.
 
