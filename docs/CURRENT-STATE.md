@@ -1,6 +1,6 @@
 # Pack One current state
 
-Updated: 2026-09-14.
+Updated: 2026-09-15.
 
 This file is the short reference for the product contract and merged implementation. Older launch and migration documents remain useful history, but this file should win when they describe an earlier rollout state. Merged backend code is not automatically deployed.
 
@@ -8,9 +8,11 @@ This file is the short reference for the product contract and merged implementat
 
 PRs [83](https://github.com/killjoy00/mtg-ev-analyzer/pull/83)–[86](https://github.com/killjoy00/mtg-ev-analyzer/pull/86) completed the initial review changes. The intervening [PR 87](https://github.com/killjoy00/mtg-ev-analyzer/pull/87) added a manual Neon deployment workflow; its earlier backend deployment was verified rather than assumed.
 
-[PR 88](https://github.com/killjoy00/mtg-ev-analyzer/pull/88) implements eight-pick runs and the Daily release guarantee. [PR 89](https://github.com/killjoy00/mtg-ev-analyzer/pull/89) strengthens release verification. Both passed unit, browser and isolated database gates and are merged. Migration 0014 is applied in development/production, the compatible Pages frontend is live, and all three Neon functions run reviewed revision `76e9dca1c21f2122c051246476fdbc8c49aaf5ca`.
+[PR 88](https://github.com/killjoy00/mtg-ev-analyzer/pull/88) implements eight-pick runs and the Daily release guarantee. [PR 89](https://github.com/killjoy00/mtg-ev-analyzer/pull/89) strengthens release verification. Both passed unit, browser and isolated database gates and are merged. Migration 0014 is applied in development/production and the compatible Pages frontend is live.
 
-See the [follow-up review and live acceptance evidence](EIGHT-PICK-REVIEW-2026-09-14.md), [backend instructions](BACKEND-RELIABILITY.md), and [remaining request/identity work](REQUEST-INTEGRITY.md). Native-device checks, representative performance testing and trusted ingress/session work remain open.
+[PR 91](https://github.com/killjoy00/mtg-ev-analyzer/pull/91) fixes missing serving statistics and refreshes them after successful imports/backfills. Migration 0015 is applied and verified on both branches. All three functions in development and production run reviewed runtime revision `ae0122f05a09de4972051cfa7350137f56eb3906`. [PR 92](https://github.com/killjoy00/mtg-ev-analyzer/pull/92) prevents image maintenance from overwriting backend releases and corrects its stale ten-pick smoke test. It changes operational tooling, not the deployed gameplay bundle. The obsolete review QA branch was deleted with approval.
+
+See the [latest review and live acceptance evidence](SERVING-REVIEW-2026-09-15.md), [eight-pick release history](EIGHT-PICK-REVIEW-2026-09-14.md), [backend instructions](BACKEND-RELIABILITY.md), and [remaining request/identity work](REQUEST-INTEGRITY.md). Native-device checks, representative performance testing and trusted ingress/session work remain open.
 
 ## Primary product
 
