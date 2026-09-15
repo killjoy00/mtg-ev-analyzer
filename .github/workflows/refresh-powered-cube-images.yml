@@ -6,11 +6,13 @@ on:
     paths:
       - scripts/refresh_powered_cube_images.py
       - scripts/refresh_powered_cube_backend_images.mjs
+      - scripts/verify-image-refresh-release.mjs
       - scripts/fetch_card_metadata.py
       - worker/trophy-import.mjs
       - worker/trophy-import-auth.mjs
       - tests/test_powered_cube_images.py
       - tests/trophy-import-auth.test.mjs
+      - tests/image-refresh-release.test.mjs
       - .github/workflows/refresh-powered-cube-images.yml
   workflow_run:
     workflows: ["build-powered-cube"]
@@ -80,6 +82,9 @@ jobs:
             generated/powered-cube-standard-images.json
             generated/powered-cube-image-refresh-report.json
 
+      - name: Verify marked, matching backend releases
+        run: node scripts/verify-image-refresh-release.mjs
+
       - name: Publish normalized Cube shards to R2
         shell: bash
         run: |
@@ -89,18 +94,6 @@ jobs:
             --content-type 'application/json; charset=utf-8' \
             --cache-control 'public, max-age=3600'
 
-      - name: Deploy current Draft Run API to development
-        shell: bash
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        run: |
-          set -euo pipefail
-          test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY is required to keep the development smoke backend current.'; exit 1; }
-          npx --yes neon@4.10.0 functions deploy draftrunapi \
-            --src worker/draft-run-function.mjs \
-            --project-id patient-shadow-91417882 \
-            --branch br-twilight-hill-ayffyd2b
-
       - name: Refresh development Draft Run image metadata
         run: node scripts/refresh_powered_cube_backend_images.mjs "$DEV_IMPORT_API"
 
@@ -108,7 +101,9 @@ jobs:
         run: node tests/trophy-import-http-smoke.mjs "$DEV_IMPORT_API"
 
       - name: Refresh production Draft Run image metadata
-        run: node scripts/refresh_powered_cube_backend_images.mjs "$PROD_IMPORT_API"
+        run: |
+          node scripts/verify-image-refresh-release.mjs
+          node scripts/refresh_powered_cube_backend_images.mjs "$PROD_IMPORT_API"
 
       - name: Verify production gameplay
         run: node tests/trophy-import-http-smoke.mjs "$PROD_IMPORT_API"
