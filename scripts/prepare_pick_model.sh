@@ -22,6 +22,7 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JOBS="${JOBS:-4}"
 CONTROL_DRAFTS="${CONTROL_DRAFTS:-3000}"
 WEIGHTS="${WEIGHTS:-0,1000,4000,16000,64000}"
+LAMBDAS="${LAMBDAS:-0,0.5,1.0}"
 
 SETS=("$@")
 if [ ${#SETS[@]} -eq 0 ]; then
@@ -91,12 +92,12 @@ prepare() {
 }
 
 export -f prepare archive_name
-export WORK BASE ROOT CONTROL_DRAFTS WEIGHTS
+export WORK BASE ROOT CONTROL_DRAFTS WEIGHTS LAMBDAS
 
 printf '%s\n' "${SETS[@]}" | xargs -P "$JOBS" -I{} bash -c 'prepare "$@"' _ {}
 
 echo
 echo "measured sets: $(ls "$WORK/obs" 2>/dev/null | wc -l) of ${#SETS[@]}"
 echo "pool them with:"
-echo "  python3 scripts/pick_value.py --adaptive --weights $WEIGHTS \\"
+echo "  python3 scripts/pick_value.py --adaptive --weights $WEIGHTS --lambdas $LAMBDAS \\"
 echo "    \$(for f in $WORK/obs/*.json; do echo --observations-in \"\$f\"; done)"

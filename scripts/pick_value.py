@@ -8,20 +8,23 @@ faith:
              volume and very little noise per observation, but it is imitation:
              whatever the consensus gets wrong, it gets wrong confidently.
 
-  OUTCOME    what actually raised the win rate, measured by IWD from game data -
-             the same decks split by whether the card was drawn, so deck quality
-             cancels. Directly about winning, but noisier and blind to context:
-             it cannot know a card is uncastable in your colours.
+  OUTCOME    what actually raised the win rate. Two measures, because they fail
+             in opposite directions. GIH WR is absolute and keeps the fact that
+             some colours are simply better, but lets a good deck flatter its own
+             cards. IWD is a within-deck contrast, so deck quality cancels - at
+             the cost of giving the best card in a bad colour full marks for
+             lifting a deck you should not be in.
 
-They are combined per decision, both standardised across the cards in the pack so
-they are on one scale:
+Combined per decision, everything standardised across the cards in the pack:
 
-    value(card) = (1 - w) * z(behaviour) + w * z(outcome)
+    outcome(card) = lambda * z(GIH) + (1 - lambda) * z(IWD)
+    value(card)   = (1 - w) * z(behaviour) + w * outcome(card)
 
-w is not chosen. It is fitted against an outcome the model never sees: whether a
-drafter who gave up less value actually won more matches, measured WITHIN a
-win-rate bucket so that "strong players both pick well and win" cannot manufacture
-the result. w = 0 is today's model; w = 1 ignores behaviour entirely.
+Neither lambda nor w is chosen. Both are fitted against an outcome the model
+never sees: whether a drafter who gave up less value actually won more matches,
+measured WITHIN a win-rate bucket so that "strong players both pick well and
+win" cannot manufacture the result. w = 0 is today's model; w = 1 ignores
+behaviour entirely.
 
 Reads caches and JSON on disk. No database, no served corpus.
 """
@@ -103,17 +106,33 @@ def standardise(values: Sequence[float]) -> List[float]:
     return [(value - mean) / spread for value in values]
 
 
-class OutcomeAxis:
-    """Card impact, optionally weighted by whether the card reaches the deck.
+def combo_label(lam: float, weight: float) -> str:
+    return f"L{lam:g}|W{weight:g}"
 
-    Raw IWD is context-free and reverses a pool-aware model's judgement at later
-    picks. Multiplying by the measured probability that the card is played from
-    this pool restores the context: a bomb you cannot cast is worth little, and a
-    weak card you certainly will play is worth less than nothing.
+
+class OutcomeAxis:
+    """Two measures of card strength, kept separate because they fail oppositely.
+
+    GIH WR is absolute: the win rate of games where the card was in hand. It
+    keeps the fact that some colours and archetypes are simply better, but a
+    mediocre card carried by the best deck in the format inherits that deck's
+    win rate.
+
+    IWD is a within-deck contrast - the same decks split by whether the card was
+    drawn - so deck quality cancels. That is what makes it honest about a card's
+    own contribution, and also what makes it blind: the best card in a bad colour
+    scores full marks for lifting a deck you should not be in.
+
+    They are biased in opposite directions, so the blend between them is fitted
+    rather than picked. Both are centred (GIH against the set's baseline win
+    rate) so that multiplying by the probability the card reaches your deck means
+    the same thing on each.
     """
 
-    def __init__(self, impact: Dict[str, float], fit: Optional[dict] = None):
-        self.impact = impact
+    def __init__(self, gih: Dict[str, float], iwd: Dict[str, float],
+                 fit: Optional[dict] = None):
+        self.gih = gih
+        self.iwd = iwd
         self.fit = fit
         self.colours: Dict[str, frozenset] = {}
         if fit:
@@ -125,18 +144,28 @@ class OutcomeAxis:
     def context_aware(self) -> bool:
         return self.fit is not None
 
-    def value(self, card: str, pool: Dict[str, int]) -> Optional[float]:
-        impact = self.impact.get(card)
-        if impact is None:
-            return None
+    def measured(self) -> int:
+        return len(set(self.gih) & set(self.iwd))
+
+    def play_probability(self, card: str, pool: Dict[str, int]) -> Optional[float]:
         if not self.fit:
-            return impact
+            return 1.0
         row = self.fit["cards"].get(card)
         if row is None:
             return None
         bucket = commit_bucket(commitment(pool, self.colours, card))
-        played = row["by_commitment"].get(bucket, row["play_rate"])
-        return played * impact
+        return row["by_commitment"].get(bucket, row["play_rate"])
+
+    def pair(self, card: str, pool: Dict[str, int]) -> Optional[Tuple[float, float]]:
+        """(absolute strength, within-deck contribution), both play-weighted."""
+        gih = self.gih.get(card)
+        iwd = self.iwd.get(card)
+        if gih is None or iwd is None:
+            return None
+        played = self.play_probability(card, pool)
+        if played is None:
+            return None
+        return played * gih, played * iwd
 
 
 def behaviour_support(model: VariantModel, card: str) -> int:
@@ -145,9 +174,9 @@ def behaviour_support(model: VariantModel, card: str) -> int:
 
 
 def decision_values(model: VariantModel, example, outcome: OutcomeAxis,
-                    weights: Sequence[float],
-                    adaptive: bool = False) -> Optional[Dict[float, Tuple[float, float]]]:
-    """For each weight, (value of the taken card, value of the best available).
+                    combos: Sequence[Tuple[float, float]],
+                    adaptive: bool = False) -> Optional[Dict[str, Tuple[float, float]]]:
+    """For each (lambda, weight), (value of the taken card, best available).
 
     A card with no outcome measurement contributes 0 on that axis rather than
     being dropped: dropping it would silently change which cards are comparable.
@@ -158,44 +187,49 @@ def decision_values(model: VariantModel, example, outcome: OutcomeAxis,
     raw = {card: model.card_tendency(card, example.raw_pack_number,
                                      example.raw_pick_number, example.pool)
            for card in cards}
-    support = normalize_probabilities(raw)
-    behaviour = standardise([logit(support[card]) for card in cards])
-    measured = [outcome.value(card, example.pool) for card in cards]
-    known = [value for value in measured if value is not None]
-    if len(known) < 2:
-        return None
-    mean = statistics.fmean(known)
-    spread = statistics.pstdev(known)
-    if spread <= EPSILON:
-        outcome_z = [0.0] * len(cards)
-    else:
-        outcome_z = [((value - mean) / spread) if value is not None else 0.0
-                     for value in measured]
+    normalised = normalize_probabilities(raw)
+    behaviour = standardise([logit(normalised[card]) for card in cards])
 
+    pairs = [outcome.pair(card, example.pool) for card in cards]
+    if sum(1 for value in pairs if value is not None) < 2:
+        return None
+
+    def axis(index: int) -> List[float]:
+        known = [value[index] for value in pairs if value is not None]
+        mean = statistics.fmean(known)
+        spread = statistics.pstdev(known)
+        if spread <= EPSILON:
+            return [0.0] * len(cards)
+        return [((value[index] - mean) / spread) if value is not None else 0.0
+                for value in pairs]
+
+    gih_z, iwd_z = axis(0), axis(1)
     taken = cards.index(example.historical_pick)
-    support = [behaviour_support(model, card) for card in cards] if adaptive else None
-    out: Dict[float, Tuple[float, float]] = {}
-    for weight in weights:
+    counts = [behaviour_support(model, card) for card in cards] if adaptive else None
+
+    out: Dict[str, Tuple[float, float]] = {}
+    for lam, weight in combos:
+        outcome_z = [lam * gih_z[i] + (1 - lam) * iwd_z[i] for i in range(len(cards))]
         if adaptive:
             # Weight each source by how much evidence it has for THIS card. A
             # card the behaviour model has barely seen leans on the outcome
             # measurement; a card it has seen thousands of times does not. The
             # swept value is the crossover point, in observations.
             per_card = [weight / (weight + count) if (weight + count) > 0 else 0.0
-                        for count in support]
+                        for count in counts]
         else:
             per_card = [weight] * len(cards)
         values = [(1 - per_card[i]) * behaviour[i] + per_card[i] * outcome_z[i]
                   for i in range(len(cards))]
-        out[weight] = (values[taken], max(values))
+        out[combo_label(lam, weight)] = (values[taken], max(values))
     return out
 
 
 def draft_regret(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
-                 outcome: OutcomeAxis, weights: Sequence[float],
+                 outcome: OutcomeAxis, combos: Sequence[Tuple[float, float]],
                  max_pick: int, all_picks: bool = False,
                  pick_range: Optional[Tuple[int, int]] = None,
-                 adaptive: bool = False) -> Dict[str, Dict[float, float]]:
+                 adaptive: bool = False) -> Dict[str, Dict[str, float]]:
     """Mean value given up per decision, per draft, for each weight.
 
     Fitting uses every pick in the draft by default rather than only the ten the
@@ -205,7 +239,7 @@ def draft_regret(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
     """
     pack_offset = cache.meta["pack_offset"]
     pick_offset = cache.meta["pick_offset"]
-    totals: Dict[str, Dict[float, List[float]]] = defaultdict(lambda: defaultdict(list))
+    totals: Dict[str, Dict[str, List[float]]] = defaultdict(lambda: defaultdict(list))
     for example in load_examples(cache, draft_ids):
         pick_number = example.raw_pick_number + pick_offset
         if pick_range is not None:
@@ -220,13 +254,13 @@ def draft_regret(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
                 continue
             if pick_number > max_pick:
                 continue
-        values = decision_values(model, example, outcome, weights, adaptive)
+        values = decision_values(model, example, outcome, combos, adaptive)
         if values is None:
             continue
-        for weight, (taken, best) in values.items():
-            totals[example.draft_id][weight].append(best - taken)
-    return {draft_id: {weight: statistics.fmean(gaps) for weight, gaps in per_weight.items()}
-            for draft_id, per_weight in totals.items() if per_weight}
+        for label, (taken, best) in values.items():
+            totals[example.draft_id][label].append(best - taken)
+    return {draft_id: {label: statistics.fmean(gaps) for label, gaps in per_label.items()}
+            for draft_id, per_label in totals.items() if per_label}
 
 
 # --------------------------------------------------------------------------
@@ -288,23 +322,23 @@ def pool_fisher(strata: Sequence[Tuple[float, int]]) -> Optional[dict]:
             "drafts": sum(n for _, n in strata)}
 
 
-def bootstrap_pooled(observations: Dict[float, List[Tuple[str, str, float, float]]],
-                     weights: Sequence[float], draws: int,
-                     seed: int = 20260918) -> Dict[float, List[float]]:
+def bootstrap_pooled(observations: Dict[str, List[Tuple[str, str, float, float]]],
+                     labels: Sequence[str], draws: int,
+                     seed: int = 20260918) -> Dict[str, List[float]]:
     """Resample drafts, recompute every stratum, re-pool. Paired across weights.
 
-    One resample of draft indices is reused for every weight, because each
-    weight scores the same drafts; independent resamples would hide the pairing
-    and widen every interval.
+    One resample of draft indices is reused for every combo, because each combo
+    scores the same drafts; independent resamples would hide the pairing and
+    widen every interval.
     """
     import random
     rng = random.Random(seed)
-    base = observations[weights[0]]
-    samples: Dict[float, List[float]] = {weight: [] for weight in weights}
+    base = observations[labels[0]]
+    samples: Dict[str, List[float]] = {label: [] for label in labels}
     for _ in range(draws):
         picks = [rng.randrange(len(base)) for _ in range(len(base))]
-        for weight in weights:
-            rows = observations[weight]
+        for label in labels:
+            rows = observations[label]
             grouped: Dict[str, List[Tuple[str, float, float]]] = defaultdict(list)
             for index in picks:
                 stratum, skill, regret, wins = rows[index]
@@ -314,12 +348,12 @@ def bootstrap_pooled(observations: Dict[float, List[Tuple[str, str, float, float
                 strata.extend(stratum_correlations(values, minimum_bucket=50))
             pooled = pool_fisher(strata)
             if pooled:
-                samples[weight].append(pooled["r"])
+                samples[label].append(pooled["r"])
     return samples
 
 
 def analyse(elite_cache: Path, archive: Path, outcomes: Path,
-            weights: Sequence[float], cap: Optional[int],
+            combos: Sequence[Tuple[float, float]], cap: Optional[int],
             control_cache: Optional[Path] = None, draws: int = 400,
             all_picks: bool = False,
             pick_range: Optional[Tuple[int, int]] = None,
@@ -328,10 +362,16 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     max_pick = 11 if cache.set_id == "powered-cube" else 10
 
     payload = json.loads(outcomes.read_text(encoding="utf-8"))
-    impact = {name: row["iwd_shrunk"] for name, row in payload["cards"].items()
-              if row.get("iwd_shrunk") is not None}
+    baseline = float(payload.get("baseline_win_rate") or 0.5)
+    # GIH is centred on the set's own baseline so both measures sit around zero;
+    # otherwise multiplying by the play probability would mostly measure the
+    # play probability.
+    gih = {name: row["gih_wr_shrunk"] - baseline for name, row in payload["cards"].items()
+           if row.get("gih_wr_shrunk") is not None}
+    iwd = {name: row["iwd_shrunk"] for name, row in payload["cards"].items()
+           if row.get("iwd_shrunk") is not None}
     fit = json.loads(deck_fit.read_text(encoding="utf-8")) if deck_fit else None
-    outcome = OutcomeAxis(impact, fit)
+    outcome = OutcomeAxis(gih, iwd, fit)
 
     train_ids = cache.split_drafts("train")
     if cap:
@@ -343,33 +383,34 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     # the elite hold-out AND the whole control cohort - is fair game, and the
     # control cohort is what gives the skill axis enough spread to correlate on.
     held_out = cache.split_drafts("validation") + cache.split_drafts("test")
-    regrets = draft_regret(model, cache, held_out, outcome, weights, max_pick,
+    regrets = draft_regret(model, cache, held_out, outcome, combos, max_pick,
                            all_picks, pick_range, adaptive)
     if control_cache is not None:
         control = Cache.load(control_cache)
         if control.set_id != cache.set_id:
             raise SystemExit(f"{control_cache} is a different set from {elite_cache}")
         regrets.update(draft_regret(model, control, control.meta["drafts"],
-                                    outcome, weights, max_pick, all_picks, pick_range, adaptive))
+                                    outcome, combos, max_pick, all_picks, pick_range, adaptive))
     results = draft_results(archive)
 
-    observations: Dict[float, List[Tuple[str, str, float, float]]] = {
-        weight: [] for weight in weights}
+    labels = [combo_label(lam, weight) for lam, weight in combos]
+    observations: Dict[str, List[Tuple[str, str, float, float]]] = {
+        label: [] for label in labels}
     for draft_id, values in regrets.items():
         record = results.get(draft_id)
         if record is None:
             continue
-        for weight in weights:
-            if weight in values:
-                observations[weight].append(
-                    (cache.set_id, record["skill"], values[weight], float(record["wins"])))
+        for label in labels:
+            if label in values:
+                observations[label].append(
+                    (cache.set_id, record["skill"], values[label], float(record["wins"])))
     return {
         "observations": observations,
         "set_id": cache.set_id,
         "train_drafts": len(train_ids),
         "training_picks": training_picks,
         "held_out_drafts": len(regrets),
-        "cards_with_outcome": len(impact),
+        "cards_with_outcome": outcome.measured(),
         "outcome_axis": "play-weighted impact" if outcome.context_aware else "raw impact",
         "weighting": "per-card by evidence" if adaptive else "fixed",
         "scored_picks": f"pack 1, picks {pick_range[0]}-{pick_range[1]}" if pick_range
@@ -379,61 +420,63 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
 
 
 def render(report: dict) -> str:
-    out = ["=" * 78,
+    out = ["=" * 84,
            "HOW MUCH SHOULD EACH SIGNAL COUNT?  (one fit, pooled over every set)",
-           "=" * 78,
+           "=" * 84,
            "Value given up per decision, correlated with the drafter's match wins.",
-           "Every (set, win-rate bucket) pair is a stratum, so the answer is one number",
-           "for the corpus rather than one per set that can disagree by chance.",
+           "Every (set, win-rate bucket) pair is a stratum, so one number comes out for",
+           "the corpus rather than one per set that can disagree by chance.",
+           "lambda = share of the outcome signal taken from absolute GIH win rate;",
+           "the rest comes from IWD, the within-deck contrast. More negative r is better.",
            f"Sets: {', '.join(entry['set_id'] for entry in report['sets'])}",
            ""]
-    label = "crossover n" if report.get("weighting") == "per-card by evidence" else "w(outcome)"
-    out.append(f"  {label:>11}{'pooled r':>11}{'95% CI':>22}{'vs w=0':>11}"
-               f"{'95% CI':>22}{'strata':>8}{'drafts':>9}")
+    wlabel = "crossover n" if report.get("weighting") == "per-card by evidence" else "w"
+    out.append(f"  {'lambda':>7}{wlabel:>12}{'pooled r':>11}{'95% CI':>22}"
+               f"{'vs baseline':>13}{'95% CI':>22}{'drafts':>9}")
     usable = [row for row in report["pooled"] if row["r"] is not None]
     best = min(usable, key=lambda row: row["r"]) if usable else None
     for row in report["pooled"]:
         if row["r"] is None:
             continue
-        ci = row["ci95"]
-        delta, dci = row["vs_baseline"], row["vs_baseline_ci95"]
+        ci, dci = row["ci95"], row["vs_baseline_ci95"]
         sep = "*" if dci and (dci[0] > 0 or dci[1] < 0) else " "
         mark = "  <- strongest" if row is best else ""
-        out.append(f"  {row['weight']:>11g}{row['r']:>+11.5f}"
+        out.append(f"  {row['lam']:>7g}{row['weight']:>12g}{row['r']:>+11.5f}"
                    f"  [{ci[0]:>+8.5f},{ci[1]:>+8.5f}]"
-                   f"{delta:>+11.5f}"
+                   f"{row['vs_baseline']:>+13.5f}"
                    f"  [{dci[0]:>+8.5f},{dci[1]:>+8.5f}]{sep}"
-                   f"{row['strata']:>7}{row['drafts']:>9}{mark}")
-    out.append("  * = change from w=0 separated from zero (paired bootstrap over drafts)")
+                   f"{row['drafts']:>8}{mark}")
+    out.append("  * = change from the baseline combo separated from zero (paired bootstrap)")
     out.append("")
-    out.append("Per set, at the pooled best weight (a breakdown, not separate fits):")
-    out.append(f"  {'set':<14}{'held-out':>10}{'cards':>8}{'r at w=0':>11}{'r at best':>11}")
+    out.append("Per set, at the pooled best combo (a breakdown, not separate fits):")
+    out.append(f"  {'set':<14}{'held-out':>10}{'cards':>8}{'r baseline':>12}{'r best':>10}")
     for entry in report["sets"]:
-        base = entry.get("r_baseline")
-        tuned = entry.get("r_best")
+        base, tuned = entry.get("r_baseline"), entry.get("r_best")
         base_text = f"{base:+.4f}" if base is not None else "n/a"
         tuned_text = f"{tuned:+.4f}" if tuned is not None else "n/a"
         out.append(f"  {entry['set_id']:<14}{entry['held_out_drafts']:>10}"
-                   f"{entry['cards_with_outcome']:>8}{base_text:>11}{tuned_text:>11}")
+                   f"{entry['cards_with_outcome']:>8}{base_text:>12}{tuned_text:>10}")
     return "\n".join(out)
 
 
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--set", action="append", required=True,
+    parser.add_argument("--set", action="append", default=[],
                         metavar="CACHE:DRAFT_ARCHIVE:OUTCOMES[:CONTROL_CACHE]",
                         help="one set's inputs; repeat for every set in the fit")
-    parser.add_argument("--weights", default="0,0.15,0.3,0.5,0.7,1.0")
+    parser.add_argument("--weights", default="0,1000,4000,16000,64000")
+    parser.add_argument("--lambdas", default="0,0.5,1.0",
+                        help="share of the outcome signal taken from absolute GIH win "
+                             "rate; the rest comes from IWD")
     parser.add_argument("--cap", type=int, default=5000)
     parser.add_argument("--bootstrap-draws", type=int, default=300)
     parser.add_argument("--adaptive", action="store_true",
-                        help="read each swept value as a crossover in observations: the "
-                             "outcome signal carries a card only as far as the behaviour "
-                             "model lacks evidence for it")
+                        help="read each weight as a crossover in observations: the outcome "
+                             "signal carries a card only as far as the behaviour model "
+                             "lacks evidence for it")
     parser.add_argument("--deck-fit", action="append", default=[],
-                        help="deck_fit.py JSON, in the same order as --set; makes the "
-                             "outcome axis pool-aware instead of raw impact")
+                        help="deck_fit.py JSON, in the same order as --set")
     parser.add_argument("--pick-range", metavar="LO:HI",
                         help="restrict to pack 1 picks LO..HI, to isolate pool size")
     parser.add_argument("--all-picks", action="store_true",
@@ -443,85 +486,85 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="write this set's measured observations and stop; lets every "
                              "set be measured in parallel before one pooled fit")
     parser.add_argument("--observations-in", action="append", default=[],
-                        help="pool previously measured observation files instead of "
-                             "measuring again; repeat per set")
+                        help="pool previously measured observation files; repeat per set")
     return parser.parse_args(argv)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
-    weights = [float(value) for value in args.weights.split(",")]
+    weights = [float(v) for v in args.weights.split(",")]
+    lambdas = [float(v) for v in args.lambdas.split(",")]
+    combos = [(lam, weight) for lam in lambdas for weight in weights]
+    labels = [combo_label(lam, weight) for lam, weight in combos]
     pick_range = tuple(int(v) for v in args.pick_range.split(":")) if args.pick_range else None
 
     entries: List[dict] = []
-    combined: Dict[float, List[Tuple[str, str, float, float]]] = {w: [] for w in weights}
+    combined: Dict[str, List[Tuple[str, str, float, float]]] = {l: [] for l in labels}
 
-    if args.observations_in:
-        for path in args.observations_in:
-            payload = json.loads(Path(path).read_text(encoding="utf-8"))
-            stored = [float(w) for w in payload["weights"]]
-            if stored != weights:
-                raise SystemExit(f"{path} was measured at weights {stored}, not {weights}")
-            for weight in weights:
-                combined[weight].extend(tuple(row) for row in payload["observations"][str(weight)])
-            entry = payload["meta"]
-            entry["_observations"] = {w: [tuple(r) for r in payload["observations"][str(w)]]
-                                      for w in weights}
-            entries.append(entry)
-        args.set = []
+    for path in args.observations_in:
+        payload = json.loads(Path(path).read_text(encoding="utf-8"))
+        missing = [l for l in labels if l not in payload["observations"]]
+        if missing:
+            raise SystemExit(f"{path} lacks {missing[:3]}; re-measure it")
+        for label in labels:
+            combined[label].extend(tuple(row) for row in payload["observations"][label])
+        entry = payload["meta"]
+        entry["_observations"] = {l: [tuple(r) for r in payload["observations"][l]]
+                                  for l in labels}
+        entries.append(entry)
 
     for position, spec in enumerate(args.set):
         parts = spec.split(":")
         if len(parts) not in (3, 4):
             raise SystemExit(f"--set needs CACHE:DRAFT_ARCHIVE:OUTCOMES[:CONTROL], got {spec!r}")
         fit = args.deck_fit[position] if position < len(args.deck_fit) else None
-        entry = analyse(Path(parts[0]), Path(parts[1]), Path(parts[2]), weights, args.cap,
+        entry = analyse(Path(parts[0]), Path(parts[1]), Path(parts[2]), combos, args.cap,
                         Path(parts[3]) if len(parts) == 4 else None, args.bootstrap_draws,
                         args.all_picks, pick_range, Path(fit) if fit else None, args.adaptive)
         observations = entry.pop("observations")
-        for weight in weights:
-            combined[weight].extend(observations[weight])
-        entry["_observations"] = observations
-        entries.append(entry)
         print(f"  measured {entry['set_id']}: {entry['held_out_drafts']} held-out drafts",
               file=sys.stderr, flush=True)
         if args.observations_out:
             Path(args.observations_out).write_text(json.dumps({
-                "weights": weights,
+                "labels": labels,
                 "meta": {k: v for k, v in entry.items() if not k.startswith("_")},
-                "observations": {str(w): observations[w] for w in weights},
+                "observations": {l: observations[l] for l in labels},
             }), encoding="utf-8")
             print(f"  wrote {args.observations_out}", file=sys.stderr, flush=True)
             return 0
+        for label in labels:
+            combined[label].extend(observations[label])
+        entry["_observations"] = observations
+        entries.append(entry)
 
-    grouped_by_weight: Dict[float, Optional[dict]] = {}
-    for weight in weights:
+    pooled_by_label: Dict[str, Optional[dict]] = {}
+    for label in labels:
         strata: List[Tuple[float, int]] = []
         per_set: Dict[str, List[Tuple[str, float, float]]] = defaultdict(list)
-        for stratum, skill, regret, wins in combined[weight]:
+        for stratum, skill, regret, wins in combined[label]:
             per_set[stratum].append((skill, regret, wins))
         for values in per_set.values():
             strata.extend(stratum_correlations(values))
-        grouped_by_weight[weight] = pool_fisher(strata)
+        pooled_by_label[label] = pool_fisher(strata)
 
     print("  bootstrapping the pooled fit", file=sys.stderr, flush=True)
-    samples = bootstrap_pooled(combined, weights, args.bootstrap_draws)
-    baseline = weights[0]
+    samples = bootstrap_pooled(combined, labels, args.bootstrap_draws)
+    baseline = labels[0]
 
     pooled_rows = []
-    for weight in weights:
-        value = grouped_by_weight[weight]
-        ordered = sorted(samples.get(weight, []))
-        paired = sorted(a - b for a, b in zip(samples.get(weight, []),
+    for (lam, weight), label in zip(combos, labels):
+        value = pooled_by_label[label]
+        ordered = sorted(samples.get(label, []))
+        paired = sorted(a - b for a, b in zip(samples.get(label, []),
                                               samples.get(baseline, [])))
         pooled_rows.append({
-            "weight": weight,
+            "lam": lam, "weight": weight, "label": label,
             "r": value["r"] if value else None,
             "ci95": [round(ordered[max(0, int(.025 * len(ordered)) - 1)], 5),
                      round(ordered[min(len(ordered) - 1, int(.975 * len(ordered)))], 5)]
             if ordered else None,
-            "vs_baseline": round((value["r"] - grouped_by_weight[baseline]["r"]), 5)
-            if value and grouped_by_weight[baseline] else 0.0,
+            "vs_baseline": round(value["r"] - pooled_by_label[baseline]["r"], 5)
+            if value and pooled_by_label[baseline] else 0.0,
             "vs_baseline_ci95": [round(paired[max(0, int(.025 * len(paired)) - 1)], 5),
                                  round(paired[min(len(paired) - 1, int(.975 * len(paired)))], 5)]
             if paired else None,
@@ -533,16 +576,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                key=lambda row: row["r"], default=None)
     for entry in entries:
         observations = entry.pop("_observations")
-        for key, weight in (("r_baseline", baseline),
-                            ("r_best", best["weight"] if best else baseline)):
-            rows = [(skill, regret, wins) for _, skill, regret, wins in observations[weight]]
+        for key, label in (("r_baseline", baseline),
+                           ("r_best", best["label"] if best else baseline)):
+            rows = [(skill, regret, wins) for _, skill, regret, wins in observations[label]]
             pooled = pool_fisher(stratum_correlations(rows))
             entry[key] = pooled["r"] if pooled else None
 
-    report = {"weights": weights, "cap": args.cap, "sets": entries,
+    report = {"labels": labels, "cap": args.cap, "sets": entries,
               "weighting": "per-card by evidence" if args.adaptive else "fixed",
               "pooled": pooled_rows,
-              "best_weight": best["weight"] if best else None}
+              "best": {"lambda": best["lam"], "weight": best["weight"]} if best else None}
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(render(report))
