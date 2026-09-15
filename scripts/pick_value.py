@@ -49,6 +49,7 @@ from eval_model import (  # noqa: E402
     VARIANTS,
     Cache,
     VariantModel,
+    behaviour_support,
     load_examples,
     train_counts,
 )
@@ -174,23 +175,6 @@ class OutcomeAxis:
         if played is None:
             return None
         return played * gih, played * iwd
-
-
-def behaviour_support(model: VariantModel, card: str, pack: int, pick: int) -> int:
-    """Observations behind the behaviour model's estimate FOR THIS decision.
-
-    base_tendency falls back exact position -> pack -> global, so the evidence
-    that matters is the count at the level it actually used. A card seen five
-    thousand times across the format can still rest on a handful of observations
-    at this exact pick, and a global count would call that certain.
-    """
-    exact = model._count("exact_seen", (card, pack, pick))
-    if exact >= 20:
-        return exact
-    pack_seen = model._count("pack_seen", (card, pack))
-    if pack_seen >= 30:
-        return pack_seen
-    return model._count("global_seen", card)
 
 
 def decision_values(model: VariantModel, example, outcome: OutcomeAxis,
@@ -382,7 +366,8 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
             control_cache: Optional[Path] = None, draws: int = 400,
             all_picks: bool = False,
             pick_range: Optional[Tuple[int, int]] = None,
-            deck_fit: Optional[Path] = None, adaptive: bool = False) -> dict:
+            deck_fit: Optional[Path] = None, adaptive: bool = False,
+            split: str = "validation") -> dict:
     cache = Cache.load(elite_cache)
     max_pick = 11 if cache.set_id == "powered-cube" else 10
 
@@ -413,10 +398,15 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     counts, training_picks = train_counts(cache, train_ids)
     model = VariantModel(counts, VARIANTS["v2"])
 
-    # The elite training split is the only data the model saw. Everything else -
-    # the elite hold-out AND the whole control cohort - is fair game, and the
-    # control cohort is what gives the skill axis enough spread to correlate on.
-    held_out = cache.split_drafts("validation") + cache.split_drafts("test")
+    # The elite training split is the only data the model saw. The control
+    # cohort is untouched by training entirely, and is what gives the skill axis
+    # enough spread to correlate on.
+    #
+    # `split` defaults to validation. Reading validation and test together, as
+    # this did, means every lambda and weight was chosen with the test split in
+    # view - which quietly turns it into more validation data, and no later run
+    # can undo that. "test" is available, for one pass on a frozen spec.
+    held_out = cache.split_drafts(split)
     regrets = draft_regret(model, cache, held_out, outcome, combos, max_pick,
                            all_picks, pick_range, adaptive)
     if control_cache is not None:
@@ -441,6 +431,7 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     return {
         "observations": observations,
         "set_id": cache.set_id,
+        "split": split,
         "train_drafts": len(train_ids),
         "training_picks": training_picks,
         "held_out_drafts": len(regrets),
@@ -524,6 +515,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="share of the outcome signal taken from absolute GIH win "
                              "rate; the rest comes from IWD")
     parser.add_argument("--cap", type=int, default=5000)
+    parser.add_argument("--split", default="validation", choices=["validation", "test"],
+                        help="held-out split to measure on (default: validation; "
+                             "pass test only for a frozen specification)")
     parser.add_argument("--bootstrap-draws", type=int, default=300)
     parser.add_argument("--adaptive", action="store_true",
                         help="read each weight as a crossover in observations: the outcome "
@@ -555,11 +549,22 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     entries: List[dict] = []
     combined: Dict[str, List[Tuple[str, str, float, float]]] = {l: [] for l in labels}
 
+    seen_splits: Dict[str, str] = {}
     for path in args.observations_in:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
         missing = [l for l in labels if l not in payload["observations"]]
         if missing:
             raise SystemExit(f"{path} lacks {missing[:3]}; re-measure it")
+        # Pooling observations measured on different splits would report one
+        # number over a mixture nobody chose, and the mixture would be invisible
+        # in the output. Files written before this field existed say so plainly
+        # rather than being assumed innocent.
+        file_split = payload["meta"].get("split", "unknown (pre-dates --split)")
+        seen_splits[file_split] = path
+        if len(seen_splits) > 1:
+            raise SystemExit(
+                "observations were measured on different splits and cannot be pooled:\n"
+                + "\n".join(f"  {s}: {p}" for s, p in sorted(seen_splits.items())))
         for label in labels:
             combined[label].extend(tuple(row) for row in payload["observations"][label])
         entry = payload["meta"]
@@ -574,7 +579,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         fit = args.deck_fit[position] if position < len(args.deck_fit) else None
         entry = analyse(Path(parts[0]), Path(parts[1]), Path(parts[2]), combos, args.cap,
                         Path(parts[3]) if len(parts) == 4 else None, args.bootstrap_draws,
-                        args.all_picks, pick_range, Path(fit) if fit else None, args.adaptive)
+                        args.all_picks, pick_range, Path(fit) if fit else None, args.adaptive,
+                        args.split)
         observations = entry.pop("observations")
         print(f"  measured {entry['set_id']}: {entry['held_out_drafts']} held-out drafts",
               file=sys.stderr, flush=True)

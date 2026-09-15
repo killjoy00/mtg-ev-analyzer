@@ -463,6 +463,40 @@ class VariantModel(OutOfFoldModel):
         return logistic(logit(base) + scale * context + fit_shift)
 
 
+def behaviour_support(model: VariantModel, card: str, pack: int, pick: int) -> int:
+    """Observations behind the behaviour model's estimate FOR THIS decision.
+
+    base_tendency falls back exact position -> pack -> global, so the evidence
+    that matters is the count at the level it actually used. A card seen five
+    thousand times across the format can still rest on a handful of observations
+    at this exact pick, and a global count would call that certain.
+
+    The thresholds here mirror base_tendency's and have to move with it.
+    """
+    exact = model._count("exact_seen", (card, pack, pick))
+    if exact >= 20:
+        return exact
+    pack_seen = model._count("pack_seen", (card, pack))
+    if pack_seen >= 30:
+        return pack_seen
+    return model._count("global_seen", card)
+
+
+# Bucket edges sit around the observed median (161 on hob at cap 5,000), so the
+# thin and the well-supported land on opposite sides of it rather than all in
+# one bucket.
+EVIDENCE_BUCKETS = ((0, 24, "evidence 0-24"), (25, 79, "evidence 25-79"),
+                    (80, 159, "evidence 80-159"), (160, 399, "evidence 160-399"),
+                    (400, 10 ** 12, "evidence 400+"))
+
+
+def evidence_bucket(count: int) -> str:
+    for low, high, name in EVIDENCE_BUCKETS:
+        if low <= count <= high:
+            return name
+    return EVIDENCE_BUCKETS[-1][2]
+
+
 def train_counts(cache: Cache, draft_ids: Sequence[str]) -> Tuple[CountStore, int]:
     wanted = set(draft_ids)
     counts = CountStore.empty()
@@ -729,6 +763,14 @@ def evaluate(cache: Cache, variant: Variant, model: "VariantModel",
         "pick": defaultdict(Accumulator),
         "pool": defaultdict(Accumulator),
         "pack": defaultdict(Accumulator),
+        # "pick" pools a position across all three packs, so it cannot cut the
+        # served slice, which is pack 1 only. This one can.
+        "served_pick": defaultdict(Accumulator),
+        # How much behavioural evidence stood behind this decision. If a context
+        # or outcome correction only helps where the strong-player counts are
+        # thin, that says where it belongs rather than that it belongs
+        # everywhere.
+        "evidence": defaultdict(Accumulator),
     }
     per_example: List[Tuple[str, float, float, int]] = []
     # The game only ever serves pack 1, so a change is worth making on the
@@ -759,11 +801,22 @@ def evaluate(cache: Cache, variant: Variant, model: "VariantModel",
         cells["rarity"][rarities.get(example.historical_pick, "unknown")].add(
             log_loss, brier, hit, rank, len(probabilities))
 
+        # Evidence behind the pack, not behind one card: the decision is only as
+        # well supported as its thinnest plausible alternative is, so the median
+        # candidate is the honest summary of what the model had to work with.
+        support = sorted(behaviour_support(model, card, example.raw_pack_number,
+                                           example.raw_pick_number)
+                         for card in example.candidates)
+        cells["evidence"][evidence_bucket(support[len(support) // 2])].add(
+            log_loss, brier, hit, rank, len(probabilities))
+
         if pack_number == 1 and pick_number <= served_max_pick:
             served.add(log_loss, brier, hit, rank, len(probabilities))
             served_calibration.add(probabilities, chosen)
             served_grading.add(probabilities, chosen)
             served_per_example.append((example.draft_id, log_loss, brier, 1 if hit else 0))
+            cells["served_pick"][f"served pick {pick_number:02d}"].add(
+                log_loss, brier, hit, rank, len(probabilities))
 
     return {
         "variant": variant.describe(),
@@ -1088,7 +1141,13 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     evaluate_parser.add_argument("--temperatures", default="1.0",
                                  help="comma-separated exponents applied to tendencies before "
                                       "normalising; 1.0 is production")
-    evaluate_parser.add_argument("--split", default="test", choices=["validation", "test"])
+    # Defaults to validation, not test. Choosing a variant while reading the
+    # test split turns it into more validation data, and nothing afterwards can
+    # undo that. Reaching for test has to be a thing someone typed.
+    evaluate_parser.add_argument("--split", default="validation",
+                                 choices=["validation", "test"],
+                                 help="held-out split to score (default: validation; "
+                                      "pass test only for a frozen specification)")
     evaluate_parser.add_argument("--max-test-drafts", type=int,
                                  help="cap the held-out drafts per set (default: all)")
     evaluate_parser.add_argument("--deck-fit-dir",

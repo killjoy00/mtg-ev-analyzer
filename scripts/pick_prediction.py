@@ -93,7 +93,7 @@ def value_vector(model: VariantModel, example, outcome: OutcomeAxis,
 
 def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Path],
               combos: Sequence[Tuple[float, float]], cap: Optional[int],
-              adaptive: bool) -> dict:
+              adaptive: bool, split: str = "validation") -> dict:
     cache = Cache.load(cache_path)
     payload = json.loads(outcomes_path.read_text(encoding="utf-8"))
 
@@ -119,7 +119,10 @@ def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Pat
     counts, _ = train_counts(cache, train_ids)
     model = VariantModel(counts, VARIANTS["v2"])
 
-    held_out = cache.split_drafts("validation") + cache.split_drafts("test")
+    # Validation by default. Reading validation and test together, as this did,
+    # means every lambda and weight was chosen with the test split in view, and
+    # no later run can undo that.
+    held_out = cache.split_drafts(split)
     hits: Dict[str, int] = defaultdict(int)
     ranks: Dict[str, int] = defaultdict(int)
     scored = 0
@@ -139,6 +142,7 @@ def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Pat
             ranks[label] += better + 1
     return {
         "set_id": cache.set_id,
+        "split": split,
         "decisions": scored,
         "top1": {label: hits[label] / scored for label in hits} if scored else {},
         "mean_rank": {label: ranks[label] / scored for label in ranks} if scored else {},
@@ -152,7 +156,8 @@ def render(report: dict) -> str:
            "Behaviour is trained for exactly this, so it should win. An outcome",
            "signal that still improves top-1 here is carrying real pick information",
            "rather than sharing units with the match-wins criterion.",
-           f"Sets: {len(report['sets'])}   decisions: {report['decisions']}",
+           f"Sets: {len(report['sets'])}   decisions: {report['decisions']}"
+           f"   split: {report['split']}",
            ""]
     rows = report["pooled"]
     baseline = rows[0]
@@ -173,6 +178,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--weights", default="0,1000,4000,16000,64000")
     parser.add_argument("--lambdas", default="0,0.5,0.75,0.9,1.0")
     parser.add_argument("--cap", type=int, default=5000)
+    parser.add_argument("--split", default="validation", choices=["validation", "test"],
+                        help="held-out split to score (default: validation; "
+                             "pass test only for a frozen specification)")
     parser.add_argument("--adaptive", action="store_true")
     parser.add_argument("--json-out")
     return parser.parse_args(argv)
@@ -191,7 +199,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             raise SystemExit(f"--set needs CACHE:OUTCOMES[:DECK_FIT], got {spec!r}")
         entry = score_set(Path(parts[0]), Path(parts[1]),
                           Path(parts[2]) if len(parts) == 3 else None,
-                          combos, args.cap, args.adaptive)
+                          combos, args.cap, args.adaptive, args.split)
         entries.append(entry)
         print(f"  scored {entry['set_id']}: {entry['decisions']} decisions",
               file=sys.stderr, flush=True)
@@ -206,7 +214,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "mean_rank": sum(e["mean_rank"].get(label, 0) * e["decisions"]
                              for e in entries) / total,
         })
-    report = {"sets": entries, "decisions": total, "pooled": pooled}
+    report = {"sets": entries, "decisions": total, "pooled": pooled, "split": args.split}
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(render(report))

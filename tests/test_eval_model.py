@@ -1,4 +1,6 @@
+import contextlib
 import gzip
+import io
 import json
 import math
 import sys
@@ -11,6 +13,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_replays import CountStore, DraftSkill, OutOfFoldModel, PickExample, logit
 from eval_model import (
     VARIANTS,
+    behaviour_support,
+    evidence_bucket,
     Accumulator,
     Cache,
     Calibration,
@@ -27,6 +31,9 @@ from eval_model import (
     pool_bucket,
     weighted_headline,
 )
+from eval_model import parse_args as eval_model_args
+from pick_prediction import parse_args as pick_prediction_args
+from pick_value import parse_args as pick_value_args
 
 
 def example(draft_id, pack, pick, chosen, candidates, pool=None):
@@ -420,6 +427,64 @@ class VariantTests(unittest.TestCase):
             "pack_offset": 1, "pick_offset": 1, "picks_file": picks_path.name,
         }))
         return Cache.load(meta_path)
+
+
+class SplitDisciplineTests(unittest.TestCase):
+    """Reaching the test split has to be something a person typed.
+
+    Every selection surface here once defaulted to test, or read validation and
+    test together. Choosing lambda, a weight or a variant while the test split
+    is in view turns it into more validation data, and no later run undoes that.
+    """
+
+    def test_every_evaluation_entry_point_defaults_to_validation(self):
+        for module, argv in ((eval_model_args, ["evaluate", "c.json"]),
+                             (pick_value_args, ["--set", "a:b:c"]),
+                             (pick_prediction_args, ["--set", "a:b"])):
+            with self.subTest(entry=module.__module__):
+                self.assertEqual(module(argv).split, "validation")
+
+    def test_test_split_is_still_reachable_on_purpose(self):
+        self.assertEqual(eval_model_args(["evaluate", "c.json", "--split", "test"]).split,
+                         "test")
+        self.assertEqual(pick_value_args(["--set", "a:b:c", "--split", "test"]).split, "test")
+        self.assertEqual(pick_prediction_args(["--set", "a:b", "--split", "test"]).split,
+                         "test")
+
+    def test_nothing_outside_those_two_splits_is_accepted(self):
+        for module, argv in ((eval_model_args, ["evaluate", "c.json", "--split", "train"]),
+                             (pick_value_args, ["--set", "a:b:c", "--split", "train"]),
+                             (pick_prediction_args, ["--set", "a:b", "--split", "train"])):
+            # argparse prints its usage to stderr on the way out; swallow it so
+            # a passing suite stays readable.
+            with self.subTest(entry=module.__module__), self.assertRaises(SystemExit), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                module(argv)
+
+
+class EvidenceBucketTests(unittest.TestCase):
+    def test_buckets_are_contiguous_and_ordered(self):
+        seen = [evidence_bucket(n) for n in (0, 24, 25, 79, 80, 159, 160, 399, 400, 10 ** 9)]
+        self.assertEqual(seen, ["evidence 0-24", "evidence 0-24",
+                                "evidence 25-79", "evidence 25-79",
+                                "evidence 80-159", "evidence 80-159",
+                                "evidence 160-399", "evidence 160-399",
+                                "evidence 400+", "evidence 400+"])
+
+    def test_support_follows_the_level_base_tendency_actually_used(self):
+        """A card seen thousands of times across the format can still rest on a
+        handful of observations at this exact pick."""
+        counts = CountStore.empty()
+        # 40 observations at (pack 0, pick 0): over the exact threshold of 20.
+        for index in range(40):
+            counts.observe(example(f"d{index}", 0, 0, "thick", ["thick", "other"]))
+        # One observation at pick 9, so that position falls back past exact and
+        # past pack to the global count.
+        counts.observe(example("late", 0, 9, "thick", ["thick", "other"]))
+        model = VariantModel(counts, VARIANTS["v2"])
+        self.assertEqual(behaviour_support(model, "thick", 0, 0), 40)
+        self.assertEqual(behaviour_support(model, "thick", 0, 9),
+                         model._count("global_seen", "thick"))
 
 
 class BootstrapTests(unittest.TestCase):
