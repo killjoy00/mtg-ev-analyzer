@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from card_outcomes import column_index, count_of, shrink, summarise, tally
+from card_outcomes import (column_index, count_of, merge_excluding, shrink,
+                           summarise, tally)
 
 
 def archive(path: Path, cards, rows):
@@ -64,24 +65,56 @@ class TallyTests(unittest.TestCase):
                     (True, {"Alpha": (1, 0)}), (False, {"Alpha": (1, 0)}),
                     (False, {"Alpha": (1, 0)}), (False, {"Alpha": (1, 0)})]
             archive(path, ["Alpha"], rows)
-            counts, seen, wins = tally(path)
-        self.assertEqual(seen, 8)
+            per_fold, seen, wins = tally(path)
+        counts = per_fold[0]
+        self.assertEqual(seen, [8])
         alpha = counts["Alpha"]
         self.assertEqual(alpha["gih_games"], 4)
         self.assertEqual(alpha["gih_wins"], 3)
         self.assertEqual(alpha["gnd_games"], 4)
         self.assertEqual(alpha["gnd_wins"], 1)
         self.assertEqual(alpha["deck_games"], 8)
-        self.assertEqual(wins, 4)
+        self.assertEqual(wins, [4])
 
     def test_a_card_not_in_the_deck_is_not_counted(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "g.csv.gz"
             archive(path, ["Alpha", "Beta"],
                     [(True, {"Alpha": (1, 1)}), (False, {"Alpha": (1, 0)})])
-            counts, _, _ = tally(path)
+            per_fold, _, _ = tally(path)
+        counts = per_fold[0]
         self.assertIn("Alpha", counts)
         self.assertNotIn("Beta", counts)
+
+
+class CrossFitTests(unittest.TestCase):
+    def test_folds_partition_the_games(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "g.csv.gz"
+            rows = [(index % 2 == 0, {"Alpha": (1, index % 3 != 0)}) for index in range(300)]
+            archive(path, ["Alpha"], rows)
+            per_fold, seen, wins = tally(path, folds=5)
+        self.assertEqual(len(per_fold), 5)
+        self.assertEqual(sum(seen), 300)
+        # every game lands in exactly one fold
+        self.assertEqual(sum(t["Alpha"]["deck_games"] for t in per_fold if "Alpha" in t), 300)
+
+    def test_a_fold_is_scored_from_the_others_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "g.csv.gz"
+            rows = [(index % 2 == 0, {"Alpha": (1, index % 3 != 0)}) for index in range(300)]
+            archive(path, ["Alpha"], rows)
+            per_fold, _, _ = tally(path, folds=5)
+        held = per_fold[2]["Alpha"]["deck_games"]
+        other = merge_excluding(per_fold, 2)["Alpha"]["deck_games"]
+        self.assertGreater(held, 0)
+        self.assertEqual(held + other, 300)
+
+    def test_merge_excluding_nothing_is_the_whole_corpus(self):
+        per_fold = [{"A": {"gih_games": 5, "gih_wins": 3}},
+                    {"A": {"gih_games": 7, "gih_wins": 4}}]
+        merged = merge_excluding(per_fold, -1)
+        self.assertEqual(merged["A"], {"gih_games": 12, "gih_wins": 7})
 
 
 class BaselineTests(unittest.TestCase):
