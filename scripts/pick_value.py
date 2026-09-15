@@ -140,7 +140,8 @@ def decision_values(model: VariantModel, example, outcome: Dict[str, float],
 
 def draft_regret(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
                  outcome: Dict[str, float], weights: Sequence[float],
-                 max_pick: int, all_picks: bool = False) -> Dict[str, Dict[float, float]]:
+                 max_pick: int, all_picks: bool = False,
+                 pick_range: Optional[Tuple[int, int]] = None) -> Dict[str, Dict[float, float]]:
     """Mean value given up per decision, per draft, for each weight.
 
     Fitting uses every pick in the draft by default rather than only the ten the
@@ -152,10 +153,18 @@ def draft_regret(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
     pick_offset = cache.meta["pick_offset"]
     totals: Dict[str, Dict[float, List[float]]] = defaultdict(lambda: defaultdict(list))
     for example in load_examples(cache, draft_ids):
-        if not all_picks:
+        pick_number = example.raw_pick_number + pick_offset
+        if pick_range is not None:
+            # Isolating a band of pick numbers isolates pool size, which is what
+            # a context-free signal should struggle with.
             if example.raw_pack_number + pack_offset != 1:
                 continue
-            if example.raw_pick_number + pick_offset > max_pick:
+            if not pick_range[0] <= pick_number <= pick_range[1]:
+                continue
+        elif not all_picks:
+            if example.raw_pack_number + pack_offset != 1:
+                continue
+            if pick_number > max_pick:
                 continue
         values = decision_values(model, example, outcome, weights)
         if values is None:
@@ -240,7 +249,8 @@ def bootstrap_r(regret: Dict[str, float], results: Dict[str, dict],
 def analyse(elite_cache: Path, archive: Path, outcomes: Path,
             weights: Sequence[float], cap: Optional[int],
             control_cache: Optional[Path] = None, draws: int = 400,
-            all_picks: bool = False) -> dict:
+            all_picks: bool = False,
+            pick_range: Optional[Tuple[int, int]] = None) -> dict:
     cache = Cache.load(elite_cache)
     max_pick = 11 if cache.set_id == "powered-cube" else 10
 
@@ -258,13 +268,14 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     # the elite hold-out AND the whole control cohort - is fair game, and the
     # control cohort is what gives the skill axis enough spread to correlate on.
     held_out = cache.split_drafts("validation") + cache.split_drafts("test")
-    regrets = draft_regret(model, cache, held_out, outcome, weights, max_pick, all_picks)
+    regrets = draft_regret(model, cache, held_out, outcome, weights, max_pick,
+                           all_picks, pick_range)
     if control_cache is not None:
         control = Cache.load(control_cache)
         if control.set_id != cache.set_id:
             raise SystemExit(f"{control_cache} is a different set from {elite_cache}")
         regrets.update(draft_regret(model, control, control.meta["drafts"],
-                                    outcome, weights, max_pick, all_picks))
+                                    outcome, weights, max_pick, all_picks, pick_range))
     results = draft_results(archive)
 
     rows = []
@@ -293,7 +304,8 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
         "training_picks": training_picks,
         "held_out_drafts": len(regrets),
         "cards_with_outcome": len(outcome),
-        "scored_picks": "every pick in the draft" if all_picks
+        "scored_picks": f"pack 1, picks {pick_range[0]}-{pick_range[1]}" if pick_range
+        else "every pick in the draft" if all_picks
         else f"pack 1, picks 1-{max_pick}",
         "weights": rows,
     }
@@ -334,6 +346,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="elite cache, draft archive, card-outcome JSON and an "
                              "optional control cache; repeatable")
     parser.add_argument("--bootstrap-draws", type=int, default=400)
+    parser.add_argument("--pick-range", metavar="LO:HI",
+                        help="restrict to pack 1 picks LO..HI, to isolate pool size")
     parser.add_argument("--all-picks", action="store_true",
                         help="fit on every pick, not only the slice the product serves")
     parser.add_argument("--weights", default="0,0.1,0.2,0.3,0.4,0.5,0.7,1.0")
@@ -352,7 +366,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             raise SystemExit(f"--set needs CACHE:DRAFT_ARCHIVE:OUTCOMES[:CONTROL], got {spec!r}")
         entry = analyse(Path(parts[0]), Path(parts[1]), Path(parts[2]), weights, args.cap,
                         Path(parts[3]) if len(parts) == 4 else None, args.bootstrap_draws,
-                        args.all_picks)
+                        args.all_picks,
+                        tuple(int(v) for v in args.pick_range.split(":")) if args.pick_range
+                        else None)
         entries.append(entry)
         print(f"  analysed {entry['set_id']}", file=sys.stderr, flush=True)
     report = {"weights": weights, "cap": args.cap, "sets": entries}
