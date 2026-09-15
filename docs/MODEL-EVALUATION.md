@@ -305,3 +305,40 @@ decision, and the data says leave the curve where it is.
    separates drafters worse.
 
 Colour/archetype context is untested here and remains a hypothesis.
+
+## The frozen specification
+
+Everything above was exploratory. Three bugs surfaced during that work, and
+each one produced a result that looked like a finding first:
+
+* `scan_decks` compared `"0.0"` to the string `"0"`, so for a float-written
+  archive every card counted as played in every draft. It made `dmu` report a
+  100% play rate, no card colours at all, and a commitment bucket that counted
+  the whole pool - three plausible-looking wrong things at once.
+* The crossover-weight grid `{0, 1000, 4000, ...}` never sampled the transition.
+  Behavioural support has a median of 161 observations, so `W/(W+n)` at
+  `W = 64000` gives behaviour 0.3% of the weight. The grid was two points -
+  pure behaviour and pure outcome - wearing five points' clothing.
+* `prepare_pick_model.sh` exported `LAMBDAS` without passing it, so every
+  measurement silently used a default lambda grid rather than the advertised one.
+
+None was caught by a unit test. Each was caught by looking at a shape across
+sets and finding it implausible. That is the argument for what follows.
+
+**The specification is frozen.** No model change may be made on the strength of
+a test-split result. Concretely:
+
+1. Selection happens on **validation**, or on the 24-set selection pool. Every
+   entry point defaults to `--split validation` and a test run has to be typed.
+2. Six sets are held out entirely: **ecl, fin, ktk, mom, powered-cube, woe**.
+   They were chosen for spread - recency, size, and the one structurally
+   different environment - before any sweep output was read, and no variant-level
+   number from them has been looked at.
+3. Every intermediate table is regenerated from scratch under the current code,
+   so no artifact predating a fix survives into the final numbers.
+4. The frozen model runs **once** on those six sets, and that is the reported
+   result. If it disagrees with the selection-pool numbers, the test number is
+   the answer and the disagreement is the finding.
+
+Only after that does a corpus regeneration or a grading change become a question
+worth asking.
