@@ -463,6 +463,41 @@ class VariantModel(OutOfFoldModel):
         return logistic(logit(base) + scale * context + fit_shift)
 
 
+def guard_test_split(split: str, final_test: bool) -> None:
+    """Two independent things have to be true before test data is read.
+
+    A default is a suggestion. Three separate surfaces here silently defaulted
+    to test or read it alongside validation, and nobody noticed until an outside
+    reviewer read the source - so `--split test` now also needs `--final-test`,
+    which exists for no other purpose and cannot be set by accident.
+    """
+    if split == "test" and not final_test:
+        raise SystemExit(
+            "Refusing to read the test split.\n"
+            "  Selection belongs on --split validation. If this really is the single\n"
+            "  pass on a frozen specification, say so with --final-test.")
+
+
+def build_backbone(cache: Cache, train_ids: Sequence[str], counts: CountStore,
+                   variant_name: str, fit: Optional[dict] = None) -> VariantModel:
+    """The behaviour model an outcome blend sits on top of.
+
+    Both fitting scripts hardcoded v2. That was fine while v2 was the only
+    behaviour model, and wrong the moment a better context family existed: an
+    outcome weight fitted against a backbone that still makes the stage errors
+    outcomes were partly compensating for measures the wrong marginal value.
+    The blend has to be refitted on whatever backbone is actually shipping.
+    """
+    if variant_name not in VARIANTS:
+        raise SystemExit(f"Unknown variant '{variant_name}'. Known: {', '.join(VARIANTS)}")
+    variant = VARIANTS[variant_name]
+    if variant.deck_fit and fit is None:
+        raise SystemExit(f"Variant '{variant_name}' needs a deck-fit table")
+    expectations = (pair_expectations(cache, train_ids, counts)
+                    if variant.stage_matched else None)
+    return VariantModel(counts, variant, expectations, fit if variant.deck_fit else None)
+
+
 def behaviour_support(model: VariantModel, card: str, pack: int, pick: int) -> int:
     """Observations behind the behaviour model's estimate FOR THIS decision.
 
@@ -1030,6 +1065,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
     fit_dir = Path(args.deck_fit_dir) if args.deck_fit_dir else None
     if needs_fit and not fit_dir:
         raise SystemExit("--deck-fit-dir is required by the deck-fit variants")
+    guard_test_split(args.split, args.final_test)
     for cache_path in args.caches:
         cache = Cache.load(Path(cache_path))
         fit = None
@@ -1148,6 +1184,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                                  choices=["validation", "test"],
                                  help="held-out split to score (default: validation; "
                                       "pass test only for a frozen specification)")
+    evaluate_parser.add_argument("--final-test", action="store_true",
+                                 help="required alongside --split test; exists only to "
+                                      "make reading the test split a deliberate act")
     evaluate_parser.add_argument("--max-test-drafts", type=int,
                                  help="cap the held-out drafts per set (default: all)")
     evaluate_parser.add_argument("--deck-fit-dir",

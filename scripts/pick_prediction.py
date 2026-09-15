@@ -36,7 +36,8 @@ from typing import Dict, List, Optional, Sequence, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import logit, normalize_probabilities, stable_fold  # noqa: E402
-from eval_model import VARIANTS, Cache, VariantModel, load_examples, train_counts  # noqa: E402
+from eval_model import (VARIANTS, Cache, VariantModel, build_backbone,  # noqa: E402
+                        guard_test_split, load_examples, train_counts)  # noqa: E402
 from pick_value import (  # noqa: E402
     EPSILON,
     OutcomeAxis,
@@ -93,7 +94,8 @@ def value_vector(model: VariantModel, example, outcome: OutcomeAxis,
 
 def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Path],
               combos: Sequence[Tuple[float, float]], cap: Optional[int],
-              adaptive: bool, split: str = "validation") -> dict:
+              adaptive: bool, split: str = "validation",
+              backbone: str = "v2") -> dict:
     cache = Cache.load(cache_path)
     payload = json.loads(outcomes_path.read_text(encoding="utf-8"))
 
@@ -117,7 +119,7 @@ def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Pat
     if cap:
         train_ids = train_ids[:cap]
     counts, _ = train_counts(cache, train_ids)
-    model = VariantModel(counts, VARIANTS["v2"])
+    model = build_backbone(cache, train_ids, counts, backbone, fit)
 
     # Validation by default. Reading validation and test together, as this did,
     # means every lambda and weight was chosen with the test split in view, and
@@ -143,6 +145,7 @@ def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Pat
     return {
         "set_id": cache.set_id,
         "split": split,
+        "backbone": backbone,
         "decisions": scored,
         "top1": {label: hits[label] / scored for label in hits} if scored else {},
         "mean_rank": {label: ranks[label] / scored for label in ranks} if scored else {},
@@ -157,7 +160,7 @@ def render(report: dict) -> str:
            "signal that still improves top-1 here is carrying real pick information",
            "rather than sharing units with the match-wins criterion.",
            f"Sets: {len(report['sets'])}   decisions: {report['decisions']}"
-           f"   split: {report['split']}",
+           f"   split: {report['split']}   backbone: {report['backbone']}",
            ""]
     rows = report["pooled"]
     baseline = rows[0]
@@ -178,9 +181,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--weights", default="0,1000,4000,16000,64000")
     parser.add_argument("--lambdas", default="0,0.5,0.75,0.9,1.0")
     parser.add_argument("--cap", type=int, default=5000)
+    parser.add_argument("--backbone", default="v2",
+                        help="behaviour model the outcome blend sits on (default: v2). "
+                             "Refit the blend whenever the backbone changes")
     parser.add_argument("--split", default="validation", choices=["validation", "test"],
                         help="held-out split to score (default: validation; "
                              "pass test only for a frozen specification)")
+    parser.add_argument("--final-test", action="store_true",
+                        help="required alongside --split test; exists only to make\n                             reading the test split a deliberate act")
     parser.add_argument("--adaptive", action="store_true")
     parser.add_argument("--json-out")
     return parser.parse_args(argv)
@@ -188,6 +196,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
+    guard_test_split(args.split, args.final_test)
     weights = [float(v) for v in args.weights.split(",")]
     lambdas = [float(v) for v in args.lambdas.split(",")]
     combos = [(lam, weight) for lam in lambdas for weight in weights]
@@ -199,7 +208,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             raise SystemExit(f"--set needs CACHE:OUTCOMES[:DECK_FIT], got {spec!r}")
         entry = score_set(Path(parts[0]), Path(parts[1]),
                           Path(parts[2]) if len(parts) == 3 else None,
-                          combos, args.cap, args.adaptive, args.split)
+                          combos, args.cap, args.adaptive, args.split, args.backbone)
         entries.append(entry)
         print(f"  scored {entry['set_id']}: {entry['decisions']} decisions",
               file=sys.stderr, flush=True)
@@ -214,7 +223,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "mean_rank": sum(e["mean_rank"].get(label, 0) * e["decisions"]
                              for e in entries) / total,
         })
-    report = {"sets": entries, "decisions": total, "pooled": pooled, "split": args.split}
+    report = {"sets": entries, "decisions": total, "pooled": pooled,
+              "split": args.split, "backbone": args.backbone}
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(render(report))

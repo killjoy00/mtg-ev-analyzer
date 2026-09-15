@@ -14,6 +14,8 @@ from build_replays import CountStore, DraftSkill, OutOfFoldModel, PickExample, l
 from eval_model import (
     VARIANTS,
     behaviour_support,
+    build_backbone,
+    guard_test_split,
     evidence_bucket,
     Accumulator,
     Cache,
@@ -460,6 +462,54 @@ class SplitDisciplineTests(unittest.TestCase):
             with self.subTest(entry=module.__module__), self.assertRaises(SystemExit), \
                     contextlib.redirect_stderr(io.StringIO()):
                 module(argv)
+
+
+    def test_reading_test_needs_a_second_deliberate_flag(self):
+        """A default is a suggestion. Three surfaces here silently defaulted to
+        test and nobody noticed until an outsider read the source."""
+        with self.assertRaises(SystemExit) as caught:
+            guard_test_split("test", final_test=False)
+        self.assertIn("--final-test", str(caught.exception))
+        guard_test_split("test", final_test=True)      # allowed, on purpose
+        guard_test_split("validation", final_test=False)
+        # The flag alone must not drag anything onto test.
+        guard_test_split("validation", final_test=True)
+
+    def test_the_flag_exists_on_every_entry_point(self):
+        for module, argv in ((eval_model_args, ["evaluate", "c.json"]),
+                             (pick_value_args, ["--set", "a:b:c"]),
+                             (pick_prediction_args, ["--set", "a:b"])):
+            with self.subTest(entry=module.__module__):
+                self.assertFalse(module(argv).final_test)
+                self.assertTrue(module(argv + ["--final-test"]).final_test)
+
+
+class BackboneTests(unittest.TestCase):
+    """An outcome weight fitted against a backbone that still makes the errors
+    outcomes were compensating for measures the wrong marginal value."""
+
+    def counts(self):
+        store = CountStore.empty()
+        for index in range(40):
+            store.observe(example(f"d{index}", 0, 0, "a" if index % 2 else "b", ["a", "b"]))
+        return store
+
+    def test_the_backbone_is_the_variant_asked_for(self):
+        counts = self.counts()
+        model = build_backbone(None, [], counts, "v2-no-context")
+        self.assertEqual(model.variant.name, "v2-no-context")
+        self.assertFalse(model.variant.context)
+
+    def test_an_unknown_backbone_is_refused(self):
+        with self.assertRaises(SystemExit):
+            build_backbone(None, [], self.counts(), "v9-imaginary")
+
+    def test_a_deck_fit_backbone_without_a_table_is_refused(self):
+        """Silently dropping the colour term would leave a model that reports
+        itself as v3 while behaving like v2."""
+        with self.assertRaises(SystemExit) as caught:
+            build_backbone(None, [], self.counts(), "v3-colour-and-pair", fit=None)
+        self.assertIn("deck-fit", str(caught.exception))
 
 
 class EvidenceBucketTests(unittest.TestCase):

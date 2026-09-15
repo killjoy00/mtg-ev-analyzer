@@ -308,37 +308,90 @@ Colour/archetype context is untested here and remains a hypothesis.
 
 ## The frozen specification
 
-Everything above was exploratory. Three bugs surfaced during that work, and
-each one produced a result that looked like a finding first:
+Everything above was exploratory. Three bugs surfaced during that work, and each
+produced a result that looked like a finding first:
 
 * `scan_decks` compared `"0.0"` to the string `"0"`, so for a float-written
-  archive every card counted as played in every draft. It made `dmu` report a
-  100% play rate, no card colours at all, and a commitment bucket that counted
-  the whole pool - three plausible-looking wrong things at once.
-* The crossover-weight grid `{0, 1000, 4000, ...}` never sampled the transition.
-  Behavioural support has a median of 161 observations, so `W/(W+n)` at
-  `W = 64000` gives behaviour 0.3% of the weight. The grid was two points -
+  archive every card counted as played in every draft. `dmu` reported a 100% play
+  rate, no card colours at all, and a commitment bucket counting the whole pool -
+  three plausible-looking wrong things at once.
+* The crossover-weight grid `{0, 1000, 4000, 16000, 64000}` never sampled the
+  transition. Behavioural support has a median of 161 observations, so `W/(W+n)`
+  at `W = 64000` gives behaviour 0.3% of the weight. The grid was two points -
   pure behaviour and pure outcome - wearing five points' clothing.
 * `prepare_pick_model.sh` exported `LAMBDAS` without passing it, so every
   measurement silently used a default lambda grid rather than the advertised one.
 
-None was caught by a unit test. Each was caught by looking at a shape across
-sets and finding it implausible. That is the argument for what follows.
+None was caught by a unit test. Each was caught by looking at a shape across sets
+and finding it implausible. That is the argument for what follows.
 
-**The specification is frozen.** No model change may be made on the strength of
-a test-split result. Concretely:
+### Two decisions, in order
 
-1. Selection happens on **validation**, or on the 24-set selection pool. Every
-   entry point defaults to `--split validation` and a test run has to be typed.
-2. Six sets are held out entirely: **ecl, fin, ktk, mom, powered-cube, woe**.
-   They were chosen for spread - recency, size, and the one structurally
-   different environment - before any sweep output was read, and no variant-level
-   number from them has been looked at.
-3. Every intermediate table is regenerated from scratch under the current code,
-   so no artifact predating a fix survives into the final numbers.
-4. The frozen model runs **once** on those six sets, and that is the reported
-   result. If it disagrees with the selection-pool numbers, the test number is
-   the answer and the disagreement is the finding.
+The context question and the outcome question stopped being the same question the
+moment a better context family existed.
 
-Only after that does a corpus regeneration or a grading change become a question
-worth asking.
+1. **Does the stage-matched colour + pair context model replace v2's context?**
+2. **Given whichever context model wins, do GIH/IWD add anything on top of it?**
+
+The second must be fitted against the backbone that actually ships. An outcome
+weight fitted against v2 measures the marginal value of outcomes *for a model that
+still makes the stage errors outcomes were partly compensating for* - which is not
+the quantity anyone wants. `--backbone` exists so the blend can be refitted on
+whatever wins decision 1, and no λ/W number is quotable until it has been.
+
+### Decision 1: the frozen candidate
+
+Candidate `v3-colour-and-pair` against incumbent `v2`. Every constant below is
+frozen; none may move in response to a reserve-set result.
+
+| | |
+|---|---|
+| candidate | `v3-colour-and-pair` (stage-matched pair lift + stage-matched format-wide colour curve) |
+| incumbent | `v2` (`strong-player-pool-context-v2`) |
+| `pair_min_seen` | 8 |
+| `pair_prior_strength` | 24.0 |
+| `context_strength` | 0.75 |
+| `fit_strength` | 0.75 |
+| `card_specific_fit` | false — one format-wide curve, no per-card play-rate table |
+| `stage_matched` / `fit_stage_matched` | true / true |
+| `COMMIT_BUCKETS` | 0 / 1-2 / 3-5 / 6-9 / 10+ |
+| `STAGE_BUCKETS` | 0 / 1-2 / 3-5 / 6-9 / 10-19 / 20+ pool cards |
+| `MIN_STAGE_CELL` | 200 picks; thinner cells fall back to the marginal curve |
+| `PLAY_PRIOR` | 25.0 |
+| `COLOUR_THRESHOLD` / `MIN_DECKS_FOR_COLOUR` | 0.90 / 30 |
+| training cap | 5,000 drafts, production hash order |
+| calibration | `SUPPORT_SHARPENING = 2`, display only; scoring uses `1/T` |
+| primary metrics | log loss and top-1, **served slice only** (pack 1, picks 1-10; 11 for Cube) |
+| aggregation | pooled across reserve sets weighted by decisions; per-set paired bootstrap, clustered over drafts, 2,000 draws |
+| pass rule | **both** metrics improve in the pooled figure, **and** no reserve set shows a separated regression on either |
+
+### Reserve sets
+
+**ecl, fin, ktk, mom, powered-cube, woe** — predeclared *variant-reserve* sets,
+chosen for spread (recency, size, and the one structurally different environment)
+before any sweep output was read.
+
+They are not "untouched" in the absolute sense, and calling them that invites an
+objection the protocol does not need. Descriptive statistics from some of them
+have been seen: per-set criterion-A correlations at the old degenerate weight
+grid, and deck-fit commitment curves. What has **not** been inspected, for any of
+the six, is any candidate context-variant result, any λ/W selection, or any part
+of the final comparison.
+
+Selection pool (24): blb bro dft dmu dsk eoe fdn hbg hob lci ltr mh3 mkm msh neo
+one otj pio sir snc sos tdm tla tmt.
+
+### How the test pass runs
+
+One command. It regenerates every intermediate table from scratch under the
+current code, runs all six reserve sets, computes every predetermined statistic,
+writes one report, and only then is the report read.
+
+Reading `ecl` first, thinking "maybe the 10-19 stage bucket wants moving", and
+then running `fin` would consume the reserve just as surely as selecting on it.
+The final test is meant to be operationally boring.
+
+Two independent things now have to be true before any command reads the test
+split: `--split test` **and** `--final-test`, which exists for no other purpose.
+Defaults alone were not enough - three separate surfaces silently read test and
+nobody noticed until an outside reviewer read the source.

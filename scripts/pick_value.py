@@ -50,6 +50,8 @@ from eval_model import (  # noqa: E402
     Cache,
     VariantModel,
     behaviour_support,
+    build_backbone,
+    guard_test_split,
     load_examples,
     train_counts,
 )
@@ -367,7 +369,7 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
             all_picks: bool = False,
             pick_range: Optional[Tuple[int, int]] = None,
             deck_fit: Optional[Path] = None, adaptive: bool = False,
-            split: str = "validation") -> dict:
+            split: str = "validation", backbone: str = "v2") -> dict:
     cache = Cache.load(elite_cache)
     max_pick = 11 if cache.set_id == "powered-cube" else 10
 
@@ -396,7 +398,7 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     if cap:
         train_ids = train_ids[:cap]
     counts, training_picks = train_counts(cache, train_ids)
-    model = VariantModel(counts, VARIANTS["v2"])
+    model = build_backbone(cache, train_ids, counts, backbone, fit)
 
     # The elite training split is the only data the model saw. The control
     # cohort is untouched by training entirely, and is what gives the skill axis
@@ -432,6 +434,7 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
         "observations": observations,
         "set_id": cache.set_id,
         "split": split,
+        "backbone": backbone,
         "train_drafts": len(train_ids),
         "training_picks": training_picks,
         "held_out_drafts": len(regrets),
@@ -515,9 +518,16 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="share of the outcome signal taken from absolute GIH win "
                              "rate; the rest comes from IWD")
     parser.add_argument("--cap", type=int, default=5000)
+    parser.add_argument("--backbone", default="v2",
+                        help="behaviour model the outcome blend sits on (default: v2). "
+                             "Refit the blend whenever the backbone changes: a weight "
+                             "fitted against an obsolete backbone measures the wrong "
+                             "marginal value")
     parser.add_argument("--split", default="validation", choices=["validation", "test"],
                         help="held-out split to measure on (default: validation; "
                              "pass test only for a frozen specification)")
+    parser.add_argument("--final-test", action="store_true",
+                        help="required alongside --split test; exists only to make\n                             reading the test split a deliberate act")
     parser.add_argument("--bootstrap-draws", type=int, default=300)
     parser.add_argument("--adaptive", action="store_true",
                         help="read each weight as a crossover in observations: the outcome "
@@ -544,6 +554,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     lambdas = [float(v) for v in args.lambdas.split(",")]
     combos = [(lam, weight) for lam in lambdas for weight in weights]
     labels = [combo_label(lam, weight) for lam, weight in combos]
+    guard_test_split(args.split, args.final_test)
     pick_range = tuple(int(v) for v in args.pick_range.split(":")) if args.pick_range else None
 
     entries: List[dict] = []
@@ -580,7 +591,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         entry = analyse(Path(parts[0]), Path(parts[1]), Path(parts[2]), combos, args.cap,
                         Path(parts[3]) if len(parts) == 4 else None, args.bootstrap_draws,
                         args.all_picks, pick_range, Path(fit) if fit else None, args.adaptive,
-                        args.split)
+                        args.split, args.backbone)
         observations = entry.pop("observations")
         print(f"  measured {entry['set_id']}: {entry['held_out_drafts']} held-out drafts",
               file=sys.stderr, flush=True)
