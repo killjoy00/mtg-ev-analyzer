@@ -52,6 +52,16 @@ from build_replays import (  # noqa: E402
     stable_score,
 )
 
+def _fit_helpers():
+    """deck_fit imports this module, so it cannot be imported at the top.
+
+    Bound once per model rather than looked up per call: card_tendency runs
+    tens of millions of times in a sweep.
+    """
+    from deck_fit import COLOURS, commit_bucket, commitment, stage_bucket  # noqa: E402
+    return COLOURS, commit_bucket, commitment, stage_bucket
+
+
 ROOT = Path(__file__).resolve().parents[1]
 CACHE_VERSION = 3
 SPLIT_SALT = "eval-split"
@@ -266,6 +276,10 @@ class Variant:
     context: bool = True
     stage_matched: bool = False
     coverage: bool = False
+    deck_fit: bool = False
+    card_specific_fit: bool = True
+    fit_stage_matched: bool = False
+    fit_strength: float = 0.75
     pair_min_seen: int = 8
     pair_prior_strength: float = 24.0
     context_strength: float = 0.75
@@ -276,6 +290,9 @@ class Variant:
         return {
             "name": self.name, "context": self.context,
             "stage_matched": self.stage_matched, "coverage": self.coverage,
+            "deck_fit": self.deck_fit, "fit_strength": self.fit_strength,
+            "card_specific_fit": self.card_specific_fit,
+            "fit_stage_matched": self.fit_stage_matched,
             "pair_min_seen": self.pair_min_seen,
             "pair_prior_strength": self.pair_prior_strength,
             "context_strength": self.context_strength,
@@ -297,6 +314,18 @@ VARIANTS: Dict[str, Variant] = {
                 notes="stage-matched lift scaled by the share of the pool carrying usable pair evidence"),
         Variant("v2-coverage", coverage=True,
                 notes="coverage scaling alone, keeping the pooled-stage baseline"),
+        Variant("v3-deck-fit", context=False, deck_fit=True,
+                notes="colour-commitment context replacing card-pair lift"),
+        Variant("v3-fit-and-pair", deck_fit=True, stage_matched=True,
+                notes="stage-matched pair lift and colour-commitment context, additive"),
+        Variant("v3-colour-only", context=False, deck_fit=True, card_specific_fit=False,
+                notes="one format-wide colour-commitment curve, no per-card play rates"),
+        Variant("v3-colour-stage", context=False, deck_fit=True, card_specific_fit=False,
+                fit_stage_matched=True,
+                notes="format-wide colour curve held at a fixed point in the draft"),
+        Variant("v3-colour-and-pair", deck_fit=True, card_specific_fit=False,
+                stage_matched=True, fit_stage_matched=True,
+                notes="stage-matched pair lift and stage-matched colour curve"),
     ]
 }
 
@@ -326,20 +355,72 @@ class VariantModel(OutOfFoldModel):
     """
 
     def __init__(self, counts: CountStore, variant: Variant,
-                 pair_expected: Optional[Mapping[Tuple[str, str], float]] = None):
+                 pair_expected: Optional[Mapping[Tuple[str, str], float]] = None,
+                 fit: Optional[dict] = None):
         super().__init__(counts, CountStore.empty())
         self.variant = variant
         self.pair_expected = pair_expected or {}
+        self.fit = fit
+        self.fit_colours: Dict[str, frozenset] = {}
+        if fit:
+            (colours, self._commit_bucket, self._commitment,
+             self._stage_bucket) = _fit_helpers()
+            for name, row in fit["cards"].items():
+                letters = row.get("colours") or "C"
+                self.fit_colours[name] = frozenset(c for c in letters if c in colours)
 
     def _count(self, attr: str, key) -> int:
         return getattr(self.all, attr)[key]
+
+    def fit_shift(self, card: str, pool: Mapping[str, int]) -> float:
+        """How much this pool changes the odds the card ever reaches the deck.
+
+        The card-pair term can only speak about pairs it has actually counted,
+        so a card the drafter has never been seen holding alongside this pool
+        card gets no context at all. Colour commitment generalises: every card
+        in the pool that shares a colour is evidence about every card in the
+        pack that shares it, which is the thing the pair counts were
+        approximating one pair at a time.
+
+        Measured as a log-odds shift against the card's own unconditional play
+        rate, so a card that is usually abandoned is not penalised twice.
+        """
+        if not self.fit:
+            return 0.0
+        # The colour-only variants still need the card's colours, to know which
+        # of the pool counts; what they drop is the card's own play rates.
+        row = (self.fit["cards"].get(card) if self.variant.card_specific_fit
+               else (self.fit if card in self.fit["cards"] else None))
+        if row is None:
+            return 0.0
+        bucket = self._commit_bucket(self._commitment(dict(pool), self.fit_colours, card))
+        conditioned = reference = None
+        if self.variant.fit_stage_matched:
+            # Commitment can never exceed the pool it is counted from, so the
+            # marginal curve reads draft stage as well as colour fit. Hold the
+            # stage and the shift is colour fit alone.
+            cell = self.fit.get("by_stage", {}).get(self._stage_bucket(sum(pool.values())))
+            if cell:
+                conditioned, reference = cell.get(bucket), cell.get("*")
+        if conditioned is None or reference is None:
+            # No usable stage cell: fall back to the marginal curve rather than
+            # to a cell too thin to report.
+            conditioned, reference = row["by_commitment"].get(bucket), row.get("play_rate")
+        if not conditioned or not reference:
+            return 0.0
+        clamp = lambda p: min(1 - 1e-6, max(1e-6, p))
+        return logit(clamp(conditioned)) - logit(clamp(reference))
 
     def card_tendency(self, card: str, pack_number: int, pick_number: int,
                       pool: Mapping[str, int]) -> float:
         base = self.base_tendency(card, pack_number, pick_number)
         variant = self.variant
+        # The colour-commitment shift is defined even at an empty pool - bucket
+        # "0" is a real estimate, not a missing one - so it is applied before
+        # the pair term's empty-pool short circuit.
+        fit_shift = variant.fit_strength * self.fit_shift(card, pool) if variant.deck_fit else 0.0
         if not variant.context or not pool:
-            return base
+            return logistic(logit(base) + fit_shift) if fit_shift else base
 
         weighted_lift = 0.0
         total_weight = 0.0
@@ -370,16 +451,16 @@ class VariantModel(OutOfFoldModel):
             total_weight += weight
 
         if not total_weight:
-            return base
+            return logistic(logit(base) + fit_shift) if fit_shift else base
 
         context = weighted_lift / total_weight
-        commitment = min(1.0, sum(pool.values()) / 8.0)
-        scale = variant.context_strength * commitment
+        pool_commitment = min(1.0, sum(pool.values()) / 8.0)
+        scale = variant.context_strength * pool_commitment
         if variant.coverage and possible_weight > 0:
             # How much of this pool actually carries usable pair evidence.
             # Numerator and denominator both carry the duplicate-copy weight.
             scale *= min(1.0, total_weight / possible_weight)
-        return logistic(logit(base) + scale * context)
+        return logistic(logit(base) + scale * context + fit_shift)
 
 
 def train_counts(cache: Cache, draft_ids: Sequence[str]) -> Tuple[CountStore, int]:
@@ -650,6 +731,10 @@ def evaluate(cache: Cache, variant: Variant, model: "VariantModel",
         "pack": defaultdict(Accumulator),
     }
     per_example: List[Tuple[str, float, float, int]] = []
+    # The game only ever serves pack 1, so a change is worth making on the
+    # strength of this slice, not of the whole draft. Kept separately because a
+    # paired bootstrap over all picks answers a question nobody is asking.
+    served_per_example: List[Tuple[str, float, float, int]] = []
 
     for example in test_examples:
         raw = {card: model.card_tendency(card, example.raw_pack_number,
@@ -678,6 +763,7 @@ def evaluate(cache: Cache, variant: Variant, model: "VariantModel",
             served.add(log_loss, brier, hit, rank, len(probabilities))
             served_calibration.add(probabilities, chosen)
             served_grading.add(probabilities, chosen)
+            served_per_example.append((example.draft_id, log_loss, brier, 1 if hit else 0))
 
     return {
         "variant": variant.describe(),
@@ -696,6 +782,7 @@ def evaluate(cache: Cache, variant: Variant, model: "VariantModel",
         "breakouts": {name: {key: cell.summary() for key, cell in sorted(group.items())}
                       for name, group in cells.items()},
         "_per_example": per_example,
+        "_served_per_example": served_per_example,
     }
 
 
@@ -886,10 +973,23 @@ def run_evaluate(args: argparse.Namespace) -> int:
     runs: List[dict] = []
     comparisons: List[dict] = []
     needs_expectations = any(v.stage_matched for v in variants)
+    needs_fit = any(v.deck_fit for v in variants)
+    fit_dir = Path(args.deck_fit_dir) if args.deck_fit_dir else None
+    if needs_fit and not fit_dir:
+        raise SystemExit("--deck-fit-dir is required by the deck-fit variants")
     for cache_path in args.caches:
         cache = Cache.load(Path(cache_path))
+        fit = None
+        if needs_fit:
+            fit_path = fit_dir / f"{cache.set_id}.json"
+            if not fit_path.exists():
+                raise SystemExit(f"No deck-fit table for {cache.set_id} at {fit_path}")
+            fit = json.loads(fit_path.read_text(encoding="utf-8"))
         train_pool = cache.split_drafts("train")
-        test_ids = cache.split_drafts(args.split)
+        # Capping the held-out set trades interval width for sweep time. The
+        # cap takes a prefix of the split's own stable order, so the same drafts
+        # are held out for every variant and every set at a given cap.
+        test_ids = cap_prefix(cache.split_drafts(args.split), args.max_test_drafts)
         served_max = 11 if cache.set_id == "powered-cube" else 10
         print(f"{cache.set_id}: loading {len(test_ids)} {args.split} drafts",
               file=sys.stderr, flush=True)
@@ -904,7 +1004,8 @@ def run_evaluate(args: argparse.Namespace) -> int:
             expectations = pair_expectations(cache, train_ids, counts) if needs_expectations else None
             for variant in variants:
                 model = VariantModel(counts, variant,
-                                     expectations if variant.stage_matched else None)
+                                     expectations if variant.stage_matched else None,
+                                     fit if variant.deck_fit else None)
                 result = evaluate(cache, variant, model, test_examples, rarities,
                                   served_max, len(train_ids), training_picks, len(test_ids))
                 result["cap"] = cap
@@ -920,14 +1021,17 @@ def run_evaluate(args: argparse.Namespace) -> int:
             if key == baseline_key:
                 continue
             base = by_key[baseline_key]
-            comparisons.append({
-                "set_id": cache.set_id,
-                "slice": "all picks",
-                "baseline": f"{baseline_key[1]}@{baseline_key[0]}",
-                "candidate": f"{key[1]}@{key[0]}",
-                "paired": paired_bootstrap(base["_per_example"], result["_per_example"],
-                                           args.bootstrap_draws),
-            })
+            for slice_name, field in (("all picks", "_per_example"),
+                                      (f"served (pack 1, picks 1-{served_max})",
+                                       "_served_per_example")):
+                comparisons.append({
+                    "set_id": cache.set_id,
+                    "slice": slice_name,
+                    "baseline": f"{baseline_key[1]}@{baseline_key[0]}",
+                    "candidate": f"{key[1]}@{key[0]}",
+                    "paired": paired_bootstrap(base[field], result[field],
+                                               args.bootstrap_draws),
+                })
 
     # Group by the requested cap, not its per-set label: "all" resolves to a
     # different size in every set and must still aggregate as one row.
@@ -943,6 +1047,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
 
     for run in runs:
         run.pop("_per_example", None)
+        run.pop("_served_per_example", None)
     report = {
         "split": f"train {TRAIN_SHARE}% / validation {VALIDATION_SHARE}% / test {100 - TRAIN_SHARE - VALIDATION_SHARE}% by draft_id",
         "evaluated_split": args.split,
@@ -984,6 +1089,10 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                                  help="comma-separated exponents applied to tendencies before "
                                       "normalising; 1.0 is production")
     evaluate_parser.add_argument("--split", default="test", choices=["validation", "test"])
+    evaluate_parser.add_argument("--max-test-drafts", type=int,
+                                 help="cap the held-out drafts per set (default: all)")
+    evaluate_parser.add_argument("--deck-fit-dir",
+                                 help="directory of per-set deck_fit.py tables, named <set>.json")
     evaluate_parser.add_argument("--bootstrap-draws", type=int, default=2000)
     evaluate_parser.add_argument("--json-out")
     evaluate_parser.set_defaults(func=run_evaluate)

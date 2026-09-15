@@ -7,8 +7,11 @@ import {
   draftRunDifficulty,
   draftRunRerollDistance,
   eligiblePickForRound,
+  calibratedSupports,
   gradeDraftRunPick,
   publicDraftRunPuzzle,
+  SCORE_EXPONENT,
+  SUPPORT_SHARPENING,
   summarizeDraftRun,
 } from '../draft-run.mjs';
 
@@ -93,4 +96,52 @@ test('reroll matching favors similar depth and decision shape', () => {
   assert.equal(difficulty.pickNumber, 6);
   assert.equal(difficulty.priorPoolSize, 5);
   assert.ok(difficulty.entropy > 0 && difficulty.entropy <= 1);
+});
+
+const calibrationPuzzle = (probabilities) => ({
+  pick_number: 3,
+  historical_pick_id: 'c1',
+  candidates: probabilities.map((p, i) => ({id: `c${i}`, name: `C${i}`, model_probability: p})),
+});
+
+test('calibrated supports are a proper distribution and keep the pack order', () => {
+  const probabilities = [0.52, 0.21, 0.15, 0.07, 0.05];
+  const calibrated = calibratedSupports(calibrationPuzzle(probabilities).candidates);
+  const values = [...calibrated.values()];
+  assert.ok(Math.abs(values.reduce((a, b) => a + b, 0) - 1) < 1e-12);
+  // sharpening is monotone, so nothing is reordered
+  for (let i = 1; i < values.length; i += 1) assert.ok(values[i] <= values[i - 1]);
+  // and the leader's share rises: that is the whole point
+  assert.ok(values[0] > probabilities[0] / probabilities.reduce((a, b) => a + b, 0));
+});
+
+test('calibration does not move a single score', () => {
+  // The award is (p_a^T / p_b^T)^(1/T), which is p_a / p_b exactly. Honest
+  // numbers on screen, and nobody's score changes.
+  assert.equal(SCORE_EXPONENT, 1 / SUPPORT_SHARPENING);
+  for (const probabilities of [[0.52, 0.21, 0.15, 0.07, 0.05],
+                               [0.9, 0.05, 0.03, 0.02],
+                               [0.3, 0.28, 0.24, 0.18],
+                               [0.4, 0.4, 0.1, 0.1]]) {
+    const puzzle = calibrationPuzzle(probabilities);
+    const leader = Math.max(...probabilities);
+    puzzle.candidates.forEach((card, index) => {
+      const before = index === 1 ? 100 : Math.round(95 * (probabilities[index] / leader));
+      assert.equal(gradeDraftRunPick(puzzle, card.id).score, before,
+        `score moved for ${card.id} in [${probabilities}]`);
+    });
+  }
+});
+
+test('difficulty still reads the raw stored supports', () => {
+  // Ratings are persisted per puzzle; a presentation change must not re-band
+  // the corpus underneath them.
+  const puzzle = calibrationPuzzle([0.5, 0.25, 0.15, 0.1]);
+  assert.equal(draftRunDifficulty(puzzle).rating, Math.round(100 * (0.25 / 0.5)));
+});
+
+test('an empty or degenerate pack still yields a usable distribution', () => {
+  const flat = calibratedSupports([{id: 'a', model_probability: 0}, {id: 'b', model_probability: 0}]);
+  assert.ok(Math.abs([...flat.values()].reduce((a, b) => a + b, 0) - 1) < 1e-12);
+  assert.equal(calibratedSupports([]).size, 0);
 });

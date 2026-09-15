@@ -36,12 +36,12 @@ import statistics
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
+from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import open_text  # noqa: E402
-from eval_model import Cache  # noqa: E402
+from eval_model import Cache, draft_split  # noqa: E402
 
 COLOURS = ("W", "U", "B", "R", "G")
 # A card counts as belonging to a colour when it is almost never played outside
@@ -51,21 +51,47 @@ MIN_DECKS_FOR_COLOUR = 30
 # Shrinkage of a per-commitment play rate toward the card's own overall rate.
 PLAY_PRIOR = 25.0
 COMMIT_BUCKETS = ((0, 0, "0"), (1, 2, "1-2"), (3, 5, "3-5"), (6, 9, "6-9"), (10, 10 ** 9, "10+"))
+# How far into the draft the pick is, measured by the pool it was taken from -
+# which is exactly the number of picks already made. Commitment cannot exceed
+# it, so the two are correlated by construction and the marginal commitment
+# curve reads draft stage as well as colour fit. Conditioning on this asks the
+# question that was wanted: holding the number of cards taken fixed, does it
+# matter how many of them share this card's colour?
+STAGE_BUCKETS = ((0, 0, "s0"), (1, 2, "s1-2"), (3, 5, "s3-5"), (6, 9, "s6-9"),
+                 (10, 19, "s10-19"), (20, 10 ** 9, "s20+"))
+# Below this many picks a (stage, commitment) cell is not reported at all; the
+# consumer falls back to the marginal curve rather than to a noisy cell.
+MIN_STAGE_CELL = 200
+
+
+def _bucket(buckets, count: int) -> str:
+    for low, high, name in buckets:
+        if low <= count <= high:
+            return name
+    return buckets[-1][2]
 
 
 def commit_bucket(count: int) -> str:
-    for low, high, name in COMMIT_BUCKETS:
-        if low <= count <= high:
-            return name
-    return COMMIT_BUCKETS[-1][2]
+    return _bucket(COMMIT_BUCKETS, count)
+
+
+def stage_bucket(pool_size: int) -> str:
+    return _bucket(STAGE_BUCKETS, pool_size)
 
 
 # --------------------------------------------------------------------------
 # pass 1 and 2: decks and card colours, from game data
 # --------------------------------------------------------------------------
 
-def scan_decks(archive: Path) -> Tuple[Dict[str, set], Dict[str, Counter]]:
-    """draft_id -> cards played, and card -> counter of its decks' colours."""
+def scan_decks(archive: Path, keep: Optional[Set[str]] = None
+               ) -> Tuple[Dict[str, set], Dict[str, Counter]]:
+    """draft_id -> cards played, and card -> counter of its decks' colours.
+
+    `keep` restricts both to those drafts. Colour identity is a fixed property
+    of a card, so reading it from every deck in the set would be a leak with no
+    plausible path to inflating anything - but "no plausible path" is not the
+    same as none, and the caller can afford to hold the split.
+    """
     played: Dict[str, set] = defaultdict(set)
     colour_hits: Dict[str, Counter] = defaultdict(Counter)
     with open_text(archive) as handle:
@@ -86,7 +112,7 @@ def scan_decks(archive: Path) -> Tuple[Dict[str, set], Dict[str, Counter]]:
             if len(values) != len(header):
                 continue
             draft_id = values[draft_at].strip()
-            if not draft_id:
+            if not draft_id or (keep is not None and draft_id not in keep):
                 continue
             main = "".join(c for c in values[colours_at].strip().upper() if c in COLOURS)
             seen_draft_colours[draft_id][main] += 1
@@ -139,23 +165,38 @@ def commitment(pool: Dict[str, int], colours: Dict[str, FrozenSet[str]],
     return total
 
 
-def observe(cache: Cache, played: Dict[str, set], colours: Dict[str, FrozenSet[str]]
+def observe(cache: Cache, played: Dict[str, set], colours: Dict[str, FrozenSet[str]],
+            split: Optional[str] = None
             ) -> Tuple[Dict[Tuple[str, str], List[int]], Dict[str, List[int]]]:
-    """(card, commitment bucket) -> played flags, and card -> played flags."""
+    """(card, commitment bucket) -> played flags, and card -> played flags.
+
+    `split` restricts to one split of the cache. Estimating play rates on the
+    same drafts the value model is later scored against would let the model
+    learn from its own evaluation set, so the pipeline fits this on train only.
+    """
     by_bucket: Dict[Tuple[str, str], List[int]] = defaultdict(list)
     by_card: Dict[str, List[int]] = defaultdict(list)
+    by_stage: Dict[Tuple[str, str], List[int]] = defaultdict(list)
     for draft_id, example in cache.examples():
         deck = played.get(draft_id)
         if deck is None:
             continue
+        if split is not None and draft_split(draft_id) != split:
+            continue
         card = example.historical_pick
         flag = 1 if card in deck else 0
-        by_bucket[(card, commit_bucket(commitment(example.pool, colours, card)))].append(flag)
+        commit = commit_bucket(commitment(example.pool, colours, card))
+        by_bucket[(card, commit)].append(flag)
         by_card[card].append(flag)
-    return by_bucket, by_card
+        # Card identity dropped: this is the format's curve, cut by how far into
+        # the draft the pick was. "*" is the whole stage, whatever the colours.
+        stage = stage_bucket(sum(example.pool.values()))
+        by_stage[(stage, commit)].append(flag)
+        by_stage[(stage, "*")].append(flag)
+    return by_bucket, by_card, by_stage
 
 
-def estimate(by_bucket, by_card, colours) -> dict:
+def estimate(by_bucket, by_card, colours, by_stage=None) -> dict:
     overall = {card: statistics.fmean(flags) for card, flags in by_card.items() if flags}
     grand = statistics.fmean(overall.values()) if overall else 0.5
     rows: Dict[str, dict] = {}
@@ -176,19 +217,57 @@ def estimate(by_bucket, by_card, colours) -> dict:
             "colours": "".join(sorted(colours.get(card, frozenset()))) or "C",
             "by_commitment": buckets,
         }
-    return {"grand_play_rate": round(grand, 5), "cards": rows}
+
+    # The same curve with the card identity dropped: how much does colour
+    # commitment alone move the odds a pick is played? A model built on this
+    # needs only which colours a card is - something already on the card - and
+    # never has to ship a per-card table, so it is worth knowing how much of the
+    # per-card version's value is just this.
+    pooled: Dict[str, dict] = {}
+    for (_, name), observed in by_bucket.items():
+        cell = pooled.setdefault(name, {"played": 0, "picks": 0})
+        cell["played"] += sum(observed)
+        cell["picks"] += len(observed)
+    format_curve = {name: round(cell["played"] / cell["picks"], 5)
+                    for name, cell in pooled.items() if cell["picks"]}
+    overall_rate = (sum(c["played"] for c in pooled.values())
+                    / sum(c["picks"] for c in pooled.values())) if pooled else 0.5
+
+    # The same curve again, this time held at a fixed point in the draft.
+    # Commitment can never exceed the pool it is counted from, so the marginal
+    # curve above confounds "your colours are settled" with "you are 20 picks
+    # in" - and the two pull opposite ways, because a late pick is more often a
+    # card that gets cut. Cells thinner than MIN_STAGE_CELL are dropped so the
+    # consumer falls back to the marginal curve rather than to noise.
+    stage_curve: Dict[str, Dict[str, float]] = {}
+    stage_picks: Dict[str, Dict[str, int]] = {}
+    for (stage, commit), observed in sorted((by_stage or {}).items()):
+        if len(observed) < MIN_STAGE_CELL:
+            continue
+        stage_curve.setdefault(stage, {})[commit] = round(statistics.fmean(observed), 5)
+        stage_picks.setdefault(stage, {})[commit] = len(observed)
+
+    return {"grand_play_rate": round(grand, 5),
+            "play_rate": round(overall_rate, 5),
+            "by_commitment": format_curve,
+            "bucket_picks": {name: cell["picks"] for name, cell in pooled.items()},
+            "by_stage": stage_curve,
+            "stage_picks": stage_picks,
+            "cards": rows}
 
 
 def run(args: argparse.Namespace) -> int:
-    played, colour_hits = scan_decks(Path(args.games))
-    colours = card_colours(colour_hits)
     cache = Cache.load(Path(args.cache))
-    by_bucket, by_card = observe(cache, played, colours)
+    keep = set(cache.split_drafts(args.split)) if args.split else None
+    played, colour_hits = scan_decks(Path(args.games), keep)
+    colours = card_colours(colour_hits)
+    by_bucket, by_card, by_stage = observe(cache, played, colours, args.split)
     if not by_card:
         raise SystemExit("No drafts in the cache matched the game data. Same set?")
-    summary = estimate(by_bucket, by_card, colours)
+    summary = estimate(by_bucket, by_card, colours, by_stage)
     summary["set_id"] = cache.set_id
     summary["drafts_with_decks"] = len(played)
+    summary["split"] = args.split or "all"
     summary["matched_drafts"] = len({d for d, _ in cache.examples() if d in played})
     Path(args.out).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
@@ -216,6 +295,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--games", required=True, help="game_data_public.<SET>.PremierDraft.csv.gz")
     parser.add_argument("--cache", required=True, help="a draft cache from eval_model.py extract")
+    parser.add_argument("--split", choices=["train", "validation", "test"],
+                        help="restrict to one split of the cache; use train so the "
+                             "estimate never sees a draft the value model is scored on")
     parser.add_argument("--out", required=True)
     return parser.parse_args(argv)
 

@@ -6,7 +6,8 @@ import unittest
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from card_outcomes import column_index, count_of, shrink, summarise, tally
+from card_outcomes import (column_index, count_of, merge_excluding, shrink,
+                           summarise, tally)
 
 
 def archive(path: Path, cards, rows):
@@ -64,23 +65,70 @@ class TallyTests(unittest.TestCase):
                     (True, {"Alpha": (1, 0)}), (False, {"Alpha": (1, 0)}),
                     (False, {"Alpha": (1, 0)}), (False, {"Alpha": (1, 0)})]
             archive(path, ["Alpha"], rows)
-            counts, seen = tally(path)
-        self.assertEqual(seen, 8)
+            per_fold, seen, wins = tally(path)
+        counts = per_fold[0]
+        self.assertEqual(seen, [8])
         alpha = counts["Alpha"]
         self.assertEqual(alpha["gih_games"], 4)
         self.assertEqual(alpha["gih_wins"], 3)
         self.assertEqual(alpha["gnd_games"], 4)
         self.assertEqual(alpha["gnd_wins"], 1)
         self.assertEqual(alpha["deck_games"], 8)
+        self.assertEqual(wins, [4])
 
     def test_a_card_not_in_the_deck_is_not_counted(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "g.csv.gz"
             archive(path, ["Alpha", "Beta"],
                     [(True, {"Alpha": (1, 1)}), (False, {"Alpha": (1, 0)})])
-            counts, _ = tally(path)
+            per_fold, _, _ = tally(path)
+        counts = per_fold[0]
         self.assertIn("Alpha", counts)
         self.assertNotIn("Beta", counts)
+
+
+class CrossFitTests(unittest.TestCase):
+    def test_folds_partition_the_games(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "g.csv.gz"
+            rows = [(index % 2 == 0, {"Alpha": (1, index % 3 != 0)}) for index in range(300)]
+            archive(path, ["Alpha"], rows)
+            per_fold, seen, wins = tally(path, folds=5)
+        self.assertEqual(len(per_fold), 5)
+        self.assertEqual(sum(seen), 300)
+        # every game lands in exactly one fold
+        self.assertEqual(sum(t["Alpha"]["deck_games"] for t in per_fold if "Alpha" in t), 300)
+
+    def test_a_fold_is_scored_from_the_others_only(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "g.csv.gz"
+            rows = [(index % 2 == 0, {"Alpha": (1, index % 3 != 0)}) for index in range(300)]
+            archive(path, ["Alpha"], rows)
+            per_fold, _, _ = tally(path, folds=5)
+        held = per_fold[2]["Alpha"]["deck_games"]
+        other = merge_excluding(per_fold, 2)["Alpha"]["deck_games"]
+        self.assertGreater(held, 0)
+        self.assertEqual(held + other, 300)
+
+    def test_merge_excluding_nothing_is_the_whole_corpus(self):
+        per_fold = [{"A": {"gih_games": 5, "gih_wins": 3}},
+                    {"A": {"gih_games": 7, "gih_wins": 4}}]
+        merged = merge_excluding(per_fold, -1)
+        self.assertEqual(merged["A"], {"gih_games": 12, "gih_wins": 7})
+
+
+class BaselineTests(unittest.TestCase):
+    def test_baseline_is_the_true_game_win_rate(self):
+        """Not the deck-games-weighted average, which counts a deck once per
+        distinct card it played and so over-weights card-dense decks."""
+        counts = {"A": {"gih_games": 10, "gih_wins": 6, "gnd_games": 10, "gnd_wins": 4,
+                        "deck_games": 20, "deck_wins": 10},
+                  "B": {"gih_games": 1, "gih_wins": 1, "gnd_games": 1, "gnd_wins": 1,
+                        "deck_games": 2, "deck_wins": 2}}
+        summary = summarise(counts, rows=100, game_wins=55)
+        self.assertAlmostEqual(summary["baseline_win_rate"], 0.55)
+        # the deck-weighted figure would have been 12/22 = 0.545
+        self.assertNotAlmostEqual(summary["baseline_win_rate"], 12 / 22, places=3)
 
 
 class SummaryTests(unittest.TestCase):
@@ -88,7 +136,7 @@ class SummaryTests(unittest.TestCase):
         counts = {"Alpha": {"gih_games": 1000, "gih_wins": 700,
                             "gnd_games": 1000, "gnd_wins": 500,
                             "deck_games": 2000, "deck_wins": 1200}}
-        rows = summarise(counts)["cards"]["Alpha"]
+        rows = summarise(counts, 2000, 1100)["cards"]["Alpha"]
         self.assertAlmostEqual(rows["gih_wr"], 0.7)
         self.assertAlmostEqual(rows["gnd_wr"], 0.5)
         self.assertAlmostEqual(rows["iwd"], 0.2)
@@ -96,7 +144,7 @@ class SummaryTests(unittest.TestCase):
     def test_a_thinly_supported_card_is_shrunk_toward_no_effect(self):
         thin = {"Alpha": {"gih_games": 6, "gih_wins": 6, "gnd_games": 6, "gnd_wins": 0,
                           "deck_games": 12, "deck_wins": 6}}
-        rows = summarise(thin)["cards"]["Alpha"]
+        rows = summarise(thin, 12, 6)["cards"]["Alpha"]
         # Raw IWD is a full 1.0; six games each way is not evidence of that.
         self.assertAlmostEqual(rows["iwd"], 1.0)
         self.assertLess(abs(rows["iwd_shrunk"]), 0.05)
@@ -105,7 +153,7 @@ class SummaryTests(unittest.TestCase):
         thick = {"Alpha": {"gih_games": 20000, "gih_wins": 13000,
                            "gnd_games": 20000, "gnd_wins": 9000,
                            "deck_games": 40000, "deck_wins": 22000}}
-        rows = summarise(thick)["cards"]["Alpha"]
+        rows = summarise(thick, 40000, 22000)["cards"]["Alpha"]
         self.assertAlmostEqual(rows["iwd"], 0.2, places=6)
         self.assertGreater(rows["iwd_shrunk"], 0.17)
 

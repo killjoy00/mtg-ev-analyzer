@@ -5,8 +5,11 @@
 #   scripts/prepare_pick_model.sh WORKDIR [SET ...]
 #
 # Per set: fetch the draft and game archives, extract an elite cohort and a
-# control cohort, measure card impact, measure deck fit, then measure pick
-# observations. The final pooled fit is a separate step, because pooling has to
+# control cohort, measure card impact, measure deck fit ON THE ELITE TRAIN SPLIT
+# ONLY so it never sees a draft the value model is later scored against, then
+# measure pick observations. Card outcomes are cross-fitted by draft, so a
+# draft is never scored using the games it itself contributed.
+# The final pooled fit is a separate step, because pooling has to
 # see every set at once:
 #
 #   python3 scripts/pick_value.py --adaptive --weights ... \
@@ -22,6 +25,8 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 JOBS="${JOBS:-4}"
 CONTROL_DRAFTS="${CONTROL_DRAFTS:-3000}"
 WEIGHTS="${WEIGHTS:-0,1000,4000,16000,64000}"
+LAMBDAS="${LAMBDAS:-0,0.5,0.75,0.9,1.0}"
+FOLDS="${FOLDS:-5}"
 
 SETS=("$@")
 if [ ${#SETS[@]} -eq 0 ]; then
@@ -72,16 +77,17 @@ prepare() {
 
   [ -s "$WORK/cards/$sid.json" ] || \
     python3 "$ROOT/scripts/card_outcomes.py" --archive "$WORK/games/$sid.csv.gz" \
-      --set-id "$sid" --out "$WORK/cards/$sid.json" >>"$log" 2>&1 || {
+      --set-id "$sid" --folds "$FOLDS" --out "$WORK/cards/$sid.json" >>"$log" 2>&1 || {
         echo "FAIL $sid: card outcomes" | tee -a "$log"; return 1; }
 
   [ -s "$WORK/fit/$sid.json" ] || \
     python3 "$ROOT/scripts/deck_fit.py" --games "$WORK/games/$sid.csv.gz" \
-      --cache "$WORK/cache/$sid-control.json" --out "$WORK/fit/$sid.json" >>"$log" 2>&1 || {
+      --cache "$WORK/cache/$sid.json" --split train --out "$WORK/fit/$sid.json" >>"$log" 2>&1 || {
         echo "FAIL $sid: deck fit" | tee -a "$log"; return 1; }
 
   [ -s "$WORK/obs/$sid.json" ] || \
-    python3 "$ROOT/scripts/pick_value.py" --all-picks --adaptive --weights "$WEIGHTS" \
+    python3 "$ROOT/scripts/pick_value.py" --all-picks --adaptive \
+      --weights "$WEIGHTS" --lambdas "$LAMBDAS" \
       --deck-fit "$WORK/fit/$sid.json" \
       --set "$WORK/cache/$sid.json:$WORK/archives/$sid.csv.gz:$WORK/cards/$sid.json:$WORK/cache/$sid-control.json" \
       --observations-out "$WORK/obs/$sid.json" >>"$log" 2>&1 || {
@@ -91,12 +97,12 @@ prepare() {
 }
 
 export -f prepare archive_name
-export WORK BASE ROOT CONTROL_DRAFTS WEIGHTS
+export WORK BASE ROOT CONTROL_DRAFTS WEIGHTS LAMBDAS FOLDS
 
 printf '%s\n' "${SETS[@]}" | xargs -P "$JOBS" -I{} bash -c 'prepare "$@"' _ {}
 
 echo
 echo "measured sets: $(ls "$WORK/obs" 2>/dev/null | wc -l) of ${#SETS[@]}"
 echo "pool them with:"
-echo "  python3 scripts/pick_value.py --adaptive --weights $WEIGHTS \\"
+echo "  python3 scripts/pick_value.py --adaptive --weights $WEIGHTS --lambdas $LAMBDAS \\"
 echo "    \$(for f in $WORK/obs/*.json; do echo --observations-in \"\$f\"; done)"

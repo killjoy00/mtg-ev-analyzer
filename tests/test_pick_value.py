@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_replays import CountStore, PickExample
 from eval_model import VARIANTS, VariantModel
+from deck_fit import scan_decks
 from pick_value import (
     OutcomeAxis,
     analyse,
@@ -50,72 +51,102 @@ class BlendTests(unittest.TestCase):
     def test_weight_zero_follows_behaviour_only(self):
         model = self.model()
         # The outcome signal says the opposite of the behaviour signal.
-        outcome = OutcomeAxis({"popular": -0.05, "unpopular": +0.05})
+        outcome = OutcomeAxis({"popular": -0.05, "unpopular": +0.05},
+                              {"popular": -0.05, "unpopular": +0.05})
         item = example("x", 0, 0, "unpopular", ["popular", "unpopular"])
-        values = decision_values(model, item, outcome, [0.0, 1.0])
-        taken_behaviour, best_behaviour = values[0.0]
+        values = decision_values(model, item, outcome, [(0.5, 0.0), (0.5, 1.0)])
+        taken_behaviour, best_behaviour = values["L0.5|W0"]
         # Behaviour prefers "popular", so taking "unpopular" gives value up.
         self.assertLess(taken_behaviour, best_behaviour)
-        taken_outcome, best_outcome = values[1.0]
+        taken_outcome, best_outcome = values["L0.5|W1"]
         # Outcome prefers "unpopular", so the same pick now gives up nothing.
         self.assertAlmostEqual(taken_outcome, best_outcome)
 
     def test_a_card_with_no_outcome_measure_sits_at_the_axis_mean(self):
         model = self.model()
-        outcome = OutcomeAxis({"popular": 0.04, "unpopular": -0.04})
+        outcome = OutcomeAxis({"popular": 0.04, "unpopular": -0.04},
+                              {"popular": 0.04, "unpopular": -0.04})
         item = example("x", 0, 0, "popular", ["popular", "unpopular", "unmeasured"])
-        values = decision_values(model, item, outcome, [1.0])
-        self.assertIsNotNone(values)
+        self.assertIsNotNone(decision_values(model, item, outcome, [(0.0, 1.0)]))
 
     def test_a_decision_with_too_little_outcome_evidence_is_skipped(self):
         model = self.model()
         item = example("x", 0, 0, "popular", ["popular", "unpopular"])
-        self.assertIsNone(decision_values(model, item, OutcomeAxis({"popular": 0.01}), [0.5]))
+        thin = OutcomeAxis({"popular": 0.01}, {"popular": 0.01})
+        self.assertIsNone(decision_values(model, item, thin, [(0.0, 0.5)]))
 
     def test_a_one_card_pack_is_skipped(self):
         model = self.model()
+        thin = OutcomeAxis({"popular": 0.01}, {"popular": 0.01})
         self.assertIsNone(decision_values(model, example("x", 0, 0, "popular", ["popular"]),
-                                          OutcomeAxis({"popular": 0.01}), [0.5]))
+                                          thin, [(0.0, 0.5)]))
 
 
 class OutcomeAxisTests(unittest.TestCase):
     def fit(self):
+        commitment = {"0": 0.2, "1-2": 0.5, "3-5": 0.7, "6-9": 0.85, "10+": 0.95}
+        flat = {k: 0.9 for k in commitment}
         return {"grand_play_rate": 0.6, "cards": {
-            "red": {"play_rate": 0.6, "colours": "R",
-                    "by_commitment": {"0": 0.2, "1-2": 0.5, "3-5": 0.7, "6-9": 0.85, "10+": 0.95}},
-            "land": {"play_rate": 0.9, "colours": "C",
-                     "by_commitment": {"0": 0.9, "1-2": 0.9, "3-5": 0.9, "6-9": 0.9, "10+": 0.9}},
+            "red": {"play_rate": 0.6, "colours": "R", "by_commitment": commitment},
+            "blue_standout": {"play_rate": 0.6, "colours": "U", "by_commitment": commitment},
+            "land": {"play_rate": 0.9, "colours": "C", "by_commitment": flat},
         }}
 
     def test_raw_axis_ignores_the_pool(self):
-        axis = OutcomeAxis({"red": 0.05})
+        axis = OutcomeAxis({"red": 0.03}, {"red": 0.05})
         self.assertFalse(axis.context_aware)
-        self.assertEqual(axis.value("red", {}), 0.05)
-        self.assertEqual(axis.value("red", {"red": 8}), 0.05)
+        self.assertEqual(axis.pair("red", {}), (0.03, 0.05))
+        self.assertEqual(axis.pair("red", {"red": 8}), (0.03, 0.05))
 
     def test_pool_aware_axis_rises_with_commitment(self):
-        axis = OutcomeAxis({"red": 0.05}, self.fit())
+        axis = OutcomeAxis({"red": 0.03}, {"red": 0.05}, self.fit())
         self.assertTrue(axis.context_aware)
-        empty = axis.value("red", {})
-        committed = axis.value("red", {"red": 12})
-        self.assertLess(empty, committed)
-        # A bomb you cannot cast keeps only a fraction of its measured impact.
-        self.assertAlmostEqual(empty, 0.2 * 0.05)
-        self.assertAlmostEqual(committed, 0.95 * 0.05)
+        empty = axis.pair("red", {})
+        committed = axis.pair("red", {"red": 12})
+        # A bomb you cannot cast keeps only a fraction of either measure.
+        self.assertAlmostEqual(empty[0], 0.2 * 0.03)
+        self.assertAlmostEqual(empty[1], 0.2 * 0.05)
+        self.assertAlmostEqual(committed[0], 0.95 * 0.03)
+        self.assertAlmostEqual(committed[1], 0.95 * 0.05)
+
+    def test_both_measures_are_carried_separately(self):
+        """The two disagree exactly where the user's blue-card case lives: a
+        strong card in a weak colour has high IWD and unremarkable GIH."""
+        axis = OutcomeAxis({"blue_standout": 0.002}, {"blue_standout": 0.09}, self.fit())
+        gih, iwd = axis.pair("blue_standout", {})
+        self.assertLess(gih, iwd)
 
     def test_a_weak_card_you_will_certainly_play_stays_negative(self):
-        axis = OutcomeAxis({"red": -0.04}, self.fit())
-        self.assertLess(axis.value("red", {"red": 12}), axis.value("red", {}))
+        axis = OutcomeAxis({"red": -0.02}, {"red": -0.04}, self.fit())
+        self.assertLess(axis.pair("red", {"red": 12})[1], axis.pair("red", {})[1])
 
     def test_a_colourless_card_is_playable_from_any_pool(self):
-        axis = OutcomeAxis({"land": 0.01}, self.fit())
+        axis = OutcomeAxis({"land": 0.005}, {"land": 0.01}, self.fit())
         # Its commitment counts the whole pool, so an off-colour pool does not
         # push it down the way it would a coloured card.
-        self.assertAlmostEqual(axis.value("land", {"red": 12}), 0.9 * 0.01)
+        self.assertAlmostEqual(axis.pair("land", {"red": 12})[1], 0.9 * 0.01)
 
-    def test_an_unmeasured_card_has_no_value_on_this_axis(self):
-        axis = OutcomeAxis({"red": 0.05}, self.fit())
-        self.assertIsNone(axis.value("missing", {}))
+    def test_cross_fitted_axis_uses_a_different_table_per_fold(self):
+        """Each fold's table is built without that fold's own games, so a draft
+        is never scored using the outcomes it helped produce."""
+        axis = OutcomeAxis(
+            [{"red": 0.01}, {"red": 0.09}],
+            [{"red": 0.02}, {"red": 0.08}],
+            self.fit(), folds=2)
+        self.assertTrue(axis.cross_fitted)
+        self.assertAlmostEqual(axis.pair("red", {}, 0)[0], 0.2 * 0.01)
+        self.assertAlmostEqual(axis.pair("red", {}, 1)[0], 0.2 * 0.09)
+        self.assertEqual(axis.measured(), 1)
+
+    def test_a_single_table_ignores_the_fold(self):
+        axis = OutcomeAxis({"red": 0.03}, {"red": 0.05}, self.fit())
+        self.assertFalse(axis.cross_fitted)
+        self.assertEqual(axis.pair("red", {}, 0), axis.pair("red", {}, 7))
+
+    def test_a_card_missing_either_measure_has_no_value(self):
+        axis = OutcomeAxis({"red": 0.03}, {"red": 0.05}, self.fit())
+        self.assertIsNone(axis.pair("missing", {}))
+        self.assertIsNone(OutcomeAxis({"red": 0.03}, {}).pair("red", {}))
 
 
 class CorrelationTests(unittest.TestCase):
@@ -249,8 +280,9 @@ class EndToEndTests(unittest.TestCase):
 
         outcomes = directory / "cards.json"
         outcomes.write_text(json.dumps({"baseline_win_rate": 0.55, "cards": {
-            "good": {"iwd_shrunk": 0.06}, "fine": {"iwd_shrunk": 0.01},
-            "weak": {"iwd_shrunk": -0.03}}}))
+            "good": {"iwd_shrunk": 0.06, "gih_wr_shrunk": 0.61},
+            "fine": {"iwd_shrunk": 0.01, "gih_wr_shrunk": 0.56},
+            "weak": {"iwd_shrunk": -0.03, "gih_wr_shrunk": 0.52}}}))
 
         fit = directory / "fit.json"
         fit.write_text(json.dumps({"grand_play_rate": 0.6, "cards": {
@@ -262,14 +294,14 @@ class EndToEndTests(unittest.TestCase):
     def test_analyse_returns_poolable_observations(self):
         with tempfile.TemporaryDirectory() as directory:
             cache, archive, outcomes, fit = self.build(Path(directory))
-            result = analyse(cache, archive, outcomes, [0.0, 4000.0], None,
+            result = analyse(cache, archive, outcomes, [(0.0, 0.0), (1.0, 4000.0)], None,
                              None, 10, True, None, fit, True)
         self.assertEqual(result["set_id"], "test")
         self.assertEqual(result["weighting"], "per-card by evidence")
         self.assertEqual(result["outcome_axis"], "play-weighted impact")
         self.assertGreater(result["held_out_drafts"], 0)
-        for weight in (0.0, 4000.0):
-            rows = result["observations"][weight]
+        for label in ("L0|W0", "L1|W4000"):
+            rows = result["observations"][label]
             self.assertTrue(rows)
             for stratum, skill, regret, wins in rows:
                 self.assertEqual(stratum, "test")
@@ -279,10 +311,53 @@ class EndToEndTests(unittest.TestCase):
     def test_analyse_without_a_deck_fit_uses_raw_impact(self):
         with tempfile.TemporaryDirectory() as directory:
             cache, archive, outcomes, _ = self.build(Path(directory))
-            result = analyse(cache, archive, outcomes, [0.0], None, None, 10, True, None,
-                             None, False)
+            result = analyse(cache, archive, outcomes, [(0.5, 0.0)], None, None, 10, True,
+                             None, None, False)
         self.assertEqual(result["outcome_axis"], "raw impact")
         self.assertEqual(result["weighting"], "fixed")
+
+
+class DeckScanTests(unittest.TestCase):
+    """Colour identity is fixed by the card, so reading it from every deck in
+    the set looked harmless. It is still a held-out draft's data reaching a
+    table the model is scored with, and the cost of not doing it is nothing."""
+
+    @staticmethod
+    def games(path: Path, rows):
+        """rows: (draft_id, main_colors, [cards in deck])"""
+        header = ["draft_id", "main_colors", "deck_Island", "deck_Mountain"]
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as handle:
+            handle.write(",".join(header) + "\n")
+            for draft_id, colours, cards in rows:
+                handle.write(f"{draft_id},{colours},"
+                             f"{1 if 'Island' in cards else 0},"
+                             f"{1 if 'Mountain' in cards else 0}\n")
+
+    def test_keep_restricts_both_decks_and_colour_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "g.csv.gz"
+            self.games(path, [("keep1", "U", ["Island"]),
+                              ("keep2", "U", ["Island"]),
+                              ("drop1", "R", ["Mountain"]),
+                              ("drop2", "R", ["Mountain"])])
+            everything, all_colours = scan_decks(path)
+            held, kept_colours = scan_decks(path, {"keep1", "keep2"})
+        self.assertEqual(set(everything), {"keep1", "keep2", "drop1", "drop2"})
+        self.assertEqual(set(held), {"keep1", "keep2"})
+        # A card only ever played in an excluded deck leaves no colour evidence.
+        self.assertIn("Mountain", all_colours)
+        self.assertNotIn("Mountain", kept_colours)
+        self.assertEqual(sum(kept_colours["Island"].values()), 2)
+
+    def test_keeping_every_draft_matches_an_unfiltered_scan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "g.csv.gz"
+            rows = [(f"d{i}", "U" if i % 2 else "R",
+                     ["Island"] if i % 2 else ["Mountain"]) for i in range(10)]
+            self.games(path, rows)
+            plain = scan_decks(path)
+            filtered = scan_decks(path, {f"d{i}" for i in range(10)})
+        self.assertEqual(plain, filtered)
 
 
 if __name__ == "__main__":

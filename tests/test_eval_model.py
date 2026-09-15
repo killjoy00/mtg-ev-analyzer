@@ -8,7 +8,7 @@ from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
-from build_replays import CountStore, DraftSkill, OutOfFoldModel, PickExample
+from build_replays import CountStore, DraftSkill, OutOfFoldModel, PickExample, logit
 from eval_model import (
     VARIANTS,
     Accumulator,
@@ -222,6 +222,175 @@ class VariantTests(unittest.TestCase):
         # v2 inflates a 10% card substantially; stage matching leaves it alone.
         self.assertGreater(naive_shift, 0.1)
         self.assertLess(matched_shift, 0.01)
+
+    # ------------------------------------------------------------------
+    # colour-commitment context
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def fit_table():
+        """"mono" is abandoned from an off-colour pool and kept from an on-colour
+        one; "vanilla" plays at the same rate whatever is beside it."""
+        return {"grand_play_rate": 0.6, "play_rate": 0.55,
+                "by_commitment": {"0": 0.40, "1-2": 0.50, "3-5": 0.60,
+                                  "6-9": 0.70, "10+": 0.80},
+                "cards": {
+            "mono": {"play_rate": 0.50, "colours": "U", "observations": 900,
+                     "by_commitment": {"0": 0.50, "1-2": 0.55, "3-5": 0.70,
+                                       "6-9": 0.85, "10+": 0.92}},
+            "vanilla": {"play_rate": 0.60, "colours": "U", "observations": 900,
+                        "by_commitment": {"0": 0.60, "1-2": 0.60, "3-5": 0.60,
+                                          "6-9": 0.60, "10+": 0.60}},
+            "offcolour": {"play_rate": 0.50, "colours": "R", "observations": 900,
+                          "by_commitment": {"0": 0.50, "1-2": 0.55, "3-5": 0.70,
+                                            "6-9": 0.85, "10+": 0.92}},
+                }}
+
+    def fit_model(self, counts=None, name="v3-deck-fit", fit=True):
+        return VariantModel(counts or self.counts_with_pair_evidence(), VARIANTS[name],
+                            None, self.fit_table() if fit else None)
+
+    def test_a_matching_pool_raises_the_odds_the_card_reaches_a_deck(self):
+        model = self.fit_model()
+        blue_pool = {f"blue{i}": 1 for i in range(6)}
+        for card in blue_pool:
+            model.fit_colours[card] = frozenset("U")
+        self.assertGreater(model.fit_shift("mono", blue_pool), 0)
+        self.assertLess(model.fit_shift("mono", {}), 1e-12)
+
+    def test_an_off_colour_pool_does_not_lift_the_card(self):
+        """The pool is large, so a term keyed on pool size alone would fire.
+        Only the colour-matched count may."""
+        model = self.fit_model()
+        red_pool = {f"red{i}": 1 for i in range(6)}
+        for card in red_pool:
+            model.fit_colours[card] = frozenset("R")
+        self.assertAlmostEqual(model.fit_shift("mono", red_pool), 0.0, places=12)
+        self.assertGreater(model.fit_shift("offcolour", red_pool), 0)
+
+    def test_a_card_whose_play_rate_never_moves_gets_no_shift(self):
+        model = self.fit_model()
+        blue_pool = {f"blue{i}": 1 for i in range(6)}
+        for card in blue_pool:
+            model.fit_colours[card] = frozenset("U")
+        self.assertAlmostEqual(model.fit_shift("vanilla", blue_pool), 0.0, places=12)
+
+    def test_an_unknown_card_or_a_missing_table_shifts_nothing(self):
+        blue_pool = {"blue": 1}
+        with_table = self.fit_model()
+        with_table.fit_colours["blue"] = frozenset("U")
+        self.assertEqual(with_table.fit_shift("never-seen", blue_pool), 0.0)
+        self.assertEqual(self.fit_model(fit=False).fit_shift("mono", blue_pool), 0.0)
+
+    def test_the_fit_term_applies_at_an_empty_pool_where_the_pair_term_cannot(self):
+        """Bucket "0" is a real estimate, not a missing one: a card nobody plays
+        off a bare pool should be marked down at pick one, and v2 cannot say so."""
+        counts = self.counts_with_pair_evidence()
+        fitted = self.fit_model(counts)
+        # A card that is usually kept but rarely kept from nothing.
+        fitted.fit["cards"]["anchor"] = {"play_rate": 0.80, "colours": "U",
+                                         "observations": 900,
+                                         "by_commitment": {"0": 0.40, "10+": 0.95}}
+        base = fitted.base_tendency("anchor", 0, 0)
+        self.assertLess(fitted.card_tendency("anchor", 0, 0, {}), base)
+        self.assertAlmostEqual(VariantModel(counts, VARIANTS["v2"]).card_tendency("anchor", 0, 0, {}),
+                               base, places=12)
+
+    def test_the_colour_only_variant_ignores_the_cards_own_play_rates(self):
+        """If this carries most of the per-card version's value, a port needs
+        only which colours a card is - already on the card - and never has to
+        ship a per-card table built from game data."""
+        pooled = self.fit_model(name="v3-colour-only")
+        per_card = self.fit_model(name="v3-deck-fit")
+        blue_pool = {f"blue{i}": 1 for i in range(6)}
+        for model in (pooled, per_card):
+            for card in blue_pool:
+                model.fit_colours[card] = frozenset("U")
+        # "vanilla" never moves on its own table, but the format's cards do.
+        self.assertAlmostEqual(per_card.fit_shift("vanilla", blue_pool), 0.0, places=12)
+        self.assertGreater(pooled.fit_shift("vanilla", blue_pool), 0)
+        # Two cards with the same colours get the same shift from one curve.
+        self.assertAlmostEqual(pooled.fit_shift("vanilla", blue_pool),
+                               pooled.fit_shift("mono", blue_pool), places=12)
+        self.assertNotAlmostEqual(per_card.fit_shift("vanilla", blue_pool),
+                                  per_card.fit_shift("mono", blue_pool), places=6)
+
+    def coloured_model(self, name, pools, by_stage=None):
+        """A model that knows the colours of the cards in `pools`.
+
+        The fit table only names the three cards under test, so a pool card's
+        colour has to be painted on or commitment silently counts zero - which
+        is a real trap, since every such test would then compare bucket "0"
+        against bucket "0" and pass for the wrong reason.
+        """
+        model = self.fit_model(name=name)
+        if by_stage is not None:
+            model.fit["by_stage"] = by_stage
+        for pool, letters in pools:
+            for card in pool:
+                model.fit_colours[card] = frozenset(letters)
+        return model
+
+    def test_holding_the_stage_strips_a_commitment_effect_that_is_only_stage(self):
+        """A pool of eight is both "your colours are settled" and "you are eight
+        picks in". Here the play rate depends only on the latter, so a term
+        that reads commitment must report nothing."""
+        pool = {f"blue{i}": 1 for i in range(8)}
+        stage = {  # every commitment level inside this stage plays at its rate
+            "s6-9": {"*": 0.70, "3-5": 0.70, "6-9": 0.70},
+            "s1-2": {"*": 0.45, "0": 0.45, "1-2": 0.45},
+        }
+        held = self.coloured_model("v3-colour-stage", [(pool, "U")], stage)
+        marginal = self.coloured_model("v3-colour-only", [(pool, "U")])
+        # The marginal curve reads this as a large lift; holding the stage
+        # leaves nothing, because nothing here is about colour.
+        self.assertGreater(marginal.fit_shift("mono", pool), 0.5)
+        self.assertAlmostEqual(held.fit_shift("mono", pool), 0.0, places=12)
+
+    def test_a_real_colour_effect_survives_holding_the_stage(self):
+        on_colour = {f"blue{i}": 1 for i in range(8)}
+        off_colour = {f"red{i}": 1 for i in range(8)}
+        model = self.coloured_model("v3-colour-stage",
+                                    [(on_colour, "U"), (off_colour, "R")],
+                                    {"s6-9": {"*": 0.60, "0": 0.30, "6-9": 0.85}})
+        self.assertGreater(model.fit_shift("mono", on_colour), 0)
+        self.assertLess(model.fit_shift("mono", off_colour), 0)
+
+    def test_a_missing_stage_cell_falls_back_to_the_marginal_curve(self):
+        """Thin cells are dropped upstream, so the consumer must land on the
+        marginal curve rather than on nothing."""
+        pool = {f"blue{i}": 1 for i in range(8)}
+        held = self.coloured_model("v3-colour-stage", [(pool, "U")],
+                                   {"s20+": {"*": 0.6, "10+": 0.9}})
+        marginal = self.coloured_model("v3-colour-only", [(pool, "U")])
+        self.assertAlmostEqual(held.fit_shift("mono", pool),
+                               marginal.fit_shift("mono", pool), places=12)
+        self.assertNotAlmostEqual(held.fit_shift("mono", pool), 0.0, places=6)
+
+    def test_the_colour_only_variant_still_needs_to_know_the_card(self):
+        """Colours come from the same table, so a card missing from it has no
+        colours to match on and must not be given the curve anyway."""
+        pooled = self.fit_model(name="v3-colour-only")
+        pooled.fit_colours["blue"] = frozenset("U")
+        self.assertEqual(pooled.fit_shift("never-seen", {"blue": 6}), 0.0)
+
+    def test_the_combined_variant_adds_both_terms_in_log_odds(self):
+        counts = self.counts_with_pair_evidence()
+        pool = {"partner": 1}
+        fit = self.fit_table()
+        fit["cards"]["anchor"] = {"play_rate": 0.50, "colours": "U", "observations": 900,
+                                  "by_commitment": {"0": 0.50, "1-2": 0.75}}
+        expectations = {("anchor", "partner"): 0.0, ("other", "partner"): 0.0}
+        pair_only = VariantModel(counts, VARIANTS["v3-stage-matched"], expectations)
+        both = VariantModel(counts, VARIANTS["v3-fit-and-pair"], expectations, fit)
+        both.fit_colours["partner"] = frozenset("U")
+        pair_shift = logit(pair_only.card_tendency("anchor", 0, 6, pool)) \
+            - logit(pair_only.base_tendency("anchor", 0, 6))
+        fit_shift = VARIANTS["v3-fit-and-pair"].fit_strength * both.fit_shift("anchor", pool)
+        self.assertGreater(abs(fit_shift), 1e-6)
+        self.assertAlmostEqual(
+            logit(both.card_tendency("anchor", 0, 6, pool)),
+            logit(both.base_tendency("anchor", 0, 6)) + pair_shift + fit_shift, places=10)
 
     @staticmethod
     def build_cache(directory: Path, examples) -> Cache:
