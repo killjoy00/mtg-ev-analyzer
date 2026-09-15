@@ -255,17 +255,90 @@ consequences are worth stating before anyone ships it:
   scores with new harsh ones on one board. Stored answers plus immutable puzzles
   make an exact re-score possible; it just has to be decided and done.
 
+## Track two, answered: which scoring curve is right
+
+`scripts/grading_curve.py` settles the question the prediction metrics cannot.
+Both exponents rank cards identically, so log loss and accuracy are blind to the
+choice. Two measurements decide it, neither needing anyone's judgement.
+
+### Does a harsher curve separate skill better? No.
+
+Train the model on elite drafters, then score the real picks of held-out elite
+drafters and of equally experienced ordinary drafters below the same win-rate
+cutoff who were never trained on. A scoring curve exists to tell those apart.
+AUC is the chance a random elite run outscores a random ordinary one; it is
+rank-based, so it moves across exponents only because a run score is the *mean*
+of transformed decisions, which really does reorder drafters.
+
+| exponent | tmt | msh | sos | blb |
+|---|---|---|---|---|
+| 0.5 | 0.6230 | 0.6085 | 0.6061 | 0.5865 |
+| **1.0 (today)** | **0.6222** | **0.6077** | **0.6054** | **0.5856** |
+| 2.0 (honest) | 0.6192 | 0.6055 | 0.6028 | 0.5828 |
+| 3.0 | 0.6162 | 0.6037 | 0.6002 | 0.5806 |
+
+Raising the exponent lowers AUC on all four sets. Paired over drafters, the drop
+at 2.0 is separated from zero on `msh`, `sos` and `blb`, and every set separates
+by 2.5. Lowering it to 0.5 nudges AUC up but never separably. Today's 1.0 sits on
+a flat plateau at the top.
+
+The point gap widens with the exponent (2.75 to 3.52 on `blb`) while Cohen's d
+shrinks (0.287 to 0.280). Harsher curves spread the numbers out without adding
+signal: one low-support pick drags a run down, and elite drafters take those too,
+so the extra spread is mostly noise.
+
+**The far bigger finding is the level, not the curve.** AUC is 0.586-0.623 and
+d is 0.27-0.42 over eight to ten decisions. A random elite drafter beats a random
+ordinary one only about 60% of the time. As an instrument for ranking drafting
+skill, Draft Run is weak, and no exponent fixes that.
+
+### What is a support ratio actually worth?
+
+Average pick position - how early the whole drafting population takes a card -
+comes straight from the archives and owes nothing to the consensus model. Mean
+picks later than the pack leader, by the leader-relative support the model gives:
+
+| support ratio | tmt | msh | sos | blb |
+|---|---|---|---|---|
+| 0.85-1.00 | +0.29 | +0.20 | +0.26 | +0.27 |
+| 0.70-0.85 | +0.66 | +0.71 | +0.75 | +0.83 |
+| 0.50-0.70 | +1.43 | +1.37 | +1.47 | +1.62 |
+| 0.30-0.50 | +2.39 | +2.43 | +2.55 | +2.73 |
+| 0.15-0.30 | +3.70 | +3.76 | +3.86 | +3.92 |
+| 0.00-0.15 | +5.95 | +6.52 | +6.49 | +6.01 |
+
+A card at half the leader's support is one the population takes about **1.5 picks
+later** out of a thirteen-card pack. Today it scores 48; honest probabilities
+flowed into the score would make it 24. Neither number is derivable from this
+table alone, but a card the population rates that close to the leader losing more
+than half its credit is hard to defend, and losing three quarters of it is harder.
+
+### The two changes are separable
+
+The claim that honest probabilities force a harsher game was wrong, and it was
+mine. Sharpening supports by T squares the ratio, so scoring the sharpened
+supports with exponent 1/T restores exactly today's award:
+
+    95 * ((ratio ** T) ** (1/T)) == 95 * ratio
+
+So the model can be calibrated - honest displayed support percentages, -10.7% log
+loss, ECE from 0.19-0.24 down to 0.03-0.07 - while every score a player sees stays
+where it is, by moving the scoring exponent to 1/T at the same time. A unit test
+pins the identity. Calibration is a model change; the curve is a separate product
+decision, and the data says leave the curve where it is.
+
 ## Suggested order
 
-1. Decide calibration and the scoring formula together. The exponent is one
-   number with a large, reproducible prediction gain and a large grading side
-   effect; neither should be chosen without the other.
-2. Stand up the grading-fairness track — blind review of alternatives,
-   concentrating on severe disagreements, sparse cards and colour pivots. Every
-   remaining question is a trade between log loss and partial credit, and
-   nothing here can settle those alone.
-3. Stage-matched context, if the grading track accepts the accuracy trade.
+1. Calibrate the model and hold the scores still, by pairing the sharpening
+   exponent T with a scoring exponent of 1/T. Honest support percentages, better
+   calibration, and no change to what any player scores.
+2. Treat the weak separation as the real problem. AUC 0.59-0.62 says the game
+   barely distinguishes drafting skill; run length, decision selection and
+   difficulty banding are where that gets fixed, not the scoring curve.
+3. Stage-matched context, if the accuracy trade is acceptable.
 4. Raise the cap. Real but small, and it needs the regeneration path first.
 5. Skip coverage scaling. Tested on five sets, it does not pay.
+6. Do not raise the scoring exponent on its own. Measured on four sets, it
+   separates drafters worse.
 
 Colour/archetype context is untested here and remains a hypothesis.
