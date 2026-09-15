@@ -8,6 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_replays import CountStore, PickExample
 from eval_model import VARIANTS, VariantModel
 from pick_value import (
+    OutcomeAxis,
     decision_values,
     draft_results,
     pearson,
@@ -46,7 +47,7 @@ class BlendTests(unittest.TestCase):
     def test_weight_zero_follows_behaviour_only(self):
         model = self.model()
         # The outcome signal says the opposite of the behaviour signal.
-        outcome = {"popular": -0.05, "unpopular": +0.05}
+        outcome = OutcomeAxis({"popular": -0.05, "unpopular": +0.05})
         item = example("x", 0, 0, "unpopular", ["popular", "unpopular"])
         values = decision_values(model, item, outcome, [0.0, 1.0])
         taken_behaviour, best_behaviour = values[0.0]
@@ -58,7 +59,7 @@ class BlendTests(unittest.TestCase):
 
     def test_a_card_with_no_outcome_measure_sits_at_the_axis_mean(self):
         model = self.model()
-        outcome = {"popular": 0.04, "unpopular": -0.04}
+        outcome = OutcomeAxis({"popular": 0.04, "unpopular": -0.04})
         item = example("x", 0, 0, "popular", ["popular", "unpopular", "unmeasured"])
         values = decision_values(model, item, outcome, [1.0])
         self.assertIsNotNone(values)
@@ -66,12 +67,52 @@ class BlendTests(unittest.TestCase):
     def test_a_decision_with_too_little_outcome_evidence_is_skipped(self):
         model = self.model()
         item = example("x", 0, 0, "popular", ["popular", "unpopular"])
-        self.assertIsNone(decision_values(model, item, {"popular": 0.01}, [0.5]))
+        self.assertIsNone(decision_values(model, item, OutcomeAxis({"popular": 0.01}), [0.5]))
 
     def test_a_one_card_pack_is_skipped(self):
         model = self.model()
         self.assertIsNone(decision_values(model, example("x", 0, 0, "popular", ["popular"]),
-                                          {"popular": 0.01}, [0.5]))
+                                          OutcomeAxis({"popular": 0.01}), [0.5]))
+
+
+class OutcomeAxisTests(unittest.TestCase):
+    def fit(self):
+        return {"grand_play_rate": 0.6, "cards": {
+            "red": {"play_rate": 0.6, "colours": "R",
+                    "by_commitment": {"0": 0.2, "1-2": 0.5, "3-5": 0.7, "6-9": 0.85, "10+": 0.95}},
+            "land": {"play_rate": 0.9, "colours": "C",
+                     "by_commitment": {"0": 0.9, "1-2": 0.9, "3-5": 0.9, "6-9": 0.9, "10+": 0.9}},
+        }}
+
+    def test_raw_axis_ignores_the_pool(self):
+        axis = OutcomeAxis({"red": 0.05})
+        self.assertFalse(axis.context_aware)
+        self.assertEqual(axis.value("red", {}), 0.05)
+        self.assertEqual(axis.value("red", {"red": 8}), 0.05)
+
+    def test_pool_aware_axis_rises_with_commitment(self):
+        axis = OutcomeAxis({"red": 0.05}, self.fit())
+        self.assertTrue(axis.context_aware)
+        empty = axis.value("red", {})
+        committed = axis.value("red", {"red": 12})
+        self.assertLess(empty, committed)
+        # A bomb you cannot cast keeps only a fraction of its measured impact.
+        self.assertAlmostEqual(empty, 0.2 * 0.05)
+        self.assertAlmostEqual(committed, 0.95 * 0.05)
+
+    def test_a_weak_card_you_will_certainly_play_stays_negative(self):
+        axis = OutcomeAxis({"red": -0.04}, self.fit())
+        self.assertLess(axis.value("red", {"red": 12}), axis.value("red", {}))
+
+    def test_a_colourless_card_is_playable_from_any_pool(self):
+        axis = OutcomeAxis({"land": 0.01}, self.fit())
+        # Its commitment counts the whole pool, so an off-colour pool does not
+        # push it down the way it would a coloured card.
+        self.assertAlmostEqual(axis.value("land", {"red": 12}), 0.9 * 0.01)
+
+    def test_an_unmeasured_card_has_no_value_on_this_axis(self):
+        axis = OutcomeAxis({"red": 0.05}, self.fit())
+        self.assertIsNone(axis.value("missing", {}))
 
 
 class CorrelationTests(unittest.TestCase):

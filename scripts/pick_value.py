@@ -41,6 +41,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import logit, normalize_probabilities, open_text  # noqa: E402
+from deck_fit import COLOURS, commit_bucket, commitment  # noqa: E402
 from eval_model import (  # noqa: E402
     VARIANTS,
     Cache,
@@ -102,8 +103,50 @@ def standardise(values: Sequence[float]) -> List[float]:
     return [(value - mean) / spread for value in values]
 
 
-def decision_values(model: VariantModel, example, outcome: Dict[str, float],
-                    weights: Sequence[float]) -> Optional[Dict[float, Tuple[float, float]]]:
+class OutcomeAxis:
+    """Card impact, optionally weighted by whether the card reaches the deck.
+
+    Raw IWD is context-free and reverses a pool-aware model's judgement at later
+    picks. Multiplying by the measured probability that the card is played from
+    this pool restores the context: a bomb you cannot cast is worth little, and a
+    weak card you certainly will play is worth less than nothing.
+    """
+
+    def __init__(self, impact: Dict[str, float], fit: Optional[dict] = None):
+        self.impact = impact
+        self.fit = fit
+        self.colours: Dict[str, frozenset] = {}
+        if fit:
+            for card, row in fit["cards"].items():
+                letters = row.get("colours") or "C"
+                self.colours[card] = frozenset(c for c in letters if c in COLOURS)
+
+    @property
+    def context_aware(self) -> bool:
+        return self.fit is not None
+
+    def value(self, card: str, pool: Dict[str, int]) -> Optional[float]:
+        impact = self.impact.get(card)
+        if impact is None:
+            return None
+        if not self.fit:
+            return impact
+        row = self.fit["cards"].get(card)
+        if row is None:
+            return None
+        bucket = commit_bucket(commitment(pool, self.colours, card))
+        played = row["by_commitment"].get(bucket, row["play_rate"])
+        return played * impact
+
+
+def behaviour_support(model: VariantModel, card: str) -> int:
+    """How many times the behaviour model has actually seen this card offered."""
+    return model._count("global_seen", card)
+
+
+def decision_values(model: VariantModel, example, outcome: OutcomeAxis,
+                    weights: Sequence[float],
+                    adaptive: bool = False) -> Optional[Dict[float, Tuple[float, float]]]:
     """For each weight, (value of the taken card, value of the best available).
 
     A card with no outcome measurement contributes 0 on that axis rather than
@@ -117,7 +160,7 @@ def decision_values(model: VariantModel, example, outcome: Dict[str, float],
            for card in cards}
     support = normalize_probabilities(raw)
     behaviour = standardise([logit(support[card]) for card in cards])
-    measured = [outcome.get(card) for card in cards]
+    measured = [outcome.value(card, example.pool) for card in cards]
     known = [value for value in measured if value is not None]
     if len(known) < 2:
         return None
@@ -130,18 +173,29 @@ def decision_values(model: VariantModel, example, outcome: Dict[str, float],
                      for value in measured]
 
     taken = cards.index(example.historical_pick)
+    support = [behaviour_support(model, card) for card in cards] if adaptive else None
     out: Dict[float, Tuple[float, float]] = {}
     for weight in weights:
-        values = [(1 - weight) * behaviour[i] + weight * outcome_z[i]
+        if adaptive:
+            # Weight each source by how much evidence it has for THIS card. A
+            # card the behaviour model has barely seen leans on the outcome
+            # measurement; a card it has seen thousands of times does not. The
+            # swept value is the crossover point, in observations.
+            per_card = [weight / (weight + count) if (weight + count) > 0 else 0.0
+                        for count in support]
+        else:
+            per_card = [weight] * len(cards)
+        values = [(1 - per_card[i]) * behaviour[i] + per_card[i] * outcome_z[i]
                   for i in range(len(cards))]
         out[weight] = (values[taken], max(values))
     return out
 
 
 def draft_regret(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
-                 outcome: Dict[str, float], weights: Sequence[float],
+                 outcome: OutcomeAxis, weights: Sequence[float],
                  max_pick: int, all_picks: bool = False,
-                 pick_range: Optional[Tuple[int, int]] = None) -> Dict[str, Dict[float, float]]:
+                 pick_range: Optional[Tuple[int, int]] = None,
+                 adaptive: bool = False) -> Dict[str, Dict[float, float]]:
     """Mean value given up per decision, per draft, for each weight.
 
     Fitting uses every pick in the draft by default rather than only the ten the
@@ -166,7 +220,7 @@ def draft_regret(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
                 continue
             if pick_number > max_pick:
                 continue
-        values = decision_values(model, example, outcome, weights)
+        values = decision_values(model, example, outcome, weights, adaptive)
         if values is None:
             continue
         for weight, (taken, best) in values.items():
@@ -250,13 +304,16 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
             weights: Sequence[float], cap: Optional[int],
             control_cache: Optional[Path] = None, draws: int = 400,
             all_picks: bool = False,
-            pick_range: Optional[Tuple[int, int]] = None) -> dict:
+            pick_range: Optional[Tuple[int, int]] = None,
+            deck_fit: Optional[Path] = None, adaptive: bool = False) -> dict:
     cache = Cache.load(elite_cache)
     max_pick = 11 if cache.set_id == "powered-cube" else 10
 
     payload = json.loads(outcomes.read_text(encoding="utf-8"))
-    outcome = {name: row["iwd_shrunk"] for name, row in payload["cards"].items()
-               if row.get("iwd_shrunk") is not None}
+    impact = {name: row["iwd_shrunk"] for name, row in payload["cards"].items()
+              if row.get("iwd_shrunk") is not None}
+    fit = json.loads(deck_fit.read_text(encoding="utf-8")) if deck_fit else None
+    outcome = OutcomeAxis(impact, fit)
 
     train_ids = cache.split_drafts("train")
     if cap:
@@ -269,13 +326,13 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     # control cohort is what gives the skill axis enough spread to correlate on.
     held_out = cache.split_drafts("validation") + cache.split_drafts("test")
     regrets = draft_regret(model, cache, held_out, outcome, weights, max_pick,
-                           all_picks, pick_range)
+                           all_picks, pick_range, adaptive)
     if control_cache is not None:
         control = Cache.load(control_cache)
         if control.set_id != cache.set_id:
             raise SystemExit(f"{control_cache} is a different set from {elite_cache}")
         regrets.update(draft_regret(model, control, control.meta["drafts"],
-                                    outcome, weights, max_pick, all_picks, pick_range))
+                                    outcome, weights, max_pick, all_picks, pick_range, adaptive))
     results = draft_results(archive)
 
     rows = []
@@ -303,7 +360,9 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
         "train_drafts": len(train_ids),
         "training_picks": training_picks,
         "held_out_drafts": len(regrets),
-        "cards_with_outcome": len(outcome),
+        "cards_with_outcome": len(impact),
+        "outcome_axis": "play-weighted impact" if outcome.context_aware else "raw impact",
+        "weighting": "per-card by evidence" if adaptive else "fixed",
         "scored_picks": f"pack 1, picks {pick_range[0]}-{pick_range[1]}" if pick_range
         else "every pick in the draft" if all_picks
         else f"pack 1, picks 1-{max_pick}",
@@ -320,8 +379,10 @@ def render(report: dict) -> str:
            "should mean winning more. w=0 is today's behaviour-only model.", ""]
     for entry in report["sets"]:
         out.append(f"--- {entry['set_id']} --- {entry['held_out_drafts']} held-out drafts, "
-                   f"{entry['cards_with_outcome']} cards with an outcome measure")
-        out.append(f"  {'w(outcome)':>11}{'within-skill r':>16}{'95% CI':>22}"
+                   f"{entry['cards_with_outcome']} cards measured, "
+                   f"outcome axis: {entry.get('outcome_axis', 'raw impact')}")
+        label = "crossover n" if entry.get("weighting") == "per-card by evidence" else "w(outcome)"
+        out.append(f"  {label:>11}{'within-skill r':>16}{'95% CI':>22}"
                    f"{'drafts':>9}{'buckets':>9}")
         usable = [row for row in entry["weights"] if row["within_skill_r"] is not None]
         best = min(usable, key=lambda row: row["within_skill_r"]) if usable else None
@@ -346,6 +407,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="elite cache, draft archive, card-outcome JSON and an "
                              "optional control cache; repeatable")
     parser.add_argument("--bootstrap-draws", type=int, default=400)
+    parser.add_argument("--adaptive", action="store_true",
+                        help="read each swept value as a crossover in observations: the "
+                             "outcome signal carries a card only as far as the behaviour "
+                             "model lacks evidence for it")
+    parser.add_argument("--deck-fit", help="deck_fit.py JSON; makes the outcome axis "
+                                          "pool-aware instead of raw impact")
     parser.add_argument("--pick-range", metavar="LO:HI",
                         help="restrict to pack 1 picks LO..HI, to isolate pool size")
     parser.add_argument("--all-picks", action="store_true",
@@ -368,7 +435,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                         Path(parts[3]) if len(parts) == 4 else None, args.bootstrap_draws,
                         args.all_picks,
                         tuple(int(v) for v in args.pick_range.split(":")) if args.pick_range
-                        else None)
+                        else None,
+                        Path(args.deck_fit) if args.deck_fit else None, args.adaptive)
         entries.append(entry)
         print(f"  analysed {entry['set_id']}", file=sys.stderr, flush=True)
     report = {"weights": weights, "cap": args.cap, "sets": entries}
