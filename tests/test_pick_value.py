@@ -323,15 +323,42 @@ class DeckScanTests(unittest.TestCase):
     table the model is scored with, and the cost of not doing it is nothing."""
 
     @staticmethod
-    def games(path: Path, rows):
-        """rows: (draft_id, main_colors, [cards in deck])"""
+    def games(path: Path, rows, style="int"):
+        """rows: (draft_id, main_colors, [cards in deck])
+
+        `style` picks how the deck counts are written. 17Lands writes integers
+        for most sets and floats for some; both have to read the same.
+        """
+        fmt = (lambda n: str(n)) if style == "int" else (lambda n: f"{n:.1f}")
         header = ["draft_id", "main_colors", "deck_Island", "deck_Mountain"]
         with gzip.open(path, "wt", encoding="utf-8", newline="") as handle:
             handle.write(",".join(header) + "\n")
             for draft_id, colours, cards in rows:
                 handle.write(f"{draft_id},{colours},"
-                             f"{1 if 'Island' in cards else 0},"
-                             f"{1 if 'Mountain' in cards else 0}\n")
+                             f"{fmt(1 if 'Island' in cards else 0)},"
+                             f"{fmt(1 if 'Mountain' in cards else 0)}\n")
+
+    def test_a_float_zero_is_not_a_card_in_the_deck(self):
+        """'0.0' is not the string '0'. Comparing the text instead of the
+        number marked every card in the set as played for every draft in dmu,
+        which reported a 100% play rate and no card colours at all."""
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "g.csv.gz"
+            self.games(path, [("d1", "U", ["Island"]), ("d2", "U", ["Island"])],
+                       style="float")
+            played, colours = scan_decks(path)
+        self.assertEqual(played["d1"], {"Island"})
+        self.assertNotIn("Mountain", played["d1"])
+        self.assertNotIn("Mountain", colours)
+
+    def test_integer_and_float_archives_agree(self):
+        rows = [(f"d{i}", "U" if i % 2 else "R",
+                 ["Island"] if i % 2 else ["Mountain"]) for i in range(40)]
+        with tempfile.TemporaryDirectory() as directory:
+            ints, floats = Path(directory) / "i.csv.gz", Path(directory) / "f.csv.gz"
+            self.games(ints, rows, style="int")
+            self.games(floats, rows, style="float")
+            self.assertEqual(scan_decks(ints), scan_decks(floats))
 
     def test_keep_restricts_both_decks_and_colour_evidence(self):
         with tempfile.TemporaryDirectory() as directory:
