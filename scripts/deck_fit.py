@@ -41,6 +41,7 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import open_text  # noqa: E402
+from card_outcomes import count_of  # noqa: E402
 from eval_model import Cache, draft_split  # noqa: E402
 
 COLOURS = ("W", "U", "B", "R", "G")
@@ -118,8 +119,12 @@ def scan_decks(archive: Path, keep: Optional[Set[str]] = None
             seen_draft_colours[draft_id][main] += 1
             cards = played[draft_id]
             for position, name in deck_at:
-                value = values[position]
-                if value and value != "0" and name not in cards:
+                # Parse the number rather than comparing the text. Some sets
+                # write these columns as floats, and "0.0" is not the string
+                # "0" - which silently marked every card in the set as played
+                # for every draft in dmu, and would for any set written the
+                # same way.
+                if count_of(values[position]) and name not in cards:
                     cards.add(name)
 
     # One deck identity per draft: the build its games were most often played with.
