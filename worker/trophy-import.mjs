@@ -2,6 +2,7 @@ import {isDeepStrictEqual} from 'node:util';
 import catalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import {validateDraftRunPuzzle,interestingDraftRunPuzzle,draftRunDifficulty,DRAFT_RUN_CORPUS_VERSION as VERSION} from '../draft-run.mjs';
 import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from './trophy-import-auth.mjs';
+import {refreshServingStatistics} from './serving-statistics.mjs';
 
 const allowed=new Set(catalog.sets.map(s=>s.id));
 const error=(message,status=400)=>Object.assign(Error(message),{status});
@@ -174,6 +175,7 @@ export async function handleTrophyImport(request,query) {
   }
   if(identity.workflow_ref!==IMPORT_WORKFLOW)throw error('Trophy import identity denied',403);
 
+  if(body.action==='refresh-statistics')return refreshServingStatistics(query);
   if(body.action==='batch')return {added:await insertTrophyBatch(query,body.puzzles)};
   const sid=body.setId||body.manifest?.id;
   if(!allowed.has(sid))throw error('Environment not registered');

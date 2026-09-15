@@ -5,6 +5,7 @@ import zlib from 'node:zlib';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from '../worker/trophy-import-auth.mjs';
 import {insertTrophyBatch,handleTrophyImport,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
+import {SERVING_ANALYZE_SQL,SERVING_STATISTICS_COLUMNS,SERVING_STATISTICS_READY_SQL} from '../worker/serving-statistics.mjs';
 
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwk={...publicKey.export({format:'jwk'}),kid:'test',use:'sig'};
@@ -65,6 +66,28 @@ test('unsigned callers and invalid batches cannot touch SQL',async()=>{
   await assert.rejects(handleTrophyImport(new Request('https://example/v1/trophy-import',{method:'POST',body:'{}'}),query),/denied/);
   await assert.rejects(insertTrophyBatch(query,[]),/Invalid batch/);
   await assert.rejects(insertTrophyBatch(query,[{set_id:'hob',puzzle_id:'x'}]),/Invalid verified puzzle/);
+});
+
+test('only the signed main trophy import can request fixed serving statistics maintenance',async t=>{
+  t.mock.method(globalThis,'fetch',async url=>{
+    assert.equal(url,'https://token.actions.githubusercontent.com/.well-known/jwks');
+    return Response.json({keys:[jwk]});
+  });
+  const now=Math.floor(Date.now()/1000);
+  const current={...claims,iat:now-10,nbf:now-10,exp:now+300};
+  const request=identity=>new Request('https://example/v1/trophy-import',{
+    method:'POST',headers:{'content-type':'application/json',...(identity?{authorization:'Bearer '+token(identity)}:{})},
+    // Untrusted extra fields cannot select a table or execute SQL.
+    body:JSON.stringify({action:'refresh-statistics',table:'players',sql:'DELETE FROM players'}),
+  });
+  const calls=[];
+  const query=async sql=>{calls.push(sql);return {rows:[Object.fromEntries(Object.keys(SERVING_STATISTICS_COLUMNS).map(table=>[table,'t']))]};};
+  await assert.rejects(handleTrophyImport(request(null),query),/denied/);
+  await assert.rejects(handleTrophyImport(request({...current,workflow_ref:IMAGE_REFRESH_WORKFLOW}),query),/denied/);
+  assert.equal(calls.length,0);
+  assert.deepEqual(await handleTrophyImport(request(current),query),{analyzed_tables:Object.keys(SERVING_STATISTICS_COLUMNS)});
+  assert.deepEqual(calls,[...SERVING_ANALYZE_SQL,SERVING_STATISTICS_READY_SQL]);
+  await assert.rejects(handleTrophyImport(request(current),async()=>{throw Error('maintenance failed');}),/maintenance failed/);
 });
 
 test('Cube image refresh changes display metadata only',async()=>{

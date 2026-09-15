@@ -1,6 +1,7 @@
 // Read-only prerequisite check; never silently apply migrations during deployment.
 import assert from 'node:assert/strict';
 import {query} from '../worker/growth-function.js';
+import {verifyServingStatistics} from '../worker/serving-statistics.mjs';
 const result=await query(`SELECT
   to_regclass('player_request_limits') IS NOT NULL limits,
   (SELECT count(*)=3 FROM pg_indexes WHERE indexname IN ('draft_run_serving_window_idx','draft_run_serving_source_idx','draft_run_rating_band_idx')) indexes,
@@ -10,4 +11,5 @@ const result=await query(`SELECT
     AND pg_get_constraintdef(oid) ~ '\\m8\\M' AND pg_get_constraintdef(oid) ~ '\\m10\\M') lengths,
   position('jsonb_array_length(s.puzzle_ids)' in pg_get_viewdef('draft_run_measurements'::regclass))>0 measurements`);
 for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply migrations 0012–0014 first.`);
-console.log('Neon schema prerequisites verified.');
+await verifyServingStatistics(query);
+console.log('Neon schema and serving-statistics prerequisites verified.');
