@@ -375,7 +375,6 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
         "scored_picks": f"pack 1, picks {pick_range[0]}-{pick_range[1]}" if pick_range
         else "every pick in the draft" if all_picks
         else f"pack 1, picks 1-{max_pick}",
-        "weights": rows,
     }
 
 

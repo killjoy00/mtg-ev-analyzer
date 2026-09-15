@@ -1,4 +1,5 @@
 import gzip
+import json
 import sys
 import tempfile
 import unittest
@@ -9,6 +10,7 @@ from build_replays import CountStore, PickExample
 from eval_model import VARIANTS, VariantModel
 from pick_value import (
     OutcomeAxis,
+    analyse,
     decision_values,
     draft_results,
     pearson,
@@ -202,6 +204,85 @@ class DraftResultTests(unittest.TestCase):
                 handle.write("draft_id,pick\na,Card\n")
             with self.assertRaises(ValueError):
                 draft_results(path)
+
+
+class EndToEndTests(unittest.TestCase):
+    """analyse() is only exercised with real data, so its return path needs a
+    smoke test of its own; a stale name in it once slipped past every unit test
+    and only surfaced after an hour of pipeline work."""
+
+    def build(self, directory: Path):
+        names, index = [], {}
+
+        def intern(name):
+            if name not in index:
+                index[name] = len(names)
+                names.append(name)
+            return index[name]
+
+        drafts = [f"d{i}" for i in range(600)]
+        order = {d: i for i, d in enumerate(drafts)}
+        picks_path = directory / "cache.json.picks.jsonl.gz"
+        with gzip.open(picks_path, "wt", encoding="utf-8") as handle:
+            for draft in drafts:
+                pool = {}
+                for pick in range(6):
+                    cards = ["good", "fine", "weak"]
+                    chosen = cards[(order[draft] + pick) % 3]
+                    handle.write(json.dumps([
+                        order[draft], 0, pick, intern(chosen),
+                        [intern(c) for c in cards],
+                        [[intern(c), n] for c, n in sorted(pool.items())],
+                    ]) + "\n")
+                    pool[chosen] = pool.get(chosen, 0) + 1
+        cache_path = directory / "cache.json"
+        cache_path.write_text(json.dumps({
+            "cache_version": 3, "set_id": "test", "drafts": drafts, "vocabulary": names,
+            "pack_offset": 1, "pick_offset": 1, "picks_file": picks_path.name,
+        }))
+
+        archive = directory / "draft.csv.gz"
+        with gzip.open(archive, "wt", encoding="utf-8", newline="") as handle:
+            handle.write("draft_id,event_match_wins,user_game_win_rate_bucket\n")
+            for position, draft in enumerate(drafts):
+                handle.write(f"{draft},{position % 8},0.5{position % 3}\n")
+
+        outcomes = directory / "cards.json"
+        outcomes.write_text(json.dumps({"baseline_win_rate": 0.55, "cards": {
+            "good": {"iwd_shrunk": 0.06}, "fine": {"iwd_shrunk": 0.01},
+            "weak": {"iwd_shrunk": -0.03}}}))
+
+        fit = directory / "fit.json"
+        fit.write_text(json.dumps({"grand_play_rate": 0.6, "cards": {
+            name: {"play_rate": 0.7, "colours": "R",
+                   "by_commitment": {"0": 0.4, "1-2": 0.6, "3-5": 0.8, "6-9": 0.9, "10+": 0.95}}
+            for name in ("good", "fine", "weak")}}))
+        return cache_path, archive, outcomes, fit
+
+    def test_analyse_returns_poolable_observations(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache, archive, outcomes, fit = self.build(Path(directory))
+            result = analyse(cache, archive, outcomes, [0.0, 4000.0], None,
+                             None, 10, True, None, fit, True)
+        self.assertEqual(result["set_id"], "test")
+        self.assertEqual(result["weighting"], "per-card by evidence")
+        self.assertEqual(result["outcome_axis"], "play-weighted impact")
+        self.assertGreater(result["held_out_drafts"], 0)
+        for weight in (0.0, 4000.0):
+            rows = result["observations"][weight]
+            self.assertTrue(rows)
+            for stratum, skill, regret, wins in rows:
+                self.assertEqual(stratum, "test")
+                self.assertIsInstance(skill, str)
+                self.assertGreaterEqual(regret, 0.0)
+
+    def test_analyse_without_a_deck_fit_uses_raw_impact(self):
+        with tempfile.TemporaryDirectory() as directory:
+            cache, archive, outcomes, _ = self.build(Path(directory))
+            result = analyse(cache, archive, outcomes, [0.0], None, None, 10, True, None,
+                             None, False)
+        self.assertEqual(result["outcome_axis"], "raw impact")
+        self.assertEqual(result["weighting"], "fixed")
 
 
 if __name__ == "__main__":
