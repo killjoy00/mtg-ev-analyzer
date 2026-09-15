@@ -11,6 +11,7 @@ on:
       - 'data/selection-policy.json'
       - 'game-date.mjs'
       - 'tests/*backend-smoke.mjs'
+      - 'scripts/verify-neon-schema.mjs'
       - '.github/workflows/backend-gate.yml'
 
 permissions:
@@ -104,7 +105,7 @@ jobs:
           # Keep this explicit list in sync until the parent is promoted; do not
           # replay arbitrary historical migrations or assume main == live SQL.
           mapfile -t pending < <({
-            printf '%s\n' migrations/0012_draft_run_serving_indexes.sql migrations/0013_player_request_limits.sql migrations/0014_eight_pick_runs.sql
+            printf '%s\n' migrations/0012_draft_run_serving_indexes.sql migrations/0013_player_request_limits.sql migrations/0014_eight_pick_runs.sql migrations/0015_draft_run_serving_statistics.sql
             printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
           } | sort -u)
           if (( ${#pending[@]} == 0 )); then
@@ -121,6 +122,7 @@ jobs:
         run: |
           set -euo pipefail
           DATABASE_URL="$(cat "$PACK1_CI_CONNECTION")" node scripts/verify-neon-schema.mjs
+          node tests/serving-statistics-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/selection-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/draft-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/cube-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures

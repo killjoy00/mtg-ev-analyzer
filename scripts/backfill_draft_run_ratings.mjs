@@ -1,6 +1,7 @@
 // node scripts/backfill_draft_run_ratings.mjs CONNECTION_FILE
 // Resumable derived-data backfill. Never rewrites a puzzle or its score.
 import fs from 'node:fs';
+import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
 const connection=fs.readFileSync(process.argv[2],'utf8').trim();
 const host=new URL(connection).hostname;
 const endpoint=`https://api.${host.split('.').slice(1).join('.')}/sql`;
@@ -36,4 +37,5 @@ for(;;) {
 const {rows:[r]}=await query(`SELECT count(*)::int AS missing FROM draft_run_verified_puzzles p WHERE NOT EXISTS
   (SELECT 1 FROM draft_run_puzzle_ratings r WHERE r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1')`);
 if(r.missing)throw Error(`${r.missing} puzzles still lack difficulty ratings`);
-console.log('All puzzles have versioned difficulty ratings.');
+await refreshServingStatistics(query);
+console.log('All puzzles have versioned difficulty ratings; serving statistics refreshed.');

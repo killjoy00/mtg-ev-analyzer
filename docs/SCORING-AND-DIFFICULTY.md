@@ -67,7 +67,7 @@ This enforces at most one easy slot in the completed run, including replacements
 
 ## Storage, API, and rollout
 
-`draft_run_puzzle_ratings` stores `puzzle_id`, `difficulty_version`, integer `rating`, `top_two_ratio`, `target_support_ratio`, and generated `band`. Its primary key is `(puzzle_id,difficulty_version)`. Ratings are derived beside the immutable puzzle payload. Migration 0008 installs an insertion trigger so future imports automatically receive ratings; `scripts/backfill_draft_run_ratings.mjs` fills existing rows resumably in bounded batches.
+`draft_run_puzzle_ratings` stores `puzzle_id`, `difficulty_version`, integer `rating`, `top_two_ratio`, `target_support_ratio`, and generated `band`. Its primary key is `(puzzle_id,difficulty_version)`. Ratings are derived beside the immutable puzzle payload. Migration 0008 installs an insertion trigger so future imports automatically receive ratings; `scripts/backfill_draft_run_ratings.mjs` fills existing rows resumably in bounded batches. After proving no ratings are missing, the backfill refreshes and verifies scalar serving statistics on both tables; it does not alter scores or puzzle payloads. Apply the current serving schema before running it; see [planner maintenance](BACKEND-RELIABILITY.md#planner-statistics).
 
 Sessions store `difficulty_version` and one `difficulty_anchors` entry per stored decision; daily schedules store `difficulty_version`. Unanswered puzzle API responses expose public card data and pick context only. They do not expose difficulty ratings/bands, candidate supports, target-support ratio, source identity, or the answer. Difficulty remains internal; the locked answer supplies the evidence used by the consensus comparison.
 

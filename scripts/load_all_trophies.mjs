@@ -6,6 +6,7 @@ import zlib from 'node:zlib';
 import readline from 'node:readline';
 import {createHash} from 'node:crypto';
 import {validateDraftRunPuzzle, interestingDraftRunPuzzle, draftRunDifficulty, DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
 const directory=process.argv[3]||'generated/trophy-import';
 const catalog=JSON.parse(fs.readFileSync(path.join(directory,'catalog.json')));
 const registry=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json'));
@@ -71,4 +72,6 @@ async function loadSet(s) {
 }
 let next=0;
 await Promise.all(Array.from({length:4},async()=>{while(next<catalog.sets.length)await loadSet(catalog.sets[next++]);}));
-console.log('All verified supplements loaded; prior payloads preserved.');
+if(remote)await importRequest(remote,{action:'refresh-statistics'});
+else await refreshServingStatistics(query);
+console.log('All verified supplements loaded; prior payloads preserved; serving statistics refreshed.');
