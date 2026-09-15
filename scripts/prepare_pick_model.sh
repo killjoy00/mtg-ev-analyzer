@@ -86,7 +86,8 @@ prepare() {
         echo "FAIL $sid: deck fit" | tee -a "$log"; return 1; }
 
   [ -s "$WORK/obs/$sid.json" ] || \
-    python3 "$ROOT/scripts/pick_value.py" --all-picks --adaptive --weights "$WEIGHTS" \
+    python3 "$ROOT/scripts/pick_value.py" --all-picks --adaptive \
+      --weights "$WEIGHTS" --lambdas "$LAMBDAS" \
       --deck-fit "$WORK/fit/$sid.json" \
       --set "$WORK/cache/$sid.json:$WORK/archives/$sid.csv.gz:$WORK/cards/$sid.json:$WORK/cache/$sid-control.json" \
       --observations-out "$WORK/obs/$sid.json" >>"$log" 2>&1 || {

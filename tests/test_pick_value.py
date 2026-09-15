@@ -8,6 +8,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_replays import CountStore, PickExample
 from eval_model import VARIANTS, VariantModel
+from deck_fit import scan_decks
 from pick_value import (
     OutcomeAxis,
     analyse,
@@ -314,6 +315,49 @@ class EndToEndTests(unittest.TestCase):
                              None, None, False)
         self.assertEqual(result["outcome_axis"], "raw impact")
         self.assertEqual(result["weighting"], "fixed")
+
+
+class DeckScanTests(unittest.TestCase):
+    """Colour identity is fixed by the card, so reading it from every deck in
+    the set looked harmless. It is still a held-out draft's data reaching a
+    table the model is scored with, and the cost of not doing it is nothing."""
+
+    @staticmethod
+    def games(path: Path, rows):
+        """rows: (draft_id, main_colors, [cards in deck])"""
+        header = ["draft_id", "main_colors", "deck_Island", "deck_Mountain"]
+        with gzip.open(path, "wt", encoding="utf-8", newline="") as handle:
+            handle.write(",".join(header) + "\n")
+            for draft_id, colours, cards in rows:
+                handle.write(f"{draft_id},{colours},"
+                             f"{1 if 'Island' in cards else 0},"
+                             f"{1 if 'Mountain' in cards else 0}\n")
+
+    def test_keep_restricts_both_decks_and_colour_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "g.csv.gz"
+            self.games(path, [("keep1", "U", ["Island"]),
+                              ("keep2", "U", ["Island"]),
+                              ("drop1", "R", ["Mountain"]),
+                              ("drop2", "R", ["Mountain"])])
+            everything, all_colours = scan_decks(path)
+            held, kept_colours = scan_decks(path, {"keep1", "keep2"})
+        self.assertEqual(set(everything), {"keep1", "keep2", "drop1", "drop2"})
+        self.assertEqual(set(held), {"keep1", "keep2"})
+        # A card only ever played in an excluded deck leaves no colour evidence.
+        self.assertIn("Mountain", all_colours)
+        self.assertNotIn("Mountain", kept_colours)
+        self.assertEqual(sum(kept_colours["Island"].values()), 2)
+
+    def test_keeping_every_draft_matches_an_unfiltered_scan(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "g.csv.gz"
+            rows = [(f"d{i}", "U" if i % 2 else "R",
+                     ["Island"] if i % 2 else ["Mountain"]) for i in range(10)]
+            self.games(path, rows)
+            plain = scan_decks(path)
+            filtered = scan_decks(path, {f"d{i}" for i in range(10)})
+        self.assertEqual(plain, filtered)
 
 
 if __name__ == "__main__":

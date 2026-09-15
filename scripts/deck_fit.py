@@ -36,7 +36,7 @@ import statistics
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
+from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -64,8 +64,15 @@ def commit_bucket(count: int) -> str:
 # pass 1 and 2: decks and card colours, from game data
 # --------------------------------------------------------------------------
 
-def scan_decks(archive: Path) -> Tuple[Dict[str, set], Dict[str, Counter]]:
-    """draft_id -> cards played, and card -> counter of its decks' colours."""
+def scan_decks(archive: Path, keep: Optional[Set[str]] = None
+               ) -> Tuple[Dict[str, set], Dict[str, Counter]]:
+    """draft_id -> cards played, and card -> counter of its decks' colours.
+
+    `keep` restricts both to those drafts. Colour identity is a fixed property
+    of a card, so reading it from every deck in the set would be a leak with no
+    plausible path to inflating anything - but "no plausible path" is not the
+    same as none, and the caller can afford to hold the split.
+    """
     played: Dict[str, set] = defaultdict(set)
     colour_hits: Dict[str, Counter] = defaultdict(Counter)
     with open_text(archive) as handle:
@@ -86,7 +93,7 @@ def scan_decks(archive: Path) -> Tuple[Dict[str, set], Dict[str, Counter]]:
             if len(values) != len(header):
                 continue
             draft_id = values[draft_at].strip()
-            if not draft_id:
+            if not draft_id or (keep is not None and draft_id not in keep):
                 continue
             main = "".join(c for c in values[colours_at].strip().upper() if c in COLOURS)
             seen_draft_colours[draft_id][main] += 1
@@ -188,9 +195,10 @@ def estimate(by_bucket, by_card, colours) -> dict:
 
 
 def run(args: argparse.Namespace) -> int:
-    played, colour_hits = scan_decks(Path(args.games))
-    colours = card_colours(colour_hits)
     cache = Cache.load(Path(args.cache))
+    keep = set(cache.split_drafts(args.split)) if args.split else None
+    played, colour_hits = scan_decks(Path(args.games), keep)
+    colours = card_colours(colour_hits)
     by_bucket, by_card = observe(cache, played, colours, args.split)
     if not by_card:
         raise SystemExit("No drafts in the cache matched the game data. Same set?")
