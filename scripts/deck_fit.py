@@ -41,7 +41,7 @@ from typing import Dict, FrozenSet, List, Optional, Sequence, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import open_text  # noqa: E402
-from eval_model import Cache  # noqa: E402
+from eval_model import Cache, draft_split  # noqa: E402
 
 COLOURS = ("W", "U", "B", "R", "G")
 # A card counts as belonging to a colour when it is almost never played outside
@@ -139,14 +139,22 @@ def commitment(pool: Dict[str, int], colours: Dict[str, FrozenSet[str]],
     return total
 
 
-def observe(cache: Cache, played: Dict[str, set], colours: Dict[str, FrozenSet[str]]
+def observe(cache: Cache, played: Dict[str, set], colours: Dict[str, FrozenSet[str]],
+            split: Optional[str] = None
             ) -> Tuple[Dict[Tuple[str, str], List[int]], Dict[str, List[int]]]:
-    """(card, commitment bucket) -> played flags, and card -> played flags."""
+    """(card, commitment bucket) -> played flags, and card -> played flags.
+
+    `split` restricts to one split of the cache. Estimating play rates on the
+    same drafts the value model is later scored against would let the model
+    learn from its own evaluation set, so the pipeline fits this on train only.
+    """
     by_bucket: Dict[Tuple[str, str], List[int]] = defaultdict(list)
     by_card: Dict[str, List[int]] = defaultdict(list)
     for draft_id, example in cache.examples():
         deck = played.get(draft_id)
         if deck is None:
+            continue
+        if split is not None and draft_split(draft_id) != split:
             continue
         card = example.historical_pick
         flag = 1 if card in deck else 0
@@ -183,12 +191,13 @@ def run(args: argparse.Namespace) -> int:
     played, colour_hits = scan_decks(Path(args.games))
     colours = card_colours(colour_hits)
     cache = Cache.load(Path(args.cache))
-    by_bucket, by_card = observe(cache, played, colours)
+    by_bucket, by_card = observe(cache, played, colours, args.split)
     if not by_card:
         raise SystemExit("No drafts in the cache matched the game data. Same set?")
     summary = estimate(by_bucket, by_card, colours)
     summary["set_id"] = cache.set_id
     summary["drafts_with_decks"] = len(played)
+    summary["split"] = args.split or "all"
     summary["matched_drafts"] = len({d for d, _ in cache.examples() if d in played})
     Path(args.out).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
@@ -216,6 +225,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--games", required=True, help="game_data_public.<SET>.PremierDraft.csv.gz")
     parser.add_argument("--cache", required=True, help="a draft cache from eval_model.py extract")
+    parser.add_argument("--split", choices=["train", "validation", "test"],
+                        help="restrict to one split of the cache; use train so the "
+                             "estimate never sees a draft the value model is scored on")
     parser.add_argument("--out", required=True)
     return parser.parse_args(argv)
 

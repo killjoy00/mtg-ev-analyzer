@@ -64,7 +64,7 @@ class TallyTests(unittest.TestCase):
                     (True, {"Alpha": (1, 0)}), (False, {"Alpha": (1, 0)}),
                     (False, {"Alpha": (1, 0)}), (False, {"Alpha": (1, 0)})]
             archive(path, ["Alpha"], rows)
-            counts, seen = tally(path)
+            counts, seen, wins = tally(path)
         self.assertEqual(seen, 8)
         alpha = counts["Alpha"]
         self.assertEqual(alpha["gih_games"], 4)
@@ -72,15 +72,30 @@ class TallyTests(unittest.TestCase):
         self.assertEqual(alpha["gnd_games"], 4)
         self.assertEqual(alpha["gnd_wins"], 1)
         self.assertEqual(alpha["deck_games"], 8)
+        self.assertEqual(wins, 4)
 
     def test_a_card_not_in_the_deck_is_not_counted(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "g.csv.gz"
             archive(path, ["Alpha", "Beta"],
                     [(True, {"Alpha": (1, 1)}), (False, {"Alpha": (1, 0)})])
-            counts, _ = tally(path)
+            counts, _, _ = tally(path)
         self.assertIn("Alpha", counts)
         self.assertNotIn("Beta", counts)
+
+
+class BaselineTests(unittest.TestCase):
+    def test_baseline_is_the_true_game_win_rate(self):
+        """Not the deck-games-weighted average, which counts a deck once per
+        distinct card it played and so over-weights card-dense decks."""
+        counts = {"A": {"gih_games": 10, "gih_wins": 6, "gnd_games": 10, "gnd_wins": 4,
+                        "deck_games": 20, "deck_wins": 10},
+                  "B": {"gih_games": 1, "gih_wins": 1, "gnd_games": 1, "gnd_wins": 1,
+                        "deck_games": 2, "deck_wins": 2}}
+        summary = summarise(counts, rows=100, game_wins=55)
+        self.assertAlmostEqual(summary["baseline_win_rate"], 0.55)
+        # the deck-weighted figure would have been 12/22 = 0.545
+        self.assertNotAlmostEqual(summary["baseline_win_rate"], 12 / 22, places=3)
 
 
 class SummaryTests(unittest.TestCase):
@@ -88,7 +103,7 @@ class SummaryTests(unittest.TestCase):
         counts = {"Alpha": {"gih_games": 1000, "gih_wins": 700,
                             "gnd_games": 1000, "gnd_wins": 500,
                             "deck_games": 2000, "deck_wins": 1200}}
-        rows = summarise(counts)["cards"]["Alpha"]
+        rows = summarise(counts, 2000, 1100)["cards"]["Alpha"]
         self.assertAlmostEqual(rows["gih_wr"], 0.7)
         self.assertAlmostEqual(rows["gnd_wr"], 0.5)
         self.assertAlmostEqual(rows["iwd"], 0.2)
@@ -96,7 +111,7 @@ class SummaryTests(unittest.TestCase):
     def test_a_thinly_supported_card_is_shrunk_toward_no_effect(self):
         thin = {"Alpha": {"gih_games": 6, "gih_wins": 6, "gnd_games": 6, "gnd_wins": 0,
                           "deck_games": 12, "deck_wins": 6}}
-        rows = summarise(thin)["cards"]["Alpha"]
+        rows = summarise(thin, 12, 6)["cards"]["Alpha"]
         # Raw IWD is a full 1.0; six games each way is not evidence of that.
         self.assertAlmostEqual(rows["iwd"], 1.0)
         self.assertLess(abs(rows["iwd_shrunk"]), 0.05)
@@ -105,7 +120,7 @@ class SummaryTests(unittest.TestCase):
         thick = {"Alpha": {"gih_games": 20000, "gih_wins": 13000,
                            "gnd_games": 20000, "gnd_wins": 9000,
                            "deck_games": 40000, "deck_wins": 22000}}
-        rows = summarise(thick)["cards"]["Alpha"]
+        rows = summarise(thick, 40000, 22000)["cards"]["Alpha"]
         self.assertAlmostEqual(rows["iwd"], 0.2, places=6)
         self.assertGreater(rows["iwd_shrunk"], 0.17)
 

@@ -5,8 +5,9 @@
 #   scripts/prepare_pick_model.sh WORKDIR [SET ...]
 #
 # Per set: fetch the draft and game archives, extract an elite cohort and a
-# control cohort, measure card impact, measure deck fit, then measure pick
-# observations. The final pooled fit is a separate step, because pooling has to
+# control cohort, measure card impact, measure deck fit ON THE ELITE TRAIN SPLIT
+# ONLY so it never sees a draft the value model is later scored against, then
+# measure pick observations. The final pooled fit is a separate step, because pooling has to
 # see every set at once:
 #
 #   python3 scripts/pick_value.py --adaptive --weights ... \
@@ -78,7 +79,7 @@ prepare() {
 
   [ -s "$WORK/fit/$sid.json" ] || \
     python3 "$ROOT/scripts/deck_fit.py" --games "$WORK/games/$sid.csv.gz" \
-      --cache "$WORK/cache/$sid-control.json" --out "$WORK/fit/$sid.json" >>"$log" 2>&1 || {
+      --cache "$WORK/cache/$sid.json" --split train --out "$WORK/fit/$sid.json" >>"$log" 2>&1 || {
         echo "FAIL $sid: deck fit" | tee -a "$log"; return 1; }
 
   [ -s "$WORK/obs/$sid.json" ] || \

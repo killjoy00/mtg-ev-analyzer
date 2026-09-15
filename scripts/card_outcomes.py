@@ -13,10 +13,15 @@ Three measures per card, all computed here rather than taken from an aggregate:
 
   GND WR  win rate in games where the card was in the deck and NOT drawn.
 
-  IWD     GIH WR - GND WR. The same decks, split by whether the card actually
-          showed up, so deck quality cancels. This is the measure closest to
-          "how much did this card itself do", and it is the one to weigh against
-          pick behaviour.
+  IWD     GIH WR - GND WR: the win rate of decks holding the card, split by
+          whether it actually showed up. Much better controlled for deck quality
+          than GIH alone, but NOT a clean causal estimate of the card's own
+          contribution. It pools across the decks holding a card rather than
+          differencing within each, and whether a card was drawn correlates with
+          how many cards were drawn, hence with game length and mulligans. Treat
+          it as a strong within-deck-quality proxy, not as the card's effect.
+          A game-level model with draft fixed effects would be cleaner; the
+          columns for it (num_turns, num_mulligans, on_play) are in this data.
 
 Every rate is reported with its sample size and a shrunk estimate, because a
 mythic seen 200 times and a common seen 40,000 times are not equal evidence and
@@ -79,7 +84,7 @@ def column_index(header: Sequence[str]) -> Tuple[Dict[str, Dict[str, int]], Dict
     return cards, plain
 
 
-def tally(archive: Path) -> Tuple[Dict[str, Dict[str, int]], int]:
+def tally(archive: Path) -> Tuple[Dict[str, Dict[str, int]], int, int]:
     """One pass: per card, games in hand / not drawn / in deck, and wins of each."""
     with open_text(archive) as handle:
         reader = csv.reader(handle)
@@ -103,6 +108,7 @@ def tally(archive: Path) -> Tuple[Dict[str, Dict[str, int]], int]:
             hand_at.append(in_hand)
 
         size = len(names)
+        game_wins = 0
         gih_games = [0] * size
         gih_wins = [0] * size
         gnd_games = [0] * size
@@ -117,6 +123,7 @@ def tally(archive: Path) -> Tuple[Dict[str, Dict[str, int]], int]:
             won_value = values[won_at]
             won = 1 if won_value in ("True", "true", "1") else 0
             rows += 1
+            game_wins += won
             for index in range(size):
                 if not count_of(values[deck_at[index]]):
                     continue
@@ -141,19 +148,21 @@ def tally(archive: Path) -> Tuple[Dict[str, Dict[str, int]], int]:
             "gnd_games": gnd_games[index], "gnd_wins": gnd_wins[index],
             "deck_games": deck_games[index], "deck_wins": deck_wins[index],
         }
-    return result, rows
+    return result, rows, game_wins
 
 
 def shrink(wins: int, games: int, mean: float, prior: float) -> float:
     return (wins + prior * mean) / (games + prior) if games or prior else mean
 
 
-def summarise(counts: Dict[str, Dict[str, int]]) -> dict:
+def summarise(counts: Dict[str, Dict[str, int]], rows: int, game_wins: int) -> dict:
+    # The set's true game win rate, over game rows. Summing each card's
+    # deck-games instead would weight a deck by how many distinct cards it
+    # played, and GIH excess is centred on this number.
+    baseline = game_wins / rows if rows else 0.5
     total_games = sum(c["deck_games"] for c in counts.values())
-    total_wins = sum(c["deck_wins"] for c in counts.values())
-    baseline = total_wins / total_games if total_games else 0.5
 
-    rows = {}
+    cards = {}
     for name, c in counts.items():
         gih = c["gih_wins"] / c["gih_games"] if c["gih_games"] else None
         gnd = c["gnd_wins"] / c["gnd_games"] if c["gnd_games"] else None
@@ -162,7 +171,7 @@ def summarise(counts: Dict[str, Dict[str, int]]) -> dict:
         # Both halves shrink toward the same baseline, so an unsupported card's
         # IWD collapses to zero rather than to a large spurious swing.
         support = min(c["gih_games"], c["gnd_games"])
-        rows[name] = {
+        cards[name] = {
             "gih_games": c["gih_games"],
             "gnd_games": c["gnd_games"],
             "deck_games": c["deck_games"],
@@ -175,12 +184,12 @@ def summarise(counts: Dict[str, Dict[str, int]]) -> dict:
             "support_games": support,
         }
     return {"baseline_win_rate": round(baseline, 5),
-            "deck_card_games": total_games, "cards": rows}
+            "game_rows": rows, "deck_card_games": total_games, "cards": cards}
 
 
 def run(args: argparse.Namespace) -> int:
-    counts, rows = tally(Path(args.archive))
-    summary = summarise(counts)
+    counts, rows, game_wins = tally(Path(args.archive))
+    summary = summarise(counts, rows, game_wins)
     summary["set_id"] = args.set_id
     summary["archive"] = Path(args.archive).name
     summary["game_rows"] = rows

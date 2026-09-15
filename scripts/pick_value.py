@@ -37,7 +37,7 @@ import json
 import math
 import statistics
 import sys
-from collections import defaultdict
+from collections import Counter, defaultdict
 from pathlib import Path
 from typing import Dict, List, Optional, Sequence, Tuple
 
@@ -168,8 +168,20 @@ class OutcomeAxis:
         return played * gih, played * iwd
 
 
-def behaviour_support(model: VariantModel, card: str) -> int:
-    """How many times the behaviour model has actually seen this card offered."""
+def behaviour_support(model: VariantModel, card: str, pack: int, pick: int) -> int:
+    """Observations behind the behaviour model's estimate FOR THIS decision.
+
+    base_tendency falls back exact position -> pack -> global, so the evidence
+    that matters is the count at the level it actually used. A card seen five
+    thousand times across the format can still rest on a handful of observations
+    at this exact pick, and a global count would call that certain.
+    """
+    exact = model._count("exact_seen", (card, pack, pick))
+    if exact >= 20:
+        return exact
+    pack_seen = model._count("pack_seen", (card, pack))
+    if pack_seen >= 30:
+        return pack_seen
     return model._count("global_seen", card)
 
 
@@ -205,7 +217,9 @@ def decision_values(model: VariantModel, example, outcome: OutcomeAxis,
 
     gih_z, iwd_z = axis(0), axis(1)
     taken = cards.index(example.historical_pick)
-    counts = [behaviour_support(model, card) for card in cards] if adaptive else None
+    counts = ([behaviour_support(model, card, example.raw_pack_number,
+                                 example.raw_pick_number) for card in cards]
+              if adaptive else None)
 
     out: Dict[str, Tuple[float, float]] = {}
     for lam, weight in combos:
@@ -447,6 +461,25 @@ def render(report: dict) -> str:
                    f"  [{dci[0]:>+8.5f},{dci[1]:>+8.5f}]{sep}"
                    f"{row['drafts']:>8}{mark}")
     out.append("  * = change from the baseline combo separated from zero (paired bootstrap)")
+    loso = report.get("leave_one_set_out") or []
+    if loso:
+        picked = Counter(row["chosen_on_the_other_sets"] for row in loso)
+        held = [row["r_on_held_out_set"] for row in loso
+                if row["r_on_held_out_set"] is not None]
+        base = [row["r_baseline_on_held_out_set"] for row in loso
+                if row["r_baseline_on_held_out_set"] is not None]
+        out.append("")
+        out.append("LEAVE-ONE-SET-OUT: combo chosen on the other sets, read on the held-out one")
+        out.append(f"  sets held out       : {len(loso)}")
+        out.append(f"  combo chosen        : " +
+                   ", ".join(f"{label} x{count}" for label, count in picked.most_common()))
+        if held:
+            out.append(f"  median r held out   : {statistics.median(held):+.5f}"
+                       f"   (baseline {statistics.median(base):+.5f})" if base
+                       else f"  median r held out   : {statistics.median(held):+.5f}")
+            out.append(f"  beat baseline on    : "
+                       f"{sum(1 for h, b in zip(held, base) if h < b)}/{len(base)} held-out sets"
+                       if base else "")
     out.append("")
     out.append("Per set, at the pooled best combo (a breakdown, not separate fits):")
     out.append(f"  {'set':<14}{'held-out':>10}{'cards':>8}{'r baseline':>12}{'r best':>10}")
@@ -572,6 +605,43 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "drafts": value["drafts"] if value else 0,
         })
 
+    # Leave-one-set-out. Choosing the combo on every set and then reporting its
+    # correlation on those same sets is not a held-out number; picking on 32
+    # sets and reading the 33rd is. Per-set observation files make it free.
+    set_ids = sorted({row[0] for row in combined[labels[0]]})
+    loso = []
+    if len(set_ids) > 2:
+        for holdout in set_ids:
+            scores = {}
+            for label in labels:
+                strata: List[Tuple[float, int]] = []
+                grouped: Dict[str, List[Tuple[str, float, float]]] = defaultdict(list)
+                for stratum, skill, regret, wins in combined[label]:
+                    if stratum != holdout:
+                        grouped[stratum].append((skill, regret, wins))
+                for values in grouped.values():
+                    strata.extend(stratum_correlations(values))
+                pooled = pool_fisher(strata)
+                if pooled:
+                    scores[label] = pooled["r"]
+            if not scores:
+                continue
+            chosen = min(scores, key=lambda label: scores[label])
+            rows = [(skill, regret, wins)
+                    for stratum, skill, regret, wins in combined[chosen]
+                    if stratum == holdout]
+            held = pool_fisher(stratum_correlations(rows, minimum_bucket=50))
+            baseline_rows = [(skill, regret, wins)
+                             for stratum, skill, regret, wins in combined[baseline]
+                             if stratum == holdout]
+            held_baseline = pool_fisher(stratum_correlations(baseline_rows, minimum_bucket=50))
+            loso.append({
+                "held_out_set": holdout,
+                "chosen_on_the_other_sets": chosen,
+                "r_on_held_out_set": held["r"] if held else None,
+                "r_baseline_on_held_out_set": held_baseline["r"] if held_baseline else None,
+            })
+
     best = min((row for row in pooled_rows if row["r"] is not None),
                key=lambda row: row["r"], default=None)
     for entry in entries:
@@ -582,7 +652,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             pooled = pool_fisher(stratum_correlations(rows))
             entry[key] = pooled["r"] if pooled else None
 
-    report = {"labels": labels, "cap": args.cap, "sets": entries,
+    report = {"labels": labels, "cap": args.cap, "sets": entries, "leave_one_set_out": loso,
               "weighting": "per-card by evidence" if args.adaptive else "fixed",
               "pooled": pooled_rows,
               "best": {"lambda": best["lam"], "weight": best["weight"]} if best else None}
