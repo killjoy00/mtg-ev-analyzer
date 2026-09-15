@@ -12,8 +12,9 @@ from pick_value import (
     decision_values,
     draft_results,
     pearson,
+    pool_fisher,
     standardise,
-    within_skill_correlation,
+    stratum_correlations,
 )
 
 
@@ -122,48 +123,62 @@ class CorrelationTests(unittest.TestCase):
         self.assertIsNone(pearson([1, 1, 1], [1, 2, 3]))
         self.assertIsNone(pearson([1], [1]))
 
-    def test_skill_control_reverses_a_confounded_correlation(self):
-        """The whole point of bucketing: strong players pick well AND win.
+    def rows(self, skill_offsets):
+        """(skill, regret, wins) with a negative relationship inside each bucket."""
+        rows = []
+        for skill, regret_base, wins_base in skill_offsets:
+            for index in range(400):
+                jitter = ((index * 37) % 11) * 0.02
+                rows.append((skill, regret_base + 0.001 * (index % 20),
+                             wins_base - (index % 20) * 0.1 + jitter))
+        return rows
 
-        Here regret and wins are POSITIVELY related overall, because the strong
-        bucket happens to sit at higher regret and also wins far more. Within
-        each bucket the true relationship is negative, and only the controlled
-        estimate recovers it.
+    def test_stratifying_reverses_a_confounded_correlation(self):
+        """Strong players pick well AND win, so the raw correlation misleads.
+
+        Here the strong bucket sits at higher regret and also wins far more, so
+        pooling everything together says higher regret means more wins. Within
+        each bucket the truth is the opposite, and only the stratified estimate
+        recovers it.
         """
-        regret, results = {}, {}
-        for index in range(400):
-            # A little jitter, so the within-bucket relationship is strong but
-            # not perfectly collinear; Fisher z is undefined at exactly |r| = 1.
-            jitter = ((index * 37) % 11) * 0.02
-            # Strong bucket: high absolute regret, but many wins.
-            key = f"strong{index}"
-            regret[key] = 0.50 + 0.001 * (index % 20)
-            results[key] = {"wins": 6 - (index % 20) * 0.1 + jitter, "skill": "0.62"}
-            # Weak bucket: low absolute regret, but few wins.
-            key = f"weak{index}"
-            regret[key] = 0.10 + 0.001 * (index % 20)
-            results[key] = {"wins": 2 - (index % 20) * 0.1 + jitter, "skill": "0.48"}
+        rows = self.rows([("0.62", 0.50, 6.0), ("0.48", 0.10, 2.0)])
+        naive = pearson([r[1] for r in rows], [r[2] for r in rows])
+        self.assertGreater(naive, 0.9)
 
-        pooled = pearson([regret[k] for k in regret],
-                         [float(results[k]["wins"]) for k in regret])
-        self.assertGreater(pooled, 0.9)
+        pooled = pool_fisher(stratum_correlations(rows, minimum_bucket=50))
+        self.assertIsNotNone(pooled)
+        self.assertLess(pooled["r"], -0.9)
+        self.assertEqual(pooled["strata"], 2)
 
-        controlled = within_skill_correlation(regret, results, minimum_bucket=50)
-        self.assertIsNotNone(controlled)
-        self.assertLess(controlled["r"], -0.9)
-        self.assertEqual(controlled["buckets"], 2)
+    def test_small_strata_are_dropped(self):
+        rows = [("0.5", float(i), float(i)) for i in range(10)]
+        self.assertEqual(stratum_correlations(rows, minimum_bucket=50), [])
+        self.assertIsNone(pool_fisher([]))
 
-    def test_small_buckets_are_dropped(self):
-        regret = {f"d{i}": float(i) for i in range(10)}
-        results = {f"d{i}": {"wins": i, "skill": "0.5"} for i in range(10)}
-        self.assertIsNone(within_skill_correlation(regret, results, minimum_bucket=50))
+    def test_pooling_combines_sets_into_one_answer(self):
+        """A stratum per (set, bucket): sets that disagree average, not fight.
 
-    def test_drafts_with_no_recorded_result_are_ignored(self):
-        regret = {f"d{i}": float(i % 7) for i in range(200)}
-        results = {f"d{i}": {"wins": i % 5, "skill": "0.5"} for i in range(100)}
-        value = within_skill_correlation(regret, results, minimum_bucket=50)
-        self.assertIsNotNone(value)
-        self.assertEqual(value["drafts"], 100)
+        One set says -0.4, another +0.2, with the first carrying four times the
+        drafts. The pooled answer sits between them, nearer the larger set.
+        """
+        pooled = pool_fisher([(-0.4, 4000), (0.2, 1000)])
+        self.assertIsNotNone(pooled)
+        self.assertLess(pooled["r"], -0.1)
+        self.assertGreater(pooled["r"], -0.4)
+        self.assertEqual(pooled["drafts"], 5000)
+        self.assertEqual(pooled["strata"], 2)
+
+    def test_larger_strata_pull_harder(self):
+        mostly_negative = pool_fisher([(-0.4, 9000), (0.2, 1000)])["r"]
+        balanced = pool_fisher([(-0.4, 5000), (0.2, 5000)])["r"]
+        self.assertLess(mostly_negative, balanced)
+
+    def test_degenerate_strata_are_ignored(self):
+        # |r| = 1 has no Fisher transform, and a stratum of three has no weight.
+        self.assertIsNone(pool_fisher([(1.0, 100)]))
+        self.assertIsNone(pool_fisher([(-0.5, 3)]))
+        # A usable stratum alongside a degenerate one still pools.
+        self.assertIsNotNone(pool_fisher([(1.0, 100), (-0.3, 500)]))
 
 
 class DraftResultTests(unittest.TestCase):
