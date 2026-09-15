@@ -32,6 +32,13 @@ from set_policy import supported_set, require_supported_set
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = 'elite-trophy-verified-v6'
 IMPORT_VERSION = 'all-premier-trophies-v1'
+# Training drafts kept per set, after the hash ordering in select_strong_drafts.
+# Most sets have several times this many eligible drafts, so for them this is a
+# random subsample and not the whole cohort. Raising it is a real model change:
+# published puzzles keep the probabilities they were first scored with (see
+# build_set), so a new cap only reaches puzzles added afterwards. Measure a
+# candidate cap with scripts/eval_model.py before changing this.
+TRAINING_DRAFT_CAP = 5000
 SOURCE_PAGE = 'https://www.17lands.com/public_datasets'
 BASE = 'https://17lands-public.s3.amazonaws.com/analysis_data'
 USER_AGENT = 'PackOne-Trophy-Import/2.0 (https://github.com/killjoy00/mtg-ev-analyzer)'
@@ -275,7 +282,18 @@ def write_gzip_jsonl(path, values):
     temp.replace(path)
 
 
-def build_set(sid, output_dir, refresh=False, discovered_expansion=None):
+def check_training_cap(sid, training_cap, published_decisions):
+    """Refuse a cap change that would leave one corpus scored by two models.
+
+    Puzzles already published keep the probabilities they were first scored
+    with, so a different cap reaches only decisions added afterwards while every
+    row still reports one model_version. Re-scoring needs a corpus version bump.
+    """
+    if published_decisions and training_cap != TRAINING_DRAFT_CAP:
+        raise ValueError(f'{sid}: training cap {training_cap} differs from the published baseline cap {TRAINING_DRAFT_CAP}; {published_decisions} existing decisions would keep their original scores. Bump the corpus version and regenerate instead of mixing models.')
+
+
+def build_set(sid, output_dir, refresh=False, discovered_expansion=None, training_cap=TRAINING_DRAFT_CAP):
     require_supported_set(sid)
     if discovered_expansion: require_supported_set(discovered_expansion)
     started = time.monotonic(); root = ROOT; directory = Path(output_dir)/sid; directory.mkdir(parents=True, exist_ok=True)
@@ -289,7 +307,7 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None):
     with csv_bytes(path) as f: header=next(csv.reader([f.readline().decode('utf-8-sig')]))
     legacy = 'user_game_win_rate_bucket' not in header or 'user_n_games_bucket' not in header
     skill_source = archive(f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz', directory/'games.csv.gz', refresh) if legacy else None
-    signature = hashlib.sha256(encoded({'source':source, 'skill_source':skill_source, 'importer':digest(__file__), 'model':digest(root/'scripts/build_replays.py'), 'legacy_model':digest(root/'scripts/backfill_legacy_sets.py'), 'images':digest(root/'corpus/draft-run/card-images.json'), 'baseline':base_entry, 'manifest':manifest})).hexdigest()
+    signature = hashlib.sha256(encoded({'source':source, 'skill_source':skill_source, 'importer':digest(__file__), 'model':digest(root/'scripts/build_replays.py'), 'legacy_model':digest(root/'scripts/backfill_legacy_sets.py'), 'images':digest(root/'corpus/draft-run/card-images.json'), 'baseline':base_entry, 'manifest':manifest, 'training_cap':training_cap})).hexdigest()
     completed = directory/'manifest.json'
     if not refresh and completed.exists():
         old = json.loads(completed.read_text())
@@ -305,12 +323,13 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None):
     experienced = {did:s for did,s in training_skills.items() if s.games_lower_bound>=100}
     training = []; cutoff = None
     if len(experienced)>=5:
-        training, calculated, _ = select_strong_drafts(training_skills,100,.15,5000)
+        training, calculated, _ = select_strong_drafts(training_skills,100,.15,training_cap)
         cutoff = None if legacy else max(.6,calculated,manifest.get('cohort',{}).get('win_rate_cutoff',0))
     qualified, rejected = eligible_trophies(drafts, cutoff or .6, legacy, conflicts)
     old_rows = json.loads(gzip.decompress((root/'corpus/draft-run'/f'{sid}.json.gz').read_bytes())) if base_entry else []
     old_by_id = {p['puzzle_id']:p for p in old_rows}
     old_sources = {p['source_draft_hash'] for p in old_rows}
+    check_training_cap(sid, training_cap, len(old_rows))
     if qualified and len(training)<5: raise ValueError(f'{sid}: insufficient broad-elite training data')
     print(f'{sid}: {len(drafts)} drafts, {len(qualified)} qualifying trophies, {len(training)} training drafts',flush=True)
     additions=[]; dispositions=[]; reasons=Counter(); retained=set(); missing_names=set(); training_picks=0
@@ -351,7 +370,7 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None):
     if len(dispositions)!=trophy_count: raise ValueError('Incomplete trophy accounting')
     puzzle_file=directory/'puzzles.jsonl.gz';ledger_file=directory/'trophies.jsonl.gz'
     write_gzip_jsonl(puzzle_file,sorted(additions,key=lambda p:p['puzzle_id']));write_gzip_jsonl(ledger_file,sorted(dispositions,key=lambda d:d['draft_id']))
-    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'input_signature':signature,'source_archive':source,'skill_source':skill_source,'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_picks':training_picks,'model_version':'strong-player-pool-context-v2','holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
+    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'input_signature':signature,'source_archive':source,'skill_source':skill_source,'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':'strong-player-pool-context-v2','holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
     atomic_json(completed,info);print(json.dumps(info),flush=True);return info
 
 
@@ -359,6 +378,7 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--sets',default='all');parser.add_argument('--workers',type=int,default=3)
     parser.add_argument('--output',default='generated/trophy-import');parser.add_argument('--refresh',action='store_true')
+    parser.add_argument('--training-cap',type=int,default=TRAINING_DRAFT_CAP,help='training drafts per set; changing it from the published value is refused for sets that already have puzzles')
     args=parser.parse_args()
     sources,discovery=discover()
     atomic_json(Path(args.output)/'discovery.json',discovery)
@@ -366,7 +386,7 @@ def main():
     if any(sid not in sources for sid in ids): raise ValueError('Requested set has no official Premier archive')
     ids=list(dict.fromkeys(ids));results=[];errors={}
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        jobs={executor.submit(build_set,sid,args.output,args.refresh,sources[sid]):sid for sid in ids}
+        jobs={executor.submit(build_set,sid,args.output,args.refresh,sources[sid],args.training_cap):sid for sid in ids}
         for future in as_completed(jobs):
             try:results.append(future.result())
             except Exception as exc:errors[jobs[future]]=str(exc);print(json.dumps({'set':jobs[future],'error':str(exc)}),flush=True)

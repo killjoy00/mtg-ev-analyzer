@@ -1,0 +1,358 @@
+import gzip
+import json
+import math
+import sys
+import tempfile
+import unittest
+from collections import Counter
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
+from build_replays import CountStore, DraftSkill, OutOfFoldModel, PickExample
+from eval_model import (
+    VARIANTS,
+    Accumulator,
+    Cache,
+    Calibration,
+    GradingStats,
+    VariantModel,
+    cap_prefix,
+    daily_weights,
+    draft_split,
+    eligible_cohort,
+    extract,
+    pair_expectations,
+    paired_bootstrap,
+    pick_metrics,
+    pool_bucket,
+    weighted_headline,
+)
+
+
+def example(draft_id, pack, pick, chosen, candidates, pool=None):
+    return PickExample(draft_id, pack, pick, chosen, list(candidates), dict(pool or {}))
+
+
+class SplitTests(unittest.TestCase):
+    def test_split_is_stable_and_draft_separated(self):
+        ids = [f"draft-{i}" for i in range(4000)]
+        first = [draft_split(i) for i in ids]
+        self.assertEqual(first, [draft_split(i) for i in ids])
+        shares = Counter(first)
+        self.assertAlmostEqual(shares["train"] / len(ids), 0.60, delta=0.03)
+        self.assertAlmostEqual(shares["validation"] / len(ids), 0.15, delta=0.03)
+        self.assertAlmostEqual(shares["test"] / len(ids), 0.25, delta=0.03)
+
+    def test_splits_do_not_overlap(self):
+        ids = [f"d{i}" for i in range(500)]
+        groups = {name: {i for i in ids if draft_split(i) == name}
+                  for name in ("train", "validation", "test")}
+        self.assertEqual(sum(len(g) for g in groups.values()), len(ids))
+        self.assertFalse(groups["train"] & groups["test"])
+        self.assertFalse(groups["train"] & groups["validation"])
+        self.assertFalse(groups["validation"] & groups["test"])
+
+
+class CohortTests(unittest.TestCase):
+    def test_ties_at_the_cutoff_are_admitted(self):
+        # Bucketed win rates mean many drafts share the cutoff value exactly,
+        # so the eligible share lands above the requested top fraction.
+        skills = {f"d{i}": DraftSkill(rate=0.55, games_lower_bound=100) for i in range(90)}
+        skills.update({f"h{i}": DraftSkill(rate=0.62, games_lower_bound=100) for i in range(10)})
+        eligible, cutoff, experienced = eligible_cohort(skills, 100, 0.15)
+        self.assertEqual(experienced, 100)
+        self.assertEqual(cutoff, 0.55)
+        self.assertEqual(len(eligible), 100)
+
+    def test_inexperienced_drafts_are_excluded(self):
+        skills = {"a": DraftSkill(0.7, 100), "b": DraftSkill(0.9, 20)}
+        eligible, _, experienced = eligible_cohort(skills, 100, 1.0)
+        self.assertEqual(experienced, 1)
+        self.assertEqual(eligible, ["a"])
+
+    def test_cap_prefix_is_nested(self):
+        ids = [f"d{i}" for i in range(50)]
+        self.assertEqual(cap_prefix(ids, 10), ids[:10])
+        self.assertEqual(cap_prefix(ids, 10), cap_prefix(ids, 20)[:10])
+        self.assertEqual(cap_prefix(ids, None), ids)
+
+
+class MetricTests(unittest.TestCase):
+    def test_pick_metrics_on_a_confident_correct_call(self):
+        loss, brier, hit, rank = pick_metrics([0.7, 0.2, 0.1], 0)
+        self.assertAlmostEqual(loss, -math.log(0.7))
+        self.assertAlmostEqual(brier, 0.09 + 0.04 + 0.01)
+        self.assertTrue(hit)
+        self.assertEqual(rank, 1)
+
+    def test_rank_counts_better_scoring_cards(self):
+        _, _, hit, rank = pick_metrics([0.5, 0.3, 0.2], 2)
+        self.assertFalse(hit)
+        self.assertEqual(rank, 3)
+
+    def test_uniform_log_loss_matches_candidate_count(self):
+        loss, _, _, _ = pick_metrics([0.25] * 4, 1)
+        self.assertAlmostEqual(loss, math.log(4))
+
+    def test_accumulator_reports_a_standard_error(self):
+        acc = Accumulator()
+        for value in (0.5, 1.5, 0.5, 1.5):
+            acc.add(value, 0.2, True, 1, 5)
+        summary = acc.summary()
+        self.assertEqual(summary["n"], 4)
+        self.assertAlmostEqual(summary["log_loss"], 1.0)
+        self.assertAlmostEqual(summary["log_loss_stderr"], 0.25)
+        self.assertEqual(summary["top1_accuracy"], 1.0)
+
+
+class CalibrationTests(unittest.TestCase):
+    def test_a_perfectly_calibrated_stream_has_near_zero_error(self):
+        calibration = Calibration()
+        # 80 of 100 examples put 0.8 on the card that was actually taken.
+        for index in range(100):
+            calibration.add([0.8, 0.2], 0 if index < 80 else 1)
+        summary = calibration.summary()
+        self.assertLess(summary["confidence_ece"], 0.02)
+        self.assertLess(summary["per_card_ece"], 0.02)
+
+    def test_overconfidence_is_detected(self):
+        calibration = Calibration()
+        for index in range(100):
+            calibration.add([0.95, 0.05], 0 if index < 50 else 1)
+        self.assertGreater(calibration.summary()["confidence_ece"], 0.4)
+
+
+class GradingTests(unittest.TestCase):
+    def test_support_ratio_and_displayed_score(self):
+        grading = GradingStats()
+        grading.add([0.5, 0.25], 1)
+        summary = grading.summary()
+        self.assertEqual(summary["historical_pick_is_leader"], 0.0)
+        self.assertAlmostEqual(summary["mean_support_ratio"], 0.5)
+        # round(95 * 0.5) is the partial credit the player would see.
+        self.assertEqual(summary["median_displayed_score"], 48)
+
+    def test_leader_pick_scores_full_marks(self):
+        grading = GradingStats()
+        grading.add([0.6, 0.4], 0)
+        summary = grading.summary()
+        self.assertEqual(summary["historical_pick_is_leader"], 1.0)
+        self.assertEqual(summary["median_displayed_score"], 95)
+
+    def test_severity_is_tracked_apart_from_disagreement(self):
+        grading = GradingStats()
+        grading.add([1.0, 0.9], 1)   # disagreement, barely
+        grading.add([1.0, 0.05], 1)  # disagreement, severe
+        summary = grading.summary()
+        self.assertEqual(summary["historical_below_leader"], 1.0)
+        self.assertEqual(summary["below_one_fifth_of_leader"], 0.5)
+
+
+class VariantTests(unittest.TestCase):
+    def counts_with_pair_evidence(self):
+        counts = CountStore.empty()
+        # "anchor" is picked half the time overall at this position.
+        for index in range(40):
+            counts.observe(example(f"d{index}", 0, 0, "anchor" if index % 2 else "other",
+                                   ["anchor", "other"]))
+        # Alongside "partner" it is taken far more often, but only at later picks.
+        for index in range(40):
+            counts.observe(example(f"p{index}", 0, 6, "anchor" if index % 10 else "other",
+                                   ["anchor", "other"], {"partner": 1}))
+        return counts
+
+    def test_v2_reproduces_production_card_tendency(self):
+        counts = self.counts_with_pair_evidence()
+        pool = {"partner": 1}
+        production = OutOfFoldModel(counts, CountStore.empty())
+        harness = VariantModel(counts, VARIANTS["v2"])
+        for pick in (0, 6):
+            self.assertAlmostEqual(
+                harness.card_tendency("anchor", 0, pick, pool),
+                production.card_tendency("anchor", 0, pick, pool), places=12)
+
+    def test_no_context_variant_ignores_the_pool(self):
+        counts = self.counts_with_pair_evidence()
+        model = VariantModel(counts, VARIANTS["v2-no-context"])
+        self.assertAlmostEqual(model.card_tendency("anchor", 0, 6, {"partner": 1}),
+                               model.base_tendency("anchor", 0, 6), places=12)
+
+    def test_coverage_shrinks_context_when_evidence_is_thin(self):
+        counts = self.counts_with_pair_evidence()
+        thin_pool = {"partner": 1, **{f"unknown{i}": 1 for i in range(7)}}
+        base = VariantModel(counts, VARIANTS["v2"]).card_tendency("anchor", 0, 6, thin_pool)
+        covered = VariantModel(counts, VARIANTS["v2-coverage"]).card_tendency("anchor", 0, 6, thin_pool)
+        plain = VariantModel(counts, VARIANTS["v2"]).base_tendency("anchor", 0, 6)
+        # One qualifying pair in an eight-card pool should move the estimate far
+        # less once coverage is taken into account.
+        self.assertGreater(abs(base - plain), abs(covered - plain))
+
+    def test_stage_matched_context_removes_a_pure_stage_effect(self):
+        """A lift explained entirely by draft stage should wash out.
+
+        "late" is taken 10% of the time at pick 2 and 90% at pick 10. The same
+        eight cards sit in the pool at both, so they cause none of that swing.
+        Pair counts are not keyed by position, so their pooled rate lands near
+        50% and v2 reads it as a large lift over the 10% base at pick 2.
+        """
+        pool = {f"partner{i}": 1 for i in range(8)}
+        examples = []
+        for index in range(200):
+            examples.append(example(f"early{index}", 0, 2,
+                                    "late" if index < 20 else "other",
+                                    ["late", "other"], pool))
+            examples.append(example(f"deep{index}", 0, 10,
+                                    "late" if index < 180 else "other",
+                                    ["late", "other"], pool))
+        counts = CountStore.empty()
+        for item in examples:
+            counts.observe(item)
+        train_ids = sorted({item.draft_id for item in examples})
+        with tempfile.TemporaryDirectory() as directory:
+            cache = self.build_cache(Path(directory), examples)
+            expectations = pair_expectations(cache, train_ids, counts)
+
+        naive = VariantModel(counts, VARIANTS["v2"])
+        matched = VariantModel(counts, VARIANTS["v3-stage-matched"], expectations)
+        base = naive.base_tendency("late", 0, 2)
+        self.assertLess(base, 0.2)
+
+        naive_shift = abs(naive.card_tendency("late", 0, 2, pool) - base)
+        matched_shift = abs(matched.card_tendency("late", 0, 2, pool) - base)
+        # v2 inflates a 10% card substantially; stage matching leaves it alone.
+        self.assertGreater(naive_shift, 0.1)
+        self.assertLess(matched_shift, 0.01)
+
+    @staticmethod
+    def build_cache(directory: Path, examples) -> Cache:
+        names: list[str] = []
+        index: dict[str, int] = {}
+
+        def intern(name):
+            if name not in index:
+                index[name] = len(names)
+                names.append(name)
+            return index[name]
+
+        drafts = sorted({e.draft_id for e in examples})
+        order = {d: i for i, d in enumerate(drafts)}
+        picks_path = directory / "cache.json.picks.jsonl.gz"
+        with gzip.open(picks_path, "wt", encoding="utf-8") as handle:
+            for item in examples:
+                handle.write(json.dumps([
+                    order[item.draft_id], item.raw_pack_number, item.raw_pick_number,
+                    intern(item.historical_pick),
+                    [intern(c) for c in item.candidates],
+                    [[intern(c), n] for c, n in sorted(item.pool.items())],
+                ]) + "\n")
+        meta_path = directory / "cache.json"
+        meta_path.write_text(json.dumps({
+            "cache_version": 3, "set_id": "test", "drafts": drafts, "vocabulary": names,
+            "pack_offset": 1, "pick_offset": 1, "picks_file": picks_path.name,
+        }))
+        return Cache.load(meta_path)
+
+
+class BootstrapTests(unittest.TestCase):
+    def test_identical_variants_produce_an_interval_covering_zero(self):
+        rows = [(f"d{i // 4}", 1.0 + (i % 3) * 0.1, 0.5, i % 2) for i in range(400)]
+        result = paired_bootstrap(rows, rows, draws=200)
+        self.assertEqual(result["log_loss_delta"], 0.0)
+        self.assertLessEqual(result["log_loss_ci95"][0], 0.0)
+        self.assertGreaterEqual(result["log_loss_ci95"][1], 0.0)
+
+    def test_a_uniform_improvement_is_separated_from_zero(self):
+        base = [(f"d{i // 4}", 2.0, 0.6, 0) for i in range(400)]
+        better = [(f"d{i // 4}", 1.0, 0.3, 1) for i in range(400)]
+        result = paired_bootstrap(base, better, draws=200)
+        self.assertAlmostEqual(result["log_loss_delta"], -1.0)
+        self.assertLess(result["log_loss_ci95"][1], 0.0)
+
+    def test_clusters_by_draft(self):
+        rows = [(f"d{i // 10}", 1.0, 0.5, 1) for i in range(100)]
+        self.assertEqual(paired_bootstrap(rows, rows, draws=50)["drafts"], 10)
+
+    def test_mismatched_lengths_are_rejected(self):
+        with self.assertRaises(ValueError):
+            paired_bootstrap([("a", 1.0, 0.5, 1)], [], draws=10)
+
+
+class ReportingTests(unittest.TestCase):
+    def test_daily_weights_follow_the_published_policy(self):
+        weights = daily_weights()
+        # Tier one is the three most recently released regular sets.
+        self.assertEqual(weights["hob"], 6.0)
+        self.assertEqual(weights["msh"], 6.0)
+        self.assertEqual(weights["tmt"], 4.0)
+        self.assertEqual(weights["stx"], 1.0)
+        # ktk released in 2014; recency ranking must not treat it as current.
+        self.assertEqual(weights["ktk"], 1.0)
+
+    def test_weighted_headline_uses_daily_exposure(self):
+        runs = [
+            {"set_id": "msh", "served_slice": {"n": 10, "log_loss": 1.0, "brier": 0.5,
+                                               "top1_accuracy": 0.4, "mean_reciprocal_rank": 0.6}},
+            {"set_id": "stx", "served_slice": {"n": 10, "log_loss": 2.0, "brier": 0.9,
+                                               "top1_accuracy": 0.2, "mean_reciprocal_rank": 0.3}},
+        ]
+        headline = weighted_headline(runs, "served_slice")
+        self.assertEqual(headline["total_weight"], 7.0)
+        self.assertAlmostEqual(headline["log_loss"], (6 * 1.0 + 1 * 2.0) / 7, places=5)
+
+    def test_pool_buckets(self):
+        self.assertEqual(pool_bucket(0), "pool 0")
+        self.assertEqual(pool_bucket(2), "pool 1-2")
+        self.assertEqual(pool_bucket(11), "pool 11+")
+
+
+class ExtractTests(unittest.TestCase):
+    def test_extract_round_trips_an_archive(self):
+        header = ["draft_id", "pack_number", "pick_number", "pick",
+                  "user_n_games_bucket", "user_game_win_rate_bucket",
+                  "pack_card_Alpha", "pack_card_Beta", "pool_Alpha", "pool_Beta"]
+        rows = []
+        for index in range(40):
+            rows.append([f"d{index}", "0", "0", "Alpha", "100 - 499", "0.60 - 0.64",
+                         "1", "1", "0", "0"])
+            rows.append([f"d{index}", "0", "1", "Beta", "100 - 499", "0.60 - 0.64",
+                         "0", "1", "1", "0"])
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "archive.csv"
+            with archive.open("w", encoding="utf-8", newline="") as handle:
+                handle.write(",".join(header) + "\n")
+                for row in rows:
+                    handle.write(",".join(row) + "\n")
+            cache_path = Path(directory) / "cache.json"
+            summary = extract(archive, "test", cache_path, 100, 1.0)
+            self.assertEqual(summary["eligible_drafts"], 40)
+            self.assertEqual(summary["picks"], 80)
+            # 17Lands ships zero-indexed packs and picks; offsets restore 1-based display.
+            self.assertEqual(summary["pack_offset"], 1)
+            self.assertEqual(summary["pick_offset"], 1)
+
+            cache = Cache.load(cache_path)
+            loaded = list(cache.examples())
+            self.assertEqual(len(loaded), 80)
+            second = [e for _, e in loaded if e.raw_pick_number == 1][0]
+            self.assertEqual(second.historical_pick, "Beta")
+            self.assertEqual(second.pool, {"Alpha": 1})
+            self.assertEqual(sorted(second.candidates), ["Beta"])
+
+    def test_rows_whose_pick_is_not_in_the_pack_are_dropped(self):
+        header = ["draft_id", "pack_number", "pick_number", "pick",
+                  "user_n_games_bucket", "user_game_win_rate_bucket",
+                  "pack_card_Alpha", "pool_Alpha"]
+        with tempfile.TemporaryDirectory() as directory:
+            archive = Path(directory) / "archive.csv"
+            with archive.open("w", encoding="utf-8", newline="") as handle:
+                handle.write(",".join(header) + "\n")
+                for index in range(10):
+                    handle.write(f"d{index},0,0,Missing,100 - 499,0.60 - 0.64,1,0\n")
+                    handle.write(f"d{index},0,1,Alpha,100 - 499,0.60 - 0.64,1,0\n")
+            cache_path = Path(directory) / "cache.json"
+            summary = extract(archive, "test", cache_path, 100, 1.0)
+            self.assertEqual(summary["picks"], 10)
+
+
+if __name__ == "__main__":
+    unittest.main()
