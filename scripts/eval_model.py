@@ -277,6 +277,7 @@ class Variant:
     stage_matched: bool = False
     coverage: bool = False
     deck_fit: bool = False
+    card_specific_fit: bool = True
     fit_strength: float = 0.75
     pair_min_seen: int = 8
     pair_prior_strength: float = 24.0
@@ -289,6 +290,7 @@ class Variant:
             "name": self.name, "context": self.context,
             "stage_matched": self.stage_matched, "coverage": self.coverage,
             "deck_fit": self.deck_fit, "fit_strength": self.fit_strength,
+            "card_specific_fit": self.card_specific_fit,
             "pair_min_seen": self.pair_min_seen,
             "pair_prior_strength": self.pair_prior_strength,
             "context_strength": self.context_strength,
@@ -314,6 +316,11 @@ VARIANTS: Dict[str, Variant] = {
                 notes="colour-commitment context replacing card-pair lift"),
         Variant("v3-fit-and-pair", deck_fit=True, stage_matched=True,
                 notes="stage-matched pair lift and colour-commitment context, additive"),
+        Variant("v3-colour-only", context=False, deck_fit=True, card_specific_fit=False,
+                notes="one format-wide colour-commitment curve, no per-card play rates"),
+        Variant("v3-colour-and-pair", deck_fit=True, card_specific_fit=False,
+                stage_matched=True,
+                notes="stage-matched pair lift and the format-wide colour curve"),
     ]
 }
 
@@ -374,7 +381,10 @@ class VariantModel(OutOfFoldModel):
         """
         if not self.fit:
             return 0.0
-        row = self.fit["cards"].get(card)
+        # The colour-only variant still needs the card's colours to know which
+        # of the pool counts; what it drops is the card's own play rates.
+        row = (self.fit["cards"].get(card) if self.variant.card_specific_fit
+               else (self.fit if card in self.fit["cards"] else None))
         if row is None:
             return 0.0
         unconditional = row.get("play_rate")

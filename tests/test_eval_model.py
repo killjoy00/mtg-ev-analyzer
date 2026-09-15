@@ -231,7 +231,10 @@ class VariantTests(unittest.TestCase):
     def fit_table():
         """"mono" is abandoned from an off-colour pool and kept from an on-colour
         one; "vanilla" plays at the same rate whatever is beside it."""
-        return {"grand_play_rate": 0.6, "cards": {
+        return {"grand_play_rate": 0.6, "play_rate": 0.55,
+                "by_commitment": {"0": 0.40, "1-2": 0.50, "3-5": 0.60,
+                                  "6-9": 0.70, "10+": 0.80},
+                "cards": {
             "mono": {"play_rate": 0.50, "colours": "U", "observations": 900,
                      "by_commitment": {"0": 0.50, "1-2": 0.55, "3-5": 0.70,
                                        "6-9": 0.85, "10+": 0.92}},
@@ -241,7 +244,7 @@ class VariantTests(unittest.TestCase):
             "offcolour": {"play_rate": 0.50, "colours": "R", "observations": 900,
                           "by_commitment": {"0": 0.50, "1-2": 0.55, "3-5": 0.70,
                                             "6-9": 0.85, "10+": 0.92}},
-        }}
+                }}
 
     def fit_model(self, counts=None, name="v3-deck-fit", fit=True):
         return VariantModel(counts or self.counts_with_pair_evidence(), VARIANTS[name],
@@ -292,6 +295,32 @@ class VariantTests(unittest.TestCase):
         self.assertLess(fitted.card_tendency("anchor", 0, 0, {}), base)
         self.assertAlmostEqual(VariantModel(counts, VARIANTS["v2"]).card_tendency("anchor", 0, 0, {}),
                                base, places=12)
+
+    def test_the_colour_only_variant_ignores_the_cards_own_play_rates(self):
+        """If this carries most of the per-card version's value, a port needs
+        only which colours a card is - already on the card - and never has to
+        ship a per-card table built from game data."""
+        pooled = self.fit_model(name="v3-colour-only")
+        per_card = self.fit_model(name="v3-deck-fit")
+        blue_pool = {f"blue{i}": 1 for i in range(6)}
+        for model in (pooled, per_card):
+            for card in blue_pool:
+                model.fit_colours[card] = frozenset("U")
+        # "vanilla" never moves on its own table, but the format's cards do.
+        self.assertAlmostEqual(per_card.fit_shift("vanilla", blue_pool), 0.0, places=12)
+        self.assertGreater(pooled.fit_shift("vanilla", blue_pool), 0)
+        # Two cards with the same colours get the same shift from one curve.
+        self.assertAlmostEqual(pooled.fit_shift("vanilla", blue_pool),
+                               pooled.fit_shift("mono", blue_pool), places=12)
+        self.assertNotAlmostEqual(per_card.fit_shift("vanilla", blue_pool),
+                                  per_card.fit_shift("mono", blue_pool), places=6)
+
+    def test_the_colour_only_variant_still_needs_to_know_the_card(self):
+        """Colours come from the same table, so a card missing from it has no
+        colours to match on and must not be given the curve anyway."""
+        pooled = self.fit_model(name="v3-colour-only")
+        pooled.fit_colours["blue"] = frozenset("U")
+        self.assertEqual(pooled.fit_shift("never-seen", {"blue": 6}), 0.0)
 
     def test_the_combined_variant_adds_both_terms_in_log_odds(self):
         counts = self.counts_with_pair_evidence()

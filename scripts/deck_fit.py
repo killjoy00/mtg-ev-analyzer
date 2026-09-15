@@ -191,7 +191,26 @@ def estimate(by_bucket, by_card, colours) -> dict:
             "colours": "".join(sorted(colours.get(card, frozenset()))) or "C",
             "by_commitment": buckets,
         }
-    return {"grand_play_rate": round(grand, 5), "cards": rows}
+
+    # The same curve with the card identity dropped: how much does colour
+    # commitment alone move the odds a pick is played? A model built on this
+    # needs only which colours a card is - something already on the card - and
+    # never has to ship a per-card table, so it is worth knowing how much of the
+    # per-card version's value is just this.
+    pooled: Dict[str, dict] = {}
+    for (_, name), observed in by_bucket.items():
+        cell = pooled.setdefault(name, {"played": 0, "picks": 0})
+        cell["played"] += sum(observed)
+        cell["picks"] += len(observed)
+    format_curve = {name: round(cell["played"] / cell["picks"], 5)
+                    for name, cell in pooled.items() if cell["picks"]}
+    overall_rate = (sum(c["played"] for c in pooled.values())
+                    / sum(c["picks"] for c in pooled.values())) if pooled else 0.5
+    return {"grand_play_rate": round(grand, 5),
+            "play_rate": round(overall_rate, 5),
+            "by_commitment": format_curve,
+            "bucket_picks": {name: cell["picks"] for name, cell in pooled.items()},
+            "cards": rows}
 
 
 def run(args: argparse.Namespace) -> int:
