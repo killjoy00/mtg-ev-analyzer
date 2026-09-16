@@ -46,6 +46,13 @@ PUBLIC_DRAFT_URL = (
     "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/"
     "draft_data_public.{code}.{format}.csv.gz"
 )
+# Which cards reached a deck. The colour term of the replay model is estimated
+# from this, and build_replays.py refuses to run without it rather than quietly
+# dropping the term and shipping a model that was never validated.
+PUBLIC_GAME_URL = (
+    "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/"
+    "game_data_public.{code}.{format}.csv.gz"
+)
 USER_AGENT = "Pack1-MTG-EV-Importer/1.0 (+https://github.com/killjoy00/mtg-ev-analyzer)"
 SCRYFALL_ACCEPT = "application/json;q=0.9,*/*;q=0.8"
 CODE_RE = re.compile(r"^[A-Z0-9]{2,8}$")
@@ -191,6 +198,30 @@ def fetch_scryfall_sets(earliest: str) -> list[tuple[str, str]]:
 
 def public_draft_url(code: str, format_name: str) -> str:
     return PUBLIC_DRAFT_URL.format(code=normalize_code(code), format=format_name)
+
+
+def public_game_url(code: str, format_name: str) -> str:
+    return PUBLIC_GAME_URL.format(code=normalize_code(code), format=format_name)
+
+
+def download_game_archive(code: str, format_name: str, destination: Path) -> Path:
+    """The colour table's input. Missing it fails the set rather than
+    publishing one built by a different model than every other set."""
+    url = public_game_url(code, format_name)
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with request(url, accept="application/gzip,*/*;q=0.8", timeout=90) as response:
+        with destination.open("wb") as handle:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                handle.write(chunk)
+    if destination.stat().st_size < 1024:
+        raise ValueError(f"Downloaded game archive for {code} is unexpectedly small.")
+    with destination.open("rb") as handle:
+        if handle.read(2) != b"\x1f\x8b":
+            raise ValueError(f"Downloaded game archive for {code} is not gzip data.")
+    return destination
 
 
 def probe_public_dataset(code: str, format_name: str, released_at: str) -> Optional[RemoteDataset]:
@@ -401,9 +432,11 @@ def build_one(remote: RemoteDataset, args: argparse.Namespace) -> ImportResult:
             stage_catalog.write_text('{"schema_version":2,"sets":[]}\n', encoding="utf-8")
 
         raw_path = stage_root / f"draft_data_public.{code}.{remote.format}.csv.gz"
+        game_path = stage_root / f"game_data_public.{code}.{remote.format}.csv.gz"
         card_metadata = stage_root / f"{lower}-cards.json"
         output_dir = stage_data / lower
         source_date = download_dataset(remote, raw_path)
+        download_game_archive(code, remote.format, game_path)
 
         # Missing card metadata should fail the set instead of publishing a degraded game.
         run_command([
@@ -420,6 +453,8 @@ def build_one(remote: RemoteDataset, args: argparse.Namespace) -> ImportResult:
             "scripts/build_replays.py",
             "--input",
             str(raw_path),
+            "--game-data",
+            str(game_path),
             "--output-dir",
             str(output_dir),
             "--catalog",

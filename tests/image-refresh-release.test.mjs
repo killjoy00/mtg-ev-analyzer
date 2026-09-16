@@ -26,5 +26,9 @@ test('image maintenance cannot deploy functions and checks revisions before remo
   assert.ok(workflow.indexOf('node scripts/verify-image-refresh-release.mjs')<workflow.indexOf('aws s3 sync'));
   assert.match(workflow,/name: Refresh production Draft Run image metadata\s+run: \|\s+node scripts\/verify-image-refresh-release.mjs\s+node scripts\/refresh_powered_cube_backend_images.mjs/);
   const acceptance=fs.readFileSync(new URL('./release-functions-smoke.mjs',import.meta.url),'utf8');
-  assert.equal((acceptance.match(/await verifyMarkers\(\)/g)||[]).length,2,'Release acceptance checks markers before and after gameplay');
+  assert.equal((acceptance.match(/await verifyMarkers\(/g)||[]).length,2,'Release acceptance checks markers before and after gameplay');
+  // The closing check is the one that catches a redeploy landing underneath an
+  // acceptance run, so it must never wait for the revision to become right.
+  assert.match(acceptance.slice(acceptance.lastIndexOf('await verifyMarkers(')),/^await verifyMarkers\(\)/,
+    'The closing marker check must not be given a settle window');
 });
