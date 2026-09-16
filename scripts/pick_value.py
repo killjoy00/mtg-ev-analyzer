@@ -44,12 +44,16 @@ from typing import Dict, List, Optional, Sequence, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import logit, normalize_probabilities, open_text, stable_fold  # noqa: E402
-from deck_fit import COLOURS, commit_bucket, commitment  # noqa: E402
+from deck_fit import commit_bucket, commitment, parse_colour_mark  # noqa: E402
 from eval_model import (  # noqa: E402
     VARIANTS,
     Cache,
     VariantModel,
+    behaviour_support,
+    build_backbone,
+    guard_test_split,
     load_examples,
+    load_training_fit,
     train_counts,
 )
 
@@ -139,8 +143,7 @@ class OutcomeAxis:
         self.colours: Dict[str, frozenset] = {}
         if fit:
             for card, row in fit["cards"].items():
-                letters = row.get("colours") or "C"
-                self.colours[card] = frozenset(c for c in letters if c in COLOURS)
+                self.colours[card] = parse_colour_mark(row.get("colours"))
 
     @property
     def context_aware(self) -> bool:
@@ -159,8 +162,12 @@ class OutcomeAxis:
         row = self.fit["cards"].get(card)
         if row is None:
             return None
-        bucket = commit_bucket(commitment(pool, self.colours, card))
-        return row["by_commitment"].get(bucket, row["play_rate"])
+        matched = commitment(pool, self.colours, card)
+        if matched is None:
+            # Colours unknown, so no commitment level applies. The card's own
+            # overall play rate is the honest estimate; the whole pool is not.
+            return row["play_rate"]
+        return row["by_commitment"].get(commit_bucket(matched), row["play_rate"])
 
     def pair(self, card: str, pool: Dict[str, int],
              fold: int = 0) -> Optional[Tuple[float, float]]:
@@ -174,23 +181,6 @@ class OutcomeAxis:
         if played is None:
             return None
         return played * gih, played * iwd
-
-
-def behaviour_support(model: VariantModel, card: str, pack: int, pick: int) -> int:
-    """Observations behind the behaviour model's estimate FOR THIS decision.
-
-    base_tendency falls back exact position -> pack -> global, so the evidence
-    that matters is the count at the level it actually used. A card seen five
-    thousand times across the format can still rest on a handful of observations
-    at this exact pick, and a global count would call that certain.
-    """
-    exact = model._count("exact_seen", (card, pack, pick))
-    if exact >= 20:
-        return exact
-    pack_seen = model._count("pack_seen", (card, pack))
-    if pack_seen >= 30:
-        return pack_seen
-    return model._count("global_seen", card)
 
 
 def decision_values(model: VariantModel, example, outcome: OutcomeAxis,
@@ -382,7 +372,8 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
             control_cache: Optional[Path] = None, draws: int = 400,
             all_picks: bool = False,
             pick_range: Optional[Tuple[int, int]] = None,
-            deck_fit: Optional[Path] = None, adaptive: bool = False) -> dict:
+            deck_fit: Optional[Path] = None, adaptive: bool = False,
+            split: str = "validation", backbone: str = "v2") -> dict:
     cache = Cache.load(elite_cache)
     max_pick = 11 if cache.set_id == "powered-cube" else 10
 
@@ -398,7 +389,7 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
                 {n: r["iwd_shrunk"] for n, r in table["cards"].items()
                  if r.get("iwd_shrunk") is not None})
 
-    fit = json.loads(deck_fit.read_text(encoding="utf-8")) if deck_fit else None
+    fit = load_training_fit(deck_fit, cache) if deck_fit else None
     if payload.get("tables"):
         folds = int(payload["folds"])
         built = [axes(payload["tables"][str(f)]) for f in range(folds)]
@@ -411,19 +402,24 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     if cap:
         train_ids = train_ids[:cap]
     counts, training_picks = train_counts(cache, train_ids)
-    model = VariantModel(counts, VARIANTS["v2"])
+    model = build_backbone(cache, train_ids, counts, backbone, fit)
 
-    # The elite training split is the only data the model saw. Everything else -
-    # the elite hold-out AND the whole control cohort - is fair game, and the
-    # control cohort is what gives the skill axis enough spread to correlate on.
-    held_out = cache.split_drafts("validation") + cache.split_drafts("test")
+    # The elite training split is the only data the model saw. The control
+    # cohort is untouched by training entirely, and is what gives the skill axis
+    # enough spread to correlate on.
+    #
+    # `split` defaults to validation. Reading validation and test together, as
+    # this did, means every lambda and weight was chosen with the test split in
+    # view - which quietly turns it into more validation data, and no later run
+    # can undo that. "test" is available, for one pass on a frozen spec.
+    held_out = cache.split_drafts(split)
     regrets = draft_regret(model, cache, held_out, outcome, combos, max_pick,
                            all_picks, pick_range, adaptive)
     if control_cache is not None:
         control = Cache.load(control_cache)
         if control.set_id != cache.set_id:
             raise SystemExit(f"{control_cache} is a different set from {elite_cache}")
-        regrets.update(draft_regret(model, control, control.meta["drafts"],
+        regrets.update(draft_regret(model, control, control.split_drafts(split),
                                     outcome, combos, max_pick, all_picks, pick_range, adaptive))
     results = draft_results(archive)
 
@@ -441,6 +437,8 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
     return {
         "observations": observations,
         "set_id": cache.set_id,
+        "split": split,
+        "backbone": backbone,
         "train_drafts": len(train_ids),
         "training_picks": training_picks,
         "held_out_drafts": len(regrets),
@@ -524,6 +522,16 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="share of the outcome signal taken from absolute GIH win "
                              "rate; the rest comes from IWD")
     parser.add_argument("--cap", type=int, default=5000)
+    parser.add_argument("--backbone", default="v2",
+                        help="behaviour model the outcome blend sits on (default: v2). "
+                             "Refit the blend whenever the backbone changes: a weight "
+                             "fitted against an obsolete backbone measures the wrong "
+                             "marginal value")
+    parser.add_argument("--split", default="validation", choices=["validation", "test"],
+                        help="held-out split to measure on (default: validation; "
+                             "pass test only for a frozen specification)")
+    parser.add_argument("--final-test", action="store_true",
+                        help="required alongside --split test; exists only to make\n                             reading the test split a deliberate act")
     parser.add_argument("--bootstrap-draws", type=int, default=300)
     parser.add_argument("--adaptive", action="store_true",
                         help="read each weight as a crossover in observations: the outcome "
@@ -550,16 +558,38 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     lambdas = [float(v) for v in args.lambdas.split(",")]
     combos = [(lam, weight) for lam in lambdas for weight in weights]
     labels = [combo_label(lam, weight) for lam, weight in combos]
+    guard_test_split(args.split, args.final_test)
     pick_range = tuple(int(v) for v in args.pick_range.split(":")) if args.pick_range else None
 
     entries: List[dict] = []
     combined: Dict[str, List[Tuple[str, str, float, float]]] = {l: [] for l in labels}
 
+    seen_splits: Dict[str, str] = {}
     for path in args.observations_in:
         payload = json.loads(Path(path).read_text(encoding="utf-8"))
         missing = [l for l in labels if l not in payload["observations"]]
         if missing:
             raise SystemExit(f"{path} lacks {missing[:3]}; re-measure it")
+        # Pooling observations measured on different splits would report one
+        # number over a mixture nobody chose, and the mixture would be invisible
+        # in the output. Files written before this field existed say so plainly
+        # rather than being assumed innocent.
+        file_split = payload["meta"].get("split", "unknown (pre-dates --split)")
+        seen_splits[file_split] = path
+        if len(seen_splits) > 1:
+            raise SystemExit(
+                "observations were measured on different splits and cannot be pooled:\n"
+                + "\n".join(f"  {s}: {p}" for s, p in sorted(seen_splits.items())))
+        # Agreeing with each other is not enough. This guard originally checked
+        # only that, so a set of files all measured on test pooled cleanly while
+        # the command claimed validation and --final-test never fired: the gate
+        # was on the flag, not on the data behind it.
+        if file_split != args.split:
+            raise SystemExit(
+                f"{path} was measured on the {file_split} split, but --split says "
+                f"{args.split}.\n  Re-measure, or ask for the split these files "
+                f"actually carry.")
+        guard_test_split(file_split, args.final_test)
         for label in labels:
             combined[label].extend(tuple(row) for row in payload["observations"][label])
         entry = payload["meta"]
@@ -574,7 +604,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         fit = args.deck_fit[position] if position < len(args.deck_fit) else None
         entry = analyse(Path(parts[0]), Path(parts[1]), Path(parts[2]), combos, args.cap,
                         Path(parts[3]) if len(parts) == 4 else None, args.bootstrap_draws,
-                        args.all_picks, pick_range, Path(fit) if fit else None, args.adaptive)
+                        args.all_picks, pick_range, Path(fit) if fit else None, args.adaptive,
+                        args.split, args.backbone)
         observations = entry.pop("observations")
         print(f"  measured {entry['set_id']}: {entry['held_out_drafts']} held-out drafts",
               file=sys.stderr, flush=True)

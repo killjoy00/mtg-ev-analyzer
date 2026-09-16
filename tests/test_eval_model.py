@@ -1,4 +1,6 @@
+import contextlib
 import gzip
+import io
 import json
 import math
 import sys
@@ -11,6 +13,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_replays import CountStore, DraftSkill, OutOfFoldModel, PickExample, logit
 from eval_model import (
     VARIANTS,
+    award,
+    behaviour_support,
+    build_backbone,
+    fit_temperature,
+    guard_test_split,
+    js_round,
+    normalize_probabilities,
+    sharpen,
+    evidence_bucket,
     Accumulator,
     Cache,
     Calibration,
@@ -27,6 +38,11 @@ from eval_model import (
     pool_bucket,
     weighted_headline,
 )
+from eval_model import parse_args as eval_model_args
+from pick_prediction import parse_args as pick_prediction_args
+from pick_value import parse_args as pick_value_args
+from grading_curve import parse_args as grading_curve_args
+from deck_fit import parse_args as deck_fit_args
 
 
 def example(draft_id, pack, pick, chosen, candidates, pool=None):
@@ -291,6 +307,11 @@ class VariantTests(unittest.TestCase):
         fitted.fit["cards"]["anchor"] = {"play_rate": 0.80, "colours": "U",
                                          "observations": 900,
                                          "by_commitment": {"0": 0.40, "10+": 0.95}}
+        # The colour map is derived at construction, so a card added afterwards
+        # has to be added to both. Without this the card reads as unknown and
+        # correctly gets no adjustment at all - which is the whole point of the
+        # three-state scheme, and would make this test pass for the wrong reason.
+        fitted.fit_colours["anchor"] = frozenset("U")
         base = fitted.base_tendency("anchor", 0, 0)
         self.assertLess(fitted.card_tendency("anchor", 0, 0, {}), base)
         self.assertAlmostEqual(VariantModel(counts, VARIANTS["v2"]).card_tendency("anchor", 0, 0, {}),
@@ -420,6 +441,175 @@ class VariantTests(unittest.TestCase):
             "pack_offset": 1, "pick_offset": 1, "picks_file": picks_path.name,
         }))
         return Cache.load(meta_path)
+
+
+class SplitDisciplineTests(unittest.TestCase):
+    """Reaching the test split has to be something a person typed.
+
+    Every selection surface here once defaulted to test, or read validation and
+    test together. Choosing lambda, a weight or a variant while the test split
+    is in view turns it into more validation data, and no later run undoes that.
+    """
+
+    def test_every_evaluation_entry_point_defaults_to_validation(self):
+        for module, argv in ((eval_model_args, ["evaluate", "c.json"]),
+                             (pick_value_args, ["--set", "a:b:c"]),
+                             (pick_prediction_args, ["--set", "a:b"])):
+            with self.subTest(entry=module.__module__):
+                self.assertEqual(module(argv).split, "validation")
+
+    def test_test_split_is_still_reachable_on_purpose(self):
+        self.assertEqual(eval_model_args(["evaluate", "c.json", "--split", "test"]).split,
+                         "test")
+        self.assertEqual(pick_value_args(["--set", "a:b:c", "--split", "test"]).split, "test")
+        self.assertEqual(pick_prediction_args(["--set", "a:b", "--split", "test"]).split,
+                         "test")
+
+    def test_nothing_outside_those_two_splits_is_accepted(self):
+        for module, argv in ((eval_model_args, ["evaluate", "c.json", "--split", "train"]),
+                             (pick_value_args, ["--set", "a:b:c", "--split", "train"]),
+                             (pick_prediction_args, ["--set", "a:b", "--split", "train"])):
+            # argparse prints its usage to stderr on the way out; swallow it so
+            # a passing suite stays readable.
+            with self.subTest(entry=module.__module__), self.assertRaises(SystemExit), \
+                    contextlib.redirect_stderr(io.StringIO()):
+                module(argv)
+
+
+    def test_reading_test_needs_a_second_deliberate_flag(self):
+        """A default is a suggestion. Three surfaces here silently defaulted to
+        test and nobody noticed until an outsider read the source."""
+        with self.assertRaises(SystemExit) as caught:
+            guard_test_split("test", final_test=False)
+        self.assertIn("--final-test", str(caught.exception))
+        guard_test_split("test", final_test=True)      # allowed, on purpose
+        guard_test_split("validation", final_test=False)
+        # The flag alone must not drag anything onto test.
+        guard_test_split("validation", final_test=True)
+
+    def test_the_flag_exists_on_every_entry_point(self):
+        for module, argv in ((eval_model_args, ["evaluate", "c.json"]),
+                             (pick_value_args, ["--set", "a:b:c"]),
+                             (pick_prediction_args, ["--set", "a:b"]),
+                             (grading_curve_args, ["--pair", "a:b"]),
+                             (deck_fit_args, ["--games", "g", "--cache", "c", "--out", "o"])):
+            with self.subTest(entry=module.__module__):
+                self.assertFalse(module(argv).final_test)
+                self.assertTrue(module(argv + ["--final-test"]).final_test)
+
+    def test_the_two_surfaces_an_outside_reviewer_found(self):
+        """grading_curve.py read the test split directly - missed because it
+        lives in the grading track, not the prediction track. deck_fit.py
+        defaulted to no restriction at all, which means every split including
+        test; the pipeline always passed train, so nothing was contaminated,
+        but a standalone run was one omitted flag away from it."""
+        self.assertEqual(grading_curve_args(["--pair", "a:b"]).split, "validation")
+        self.assertEqual(deck_fit_args(["--games", "g", "--cache", "c",
+                                        "--out", "o"]).split, "train")
+        # "all" stays reachable for a deliberate descriptive run, and is not test.
+        self.assertEqual(deck_fit_args(["--games", "g", "--cache", "c", "--out", "o",
+                                        "--split", "all"]).split, "all")
+
+
+class BackboneTests(unittest.TestCase):
+    """An outcome weight fitted against a backbone that still makes the errors
+    outcomes were compensating for measures the wrong marginal value."""
+
+    def counts(self):
+        store = CountStore.empty()
+        for index in range(40):
+            store.observe(example(f"d{index}", 0, 0, "a" if index % 2 else "b", ["a", "b"]))
+        return store
+
+    def test_the_backbone_is_the_variant_asked_for(self):
+        counts = self.counts()
+        model = build_backbone(None, [], counts, "v2-no-context")
+        self.assertEqual(model.variant.name, "v2-no-context")
+        self.assertFalse(model.variant.context)
+
+    def test_an_unknown_backbone_is_refused(self):
+        with self.assertRaises(SystemExit):
+            build_backbone(None, [], self.counts(), "v9-imaginary")
+
+    def test_a_deck_fit_backbone_without_a_table_is_refused(self):
+        """Silently dropping the colour term would leave a model that reports
+        itself as v3 while behaving like v2."""
+        with self.assertRaises(SystemExit) as caught:
+            build_backbone(None, [], self.counts(), "v3-colour-and-pair", fit=None)
+        self.assertIn("deck-fit", str(caught.exception))
+
+
+class EvidenceBucketTests(unittest.TestCase):
+    def test_buckets_are_contiguous_and_ordered(self):
+        seen = [evidence_bucket(n) for n in (0, 24, 25, 79, 80, 159, 160, 399, 400, 10 ** 9)]
+        self.assertEqual(seen, ["evidence 0-24", "evidence 0-24",
+                                "evidence 25-79", "evidence 25-79",
+                                "evidence 80-159", "evidence 80-159",
+                                "evidence 160-399", "evidence 160-399",
+                                "evidence 400+", "evidence 400+"])
+
+    def test_support_follows_the_level_base_tendency_actually_used(self):
+        """A card seen thousands of times across the format can still rest on a
+        handful of observations at this exact pick."""
+        counts = CountStore.empty()
+        # 40 observations at (pack 0, pick 0): over the exact threshold of 20.
+        for index in range(40):
+            counts.observe(example(f"d{index}", 0, 0, "thick", ["thick", "other"]))
+        # One observation at pick 9, so that position falls back past exact and
+        # past pack to the global count.
+        counts.observe(example("late", 0, 9, "thick", ["thick", "other"]))
+        model = VariantModel(counts, VARIANTS["v2"])
+        self.assertEqual(behaviour_support(model, "thick", 0, 0), 40)
+        self.assertEqual(behaviour_support(model, "thick", 0, 9),
+                         model._count("global_seen", "thick"))
+
+
+class AwardTests(unittest.TestCase):
+    """Log loss says a model ranks better. It does not say what happens to the
+    points in a player's run, and those are different questions."""
+
+    def test_the_award_is_the_production_formula(self):
+        self.assertEqual(award([0.5, 0.25, 0.25], 0), 95)      # leader
+        self.assertEqual(award([0.5, 0.25, 0.25], 1), 48)      # round(95 * 0.5)
+        self.assertEqual(award([0.0, 0.0, 0.0], 0), 0)         # degenerate pack
+
+    def test_half_points_round_the_way_production_rounds(self):
+        """95 x 0.7 is 66.5. Python's banker's rounding says 66 and JavaScript
+        says 67 - a one-point gap in a comparison built to count one-point gaps."""
+        self.assertEqual(js_round(66.5), 67)
+        self.assertEqual(js_round(-0.5), 0)
+        self.assertEqual(award([1.0, 0.7], 1), 67)
+
+    def test_the_display_exponent_cannot_move_a_single_point(self):
+        """Calibration raises supports to T and scoring raises the ratio to 1/T,
+        so T cancels exactly. This is what makes the display change display-only
+        - and it means refitting T for a new model is not a scoring risk. What
+        moves points is the model changing the underlying probabilities."""
+        raw = [0.52, 0.21, 0.15, 0.07, 0.05]
+        for temperature in (1.0, 1.5, 2.0, 2.25, 3.0):
+            sharpened = normalize_probabilities(sharpen(
+                {i: v for i, v in enumerate(raw)}, temperature))
+            calibrated = [sharpened[i] for i in range(len(raw))]
+            for index in range(len(raw)):
+                ratio = calibrated[index] / max(calibrated)
+                with self.subTest(temperature=temperature, index=index):
+                    self.assertEqual(js_round(95 * ratio ** (1 / temperature)),
+                                     award(raw, index))
+
+    def test_a_sharper_model_awards_less_partial_credit(self):
+        """The direction that matters for the product: a more confident model
+        puts less probability on the alternatives, so the ratio to the leader
+        shrinks and partial credit falls - without anyone changing the formula."""
+        flat, sharp = [0.4, 0.3, 0.3], [0.8, 0.1, 0.1]
+        self.assertGreater(award(flat, 1), award(sharp, 1))
+
+    def test_the_fitted_exponent_is_the_one_that_calibrates_best(self):
+        # A stream where the top card is taken far more often than a flat
+        # normalisation claims, so sharpening should be preferred to not.
+        pairs = [([0.4, 0.3, 0.3], 0)] * 90 + [([0.4, 0.3, 0.3], 1)] * 10
+        fitted, loss = fit_temperature(pairs, [1.0, 2.0, 4.0, 8.0])
+        self.assertGreater(fitted, 1.0)
+        self.assertGreater(loss, 0.0)
 
 
 class BootstrapTests(unittest.TestCase):

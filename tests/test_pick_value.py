@@ -7,8 +7,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_replays import CountStore, PickExample
-from eval_model import VARIANTS, VariantModel
-from deck_fit import scan_decks
+from eval_model import VARIANTS, VariantModel, Cache, cache_identity
+from collections import Counter
+from deck_fit import (MIN_DECKS_FOR_COLOUR, card_colours, colour_mark, commitment,
+                      parse_colour_mark, scan_decks)
 from pick_value import (
     OutcomeAxis,
     analyse,
@@ -285,7 +287,9 @@ class EndToEndTests(unittest.TestCase):
             "weak": {"iwd_shrunk": -0.03, "gih_wr_shrunk": 0.52}}}))
 
         fit = directory / "fit.json"
-        fit.write_text(json.dumps({"grand_play_rate": 0.6, "cards": {
+        fit.write_text(json.dumps({"set_id": "test", "split": "train", "fit_schema_version": 2,
+            "cache_identity": cache_identity(Cache.load(cache_path)),
+            "grand_play_rate": 0.6, "cards": {
             name: {"play_rate": 0.7, "colours": "R",
                    "by_commitment": {"0": 0.4, "1-2": 0.6, "3-5": 0.8, "6-9": 0.9, "10+": 0.95}}
             for name in ("good", "fine", "weak")}}))
@@ -315,6 +319,68 @@ class EndToEndTests(unittest.TestCase):
                              None, None, False)
         self.assertEqual(result["outcome_axis"], "raw impact")
         self.assertEqual(result["weighting"], "fixed")
+
+
+class UnknownColourTests(unittest.TestCase):
+    """Unknown and colourless were the same value, and commitment() reads
+    colourless as "playable from anywhere, count the whole pool". One deck
+    either side of MIN_DECKS_FOR_COLOUR moved a red card from "the entire blue
+    pool supports me" to "none of it does"."""
+
+    @staticmethod
+    def hits(n_red_decks, pool):
+        h = {"sparse": Counter({"R": n_red_decks})}
+        for card in pool:
+            h[card] = Counter({"U": 100})
+        return h
+
+    def test_the_discontinuity_at_the_threshold_is_gone(self):
+        pool = {f"blue{i}": 1 for i in range(8)}
+        below = card_colours(self.hits(MIN_DECKS_FOR_COLOUR - 1, pool))
+        above = card_colours(self.hits(MIN_DECKS_FOR_COLOUR, pool))
+        # Below the threshold the answer is "we do not know", not "colourless".
+        self.assertIsNone(below["sparse"])
+        self.assertEqual(above["sparse"], frozenset("R"))
+        # And unknown declines to make a colour judgement rather than claiming
+        # the whole pool, which is what the old empty frozenset did.
+        self.assertIsNone(commitment(pool, below, "sparse"))
+        self.assertEqual(commitment(pool, above, "sparse"), 0)
+
+    def test_a_genuinely_colourless_card_still_counts_the_whole_pool(self):
+        """An artifact appears in decks of every colour, so no colour clears the
+        share threshold. That empty set is a finding, not a gap."""
+        pool = {f"blue{i}": 1 for i in range(8)}
+        hits = {"artifact": Counter({"U": 40, "R": 40, "W": 40, "B": 40, "G": 40})}
+        for card in pool:
+            hits[card] = Counter({"U": 100})
+        colours = card_colours(hits)
+        self.assertEqual(colours["artifact"], frozenset())
+        self.assertEqual(commitment(pool, colours, "artifact"), 8)
+
+    def test_a_gold_card_keeps_both_colours(self):
+        """Every deck playing a WU card is a W deck and a U deck, so both shares
+        reach 1.0. No special case needed - but worth pinning, because treating
+        the most colour-demanding card in the set as colourless would be worse
+        than the bug this replaces."""
+        hits = {"gold": Counter({"WU": 50})}
+        self.assertEqual(card_colours(hits)["gold"], frozenset({"W", "U"}))
+
+    def test_a_pool_card_of_unknown_colour_does_not_count_as_matching(self):
+        """Guessing that it might share a colour would recreate the same bug one
+        level down."""
+        colours = {"card": frozenset("R"), "mystery": None, "red": frozenset("R")}
+        self.assertEqual(commitment({"mystery": 5}, colours, "card"), 0)
+        self.assertEqual(commitment({"mystery": 5, "red": 2}, colours, "card"), 2)
+
+    def test_the_three_states_survive_serialisation(self):
+        for value, mark in ((frozenset("RG"), "GR"), (frozenset(), "C"), (None, "?")):
+            with self.subTest(mark=mark):
+                self.assertEqual(colour_mark(value), mark)
+                self.assertEqual(parse_colour_mark(mark), value)
+        # A table written before this existed has no field at all; that is
+        # unknown, not colourless.
+        self.assertIsNone(parse_colour_mark(None))
+        self.assertIsNone(parse_colour_mark(""))
 
 
 class DeckScanTests(unittest.TestCase):
