@@ -17,7 +17,17 @@ jobs:
         with:
           node-version: 24
       - name: Install pinned Workers tools
-        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund wrangler@4.132.0 esbuild@0.28.2
+        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund wrangler@4.132.0 esbuild@0.28.2 neon@4.17.4
+      - name: Verify the pinned Neon deployment interface
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: |
+          node --input-type=module <<'JS'
+          import {execFileSync} from 'node:child_process';
+          import assert from 'node:assert/strict';
+          const help=execFileSync(process.env.EDGE_TOOLS_DIR+'/node_modules/.bin/neon',['functions','deploy','--help'],{encoding:'utf8'});
+          for(const flag of ['--env','--no-bundle','--wait'])assert.ok(help.includes(flag),`Missing Neon deploy flag ${flag}`);
+          JS
       - name: Test request and origin boundaries
         run: node --test tests/ingress.test.mjs
       - name: Build and test the Workers runtime

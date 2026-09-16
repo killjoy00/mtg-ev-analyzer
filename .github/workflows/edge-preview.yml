@@ -74,3 +74,10 @@ jobs:
         env:
           PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
         run: node tests/edge-live-smoke.mjs
+      - name: Remove a failed newly created preview branch
+        if: failure() && steps.neon.outputs.created == 'true'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}
