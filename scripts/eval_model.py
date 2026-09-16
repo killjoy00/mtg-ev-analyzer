@@ -58,8 +58,9 @@ def _fit_helpers():
     Bound once per model rather than looked up per call: card_tendency runs
     tens of millions of times in a sweep.
     """
-    from deck_fit import COLOURS, commit_bucket, commitment, stage_bucket  # noqa: E402
-    return COLOURS, commit_bucket, commitment, stage_bucket
+    from deck_fit import (COLOURS, commit_bucket, commitment,  # noqa: E402
+                          parse_colour_mark, stage_bucket)
+    return COLOURS, commit_bucket, commitment, stage_bucket, parse_colour_mark
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -361,13 +362,15 @@ class VariantModel(OutOfFoldModel):
         self.variant = variant
         self.pair_expected = pair_expected or {}
         self.fit = fit
-        self.fit_colours: Dict[str, frozenset] = {}
+        self.fit_colours: Dict[str, Optional[frozenset]] = {}
         if fit:
-            (colours, self._commit_bucket, self._commitment,
-             self._stage_bucket) = _fit_helpers()
+            (_colours, self._commit_bucket, self._commitment,
+             self._stage_bucket, parse_mark) = _fit_helpers()
+            # Three states survive the round trip. A card whose colours are
+            # unknown maps to None and gets no colour adjustment - previously it
+            # was read as colourless, which credited it with the whole pool.
             for name, row in fit["cards"].items():
-                letters = row.get("colours") or "C"
-                self.fit_colours[name] = frozenset(c for c in letters if c in colours)
+                self.fit_colours[name] = parse_mark(row.get("colours"))
 
     def _count(self, attr: str, key) -> int:
         return getattr(self.all, attr)[key]
@@ -393,7 +396,10 @@ class VariantModel(OutOfFoldModel):
                else (self.fit if card in self.fit["cards"] else None))
         if row is None:
             return 0.0
-        bucket = self._commit_bucket(self._commitment(dict(pool), self.fit_colours, card))
+        matched = self._commitment(dict(pool), self.fit_colours, card)
+        if matched is None:
+            return 0.0    # colours unknown: decline the judgement, do not invent one
+        bucket = self._commit_bucket(matched)
         conditioned = reference = None
         if self.variant.fit_stage_matched:
             # Commitment can never exceed the pool it is counted from, so the

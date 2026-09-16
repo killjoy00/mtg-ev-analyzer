@@ -44,7 +44,7 @@ from typing import Dict, List, Optional, Sequence, Tuple
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import logit, normalize_probabilities, open_text, stable_fold  # noqa: E402
-from deck_fit import COLOURS, commit_bucket, commitment  # noqa: E402
+from deck_fit import commit_bucket, commitment, parse_colour_mark  # noqa: E402
 from eval_model import (  # noqa: E402
     VARIANTS,
     Cache,
@@ -142,8 +142,7 @@ class OutcomeAxis:
         self.colours: Dict[str, frozenset] = {}
         if fit:
             for card, row in fit["cards"].items():
-                letters = row.get("colours") or "C"
-                self.colours[card] = frozenset(c for c in letters if c in COLOURS)
+                self.colours[card] = parse_colour_mark(row.get("colours"))
 
     @property
     def context_aware(self) -> bool:
@@ -162,8 +161,12 @@ class OutcomeAxis:
         row = self.fit["cards"].get(card)
         if row is None:
             return None
-        bucket = commit_bucket(commitment(pool, self.colours, card))
-        return row["by_commitment"].get(bucket, row["play_rate"])
+        matched = commitment(pool, self.colours, card)
+        if matched is None:
+            # Colours unknown, so no commitment level applies. The card's own
+            # overall play rate is the honest estimate; the whole pool is not.
+            return row["play_rate"]
+        return row["by_commitment"].get(commit_bucket(matched), row["play_rate"])
 
     def pair(self, card: str, pool: Dict[str, int],
              fold: int = 0) -> Optional[Tuple[float, float]]:
@@ -576,6 +579,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             raise SystemExit(
                 "observations were measured on different splits and cannot be pooled:\n"
                 + "\n".join(f"  {s}: {p}" for s, p in sorted(seen_splits.items())))
+        # Agreeing with each other is not enough. This guard originally checked
+        # only that, so a set of files all measured on test pooled cleanly while
+        # the command claimed validation and --final-test never fired: the gate
+        # was on the flag, not on the data behind it.
+        if file_split != args.split:
+            raise SystemExit(
+                f"{path} was measured on the {file_split} split, but --split says "
+                f"{args.split}.\n  Re-measure, or ask for the split these files "
+                f"actually carry.")
+        guard_test_split(file_split, args.final_test)
         for label in labels:
             combined[label].extend(tuple(row) for row in payload["observations"][label])
         entry = payload["meta"]

@@ -36,6 +36,8 @@ from eval_model import (
 from eval_model import parse_args as eval_model_args
 from pick_prediction import parse_args as pick_prediction_args
 from pick_value import parse_args as pick_value_args
+from grading_curve import parse_args as grading_curve_args
+from deck_fit import parse_args as deck_fit_args
 
 
 def example(draft_id, pack, pick, chosen, candidates, pool=None):
@@ -300,6 +302,11 @@ class VariantTests(unittest.TestCase):
         fitted.fit["cards"]["anchor"] = {"play_rate": 0.80, "colours": "U",
                                          "observations": 900,
                                          "by_commitment": {"0": 0.40, "10+": 0.95}}
+        # The colour map is derived at construction, so a card added afterwards
+        # has to be added to both. Without this the card reads as unknown and
+        # correctly gets no adjustment at all - which is the whole point of the
+        # three-state scheme, and would make this test pass for the wrong reason.
+        fitted.fit_colours["anchor"] = frozenset("U")
         base = fitted.base_tendency("anchor", 0, 0)
         self.assertLess(fitted.card_tendency("anchor", 0, 0, {}), base)
         self.assertAlmostEqual(VariantModel(counts, VARIANTS["v2"]).card_tendency("anchor", 0, 0, {}),
@@ -478,10 +485,25 @@ class SplitDisciplineTests(unittest.TestCase):
     def test_the_flag_exists_on_every_entry_point(self):
         for module, argv in ((eval_model_args, ["evaluate", "c.json"]),
                              (pick_value_args, ["--set", "a:b:c"]),
-                             (pick_prediction_args, ["--set", "a:b"])):
+                             (pick_prediction_args, ["--set", "a:b"]),
+                             (grading_curve_args, ["--pair", "a:b"]),
+                             (deck_fit_args, ["--games", "g", "--cache", "c", "--out", "o"])):
             with self.subTest(entry=module.__module__):
                 self.assertFalse(module(argv).final_test)
                 self.assertTrue(module(argv + ["--final-test"]).final_test)
+
+    def test_the_two_surfaces_an_outside_reviewer_found(self):
+        """grading_curve.py read the test split directly - missed because it
+        lives in the grading track, not the prediction track. deck_fit.py
+        defaulted to no restriction at all, which means every split including
+        test; the pipeline always passed train, so nothing was contaminated,
+        but a standalone run was one omitted flag away from it."""
+        self.assertEqual(grading_curve_args(["--pair", "a:b"]).split, "validation")
+        self.assertEqual(deck_fit_args(["--games", "g", "--cache", "c",
+                                        "--out", "o"]).split, "train")
+        # "all" stays reachable for a deliberate descriptive run, and is not test.
+        self.assertEqual(deck_fit_args(["--games", "g", "--cache", "c", "--out", "o",
+                                        "--split", "all"]).split, "all")
 
 
 class BackboneTests(unittest.TestCase):

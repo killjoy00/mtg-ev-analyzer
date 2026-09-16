@@ -44,6 +44,8 @@ from eval_model import (  # noqa: E402
     VARIANTS,
     Cache,
     VariantModel,
+    build_backbone,
+    guard_test_split,
     load_examples,
     train_counts,
 )
@@ -272,7 +274,8 @@ def run_scores(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
 
 
 def analyse_set(elite_path: Path, control_path: Path, exponents: Sequence[float],
-                cap: Optional[int], draws: int) -> dict:
+                cap: Optional[int], draws: int,
+                split: str = "validation", backbone: str = "v2") -> dict:
     elite = Cache.load(elite_path)
     control = Cache.load(control_path)
     if elite.set_id != control.set_id:
@@ -283,9 +286,13 @@ def analyse_set(elite_path: Path, control_path: Path, exponents: Sequence[float]
     if cap:
         train_ids = train_ids[:cap]
     counts, training_picks = train_counts(elite, train_ids)
-    model = VariantModel(counts, VARIANTS["v2"])
+    model = build_backbone(elite, train_ids, counts, backbone)
 
-    elite_test = elite.split_drafts("test")
+    # Was hardcoded to the test split. A curve chosen while reading test data
+    # is chosen on the final exam, exactly the hole the other three surfaces
+    # had; this one was missed because it lives in the grading track rather
+    # than the prediction track.
+    elite_test = elite.split_drafts(split)
     control_ids = control.meta["drafts"]
 
     elite_runs, elite_singles, elite_decisions = run_scores(
@@ -386,6 +393,12 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--exponents", default=",".join(str(e) for e in DEFAULT_EXPONENTS))
     parser.add_argument("--cap", type=int, default=5000,
                         help="training cap, matching production")
+    parser.add_argument("--split", default="validation", choices=["validation", "test"],
+                        help="elite held-out split to score (default: validation)")
+    parser.add_argument("--final-test", action="store_true",
+                        help="required alongside --split test")
+    parser.add_argument("--backbone", default="v2",
+                        help="behaviour model the curve is measured on")
     parser.add_argument("--bootstrap-draws", type=int, default=1000)
     parser.add_argument("--json-out")
     return parser.parse_args(argv)
@@ -393,6 +406,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
+    guard_test_split(args.split, args.final_test)
     exponents = [float(value) for value in args.exponents.split(",")]
     entries = []
     for pair in args.pair:
@@ -400,10 +414,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         if not control_path:
             raise SystemExit(f"--pair needs ELITE:CONTROL, got {pair!r}")
         entry = analyse_set(Path(elite_path), Path(control_path), exponents,
-                            args.cap, args.bootstrap_draws)
+                            args.cap, args.bootstrap_draws, args.split, args.backbone)
         entries.append(entry)
         print(f"  analysed {entry['set_id']}", file=sys.stderr, flush=True)
-    report = {"exponents": exponents, "cap": args.cap, "sets": entries}
+    report = {"exponents": exponents, "cap": args.cap, "sets": entries,
+              "split": args.split, "backbone": args.backbone}
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(render(report))
