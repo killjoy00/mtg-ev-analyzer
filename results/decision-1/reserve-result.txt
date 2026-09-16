@@ -1,0 +1,86 @@
+==============================================================================
+PACK ONE MODEL EVALUATION
+==============================================================================
+split: train 60% / validation 15% / test 25% by draft_id   bootstrap: cluster over drafts, 2000 draws
+
+--- ecl  (cap 5000, variant v2) ---
+    train 5000 drafts / 190000 picks    test 2844 drafts    distinct pairs 80063
+    all picks                n=108072  logloss=1.3183 (SE 0.0019)  brier=0.6275  top1=0.5728  MRR=0.7358
+    pack 1, picks 1-10       n=25596   logloss=1.4359 (SE 0.0033)  brier=0.6806  top1=0.5351  MRR=0.7095
+
+--- ecl  (cap 5000, variant v3-colour-and-pair) ---
+    train 5000 drafts / 190000 picks    test 2844 drafts    distinct pairs 80063
+    all picks                n=108072  logloss=1.1045 (SE 0.0022)  brier=0.5521  top1=0.5940  MRR=0.7542
+    pack 1, picks 1-10       n=25596   logloss=1.2982 (SE 0.0040)  brier=0.6279  top1=0.5516  MRR=0.7228
+
+--- fin  (cap 5000, variant v2) ---
+    train 5000 drafts / 210000 picks    test 5091 drafts    distinct pairs 125346
+    all picks                n=213822  logloss=1.3513 (SE 0.0014)  brier=0.6321  top1=0.5529  MRR=0.7197
+    pack 1, picks 1-10       n=50910   logloss=1.4500 (SE 0.0025)  brier=0.6748  top1=0.5357  MRR=0.7081
+
+--- fin  (cap 5000, variant v3-colour-and-pair) ---
+    train 5000 drafts / 210000 picks    test 5091 drafts    distinct pairs 125346
+    all picks                n=213822  logloss=1.1060 (SE 0.0016)  brier=0.5484  top1=0.6036  MRR=0.7598
+    pack 1, picks 1-10       n=50910   logloss=1.2867 (SE 0.0029)  brier=0.6139  top1=0.5727  MRR=0.7359
+
+--- ktk  (cap 5000, variant v2) ---
+    train 1538 drafts / 64259 picks    test 645 drafts    distinct pairs 60958
+    all picks                n=26966   logloss=1.3192 (SE 0.0038)  brier=0.6267  top1=0.5648  MRR=0.7338
+    pack 1, picks 1-10       n=6449    logloss=1.4046 (SE 0.0065)  brier=0.6593  top1=0.5587  MRR=0.7280
+
+--- ktk  (cap 5000, variant v3-colour-and-pair) ---
+    train 1538 drafts / 64259 picks    test 645 drafts    distinct pairs 60958
+    all picks                n=26966   logloss=1.1819 (SE 0.0043)  brier=0.5879  top1=0.5574  MRR=0.7313
+    pack 1, picks 1-10       n=6449    logloss=1.2873 (SE 0.0076)  brier=0.6194  top1=0.5621  MRR=0.7321
+
+--- mom  (cap 5000, variant v2) ---
+    train 5000 drafts / 223252 picks    test 7318 drafts    distinct pairs 118183
+    all picks                n=327082  logloss=1.3661 (SE 0.0012)  brier=0.6313  top1=0.5513  MRR=0.7172
+    pack 1, picks 1-10       n=72985   logloss=1.4709 (SE 0.0023)  brier=0.6715  top1=0.5332  MRR=0.7034
+
+--- mom  (cap 5000, variant v3-colour-and-pair) ---
+    train 5000 drafts / 223252 picks    test 7318 drafts    distinct pairs 118183
+    all picks                n=327082  logloss=1.1098 (SE 0.0013)  brier=0.5461  top1=0.5985  MRR=0.7555
+    pack 1, picks 1-10       n=72985   logloss=1.3011 (SE 0.0026)  brier=0.6140  top1=0.5639  MRR=0.7278
+
+--- powered-cube  (cap 5000, variant v2) ---
+    train 3291 drafts / 144804 picks    test 1348 drafts    distinct pairs 291048
+    all picks                n=59311   logloss=1.4763 (SE 0.0028)  brier=0.6760  top1=0.4918  MRR=0.6730
+    pack 1, picks 1-11       n=13480   logloss=1.6752 (SE 0.0045)  brier=0.7434  top1=0.4592  MRR=0.6448
+
+--- powered-cube  (cap 5000, variant v3-colour-and-pair) ---
+    train 3291 drafts / 144804 picks    test 1348 drafts    distinct pairs 291048
+    all picks                n=59311   logloss=1.3326 (SE 0.0031)  brier=0.6337  top1=0.5117  MRR=0.6920
+    pack 1, picks 1-11       n=13480   logloss=1.5672 (SE 0.0056)  brier=0.7072  top1=0.4728  MRR=0.6577
+
+--- woe  (cap 5000, variant v2) ---
+    train 5000 drafts / 206161 picks    test 5860 drafts    distinct pairs 102883
+    all picks                n=242315  logloss=1.3469 (SE 0.0013)  brier=0.6354  top1=0.5474  MRR=0.7178
+    pack 1, picks 1-10       n=58229   logloss=1.4144 (SE 0.0025)  brier=0.6617  top1=0.5404  MRR=0.7133
+
+--- woe  (cap 5000, variant v3-colour-and-pair) ---
+    train 5000 drafts / 206161 picks    test 5860 drafts    distinct pairs 102883
+    all picks                n=242315  logloss=1.0920 (SE 0.0015)  brier=0.5448  top1=0.6013  MRR=0.7598
+    pack 1, picks 1-10       n=58229   logloss=1.2592 (SE 0.0029)  brier=0.6039  top1=0.5704  MRR=0.7355
+
+PAIRED COMPARISONS (negative log loss / Brier = better; positive top-1 = better)
+set           slice                        comparison                          d(logloss)  95% CI              d(top1)  separated
+------------  ---------------------------  ----------------------------------  ----------  ------------------  -------  ---------
+ecl           all picks                    v2@5000 -> v3-colour-and-pair@5000  -0.2138     [-0.2171, -0.2107]  +0.0212  yes      
+ecl           served (pack 1, picks 1-10)  v2@5000 -> v3-colour-and-pair@5000  -0.1377     [-0.1409, -0.1345]  +0.0165  yes      
+fin           all picks                    v2@5000 -> v3-colour-and-pair@5000  -0.2453     [-0.2475, -0.2430]  +0.0507  yes      
+fin           served (pack 1, picks 1-10)  v2@5000 -> v3-colour-and-pair@5000  -0.1634     [-0.1657, -0.1611]  +0.0370  yes      
+ktk           all picks                    v2@5000 -> v3-colour-and-pair@5000  -0.1373     [-0.1423, -0.1326]  -0.0075  yes      
+ktk           served (pack 1, picks 1-10)  v2@5000 -> v3-colour-and-pair@5000  -0.1173     [-0.1225, -0.1118]  +0.0034  yes      
+mom           all picks                    v2@5000 -> v3-colour-and-pair@5000  -0.2562     [-0.2581, -0.2544]  +0.0473  yes      
+mom           served (pack 1, picks 1-10)  v2@5000 -> v3-colour-and-pair@5000  -0.1698     [-0.1719, -0.1678]  +0.0308  yes      
+powered-cube  all picks                    v2@5000 -> v3-colour-and-pair@5000  -0.1437     [-0.1473, -0.1401]  +0.0200  yes      
+powered-cube  served (pack 1, picks 1-11)  v2@5000 -> v3-colour-and-pair@5000  -0.1080     [-0.1124, -0.1036]  +0.0136  yes      
+woe           all picks                    v2@5000 -> v3-colour-and-pair@5000  -0.2549     [-0.2570, -0.2526]  +0.0539  yes      
+woe           served (pack 1, picks 1-10)  v2@5000 -> v3-colour-and-pair@5000  -0.1553     [-0.1573, -0.1531]  +0.0300  yes      
+
+DAILY-WEIGHTED HEADLINE (served slice, weighted by Daily set exposure)
+variant/cap                    logloss  brier   top1    weight
+-----------------------------  -------  ------  ------  ------
+v2 @ cap 5000                  1.4370   0.6738  0.5382  9     
+v3-colour-and-pair @ cap 5000  1.2904   0.6196  0.5609  9     

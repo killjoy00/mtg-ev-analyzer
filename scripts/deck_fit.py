@@ -36,13 +36,13 @@ import statistics
 import sys
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import Dict, FrozenSet, List, Optional, Sequence, Set, Tuple
+from typing import Dict, FrozenSet, List, Mapping, Optional, Sequence, Set, Tuple
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import open_text  # noqa: E402
 from card_outcomes import count_of  # noqa: E402
-from eval_model import Cache, draft_split  # noqa: E402
+from eval_model import Cache, cache_identity, draft_split, guard_test_split  # noqa: E402
 
 COLOURS = ("W", "U", "B", "R", "G")
 # A card counts as belonging to a colour when it is almost never played outside
@@ -63,6 +63,30 @@ STAGE_BUCKETS = ((0, 0, "s0"), (1, 2, "s1-2"), (3, 5, "s3-5"), (6, 9, "s6-9"),
 # Below this many picks a (stage, commitment) cell is not reported at all; the
 # consumer falls back to the marginal curve rather than to a noisy cell.
 MIN_STAGE_CELL = 200
+# Distinguishes "this card is not in the table" from "this card is in the table
+# with unknown colours". Both decline the colour judgement, but conflating them
+# with frozenset() is the bug this whole three-state scheme exists to prevent.
+MISSING = object()
+# What the serialised table writes for each of the three states.
+COLOURLESS_MARK, UNKNOWN_MARK = "C", "?"
+
+
+def colour_mark(value) -> str:
+    """Serialise one of the three colour states. Unknown must not read as 'C'."""
+    if value is MISSING or value is None:
+        return UNKNOWN_MARK
+    return "".join(sorted(value)) or COLOURLESS_MARK
+
+
+def parse_colour_mark(mark: Optional[str]) -> Optional[FrozenSet[str]]:
+    """Read a serialised table back into the three states."""
+    if not mark or mark == UNKNOWN_MARK:
+        return None
+    if mark == COLOURLESS_MARK:
+        return frozenset()
+    if any(c not in COLOURS for c in mark):
+        return None
+    return frozenset(c for c in mark if c in COLOURS)
 
 
 def _bucket(buckets, count: int) -> str:
@@ -135,13 +159,32 @@ def scan_decks(archive: Path, keep: Optional[Set[str]] = None
     return dict(played), dict(colour_hits)
 
 
-def card_colours(colour_hits: Dict[str, Counter]) -> Dict[str, FrozenSet[str]]:
-    """A card's colours, inferred from the decks that played it."""
-    result: Dict[str, FrozenSet[str]] = {}
+def card_colours(colour_hits: Dict[str, Counter]) -> Dict[str, Optional[FrozenSet[str]]]:
+    """A card's colours, inferred from the decks that played it.
+
+    THREE states, not two. This returned an empty frozenset both for a card that
+    is genuinely colourless and for a card with too little evidence to say - and
+    commitment() reads empty as "playable from anywhere, count the whole pool".
+    One deck either side of the threshold therefore moved a red card from "the
+    entire blue pool supports me" to "none of it does", and it did so exactly
+    where the evidence was thinnest. On a new set, where most cards sit under
+    the threshold, nearly every card took the wrong branch.
+
+      frozenset({...})  known colours
+      frozenset()       known to be colourless - an artifact or land appears in
+                        decks of every colour, so no colour clears the share
+                        threshold. This is a real finding, not a missing one.
+      None              unknown; too few decks to say anything
+
+    Gold cards are handled correctly by the share rule and need no special case:
+    every deck playing a WU card is a W deck and a U deck, so both shares reach
+    1.0 and both clear the threshold.
+    """
+    result: Dict[str, Optional[FrozenSet[str]]] = {}
     for card, counter in colour_hits.items():
         total = sum(counter.values())
         if total < MIN_DECKS_FOR_COLOUR:
-            result[card] = frozenset()
+            result[card] = None
             continue
         share = {colour: sum(count for main, count in counter.items() if colour in main) / total
                  for colour in COLOURS}
@@ -153,19 +196,28 @@ def card_colours(colour_hits: Dict[str, Counter]) -> Dict[str, FrozenSet[str]]:
 # pass 3: commitment at each pick, joined to whether the card was played
 # --------------------------------------------------------------------------
 
-def commitment(pool: Dict[str, int], colours: Dict[str, FrozenSet[str]],
-               card: str) -> int:
-    """How many pool cards share a colour with this card.
+def commitment(pool: Dict[str, int], colours: Mapping[str, Optional[FrozenSet[str]]],
+               card: str) -> Optional[int]:
+    """How many pool cards share a colour with this card, or None if unknown.
 
-    A colourless card is playable from any pool, so it is credited with the
-    whole pool rather than with nothing.
+    A genuinely colourless card is playable from any pool, so it is credited
+    with the whole pool. A card whose colours we could not determine gets None,
+    and every caller must then decline to make a colour judgement rather than
+    invent one - absence of evidence produces absence of adjustment.
+
+    A pool card of unknown colour likewise contributes nothing to the match: it
+    might share a colour, and guessing that it does would recreate the same bug
+    one level down.
     """
-    wanted = colours.get(card) or frozenset()
+    wanted = colours.get(card, MISSING)
+    if wanted is MISSING or wanted is None:
+        return None
     if not wanted:
         return sum(pool.values())
     total = 0
     for pool_card, count in pool.items():
-        if colours.get(pool_card, frozenset()) & wanted:
+        known = colours.get(pool_card)
+        if known and known & wanted:
             total += count
     return total
 
@@ -190,9 +242,15 @@ def observe(cache: Cache, played: Dict[str, set], colours: Dict[str, FrozenSet[s
             continue
         card = example.historical_pick
         flag = 1 if card in deck else 0
-        commit = commit_bucket(commitment(example.pool, colours, card))
-        by_bucket[(card, commit)].append(flag)
         by_card[card].append(flag)
+        matched = commitment(example.pool, colours, card)
+        if matched is None:
+            # Unknown colours: the pick still counts toward the card's overall
+            # play rate, but it cannot be filed under a commitment level without
+            # inventing one.
+            continue
+        commit = commit_bucket(matched)
+        by_bucket[(card, commit)].append(flag)
         # Card identity dropped: this is the format's curve, cut by how far into
         # the draft the pick was. "*" is the whole stage, whatever the colours.
         stage = stage_bucket(sum(example.pool.values()))
@@ -219,7 +277,7 @@ def estimate(by_bucket, by_card, colours, by_stage=None) -> dict:
         rows[card] = {
             "play_rate": round(base, 5),
             "observations": len(flags),
-            "colours": "".join(sorted(colours.get(card, frozenset()))) or "C",
+            "colours": colour_mark(colours.get(card, MISSING)),
             "by_commitment": buckets,
         }
 
@@ -263,16 +321,20 @@ def estimate(by_bucket, by_card, colours, by_stage=None) -> dict:
 
 def run(args: argparse.Namespace) -> int:
     cache = Cache.load(Path(args.cache))
-    keep = set(cache.split_drafts(args.split)) if args.split else None
+    guard_test_split(args.split, args.final_test)
+    split = None if args.split == "all" else args.split
+    keep = set(cache.split_drafts(split)) if split else None
     played, colour_hits = scan_decks(Path(args.games), keep)
     colours = card_colours(colour_hits)
-    by_bucket, by_card, by_stage = observe(cache, played, colours, args.split)
+    by_bucket, by_card, by_stage = observe(cache, played, colours, split)
     if not by_card:
         raise SystemExit("No drafts in the cache matched the game data. Same set?")
     summary = estimate(by_bucket, by_card, colours, by_stage)
     summary["set_id"] = cache.set_id
     summary["drafts_with_decks"] = len(played)
-    summary["split"] = args.split or "all"
+    summary["split"] = split or "all"
+    summary["fit_schema_version"] = 2
+    summary["cache_identity"] = cache_identity(cache)
     summary["matched_drafts"] = len({d for d, _ in cache.examples() if d in played})
     Path(args.out).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
@@ -300,9 +362,17 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--games", required=True, help="game_data_public.<SET>.PremierDraft.csv.gz")
     parser.add_argument("--cache", required=True, help="a draft cache from eval_model.py extract")
-    parser.add_argument("--split", choices=["train", "validation", "test"],
-                        help="restrict to one split of the cache; use train so the "
-                             "estimate never sees a draft the value model is scored on")
+    # Defaulted to no restriction, which means every split including test. The
+    # pipeline always passed train, so nothing was actually contaminated - but a
+    # standalone invocation was one omitted flag away from building a table out
+    # of the data the model is later scored on. Train is the only sane default;
+    # "all" stays reachable for a deliberate descriptive run.
+    parser.add_argument("--split", default="train",
+                        choices=["train", "validation", "test", "all"],
+                        help="restrict to one split of the cache (default: train, so "
+                             "the estimate never sees a draft the model is scored on)")
+    parser.add_argument("--final-test", action="store_true",
+                        help="required alongside --split test")
     parser.add_argument("--out", required=True)
     return parser.parse_args(argv)
 

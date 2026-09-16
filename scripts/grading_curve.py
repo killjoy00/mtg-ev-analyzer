@@ -44,7 +44,10 @@ from eval_model import (  # noqa: E402
     VARIANTS,
     Cache,
     VariantModel,
+    build_backbone,
+    guard_test_split,
     load_examples,
+    load_training_fit,
     train_counts,
 )
 
@@ -174,7 +177,7 @@ def interval(values: Sequence[float], places: int = 3) -> List[float]:
 # average pick position, straight from the archive
 # --------------------------------------------------------------------------
 
-def average_taken_at(caches: Sequence[Cache], minimum: int = 40) -> Dict[str, float]:
+def average_taken_at(caches: Sequence[Cache], minimum: int = 40, split: str = "train") -> Dict[str, float]:
     """Mean pick number at which each card was taken, over every cached drafter.
 
     This is the drafting population's own valuation of a card. It is computed
@@ -185,7 +188,10 @@ def average_taken_at(caches: Sequence[Cache], minimum: int = 40) -> Dict[str, fl
     for cache in caches:
         pick_offset = cache.meta["pick_offset"]
         pack_offset = cache.meta["pack_offset"]
-        for _, example in cache.examples():
+        wanted = set(cache.split_drafts(split))
+        for draft_id, example in cache.examples():
+            if draft_id not in wanted:
+                continue
             if example.raw_pack_number + pack_offset != 1:
                 continue
             taken[example.historical_pick].append(example.raw_pick_number + pick_offset)
@@ -272,7 +278,9 @@ def run_scores(model: VariantModel, cache: Cache, draft_ids: Sequence[str],
 
 
 def analyse_set(elite_path: Path, control_path: Path, exponents: Sequence[float],
-                cap: Optional[int], draws: int) -> dict:
+                cap: Optional[int], draws: int,
+                split: str = "validation", backbone: str = "v2",
+                fit_path: Optional[Path] = None) -> dict:
     elite = Cache.load(elite_path)
     control = Cache.load(control_path)
     if elite.set_id != control.set_id:
@@ -283,10 +291,15 @@ def analyse_set(elite_path: Path, control_path: Path, exponents: Sequence[float]
     if cap:
         train_ids = train_ids[:cap]
     counts, training_picks = train_counts(elite, train_ids)
-    model = VariantModel(counts, VARIANTS["v2"])
+    fit = load_training_fit(fit_path, elite) if fit_path else None
+    model = build_backbone(elite, train_ids, counts, backbone, fit)
 
-    elite_test = elite.split_drafts("test")
-    control_ids = control.meta["drafts"]
+    # Was hardcoded to the test split. A curve chosen while reading test data
+    # is chosen on the final exam, exactly the hole the other three surfaces
+    # had; this one was missed because it lives in the grading track rather
+    # than the prediction track.
+    elite_test = elite.split_drafts(split)
+    control_ids = control.split_drafts(split)
 
     elite_runs, elite_singles, elite_decisions = run_scores(
         model, elite, elite_test, exponents, max_pick)
@@ -386,6 +399,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--exponents", default=",".join(str(e) for e in DEFAULT_EXPONENTS))
     parser.add_argument("--cap", type=int, default=5000,
                         help="training cap, matching production")
+    parser.add_argument("--split", default="validation", choices=["validation", "test"],
+                        help="elite held-out split to score (default: validation)")
+    parser.add_argument("--final-test", action="store_true",
+                        help="required alongside --split test")
+    parser.add_argument("--backbone", default="v2",
+                        help="behaviour model the curve is measured on")
+    parser.add_argument("--deck-fit-dir", type=Path,
+                        help="train-only colour tables for the selected backbone")
     parser.add_argument("--bootstrap-draws", type=int, default=1000)
     parser.add_argument("--json-out")
     return parser.parse_args(argv)
@@ -393,17 +414,21 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
     args = parse_args(argv)
+    guard_test_split(args.split, args.final_test)
     exponents = [float(value) for value in args.exponents.split(",")]
     entries = []
     for pair in args.pair:
         elite_path, _, control_path = pair.partition(":")
         if not control_path:
             raise SystemExit(f"--pair needs ELITE:CONTROL, got {pair!r}")
+        fit_path = (args.deck_fit_dir / f"{Cache.load(Path(elite_path)).set_id}.json"
+                    if args.deck_fit_dir else None)
         entry = analyse_set(Path(elite_path), Path(control_path), exponents,
-                            args.cap, args.bootstrap_draws)
+                            args.cap, args.bootstrap_draws, args.split, args.backbone, fit_path)
         entries.append(entry)
         print(f"  analysed {entry['set_id']}", file=sys.stderr, flush=True)
-    report = {"exponents": exponents, "cap": args.cap, "sets": entries}
+    report = {"exponents": exponents, "cap": args.cap, "sets": entries,
+              "split": args.split, "backbone": args.backbone}
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(render(report))
