@@ -18,6 +18,11 @@ export const SUPPORT_SHARPENING = 2;
 // what it has always been:  (p_a^T / p_b^T)^(1/T) === p_a / p_b. Honest numbers
 // on screen, and not one point of anyone's score moves. A test pins this.
 export const SCORE_EXPONENT = 1 / SUPPORT_SHARPENING;
+// Stays at v6 until a v7 corpus exists. The version is hashed into every
+// puzzle id, so declaring v7 while only v6 rows are stored makes every
+// published puzzle fail verification - the guard firing exactly as intended.
+// Bumping is the LAST step of the v3 rollout, not the first: regenerate at the
+// new version, load the rows, then bump so the app serves them.
 export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-verified-v6';
 export const POWERED_CUBE_ENVIRONMENT = 'powered-cube';
 

@@ -59,9 +59,12 @@ class FullTrophyTests(unittest.TestCase):
             with gzip.open(p,'wt',newline='') as f:
                 w=csv.writer(f);w.writerow(header)
                 w.writerow(['training',0,0,'A',1,1,1,1,0]);w.writerow(['trophy',0,0,'B',1,1,1,1,0])
-            counts,folds,output,invalid,n=collect(p,{'training'},{'trophy'},header)
+            counts,folds,output,invalid,n,colour=collect(p,{'training'},{'trophy'},header)
             self.assertEqual(n,1);self.assertEqual(set(output),{'trophy'})
             self.assertEqual(output['trophy'][0].historical_pick,'B')
+            # The colour table may learn from the training draft but never from
+            # the trophy, which is the puzzle this build will serve.
+            self.assertEqual({did for did,_ in colour},{'training'})
 
     def test_discovery_does_not_depend_on_local_catalog(self):
         def record(exp,fmt,link=True):
@@ -80,7 +83,8 @@ class FullTrophyTests(unittest.TestCase):
             with gzip.open(p,'wt',newline='') as f:
                 w=csv.writer(f);w.writerow(header)
                 for pack in (0,1,2):w.writerow(['trophy',pack,0,'A',1,1,1,1,0])
-            *_,output,invalid,n=collect(p,set(),{'trophy'},header)
+            *_,output,invalid,n,colour=collect(p,set(),{'trophy'},header)
+            self.assertEqual(colour,[])
             self.assertEqual(len(output['trophy']),1)
             self.assertEqual(output['trophy'][0].raw_pack_number,0)
 
