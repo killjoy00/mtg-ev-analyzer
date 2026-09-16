@@ -2,6 +2,54 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "hbg",
+      "name": "HBG",
+      "format": "PremierDraft",
+      "manifest_path": "./data/hbg/manifest.json",
+      "replay_count": 295,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2022-07-29",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.62,
+      "training_drafts": 3048
+    },
+    {
+      "id": "tmt",
+      "name": "TMT",
+      "format": "PremierDraft",
+      "manifest_path": "./data/tmt/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2026-04-08",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.62,
+      "training_drafts": 3126
+    },
+    {
+      "id": "dsk",
+      "name": "DSK",
+      "format": "PremierDraft",
+      "manifest_path": "./data/dsk/manifest.json",
+      "replay_count": 299,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2024-10-30",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "woe",
+      "name": "WOE",
+      "format": "PremierDraft",
+      "manifest_path": "./data/woe/manifest.json",
+      "replay_count": 296,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2023-10-18",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
       "id": "dmu",
       "name": "DMU",
       "format": "PremierDraft",
@@ -116,18 +164,6 @@
       "training_drafts": 5000
     },
     {
-      "id": "hbg",
-      "name": "HBG",
-      "format": "PremierDraft",
-      "manifest_path": "./data/hbg/manifest.json",
-      "replay_count": 295,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2022-07-29",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.62,
-      "training_drafts": 3048
-    },
-    {
       "id": "bro",
       "name": "BRO",
       "format": "PremierDraft",
@@ -171,18 +207,6 @@
       "replay_count": 299,
       "model_version": "strong-player-pool-context-v2",
       "data_date": "2023-08-30",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
-      "id": "woe",
-      "name": "WOE",
-      "format": "PremierDraft",
-      "manifest_path": "./data/woe/manifest.json",
-      "replay_count": 296,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2023-10-18",
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
       "training_drafts": 5000
@@ -243,18 +267,6 @@
       "replay_count": 300,
       "model_version": "strong-player-pool-context-v2",
       "data_date": "2026-06-05",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
-      "id": "dsk",
-      "name": "DSK",
-      "format": "PremierDraft",
-      "manifest_path": "./data/dsk/manifest.json",
-      "replay_count": 299,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2024-10-30",
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
       "training_drafts": 5000
@@ -366,18 +378,6 @@
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
       "training_drafts": 5000
-    },
-    {
-      "id": "tmt",
-      "name": "TMT",
-      "format": "PremierDraft",
-      "manifest_path": "./data/tmt/manifest.json",
-      "replay_count": 300,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2026-04-08",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.62,
-      "training_drafts": 3126
     },
     {
       "id": "ecl",
