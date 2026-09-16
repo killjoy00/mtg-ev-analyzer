@@ -13,9 +13,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_replays import CountStore, DraftSkill, OutOfFoldModel, PickExample, logit
 from eval_model import (
     VARIANTS,
+    award,
     behaviour_support,
     build_backbone,
+    fit_temperature,
     guard_test_split,
+    js_round,
+    normalize_probabilities,
+    sharpen,
     evidence_bucket,
     Accumulator,
     Cache,
@@ -557,6 +562,54 @@ class EvidenceBucketTests(unittest.TestCase):
         self.assertEqual(behaviour_support(model, "thick", 0, 0), 40)
         self.assertEqual(behaviour_support(model, "thick", 0, 9),
                          model._count("global_seen", "thick"))
+
+
+class AwardTests(unittest.TestCase):
+    """Log loss says a model ranks better. It does not say what happens to the
+    points in a player's run, and those are different questions."""
+
+    def test_the_award_is_the_production_formula(self):
+        self.assertEqual(award([0.5, 0.25, 0.25], 0), 95)      # leader
+        self.assertEqual(award([0.5, 0.25, 0.25], 1), 48)      # round(95 * 0.5)
+        self.assertEqual(award([0.0, 0.0, 0.0], 0), 0)         # degenerate pack
+
+    def test_half_points_round_the_way_production_rounds(self):
+        """95 x 0.7 is 66.5. Python's banker's rounding says 66 and JavaScript
+        says 67 - a one-point gap in a comparison built to count one-point gaps."""
+        self.assertEqual(js_round(66.5), 67)
+        self.assertEqual(js_round(-0.5), 0)
+        self.assertEqual(award([1.0, 0.7], 1), 67)
+
+    def test_the_display_exponent_cannot_move_a_single_point(self):
+        """Calibration raises supports to T and scoring raises the ratio to 1/T,
+        so T cancels exactly. This is what makes the display change display-only
+        - and it means refitting T for a new model is not a scoring risk. What
+        moves points is the model changing the underlying probabilities."""
+        raw = [0.52, 0.21, 0.15, 0.07, 0.05]
+        for temperature in (1.0, 1.5, 2.0, 2.25, 3.0):
+            sharpened = normalize_probabilities(sharpen(
+                {i: v for i, v in enumerate(raw)}, temperature))
+            calibrated = [sharpened[i] for i in range(len(raw))]
+            for index in range(len(raw)):
+                ratio = calibrated[index] / max(calibrated)
+                with self.subTest(temperature=temperature, index=index):
+                    self.assertEqual(js_round(95 * ratio ** (1 / temperature)),
+                                     award(raw, index))
+
+    def test_a_sharper_model_awards_less_partial_credit(self):
+        """The direction that matters for the product: a more confident model
+        puts less probability on the alternatives, so the ratio to the leader
+        shrinks and partial credit falls - without anyone changing the formula."""
+        flat, sharp = [0.4, 0.3, 0.3], [0.8, 0.1, 0.1]
+        self.assertGreater(award(flat, 1), award(sharp, 1))
+
+    def test_the_fitted_exponent_is_the_one_that_calibrates_best(self):
+        # A stream where the top card is taken far more often than a flat
+        # normalisation claims, so sharpening should be preferred to not.
+        pairs = [([0.4, 0.3, 0.3], 0)] * 90 + [([0.4, 0.3, 0.3], 1)] * 10
+        fitted, loss = fit_temperature(pairs, [1.0, 2.0, 4.0, 8.0])
+        self.assertGreater(fitted, 1.0)
+        self.assertGreater(loss, 0.0)
 
 
 class BootstrapTests(unittest.TestCase):

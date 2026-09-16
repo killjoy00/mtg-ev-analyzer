@@ -95,7 +95,7 @@ def value_vector(model: VariantModel, example, outcome: OutcomeAxis,
 def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Path],
               combos: Sequence[Tuple[float, float]], cap: Optional[int],
               adaptive: bool, split: str = "validation",
-              backbone: str = "v2") -> dict:
+              backbone: str = "v2", served_only: bool = True) -> dict:
     cache = Cache.load(cache_path)
     payload = json.loads(outcomes_path.read_text(encoding="utf-8"))
 
@@ -125,10 +125,19 @@ def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Pat
     # means every lambda and weight was chosen with the test split in view, and
     # no later run can undo that.
     held_out = cache.split_drafts(split)
+    # The game only ever serves pack 1. Scoring all 42 positions of a draft
+    # answers a question nobody is asking, and weights the late picks - where
+    # pools are largest and the context term has most to say - far above the
+    # ones a player will actually see.
+    pack_offset, pick_offset = cache.meta["pack_offset"], cache.meta["pick_offset"]
+    served_max = 11 if cache.set_id == "powered-cube" else 10
     hits: Dict[str, int] = defaultdict(int)
     ranks: Dict[str, int] = defaultdict(int)
     scored = 0
     for example in load_examples(cache, held_out):
+        if served_only and not (example.raw_pack_number + pack_offset == 1
+                                and example.raw_pick_number + pick_offset <= served_max):
+            continue
         fold = stable_fold(example.draft_id, outcome.folds) if outcome.cross_fitted else 0
         vectors = value_vector(model, example, outcome, combos, adaptive, fold)
         if vectors is None:
@@ -146,6 +155,7 @@ def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Pat
         "set_id": cache.set_id,
         "split": split,
         "backbone": backbone,
+        "slice": "served (pack 1)" if served_only else "all picks",
         "decisions": scored,
         "top1": {label: hits[label] / scored for label in hits} if scored else {},
         "mean_rank": {label: ranks[label] / scored for label in ranks} if scored else {},
@@ -160,7 +170,8 @@ def render(report: dict) -> str:
            "signal that still improves top-1 here is carrying real pick information",
            "rather than sharing units with the match-wins criterion.",
            f"Sets: {len(report['sets'])}   decisions: {report['decisions']}"
-           f"   split: {report['split']}   backbone: {report['backbone']}",
+           f"   split: {report['split']}   backbone: {report['backbone']}\n"
+           f"Slice: {report['slice']}",
            ""]
     rows = report["pooled"]
     baseline = rows[0]
@@ -189,6 +200,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                              "pass test only for a frozen specification)")
     parser.add_argument("--final-test", action="store_true",
                         help="required alongside --split test; exists only to make\n                             reading the test split a deliberate act")
+    parser.add_argument("--all-picks", action="store_true",
+                        help="score every draft position instead of only the served "
+                             "slice (pack 1, picks 1-10; 11 for Cube)")
     parser.add_argument("--adaptive", action="store_true")
     parser.add_argument("--json-out")
     return parser.parse_args(argv)
@@ -208,7 +222,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             raise SystemExit(f"--set needs CACHE:OUTCOMES[:DECK_FIT], got {spec!r}")
         entry = score_set(Path(parts[0]), Path(parts[1]),
                           Path(parts[2]) if len(parts) == 3 else None,
-                          combos, args.cap, args.adaptive, args.split, args.backbone)
+                          combos, args.cap, args.adaptive, args.split, args.backbone,
+                          not args.all_picks)
         entries.append(entry)
         print(f"  scored {entry['set_id']}: {entry['decisions']} decisions",
               file=sys.stderr, flush=True)
@@ -224,7 +239,8 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                              for e in entries) / total,
         })
     report = {"sets": entries, "decisions": total, "pooled": pooled,
-              "split": args.split, "backbone": args.backbone}
+              "split": args.split, "backbone": args.backbone,
+              "slice": "all picks" if args.all_picks else "served (pack 1)"}
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(render(report))

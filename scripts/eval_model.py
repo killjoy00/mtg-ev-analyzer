@@ -1157,6 +1157,179 @@ def run_evaluate(args: argparse.Namespace) -> int:
     return 0
 
 
+
+# --------------------------------------------------------------------------
+# what a model change does to the points a player is awarded
+# --------------------------------------------------------------------------
+
+SCORE_CAP = 95
+
+
+def js_round(value: float) -> int:
+    """Math.round's half-up, which Python's banker's rounding does not match.
+
+    95 x 0.7 is 66.5: Python says 66, production says 67. A one-point gap in a
+    comparison whose whole purpose is counting one-point gaps.
+    """
+    return math.floor(value + 0.5)
+
+
+def award(probabilities: Sequence[float], index: int) -> int:
+    """The points production would give for taking candidate `index`.
+
+    Scoring uses the calibrated supports raised to 1/T, and calibration raises
+    them to T, so T cancels exactly: the award is 95 x (p_selected / p_leader)
+    whatever the display exponent is. That is what makes the calibration change
+    display-only - and also why refitting T CANNOT move a single point. What
+    moves points is the model changing p, which is what this measures.
+    """
+    leader = max(probabilities)
+    if leader <= 0:
+        return 0
+    return js_round(SCORE_CAP * max(0.0, min(1.0, probabilities[index] / leader)))
+
+
+def fit_temperature(pairs: Sequence[Tuple[Sequence[float], int]],
+                    grid: Sequence[float]) -> Tuple[float, float]:
+    """The display exponent that best calibrates THIS model, on this split.
+
+    Exponent 2 was fitted on v2's supports. A different model produces different
+    supports, so the old value does not transfer and assuming it does would put
+    a number on screen that no longer means what it says.
+    """
+    best, best_loss = grid[0], float("inf")
+    for temperature in grid:
+        total = 0.0
+        for raw, chosen in pairs:
+            normalised = normalize_probabilities(sharpen(
+                {index: value for index, value in enumerate(raw)}, temperature))
+            total += -math.log(max(normalised[chosen], 1e-12))
+        if total < best_loss:
+            best, best_loss = temperature, total
+    return best, best_loss / max(1, len(pairs))
+
+
+def run_awards(args: argparse.Namespace) -> int:
+    """Three comparisons the prediction table cannot make, reported apart.
+
+    Log loss says a model ranks better. It does not say what happens to the
+    number on a player's screen, and it does not say what happens to the points
+    in their run. Those are different questions and they get different tables.
+    """
+    guard_test_split(args.split, args.final_test)
+    fit_dir = Path(args.deck_fit_dir) if args.deck_fit_dir else None
+    grid = [float(v) for v in args.temperature_grid.split(",")]
+    names = [args.baseline, args.candidate]
+
+    deltas: Counter = Counter()
+    moved_20 = harsher = gentler = same = 0
+    per_model_pairs: Dict[str, List[Tuple[Sequence[float], int]]] = {n: [] for n in names}
+    trophy_delta: List[int] = []
+    decisions = 0
+
+    for cache_path in args.caches:
+        cache = Cache.load(Path(cache_path))
+        fit = None
+        if fit_dir and (fit_dir / f"{cache.set_id}.json").exists():
+            fit = json.loads((fit_dir / f"{cache.set_id}.json").read_text(encoding="utf-8"))
+        train_ids = cap_prefix(cache.split_drafts("train"), args.cap)
+        counts, _ = train_counts(cache, train_ids)
+        models = {n: build_backbone(cache, train_ids, counts, n, fit) for n in names}
+        pack_offset, pick_offset = cache.meta["pack_offset"], cache.meta["pick_offset"]
+        served_max = 11 if cache.set_id == "powered-cube" else 10
+
+        held = cap_prefix(cache.split_drafts(args.split), args.max_test_drafts)
+        for example in load_examples(cache, held):
+            if not (example.raw_pack_number + pack_offset == 1
+                    and example.raw_pick_number + pick_offset <= served_max):
+                continue
+            vectors = {}
+            for name in names:
+                raw = {card: models[name].card_tendency(
+                    card, example.raw_pack_number, example.raw_pick_number, example.pool)
+                    for card in example.candidates}
+                normalised = normalize_probabilities(raw)
+                vectors[name] = [normalised[card] for card in example.candidates]
+            chosen = example.candidates.index(example.historical_pick)
+            for name in names:
+                per_model_pairs[name].append((vectors[name], chosen))
+            decisions += 1
+            # Every candidate, not only the one taken: a player may pick any of
+            # them, so the award distribution over the whole pack is what moves.
+            for index in range(len(example.candidates)):
+                change = award(vectors[names[1]], index) - award(vectors[names[0]], index)
+                deltas[change] += 1
+                if abs(change) >= 20:
+                    moved_20 += 1
+                if change < 0:
+                    harsher += 1
+                elif change > 0:
+                    gentler += 1
+                else:
+                    same += 1
+            trophy_delta.append(award(vectors[names[1]], chosen)
+                                - award(vectors[names[0]], chosen))
+        print(f"  {cache.set_id}: {decisions} served decisions so far",
+              file=sys.stderr, flush=True)
+
+    temperatures = {n: fit_temperature(per_model_pairs[n], grid) for n in names}
+    total_awards = sum(deltas.values())
+    ordered = sorted(trophy_delta)
+    report = {
+        "split": args.split, "slice": "served (pack 1)",
+        "baseline": names[0], "candidate": names[1],
+        "decisions": decisions, "awards_compared": total_awards,
+        "display_temperature": {n: {"fitted": t, "log_loss": round(l, 5)}
+                                for n, (t, l) in temperatures.items()},
+        "award_change": {
+            "mean": round(sum(k * v for k, v in deltas.items()) / max(1, total_awards), 3),
+            "unchanged_share": round(same / max(1, total_awards), 4),
+            "harsher_share": round(harsher / max(1, total_awards), 4),
+            "gentler_share": round(gentler / max(1, total_awards), 4),
+            "moved_20_or_more_share": round(moved_20 / max(1, total_awards), 4),
+        },
+        "trophy_pick_award_change": {
+            "mean": round(sum(trophy_delta) / max(1, len(trophy_delta)), 3),
+            "median": ordered[len(ordered) // 2] if ordered else 0,
+            "p05": ordered[int(0.05 * len(ordered))] if ordered else 0,
+            "p95": ordered[int(0.95 * len(ordered))] if ordered else 0,
+        },
+    }
+    if args.json_out:
+        Path(args.json_out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
+    print(render_awards(report))
+    return 0
+
+
+def render_awards(report: dict) -> str:
+    out = ["=" * 74,
+           "WHAT THE MODEL CHANGE DOES TO POINTS AND TO THE DISPLAYED NUMBER",
+           "=" * 74,
+           f"{report['baseline']} -> {report['candidate']}   split: {report['split']}"
+           f"   slice: {report['slice']}",
+           f"served decisions {report['decisions']:,}   "
+           f"candidate awards compared {report['awards_compared']:,}", "",
+           "1. DISPLAY EXPONENT, fitted separately per model on this split.",
+           "   Production ships 2, fitted on the baseline's supports. It does not",
+           "   transfer automatically - but note it cannot move points either way,",
+           "   because scoring raises the ratio to its reciprocal.",
+           ""]
+    for name, row in report["display_temperature"].items():
+        out.append(f"     {name:<22} fitted T = {row['fitted']:<6g} log loss {row['log_loss']:.4f}")
+    change = report["award_change"]
+    out += ["", "2. POINTS, over every candidate in every served pack.",
+            f"     mean change          {change['mean']:+.2f}",
+            f"     unchanged            {change['unchanged_share']:.1%}",
+            f"     harsher              {change['harsher_share']:.1%}",
+            f"     more generous        {change['gentler_share']:.1%}",
+            f"     moved 20+ points     {change['moved_20_or_more_share']:.1%}", ""]
+    trophy = report["trophy_pick_award_change"]
+    out += ["3. POINTS for the card the strong player actually took.",
+            f"     mean {trophy['mean']:+.2f}   median {trophy['median']:+d}"
+            f"   5th pct {trophy['p05']:+d}   95th pct {trophy['p95']:+d}"]
+    return "\n".join(out)
+
+
 def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
@@ -1200,6 +1373,22 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     evaluate_parser.add_argument("--bootstrap-draws", type=int, default=2000)
     evaluate_parser.add_argument("--json-out")
     evaluate_parser.set_defaults(func=run_evaluate)
+
+    awards_parser = sub.add_parser(
+        "awards", help="What a model change does to points and to the displayed number")
+    awards_parser.add_argument("caches", nargs="+")
+    awards_parser.add_argument("--baseline", default="v2")
+    awards_parser.add_argument("--candidate", default="v3-colour-and-pair")
+    awards_parser.add_argument("--deck-fit-dir")
+    awards_parser.add_argument("--cap", type=int, default=5000)
+    awards_parser.add_argument("--max-test-drafts", type=int)
+    awards_parser.add_argument("--temperature-grid",
+                               default="1.0,1.25,1.5,1.75,2.0,2.25,2.5,3.0")
+    awards_parser.add_argument("--split", default="validation",
+                               choices=["validation", "test"])
+    awards_parser.add_argument("--final-test", action="store_true")
+    awards_parser.add_argument("--json-out")
+    awards_parser.set_defaults(func=run_awards)
     return parser.parse_args(argv)
 
 
