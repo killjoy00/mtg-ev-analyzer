@@ -1,6 +1,7 @@
 import csv
 import gzip
 import io
+import re
 import sys
 import tarfile
 import tempfile
@@ -158,6 +159,27 @@ class CorpusVersionTests(unittest.TestCase):
                         and 'corpus_version' not in line:
                     stale.append(f'{path.relative_to(root)}: {line.strip()[:90]}')
         self.assertEqual(stale, [], 'stale corpus version literal(s) found')
+
+    def test_no_script_writes_or_guards_a_model_version_from_a_literal(self):
+        """The same failure as the corpus version, one layer down. Two live
+        scripts held 'strong-player-pool-context-v2' as a literal: the importer
+        stamped it into every manifest it wrote, so a v3 import would have
+        claimed v2, and the legacy backfill raised on any manifest that did not
+        match it, so the first legitimate model change broke that workflow
+        outright. Both were found by reading, not by a failing test."""
+        root = Path(__file__).resolve().parents[1]
+        offenders = []
+        for path in list(root.glob('scripts/*.py')) + list(root.glob('*.mjs')) \
+                + list(root.glob('worker/*.mjs')):
+            if str(path.relative_to(root)) in self.SUPERSEDED_BUILDERS:
+                continue
+            for number, line in enumerate(path.read_text(encoding='utf-8',
+                                                         errors='ignore').splitlines(), 1):
+                # Lowercase: MODEL_VERSION is the constant's own definition.
+                if 'model_version' in line and re.search(r"['\"]strong-player-[a-z0-9-]+['\"]", line):
+                    offenders.append(f'{path.relative_to(root)}:{number}: {line.strip()[:90]}')
+        self.assertEqual(offenders, [],
+                         'model version literal(s) found; import the builder constant instead')
 
     def test_the_exempt_builders_really_are_wired_to_nothing(self):
         """The exemption is only safe while they stay dead. If one becomes live
