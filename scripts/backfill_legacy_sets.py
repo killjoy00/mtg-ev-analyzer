@@ -35,7 +35,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 try:
-    from .build_replays import stable_score
+    from .build_replays import MODEL_VERSION, stable_score
     from .fetch_card_metadata import aliases, compact_card, draft_candidate_names, fetch_named
     from .import_sets import (
         CATALOG_PATH,
@@ -51,7 +51,7 @@ try:
         validate_path_model,
     )
 except ImportError:  # Script execution from scripts/.
-    from build_replays import stable_score
+    from build_replays import MODEL_VERSION, stable_score
     from fetch_card_metadata import aliases, compact_card, draft_candidate_names, fetch_named
     from import_sets import (
         CATALOG_PATH,
@@ -463,8 +463,14 @@ def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
         path_cards, path_pairs = validate_path_model(output_dir / "path-model.json", args.max_path_bytes)
 
         manifest = json.loads((output_dir / "manifest.json").read_text(encoding="utf-8"))
-        if manifest.get("model", {}).get("model_version") != "strong-player-pool-context-v2":
-            raise ValueError("Legacy backfill changed the replay model version unexpectedly.")
+        # Compared against the builder's own constant, not a literal. The point
+        # of this guard is that the backfill must not QUIETLY change the model -
+        # not that the model must be one particular version forever. Pinned to a
+        # literal it fired on the first legitimate model change instead.
+        if manifest.get("model", {}).get("model_version") != MODEL_VERSION:
+            raise ValueError(
+                f"Legacy backfill wrote model {manifest.get('model', {}).get('model_version')!r}, "
+                f"expected {MODEL_VERSION!r}.")
         if manifest.get("cohort", {}).get("selection_metric") != "earliest_game_arena_rank":
             raise ValueError("Legacy backfill did not replace the temporary selection metadata.")
         if "win_rate_cutoff" in manifest.get("cohort", {}):

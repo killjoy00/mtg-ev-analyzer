@@ -22,7 +22,7 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
-from build_replays import (CountStore, OutOfFoldModel, DraftSkill, stable_fold,
+from build_replays import (CountStore, OutOfFoldModel, DraftSkill, MODEL_VERSION, stable_fold,
     build_colour_table,
     select_strong_drafts, parse_example, candidate_columns, pool_columns,
     render_replay, parse_rate_bucket, parse_games_lower_bound, slugify)
@@ -417,7 +417,7 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     if len(dispositions)!=trophy_count: raise ValueError('Incomplete trophy accounting')
     puzzle_file=directory/'puzzles.jsonl.gz';ledger_file=directory/'trophies.jsonl.gz'
     write_gzip_jsonl(puzzle_file,sorted(additions,key=lambda p:p['puzzle_id']));write_gzip_jsonl(ledger_file,sorted(dispositions,key=lambda d:d['draft_id']))
-    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'input_signature':signature,'source_archive':source,'skill_source':skill_source,'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':'strong-player-pool-context-v2','holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
+    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'input_signature':signature,'source_archive':source,'skill_source':skill_source,'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
     atomic_json(completed,info);print(json.dumps(info),flush=True);return info
 
 

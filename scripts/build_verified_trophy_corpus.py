@@ -36,7 +36,10 @@ def build(root=ROOT, selected=None):
                     resolved = {**images.get(card['id'], {}), **card}
                     if resolved.get('image_url'):
                         metadata[card['name']] = {k: v for k, v in resolved.items() if k != 'model_probability'}
-    catalog = {'corpus_version': VERSION, 'model_version': 'strong-player-pool-context-v2',
+    # The model version is a property of the shards this reads, not of this
+    # script, so it is taken from their manifests rather than written down here.
+    # Held as a literal it claimed v2 for whatever the shards actually held.
+    catalog = {'corpus_version': VERSION, 'model_version': None,
                'holdout': '5-fold by draft_id', 'verification': 'official_archive_trajectory', 'sets': []}
     missing_images = {}
     for entry in registry:
@@ -45,6 +48,12 @@ def build(root=ROOT, selected=None):
             continue
         manifest = json.loads((root / 'data' / sid / 'manifest.json').read_text())
         assert manifest['model']['holdout'] == catalog['holdout']
+        model = manifest['model']['model_version']
+        # One corpus, one model. A half-rebuilt data/ would otherwise publish a
+        # corpus whose rows came from two models under a single label.
+        assert catalog['model_version'] in (None, model), \
+            f"{sid} is model {model}, corpus already holds {catalog['model_version']}"
+        catalog['model_version'] = model
         assert manifest['cohort']['minimum_games_bucket_lower_bound'] >= 100
         evidence_path = root / 'corpus/draft-run/evidence' / f'{sid}.json.gz'
         evidence = read_gzip(evidence_path)
