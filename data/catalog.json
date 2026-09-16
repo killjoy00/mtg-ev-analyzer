@@ -2,6 +2,54 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "msh",
+      "name": "MSH",
+      "format": "PremierDraft",
+      "manifest_path": "./data/msh/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2026-07-27",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "sir",
+      "name": "SIR",
+      "format": "PremierDraft",
+      "manifest_path": "./data/sir/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2023-04-21",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "fin",
+      "name": "FIN",
+      "format": "PremierDraft",
+      "manifest_path": "./data/fin/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2025-07-19",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "lci",
+      "name": "LCI",
+      "format": "PremierDraft",
+      "manifest_path": "./data/lci/manifest.json",
+      "replay_count": 294,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2023-12-27",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
       "id": "pio",
       "name": "PIO",
       "format": "PremierDraft",
@@ -236,30 +284,6 @@
       "training_drafts": 5000
     },
     {
-      "id": "sir",
-      "name": "SIR",
-      "format": "PremierDraft",
-      "manifest_path": "./data/sir/manifest.json",
-      "replay_count": 300,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2023-04-21",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
-      "id": "lci",
-      "name": "LCI",
-      "format": "PremierDraft",
-      "manifest_path": "./data/lci/manifest.json",
-      "replay_count": 294,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2023-12-27",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
       "id": "mh3",
       "name": "MH3",
       "format": "PremierDraft",
@@ -332,18 +356,6 @@
       "training_drafts": 5000
     },
     {
-      "id": "fin",
-      "name": "FIN",
-      "format": "PremierDraft",
-      "manifest_path": "./data/fin/manifest.json",
-      "replay_count": 300,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2025-07-19",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
       "id": "eoe",
       "name": "EOE",
       "format": "PremierDraft",
@@ -363,18 +375,6 @@
       "replay_count": 300,
       "model_version": "strong-player-pool-context-v2",
       "data_date": "2026-01-10",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
-      "id": "msh",
-      "name": "MSH",
-      "format": "PremierDraft",
-      "manifest_path": "./data/msh/manifest.json",
-      "replay_count": 300,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2026-07-26",
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
       "training_drafts": 5000
