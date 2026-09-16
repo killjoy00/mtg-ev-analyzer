@@ -1,5 +1,6 @@
 {
   "catalog_signature": [
+    "ktk:2024-01-18:298",
     "stx:2024-01-11:299",
     "mid:2024-01-11:272",
     "vow:2024-01-11:298",
@@ -14,7 +15,6 @@
     "ltr:2023-08-30:299",
     "woe:2023-10-18:296",
     "lci:2023-12-27:294",
-    "ktk:2024-01-18:298",
     "mkm:2024-03-20:298",
     "otj:2024-06-27:299",
     "mh3:2024-07-17:299",
@@ -35,6 +35,15 @@
     "powered-cube:2025-12-01:300"
   ],
   "datasets": [
+    {
+      "data_date": "2024-01-18",
+      "error_codes": [],
+      "id": "ktk",
+      "name": "KTK",
+      "replay_count": 298,
+      "status": "healthy",
+      "warning_codes": []
+    },
     {
       "data_date": "2024-01-11",
       "error_codes": [],
@@ -160,15 +169,6 @@
       "id": "lci",
       "name": "LCI",
       "replay_count": 294,
-      "status": "healthy",
-      "warning_codes": []
-    },
-    {
-      "data_date": "2024-01-18",
-      "error_codes": [],
-      "id": "ktk",
-      "name": "KTK",
-      "replay_count": 298,
       "status": "healthy",
       "warning_codes": []
     },
