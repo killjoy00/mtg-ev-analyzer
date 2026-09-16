@@ -2,6 +2,54 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "pio",
+      "name": "PIO",
+      "format": "PremierDraft",
+      "manifest_path": "./data/pio/manifest.json",
+      "replay_count": 299,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2025-01-15",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.62,
+      "training_drafts": 5000
+    },
+    {
+      "id": "hob",
+      "name": "HOB",
+      "format": "PremierDraft",
+      "manifest_path": "./data/hob/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2026-09-03",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.62,
+      "training_drafts": 2341
+    },
+    {
+      "id": "mkm",
+      "name": "MKM",
+      "format": "PremierDraft",
+      "manifest_path": "./data/mkm/manifest.json",
+      "replay_count": 298,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2024-03-20",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "ltr",
+      "name": "LTR",
+      "format": "PremierDraft",
+      "manifest_path": "./data/ltr/manifest.json",
+      "replay_count": 299,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2023-08-30",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
       "id": "hbg",
       "name": "HBG",
       "format": "PremierDraft",
@@ -200,18 +248,6 @@
       "training_drafts": 5000
     },
     {
-      "id": "ltr",
-      "name": "LTR",
-      "format": "PremierDraft",
-      "manifest_path": "./data/ltr/manifest.json",
-      "replay_count": 299,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2023-08-30",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
       "id": "lci",
       "name": "LCI",
       "format": "PremierDraft",
@@ -219,18 +255,6 @@
       "replay_count": 294,
       "model_version": "strong-player-pool-context-v2",
       "data_date": "2023-12-27",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
-      "id": "mkm",
-      "name": "MKM",
-      "format": "PremierDraft",
-      "manifest_path": "./data/mkm/manifest.json",
-      "replay_count": 298,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2024-03-20",
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
       "training_drafts": 5000
@@ -281,18 +305,6 @@
       "data_date": "2024-12-19",
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
-      "id": "pio",
-      "name": "PIO",
-      "format": "PremierDraft",
-      "manifest_path": "./data/pio/manifest.json",
-      "replay_count": 299,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2025-01-15",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.62,
       "training_drafts": 5000
     },
     {
@@ -354,18 +366,6 @@
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
       "training_drafts": 5000
-    },
-    {
-      "id": "hob",
-      "name": "HOB",
-      "format": "PremierDraft",
-      "manifest_path": "./data/hob/manifest.json",
-      "replay_count": 300,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2026-09-03",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.62,
-      "training_drafts": 2341
     },
     {
       "id": "msh",
