@@ -18,11 +18,23 @@ export const SUPPORT_SHARPENING = 2;
 // what it has always been:  (p_a^T / p_b^T)^(1/T) === p_a / p_b. Honest numbers
 // on screen, and not one point of anyone's score moves. A test pins this.
 export const SCORE_EXPONENT = 1 / SUPPORT_SHARPENING;
-// Stays at v6 until a v7 corpus exists. The version is hashed into every
-// puzzle id, so declaring v7 while only v6 rows are stored makes every
-// published puzzle fail verification - the guard firing exactly as intended.
-// Bumping is the LAST step of the v3 rollout, not the first: regenerate at the
-// new version, load the rows, then bump so the app serves them.
+// Hashed into every puzzle id, so a bump publishes a parallel corpus rather
+// than editing the old one: existing rows stay resolvable, in-flight sessions
+// and old challenges keep working, and recorded scores are untouched.
+// scripts/set_policy.py reads this value rather than copying it, and a test
+// refuses any stale literal elsewhere - a half-landed bump is what lets the
+// importer reuse old payloads under a new label and ship two models as one.
+// STILL v6, and the remaining blocker is now precisely identified: the
+// committed corpus under corpus/draft-run/*.json.gz was written at v6, and
+// three JS tests verify it against whatever this constant says. Declaring v7
+// while those files hold v6 rows means the app would serve a version its own
+// published corpus does not carry.
+//
+// So the last step is regenerating those committed files at v7 - written by
+// scripts/build_verified_trophy_corpus.py, which no workflow currently runs.
+// Everything else for the bump is in place: set_policy.corpus_version() makes
+// this the single source, a test refuses stale literals, and build_set now
+// treats a baseline at another version as superseded and rebuilds it.
 export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-verified-v6';
 export const POWERED_CUBE_ENVIRONMENT = 'powered-cube';
 

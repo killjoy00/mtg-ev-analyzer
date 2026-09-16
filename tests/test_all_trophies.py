@@ -119,3 +119,89 @@ class FullTrophyTests(unittest.TestCase):
                     build_set('retired','unused')
 
 if __name__=='__main__':unittest.main()
+
+
+class CorpusVersionTests(unittest.TestCase):
+    """The corpus version is hashed into every puzzle id. A bump that lands in
+    one language and not the other makes the server unable to resolve its own
+    puzzles - and worse, lets the importer reuse old payloads under a new
+    label, putting two models in one corpus."""
+
+    def test_python_reads_the_version_from_the_javascript(self):
+        from set_policy import corpus_version
+        import import_all_trophies
+        self.assertEqual(import_all_trophies.VERSION, corpus_version())
+
+    # Superseded corpus builders, predecessors of import_all_trophies.py and
+    # wired to no workflow. They carry their own dead lineages rather than stale
+    # copies of the live one, so they are named here instead of being silently
+    # matched - if either is ever revived, this list is the note explaining why
+    # its version does not track the current corpus.
+    SUPERSEDED_BUILDERS = ('scripts/build_draft_run_corpus.py',
+                           'scripts/verify_draft_run_corpus.py')
+
+    def test_no_stale_copy_of_the_version_survives_anywhere(self):
+        """Nine places held a version literal. Any one missed during a bump
+        reproduces exactly the failure this suite exists to prevent: puzzle ids
+        the server cannot resolve, and old payloads reused under a new label."""
+        from set_policy import corpus_version
+        root = Path(__file__).resolve().parents[1]
+        current = corpus_version()
+        stale = []
+        for path in list(root.glob('scripts/*.py')) + list(root.glob('tests/*.mjs')) \
+                + list(root.glob('*.mjs')) + list(root.glob('worker/*.mjs')):
+            if str(path.relative_to(root)) in self.SUPERSEDED_BUILDERS:
+                continue
+            text = path.read_text(encoding='utf-8', errors='ignore')
+            for line in text.splitlines():
+                if 'elite-trophy-' in line and current not in line \
+                        and 'corpus_version' not in line:
+                    stale.append(f'{path.relative_to(root)}: {line.strip()[:90]}')
+        self.assertEqual(stale, [], 'stale corpus version literal(s) found')
+
+    def test_the_exempt_builders_really_are_wired_to_nothing(self):
+        """The exemption is only safe while they stay dead. If one becomes live
+        again its version has to start tracking, and this fails first."""
+        root = Path(__file__).resolve().parents[1]
+        live = list(root.glob('.github/workflows/*.yml')) + list(root.glob('worker/*.mjs'))
+        for builder in self.SUPERSEDED_BUILDERS:
+            stem = Path(builder).stem
+            for path in live:
+                with self.subTest(builder=stem, caller=path.name):
+                    self.assertNotIn(stem, path.read_text(encoding='utf-8', errors='ignore'))
+
+
+class SupersedeTests(unittest.TestCase):
+    """A baseline at a different version is superseded, not broken. Without
+    this, a bump fails every re-verification; without the version check, the
+    importer silently keeps old payloads and ships two models as one."""
+
+    def rows(self, version, n=3):
+        return [{'puzzle_id': f'p{i}', 'corpus_version': version} for i in range(n)]
+
+    def test_a_baseline_at_the_current_version_is_kept(self):
+        from import_all_trophies import VERSION
+        rows = self.rows(VERSION)
+        superseded = [r for r in rows if r.get('corpus_version') != VERSION]
+        self.assertEqual(superseded, [])
+
+    def test_a_baseline_at_an_older_version_is_discarded_whole(self):
+        from import_all_trophies import VERSION
+        rows = self.rows('elite-trophy-verified-v5')
+        superseded = [r for r in rows if r.get('corpus_version') != VERSION]
+        self.assertEqual(len(superseded), len(rows))
+
+    def test_a_mixed_baseline_is_refused_rather_than_guessed(self):
+        """Half-superseded means an earlier bump went wrong. Picking a side
+        would bake that in."""
+        from import_all_trophies import VERSION
+        rows = self.rows(VERSION, 2) + self.rows('elite-trophy-verified-v5', 2)
+        superseded = [r for r in rows if r.get('corpus_version') != VERSION]
+        self.assertTrue(0 < len(superseded) < len(rows))
+
+    def test_the_source_of_the_rule_is_present_in_build_set(self):
+        import inspect
+        from import_all_trophies import build_set
+        source = inspect.getsource(build_set)
+        self.assertIn('superseded', source)
+        self.assertIn('refusing to guess which model produced which puzzle', source)

@@ -28,10 +28,10 @@ from build_replays import (CountStore, OutOfFoldModel, DraftSkill, stable_fold,
     render_replay, parse_rate_bucket, parse_games_lower_bound, slugify)
 from backfill_legacy_sets import arena_rank_proxy, arena_rank_tier, _game_order
 from fetch_card_metadata import compact_card, aliases
-from set_policy import supported_set, require_supported_set
+from set_policy import corpus_version, supported_set, require_supported_set
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = 'elite-trophy-verified-v6'
+VERSION = corpus_version()
 IMPORT_VERSION = 'all-premier-trophies-v1'
 # Training drafts kept per set, after the hash ordering in select_strong_drafts.
 # Most sets have several times this many eligible drafts, so for them this is a
@@ -353,6 +353,25 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
         cutoff = None if legacy else max(.6,calculated,manifest.get('cohort',{}).get('win_rate_cutoff',0))
     qualified, rejected = eligible_trophies(drafts, cutoff or .6, legacy, conflicts)
     old_rows = json.loads(gzip.decompress((root/'corpus/draft-run'/f'{sid}.json.gz').read_bytes())) if base_entry else []
+    # A baseline written under a different corpus version is a SUPERSEDED
+    # corpus, not a broken one. Its puzzle ids were hashed with that version, so
+    # none of them can match under this one - re-verifying against it would fail
+    # every decision and reusing its payloads would put two models in one corpus
+    # under a single label. Both are wrong; the right answer is to rebuild.
+    #
+    # This is what makes a version bump a real regeneration instead of a no-op.
+    # It does NOT weaken the in-place guard: at the SAME version the baseline is
+    # still loaded, still re-verified, and still refuses a rewrite.
+    superseded = [row for row in old_rows if row.get('corpus_version') != VERSION]
+    if superseded:
+        if len(superseded) != len(old_rows):
+            raise ValueError(
+                f'{sid}: baseline mixes corpus versions '
+                f'({len(superseded)} of {len(old_rows)} rows are not {VERSION}); '
+                f'refusing to guess which model produced which puzzle')
+        print(f'{sid}: baseline is {old_rows[0].get("corpus_version")}, rebuilding '
+              f'{len(old_rows)} decisions at {VERSION}', flush=True)
+        old_rows = []
     old_by_id = {p['puzzle_id']:p for p in old_rows}
     old_sources = {p['source_draft_hash'] for p in old_rows}
     check_training_cap(sid, training_cap, len(old_rows))
