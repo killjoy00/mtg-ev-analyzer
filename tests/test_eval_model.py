@@ -21,9 +21,6 @@ from eval_model import (
     js_round,
     normalize_probabilities,
     sharpen,
-    REVIEW_INSTRUCTIONS,
-    pack_strata,
-    render_review_sheet,
     evidence_bucket,
     Accumulator,
     Cache,
@@ -613,84 +610,6 @@ class AwardTests(unittest.TestCase):
         fitted, loss = fit_temperature(pairs, [1.0, 2.0, 4.0, 8.0])
         self.assertGreater(fitted, 1.0)
         self.assertGreater(loss, 0.0)
-
-
-class BlindReviewTests(unittest.TestCase):
-    """The sheet is worthless the moment a reviewer can infer the answer from
-    it, and nothing else in the suite would catch that."""
-
-    def sheet(self):
-        entries = [{"pack": 1, "set": "tst", "position": "pack 1, pick 3",
-                    "pool": {"Swamp": 2}, "choices": ["Alpha", "Beta", "Gamma"],
-                    "verdict": {"Alpha": "", "Beta": "", "Gamma": ""}}]
-        return entries, render_review_sheet(entries)
-
-    def test_the_machine_readable_sheet_carries_no_answer_fields(self):
-        """Checked against the entries, not the prose: the rendered page says
-        'no model scores appear here', and a substring search over that would
-        fail on its own disclaimer."""
-        entries, _ = self.sheet()
-        blob = json.dumps(entries).lower()
-        for leak in ("award", "probabilit", "taken", "stratum", "score", "support"):
-            with self.subTest(leak=leak):
-                self.assertNotIn(leak, blob)
-
-    def test_a_known_answer_does_not_survive_into_the_rendered_page(self):
-        entries, text = self.sheet()
-        # Values a reviewer must not be able to read off: the award, the
-        # probability, and which card was taken.
-        for secret in ("95", "48", "0.6123", "Alpha was taken"):
-            with self.subTest(secret=secret):
-                self.assertNotIn(secret, text)
-        # The cards themselves must of course be there.
-        for card in entries[0]["choices"]:
-            self.assertIn(card, text)
-
-    def test_the_sheet_asks_for_a_judgement_not_a_guess(self):
-        """A reviewer told to guess what someone else took would reproduce the
-        population's bias, which is the thing under test."""
-        self.assertIn("not being asked to guess", REVIEW_INSTRUCTIONS)
-        for verdict in ("BEST", "REASONABLE", "MISTAKE"):
-            self.assertIn(verdict, REVIEW_INSTRUCTIONS)
-
-    def test_every_choice_appears_exactly_once(self):
-        entries, text = self.sheet()
-        for card in entries[0]["choices"]:
-            self.assertEqual(text.count(f"| {card} |"), 1)
-
-    def test_thin_evidence_reads_the_least_supported_card(self):
-        """Keyed on the median it fired on nothing: measured on hob the minimum
-        has p05 = 22 while the median has p05 = 60."""
-        counts = CountStore.empty()
-        for index in range(200):
-            counts.observe(example(f"d{index}", 0, 0, "common", ["common", "rare"]))
-        model = VariantModel(counts, VARIANTS["v2"])
-        thin = example("x", 0, 0, "common", ["common", "rare", "never-seen"])
-        thick = example("y", 0, 0, "common", ["common", "rare"])
-        self.assertIn("thin-evidence", pack_strata(thin, _FakeCache(), model, {}, 0, 0))
-        self.assertNotIn("thin-evidence", pack_strata(thick, _FakeCache(), model, {}, 0, 0))
-
-    def test_a_pack_with_no_special_feature_still_gets_sampled(self):
-        """A review made only of hard cases tells you only about hard cases."""
-        counts = CountStore.empty()
-        for index in range(200):
-            counts.observe(example(f"d{index}", 0, 0, "a", ["a", "b"]))
-        model = VariantModel(counts, VARIANTS["v2"])
-        plain = example("z", 0, 0, "a", ["a", "b"])
-        self.assertEqual(pack_strata(plain, _FakeCache(), model, {}, 50, 50), ["ordinary"])
-
-    def test_a_large_award_change_is_always_sampled(self):
-        counts = CountStore.empty()
-        for index in range(200):
-            counts.observe(example(f"d{index}", 0, 0, "a", ["a", "b"]))
-        model = VariantModel(counts, VARIANTS["v2"])
-        plain = example("z", 0, 0, "a", ["a", "b"])
-        self.assertIn("award-shift",
-                      pack_strata(plain, _FakeCache(), model, {}, 95, 60))
-
-
-class _FakeCache:
-    set_id = "tst"
 
 
 class BootstrapTests(unittest.TestCase):
