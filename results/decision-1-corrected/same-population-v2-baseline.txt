@@ -1,0 +1,49 @@
+  bootstrapping the pooled fit
+====================================================================================
+HOW MUCH SHOULD EACH SIGNAL COUNT?  (one fit, pooled over every set)
+====================================================================================
+Value given up per decision, correlated with the drafter's match wins.
+Every (set, win-rate bucket) pair is a stratum, so one number comes out for
+the corpus rather than one per set that can disagree by chance.
+lambda = share of the outcome signal taken from absolute GIH win rate;
+the rest comes from IWD, the within-deck contrast. More negative r is better.
+Sets: blb, bro, dft, dmu, dsk, eoe, fdn, hbg, hob, lci, ltr, mh3, mkm, msh, neo, one, otj, pio, sir, snc, sos, tdm, tla, tmt
+
+   lambda crossover n   pooled r                95% CI  vs baseline                95% CI   drafts
+        1           0   -0.06500  [-0.07135,-0.06063]     +0.00000  [+0.00000,+0.00000]   106084  <- strongest
+        1          50   -0.06116  [-0.06817,-0.05706]     +0.00384  [+0.00170,+0.00489]*  106084
+        1         200   -0.06118  [-0.06799,-0.05697]     +0.00382  [+0.00062,+0.00564]*  106084
+  * = change from the baseline combo separated from zero (paired bootstrap)
+
+LEAVE-ONE-SET-OUT: combo chosen on the other sets, read on the held-out one
+  sets held out       : 24
+  combo chosen        : L1|W0 x24
+  median r held out   : -0.06299   (baseline -0.06299)
+  beat baseline on    : 0/24 held-out sets
+
+Per set, at the pooled best combo (a breakdown, not separate fits):
+  set             held-out   cards  r baseline    r best
+  blb                 5408     276     -0.0556   -0.0556
+  bro                 4212     335     -0.0556   -0.0556
+  dft                 5807     286     -0.0431   -0.0431
+  dmu                 5888     266     -0.0474   -0.0474
+  dsk                 5949     286     -0.0684   -0.0684
+  eoe                 4988     321     -0.0684   -0.0684
+  fdn                 4936     286     -0.0479   -0.0479
+  hbg                 3460     271     -0.0944   -0.0944
+  hob                 3359     193     -0.0626   -0.0626
+  lci                 5890     291     -0.0917   -0.0917
+  ltr                 7205     266     -0.0568   -0.0568
+  mh3                 5634     326     -0.0939   -0.0939
+  mkm                 6258     326     -0.0734   -0.0734
+  msh                 4480     339     -0.0476   -0.0476
+  neo                 5299     287     -0.0284   -0.0284
+  one                 4511     270     -0.1019   -0.1019
+  otj                 6255     381     -0.0455   -0.0455
+  pio                 3741     402     -0.0794   -0.0794
+  sir                 3720     357     -0.1149   -0.1149
+  snc                 5801     266     -0.1200   -0.1200
+  sos                 5241     346     -0.0545   -0.0545
+  tdm                 4758     286     -0.0513   -0.0513
+  tla                 5532     346     -0.0251   -0.0251
+  tmt                 3457     215     -0.0691   -0.0691
