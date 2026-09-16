@@ -1,10 +1,12 @@
 # Pack One current state
 
-Updated: 2026-09-15.
+Updated: 2026-09-16.
 
 This file is the short reference for the product contract and merged implementation. Older launch and migration documents remain useful history, but this file should win when they describe an earlier rollout state. Merged backend code is not automatically deployed.
 
 ## Release status
+
+Cloudflare routing inspection succeeded on September 16. The public website and browser APIs still use their existing routes; the audit did not enable a proxy or close backend access. A [private gateway preview and operating plan](EDGE-OPERATIONS.md) now provides opt-in origin authentication, durable network quotas and deployment requests through reviewed PRs. Live preview acceptance requires the separate scoped `CLOUDFLARE_EDGE_TOKEN` secret. Production rollout, HttpOnly sessions/revocation and review of 14 additional deployed function names remain open. See the [sanitized inventory](audits/edge-inventory-2026-09-16.json).
 
 PRs [83](https://github.com/killjoy00/mtg-ev-analyzer/pull/83)–[86](https://github.com/killjoy00/mtg-ev-analyzer/pull/86) completed the initial review changes. The intervening [PR 87](https://github.com/killjoy00/mtg-ev-analyzer/pull/87) added a manual Neon deployment workflow; its earlier backend deployment was verified rather than assumed.
 

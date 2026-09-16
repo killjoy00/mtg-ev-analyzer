@@ -1,4 +1,5 @@
 import {releaseMetadata} from './release.mjs';
+import {guardIngress} from './ingress-auth.mjs';
 import {readJson} from './request-json.mjs';
 import { challengeIndex, featuredSetId, firstPackPicks, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from './core.mjs';
 
@@ -447,6 +448,7 @@ async function route(request) {
 
 export default {
   async fetch(request) {
+    const denied=guardIngress(request);if(denied)return denied;
     try {
       return withCors(await route(request), request);
     } catch (error) {

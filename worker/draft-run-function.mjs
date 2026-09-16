@@ -1,4 +1,5 @@
 import {releaseMetadata} from './release.mjs';
+import {guardIngress} from './ingress-auth.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import growth, { query, player, readJson, json, withCors, gameDateKey } from './growth-function.js';
@@ -231,6 +232,7 @@ async function route(request) {
 }
 
 export default {async fetch(request) {
+  const denied=guardIngress(request);if(denied)return denied;
   try {const response=await route(request);response.headers.set('cache-control','no-store');return withCors(response,request);}
   catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);const response=json({error:status===500?'Could not save your run. Please retry.':error.message},status);if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));return withCors(response,request);}
 }};
