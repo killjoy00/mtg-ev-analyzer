@@ -1,0 +1,30 @@
+name: gateway runtime tests
+on:
+  pull_request:
+    paths: ['edge/**', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
+  push:
+    branches: [main]
+    paths: ['edge/**', 'worker/ingress-auth.mjs', 'tests/ingress.test.mjs', 'tests/edge-runtime.mjs', 'scripts/edge-*.mjs', '.github/workflows/edge-*.yml']
+permissions:
+  contents: read
+jobs:
+  runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pinned Workers tools
+        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund wrangler@4.132.0 esbuild@0.28.2
+      - name: Test request and origin boundaries
+        run: node --test tests/ingress.test.mjs
+      - name: Build and test the Workers runtime
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: |
+          "$EDGE_TOOLS_DIR/node_modules/.bin/esbuild" edge/gateway.mjs --bundle --format=esm --platform=browser --external:node:net --outfile="$RUNNER_TEMP/gateway.mjs"
+          node tests/edge-runtime.mjs "$RUNNER_TEMP/gateway.mjs"
+      - name: Validate Cloudflare deployment configuration
+        run: "$RUNNER_TEMP/edge-tools/node_modules/.bin/wrangler deploy --config edge/wrangler.json --dry-run --outdir $RUNNER_TEMP/edge-dry-run"
