@@ -14,6 +14,8 @@ Reviewed 2026-09-14. Backend changes require deployment after migration 0013; me
 
 ## Remaining ingress and account work
 
+Cloudflare inspection can run from a phone through the [read-only GitHub Actions setup](CLOUDFLARE-ACCESS.md). The manually dispatched audit needs a zone-scoped `CLOUDFLARE_AUDIT_TOKEN` secret; it does not grant deployment access or change live settings. Verify its actual inventory before choosing the first-party routing and origin-protection design.
+
 These limits do **not** stop a caller creating many new guest identities. `/v1/session` still needs a trusted IP/edge quota, and expensive public health/reporting endpoints need ingress protection. Determine which proxy overwrites the client IP header, block direct-origin bypass, and verify spoofed headers before enforcing a quota. Do not trust arbitrary `X-Forwarded-For` or claim a function-local memory counter protects a serverless deployment. No new infrastructure, guessed proxy header or opaque challenge has been enabled.
 
 Guest leaderboards identify devices/accounts, not verified humans. Optional account claiming alone cannot prevent multiple-account answer harvesting. Keep guest access while deciding whether competition warrants a separate verified board and what verification actually means. Never seed simulated scores as players or treat duplicate display names as verified identities.
