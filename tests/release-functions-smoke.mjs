@@ -9,12 +9,38 @@ async function call(slug,path,body,token,status=200) {
   const data=await r.json();assert.equal(r.status,status,`${slug}${path}: ${JSON.stringify(data)}`);
   timings.push({service:slug,path:path.replace(/[a-f0-9-]{24,}/g,'<qa>'),ms:Math.round(performance.now()-start)});return data;
 }
-async function verifyMarkers() {
+// Neon reporting a deployment "completed" is not the same as every instance
+// serving it. A production deploy of an unchanged-but-remarked bundle reported
+// pack1growth/9 active at 04:10:28 and was still answering with the PREVIOUS
+// commit ten minutes later, then answered with the new one without any further
+// deploy. The mechanism is not visible from here - an instance outliving its
+// deployment is the obvious guess, not a confirmed cause - but asserting one
+// request after the deploy call returns makes a green release a coin flip.
+// Only the caller that just deployed passes --settle. The pre-promotion gate
+// asks whether development ALREADY runs this revision, which is a question that
+// should be answered instantly, so it keeps failing fast.
+const SETTLE_MS=process.argv.includes('--settle')?10*60*1000:0, POLL_MS=10*1000;
+async function verifyMarkers({settle=false}={}) {
+  const deadline=Date.now()+SETTLE_MS;
   for(const slug of ['draftrunapi','pack1growth','pack1api']) {
-    const h=await call(slug,'/health?quick=1');assert.equal(h.ok,true);assert.equal(h.release_commit,commit,`${slug} revision`);
+    const started=Date.now();
+    for(;;) {
+      const h=await call(slug,'/health?quick=1');
+      assert.equal(h.ok,true);
+      if(h.release_commit===commit) {
+        const waited=Math.round((Date.now()-started)/1000);
+        // Absorbing this silently would hide a pipeline getting slower.
+        if(waited>=POLL_MS/1000)console.log(`${slug}: settled on ${commit.slice(0,7)} after ${waited}s`);
+        break;
+      }
+      // The closing pass is a different question - has something redeployed
+      // underneath the acceptance run? - so it gets no grace at all.
+      if(!settle||Date.now()>=deadline) assert.equal(h.release_commit,commit,`${slug} revision`);
+      await new Promise(resolve=>setTimeout(resolve,POLL_MS));
+    }
   }
 }
-await verifyMarkers();
+await verifyMarkers({settle:true});
 const health=await call('draftrunapi','/health');
 assert.equal(health.ok,true);assert.equal(health.run_length,8);assert.equal(health.selection_version,'eight-pick-v3');
 assert.equal(health.unrated_puzzles,0);assert.deepEqual(health.missing_sets,[]);assert.equal(health.daily_featured_sets.length,3);

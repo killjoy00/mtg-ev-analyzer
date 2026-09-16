@@ -40,6 +40,7 @@ try:
     from .import_sets import (
         CATALOG_PATH,
         PATH_MODEL_VERSION,
+        PUBLIC_GAME_URL,
         RemoteDataset,
         catalog_codes,
         download_dataset,
@@ -56,6 +57,7 @@ except ImportError:  # Script execution from scripts/.
     from import_sets import (
         CATALOG_PATH,
         PATH_MODEL_VERSION,
+        PUBLIC_GAME_URL,
         RemoteDataset,
         catalog_codes,
         download_dataset,
@@ -69,10 +71,6 @@ except ImportError:  # Script execution from scripts/.
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_SETS = ("VOW", "MID", "STX")
-PUBLIC_GAME_URL = (
-    "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/"
-    "game_data_public.{code}.{format}.csv.gz"
-)
 EXPERIENCE_COLUMN = "user_n_games_bucket"
 TEMP_RATE_COLUMN = "user_game_win_rate_bucket"
 RANK_COLUMN = "rank"
@@ -417,6 +415,9 @@ def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
             sys.executable,
             "scripts/build_replays.py",
             "--input", str(augmented_path),
+            # Already downloaded above for the rank proxy join. The colour term
+            # is estimated from it; without it the builder refuses to run.
+            "--game-data", str(game_path),
             "--output-dir", str(output_dir),
             "--catalog", str(stage_catalog),
             "--expansion", code,
