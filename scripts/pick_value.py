@@ -53,6 +53,7 @@ from eval_model import (  # noqa: E402
     build_backbone,
     guard_test_split,
     load_examples,
+    load_training_fit,
     train_counts,
 )
 
@@ -388,7 +389,7 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
                 {n: r["iwd_shrunk"] for n, r in table["cards"].items()
                  if r.get("iwd_shrunk") is not None})
 
-    fit = json.loads(deck_fit.read_text(encoding="utf-8")) if deck_fit else None
+    fit = load_training_fit(deck_fit, cache) if deck_fit else None
     if payload.get("tables"):
         folds = int(payload["folds"])
         built = [axes(payload["tables"][str(f)]) for f in range(folds)]
@@ -418,7 +419,7 @@ def analyse(elite_cache: Path, archive: Path, outcomes: Path,
         control = Cache.load(control_cache)
         if control.set_id != cache.set_id:
             raise SystemExit(f"{control_cache} is a different set from {elite_cache}")
-        regrets.update(draft_regret(model, control, control.meta["drafts"],
+        regrets.update(draft_regret(model, control, control.split_drafts(split),
                                     outcome, combos, max_pick, all_picks, pick_range, adaptive))
     results = draft_results(archive)
 

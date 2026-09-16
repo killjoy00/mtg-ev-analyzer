@@ -7,7 +7,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 from build_replays import CountStore, PickExample
-from eval_model import VARIANTS, VariantModel
+from eval_model import VARIANTS, VariantModel, Cache, cache_identity
 from collections import Counter
 from deck_fit import (MIN_DECKS_FOR_COLOUR, card_colours, colour_mark, commitment,
                       parse_colour_mark, scan_decks)
@@ -287,7 +287,9 @@ class EndToEndTests(unittest.TestCase):
             "weak": {"iwd_shrunk": -0.03, "gih_wr_shrunk": 0.52}}}))
 
         fit = directory / "fit.json"
-        fit.write_text(json.dumps({"grand_play_rate": 0.6, "cards": {
+        fit.write_text(json.dumps({"set_id": "test", "split": "train", "fit_schema_version": 2,
+            "cache_identity": cache_identity(Cache.load(cache_path)),
+            "grand_play_rate": 0.6, "cards": {
             name: {"play_rate": 0.7, "colours": "R",
                    "by_commitment": {"0": 0.4, "1-2": 0.6, "3-5": 0.8, "6-9": 0.9, "10+": 0.95}}
             for name in ("good", "fine", "weak")}}))

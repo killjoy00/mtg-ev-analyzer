@@ -21,6 +21,7 @@ because an unbootstrapped delta on one set is not evidence.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import csv
 import gzip
 import json
@@ -82,6 +83,40 @@ def draft_split(draft_id: str) -> str:
     if bucket < TRAIN_SHARE + VALIDATION_SHARE:
         return "validation"
     return "test"
+
+
+def validation_role(draft_id: str) -> str:
+    """Disjoint calibration, curve selection and assessment inside validation.
+
+    These are development partitions, not a new untouched final test set.
+    """
+    return ("calibration", "selection", "assessment")[
+        stable_score(f"scoring-validation-v1:{draft_id}") % 3]
+
+
+def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def cache_identity(cache: "Cache") -> dict:
+    return {"cache_sha256": file_sha256(cache.path),
+            "picks_sha256": file_sha256(cache.path.parent / cache.meta["picks_file"]),
+            "train_ids_sha256": hashlib.sha256(
+                "\n".join(sorted(cache.split_drafts("train"))).encode()).hexdigest()}
+
+
+def load_training_fit(path: Path, cache: "Cache") -> dict:
+    """Reject held-out, stale, mismatched and pre-provenance colour tables."""
+    fit = json.loads(path.read_text(encoding="utf-8"))
+    if fit.get("set_id") != cache.set_id or fit.get("split") != "train":
+        raise ValueError(f"{path}: deck fit must use this set's train split")
+    if fit.get("fit_schema_version") != 2 or fit.get("cache_identity") != cache_identity(cache):
+        raise ValueError(f"{path}: missing or mismatched fit provenance; rebuild deck_fit.py")
+    return fit
 
 
 def scan_skills(path: Path) -> Tuple[Dict[str, DraftSkill], List[str]]:
@@ -388,7 +423,7 @@ class VariantModel(OutOfFoldModel):
         Measured as a log-odds shift against the card's own unconditional play
         rate, so a card that is usually abandoned is not penalised twice.
         """
-        if not self.fit:
+        if not self.fit or (self.variant.fit_stage_matched and not pool):
             return 0.0
         # The colour-only variants still need the card's colours, to know which
         # of the pool counts; what they drop is the card's own play rates.
@@ -412,7 +447,7 @@ class VariantModel(OutOfFoldModel):
             # No usable stage cell: fall back to the marginal curve rather than
             # to a cell too thin to report.
             conditioned, reference = row["by_commitment"].get(bucket), row.get("play_rate")
-        if not conditioned or not reference:
+        if conditioned is None or reference is None:
             return 0.0
         clamp = lambda p: min(1 - 1e-6, max(1e-6, p))
         return logit(clamp(conditioned)) - logit(clamp(reference))
@@ -477,7 +512,7 @@ def guard_test_split(split: str, final_test: bool) -> None:
     reviewer read the source - so `--split test` now also needs `--final-test`,
     which exists for no other purpose and cannot be set by accident.
     """
-    if split == "test" and not final_test:
+    if split in ("test", "all") and not final_test:
         raise SystemExit(
             "Refusing to read the test split.\n"
             "  Selection belongs on --split validation. If this really is the single\n"
@@ -632,6 +667,7 @@ class Calibration:
     card_weight: List[float] = field(default_factory=lambda: [0.0] * 10)
     card_hits: List[float] = field(default_factory=lambda: [0.0] * 10)
     card_n: List[int] = field(default_factory=lambda: [0] * 10)
+    ranks: dict = field(default_factory=dict)
 
     def _bin(self, probability: float) -> int:
         return min(self.bins - 1, max(0, int(probability * self.bins)))
@@ -647,6 +683,16 @@ class Calibration:
             self.card_weight[slot] += probability
             self.card_hits[slot] += 1.0 if index == chosen else 0.0
             self.card_n[slot] += 1
+        # Keep runner-up calibration visible instead of hiding it among the
+        # many near-zero probabilities of low-ranked cards.
+        order = sorted(range(len(probabilities)), key=lambda i: (-probabilities[i], i))
+        for rank, index in enumerate(order, 1):
+            name = str(rank) if rank <= 3 else "4+"
+            weights, hits, counts = self.ranks.setdefault(name, ([0.0]*10, [0.0]*10, [0]*10))
+            slot = self._bin(probabilities[index])
+            weights[slot] += probabilities[index]
+            hits[slot] += int(index == chosen)
+            counts[slot] += 1
 
     @staticmethod
     def _error(weight: List[float], hits: List[float], counts: List[int]) -> Tuple[float, List[dict]]:
@@ -672,6 +718,10 @@ class Calibration:
             "per_card_ece": round(card_error, 5),
             "confidence_bins": confidence_table,
             "per_card_bins": card_table,
+            "by_candidate_rank": {
+                rank: {"ece": round(self._error(*values)[0], 5),
+                       "bins": self._error(*values)[1]}
+                for rank, values in sorted(self.ranks.items())},
         }
 
 
@@ -699,7 +749,7 @@ class GradingStats:
         self.support_ratio += ratio
         self.below_fifth += 1 if ratio < 0.2 else 0
         self.below_half += 1 if ratio < 0.5 else 0
-        self.displayed_scores[min(100, round(95 * ratio))] += 1
+        self.displayed_scores[min(95, js_round(95 * ratio))] += 1
 
     def summary(self) -> dict:
         if not self.n:
@@ -889,24 +939,30 @@ def paired_bootstrap(baseline: Sequence[Tuple[str, float, float, int]],
     together; they are not independent and treating them as such would make
     every interval look far tighter than it is.
     """
+    if draws < 1:
+        raise ValueError("Bootstrap draws must be positive")
     if len(baseline) != len(candidate):
         raise ValueError("Paired bootstrap needs identical example sets.")
     by_draft: Dict[str, List[Tuple[float, float, int]]] = defaultdict(list)
-    for (draft_id, base_loss, base_brier, base_hit), (_, cand_loss, cand_brier, cand_hit) in zip(baseline, candidate):
+    for (draft_id, base_loss, base_brier, base_hit), (cand_id, cand_loss, cand_brier, cand_hit) in zip(baseline, candidate):
+        if cand_id != draft_id:
+            raise ValueError("Paired bootstrap examples must have matching draft order")
         by_draft[draft_id].append((cand_loss - base_loss, cand_brier - base_brier, cand_hit - base_hit))
     drafts = list(by_draft)
     if not drafts:
         return {}
+    totals_by_draft = {d: (sum(x[0] for x in rows), sum(x[1] for x in rows),
+                           sum(x[2] for x in rows), len(rows)) for d, rows in by_draft.items()}
 
     def means(sample: Sequence[str]) -> Tuple[float, float, float]:
         total = [0.0, 0.0, 0.0]
         n = 0
         for draft_id in sample:
-            for loss, brier, hit in by_draft[draft_id]:
-                total[0] += loss
-                total[1] += brier
-                total[2] += hit
-                n += 1
+            loss, brier, hit, count = totals_by_draft[draft_id]
+            total[0] += loss
+            total[1] += brier
+            total[2] += hit
+            n += count
         return (total[0] / n, total[1] / n, total[2] / n) if n else (0.0, 0.0, 0.0)
 
     observed = means(drafts)
@@ -1079,7 +1135,7 @@ def run_evaluate(args: argparse.Namespace) -> int:
             fit_path = fit_dir / f"{cache.set_id}.json"
             if not fit_path.exists():
                 raise SystemExit(f"No deck-fit table for {cache.set_id} at {fit_path}")
-            fit = json.loads(fit_path.read_text(encoding="utf-8"))
+            fit = load_training_fit(fit_path, cache)
         train_pool = cache.split_drafts("train")
         # Capping the held-out set trades interval width for sweep time. The
         # cap takes a prefix of the split's own stable order, so the same drafts
@@ -1197,6 +1253,8 @@ def fit_temperature(pairs: Sequence[Tuple[Sequence[float], int]],
     supports, so the old value does not transfer and assuming it does would put
     a number on screen that no longer means what it says.
     """
+    if not pairs or not grid or any(not math.isfinite(t) or t <= 0 for t in grid):
+        raise ValueError("Calibration requires observations and a positive finite exponent grid")
     best, best_loss = grid[0], float("inf")
     for temperature in grid:
         total = 0.0
@@ -1220,10 +1278,22 @@ def run_awards(args: argparse.Namespace) -> int:
     fit_dir = Path(args.deck_fit_dir) if args.deck_fit_dir else None
     grid = [float(v) for v in args.temperature_grid.split(",")]
     names = [args.baseline, args.candidate]
+    if len(set(names)) != 2:
+        raise ValueError("Awards comparison requires two different models")
+    frozen_path = getattr(args, "calibration_in", None)
+    if args.split == "test" and not frozen_path:
+        raise ValueError("Test awards require --calibration-in from a validation run")
+    if args.split == "test" and getattr(args, "calibration_out", None):
+        raise ValueError("Test cannot write a newly fitted calibration")
+    frozen = json.loads(Path(frozen_path).read_text()) if frozen_path else None
+    provenance = {"models": names, "training_cap": args.cap,
+                  "model_code": {p: file_sha256(ROOT / "scripts" / p) for p in
+                                 ["build_replays.py", "eval_model.py", "deck_fit.py"]}, "sets": {}}
 
     deltas: Counter = Counter()
     moved_20 = harsher = gentler = same = 0
     per_model_pairs: Dict[str, List[Tuple[Sequence[float], int]]] = {n: [] for n in names}
+    calibration_pairs: Dict[str, List[Tuple[Sequence[float], int]]] = {n: [] for n in names}
     trophy_delta: List[int] = []
     decisions = 0
 
@@ -1231,15 +1301,25 @@ def run_awards(args: argparse.Namespace) -> int:
         cache = Cache.load(Path(cache_path))
         fit = None
         if fit_dir and (fit_dir / f"{cache.set_id}.json").exists():
-            fit = json.loads((fit_dir / f"{cache.set_id}.json").read_text(encoding="utf-8"))
+            fit = load_training_fit(fit_dir / f"{cache.set_id}.json", cache)
+        if cache.set_id in provenance["sets"]:
+            raise ValueError("Duplicate set caches")
+        provenance["sets"][cache.set_id] = {"cache": cache_identity(cache),
+            "fit_sha256": file_sha256(fit_dir / f"{cache.set_id}.json") if fit else None}
         train_ids = cap_prefix(cache.split_drafts("train"), args.cap)
         counts, _ = train_counts(cache, train_ids)
         models = {n: build_backbone(cache, train_ids, counts, n, fit) for n in names}
         pack_offset, pick_offset = cache.meta["pack_offset"], cache.meta["pick_offset"]
         served_max = 11 if cache.set_id == "powered-cube" else 10
 
-        held = cap_prefix(cache.split_drafts(args.split), args.max_test_drafts)
-        for example in load_examples(cache, held):
+        held = cache.split_drafts(args.split)
+        if args.split == "validation":
+            held = [did for did in held if validation_role(did) == "assessment"]
+        held = cap_prefix(held, args.max_test_drafts)
+        calibration_ids = [] if frozen else [did for did in cache.split_drafts("validation")
+                                            if validation_role(did) == "calibration"]
+        calibrating = set(calibration_ids)
+        for example in load_examples(cache, held + calibration_ids):
             if not (example.raw_pack_number + pack_offset == 1
                     and example.raw_pick_number + pick_offset <= served_max):
                 continue
@@ -1251,6 +1331,10 @@ def run_awards(args: argparse.Namespace) -> int:
                 normalised = normalize_probabilities(raw)
                 vectors[name] = [normalised[card] for card in example.candidates]
             chosen = example.candidates.index(example.historical_pick)
+            if example.draft_id in calibrating:
+                for name in names:
+                    calibration_pairs[name].append((vectors[name], chosen))
+                continue
             for name in names:
                 per_model_pairs[name].append((vectors[name], chosen))
             decisions += 1
@@ -1272,15 +1356,29 @@ def run_awards(args: argparse.Namespace) -> int:
         print(f"  {cache.set_id}: {decisions} served decisions so far",
               file=sys.stderr, flush=True)
 
-    temperatures = {n: fit_temperature(per_model_pairs[n], grid) for n in names}
+    if frozen:
+        if frozen.get("provenance") != provenance or frozen.get("source") != "validation:calibration":
+            raise ValueError("Calibration artifact does not match these models, inputs and training cap")
+        temperatures = frozen["temperatures"]
+        if set(temperatures) != set(names) or any(not math.isfinite(t) or t <= 0 for t in temperatures.values()):
+            raise ValueError("Invalid frozen temperatures")
+    else:
+        temperatures = {n: fit_temperature(calibration_pairs[n], grid)[0] for n in names}
+        if getattr(args, "calibration_out", None):
+            Path(args.calibration_out).write_text(json.dumps({"source": "validation:calibration",
+                "provenance": provenance, "temperatures": temperatures, "grid": grid,
+                "decisions": len(calibration_pairs[names[0]])}, indent=2) + "\n")
     total_awards = sum(deltas.values())
     ordered = sorted(trophy_delta)
     report = {
         "split": args.split, "slice": "served (pack 1)",
         "baseline": names[0], "candidate": names[1],
         "decisions": decisions, "awards_compared": total_awards,
-        "display_temperature": {n: {"fitted": t, "log_loss": round(l, 5)}
-                                for n, (t, l) in temperatures.items()},
+        "calibration_source": "validation:calibration",
+        "evaluation_partition": "validation:assessment" if args.split == "validation" else "test",
+        "display_temperature": {n: {"fitted": t,
+            "log_loss": round(fit_temperature(per_model_pairs[n], [t])[1], 5)}
+                                for n, t in temperatures.items()},
         "award_change": {
             "mean": round(sum(k * v for k, v in deltas.items()) / max(1, total_awards), 3),
             "unchanged_share": round(same / max(1, total_awards), 4),
@@ -1288,12 +1386,13 @@ def run_awards(args: argparse.Namespace) -> int:
             "gentler_share": round(gentler / max(1, total_awards), 4),
             "moved_20_or_more_share": round(moved_20 / max(1, total_awards), 4),
         },
-        "trophy_pick_award_change": {
+        "observed_pick_underlying_award_change": {
             "mean": round(sum(trophy_delta) / max(1, len(trophy_delta)), 3),
             "median": ordered[len(ordered) // 2] if ordered else 0,
             "p05": ordered[int(0.05 * len(ordered))] if ordered else 0,
             "p95": ordered[int(0.95 * len(ordered))] if ordered else 0,
         },
+        "production_trophy_override_award_change": 0,
     }
     if args.json_out:
         Path(args.json_out).write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
@@ -1309,7 +1408,8 @@ def render_awards(report: dict) -> str:
            f"   slice: {report['slice']}",
            f"served decisions {report['decisions']:,}   "
            f"candidate awards compared {report['awards_compared']:,}", "",
-           "1. DISPLAY EXPONENT, fitted separately per model on this split.",
+           "1. DISPLAY EXPONENT, fitted per model on validation:calibration.",
+           f"   Log loss evaluated on {report['evaluation_partition']}.",
            "   Production ships 2, fitted on the baseline's supports. It does not",
            "   transfer automatically - but note it cannot move points either way,",
            "   because scoring raises the ratio to its reciprocal.",
@@ -1323,7 +1423,7 @@ def render_awards(report: dict) -> str:
             f"     harsher              {change['harsher_share']:.1%}",
             f"     more generous        {change['gentler_share']:.1%}",
             f"     moved 20+ points     {change['moved_20_or_more_share']:.1%}", ""]
-    trophy = report["trophy_pick_award_change"]
+    trophy = report["observed_pick_underlying_award_change"]
     out += ["3. POINTS for the card the strong player actually took.",
             f"     mean {trophy['mean']:+.2f}   median {trophy['median']:+d}"
             f"   5th pct {trophy['p05']:+d}   95th pct {trophy['p95']:+d}"]
@@ -1387,6 +1487,8 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     awards_parser.add_argument("--split", default="validation",
                                choices=["validation", "test"])
     awards_parser.add_argument("--final-test", action="store_true")
+    awards_parser.add_argument("--calibration-in", help="Frozen validation calibration artifact; required for test")
+    awards_parser.add_argument("--calibration-out", help="Write fitted validation calibration for a later frozen test")
     awards_parser.add_argument("--json-out")
     awards_parser.set_defaults(func=run_awards)
     return parser.parse_args(argv)

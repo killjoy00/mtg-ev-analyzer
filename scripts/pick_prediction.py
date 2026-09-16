@@ -37,7 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import logit, normalize_probabilities, stable_fold  # noqa: E402
 from eval_model import (VARIANTS, Cache, VariantModel, build_backbone,  # noqa: E402
-                        guard_test_split, load_examples, train_counts)  # noqa: E402
+                        guard_test_split, load_examples, load_training_fit, train_counts)  # noqa: E402
 from pick_value import (  # noqa: E402
     EPSILON,
     OutcomeAxis,
@@ -106,7 +106,7 @@ def score_set(cache_path: Path, outcomes_path: Path, deck_fit_path: Optional[Pat
                 {n: r["iwd_shrunk"] for n, r in table["cards"].items()
                  if r.get("iwd_shrunk") is not None})
 
-    fit = json.loads(deck_fit_path.read_text(encoding="utf-8")) if deck_fit_path else None
+    fit = load_training_fit(deck_fit_path, cache) if deck_fit_path else None
     if payload.get("tables"):
         folds = int(payload["folds"])
         built = [axes(payload["tables"][str(f)]) for f in range(folds)]

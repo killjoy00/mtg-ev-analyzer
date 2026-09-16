@@ -1,5 +1,12 @@
 # Model evaluation harness
 
+See [Automated scoring validation](AUTOMATED-SCORING.md) for the current disjoint
+calibration, curve-selection and assessment workflow, strict train-table
+provenance, and eight-pick cohort simulation. Human grading is not a prerequisite.
+The experiments below are historical development evidence. The original Decision 1
+artifact certifies its archived implementation, including the defect recorded in
+its provenance; it does not certify a changed candidate.
+
 `scripts/eval_model.py` measures the consensus model offline. It never reads or
 writes the served corpus, the database, or any published artifact.
 

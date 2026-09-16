@@ -42,7 +42,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_replays import open_text  # noqa: E402
 from card_outcomes import count_of  # noqa: E402
-from eval_model import Cache, draft_split, guard_test_split  # noqa: E402
+from eval_model import Cache, cache_identity, draft_split, guard_test_split  # noqa: E402
 
 COLOURS = ("W", "U", "B", "R", "G")
 # A card counts as belonging to a colour when it is almost never played outside
@@ -84,6 +84,8 @@ def parse_colour_mark(mark: Optional[str]) -> Optional[FrozenSet[str]]:
         return None
     if mark == COLOURLESS_MARK:
         return frozenset()
+    if any(c not in COLOURS for c in mark):
+        return None
     return frozenset(c for c in mark if c in COLOURS)
 
 
@@ -331,6 +333,8 @@ def run(args: argparse.Namespace) -> int:
     summary["set_id"] = cache.set_id
     summary["drafts_with_decks"] = len(played)
     summary["split"] = split or "all"
+    summary["fit_schema_version"] = 2
+    summary["cache_identity"] = cache_identity(cache)
     summary["matched_drafts"] = len({d for d, _ in cache.examples() if d in played})
     Path(args.out).write_text(json.dumps(summary, indent=2) + "\n", encoding="utf-8")
 
