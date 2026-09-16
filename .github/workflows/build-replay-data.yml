@@ -77,6 +77,12 @@ jobs:
           curl --fail --location --retry 5 --retry-delay 3 \
             --output "raw-data/draft_data_public.$UPPER.$FORMAT.csv.gz" \
             "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.$UPPER.$FORMAT.csv.gz"
+          # Game data carries which cards reached a deck, which is what the
+          # colour table is estimated from. The build refuses to run without it
+          # rather than silently shipping a model without the colour term.
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output "raw-data/game_data_public.$UPPER.$FORMAT.csv.gz" \
+            "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.$UPPER.$FORMAT.csv.gz"
       - name: Fetch offline card metadata
         env:
           EXPANSION: ${{ inputs.expansion }}
@@ -99,6 +105,7 @@ jobs:
           LOWER=$(printf '%s' "$EXPANSION" | tr '[:upper:]' '[:lower:]')
           python scripts/build_replays.py \
             --input "raw-data/draft_data_public.$UPPER.$FORMAT.csv.gz" \
+            --game-data "raw-data/game_data_public.$UPPER.$FORMAT.csv.gz" \
             --output-dir "data/$LOWER" \
             --catalog data/catalog.json \
             --expansion "$UPPER" \

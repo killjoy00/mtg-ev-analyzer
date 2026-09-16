@@ -363,9 +363,11 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             temp = Path(tmp)
             archive = temp / "powered-cube.csv.gz"
             model_archive = temp / "powered-cube-model.csv.gz"
+            game_archive = temp / "powered-cube-games.csv.gz"
             metadata_path = temp / "powered-cube-cards.json"
 
             source_date = cube.download_archive(archive)
+            cube.download_game_archive(game_archive)
             raw_shape, inherited = analyze_raw_archive(archive)
             report.update({"source_date": source_date, "raw_shape": raw_shape})
             write_report(report)  # cheap evidence checkpoint before model work
@@ -383,6 +385,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             cube.run_command([
                 sys.executable, "scripts/build_replays.py",
                 "--input", str(model_archive),
+                "--game-data", str(game_archive),
                 "--output-dir", str(cube.OUTPUT_DIR),
                 "--expansion", cube.CUBE_ID,
                 "--format", cube.CUBE_FORMAT,

@@ -222,23 +222,23 @@ def commitment(pool: Dict[str, int], colours: Mapping[str, Optional[FrozenSet[st
     return total
 
 
-def observe(cache: Cache, played: Dict[str, set], colours: Dict[str, FrozenSet[str]],
-            split: Optional[str] = None
-            ) -> Tuple[Dict[Tuple[str, str], List[int]], Dict[str, List[int]]]:
-    """(card, commitment bucket) -> played flags, and card -> played flags.
+def observe_examples(pairs, played: Dict[str, set],
+                     colours: Mapping[str, Optional[FrozenSet[str]]]
+                     ) -> Tuple[Dict[Tuple[str, str], List[int]],
+                                Dict[str, List[int]],
+                                Dict[Tuple[str, str], List[int]]]:
+    """The estimator, over any iterable of (draft_id, example).
 
-    `split` restricts to one split of the cache. Estimating play rates on the
-    same drafts the value model is later scored against would let the model
-    learn from its own evaluation set, so the pipeline fits this on train only.
+    Takes examples rather than a Cache so the replay builder can feed it its
+    own, and so the caller decides which drafts are admissible instead of that
+    being wired to one split scheme.
     """
     by_bucket: Dict[Tuple[str, str], List[int]] = defaultdict(list)
     by_card: Dict[str, List[int]] = defaultdict(list)
     by_stage: Dict[Tuple[str, str], List[int]] = defaultdict(list)
-    for draft_id, example in cache.examples():
+    for draft_id, example in pairs:
         deck = played.get(draft_id)
         if deck is None:
-            continue
-        if split is not None and draft_split(draft_id) != split:
             continue
         card = example.historical_pick
         flag = 1 if card in deck else 0
@@ -257,6 +257,18 @@ def observe(cache: Cache, played: Dict[str, set], colours: Dict[str, FrozenSet[s
         by_stage[(stage, commit)].append(flag)
         by_stage[(stage, "*")].append(flag)
     return by_bucket, by_card, by_stage
+
+
+def observe(cache: Cache, played: Dict[str, set],
+            colours: Mapping[str, Optional[FrozenSet[str]]],
+            split: Optional[str] = None):
+    """Cache-shaped wrapper. Estimating play rates on the same drafts the model
+    is later scored against would let it learn from its own evaluation set, so
+    the CLI fits this on train only."""
+    return observe_examples(
+        ((draft_id, example) for draft_id, example in cache.examples()
+         if split is None or draft_split(draft_id) == split),
+        played, colours)
 
 
 def estimate(by_bucket, by_card, colours, by_stage=None) -> dict:

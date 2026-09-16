@@ -412,7 +412,7 @@ def choose_output_ids(strong_ids: Sequence[str], max_output_drafts: int) -> List
     return ordered[:max_output_drafts] if max_output_drafts else ordered
 
 
-def train_and_collect(path: Path, strong_ids: set[str], output_ids: set[str], fieldnames: Sequence[str], folds: int) -> Tuple[CountStore, List[CountStore], Dict[str, List[PickExample]], int, int, int]:
+def train_and_collect(path: Path, strong_ids: set[str], output_ids: set[str], fieldnames: Sequence[str], folds: int, colour_examples: Optional[list] = None) -> Tuple[CountStore, List[CountStore], Dict[str, List[PickExample]], int, int, int]:
     pack_cols = candidate_columns(fieldnames)
     pool_cols = pool_columns(fieldnames)
     all_counts = CountStore.empty()
@@ -464,6 +464,8 @@ def train_and_collect(path: Path, strong_ids: set[str], output_ids: set[str], fi
                 continue
             all_counts.observe_expected(example, base_of)
             fold_counts[stable_fold(example.draft_id, folds)].observe_expected(example, base_of)
+            if colour_examples is not None and draft_id not in output_ids:
+                colour_examples.append((draft_id, example))
 
     return all_counts, fold_counts, dict(outputs), min_pack, min_pick, parsed_examples
 
@@ -510,6 +512,40 @@ def render_replay(draft_id: str, picks: Sequence[PickExample], model: OutOfFoldM
     return {"draft_id": draft_id, "picks": rendered_picks}
 
 
+def build_colour_table(game_archive: Path, examples, contributing: set, set_id: str) -> dict:
+    """The colour table, built here rather than shipped as a committed artifact.
+
+    A stale table is a silent model change - the colour term would keep
+    producing numbers, just the wrong ones - so it is derived from the same two
+    public archives the rest of the build reads.
+
+    `contributing` excludes the drafts that will be served. A served puzzle's
+    own deck should not inform the table that scores it. The influence of any
+    one draft on a format-wide curve is small, but "small" was the wrong answer
+    to this question once already in this project.
+    """
+    from deck_fit import (card_colours, colour_mark, estimate,  # noqa: E402
+                          observe_examples, scan_decks)
+    played, colour_hits = scan_decks(game_archive, contributing)
+    colours = card_colours(colour_hits)
+    by_bucket, by_card, by_stage = observe_examples(
+        ((draft_id, example) for draft_id, example in examples
+         if draft_id in contributing), played, colours)
+    if not by_card:
+        raise ValueError(
+            f"{game_archive}: no draft in the training cohort matched the game "
+            f"data. Wrong set, or a draft/game archive pair from different runs?")
+    fit = estimate(by_bucket, by_card, colours, by_stage)
+    fit["set_id"] = set_id
+    fit["split"] = "train"
+    fit["contributing_drafts"] = len(contributing)
+    fit["decks_matched"] = len(played)
+    unknown = sum(1 for row in fit["cards"].values()
+                  if row["colours"] == colour_mark(None))
+    fit["cards_with_unknown_colour"] = unknown
+    return fit
+
+
 def load_deck_fit(path: Path) -> dict:
     """The colour table, checked for the two things that would silently change
     the model: the wrong split, and a missing stage curve."""
@@ -525,6 +561,10 @@ def load_deck_fit(path: Path) -> dict:
 
 
 def build(args: argparse.Namespace) -> dict:
+    if not getattr(args, "deck_fit", None) and not getattr(args, "game_data", None):
+        raise ValueError("Pass --game-data (or --deck-fit). Building without a "
+                         "colour table silently ships a different model from the "
+                         "one that was validated.")
     input_path = Path(args.input)
     skills, fieldnames = scan_draft_skill(input_path)
     strong_ids, cutoff, experienced_count = select_strong_drafts(skills, args.minimum_games, args.top_fraction, args.max_training_drafts)
@@ -533,9 +573,16 @@ def build(args: argparse.Namespace) -> dict:
 
     folds = min(args.folds, len(strong_ids))
     output_ids = choose_output_ids(strong_ids, args.max_output_drafts)
-    all_counts, fold_counts, collected, min_pack, min_pick, parsed_examples = train_and_collect(input_path, set(strong_ids), set(output_ids), fieldnames, folds)
+    colour_examples: List[Tuple[str, PickExample]] = []
+    all_counts, fold_counts, collected, min_pack, min_pick, parsed_examples = train_and_collect(
+        input_path, set(strong_ids), set(output_ids), fieldnames, folds, colour_examples)
     metadata = load_card_metadata(Path(args.card_metadata) if args.card_metadata else None)
-    deck_fit = load_deck_fit(Path(args.deck_fit))
+    if args.deck_fit:
+        deck_fit = load_deck_fit(Path(args.deck_fit))
+    else:
+        contributing = {draft_id for draft_id, _ in colour_examples}
+        deck_fit = build_colour_table(Path(args.game_data), colour_examples,
+                                      contributing, args.expansion.lower())
     pack_offset = 1 if min_pack == 0 else 0
     pick_offset = 1 if min_pick == 0 else 0
 
@@ -570,7 +617,7 @@ def build(args: argparse.Namespace) -> dict:
             "model_version": MODEL_VERSION,
             "holdout": f"{folds}-fold by draft_id",
             "probabilities_are_calibrated": False,
-            "description": "Hierarchical strong-player pick tendency adjusted by shrinkage-weighted card/pool co-pick lift; normalized within each pack.",
+            "description": "Hierarchical strong-player pick tendency, adjusted by a stage-matched card/pool co-pick lift and a stage-matched colour-commitment shift; normalized within each pack.",
             "pool_conditioned": True,
         },
         "replays": replays,
@@ -647,11 +694,15 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--shard-size", type=int, default=2)
     parser.add_argument("--card-metadata")
-    parser.add_argument("--deck-fit", required=True,
-                        help="deck_fit.py colour table for this set, built on its "
-                             "train split. Required: without it the colour term "
-                             "contributes nothing and what ships is a different "
-                             "model from the one that was validated.")
+    parser.add_argument("--game-data",
+                        help="17Lands game_data archive for this set. The colour "
+                             "table is built from it, excluding the drafts this "
+                             "build will serve.")
+    parser.add_argument("--deck-fit",
+                        help="a prebuilt deck_fit.py table instead of --game-data. "
+                             "One of the two is required: without a colour table "
+                             "the colour term contributes nothing and what ships "
+                             "is a different model from the one validated.")
     return parser.parse_args(argv)
 
 

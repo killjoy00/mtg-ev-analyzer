@@ -60,6 +60,13 @@ CUBE_ARCHIVE_URL = (
     "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/"
     "draft_data_public.Cube_-_Powered.PremierDraft.csv.gz"
 )
+# Which cards reached a deck. The colour term is estimated from this, and
+# build_replays.py refuses to run without it rather than quietly dropping the
+# term and shipping a model that was never validated.
+CUBE_GAME_ARCHIVE_URL = (
+    "https://17lands-public.s3.amazonaws.com/analysis_data/game_data/"
+    "game_data_public.Cube_-_Powered.PremierDraft.csv.gz"
+)
 # Scryfall's current bulk contract is discovered from this list endpoint. In
 # 2026 the preferred card export moved to a gzipped JSONL URL exposed as
 # jsonl_download_uri; legacy metadata/files are still accepted below.
@@ -88,6 +95,23 @@ def http_date_to_iso(value: Optional[str], fallback: str = CUBE_SOURCE_DATE) -> 
     if parsed.tzinfo is None:
         parsed = parsed.replace(tzinfo=dt.timezone.utc)
     return parsed.astimezone(dt.timezone.utc).date().isoformat()
+
+
+def download_game_archive(destination: Path) -> str:
+    """The game archive, fetched the same way as the draft archive."""
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    with request(CUBE_GAME_ARCHIVE_URL, accept="application/gzip,*/*;q=0.8",
+                 timeout=300) as response:
+        source_date = http_date_to_iso(response.headers.get("Last-Modified"))
+        with destination.open("wb") as handle:
+            while True:
+                chunk = response.read(1024 * 1024)
+                if not chunk:
+                    break
+                handle.write(chunk)
+    if destination.stat().st_size < 1024:
+        raise ValueError("Powered Cube game archive is unexpectedly small.")
+    return source_date
 
 
 def download_archive(destination: Path) -> str:
@@ -498,8 +522,10 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         temp = Path(tmp)
         archive = temp / "powered-cube.csv.gz"
         model_archive = temp / "powered-cube-model.csv.gz"
+        game_archive = temp / "powered-cube-games.csv.gz"
         metadata_path = temp / "powered-cube-cards.json"
         source_date = download_archive(archive)
+        download_game_archive(game_archive)
         names = draft_candidate_names(archive)
         incomplete_p1p1_rows_removed = write_model_archive(archive, model_archive)
         metadata, unresolved = fetch_cross_set_metadata(names)
@@ -513,6 +539,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             sys.executable,
             "scripts/build_replays.py",
             "--input", str(model_archive),
+            "--game-data", str(game_archive),
             "--output-dir", str(OUTPUT_DIR),
             "--expansion", CUBE_ID,
             "--format", CUBE_FORMAT,

@@ -23,6 +23,7 @@ import urllib.error
 import urllib.parse
 
 from build_replays import (CountStore, OutOfFoldModel, DraftSkill, stable_fold,
+    build_colour_table,
     select_strong_drafts, parse_example, candidate_columns, pool_columns,
     render_replay, parse_rate_bucket, parse_games_lower_bound, slugify)
 from backfill_legacy_sets import arena_rank_proxy, arena_rank_tier, _game_order
@@ -205,6 +206,10 @@ def eligible_trophies(drafts, cutoff, legacy=False, conflicts=()):
 def collect(path, training_ids, output_ids, header):
     all_counts = CountStore.empty(); folds = [CountStore.empty() for _ in range(5)]
     output = defaultdict(list); invalid = Counter(); picks = 0
+    # Training examples from drafts that will NOT be served. A served puzzle's
+    # own deck must not inform the colour table that scores it.
+    colour_examples = []
+    training_examples = []
     pack_cols, pool_cols = candidate_columns(header), pool_columns(header)
     if not pack_cols or not pool_cols: raise ValueError('Missing pack or pool columns')
     for row in rows(path, training_ids | output_ids):
@@ -214,9 +219,27 @@ def collect(path, training_ids, output_ids, header):
             continue
         if did in training_ids:
             all_counts.observe(example); folds[stable_fold(did, 5)].observe(example); picks += 1
+            training_examples.append((did, example))
+            if did not in output_ids:
+                colour_examples.append((did, example))
         if did in output_ids and example.raw_pack_number == 0 and example.raw_pick_number <= 11:
             output[did].append(example)
-    return all_counts, folds, output, invalid, picks
+    # Second pass for the stage anchor: the base rates it sums are only defined
+    # once counting has finished.
+    base = OutOfFoldModel(all_counts, CountStore.empty())
+    memo = {}
+
+    def base_of(card, pack, pick):
+        key = (card, pack, pick)
+        value = memo.get(key)
+        if value is None:
+            value = base.base_tendency(card, pack, pick); memo[key] = value
+        return value
+
+    for did, example in training_examples:
+        all_counts.observe_expected(example, base_of)
+        folds[stable_fold(did, 5)].observe_expected(example, base_of)
+    return all_counts, folds, output, invalid, picks, colour_examples
 
 
 def trajectory(examples, last_pick):
@@ -306,7 +329,10 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     path = directory/'draft.csv.gz'; source = archive(url, path, refresh)
     with csv_bytes(path) as f: header=next(csv.reader([f.readline().decode('utf-8-sig')]))
     legacy = 'user_game_win_rate_bucket' not in header or 'user_n_games_bucket' not in header
-    skill_source = archive(f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz', directory/'games.csv.gz', refresh) if legacy else None
+    # Game data was fetched only for legacy sets, to recover skill. Every set
+    # needs it now: the colour table is estimated from which cards reached a
+    # deck, and building without one silently ships a model with no colour term.
+    skill_source = archive(f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz', directory/'games.csv.gz', refresh)
     signature = hashlib.sha256(encoded({'source':source, 'skill_source':skill_source, 'importer':digest(__file__), 'model':digest(root/'scripts/build_replays.py'), 'legacy_model':digest(root/'scripts/backfill_legacy_sets.py'), 'images':digest(root/'corpus/draft-run/card-images.json'), 'baseline':base_entry, 'manifest':manifest, 'training_cap':training_cap})).hexdigest()
     completed = directory/'manifest.json'
     if not refresh and completed.exists():
@@ -334,13 +360,15 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     print(f'{sid}: {len(drafts)} drafts, {len(qualified)} qualifying trophies, {len(training)} training drafts',flush=True)
     additions=[]; dispositions=[]; reasons=Counter(); retained=set(); missing_names=set(); training_picks=0
     if qualified:
-        all_counts, folds, output, invalid, training_picks = collect(path,set(training),set(qualified),header)
+        all_counts, folds, output, invalid, training_picks, colour_examples = collect(path,set(training),set(qualified),header)
+        deck_fit = build_colour_table(directory/'games.csv.gz', colour_examples,
+                                      {did for did,_ in colour_examples}, sid)
         all_names = {name for examples in output.values() for p in examples for name in list(p.candidates)+list(p.pool)}
         known = resolve_images(all_names, metadata(root), directory/'images.json')
         for did,d in sorted(qualified.items()):
             valid, prior, why = trajectory(output.get(did,[]),12 if sid=='powered-cube' else 11)
             source_hash=hashlib.sha256(f'{sid}|{did}'.encode()).hexdigest()[:32]
-            model=OutOfFoldModel(all_counts,folds[stable_fold(did,5)])
+            model=OutOfFoldModel(all_counts,folds[stable_fold(did,5)],deck_fit)
             rendered=render_replay(did,valid,model,1,1,known)['picks']
             fingerprint=hashlib.sha256(encoded([{'pick':p.raw_pick_number,'choice':p.historical_pick,'pack':p.candidates,'pool':p.pool} for p in valid])).hexdigest()
             included=0; new=0; skipped=Counter()
