@@ -6,10 +6,12 @@ import {mkdtemp,rm} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import path from 'node:path';
 const require=createRequire(path.resolve(process.env.EDGE_TOOLS_DIR,'node_modules/wrangler/package.json'));
-const {Miniflare}=await import(pathToFileURL(require.resolve('miniflare')));
+const {Miniflare,convertV4MiniflareOptions}=await import(pathToFileURL(require.resolve('miniflare')));
 const persist=await mkdtemp(path.join(tmpdir(),'pack1-quota-'));
-const options={durableObjectsPersist:persist,workers:[{name:'gateway',modules:true,scriptPath:process.argv[2],compatibilityDate:'2026-09-01',compatibilityFlags:['nodejs_compat'],
-  durableObjects:{NETWORK_QUOTA:{className:'NetworkQuota',useSQLite:true}}}]};
+// Wrangler 4.132 ships Miniflare 5; use its supported v4 configuration adapter
+// rather than relying on the older constructor shape still shown in examples.
+const options=convertV4MiniflareOptions({resourcePersistencePath:persist,workers:[{name:'gateway',modules:true,scriptPath:process.argv[2],compatibilityDate:'2026-09-01',compatibilityFlags:['nodejs_compat'],
+  durableObjects:{NETWORK_QUOTA:{className:'NetworkQuota',useSQLite:true}}}]});
 let mf;
 try {
   mf=new Miniflare(options);
