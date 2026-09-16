@@ -1,6 +1,6 @@
 # Cloudflare access from a phone
 
-This setup uses a manually dispatched GitHub Action; a desktop app or direct Cloudflare connector is not required. The token stays in a GitHub Actions secret and is sent only to Cloudflare's API by the runner. Do not commit it to a file or paste it into chat, a PR, an issue or a workflow input.
+This setup uses a GitHub Action, triggered either manually or by merging an audit request into `main`; a desktop app or direct Cloudflare connector is not required. The token stays in a GitHub Actions secret and is sent only to Cloudflare's API by the runner. Do not commit it to a file or paste it into chat, a PR, an issue or a workflow input.
 
 ## Create a limited inspection token
 
@@ -24,7 +24,9 @@ The assistant cannot retrieve a stored secret's plaintext. It can review the che
 
 ## Run the inspection
 
-Open [inspect Cloudflare routing](https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/cloudflare-audit.yml), select **Run workflow**, choose **main**, and run it. If the mobile page hides a control, try your browser's **Request Desktop Website** option; this does not require a desktop computer. Tell the assistant the run finished, or provide the run URL. No token value is needed in chat.
+If the GitHub connection cannot dispatch workflows or the manual button is unavailable, the assistant can update [the audit request file](../.github/cloudflare-audit-request.txt) with the date and purpose, open a PR, verify its checks and merge it under the owner's authorization. The workflow runs only when that exact file changes on `main`; changes on PR branches, documentation edits and ordinary app merges do not trigger it. The request is plain text, never executed or passed to the audit script. Keep credentials out of it. This path uses normal repository review and merge permissions, and does not bypass branch protection. See [GitHub's branch and path trigger filters](https://docs.github.com/actions/using-workflows/triggering-a-workflow).
+
+Manual dispatch remains available at [inspect Cloudflare routing](https://github.com/killjoy00/mtg-ev-analyzer/actions/workflows/cloudflare-audit.yml) for maintainers who can use it. Either path produces the same sanitized report. No token value is needed in chat.
 
 The workflow only sends GET requests to Cloudflare. It reports zone status, proxy flags and broad destination categories for the apex, `www`, `api`, `auth`, `data` and wildcard hostnames, plus Worker route patterns and whether a Worker is attached. Raw DNS targets/IPs, TXT records, account/zone IDs, script names and credentials are excluded. The filtered report appears in the job log and a seven-day artifact; visibility follows the repository's Actions access. Errors fail the workflow without printing raw API error bodies. Missing scope or oversized/incomplete pagination is not treated as an empty healthy inventory.
 
