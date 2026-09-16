@@ -181,6 +181,59 @@ class CorpusVersionTests(unittest.TestCase):
         self.assertEqual(offenders, [],
                          'model version literal(s) found; import the builder constant instead')
 
+    def test_the_version_can_be_written_by_the_same_pattern_that_reads_it(self):
+        import shutil
+        import tempfile
+        from set_policy import corpus_version, set_corpus_version
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            stage = Path(temp)
+            shutil.copy2(root/'draft-run.mjs', stage/'draft-run.mjs')
+            before = corpus_version(stage)
+            self.assertEqual(set_corpus_version('elite-trophy-probe-v99', stage), before)
+            self.assertEqual(corpus_version(stage), 'elite-trophy-probe-v99')
+            # Exactly one declaration is rewritten, and nothing else moves.
+            text = (stage/'draft-run.mjs').read_text(encoding='utf-8')
+            self.assertEqual(text.count('elite-trophy-probe-v99'), 1)
+            self.assertNotIn(before, text)
+
+    def test_a_malformed_or_repeated_version_is_refused(self):
+        import shutil
+        import tempfile
+        from set_policy import set_corpus_version
+        root = Path(__file__).resolve().parents[1]
+        with tempfile.TemporaryDirectory() as temp:
+            stage = Path(temp)
+            shutil.copy2(root/'draft-run.mjs', stage/'draft-run.mjs')
+            original = (stage/'draft-run.mjs').read_text(encoding='utf-8')
+            for bad in ('Elite-Trophy-V7', 'v7', 'has space', 'under_scored', ''):
+                with self.subTest(version=bad):
+                    with self.assertRaises(ValueError):
+                        set_corpus_version(bad, stage)
+            # Re-declaring the current version is a no-op the caller meant as a
+            # bump, so it is an error rather than a silent success.
+            from set_policy import corpus_version
+            with self.assertRaisesRegex(ValueError, 'already declares'):
+                set_corpus_version(corpus_version(stage), stage)
+            self.assertEqual((stage/'draft-run.mjs').read_text(encoding='utf-8'), original)
+
+    def test_the_bump_and_the_regeneration_are_one_commit(self):
+        """A version declared without rows carrying it is what reverted the
+        last two attempts: every puzzle fails validateDraftRunPuzzle and the
+        health endpoint goes 503. The workflow must not be able to do half."""
+        root = Path(__file__).resolve().parents[1]
+        text = (root/'.github/workflows/regenerate-draft-run-corpus.yml').read_text(encoding='utf-8')
+        declare = text.index('--set-corpus-version')
+        rebuild = text.index('python scripts/build_verified_trophy_corpus.py')
+        tests = text.index('run: npm test')
+        commit = text.index('git commit -m')
+        self.assertLess(declare, rebuild, 'the version must be declared before the rebuild reads it')
+        self.assertLess(rebuild, tests, 'the suite must run against the regenerated corpus')
+        self.assertLess(tests, commit, 'nothing is committed before the suite passes')
+        self.assertIn('git add draft-run.mjs corpus/draft-run', text)
+        # A mixed data/ would publish two models under one label.
+        self.assertLess(text.index('Refuse a half-rebuilt data directory'), declare)
+
     def test_the_exempt_builders_really_are_wired_to_nothing(self):
         """The exemption is only safe while they stay dead. If one becomes live
         again its version has to start tracking, and this fails first."""
