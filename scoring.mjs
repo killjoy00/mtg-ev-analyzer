@@ -1,5 +1,13 @@
 const EPSILON = 1e-9;
-const SUPPORT_EXPONENT = 0.75;
+// Linear, matching Draft Run. docs/SCORING-AND-DIFFICULTY.md settled this: the
+// 0.75 power inflated weak choices, and the review kept the linear ratio
+// because it separates weak and uninformed picks without that inflation. Full
+// Pack and Top 3 were left on the old curve when Draft Run moved, so the same
+// pack could be graded two different ways depending on which mode opened it.
+const SUPPORT_EXPONENT = 1;
+// The actual trophy drafter's pick earns 100; every alternative is capped here
+// and earns in proportion to its share of the leading support.
+export const ALTERNATIVE_CAP = 95;
 
 export function rankCandidates(candidates) {
   return [...candidates].sort((a, b) => {
@@ -14,9 +22,8 @@ function supportScore(selectedProbability, targetProbability) {
   const target = Math.max(0, Number(targetProbability) || 0);
   if (target <= EPSILON) return 1;
   const ratio = Math.max(0, Math.min(1, selected / target));
-  // The probabilities are comparative rather than calibrated. A 0.75 power
-  // still softens near-ties, but preserves substantially more separation than
-  // sqrt for cards with only a fraction of the consensus support.
+  // These are comparative supports, not calibrated probabilities. The ratio is
+  // used as-is: a card with half the leading support earns half the credit.
   return ratio ** SUPPORT_EXPONENT;
 }
 
@@ -52,7 +59,12 @@ export function gradePick(candidates, selectedId, historicalId) {
   const bestProbability = Number(best.model_probability || 0);
   const selectedProbability = Number(selected.model_probability || 0);
   const gap = Math.max(0, bestProbability - selectedProbability);
-  const score = Math.round(supportScore(selectedProbability, bestProbability) * 100);
+  // Matching the trophy drafter is the thing being scored, so it earns 100
+  // outright. Everything else earns its share of the leading support, capped at
+  // 95 - including the model leader, when the drafter took something else.
+  const score = selectedId === historicalId
+    ? 100
+    : Math.round(ALTERNATIVE_CAP * supportScore(selectedProbability, bestProbability));
   const candidateCount = ranked.length;
   const decisionWeight = fullPackDecisionWeight(candidateCount);
 

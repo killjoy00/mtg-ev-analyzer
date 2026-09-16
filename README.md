@@ -8,7 +8,7 @@ Live site: [packone.pro](https://packone.pro). Start with the [current state and
 
 - Historical replay study, **not** a counterfactual draft simulator.
 - High 17Lands win rate is the primary definition of player strength.
-- The product owner’s settled design is to match the trophy drafter. Draft Run awards 100 for that pick and up to 95 from relative contextual support for alternatives. Other modes retain their existing scoring.
+- The product owner’s settled design is to match the trophy drafter. **All three modes** award 100 for that pick and up to 95 from relative contextual support for alternatives — `round(95 * selected_support / leading_support)`. Draft Run and Full Pack apply it per decision; Top 3 applies the same support ratio through its membership and ordering weights. There is no separate curve for any mode, and a test grades one pack through both implementations to keep it that way.
 - Historical drafter picks are shown separately from consensus.
 - No model/LLM API is used for runtime scoring.
 - Raw 17Lands archives are never committed or shipped to the browser.
@@ -16,6 +16,16 @@ Live site: [packone.pro](https://packone.pro). Start with the [current state and
 - Accounts are optional. Guest-first play remains the default.
 
 ## Game modes
+
+Three modes, and only three. Every one of them grades **Pack 1 only** — nothing in the product plays pack 2 or 3. Shards carry all 42 picks because the model needs the earlier pool to condition on, not because any mode shows them.
+
+| Mode | What you play | Decisions | Card data comes from |
+| --- | --- | --- | --- |
+| **Draft Run** | eight independent picks sampled across sets, or Powered Cube | 8 | Neon (`draft_run_verified_puzzles`) |
+| **Full Pack** | every decision in one seat's Pack 1 | 10 | R2 shards via `data.packone.pro` |
+| **Top 3** | P1P1 only — rank your three best starts | 1 | R2 shards via `data.packone.pro` |
+
+Draft Run draws from the full verified trophy corpus in the database. Full Pack and Top 3 read a replay shard for the selected set. Both populations are trophy drafts; they are built by different pipelines (`scripts/import_all_trophies.py` and `scripts/build_replays.py`), so a model change has to be rolled out to both before every mode agrees.
 
 ### Draft Run
 
@@ -27,11 +37,11 @@ One deterministic replay per set/mode/day, with the game day resetting at midnig
 
 ### Top 3
 
-Rank the three cards you would most want to start a draft with. The result compares membership and ordering against the model's top three. Ordinary games receive deterministic seed URLs so friends can play the exact same opening pack.
+Pack 1, pick 1 only. Rank the three cards you would most want to start a draft with. The result compares membership and ordering against the model's top three. Ordinary games receive deterministic seed URLs so friends can play the exact same opening pack.
 
 ### Full Pack
 
-Play every decision in Pack 1 of a historical draft seat. Your hypothetical selections do not alter the later historical packs. Later support reconditions on the cards you chose; replay-bound wheels receive feedback without ranked score weight. The final score summarizes the per-pick model-support scores.
+Play every decision in Pack 1 of a historical draft seat — ten picks, and only Pack 1. Your hypothetical selections do not alter the later historical packs. Later support reconditions on the cards you chose; replay-bound wheels receive feedback without ranked score weight. The final score summarizes the per-pick model-support scores, weighted by `log2(candidate_count)` so a forced last pick carries no weight.
 
 ## Production data
 
