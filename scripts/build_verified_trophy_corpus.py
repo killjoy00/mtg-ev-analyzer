@@ -6,10 +6,11 @@ import gzip
 import hashlib
 import json
 from pathlib import Path
+from set_policy import corpus_version
 import re
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = 'elite-trophy-verified-v6'
+VERSION = corpus_version()
 
 
 def slug(name):
