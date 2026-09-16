@@ -29,7 +29,10 @@ from pathlib import Path
 from typing import Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 SCHEMA_VERSION = 2
-MODEL_VERSION = "strong-player-pool-context-v2"
+MODEL_VERSION = "strong-player-colour-stage-v3"
+# Weight on the colour-commitment shift, frozen with the rest of the
+# specification in docs/MODEL-EVALUATION.md and validated on six held-out sets.
+FIT_STRENGTH = 0.75
 CARD_PREFIX = "pack_card_"
 POOL_PREFIX = "pool_"
 PAIR_MIN_SEEN = 8
@@ -175,10 +178,17 @@ class CountStore:
     global_picked: Counter
     pair_seen: Counter
     pair_picked: Counter
+    # Sum of the stage-specific base rate over exactly the observations behind
+    # pair_seen. The pair counts pool every pack and pick a pair was seen at,
+    # while the base they were once differenced against is specific to one
+    # position - so the difference read draft stage as a pool effect. Anchoring
+    # on this instead removes that. Filled by a SECOND pass, because the base
+    # rates it sums are only defined once the first pass has finished counting.
+    pair_expected: Counter
 
     @classmethod
     def empty(cls) -> "CountStore":
-        return cls(*(Counter() for _ in range(8)))
+        return cls(*(Counter() for _ in range(9)))
 
     def observe(self, example: PickExample) -> None:
         pool_cards = tuple(example.pool.keys())
@@ -198,11 +208,79 @@ class CountStore:
         for pool_card in pool_cards:
             self.pair_picked[(picked, pool_card)] += 1
 
+    def observe_expected(self, example: PickExample, base_of) -> None:
+        """Second pass: accumulate the base rate expected at this position."""
+        pool_cards = tuple(example.pool.keys())
+        if not pool_cards:
+            return
+        for card in example.candidates:
+            base = base_of(card, example.raw_pack_number, example.raw_pick_number)
+            for pool_card in pool_cards:
+                self.pair_expected[(card, pool_card)] += base
+
+
+def _colour_helpers():
+    """deck_fit imports eval_model which imports this module, so the colour
+    primitives cannot be imported at the top. Bound once per model rather than
+    looked up per call: card_tendency runs millions of times in a build."""
+    from deck_fit import (commit_bucket, commitment,  # noqa: E402
+                          parse_colour_mark, stage_bucket)
+    return commit_bucket, commitment, parse_colour_mark, stage_bucket
+
 
 class OutOfFoldModel:
-    def __init__(self, all_counts: CountStore, held_out_counts: CountStore):
+    def __init__(self, all_counts: CountStore, held_out_counts: CountStore,
+                 fit: Optional[dict] = None):
         self.all = all_counts
         self.held = held_out_counts
+        # The colour table. Without one the colour term contributes nothing and
+        # the model degrades to the stage-matched pair term alone, which is a
+        # different model from the validated one - so build() requires it.
+        self.fit = fit
+        self.fit_colours: Dict[str, Optional[frozenset]] = {}
+        (self._commit_bucket, self._commitment,
+         parse_colour_mark, self._stage_bucket) = _colour_helpers()
+        if fit:
+            for name, row in fit["cards"].items():
+                self.fit_colours[name] = parse_colour_mark(row.get("colours"))
+
+    def _expected(self, key) -> float:
+        return max(0.0, self.all.pair_expected[key] - self.held.pair_expected[key])
+
+    def fit_shift(self, card: str, pool: Mapping[str, int]) -> float:
+        """How much this pool changes the odds the card ever reaches the deck.
+
+        Colour commitment generalises where card-pair counts cannot: every pool
+        card sharing a colour is evidence about every pack card sharing it.
+        Held at a fixed draft stage, because commitment can never exceed the
+        pool it is counted from, so the marginal curve reads stage as well as
+        colour fit and the two pull opposite ways.
+
+        One format-wide curve, not a per-card table: the per-card version lost
+        to this one on both criteria, and it estimated a counterfactual the data
+        cannot identify.
+        """
+        if not self.fit or not pool:
+            return 0.0
+        if card not in self.fit["cards"]:
+            return 0.0
+        matched = self._commitment(dict(pool), self.fit_colours, card)
+        if matched is None:
+            return 0.0    # colours unknown: decline the judgement, do not invent one
+        bucket = self._commit_bucket(matched)
+        conditioned = reference = None
+        cell = self.fit.get("by_stage", {}).get(self._stage_bucket(sum(pool.values())))
+        if cell:
+            conditioned, reference = cell.get(bucket), cell.get("*")
+        if conditioned is None or reference is None:
+            # Too thin a stage cell to report: fall back to the marginal curve
+            # rather than to noise.
+            conditioned = self.fit["by_commitment"].get(bucket)
+            reference = self.fit.get("play_rate")
+        if not conditioned or not reference:
+            return 0.0
+        clamp = lambda p: min(1 - 1e-6, max(1e-6, p))
+        return logit(clamp(conditioned)) - logit(clamp(reference))
 
     def _count(self, attr: str, key) -> int:
         return max(0, getattr(self.all, attr)[key] - getattr(self.held, attr)[key])
@@ -222,9 +300,17 @@ class OutOfFoldModel:
         return 0.01
 
     def card_tendency(self, card: str, pack_number: int, pick_number: int, pool: Mapping[str, int]) -> float:
+        """strong-player-colour-stage-v3.
+
+        Ported from the eval harness's `v3-colour-and-pair`, which is the
+        configuration validated on six held-out sets. A test asserts the two
+        agree to twelve places on identical inputs; if they ever diverge, what
+        ships is no longer what was measured.
+        """
         base = self.base_tendency(card, pack_number, pick_number)
+        shift = FIT_STRENGTH * self.fit_shift(card, pool)
         if not pool:
-            return base
+            return logistic(logit(base) + shift) if shift else base
 
         weighted_lift = 0.0
         total_weight = 0.0
@@ -233,9 +319,15 @@ class OutOfFoldModel:
             seen = self._count("pair_seen", key)
             if seen < PAIR_MIN_SEEN:
                 continue
+            expected = self._expected(key)
+            if not expected:
+                continue
+            # Anchor the lift on the base rate expected over exactly these
+            # observations, not on the base rate at the position being scored.
+            reference = min(1 - 1e-6, max(1e-6, expected / seen))
             picked = self._count("pair_picked", key)
-            pair_rate = (picked + PAIR_PRIOR_STRENGTH * base) / (seen + PAIR_PRIOR_STRENGTH)
-            lift = logit(pair_rate) - logit(base)
+            pair_rate = (picked + PAIR_PRIOR_STRENGTH * reference) / (seen + PAIR_PRIOR_STRENGTH)
+            lift = logit(pair_rate) - logit(reference)
             support_weight = min(1.0, math.sqrt(seen / 80.0))
             copy_weight = min(1.5, 1.0 + 0.15 * max(0, int(copies) - 1))
             weight = support_weight * copy_weight
@@ -243,11 +335,11 @@ class OutOfFoldModel:
             total_weight += weight
 
         if not total_weight:
-            return base
+            return logistic(logit(base) + shift) if shift else base
 
         context = weighted_lift / total_weight
-        commitment = min(1.0, sum(pool.values()) / 8.0)
-        return logistic(logit(base) + CONTEXT_STRENGTH * commitment * context)
+        pool_commitment = min(1.0, sum(pool.values()) / 8.0)
+        return logistic(logit(base) + CONTEXT_STRENGTH * pool_commitment * context + shift)
 
 
 def normalize_probabilities(raw: Mapping[str, float]) -> Dict[str, float]:
@@ -347,6 +439,32 @@ def train_and_collect(path: Path, strong_ids: set[str], output_ids: set[str], fi
             if draft_id in output_ids:
                 outputs[draft_id].append(example)
 
+    # Second pass. The base rates summed here are only defined once the first
+    # pass has finished counting, so the archive is read twice rather than the
+    # stage anchor being approximated.
+    base_model = OutOfFoldModel(all_counts, CountStore.empty())
+    memo: Dict[Tuple[str, int, int], float] = {}
+
+    def base_of(card: str, pack: int, pick: int) -> float:
+        key = (card, pack, pick)
+        value = memo.get(key)
+        if value is None:
+            value = base_model.base_tendency(card, pack, pick)
+            memo[key] = value
+        return value
+
+    with open_text(path) as handle:
+        reader = csv.DictReader(handle)
+        for row in reader:
+            draft_id = (row.get("draft_id") or "").strip()
+            if draft_id not in strong_ids:
+                continue
+            example = parse_example(row, pack_cols, pool_cols)
+            if not example:
+                continue
+            all_counts.observe_expected(example, base_of)
+            fold_counts[stable_fold(example.draft_id, folds)].observe_expected(example, base_of)
+
     return all_counts, fold_counts, dict(outputs), min_pack, min_pick, parsed_examples
 
 
@@ -392,6 +510,20 @@ def render_replay(draft_id: str, picks: Sequence[PickExample], model: OutOfFoldM
     return {"draft_id": draft_id, "picks": rendered_picks}
 
 
+def load_deck_fit(path: Path) -> dict:
+    """The colour table, checked for the two things that would silently change
+    the model: the wrong split, and a missing stage curve."""
+    fit = json.loads(path.read_text(encoding="utf-8"))
+    if fit.get("split") != "train":
+        raise ValueError(f"{path}: deck fit must be built on the train split, "
+                         f"not {fit.get('split')!r}")
+    for required in ("cards", "by_commitment", "by_stage", "play_rate"):
+        if required not in fit:
+            raise ValueError(f"{path}: deck fit lacks {required!r}; rebuild with "
+                             f"the current deck_fit.py")
+    return fit
+
+
 def build(args: argparse.Namespace) -> dict:
     input_path = Path(args.input)
     skills, fieldnames = scan_draft_skill(input_path)
@@ -403,6 +535,7 @@ def build(args: argparse.Namespace) -> dict:
     output_ids = choose_output_ids(strong_ids, args.max_output_drafts)
     all_counts, fold_counts, collected, min_pack, min_pick, parsed_examples = train_and_collect(input_path, set(strong_ids), set(output_ids), fieldnames, folds)
     metadata = load_card_metadata(Path(args.card_metadata) if args.card_metadata else None)
+    deck_fit = load_deck_fit(Path(args.deck_fit))
     pack_offset = 1 if min_pack == 0 else 0
     pick_offset = 1 if min_pick == 0 else 0
 
@@ -412,7 +545,7 @@ def build(args: argparse.Namespace) -> dict:
         if len(picks) < args.minimum_picks:
             continue
         fold = stable_fold(draft_id, folds)
-        model = OutOfFoldModel(all_counts, fold_counts[fold])
+        model = OutOfFoldModel(all_counts, fold_counts[fold], deck_fit)
         replays.append(render_replay(draft_id, picks, model, pack_offset, pick_offset, metadata))
 
     if not replays:
@@ -514,6 +647,11 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--folds", type=int, default=5)
     parser.add_argument("--shard-size", type=int, default=2)
     parser.add_argument("--card-metadata")
+    parser.add_argument("--deck-fit", required=True,
+                        help="deck_fit.py colour table for this set, built on its "
+                             "train split. Required: without it the colour term "
+                             "contributes nothing and what ships is a different "
+                             "model from the one that was validated.")
     return parser.parse_args(argv)
 
 

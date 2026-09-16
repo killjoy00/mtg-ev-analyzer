@@ -165,6 +165,13 @@ class GradingTests(unittest.TestCase):
 
 
 class VariantTests(unittest.TestCase):
+    def examples_with_pair_evidence(self):
+        items = [example(f"d{i}", 0, 0, "anchor" if i % 2 else "other",
+                         ["anchor", "other"]) for i in range(40)]
+        items += [example(f"p{i}", 0, 6, "anchor" if i % 10 else "other",
+                          ["anchor", "other"], {"partner": 1}) for i in range(40)]
+        return items
+
     def counts_with_pair_evidence(self):
         counts = CountStore.empty()
         # "anchor" is picked half the time overall at this position.
@@ -177,11 +184,25 @@ class VariantTests(unittest.TestCase):
                                    ["anchor", "other"], {"partner": 1}))
         return counts
 
-    def test_v2_reproduces_production_card_tendency(self):
+    def test_the_harness_still_reproduces_production(self):
+        """Production shipped strong-player-colour-stage-v3, so the variant this
+        anchors on moved with it. v2 is kept as a historical comparison point,
+        not as a description of what runs.
+
+        The full cross-check over cards, picks and pools lives in
+        tests/test_build_replays.py; this is the harness-side tripwire.
+        """
         counts = self.counts_with_pair_evidence()
         pool = {"partner": 1}
-        production = OutOfFoldModel(counts, CountStore.empty())
-        harness = VariantModel(counts, VARIANTS["v2"])
+        base = OutOfFoldModel(counts, CountStore.empty())
+        for item in self.examples_with_pair_evidence():
+            counts.observe_expected(item, base.base_tendency)
+        fit = {"set_id": "tst", "split": "train", "play_rate": 0.6,
+               "by_commitment": {"0": 0.5, "1-2": 0.58, "3-5": 0.62},
+               "by_stage": {}, "cards": {}}
+        production = OutOfFoldModel(counts, CountStore.empty(), fit)
+        harness = VariantModel(counts, VARIANTS["v3-colour-and-pair"],
+                               dict(counts.pair_expected), fit)
         for pick in (0, 6):
             self.assertAlmostEqual(
                 harness.card_tendency("anchor", 0, pick, pool),

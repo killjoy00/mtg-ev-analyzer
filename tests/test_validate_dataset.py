@@ -1,5 +1,6 @@
 import argparse
 import csv
+import json
 import tempfile
 import unittest
 from pathlib import Path
@@ -27,7 +28,12 @@ class DatasetValidationTests(unittest.TestCase):
                 writer = csv.DictWriter(handle, fieldnames=fields)
                 writer.writeheader()
                 writer.writerows(rows)
-            args = argparse.Namespace(input=str(csv_path),output_dir=str(data_dir),catalog=None,expansion="TST",format="PremierDraft",source_date="2026-01-01",minimum_games=100,top_fraction=1.0,max_training_drafts=10,max_output_drafts=10,minimum_picks=2,folds=2,shard_size=2,card_metadata=None)
+            fit_path = data_dir / "fit.json"
+            fit_path.parent.mkdir(parents=True, exist_ok=True)
+            fit_path.write_text(json.dumps({
+                "set_id": "tst", "split": "train", "play_rate": 0.6,
+                "by_commitment": {"0": 0.5, "3-5": 0.6}, "by_stage": {}, "cards": {}}))
+            args = argparse.Namespace(input=str(csv_path),output_dir=str(data_dir),catalog=None,expansion="TST",format="PremierDraft",source_date="2026-01-01",minimum_games=100,top_fraction=1.0,max_training_drafts=10,max_output_drafts=10,minimum_picks=2,folds=2,shard_size=2,card_metadata=None,deck_fit=str(fit_path))
             dataset = build(args)
             write_sharded_dataset(dataset, data_dir, 2)
             result = validate(data_dir / "manifest.json", minimum_replays=4)

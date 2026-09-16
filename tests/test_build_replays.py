@@ -10,6 +10,7 @@ from scripts.build_replays import (
     OutOfFoldModel,
     PickExample,
     build,
+    load_deck_fit,
     parse_games_lower_bound,
     parse_rate_bucket,
     quantile_cutoff,
@@ -34,6 +35,100 @@ class ParsingTests(unittest.TestCase):
 
 
 class ModelTests(unittest.TestCase):
+    def test_production_reproduces_the_validated_harness_model(self):
+        """The port's whole correctness guarantee.
+
+        `v3-colour-and-pair` is the configuration measured on six held-out
+        sets. If production and the harness ever disagree, what ships is not
+        what was validated - and nothing else in this suite would notice.
+        """
+        import sys
+        from pathlib import Path as _P
+        sys.path.insert(0, str(_P(__file__).resolve().parents[1] / "scripts"))
+        from eval_model import VARIANTS, VariantModel
+
+        fit = {"set_id": "tst", "split": "train", "play_rate": 0.60,
+               "by_commitment": {"0": 0.42, "1-2": 0.50, "3-5": 0.61,
+                                 "6-9": 0.70, "10+": 0.64},
+               "by_stage": {"s3-5": {"*": 0.58, "0": 0.33, "1-2": 0.47,
+                                     "3-5": 0.71, "6-9": 0.80},
+                            "s6-9": {"*": 0.66, "3-5": 0.55, "6-9": 0.83}},
+               "cards": {"A": {"colours": "U", "play_rate": 0.7,
+                               "by_commitment": {"0": 0.4, "3-5": 0.8}},
+                         "B": {"colours": "R", "play_rate": 0.5,
+                               "by_commitment": {"0": 0.3, "3-5": 0.6}},
+                         "Signal X": {"colours": "U", "play_rate": 0.6,
+                                      "by_commitment": {}},
+                         "Signal Y": {"colours": "R", "play_rate": 0.6,
+                                      "by_commitment": {}},
+                         "Mystery": {"colours": "?", "play_rate": 0.6,
+                                     "by_commitment": {}}}}
+
+        counts = CountStore.empty()
+        for i in range(60):
+            pool = {"Signal X": 1 + i % 2} if i % 3 else {"Signal Y": 1}
+            picked = "A" if i % 4 else "B"
+            counts.observe(PickExample(f"d{i}", 0, 2 + i % 6, picked, ["A", "B"], pool))
+        base = OutOfFoldModel(counts, CountStore.empty())
+        for i in range(60):
+            pool = {"Signal X": 1 + i % 2} if i % 3 else {"Signal Y": 1}
+            picked = "A" if i % 4 else "B"
+            counts.observe_expected(
+                PickExample(f"d{i}", 0, 2 + i % 6, picked, ["A", "B"], pool),
+                base.base_tendency)
+
+        production = OutOfFoldModel(counts, CountStore.empty(), fit)
+        harness = VariantModel(counts, VARIANTS["v3-colour-and-pair"],
+                               dict(counts.pair_expected), fit)
+
+        pools = [{}, {"Signal X": 1}, {"Signal Y": 2},
+                 {"Signal X": 3, "Signal Y": 1}, {"Mystery": 4},
+                 {"Signal X": 5, "Mystery": 2}]
+        checked = 0
+        for card in ("A", "B", "Mystery"):
+            for pick in (0, 3, 7):
+                for pool in pools:
+                    with self.subTest(card=card, pick=pick, pool=tuple(sorted(pool))):
+                        self.assertAlmostEqual(
+                            production.card_tendency(card, 0, pick, pool),
+                            harness.card_tendency(card, 0, pick, pool), places=12)
+                    checked += 1
+        self.assertEqual(checked, 54)
+
+    def test_an_unknown_colour_gets_no_shift_in_production_either(self):
+        fit = {"set_id": "tst", "split": "train", "play_rate": 0.6,
+               "by_commitment": {"0": 0.4, "3-5": 0.8}, "by_stage": {},
+               "cards": {"Mystery": {"colours": "?", "play_rate": 0.6,
+                                     "by_commitment": {}},
+                         "Blue": {"colours": "U", "play_rate": 0.6,
+                                  "by_commitment": {}}}}
+        counts = CountStore.empty()
+        for i in range(30):
+            counts.observe(PickExample(f"d{i}", 0, 3, "Mystery", ["Mystery", "Blue"],
+                                       {"Blue": 4}))
+        model = OutOfFoldModel(counts, CountStore.empty(), fit)
+        self.assertEqual(model.fit_shift("Mystery", {"Blue": 4}), 0.0)
+
+    def test_a_fit_table_from_the_wrong_split_is_refused(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "fit.json"
+            path.write_text(json.dumps({"split": "test", "cards": {},
+                                        "by_commitment": {}, "by_stage": {},
+                                        "play_rate": 0.6}))
+            with self.assertRaises(ValueError) as caught:
+                load_deck_fit(path)
+            self.assertIn("train split", str(caught.exception))
+
+    def test_a_fit_table_without_a_stage_curve_is_refused(self):
+        """Silently falling back to the marginal curve everywhere would ship a
+        model with the stage confound the whole change exists to remove."""
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "fit.json"
+            path.write_text(json.dumps({"split": "train", "cards": {},
+                                        "by_commitment": {}, "play_rate": 0.6}))
+            with self.assertRaises(ValueError):
+                load_deck_fit(path)
+
     def test_pool_context_changes_card_preference(self):
         counts = CountStore.empty()
         held = CountStore.empty()
@@ -41,6 +136,15 @@ class ModelTests(unittest.TestCase):
             pool = {"Signal X": 1} if i < 10 else {"Signal Y": 1}
             picked = "A" if i < 10 else "B"
             counts.observe(PickExample(f"d{i}", 0, 5, picked, ["A", "B"], pool))
+        # The stage-matched lift anchors on the base rate expected over the
+        # pair's own observations, so the second pass has to run here too -
+        # without it every pair abstains and the pool changes nothing.
+        base = OutOfFoldModel(counts, CountStore.empty())
+        for i in range(20):
+            pool = {"Signal X": 1} if i < 10 else {"Signal Y": 1}
+            picked = "A" if i < 10 else "B"
+            counts.observe_expected(PickExample(f"d{i}", 0, 5, picked, ["A", "B"], pool),
+                                    base.base_tendency)
         model = OutOfFoldModel(counts, held)
         a_x = model.card_tendency("A", 0, 5, {"Signal X": 1})
         b_x = model.card_tendency("B", 0, 5, {"Signal X": 1})
@@ -99,7 +203,20 @@ class PipelineTests(unittest.TestCase):
             expansion="TST", format="PremierDraft", source_date="2026-01-01", minimum_games=100,
             top_fraction=2/3, max_training_drafts=100, max_output_drafts=100, minimum_picks=2,
             folds=3, shard_size=2, card_metadata=None,
+            deck_fit=str(self.make_deck_fit(Path(tmp) / "fit.json")),
         )
+
+    @staticmethod
+    def make_deck_fit(path):
+        """A minimal colour table. Every card unknown, so the colour term
+        abstains and the fixture exercises the pair path alone; the stage curve
+        is present so load_deck_fit accepts it."""
+        path.write_text(json.dumps({
+            "set_id": "tst", "split": "train", "play_rate": 0.6,
+            "by_commitment": {"0": 0.5, "1-2": 0.55, "3-5": 0.6, "6-9": 0.65, "10+": 0.6},
+            "by_stage": {}, "cards": {},
+        }))
+        return path
 
     def test_pipeline_emits_pool_conditioned_replays(self):
         with tempfile.TemporaryDirectory() as tmp:
