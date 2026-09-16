@@ -39,11 +39,12 @@ test('Cloudflare audit fails closed without echoing token-bearing API errors',as
   await assert.rejects(auditCloudflare({token,fetcher:async url=>url.pathname.endsWith('/zones')?ok([zone]):ok([],{result_info:{total_pages:21}})}),/pagination/);
 });
 
-test('the Cloudflare secret is used only by a manually dispatched main-branch reader',()=>{
+test('the Cloudflare reader accepts manual runs or a narrowly scoped main-branch request',()=>{
   const workflow=fs.readFileSync(new URL('../.github/workflows/cloudflare-audit.yml',import.meta.url),'utf8');
-  assert.match(workflow,/workflow_dispatch:/);
+  assert.equal(workflow.match(/^on:\n([\s\S]*?)\npermissions:/m)?.[1],
+    "  workflow_dispatch:\n  push:\n    branches: [main]\n    paths:\n      - '.github/cloudflare-audit-request.txt'\n");
   assert.match(workflow,/github.ref == 'refs\/heads\/main'/);
   assert.match(workflow,/contents: read/);
-  assert.doesNotMatch(workflow,/pull_request|schedule:|push:|contents: write|NEON_API_KEY|CLOUDFLARE_API_KEY/);
+  assert.doesNotMatch(workflow,/pull_request|schedule:|contents: write|NEON_API_KEY|CLOUDFLARE_API_KEY/);
   assert.equal((workflow.match(/secrets\.CLOUDFLARE_AUDIT_TOKEN/g)||[]).length,1);
 });
