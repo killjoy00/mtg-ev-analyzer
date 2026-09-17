@@ -2,6 +2,54 @@
   "schema_version": 2,
   "sets": [
     {
+      "id": "tla",
+      "name": "TLA",
+      "format": "PremierDraft",
+      "manifest_path": "./data/tla/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2026-01-10",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "sos",
+      "name": "SOS",
+      "format": "PremierDraft",
+      "manifest_path": "./data/sos/manifest.json",
+      "replay_count": 300,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2026-06-05",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "snc",
+      "name": "SNC",
+      "format": "PremierDraft",
+      "manifest_path": "./data/snc/manifest.json",
+      "replay_count": 296,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2022-07-07",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
+      "id": "fdn",
+      "name": "FDN",
+      "format": "PremierDraft",
+      "manifest_path": "./data/fdn/manifest.json",
+      "replay_count": 298,
+      "model_version": "strong-player-colour-stage-v3",
+      "data_date": "2024-12-19",
+      "is_fixture": false,
+      "win_rate_cutoff": 0.6,
+      "training_drafts": 5000
+    },
+    {
       "id": "neo",
       "name": "NEO",
       "format": "PremierDraft",
@@ -284,18 +332,6 @@
       "arena_rank_cutoff_tier": "diamond"
     },
     {
-      "id": "snc",
-      "name": "SNC",
-      "format": "PremierDraft",
-      "manifest_path": "./data/snc/manifest.json",
-      "replay_count": 296,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2022-07-07",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
       "id": "bro",
       "name": "BRO",
       "format": "PremierDraft",
@@ -320,30 +356,6 @@
       "training_drafts": 5000
     },
     {
-      "id": "sos",
-      "name": "SOS",
-      "format": "PremierDraft",
-      "manifest_path": "./data/sos/manifest.json",
-      "replay_count": 300,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2026-06-05",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
-      "id": "fdn",
-      "name": "FDN",
-      "format": "PremierDraft",
-      "manifest_path": "./data/fdn/manifest.json",
-      "replay_count": 298,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2024-12-19",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
       "id": "tdm",
       "name": "TDM",
       "format": "PremierDraft",
@@ -363,18 +375,6 @@
       "replay_count": 300,
       "model_version": "strong-player-pool-context-v2",
       "data_date": "2025-09-03",
-      "is_fixture": false,
-      "win_rate_cutoff": 0.6,
-      "training_drafts": 5000
-    },
-    {
-      "id": "tla",
-      "name": "TLA",
-      "format": "PremierDraft",
-      "manifest_path": "./data/tla/manifest.json",
-      "replay_count": 300,
-      "model_version": "strong-player-pool-context-v2",
-      "data_date": "2026-01-10",
       "is_fixture": false,
       "win_rate_cutoff": 0.6,
       "training_drafts": 5000
