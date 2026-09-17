@@ -11,7 +11,7 @@ import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,publicDifficulty,
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,regularRunSet,dailySetWeight,dailyRequiredSets,DRAFT_RUN_LENGTH} from '../draft-run-policy.mjs';
 import {
   DRAFT_RUN_CORPUS_VERSION, DRAFT_RUN_SCORING_VERSION, gradeDraftRunPick,
-  publicDraftRunPuzzle, validateDraftRunPuzzle, draftRunEnvironment, calibratedSupports,
+  publicDraftRunPuzzle, validateDraftRunPuzzle, draftRunEnvironment, calibratedSupports, supportSharpening,
 } from '../draft-run.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -153,7 +153,7 @@ async function change(request,id,action) {
     const grade=gradeDraftRunPick(p,body.cardId);
     const evidence=rateDraftRunPuzzle(p);
     grade.modelTargetDisagreement=evidence.modelTargetDisagreement;
-    s.answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:(()=>{const calibrated=calibratedSupports(p.candidates);return [...p.candidates].sort((a,b)=>b.model_probability-a.model_probability).map(c=>({id:c.id,name:c.name,support:calibrated.get(c.id),score:gradeDraftRunPick(p,c.id).score}));})()});
+    s.answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:(()=>{const calibrated=calibratedSupports(p.candidates,supportSharpening(p.corpus_version));return [...p.candidates].sort((a,b)=>b.model_probability-a.model_probability).map(c=>({id:c.id,name:c.name,support:calibrated.get(c.id),score:gradeDraftRunPick(p,c.id).score}));})()});
     if(s.answers.length===runLength(s)) s.score=Math.round(s.answers.reduce((n,a)=>n+a.score,0)/runLength(s));
   } else {
     const type=body.type;

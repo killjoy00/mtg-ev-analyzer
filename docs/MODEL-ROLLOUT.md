@@ -5,6 +5,11 @@ The target is `strong-player-colour-stage-v3` in the parallel corpus
 the verified trophy choice earns 100, and alternatives earn
 `round(95 * selected_support / leading_support)`.
 
+Displayed support uses the pooled validation exponent for the model: 2.0 for
+the old pair model, 1.75 for the colour-stage model. Points are computed from
+the raw support ratio directly, avoiding rounding changes from applying and
+then undoing a display transform. Existing runs retain their display model.
+
 ## Retirement failure and verification
 
 PR #110 failed because an existing Daily schedule contained a retired puzzle
