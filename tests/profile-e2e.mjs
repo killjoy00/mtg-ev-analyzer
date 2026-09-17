@@ -165,7 +165,9 @@ try {
   await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
   await page.locator('#profile-settings-form button[type="submit"]').click();
-  await page.waitForFunction(() => document.querySelector('.player-profile-page') && document.querySelector('select[name="favoriteSetId"]')?.value === 'ktk');
+  // The select already has this value before submit; wait for the saved
+  // profile to render instead of racing the asynchronous update response.
+  await page.waitForFunction(() => document.querySelector('.profile-hero h1')?.textContent?.trim() === 'Leaderboard Ace' && document.querySelector('select[name="favoriteSetId"]')?.value === 'ktk');
   assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10' });
   assert.equal((await page.locator('.profile-hero h1').textContent())?.trim(), 'Leaderboard Ace');
   assert.equal(await page.evaluate(() => localStorage.getItem('pack1-player-name-v1')), 'Leaderboard Ace');
