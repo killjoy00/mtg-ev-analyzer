@@ -12,6 +12,7 @@ import {
   publicDraftRunPuzzle,
   SCORE_EXPONENT,
   SUPPORT_SHARPENING,
+  supportSharpening,
   summarizeDraftRun,
 } from '../draft-run.mjs';
 
@@ -130,6 +131,17 @@ test('calibration does not move a single score', () => {
       assert.equal(gradeDraftRunPick(puzzle, card.id).score, before,
         `score moved for ${card.id} in [${probabilities}]`);
     });
+  }
+});
+
+test('colour-stage display calibration preserves linear awards at rounding boundaries',()=>{
+  assert.equal(supportSharpening('qa-pair-model'),2);
+  assert.equal(supportSharpening('qa-colour-stage-v7'),1.75);
+  for(const supports of [[1,0.5,0.3,0.1],[0.9,0.45,0.15,0.01],[0.4,0.4,0.1,0.1]]) {
+    const item=puzzle({supports,historical:'d'});
+    const scores=version=>item.candidates.map(c=>gradeDraftRunPick({...item,corpus_version:version},c.id).score);
+    assert.deepEqual(scores('qa-colour-stage-v7'),scores('qa-pair-model'));
+    assert.deepEqual(scores('qa-colour-stage-v7'),supports.map((p,i)=>i===3?100:Math.round(95*p/Math.max(...supports))));
   }
 });
 

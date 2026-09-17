@@ -7,6 +7,7 @@ import readline from 'node:readline';
 import {createHash} from 'node:crypto';
 import {validateDraftRunPuzzle, interestingDraftRunPuzzle, draftRunDifficulty, DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
+import {corpusDatabase} from './neon-corpus-db.mjs';
 const directory=process.argv[3]||'generated/trophy-import';
 const catalog=JSON.parse(fs.readFileSync(path.join(directory,'catalog.json')));
 const registry=JSON.parse(fs.readFileSync('corpus/draft-run/catalog.json'));
@@ -15,6 +16,7 @@ const supported=s=>!policy.retired_set_fingerprints.includes(createHash('sha256'
 if(catalog.requested_sets.some(s=>!supported(s))||catalog.sets.some(s=>!supported(s.id)))throw Error('Import contains a permanently retired environment');
 const allowed=new Set(registry.sets.map(s=>s.id));
 if(!catalog.complete || Object.keys(catalog.errors).length || catalog.corpus_version!==DRAFT_RUN_CORPUS_VERSION) throw Error('Incomplete or incompatible import');
+if(catalog.sets.some(s=>s.model_version!==registry.model_version))throw Error('Import and baseline model versions differ');
 if(new Set(catalog.requested_sets).size!==catalog.sets.length || catalog.sets.some(s=>!catalog.requested_sets.includes(s.id)))throw Error('Set accounting mismatch');
 async function hash(file) { const h=createHash('sha256'); for await(const c of fs.createReadStream(file)) h.update(c);return h.digest('hex'); }
 async function* records(file) { const lines=readline.createInterface({input:fs.createReadStream(file).pipe(zlib.createGunzip()),crlfDelay:Infinity});for await(const line of lines) if(line)yield JSON.parse(line); }
@@ -43,16 +45,7 @@ for(const s of catalog.sets) {
 if(process.argv.includes('--validate-only'))process.exit(0);
 const remote=process.argv[2]?.startsWith('https://')?process.argv[2]:null;
 const {importRequest}=await import('./actions-import-auth.mjs');
-const connection=remote?null:fs.readFileSync(process.argv[2],'utf8').trim();const db=remote?null:new URL(connection);
-const endpoint=remote?null:`https://api.${db.hostname.split('.').slice(1).join('.')}/sql`;
-async function query(sql,params=[]) {
-  for(let attempt=0;attempt<3;attempt++) {
-    const r=await fetch(endpoint,{method:'POST',headers:{'content-type':'application/json','Neon-Connection-String':connection},body:JSON.stringify({query:sql,params}),signal:AbortSignal.timeout(120000)});
-    if(r.ok)return r.json();
-    if(![429,502,503,504].includes(r.status)||attempt===2)throw Error('SQL request failed: '+r.status);
-    await new Promise(resolve=>setTimeout(resolve,1000*(attempt+1)));
-  }
-}
+const query=remote?null:corpusDatabase(process.argv[2]);
 async function batchInsert(puzzles) {
   if(remote)return Number((await importRequest(remote,{action:'batch',puzzles})).added);
   const {insertTrophyBatch}=await import('../worker/trophy-import.mjs');

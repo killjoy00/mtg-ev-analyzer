@@ -333,7 +333,7 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     # needs it now: the colour table is estimated from which cards reached a
     # deck, and building without one silently ships a model with no colour term.
     skill_source = archive(f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz', directory/'games.csv.gz', refresh)
-    signature = hashlib.sha256(encoded({'source':source, 'skill_source':skill_source, 'importer':digest(__file__), 'model':digest(root/'scripts/build_replays.py'), 'legacy_model':digest(root/'scripts/backfill_legacy_sets.py'), 'images':digest(root/'corpus/draft-run/card-images.json'), 'baseline':base_entry, 'manifest':manifest, 'training_cap':training_cap})).hexdigest()
+    signature = hashlib.sha256(encoded({'corpus_version':VERSION, 'source':source, 'skill_source':skill_source, 'importer':digest(__file__), 'model':digest(root/'scripts/build_replays.py'), 'colour_dependencies':{name:digest(root/'scripts'/name) for name in ['deck_fit.py','card_outcomes.py','eval_model.py']}, 'legacy_model':digest(root/'scripts/backfill_legacy_sets.py'), 'images':digest(root/'corpus/draft-run/card-images.json'), 'baseline':base_entry, 'manifest':manifest, 'training_cap':training_cap})).hexdigest()
     completed = directory/'manifest.json'
     if not refresh and completed.exists():
         old = json.loads(completed.read_text())
