@@ -1,6 +1,7 @@
 {
-  "request_id": "colour-stage-v7-regenerate-retry-20260917",
-  "operation": "regenerate",
-  "corpus_version": "elite-trophy-colour-stage-v7",
-  "reason": "Retry the complete v7 baseline build after fixing version-dependent fixtures; PR #116 passed unit, browser and real-database gates."
+  "request_id": "v7-ktk-development-20260918-01",
+  "reason": "Exercise the regenerated v7 trophy import on KTK in development before the complete corpus rollout.",
+  "operation": "import",
+  "sets": "ktk",
+  "target": "development"
 }
