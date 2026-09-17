@@ -25,7 +25,9 @@ Three modes, and only three. Every one of them grades **Pack 1 only** — nothin
 | **Full Pack** | every decision in one seat's Pack 1 | 10 | R2 shards via `data.packone.pro` |
 | **Top 3** | P1P1 only — rank your three best starts | 1 | R2 shards via `data.packone.pro` |
 
-Draft Run draws from the full verified trophy corpus in the database. Full Pack and Top 3 read a replay shard for the selected set. Both populations are trophy drafts; they are built by different pipelines (`scripts/import_all_trophies.py` and `scripts/build_replays.py`), so a model change has to be rolled out to both before every mode agrees.
+Draft Run draws from the full verified trophy corpus in the database. Full Pack and Top 3 read a replay shard for the selected set. They are built by different pipelines (`scripts/import_all_trophies.py` and `scripts/build_replays.py`), so a model change has to be rolled out to both before every mode agrees.
+
+> **Known defect — Full Pack and Top 3 are not trophy-only.** They are intended to serve trophy drafts, and the app says so, but `scripts/build_replays.py` selects on the drafter's *lifetime* win-rate bucket (experienced, top 15%) and never reads `event_match_wins`. Measured against the trophy evidence files, only 21–28% of served seats are trophy drafts; the rest are strong drafters who did not go 7-0 in that event. Draft Run is unaffected — its corpus is trophy-verified by a separate pipeline. Fixing this means filtering the replay output on event wins and rebuilding every set's shards.
 
 ### Draft Run
 
