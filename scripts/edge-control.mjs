@@ -16,7 +16,7 @@ export function checkBranch(branch) {
 }
 export function inheritedFunctionSlugs(list,branch,created) {
   checkBranch(branch);
-  if(created!=='true')throw Error('Require a newly created isolated branch for inherited function cleanup.');
+  if(created!=='true')throw Error('Require a newly created isolated branch for inherited function isolation.');
   const functions=Array.isArray(list)?list:list?.functions;
   if(!Array.isArray(functions)||functions.some(f=>!f||!/^[a-z][a-z0-9-]{0,62}$/.test(f.slug)))throw Error('Unexpected inherited function inventory.');
   const slugs=functions.map(f=>f.slug);
@@ -92,13 +92,22 @@ async function main(action) {
     try {return execFileSync(bin(name),args,{input,encoding:'utf8',stdio:['pipe','pipe','pipe'],env:{...process.env,CLOUDFLARE_API_TOKEN:process.env.CLOUDFLARE_EDGE_TOKEN}});}
     catch(error) {throw Error(commandFailure(name,args,error));}
   };
-  // New branches inherit public functions. Delete only these disposable copies,
-  // never functions on either existing branch, before installing guarded code.
+  // Inherited function entries cannot reliably be deleted (live API: 404).
+  // Shadow utility functions with always-deny code on this fresh branch only.
   const inventory=()=>inheritedFunctionSlugs(JSON.parse(run('neon',['functions','list','--project-id','patient-shadow-91417882','--branch',branch,'--output','json'])),branch,process.env.PREVIEW_CREATED);
   const inherited=inventory();
-  for(const slug of inherited)run('neon',['functions','delete',slug,'--project-id','patient-shadow-91417882','--branch',branch]);
-  if(inventory().length)throw Error('Unexpected inherited functions remain after isolated cleanup.');
-  console.log(`Removed ${inherited.length} inherited function copies from the newly created preview branch.`);
+  const sealed=inherited.filter(slug=>!['pack1api','pack1growth','draftrunapi'].includes(slug));
+  const closedDir=path.join(process.env.RUNNER_TEMP,'closed-preview-origin');fs.mkdirSync(closedDir,{recursive:true});
+  fs.copyFileSync('edge/closed-origin.mjs',path.join(closedDir,'closed-origin.mjs'));
+  fs.writeFileSync(path.join(closedDir,'index.mjs'),`import {closedOrigin} from './closed-origin.mjs'; export default closedOrigin(${JSON.stringify(commit)});\n`);
+  fs.writeFileSync(path.join(closedDir,'package.json'),'{"type":"module"}\n');
+  for(const slug of sealed) {
+    run('neon',['functions','deploy',slug,'--src',closedDir,'--no-bundle','--project-id','patient-shadow-91417882','--branch',branch,'--runtime','nodejs24','--wait']);
+    const response=await fetch(`https://${branch}-${slug}.compute.c-5.us-east-2.aws.neon.tech/health?quick=1`,{redirect:'error',signal:AbortSignal.timeout(30000)});
+    if(response.status!==403||(await response.json()).release_commit!==commit)throw Error('Origin closure verification failed; preview has not been attached.');
+    console.log(`${slug}: inherited preview endpoint closed and revision verified.`);
+  }
+  variable('PREVIEW_SEALED_FUNCTIONS',sealed.join(','));
   for(const slug of ['pack1api','pack1growth','draftrunapi']) {
     run('neon',['functions','deploy',slug,'--src',path.join(process.env.RUNNER_TEMP,'pack1-bundles',slug),'--no-bundle','--project-id','patient-shadow-91417882','--branch',branch,'--runtime','nodejs24','--env','PACK1_REQUIRE_INGRESS=1','--env',`PACK1_INGRESS_SECRET=${origin}`,'--wait']);
     const base=`https://${branch}-${slug}.compute.c-5.us-east-2.aws.neon.tech`;
@@ -108,6 +117,9 @@ async function main(action) {
     if(verified.status!==200||(await verified.json()).release_commit!==commit)throw Error('Origin revision verification failed.');
     console.log(`${slug}: protected preview origin and revision verified.`);
   }
+  const expected=new Set([...sealed,'pack1api','pack1growth','draftrunapi']);
+  const installed=inventory();
+  if(installed.length!==expected.size||installed.some(slug=>!expected.has(slug)))throw Error('Unexpected inherited function inventory after deployment.');
   const config=JSON.parse(fs.readFileSync('edge/wrangler.json','utf8'));
   config.main=path.resolve('edge/gateway.mjs');config.account_id=zone.account.id;
   config.vars={...config.vars,NEON_BRANCH_ID:branch};
@@ -123,6 +135,6 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url)main(p
   // Unexpected failures may carry request data. Only our fixed messages leave
   // this control process; never print a provider response or process arguments.
   const message=String(error.message||'');
-  console.error(/^(Add repository|Invalid preview|An isolated|Cloudflare control|Cloudflare rejected|Neon control|Expected the|Invalid Cloudflare|Cannot verify|Preview hostname|Preview DNS|Existing Worker|Unexpected custom|Unknown preview|Require a newly|Unexpected inherited|Origin did|Origin revision|neon failed|wrangler failed)/.test(message)?message:'Preview operation failed; inspect the sanitized step status.');
+  console.error(/^(Add repository|Invalid preview|An isolated|Cloudflare control|Cloudflare rejected|Neon control|Expected the|Invalid Cloudflare|Cannot verify|Preview hostname|Preview DNS|Existing Worker|Unexpected custom|Unknown preview|Require a newly|Unexpected inherited|Origin did|Origin revision|Origin closure|neon failed|wrangler failed)/.test(message)?message:'Preview operation failed; inspect the sanitized step status.');
   process.exitCode=1;
 });

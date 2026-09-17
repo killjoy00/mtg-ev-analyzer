@@ -1,1 +1,1 @@
-{"operation":"deploy-preview","reason":"2026-09-17: Verify Neon function API permission before provisioning and include safe command-stage diagnostics for the preview retry."}
+{"operation":"deploy-preview","reason":"2026-09-17: Neon function access is verified; shadow inherited utility functions with always-deny handlers because deleting inherited entries returns not found."}

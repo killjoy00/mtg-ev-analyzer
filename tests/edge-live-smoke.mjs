@@ -19,6 +19,12 @@ for(let attempt=0;attempt<18;attempt++) {
 }
 assert.ok(ready,'Preview TLS/readiness did not become available.');
 const verify=async()=>{
+  for(const slug of (process.env.PREVIEW_SEALED_FUNCTIONS||'').split(',').filter(Boolean)) {
+    assert.match(slug,/^[a-z][a-z0-9-]{0,62}$/);
+    const r=await fetch(`https://${branch}-${slug}.compute.c-5.us-east-2.aws.neon.tech/health?quick=1`,{headers:{'x-pack1-ingress-secret':origin},redirect:'error',signal:AbortSignal.timeout(30000)});
+    assert.equal(r.status,403,'Inherited utility endpoint must remain disabled even with the gateway credential.');
+    assert.equal((await r.json()).release_commit,commit);
+  }
   for(const [service,slug] of [['legacy','pack1api'],['growth','pack1growth'],['draft','draftrunapi']]) {
     assert.equal((await call(service,'/health?quick=1')).release_commit,commit);
     for(const headers of [{},{'x-pack1-ingress-secret':'forged','cf-connecting-ip':'127.0.0.1','x-forwarded-for':'127.0.0.1'}]) {

@@ -6,6 +6,7 @@ import growth from '../worker/growth-function.js';
 import draft from '../worker/draft-run-function.mjs';
 import {gateway,ipNetwork} from '../edge/gateway.mjs';
 import {parseRequest,checkBranch,inheritedFunctionSlugs,commandFailure} from '../scripts/edge-control.mjs';
+import {closedOrigin} from '../edge/closed-origin.mjs';
 const key='a'.repeat(64);
 const env={MODE:'preview',NEON_BRANCH_ID:'br-isolated-preview',ORIGIN_SECRET:key,PREVIEW_KEY:'b'.repeat(64),QUOTA_KEY:'c'.repeat(64),
   NETWORK_QUOTA:{idFromName(name){assert.match(name,/^[a-f0-9]{64}$/);return name;},get(){return {fetch:async()=>new Response(null,{status:204})};}}};
@@ -80,13 +81,23 @@ test('operations reject arbitrary commands and existing branch targets',()=>{
   checkBranch('br-new-isolated-preview');
 });
 
-test('inherited function cleanup requires a newly created isolated branch and valid complete inventory',()=>{
+test('inherited function isolation requires a newly created isolated branch and valid complete inventory',()=>{
   const list=[{slug:'pack1api'},{slug:'historical-helper'}];
   assert.deepEqual(inheritedFunctionSlugs(list,'br-new-preview','true'),['pack1api','historical-helper']);
   assert.deepEqual(inheritedFunctionSlugs({functions:[]},'br-new-preview','true'),[]);
   for(const branch of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'])assert.throws(()=>inheritedFunctionSlugs(list,branch,'true'));
   for(const created of ['false',undefined,true])assert.throws(()=>inheritedFunctionSlugs(list,'br-new-preview',created));
   for(const invalid of [null,{},[{slug:'--help'}],[{slug:'../other'}],[{slug:'same'},{slug:'same'}]])assert.throws(()=>inheritedFunctionSlugs(invalid,'br-new-preview','true'));
+});
+
+test('closed inherited endpoints deny every method and credential without running historical code',async()=>{
+  const commit='a'.repeat(40),handler=closedOrigin(commit);
+  assert.throws(()=>closedOrigin('invalid'));
+  for(const method of ['GET','POST','OPTIONS','DELETE']) {
+    const response=handler.fetch(new Request('https://example.test/admin',{method,headers:{authorization:'Bearer forged','x-pack1-ingress-secret':'a'.repeat(64)}}));
+    assert.equal(response.status,403);assert.equal(response.headers.get('cache-control'),'no-store');
+    assert.equal((await response.json()).release_commit,commit);
+  }
 });
 
 test('command diagnostics reveal only fixed stages, categories and numeric statuses',()=>{
