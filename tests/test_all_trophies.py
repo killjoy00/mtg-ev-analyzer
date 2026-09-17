@@ -305,6 +305,32 @@ class RetirementTests(unittest.TestCase):
             with self.subTest(fingerprint=fingerprint[:12]):
                 self.assertIn(fingerprint, newest)
 
+    # child table -> parent it references, for every foreign key that a
+    # set-scoped delete can trip. 0010 predates the first two and deleted the
+    # parent first, which aborts the migration on a real database:
+    #   ERROR: delete on "draft_run_verified_puzzles" violates foreign key
+    #   constraint "draft_run_decision_observations_puzzle_id_fkey"
+    FOREIGN_KEYS = (
+        ('draft_run_decision_observations', 'draft_run_verified_puzzles'),
+        ('draft_run_puzzle_ratings', 'draft_run_verified_puzzles'),
+        ('draft_run_verified_puzzles', 'draft_run_verified_sets'),
+        ('draft_run_environment_policy', 'draft_run_verified_sets'),
+        ('draft_run_puzzles', 'draft_run_sets'),
+        ('game_result_environments', 'game_results'),
+    )
+
+    def test_every_dependent_is_deleted_before_the_table_it_references(self):
+        root = Path(__file__).resolve().parents[1]
+        text = sorted(root.glob('migrations/*_retire_*.sql'))[-1].read_text(encoding='utf-8')
+        deletes = [line.split()[2] for line in text.splitlines()
+                   if line.startswith('DELETE FROM ')]
+        for child, parent in self.FOREIGN_KEYS:
+            with self.subTest(child=child, parent=parent):
+                self.assertIn(child, deletes, f'{child} rows are never cleared')
+                self.assertIn(parent, deletes, f'{parent} rows are never cleared')
+                self.assertLess(deletes.index(child), deletes.index(parent),
+                                f'{child} must be deleted before {parent}')
+
     def test_the_newest_migration_replaces_constraints_rather_than_adding(self):
         """Adding a constraint beside an older, narrower one leaves the old one
         in place; only a DROP then ADD actually widens the enforced list."""
@@ -333,13 +359,19 @@ class RetirementTests(unittest.TestCase):
             (root / 'corpus/draft-run/catalog.json').read_text(encoding='utf-8'))['sets']}
         self.assertEqual(registry, corpus)
 
-    def test_no_data_or_corpus_file_survives_for_a_retired_environment(self):
+    def test_no_committed_file_survives_for_a_retired_environment(self):
+        """Scoped to TRACKED files on purpose. CI hydrates the replay shards from
+        R2, and the object purge runs on merge to main, so a working-tree scan
+        sees a retired environment's shards sitting there on every pre-merge run
+        and can never pass. What a pull request controls is what is committed."""
+        import subprocess
         from purge_retired_data import retired_path
         root = Path(__file__).resolve().parents[1]
-        stale = [str(p.relative_to(root)) for base in ('data', 'corpus/draft-run')
-                 for p in (root / base).rglob('*')
-                 if p.is_file() and retired_path(p.relative_to(root / base))]
-        self.assertEqual(stale, [], 'retired environment files still present')
+        tracked = subprocess.run(['git', 'ls-files', 'data', 'corpus/draft-run'],
+                                 cwd=root, capture_output=True, text=True, check=True)
+        stale = [line for line in tracked.stdout.split()
+                 if retired_path(Path(line))]
+        self.assertEqual(stale, [], 'retired environment files are still committed')
 
     def test_the_published_health_snapshot_forgets_a_retired_environment(self):
         """purge_retired_data works on PATHS, so a generated file that merely
