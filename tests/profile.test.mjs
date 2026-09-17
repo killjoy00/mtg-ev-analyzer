@@ -38,14 +38,14 @@ test('profile helpers summarize challenges, recent form, unlocks, and share copy
     player:{ display_name:'Drafter' },
     summary:{ games:12, average_score:78.25, best_score:99, current_streak:4, challenge_wins:3, challenge_losses:2, challenge_ties:1 },
     trend:[{ score:70 },{ score:80 },{ score:90 }],
-    best_environments:[{ set_id:'neo' },{ set_id:'stx' }],
+    best_environments:[{ set_id:'neo' },{ set_id:'ktk' }],
     achievements:[{ id:'a', unlocked:true },{ id:'b', unlocked:false }],
   };
   assert.equal(formatChallengeRecord(profile.summary), '3–2–1');
   assert.equal(recentForm(profile, 2), 85);
   assert.deepEqual(unlockedAchievements(profile).map((row)=>row.id), ['a']);
-  assert.deepEqual(profileShareSummary(profile, { played:5, total:33 }), {
+  assert.deepEqual(profileShareSummary(profile, { played:5, total:32 }), {
     name:'Drafter', games:12, average:78.25, best:99, streak:4,
-    environmentsPlayed:5, environmentTotal:33, bestEnvironments:['NEO','STX'],
+    environmentsPlayed:5, environmentTotal:32, bestEnvironments:['NEO','KTK'],
   });
 });

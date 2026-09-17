@@ -240,7 +240,7 @@ if __name__ == "__main__":
 class LegacyRebuildTests(unittest.TestCase):
     """The backfill began as a one-time import for environments that did not
     exist yet, so it skips anything already in data/catalog.json. Carrying a
-    MODEL change into VOW/MID/STX needs the opposite, and the default run
+    MODEL change into the legacy sets needs the opposite, and the default run
     reports success having built nothing - which is exactly how a rollout
     leaves three sets on the old model while every check stays green."""
 
