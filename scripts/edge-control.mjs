@@ -24,6 +24,13 @@ export function inheritedFunctionSlugs(list,branch,created) {
   return slugs;
 }
 function variable(name,value) {fs.appendFileSync(process.env.GITHUB_ENV,`${name}=${value}\n`);}
+export function commandFailure(name,args,error) {
+  const output=String(error.stderr||'')+'\n'+String(error.stdout||'');
+  const status=output.match(/(?:status code|HTTP)\s+(\d{3})\b/i)?.[1];
+  const category=/unknown arguments?/i.test(output)?'unsupported argument':/unauthorized|authentication|api.key/i.test(output)?'authentication':/permission|forbidden/i.test(output)?'permission':/not found/i.test(output)?'not found':'unclassified';
+  const stage=name==='neon'?`functions ${['list','delete','deploy'].includes(args[1])?args[1]:'operation'}`:args[0]==='secret'?'secret installation':'Worker upload';
+  return `${name} failed during ${stage}; exit ${Number.isInteger(error.status)?error.status:'unknown'}; category ${category}${status?`; HTTP ${status}`:''}.`;
+}
 async function cf(route,{method='GET',body,allow404=false}={}) {
   let r;
   try {r=await fetch('https://api.cloudflare.com/client/v4'+route,{method,redirect:'error',headers:{authorization:`Bearer ${process.env.CLOUDFLARE_EDGE_TOKEN}`,'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000)});}catch{throw Error('Cloudflare control request failed.');}
@@ -47,6 +54,15 @@ async function main(action) {
   if(action==='request') {
     const operation=parseRequest(JSON.parse(fs.readFileSync('.github/edge-preview-request.json','utf8')));
     fs.appendFileSync(process.env.GITHUB_OUTPUT,`operation=${operation}\n`);return;
+  }
+  if(action==='neon-preflight') {
+    if(!process.env.NEON_API_KEY)throw Error('Neon control credential is missing.');
+    let response;
+    try {response=await fetch('https://console.neon.tech/api/v2/projects/patient-shadow-91417882/branches/br-twilight-hill-ayffyd2b/functions',{headers:{authorization:`Bearer ${process.env.NEON_API_KEY}`},redirect:'error',signal:AbortSignal.timeout(30000)});}catch{throw Error('Neon control request failed.');}
+    if(!response.ok)throw Error(`Neon control function inventory HTTP ${response.status}; no preview branch was created.`);
+    const body=await response.json();
+    if(!Array.isArray(body.functions))throw Error('Neon control returned an unexpected function inventory.');
+    console.log('Neon function inventory access verified before provisioning.');return;
   }
   if(!process.env.CLOUDFLARE_EDGE_TOKEN)throw Error('Add repository Actions secret CLOUDFLARE_EDGE_TOKEN; see docs/EDGE-OPERATIONS.md.');
   const {zone,domain}=await context();
@@ -74,7 +90,7 @@ async function main(action) {
   const bin=name=>path.join(process.env.EDGE_TOOLS_DIR,'node_modules/.bin',name);
   const run=(name,args,input)=>{
     try {return execFileSync(bin(name),args,{input,encoding:'utf8',stdio:['pipe','pipe','pipe'],env:{...process.env,CLOUDFLARE_API_TOKEN:process.env.CLOUDFLARE_EDGE_TOKEN}});}
-    catch {throw Error(`${name} failed during preview deployment; no raw credential-bearing output is printed.`);}
+    catch(error) {throw Error(commandFailure(name,args,error));}
   };
   // New branches inherit public functions. Delete only these disposable copies,
   // never functions on either existing branch, before installing guarded code.
@@ -107,6 +123,6 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url)main(p
   // Unexpected failures may carry request data. Only our fixed messages leave
   // this control process; never print a provider response or process arguments.
   const message=String(error.message||'');
-  console.error(/^(Add repository|Invalid preview|An isolated|Cloudflare control|Cloudflare rejected|Expected the|Invalid Cloudflare|Cannot verify|Preview hostname|Preview DNS|Existing Worker|Unexpected custom|Unknown preview|Require a newly|Unexpected inherited|Origin did|Origin revision|neon failed|wrangler failed)/.test(message)?message:'Preview operation failed; inspect the sanitized step status.');
+  console.error(/^(Add repository|Invalid preview|An isolated|Cloudflare control|Cloudflare rejected|Neon control|Expected the|Invalid Cloudflare|Cannot verify|Preview hostname|Preview DNS|Existing Worker|Unexpected custom|Unknown preview|Require a newly|Unexpected inherited|Origin did|Origin revision|neon failed|wrangler failed)/.test(message)?message:'Preview operation failed; inspect the sanitized step status.');
   process.exitCode=1;
 });
