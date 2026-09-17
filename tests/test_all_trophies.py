@@ -1,3 +1,4 @@
+import json
 import csv
 import gzip
 import io
@@ -280,3 +281,62 @@ class SupersedeTests(unittest.TestCase):
         source = inspect.getsource(build_set)
         self.assertIn('superseded', source)
         self.assertIn('refusing to guess which model produced which puzzle', source)
+
+
+class RetirementTests(unittest.TestCase):
+    """Retirement lives in two places that must agree: the fingerprint list in
+    data/selection-policy.json, which every script reads, and the CHECK
+    constraints in the migrations, which the database enforces. 0010 pinned each
+    CHECK to the two fingerprints retired at the time, so a later retirement that
+    only appends to the policy would be deleted once and admitted by the database
+    ever after."""
+
+    def _policy_fingerprints(self):
+        root = Path(__file__).resolve().parents[1]
+        return json.loads((root / 'data/selection-policy.json').read_text(
+            encoding='utf-8'))['retired_set_fingerprints']
+
+    def test_the_newest_retirement_migration_covers_every_fingerprint(self):
+        root = Path(__file__).resolve().parents[1]
+        migrations = sorted(root.glob('migrations/*_retire_*.sql'))
+        self.assertTrue(migrations, 'no retirement migration found')
+        newest = migrations[-1].read_text(encoding='utf-8')
+        for fingerprint in self._policy_fingerprints():
+            with self.subTest(fingerprint=fingerprint[:12]):
+                self.assertIn(fingerprint, newest)
+
+    def test_the_newest_migration_replaces_constraints_rather_than_adding(self):
+        """Adding a constraint beside an older, narrower one leaves the old one
+        in place; only a DROP then ADD actually widens the enforced list."""
+        root = Path(__file__).resolve().parents[1]
+        newest = sorted(root.glob('migrations/*_retire_*.sql'))[-1].read_text(encoding='utf-8')
+        adds = newest.count('ADD CONSTRAINT')
+        drops = newest.count('DROP CONSTRAINT IF EXISTS')
+        self.assertEqual(adds, drops,
+                         'every re-added constraint must be dropped first')
+
+    def test_a_retired_environment_is_absent_from_both_catalogs(self):
+        """A retired set left in either catalog makes the health endpoint compare
+        a set count that can never be satisfied."""
+        from set_policy import supported_set
+        root = Path(__file__).resolve().parents[1]
+        for relative in ('data/catalog.json', 'corpus/draft-run/catalog.json'):
+            catalog = json.loads((root / relative).read_text(encoding='utf-8'))
+            retired = [s['id'] for s in catalog['sets'] if not supported_set(s['id'])]
+            self.assertEqual(retired, [], f'{relative} still lists a retired environment')
+
+    def test_the_two_catalogs_agree(self):
+        root = Path(__file__).resolve().parents[1]
+        registry = {s['id'] for s in json.loads(
+            (root / 'data/catalog.json').read_text(encoding='utf-8'))['sets']}
+        corpus = {s['id'] for s in json.loads(
+            (root / 'corpus/draft-run/catalog.json').read_text(encoding='utf-8'))['sets']}
+        self.assertEqual(registry, corpus)
+
+    def test_no_data_or_corpus_file_survives_for_a_retired_environment(self):
+        from purge_retired_data import retired_path
+        root = Path(__file__).resolve().parents[1]
+        stale = [str(p.relative_to(root)) for base in ('data', 'corpus/draft-run')
+                 for p in (root / base).rglob('*')
+                 if p.is_file() and retired_path(p.relative_to(root / base))]
+        self.assertEqual(stale, [], 'retired environment files still present')

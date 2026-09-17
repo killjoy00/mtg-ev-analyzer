@@ -1,11 +1,16 @@
 #!/usr/bin/env python3
 """Backfill legacy 17Lands draft sets whose draft_data lacks skill history.
 
-VOW, MID, and STX predate the draft-data schema that exposes both
+VOW and MID predate the draft-data schema that exposes both
 ``user_game_win_rate_bucket`` and ``rank``. Their matching legacy game_data
 still carries Arena rank plus ``user_n_games_bucket``. For these frozen sets we
 select an experienced, high-ranked Arena cohort instead of inventing a win rate
 or selecting on the draft's own results.
+
+STX was retired rather than carried forward. Its game_data predates the
+``main_colors`` column that the colour term of strong-player-colour-stage-v3 is
+estimated from, so the model that every other environment runs cannot be built
+for it from its own data.
 
 For each draft, only the earliest available game row is used. Its rank and
 prior-games bucket are observed before that game's outcome, so later wins,
@@ -70,7 +75,7 @@ except ImportError:  # Script execution from scripts/.
     )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-DEFAULT_SETS = ("VOW", "MID", "STX")
+DEFAULT_SETS = ("VOW", "MID")
 EXPERIENCE_COLUMN = "user_n_games_bucket"
 TEMP_RATE_COLUMN = "user_game_win_rate_bucket"
 RANK_COLUMN = "rank"

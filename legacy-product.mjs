@@ -1,6 +1,6 @@
 import { onAppRender } from './render-lifecycle.mjs';
 
-export const LEGACY_RANK_SETS = new Set(['vow', 'mid', 'stx']);
+export const LEGACY_RANK_SETS = new Set(['vow', 'mid']);
 
 function currentSet() {
   return new URLSearchParams(globalThis.location?.search || '').get('set') || '';
