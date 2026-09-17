@@ -1,5 +1,10 @@
 {
   "catalog_signature": [
+    "ecl:2026-05-18:300",
+    "one:2023-03-01:297",
+    "eoe:2025-09-03:300",
+    "bro:2022-12-15:297",
+    "tdm:2025-05-20:300",
     "tla:2026-01-10:300",
     "sos:2026-06-05:300",
     "snc:2022-07-07:296",
@@ -27,14 +32,54 @@
     "stx:2024-01-11:299",
     "mid:2024-01-11:272",
     "vow:2024-01-11:298",
-    "bro:2022-12-15:297",
-    "one:2023-03-01:297",
-    "tdm:2025-05-20:300",
-    "eoe:2025-09-03:300",
-    "ecl:2026-02-08:300",
     "powered-cube:2025-12-01:300"
   ],
   "datasets": [
+    {
+      "data_date": "2026-05-18",
+      "error_codes": [],
+      "id": "ecl",
+      "name": "ECL",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2023-03-01",
+      "error_codes": [],
+      "id": "one",
+      "name": "ONE",
+      "replay_count": 297,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2025-09-03",
+      "error_codes": [],
+      "id": "eoe",
+      "name": "EOE",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2022-12-15",
+      "error_codes": [],
+      "id": "bro",
+      "name": "BRO",
+      "replay_count": 297,
+      "status": "healthy",
+      "warning_codes": []
+    },
+    {
+      "data_date": "2025-05-20",
+      "error_codes": [],
+      "id": "tdm",
+      "name": "TDM",
+      "replay_count": 300,
+      "status": "healthy",
+      "warning_codes": []
+    },
     {
       "data_date": "2026-01-10",
       "error_codes": [],
@@ -277,51 +322,6 @@
       "id": "vow",
       "name": "VOW",
       "replay_count": 298,
-      "status": "healthy",
-      "warning_codes": []
-    },
-    {
-      "data_date": "2022-12-15",
-      "error_codes": [],
-      "id": "bro",
-      "name": "BRO",
-      "replay_count": 297,
-      "status": "healthy",
-      "warning_codes": []
-    },
-    {
-      "data_date": "2023-03-01",
-      "error_codes": [],
-      "id": "one",
-      "name": "ONE",
-      "replay_count": 297,
-      "status": "healthy",
-      "warning_codes": []
-    },
-    {
-      "data_date": "2025-05-20",
-      "error_codes": [],
-      "id": "tdm",
-      "name": "TDM",
-      "replay_count": 300,
-      "status": "healthy",
-      "warning_codes": []
-    },
-    {
-      "data_date": "2025-09-03",
-      "error_codes": [],
-      "id": "eoe",
-      "name": "EOE",
-      "replay_count": 300,
-      "status": "healthy",
-      "warning_codes": []
-    },
-    {
-      "data_date": "2026-02-08",
-      "error_codes": [],
-      "id": "ecl",
-      "name": "ECL",
-      "replay_count": 300,
       "status": "healthy",
       "warning_codes": []
     },

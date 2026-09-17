@@ -4,14 +4,14 @@
   "metrics": {
     "cards": {
       "candidate_occurrences": 81900,
-      "image_metadata_coverage": 0.9887,
-      "rarity_metadata_coverage": 0.9887,
+      "image_metadata_coverage": 0.9989,
+      "rarity_metadata_coverage": 0.9989,
       "unique_candidates": 316
     },
     "consensus": {
-      "historical_pack_score_p10": 75.69,
-      "historical_pack_score_p50": 86.94,
-      "historical_pack_score_p90": 95.35,
+      "historical_pack_score_p10": 75.06,
+      "historical_pack_score_p50": 86.36,
+      "historical_pack_score_p90": 95.42,
       "opening_top_support_p10": 0.29,
       "opening_top_support_p50": 0.46,
       "opening_top_support_p90": 0.67

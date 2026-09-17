@@ -1,20 +1,20 @@
 {
-  "data_date": "2026-02-08",
+  "data_date": "2026-05-18",
   "errors": [],
   "metrics": {
     "cards": {
       "candidate_occurrences": 77999,
-      "image_metadata_coverage": 0.9991,
-      "rarity_metadata_coverage": 0.9991,
+      "image_metadata_coverage": 1.0,
+      "rarity_metadata_coverage": 1.0,
       "unique_candidates": 286
     },
     "consensus": {
-      "historical_pack_score_p10": 75.58,
-      "historical_pack_score_p50": 87.03,
-      "historical_pack_score_p90": 94.81,
-      "opening_top_support_p10": 0.26,
-      "opening_top_support_p50": 0.37,
-      "opening_top_support_p90": 0.54
+      "historical_pack_score_p10": 72.16,
+      "historical_pack_score_p50": 84.11,
+      "historical_pack_score_p90": 93.54,
+      "opening_top_support_p10": 0.27,
+      "opening_top_support_p50": 0.4,
+      "opening_top_support_p90": 0.58
     },
     "path_model": {
       "bytes": 1138362,
