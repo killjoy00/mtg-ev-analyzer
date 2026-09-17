@@ -1,1 +1,1 @@
-{"operation":"deploy-preview","reason":"2026-09-17: Deploy through the Neon API and verify fresh deployment metadata plus exact origin revisions; inherited function version numbers restart at 1 and cannot drive CLI readiness."}
+{"operation":"deploy-preview","reason":"2026-09-17: Apply the reviewed retirement migration only to the new preview branch and verify exact corpus health before deploying; development still has one retired environment."}
