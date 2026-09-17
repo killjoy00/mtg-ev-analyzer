@@ -1,1 +1,1 @@
-{"operation":"deploy-preview","reason":"2026-09-17: Retry with the verified 300-second Neon idle timeout and remove inherited functions only from the newly created disposable preview before deploying guarded APIs."}
+{"operation":"deploy-preview","reason":"2026-09-17: Verify Neon function API permission before provisioning and include safe command-stage diagnostics for the preview retry."}

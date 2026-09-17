@@ -32,6 +32,11 @@ jobs:
         env:
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
         run: node scripts/edge-control.mjs disable
+      - name: Verify Neon function access before provisioning
+        if: steps.request.outputs.operation == 'deploy-preview'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: node scripts/edge-control.mjs neon-preflight
       - name: Set preview expiry
         if: steps.request.outputs.operation == 'deploy-preview'
         id: expiry

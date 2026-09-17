@@ -5,7 +5,7 @@ import legacy from '../worker/index.js';
 import growth from '../worker/growth-function.js';
 import draft from '../worker/draft-run-function.mjs';
 import {gateway,ipNetwork} from '../edge/gateway.mjs';
-import {parseRequest,checkBranch,inheritedFunctionSlugs} from '../scripts/edge-control.mjs';
+import {parseRequest,checkBranch,inheritedFunctionSlugs,commandFailure} from '../scripts/edge-control.mjs';
 const key='a'.repeat(64);
 const env={MODE:'preview',NEON_BRANCH_ID:'br-isolated-preview',ORIGIN_SECRET:key,PREVIEW_KEY:'b'.repeat(64),QUOTA_KEY:'c'.repeat(64),
   NETWORK_QUOTA:{idFromName(name){assert.match(name,/^[a-f0-9]{64}$/);return name;},get(){return {fetch:async()=>new Response(null,{status:204})};}}};
@@ -87,4 +87,13 @@ test('inherited function cleanup requires a newly created isolated branch and va
   for(const branch of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'])assert.throws(()=>inheritedFunctionSlugs(list,branch,'true'));
   for(const created of ['false',undefined,true])assert.throws(()=>inheritedFunctionSlugs(list,'br-new-preview',created));
   for(const invalid of [null,{},[{slug:'--help'}],[{slug:'../other'}],[{slug:'same'},{slug:'same'}]])assert.throws(()=>inheritedFunctionSlugs(invalid,'br-new-preview','true'));
+});
+
+test('command diagnostics reveal only fixed stages, categories and numeric statuses',()=>{
+  const secret='credential-that-must-never-be-logged';
+  const message=commandFailure('neon',['functions','list'],{status:1,stderr:`Request failed with status code 403 Authorization: Bearer ${secret}\n::error::injected`});
+  assert.match(message,/functions list; exit 1/);assert.match(message,/HTTP 403/);
+  assert.ok(!message.includes(secret));assert.ok(!message.includes('::error::'));assert.ok(!message.includes('\n'));
+  assert.match(commandFailure('wrangler',['secret','bulk'],{status:1,stderr:'Unknown argument '+secret}),/secret installation; exit 1; category unsupported argument/);
+  assert.match(commandFailure('neon',['functions','deploy'],{stderr:secret}),/unclassified/);
 });
