@@ -513,6 +513,15 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--shard-size", type=int, default=2)
     parser.add_argument("--max-path-bytes", type=int, default=4_000_000)
     parser.add_argument("--report", default="generated/legacy-backfill-report.json")
+    # Published sets are skipped by default, because this began as a one-time
+    # backfill for environments that did not exist yet. A model change needs the
+    # opposite: rebuild a set that IS published, with the same legacy cohort.
+    # Without this the run reports success having built nothing, which is how a
+    # model rollout silently leaves these three sets behind.
+    parser.add_argument("--rebuild-published", action="store_true",
+                        help="rebuild sets already in data/catalog.json instead of "
+                             "skipping them; required to carry a model change into "
+                             "the legacy environments")
     return parser.parse_args(argv)
 
 
@@ -525,7 +534,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     skipped: list[str] = []
 
     for code in codes:
-        if code in existing:
+        if code in existing and not args.rebuild_published:
             skipped.append(code)
             continue
         remote = probe_public_dataset(code, args.format, "")

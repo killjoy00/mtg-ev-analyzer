@@ -2,6 +2,12 @@ name: backfill-legacy-sets
 
 on:
   workflow_dispatch:
+    inputs:
+      rebuild_published:
+        description: 'Rebuild VOW/MID/STX even though they are already published. Required to carry a model change into the legacy environments; without it the run skips them and reports success having built nothing.'
+        type: boolean
+        default: false
+        required: false
 
 permissions:
   contents: write
@@ -62,6 +68,28 @@ jobs:
           --folds 5
           --shard-size 2
           --max-path-bytes 4000000
+          ${{ inputs.rebuild_published && '--rebuild-published' || '' }}
+
+      # A run that skipped every set it was given did nothing, and said so only
+      # inside a JSON report nobody reads. It reported success for ten minutes
+      # while three sets stayed on the old model.
+      - name: Refuse a run that built nothing
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('generated/legacy-backfill-report.json').read_text())
+          built = len(report.get('successes') or [])
+          skipped = report.get('skipped_already_live') or []
+          print(f"built {built}, skipped {len(skipped)}, failed {len(report.get('failures') or [])}")
+          if not built and skipped:
+              raise SystemExit(
+                  f"Skipped every set ({' '.join(skipped)}) because they are already "
+                  f"published, and built nothing. Re-run with rebuild_published=true "
+                  f"to carry a model change into them.")
+          PY
 
       - name: Audit datasets and refresh health
         id: audit
