@@ -235,3 +235,34 @@ class LegacySkillBackfillTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LegacyRebuildTests(unittest.TestCase):
+    """The backfill began as a one-time import for environments that did not
+    exist yet, so it skips anything already in data/catalog.json. Carrying a
+    MODEL change into VOW/MID/STX needs the opposite, and the default run
+    reports success having built nothing - which is exactly how a rollout
+    leaves three sets on the old model while every check stays green."""
+
+    def test_published_sets_are_skipped_by_default(self):
+        from scripts.backfill_legacy_sets import parse_args
+        self.assertFalse(parse_args([]).rebuild_published)
+
+    def test_the_rebuild_flag_exists_and_is_opt_in(self):
+        from scripts.backfill_legacy_sets import parse_args
+        self.assertTrue(parse_args(['--rebuild-published']).rebuild_published)
+
+    def test_the_skip_is_conditional_on_the_flag(self):
+        source = (Path(__file__).resolve().parents[1]
+                  / 'scripts/backfill_legacy_sets.py').read_text(encoding='utf-8')
+        self.assertIn('if code in existing and not args.rebuild_published:', source)
+
+    def test_the_workflow_can_pass_the_flag_and_refuses_an_empty_run(self):
+        text = (Path(__file__).resolve().parents[1]
+                / '.github/workflows/backfill-legacy-sets.yml').read_text(encoding='utf-8')
+        self.assertIn('rebuild_published', text)
+        self.assertIn('--rebuild-published', text)
+        # Building nothing must fail the run rather than report success.
+        self.assertIn('Refuse a run that built nothing', text)
+        self.assertLess(text.index('Backfill legacy Premier Draft sets'),
+                        text.index('Refuse a run that built nothing'))
