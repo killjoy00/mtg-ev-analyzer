@@ -20,7 +20,7 @@ test('every eight-pick Daily guarantees released top three and distinct sets/sou
     for(const id of dailyRequiredSets(day))assert.equal(run.filter(p=>p.set_id===id).length,1);
     assert.deepEqual(run,selectDraftRun(pool,'required-'+i,'mixed',{daily:true,day}));
   }
-  assert.deepEqual(['tmt','ecl','tla','eoe','stx'].map(id=>dailySetWeight(id,undefined,day)),[4,4,4,2,1]);
+  assert.deepEqual(['tmt','ecl','tla','eoe','ktk'].map(id=>dailySetWeight(id,undefined,day)),[4,4,4,2,1]);
 });
 
 test('release dates, not archive timestamps, determine the guarantee and exclude future releases',()=>{

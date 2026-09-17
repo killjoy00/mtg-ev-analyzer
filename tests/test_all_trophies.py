@@ -351,6 +351,30 @@ class RetirementTests(unittest.TestCase):
             retired = [s['id'] for s in catalog['sets'] if not supported_set(s['id'])]
             self.assertEqual(retired, [], f'{relative} still lists a retired environment')
 
+    def test_the_policy_never_names_an_environment_it_has_retired(self):
+        """The fingerprint list is not the whole policy. regular_sets_newest_first
+        and release_dates kept naming a retired environment, so selection still
+        offered it while the migration had already deleted its puzzles: the run
+        came back with a puzzle id that loads to nothing, and the backend
+        answered 409 'This challenge uses an unavailable corpus.'"""
+        from set_policy import supported_set
+        root = Path(__file__).resolve().parents[1]
+        policy = json.loads((root / 'data/selection-policy.json').read_text(encoding='utf-8'))
+
+        def named(value, path='policy'):
+            if isinstance(value, dict):
+                return [f'{path}.{k}' for k in value if isinstance(k, str) and not supported_set(k)] + \
+                       [hit for k, v in value.items() for hit in named(v, f'{path}.{k}')]
+            if isinstance(value, list):
+                return [f'{path}[{i}]' for i, v in enumerate(value)
+                        if isinstance(v, str) and not supported_set(v)]
+            return []
+
+        offenders = named({k: v for k, v in policy.items()
+                           if k != 'retired_set_fingerprints'})
+        self.assertEqual(offenders, [],
+                         'selection policy still offers a retired environment')
+
     def test_the_two_catalogs_agree(self):
         root = Path(__file__).resolve().parents[1]
         registry = {s['id'] for s in json.loads(

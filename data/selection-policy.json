@@ -38,8 +38,7 @@
     "snc",
     "neo",
     "vow",
-    "mid",
-    "stx"
+    "mid"
   ],
   "daily_weight_tiers": [
     {
@@ -100,8 +99,7 @@
     "snc": "2022-04-29",
     "neo": "2022-02-18",
     "vow": "2021-11-19",
-    "mid": "2021-09-24",
-    "stx": "2021-04-23"
+    "mid": "2021-09-24"
   },
   "release_dates_source": "https://api.scryfall.com/sets",
   "release_dates_verified_at": "2026-09-14"
