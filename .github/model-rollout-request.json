@@ -1,6 +1,6 @@
 {
-  "request_id": "colour-stage-v7-regenerate-20260917",
+  "request_id": "colour-stage-v7-regenerate-retry-20260917",
   "operation": "regenerate",
   "corpus_version": "elite-trophy-colour-stage-v7",
-  "reason": "Complete the owner-authorized v3 model rollout after retirement and version-transition gates passed."
+  "reason": "Retry the complete v7 baseline build after fixing version-dependent fixtures; PR #116 passed unit, browser and real-database gates."
 }
