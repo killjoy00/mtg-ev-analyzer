@@ -5,7 +5,7 @@ import legacy from '../worker/index.js';
 import growth from '../worker/growth-function.js';
 import draft from '../worker/draft-run-function.mjs';
 import {gateway,ipNetwork} from '../edge/gateway.mjs';
-import {parseRequest,checkBranch} from '../scripts/edge-control.mjs';
+import {parseRequest,checkBranch,inheritedFunctionSlugs} from '../scripts/edge-control.mjs';
 const key='a'.repeat(64);
 const env={MODE:'preview',NEON_BRANCH_ID:'br-isolated-preview',ORIGIN_SECRET:key,PREVIEW_KEY:'b'.repeat(64),QUOTA_KEY:'c'.repeat(64),
   NETWORK_QUOTA:{idFromName(name){assert.match(name,/^[a-f0-9]{64}$/);return name;},get(){return {fetch:async()=>new Response(null,{status:204})};}}};
@@ -78,4 +78,13 @@ test('operations reject arbitrary commands and existing branch targets',()=>{
   for(const value of [{operation:'deploy-production',reason:'x'},{operation:'deploy-preview',reason:'x',command:'anything'},{operation:'deploy-preview',reason:''},null])assert.throws(()=>parseRequest(value));
   for(const branch of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b','main','../../production'])assert.throws(()=>checkBranch(branch));
   checkBranch('br-new-isolated-preview');
+});
+
+test('inherited function cleanup requires a newly created isolated branch and valid complete inventory',()=>{
+  const list=[{slug:'pack1api'},{slug:'historical-helper'}];
+  assert.deepEqual(inheritedFunctionSlugs(list,'br-new-preview','true'),['pack1api','historical-helper']);
+  assert.deepEqual(inheritedFunctionSlugs({functions:[]},'br-new-preview','true'),[]);
+  for(const branch of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'])assert.throws(()=>inheritedFunctionSlugs(list,branch,'true'));
+  for(const created of ['false',undefined,true])assert.throws(()=>inheritedFunctionSlugs(list,'br-new-preview',created));
+  for(const invalid of [null,{},[{slug:'--help'}],[{slug:'../other'}],[{slug:'same'},{slug:'same'}]])assert.throws(()=>inheritedFunctionSlugs(invalid,'br-new-preview','true'));
 });

@@ -47,7 +47,7 @@ jobs:
           branch_name: gateway-preview-${{ github.run_id }}-${{ github.run_attempt }}
           database: pack1
           role: pack1_owner
-          suspend_timeout: 60
+          suspend_timeout: 300
           expires_at: ${{ steps.expiry.outputs.expires_at }}
       - name: Install pinned deployment tools
         if: steps.request.outputs.operation == 'deploy-preview'

@@ -14,6 +14,15 @@ export function parseRequest(value) {
 export function checkBranch(branch) {
   if(!/^br-[a-z0-9-]+$/.test(branch||'')||['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(branch))throw Error('An isolated preview branch is required.');
 }
+export function inheritedFunctionSlugs(list,branch,created) {
+  checkBranch(branch);
+  if(created!=='true')throw Error('Require a newly created isolated branch for inherited function cleanup.');
+  const functions=Array.isArray(list)?list:list?.functions;
+  if(!Array.isArray(functions)||functions.some(f=>!f||!/^[a-z][a-z0-9-]{0,62}$/.test(f.slug)))throw Error('Unexpected inherited function inventory.');
+  const slugs=functions.map(f=>f.slug);
+  if(new Set(slugs).size!==slugs.length)throw Error('Unexpected inherited function inventory.');
+  return slugs;
+}
 function variable(name,value) {fs.appendFileSync(process.env.GITHUB_ENV,`${name}=${value}\n`);}
 async function cf(route,{method='GET',body,allow404=false}={}) {
   let r;
@@ -67,11 +76,13 @@ async function main(action) {
     try {return execFileSync(bin(name),args,{input,encoding:'utf8',stdio:['pipe','pipe','pipe'],env:{...process.env,CLOUDFLARE_API_TOKEN:process.env.CLOUDFLARE_EDGE_TOKEN}});}
     catch {throw Error(`${name} failed during preview deployment; no raw credential-bearing output is printed.`);}
   };
-  // Branch creation may inherit functions. Do not leave an unreviewed legacy
-  // deployment available on the preview branch or assume it is safe to delete.
-  const list=JSON.parse(run('neon',['functions','list','--project-id','patient-shadow-91417882','--branch',branch,'--output','json']));
-  const functions=Array.isArray(list)?list:list.functions;
-  if(!Array.isArray(functions)||functions.some(f=>!['pack1api','pack1growth','draftrunapi'].includes(f.slug)))throw Error('Unexpected inherited preview functions; inspect this isolated branch before proceeding.');
+  // New branches inherit public functions. Delete only these disposable copies,
+  // never functions on either existing branch, before installing guarded code.
+  const inventory=()=>inheritedFunctionSlugs(JSON.parse(run('neon',['functions','list','--project-id','patient-shadow-91417882','--branch',branch,'--output','json'])),branch,process.env.PREVIEW_CREATED);
+  const inherited=inventory();
+  for(const slug of inherited)run('neon',['functions','delete',slug,'--project-id','patient-shadow-91417882','--branch',branch]);
+  if(inventory().length)throw Error('Unexpected inherited functions remain after isolated cleanup.');
+  console.log(`Removed ${inherited.length} inherited function copies from the newly created preview branch.`);
   for(const slug of ['pack1api','pack1growth','draftrunapi']) {
     run('neon',['functions','deploy',slug,'--src',path.join(process.env.RUNNER_TEMP,'pack1-bundles',slug),'--no-bundle','--project-id','patient-shadow-91417882','--branch',branch,'--runtime','nodejs24','--env','PACK1_REQUIRE_INGRESS=1','--env',`PACK1_INGRESS_SECRET=${origin}`,'--wait']);
     const base=`https://${branch}-${slug}.compute.c-5.us-east-2.aws.neon.tech`;
