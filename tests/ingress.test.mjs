@@ -7,6 +7,10 @@ import draft from '../worker/draft-run-function.mjs';
 import {gateway,ipNetwork} from '../edge/gateway.mjs';
 import {parseRequest,checkBranch,inheritedFunctionSlugs,commandFailure} from '../scripts/edge-control.mjs';
 import {closedOrigin} from '../edge/closed-origin.mjs';
+import {freshDeployment,deployPreviewFunction} from '../scripts/edge-neon-deploy.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 const key='a'.repeat(64);
 const env={MODE:'preview',NEON_BRANCH_ID:'br-isolated-preview',ORIGIN_SECRET:key,PREVIEW_KEY:'b'.repeat(64),QUOTA_KEY:'c'.repeat(64),
   NETWORK_QUOTA:{idFromName(name){assert.match(name,/^[a-f0-9]{64}$/);return name;},get(){return {fetch:async()=>new Response(null,{status:204})};}}};
@@ -107,4 +111,35 @@ test('command diagnostics reveal only fixed stages, categories and numeric statu
   assert.ok(!message.includes(secret));assert.ok(!message.includes('::error::'));assert.ok(!message.includes('\n'));
   assert.match(commandFailure('wrangler',['secret','bulk'],{status:1,stderr:'Unknown argument '+secret}),/secret installation; exit 1; category unsupported argument/);
   assert.match(commandFailure('neon',['functions','deploy'],{stderr:secret}),/unclassified/);
+});
+
+test('deployment readiness accepts a fresh child version 1 and rejects inherited or failed versions',()=>{
+  const now=Date.now();
+  const fn=(id,time,status='completed')=>({current_deployment:{id,created_at:new Date(time).toISOString(),status},active_deployment:{id}});
+  assert.equal(freshDeployment(fn(1,now),now),true);
+  assert.equal(freshDeployment(fn(62,now-86400000),now),false);
+  assert.equal(freshDeployment(fn(1,now,'building'),now),false);
+  assert.throws(()=>freshDeployment(fn(1,now,'failed'),now));
+  assert.equal(freshDeployment({current_deployment:{id:1,status:'completed',created_at:'invalid'}},now),false);
+});
+
+test('direct deployment uploads a source ZIP once and verifies fresh metadata without exposing errors',async()=>{
+  const directory=fs.mkdtempSync(path.join(os.tmpdir(),'edge-deploy-'));
+  try {
+    fs.writeFileSync(path.join(directory,'index.mjs'),'export default {fetch(){return new Response("closed",{status:403})}};');
+    const requests=[];
+    await deployPreviewFunction({branch:'br-new-preview',slug:'closed',directory,apiKey:'test-credential',fetcher:async(url,options)=>{
+      requests.push({url,method:options.method||'GET'});
+      if(options.method==='POST') {
+        assert.equal(options.headers.authorization,'Bearer test-credential');
+        const bytes=new Uint8Array(await options.body.get('zip').arrayBuffer());assert.deepEqual([...bytes.slice(0,2)],[80,75]);
+        assert.equal(options.body.get('runtime'),'nodejs24');return new Response('{}',{status:201});
+      }
+      return Response.json({function:{current_deployment:{id:1,created_at:new Date().toISOString(),status:'completed'},active_deployment:{id:1}}});
+    }});
+    assert.deepEqual(requests.map(r=>r.method),['POST','GET']);
+    let attempts=0;
+    await assert.rejects(deployPreviewFunction({branch:'br-new-preview',slug:'closed',directory,apiKey:'secret',fetcher:async()=>{attempts++;return new Response('secret provider body',{status:403});}}),/^Error: Neon control deployment HTTP 403\.$/);
+    assert.equal(attempts,1);
+  } finally {fs.rmSync(directory,{recursive:true,force:true});}
 });
