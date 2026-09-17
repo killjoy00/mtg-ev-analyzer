@@ -13,7 +13,7 @@ export const DRAFT_RUN_SCORING_VERSION = 'trophy-consensus-v3';
 // scripts/set_policy.py reads this value rather than copying it, and a test
 // refuses any stale literal elsewhere - a half-landed bump is what lets the
 // importer reuse old payloads under a new label and ship two models as one.
-export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-verified-v6';
+export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v7';
 // Pooled validation fitted 2.0 for the old pair model and 1.75 for the
 // colour-stage model. Display calibration follows the puzzle's pinned model.
 export function supportSharpening(corpusVersion=DRAFT_RUN_CORPUS_VERSION) {
