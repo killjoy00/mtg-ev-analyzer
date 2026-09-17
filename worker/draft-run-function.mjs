@@ -20,10 +20,10 @@ const runLength = s => s.puzzle_ids.length;
 const parse = value => typeof value === 'string' ? JSON.parse(value) : value;
 const fail = (message,status=400) => { throw Object.assign(new Error(message),{status}); };
 
-async function puzzle(id) {
+async function puzzle(id,corpusVersion) {
   const r=await query('SELECT payload FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[id]);
   const p=r.rows[0] ? parse(r.rows[0].payload) : null;
-  if(!validateDraftRunPuzzle(p)) fail('This puzzle failed its data-quality check.',503);
+  if(!validateDraftRunPuzzle(p,corpusVersion)) fail('This puzzle failed its data-quality check.',503);
   return p;
 }
 
@@ -40,7 +40,7 @@ async function session(id,owner) {
 
 async function share(id) {
   if(!/^[a-f0-9]{24}$/.test(id||'')) fail('Invalid challenge.');
-  const r=await query('SELECT sh.id,sh.display_name,sh.score,sh.puzzle_ids,s.environment,s.difficulty_version,s.selection_version FROM draft_run_shares sh JOIN draft_run_sessions s ON s.id=sh.session_id WHERE sh.id=$1',[id]);
+  const r=await query('SELECT sh.id,sh.display_name,sh.score,sh.puzzle_ids,s.environment,s.corpus_version,s.difficulty_version,s.selection_version FROM draft_run_shares sh JOIN draft_run_sessions s ON s.id=sh.session_id WHERE sh.id=$1',[id]);
   if(!r.rows[0]) fail('Challenge not found.',404);
   return {...r.rows[0],score:Number(r.rows[0].score),puzzle_ids:parse(r.rows[0].puzzle_ids)};
 }
@@ -76,7 +76,7 @@ async function persistResult(s) {
 async function responseFor(s) {
   const complete=s.answers.length===runLength(s);
   if(complete && !s.result_persisted_at) await persistResult(s);
-  const current=complete ? null : publicDraftRunPuzzle(await puzzle(s.puzzle_ids[s.answers.length]));
+  const current=complete ? null : publicDraftRunPuzzle(await puzzle(s.puzzle_ids[s.answers.length],s.corpus_version));
   const other=s.challenge_id ? await share(s.challenge_id) : null;
   const comparison=other ? {name:other.display_name,score:other.score,exact:JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids)} : null;
   let standing=null;
@@ -102,10 +102,17 @@ async function start(request) {
   }
   await consumePlayerLimit(query,owner,'runs',{limit:30,seconds:600});
   let seed=day ? `daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}` : crypto.randomUUID();
+  const corpusVersion=source?.corpus_version||DRAFT_RUN_CORPUS_VERSION;
   let ids,featuredSets=[],difficultyVersion=source?.difficulty_version||DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion=source?.selection_version||DRAFT_RUN_SELECTION_VERSION;
   if(source) ids=source.puzzle_ids;
   else if(day) {
     let schedule=(await query('SELECT puzzle_ids,corpus_version,difficulty_version,selection_version,daily_featured_sets FROM draft_run_schedules WHERE day=$1::date AND environment=$2',[day,environment])).rows[0];
+    if(schedule&&schedule.corpus_version!==corpusVersion) {
+      // Do not reuse yesterday's model under today's release version. The
+      // version predicate prevents a concurrent request deleting a new plan.
+      await query('DELETE FROM draft_run_schedules WHERE day=$1::date AND environment=$2 AND corpus_version=$3',[day,environment,schedule.corpus_version]);
+      schedule=null;
+    }
     if(!schedule) {
       featuredSets=environment==='mixed'?dailyRequiredSets(day):[];
       const plan=(await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day})).map(p=>p.puzzle_id);
@@ -117,14 +124,14 @@ async function start(request) {
     featuredSets=parse(schedule.daily_featured_sets||'[]');
     seed=`daily:${environment}:${day}:${schedule.corpus_version}:${selectionVersion}`;
   } else ids=(await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment)).map(p=>p.puzzle_id);
-  const choices=await loadPuzzleMetadata(query,DRAFT_RUN_CORPUS_VERSION,ids);
+  const choices=await loadPuzzleMetadata(query,corpusVersion,ids);
   if(choices.some(p=>!p || (environment==='powered-cube')!==(p.set_id==='powered-cube'))) fail('This challenge uses an unavailable corpus.',409);
   const sources=choices.map(p=>p.source_draft_hash),anchors=choices.map(publicDifficulty);
   const rerolls=environment==='powered-cube'?{set:0,pack:2}:{set:1,pack:1};
   const inserted=await query(`INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version,measurement_qa,daily_featured_sets)
     VALUES($1::uuid,$2::date,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12::jsonb,$13,
       $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb)
-    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_SCORING_VERSION,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets)]);
+    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,corpusVersion,DRAFT_RUN_SCORING_VERSION,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets)]);
   let s=inserted.rows[0];
   if(!s && day) s=(await query('SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date AND environment=$3',[owner,day,environment])).rows[0];
   if(!s) fail('Could not start your run. Please retry.',409);
@@ -141,7 +148,7 @@ async function change(request,id,action) {
   if(s.day && s.day!==gameDateKey()) fail('This Daily has closed. Start today’s run.',410);
   if(s.revision!==body.revision || round!==s.answers.length || body.puzzleId!==s.puzzle_ids[round]) fail('Your run changed in another tab. Reload to continue.',409);
   if(action==='pick') {
-    const p=await puzzle(body.puzzleId);
+    const p=await puzzle(body.puzzleId,s.corpus_version);
     if(!p.candidates.some(c=>c.id===body.cardId)) fail('Choose a card from this pack.');
     const grade=gradeDraftRunPick(p,body.cardId);
     const evidence=rateDraftRunPuzzle(p);
@@ -153,10 +160,10 @@ async function change(request,id,action) {
     if(!['set','pack'].includes(type)) fail('Invalid reroll.');
     if(environmentOf(s)==='powered-cube' && type==='set') fail('Powered Cube has two pack rerolls and no set reroll.');
     if(!Number.isInteger(s.rerolls[type]) || s.rerolls[type]<1) fail('That reroll has already been used.',409);
-    const [current]=await loadPuzzleMetadata(query,DRAFT_RUN_CORPUS_VERSION,[body.puzzleId]);
+    const [current]=await loadPuzzleMetadata(query,s.corpus_version,[body.puzzleId]);
     if(!current) fail('This puzzle is unavailable.',503);
     if(type==='set'&&s.day&&s.daily_featured_sets.includes(current.set_id))fail('This set is one of today’s three guaranteed releases. Use a pack reroll here, or save the set reroll for another round.',409);
-    const replacement=await selectDatabaseReroll(query,DRAFT_RUN_CORPUS_VERSION,current,{type,round,seed:s.seed,excludedSources:s.seen_sources,environment:environmentOf(s),difficultyVersion:s.difficulty_version||LEGACY_DIFFICULTY_VERSION,selectionVersion:s.selection_version||PREVIOUS_SELECTION_VERSION,daily:Boolean(s.day),day:s.day||gameDateKey(),anchor:s.difficulty_anchors[round]});
+    const replacement=await selectDatabaseReroll(query,s.corpus_version,current,{type,round,seed:s.seed,excludedSources:s.seen_sources,environment:environmentOf(s),difficultyVersion:s.difficulty_version||LEGACY_DIFFICULTY_VERSION,selectionVersion:s.selection_version||PREVIOUS_SELECTION_VERSION,daily:Boolean(s.day),day:s.day||gameDateKey(),anchor:s.difficulty_anchors[round]});
     if(!replacement) fail('No comparable replacement is available. Your reroll is still yours.',409);
     s.puzzle_ids[round]=replacement.puzzle_id;s.seen_sources.push(replacement.source_draft_hash);s.rerolls[type]-=1;
   }

@@ -209,7 +209,10 @@ export function eligiblePickForRound(roundIndex, pickNumber, environment = 'mixe
   return Number.isInteger(pick) && pick >= window[0] && pick <= window[1];
 }
 
-export function validateDraftRunPuzzle(puzzle) {
+// Imports use the current version by default. Existing sessions explicitly
+// supply the version pinned when they were created; a release does not rewrite
+// their immutable evidence or make their still-present puzzles unreadable.
+export function validateDraftRunPuzzle(puzzle, expectedVersion = DRAFT_RUN_CORPUS_VERSION) {
   const cards = puzzle?.candidates || [];
   const prior = puzzle?.prior_picks || [];
   const pick = Number(puzzle?.pick_number);
@@ -218,7 +221,8 @@ export function validateDraftRunPuzzle(puzzle) {
     ['diamond','mythic'].includes(puzzle?.player_rank_tier) && puzzle?.player_win_rate_bucket == null;
   const rateSkill = puzzle?.skill_evidence === 'win_rate_bucket' &&
     Number(puzzle?.player_win_rate_bucket) >= 0.6 && Number(puzzle?.player_win_rate_bucket) <= 1;
-  return puzzle?.corpus_version === DRAFT_RUN_CORPUS_VERSION &&
+  return typeof expectedVersion === 'string' && expectedVersion.length > 0 &&
+    puzzle?.corpus_version === expectedVersion &&
     Number(puzzle.pack_number??1)===1 &&
     Number(puzzle.event_match_wins) === 7 && Number(puzzle.player_games_lower_bound) >= 100 &&
     (legacySkill || rateSkill) && puzzle.source_evidence === 'official_archive_trajectory' &&
