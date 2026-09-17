@@ -6,6 +6,7 @@ import {generateKeyPairSync,sign} from 'node:crypto';
 import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from '../worker/trophy-import-auth.mjs';
 import {insertTrophyBatch,handleTrophyImport,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
 import {SERVING_ANALYZE_SQL,SERVING_STATISTICS_COLUMNS,SERVING_STATISTICS_READY_SQL} from '../worker/serving-statistics.mjs';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwk={...publicKey.export({format:'jwk'}),kid:'test',use:'sig'};
@@ -135,11 +136,11 @@ test('Cube image refresh changes display metadata only',async()=>{
 test('legacy image markers clear only after every served card has an HTTPS image',async()=>{
   const updates=[];
   const query=async(sql,params=[])=>{
-    if(sql.includes('SELECT s.corpus_version'))return {rows:[{corpus_version:'elite-trophy-verified-v6',puzzles:123,missing_images:0}]};
+    if(sql.includes('SELECT s.corpus_version'))return {rows:[{corpus_version:DRAFT_RUN_CORPUS_VERSION,puzzles:123,missing_images:0}]};
     if(sql.includes('UPDATE draft_run_verified_sets')){
       assert.match(sql,/unresolved_image_names/);
       assert.match(sql,/full_import,missing_image_names/);
-      assert.equal(params[1],'elite-trophy-verified-v6');
+      assert.equal(params[1],DRAFT_RUN_CORPUS_VERSION);
       updates.push(params[0]);
       return {rows:[{set_id:params[0]}]};
     }
@@ -151,7 +152,7 @@ test('legacy image markers clear only after every served card has an HTTPS image
 
   let wrote=false;
   const missingQuery=async sql=>{
-    if(sql.includes('SELECT s.corpus_version'))return {rows:[{corpus_version:'elite-trophy-verified-v6',puzzles:123,missing_images:1}]};
+    if(sql.includes('SELECT s.corpus_version'))return {rows:[{corpus_version:DRAFT_RUN_CORPUS_VERSION,puzzles:123,missing_images:1}]};
     wrote=true;
     return {rows:[]};
   };

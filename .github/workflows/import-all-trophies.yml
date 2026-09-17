@@ -45,16 +45,16 @@ jobs:
       - uses: actions/cache/restore@v4
         with:
           path: generated/trophy-import
-          key: supported-trophies-v1-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: staged-trophies-v2-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py', 'scripts/deck_fit.py', 'corpus/draft-run/catalog.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: |
-            supported-trophies-v1-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py') }}-
-            supported-trophies-v1-
+            staged-trophies-v2-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py', 'scripts/deck_fit.py', 'corpus/draft-run/catalog.json') }}-
+            staged-trophies-v2-
       - name: Import every qualifying trophy
         env:
           IMPORT_SETS: ${{ inputs.sets || 'all' }}
         run: |
           python scripts/purge_retired_data.py
-          python -u scripts/run_import_all_trophies.py --sets "$IMPORT_SETS" --workers 2
+          python -u scripts/run_import_all_trophies.py --sets "$IMPORT_SETS" --workers 2 --max-seconds 6000 --discard-source-archives
       - name: Validate all outputs and accounting
         run: node scripts/load_all_trophies.mjs unused generated/trophy-import --validate-only
       - name: Install pinned Neon loader tooling
@@ -106,7 +106,7 @@ jobs:
         if: always()
         with:
           path: generated/trophy-import
-          key: supported-trophies-v1-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          key: staged-trophies-v2-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py', 'scripts/deck_fit.py', 'corpus/draft-run/catalog.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:

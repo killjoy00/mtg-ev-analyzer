@@ -7,7 +7,7 @@ if(!process.argv.includes('--dev-fixtures'))throw Error('An isolated development
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query}=await import('../worker/growth-function.js');
 const tag=crypto.randomUUID().replaceAll('-',''),pTable=`qa_selection_p_${tag}`,rTable=`qa_selection_r_${tag}`;
-const version='elite-trophy-verified-v6';
+const {DRAFT_RUN_CORPUS_VERSION:version}=await import('../draft-run.mjs');
 try {
   // Stratify a real-data fixture across every available set, pick and band.
   // SQL retains each stored real's text representation, matching the API loader.

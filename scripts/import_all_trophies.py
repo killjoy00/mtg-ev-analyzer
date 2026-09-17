@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Enumerate every official Premier Draft trophy, independently of replay samples.
 
-Outputs immutable additional v6 puzzles and a disposition for EVERY source trophy.
+Outputs immutable additional puzzles and a disposition for EVERY source trophy.
 Model training is bounded, broad-elite, and five-fold held out; trophy output is not.
 Raw archives/checkpoints stay under generated/. The loader never changes old puzzles.
 """
@@ -316,6 +316,44 @@ def check_training_cap(sid, training_cap, published_decisions):
         raise ValueError(f'{sid}: training cap {training_cap} differs from the published baseline cap {TRAINING_DRAFT_CAP}; {published_decisions} existing decisions would keep their original scores. Bump the corpus version and regenerate instead of mixing models.')
 
 
+def input_signature(root, source, skill_source, baseline, manifest, training_cap):
+    return hashlib.sha256(encoded({
+        'corpus_version': VERSION, 'source': source, 'skill_source': skill_source,
+        'importer': digest(__file__), 'model': digest(root/'scripts/build_replays.py'),
+        'colour_dependencies': {name: digest(root/'scripts'/name) for name in
+                                ['deck_fit.py', 'card_outcomes.py', 'eval_model.py']},
+        'legacy_model': digest(root/'scripts/backfill_legacy_sets.py'),
+        'images': digest(root/'corpus/draft-run/card-images.json'),
+        'baseline': baseline, 'manifest': manifest, 'training_cap': training_cap,
+    })).hexdigest()
+
+
+def reusable_checkpoint(directory, old, signature, draft_url, game_url):
+    """Verify completed outputs and unchanged remote objects without raw archives.
+
+    Source SHA256s remain in the hashed input description. ETag, byte length,
+    and modification time must still match the official S3 objects. Missing
+    or changed metadata forces the normal download-and-hash path.
+    """
+    if old.get('input_signature') != signature:
+        return False
+    for key, filename in [('puzzle_file', 'puzzles.jsonl.gz'), ('ledger_file', 'trophies.jsonl.gz')]:
+        path = directory/filename
+        if old.get(key) != filename or not path.exists() or digest(path) != old.get(key+'_sha256'):
+            return False
+    for key, url in [('source_archive', draft_url), ('skill_source', game_url)]:
+        source = old.get(key, {})
+        if source.get('url') != url or not all(source.get(k) for k in ['etag', 'last_modified', 'compressed_bytes', 'sha256']):
+            return False
+        with request(url, 'HEAD') as response:
+            current = {'etag': response.headers.get('ETag'),
+                       'last_modified': response.headers.get('Last-Modified'),
+                       'compressed_bytes': int(response.headers.get('Content-Length', 0))}
+        if any(source.get(k) != value for k, value in current.items()):
+            return False
+    return True
+
+
 def build_set(sid, output_dir, refresh=False, discovered_expansion=None, training_cap=TRAINING_DRAFT_CAP):
     require_supported_set(sid)
     if discovered_expansion: require_supported_set(discovered_expansion)
@@ -326,15 +364,22 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
     expansion = discovered_expansion or manifest.get('source',{}).get('archive_expansion') or sid.upper()
     url = f'{BASE}/draft_data/draft_data_public.{expansion}.PremierDraft.csv.gz'
+    game_url = f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz'
+    completed = directory/'manifest.json'
+    if not refresh and completed.exists():
+        old = json.loads(completed.read_text())
+        signature = input_signature(root, old.get('source_archive'), old.get('skill_source'), base_entry, manifest, training_cap)
+        if reusable_checkpoint(directory, old, signature, url, game_url):
+            print(f'{sid}: complete checkpoint reused; both source objects unchanged', flush=True)
+            return old
     path = directory/'draft.csv.gz'; source = archive(url, path, refresh)
     with csv_bytes(path) as f: header=next(csv.reader([f.readline().decode('utf-8-sig')]))
     legacy = 'user_game_win_rate_bucket' not in header or 'user_n_games_bucket' not in header
     # Game data was fetched only for legacy sets, to recover skill. Every set
     # needs it now: the colour table is estimated from which cards reached a
     # deck, and building without one silently ships a model with no colour term.
-    skill_source = archive(f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz', directory/'games.csv.gz', refresh)
-    signature = hashlib.sha256(encoded({'corpus_version':VERSION, 'source':source, 'skill_source':skill_source, 'importer':digest(__file__), 'model':digest(root/'scripts/build_replays.py'), 'colour_dependencies':{name:digest(root/'scripts'/name) for name in ['deck_fit.py','card_outcomes.py','eval_model.py']}, 'legacy_model':digest(root/'scripts/backfill_legacy_sets.py'), 'images':digest(root/'corpus/draft-run/card-images.json'), 'baseline':base_entry, 'manifest':manifest, 'training_cap':training_cap})).hexdigest()
-    completed = directory/'manifest.json'
+    skill_source = archive(game_url, directory/'games.csv.gz', refresh)
+    signature = input_signature(root, source, skill_source, base_entry, manifest, training_cap)
     if not refresh and completed.exists():
         old = json.loads(completed.read_text())
         if old.get('input_signature') == signature and all((directory/old[k]).exists() and digest(directory/old[k]) == old[k+'_sha256'] for k in ['puzzle_file','ledger_file']):
