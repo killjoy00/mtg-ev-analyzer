@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       rebuild_published:
-        description: 'Rebuild VOW/MID/STX even though they are already published. Required to carry a model change into the legacy environments; without it the run skips them and reports success having built nothing.'
+        description: 'Rebuild VOW/MID even though they are already published. Required to carry a model change into the legacy environments; without it the run skips them and reports success having built nothing.'
         type: boolean
         default: false
         required: false
@@ -57,7 +57,7 @@ jobs:
         continue-on-error: true
         run: >-
           python scripts/backfill_legacy_sets.py
-          --sets VOW,MID,STX
+          --sets VOW,MID
           --format PremierDraft
           --minimum-games 100
           --top-fraction 0.15

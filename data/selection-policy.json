@@ -38,8 +38,7 @@
     "snc",
     "neo",
     "vow",
-    "mid",
-    "stx"
+    "mid"
   ],
   "daily_weight_tiers": [
     {
@@ -57,7 +56,8 @@
   ],
   "retired_set_fingerprints": [
     "f8272fb2c87fbdf3e6c933649a30f2663ba60983247b85ec223fc22b08358988",
-    "79b159b843b0aaba706b57fc165afa2d49c3680c43503ed36af6b4f66cbade5b"
+    "79b159b843b0aaba706b57fc165afa2d49c3680c43503ed36af6b4f66cbade5b",
+    "ca2b25a9b0e7a993f09d627d5929fb8cbfaa95403ac921f231149dc98ddce93d"
   ],
   "previous_daily_weight_tiers": [
     {
@@ -99,8 +99,7 @@
     "snc": "2022-04-29",
     "neo": "2022-02-18",
     "vow": "2021-11-19",
-    "mid": "2021-09-24",
-    "stx": "2021-04-23"
+    "mid": "2021-09-24"
   },
   "release_dates_source": "https://api.scryfall.com/sets",
   "release_dates_verified_at": "2026-09-14"

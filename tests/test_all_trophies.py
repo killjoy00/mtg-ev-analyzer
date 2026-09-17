@@ -1,3 +1,4 @@
+import json
 import csv
 import gzip
 import io
@@ -280,3 +281,133 @@ class SupersedeTests(unittest.TestCase):
         source = inspect.getsource(build_set)
         self.assertIn('superseded', source)
         self.assertIn('refusing to guess which model produced which puzzle', source)
+
+
+class RetirementTests(unittest.TestCase):
+    """Retirement lives in two places that must agree: the fingerprint list in
+    data/selection-policy.json, which every script reads, and the CHECK
+    constraints in the migrations, which the database enforces. 0010 pinned each
+    CHECK to the two fingerprints retired at the time, so a later retirement that
+    only appends to the policy would be deleted once and admitted by the database
+    ever after."""
+
+    def _policy_fingerprints(self):
+        root = Path(__file__).resolve().parents[1]
+        return json.loads((root / 'data/selection-policy.json').read_text(
+            encoding='utf-8'))['retired_set_fingerprints']
+
+    def test_the_newest_retirement_migration_covers_every_fingerprint(self):
+        root = Path(__file__).resolve().parents[1]
+        migrations = sorted(root.glob('migrations/*_retire_*.sql'))
+        self.assertTrue(migrations, 'no retirement migration found')
+        newest = migrations[-1].read_text(encoding='utf-8')
+        for fingerprint in self._policy_fingerprints():
+            with self.subTest(fingerprint=fingerprint[:12]):
+                self.assertIn(fingerprint, newest)
+
+    # child table -> parent it references, for every foreign key that a
+    # set-scoped delete can trip. 0010 predates the first two and deleted the
+    # parent first, which aborts the migration on a real database:
+    #   ERROR: delete on "draft_run_verified_puzzles" violates foreign key
+    #   constraint "draft_run_decision_observations_puzzle_id_fkey"
+    FOREIGN_KEYS = (
+        ('draft_run_decision_observations', 'draft_run_verified_puzzles'),
+        ('draft_run_puzzle_ratings', 'draft_run_verified_puzzles'),
+        ('draft_run_verified_puzzles', 'draft_run_verified_sets'),
+        ('draft_run_environment_policy', 'draft_run_verified_sets'),
+        ('draft_run_puzzles', 'draft_run_sets'),
+        ('game_result_environments', 'game_results'),
+    )
+
+    def test_every_dependent_is_deleted_before_the_table_it_references(self):
+        root = Path(__file__).resolve().parents[1]
+        text = sorted(root.glob('migrations/*_retire_*.sql'))[-1].read_text(encoding='utf-8')
+        deletes = [line.split()[2] for line in text.splitlines()
+                   if line.startswith('DELETE FROM ')]
+        for child, parent in self.FOREIGN_KEYS:
+            with self.subTest(child=child, parent=parent):
+                self.assertIn(child, deletes, f'{child} rows are never cleared')
+                self.assertIn(parent, deletes, f'{parent} rows are never cleared')
+                self.assertLess(deletes.index(child), deletes.index(parent),
+                                f'{child} must be deleted before {parent}')
+
+    def test_the_newest_migration_replaces_constraints_rather_than_adding(self):
+        """Adding a constraint beside an older, narrower one leaves the old one
+        in place; only a DROP then ADD actually widens the enforced list."""
+        root = Path(__file__).resolve().parents[1]
+        newest = sorted(root.glob('migrations/*_retire_*.sql'))[-1].read_text(encoding='utf-8')
+        adds = newest.count('ADD CONSTRAINT')
+        drops = newest.count('DROP CONSTRAINT IF EXISTS')
+        self.assertEqual(adds, drops,
+                         'every re-added constraint must be dropped first')
+
+    def test_a_retired_environment_is_absent_from_both_catalogs(self):
+        """A retired set left in either catalog makes the health endpoint compare
+        a set count that can never be satisfied."""
+        from set_policy import supported_set
+        root = Path(__file__).resolve().parents[1]
+        for relative in ('data/catalog.json', 'corpus/draft-run/catalog.json'):
+            catalog = json.loads((root / relative).read_text(encoding='utf-8'))
+            retired = [s['id'] for s in catalog['sets'] if not supported_set(s['id'])]
+            self.assertEqual(retired, [], f'{relative} still lists a retired environment')
+
+    def test_the_policy_never_names_an_environment_it_has_retired(self):
+        """The fingerprint list is not the whole policy. regular_sets_newest_first
+        and release_dates kept naming a retired environment, so selection still
+        offered it while the migration had already deleted its puzzles: the run
+        came back with a puzzle id that loads to nothing, and the backend
+        answered 409 'This challenge uses an unavailable corpus.'"""
+        from set_policy import supported_set
+        root = Path(__file__).resolve().parents[1]
+        policy = json.loads((root / 'data/selection-policy.json').read_text(encoding='utf-8'))
+
+        def named(value, path='policy'):
+            if isinstance(value, dict):
+                return [f'{path}.{k}' for k in value if isinstance(k, str) and not supported_set(k)] + \
+                       [hit for k, v in value.items() for hit in named(v, f'{path}.{k}')]
+            if isinstance(value, list):
+                return [f'{path}[{i}]' for i, v in enumerate(value)
+                        if isinstance(v, str) and not supported_set(v)]
+            return []
+
+        offenders = named({k: v for k, v in policy.items()
+                           if k != 'retired_set_fingerprints'})
+        self.assertEqual(offenders, [],
+                         'selection policy still offers a retired environment')
+
+    def test_the_two_catalogs_agree(self):
+        root = Path(__file__).resolve().parents[1]
+        registry = {s['id'] for s in json.loads(
+            (root / 'data/catalog.json').read_text(encoding='utf-8'))['sets']}
+        corpus = {s['id'] for s in json.loads(
+            (root / 'corpus/draft-run/catalog.json').read_text(encoding='utf-8'))['sets']}
+        self.assertEqual(registry, corpus)
+
+    def test_no_committed_file_survives_for_a_retired_environment(self):
+        """Scoped to TRACKED files on purpose. CI hydrates the replay shards from
+        R2, and the object purge runs on merge to main, so a working-tree scan
+        sees a retired environment's shards sitting there on every pre-merge run
+        and can never pass. What a pull request controls is what is committed."""
+        import subprocess
+        from purge_retired_data import retired_path
+        root = Path(__file__).resolve().parents[1]
+        tracked = subprocess.run(['git', 'ls-files', 'data', 'corpus/draft-run'],
+                                 cwd=root, capture_output=True, text=True, check=True)
+        stale = [line for line in tracked.stdout.split()
+                 if retired_path(Path(line))]
+        self.assertEqual(stale, [], 'retired environment files are still committed')
+
+    def test_the_published_health_snapshot_forgets_a_retired_environment(self):
+        """purge_retired_data works on PATHS, so a generated file that merely
+        NAMES a retired environment survives it. data/status.json is exactly
+        that: regenerated by audit_datasets.py, and it came back from a merge
+        still listing the retired set after every file of its own was gone."""
+        from set_policy import supported_set
+        root = Path(__file__).resolve().parents[1]
+        status = json.loads((root / 'data/status.json').read_text(encoding='utf-8'))
+        named = [d.get('id') for d in status.get('datasets', [])
+                 if d.get('id') and not supported_set(d['id'])]
+        self.assertEqual(named, [], 'health snapshot still lists a retired environment')
+        registry = {s['id'] for s in json.loads(
+            (root / 'data/catalog.json').read_text(encoding='utf-8'))['sets']}
+        self.assertEqual({d['id'] for d in status.get('datasets', [])}, registry)

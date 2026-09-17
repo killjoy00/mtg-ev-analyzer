@@ -37,10 +37,10 @@ const fixture = {
     environments_played:6,
     current_streak:5,
   },
-  environment_total:33,
+  environment_total:32,
   by_set:[
     { set_id:'neo', games:8, average_score:86.2, best_score:100, daily_games:3, last_played_at:'2026-09-09T12:00:00Z' },
-    { set_id:'stx', games:6, average_score:82.1, best_score:95, daily_games:2, last_played_at:'2026-09-08T12:00:00Z' },
+    { set_id:'ktk', games:6, average_score:82.1, best_score:95, daily_games:2, last_played_at:'2026-09-08T12:00:00Z' },
     { set_id:'mid', games:5, average_score:79.4, best_score:91, daily_games:2, last_played_at:'2026-09-07T12:00:00Z' },
     { set_id:'vow', games:4, average_score:77.0, best_score:88, daily_games:1, last_played_at:'2026-09-06T12:00:00Z' },
     { set_id:'msh', games:3, average_score:75.0, best_score:84, daily_games:1, last_played_at:'2026-09-05T12:00:00Z' },
@@ -52,18 +52,18 @@ const fixture = {
   ],
   best_environments:[
     { set_id:'neo', games:8, average_score:86.2, best_score:100 },
-    { set_id:'stx', games:6, average_score:82.1, best_score:95 },
+    { set_id:'ktk', games:6, average_score:82.1, best_score:95 },
     { set_id:'mid', games:5, average_score:79.4, best_score:91 },
   ],
   cube:{ set_id:'powered-cube', games:2, average_score:73.5, best_score:81 },
   daily_history:[
     { date:'2026-09-09', set_id:'neo', mode:'top3', score:93, grade:'A', rank:7, total:100, percentile:7 },
-    { date:'2026-09-08', set_id:'stx', mode:'full', score:84, grade:'B+', rank:18, total:90, percentile:20 },
+    { date:'2026-09-08', set_id:'ktk', mode:'full', score:84, grade:'B+', rank:18, total:90, percentile:20 },
   ],
   recent:Array.from({ length:20 }, (_,index) => ({
     cursor:String(200-index),
     played_at:`2026-09-${String(Math.max(1,9-Math.floor(index/3))).padStart(2,'0')}T12:00:00Z`,
-    set_id:index % 5 === 0 ? 'powered-cube' : index % 2 ? 'neo' : 'stx',
+    set_id:index % 5 === 0 ? 'powered-cube' : index % 2 ? 'neo' : 'ktk',
     mode:index % 3 ? 'top3' : 'full',
     score:70 + (index % 25),
     grade:'B',
@@ -162,11 +162,11 @@ try {
   await page.locator('.profile-settings summary').click();
   assert.equal(await page.locator('input[name="displayName"]').inputValue(), 'Profile Tester');
   await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
-  await page.locator('select[name="favoriteSetId"]').selectOption('stx');
+  await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
   await page.locator('#profile-settings-form button[type="submit"]').click();
-  await page.waitForFunction(() => document.querySelector('.player-profile-page') && document.querySelector('select[name="favoriteSetId"]')?.value === 'stx');
-  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'stx', showcaseAchievement:'top10' });
+  await page.waitForFunction(() => document.querySelector('.player-profile-page') && document.querySelector('select[name="favoriteSetId"]')?.value === 'ktk');
+  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10' });
   assert.equal((await page.locator('.profile-hero h1').textContent())?.trim(), 'Leaderboard Ace');
   assert.equal(await page.evaluate(() => localStorage.getItem('pack1-player-name-v1')), 'Leaderboard Ace');
 

@@ -664,15 +664,16 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual(weights["hob"], 6.0)
         self.assertEqual(weights["msh"], 6.0)
         self.assertEqual(weights["tmt"], 4.0)
-        self.assertEqual(weights["stx"], 1.0)
         # ktk released in 2014; recency ranking must not treat it as current.
         self.assertEqual(weights["ktk"], 1.0)
+        # A retired environment has no weight at all, because it is not offered.
+        self.assertNotIn("stx", weights)
 
     def test_weighted_headline_uses_daily_exposure(self):
         runs = [
             {"set_id": "msh", "served_slice": {"n": 10, "log_loss": 1.0, "brier": 0.5,
                                                "top1_accuracy": 0.4, "mean_reciprocal_rank": 0.6}},
-            {"set_id": "stx", "served_slice": {"n": 10, "log_loss": 2.0, "brier": 0.9,
+            {"set_id": "ktk", "served_slice": {"n": 10, "log_loss": 2.0, "brier": 0.9,
                                                "top1_accuracy": 0.2, "mean_reciprocal_rank": 0.3}},
         ]
         headline = weighted_headline(runs, "served_slice")

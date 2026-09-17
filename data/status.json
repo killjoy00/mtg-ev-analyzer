@@ -31,7 +31,6 @@
     "otj:2024-06-27:299",
     "mom:2023-06-14:297",
     "ktk:2024-01-18:298",
-    "stx:2024-01-11:299",
     "powered-cube:2025-12-01:300"
   ],
   "datasets": [
@@ -317,15 +316,6 @@
       "warning_codes": []
     },
     {
-      "data_date": "2024-01-11",
-      "error_codes": [],
-      "id": "stx",
-      "name": "STX",
-      "replay_count": 299,
-      "status": "healthy",
-      "warning_codes": []
-    },
-    {
       "data_date": "2025-12-01",
       "error_codes": [],
       "id": "powered-cube",
@@ -459,23 +449,19 @@
     {
       "code": "MID",
       "status": "live"
-    },
-    {
-      "code": "STX",
-      "status": "live"
     }
   ],
   "normal_queue_counts": {
-    "blocked": 0,
-    "live": 32,
-    "pending": 0
+    "live": 31,
+    "pending": 0,
+    "blocked": 0
   },
   "overall": "warning",
-  "published_dataset_count": 33,
+  "published_dataset_count": 32,
   "quality_counts": {
-    "error": 0,
-    "healthy": 32,
-    "warning": 1
+    "healthy": 31,
+    "warning": 1,
+    "error": 0
   },
   "schema_version": 1,
   "special_modes": [

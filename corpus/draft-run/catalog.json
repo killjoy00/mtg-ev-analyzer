@@ -5,29 +5,6 @@
   "verification": "official_archive_trajectory",
   "sets": [
     {
-      "id": "stx",
-      "name": "STX",
-      "puzzles": 510,
-      "trophy_drafts": 51,
-      "first_pick": 2,
-      "last_pick": 11,
-      "category": "expansion",
-      "source_date": "2024-01-11",
-      "source_archive": {
-        "url": "https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.STX.PremierDraft.csv.gz",
-        "etag": "\"6981a94ef8482984e9b116ee00d4332b-9\"",
-        "last_modified": "Thu, 11 Jan 2024 09:47:17 GMT",
-        "sha256": "fe0e87b11fc2c176f06da3785d65eda43c48f32320fff5b7ca0352b61d4f8b42",
-        "compressed_bytes": 148456732,
-        "rows_scanned": 3351797,
-        "matched_replays": 299
-      },
-      "evidence_sha256": "8bb54f820670463646b22ea0c303bc0c4c0a6c323ce4b19b13ba324479ae924b",
-      "exclusions": {},
-      "unresolved_image_names": [],
-      "sha256": "f4aea03ed835a6e9b9a8e51a834f76bbc9851cb4d29b34726e089bb938e1d0ce"
-    },
-    {
       "id": "mid",
       "name": "MID",
       "puzzles": 561,
