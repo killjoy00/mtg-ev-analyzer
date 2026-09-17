@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Run the full trophy importer with retryable I/O and serializable worker results.
 
-This runner deliberately leaves import_all_trophies.py unchanged so successful
-all-premier-trophies-v1 checkpoints keep the exact input signature that produced
-them. Worker exceptions are converted to plain strings before crossing the
+Completed sets are checkpointed independently of their disposable raw archives.
+A time budget stops new work early enough to save those checkpoints before the
+CI job limit. Worker exceptions are converted to plain strings before crossing the
 ProcessPool boundary, avoiding multiprocessing failures from exceptions (such
 as urllib HTTPError) that retain unpickleable response streams.
 """
 import argparse
-from concurrent.futures import ProcessPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, wait, FIRST_COMPLETED
 import json
 from pathlib import Path
 import time
@@ -59,13 +59,50 @@ def resilient_request(url, method='GET'):
             time.sleep(2 ** attempt)
 
 
-def run_set_safely(sid, output_dir, refresh, expansion):
+def run_set_safely(sid, output_dir, refresh, expansion, discard_source_archives=False):
     """Return only pickle-safe data from a worker, including on failure."""
     importer.request = resilient_request
     try:
         return {'ok': True, 'result': importer.build_set(sid, output_dir, refresh, expansion)}
     except Exception as exc:
         return {'ok': False, 'error': _error_text(exc)}
+    finally:
+        if discard_source_archives:
+            # Keep manifests, source hashes, ledgers and puzzles. Raw public
+            # objects can be downloaded again if an input signature changes.
+            for name in ['draft.csv.gz', 'games.csv.gz', 'draft.csv.gz.part', 'games.csv.gz.part']:
+                (Path(output_dir)/sid/name).unlink(missing_ok=True)
+
+
+def run_jobs(executor, ids, sources, args, started):
+    """Bound both active work and queued work so a CI timeout is resumable."""
+    waiting = list(ids)
+    running = {}
+    results, errors = [], {}
+    while waiting or running:
+        while waiting and len(running) < args.workers:
+            if args.max_seconds and time.monotonic() - started >= args.max_seconds:
+                break
+            sid = waiting.pop(0)
+            future = executor.submit(run_set_safely, sid, args.output, args.refresh,
+                                     sources[sid], args.discard_source_archives)
+            running[future] = sid
+        if not running:
+            errors.update({sid: 'Time budget reached; rerun to resume this environment' for sid in waiting})
+            break
+        finished, _ = wait(running, return_when=FIRST_COMPLETED)
+        for future in finished:
+            sid = running.pop(future)
+            try:
+                outcome = future.result()
+            except Exception as exc:
+                outcome = {'ok': False, 'error': _error_text(exc)}
+            if outcome['ok']:
+                results.append(outcome['result'])
+            else:
+                errors[sid] = outcome['error']
+                print(json.dumps({'set': sid, 'error': errors[sid]}), flush=True)
+    return results, errors
 
 
 def main():
@@ -74,7 +111,20 @@ def main():
     parser.add_argument('--workers', type=int, default=3)
     parser.add_argument('--output', default='generated/trophy-import')
     parser.add_argument('--refresh', action='store_true')
+    parser.add_argument('--max-seconds', type=int, default=0,
+                        help='stop scheduling new environments after this build budget; 0 is unlimited')
+    parser.add_argument('--discard-source-archives', action='store_true',
+                        help='retain verified checkpoints but remove disposable source downloads')
     args = parser.parse_args()
+    if args.workers < 1 or args.max_seconds < 0:
+        parser.error('workers must be positive and max-seconds nonnegative')
+    started = time.monotonic()
+    if args.discard_source_archives:
+        # Older caches may contain every source download. Bound disk usage
+        # before starting any workers, including after a cancelled prior run.
+        for name in ['draft.csv.gz', 'games.csv.gz', 'draft.csv.gz.part', 'games.csv.gz.part']:
+            for archive in Path(args.output).glob('*/'+name):
+                archive.unlink()
 
     # Discovery gets the same bounded retry behavior as per-environment work.
     importer.request = resilient_request
@@ -85,28 +135,8 @@ def main():
         raise ValueError('Requested set has no official Premier archive')
     ids = list(dict.fromkeys(ids))
 
-    results = []
-    errors = {}
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
-        jobs = {
-            executor.submit(run_set_safely, sid, args.output, args.refresh, sources[sid]): sid
-            for sid in ids
-        }
-        for future in as_completed(jobs):
-            sid = jobs[future]
-            try:
-                outcome = future.result()
-            except Exception as exc:
-                # Process startup/termination failures are uncommon, but keep the
-                # catalog actionable instead of losing all successful checkpoints.
-                errors[sid] = _error_text(exc)
-                print(json.dumps({'set': sid, 'error': errors[sid]}), flush=True)
-                continue
-            if outcome['ok']:
-                results.append(outcome['result'])
-            else:
-                errors[sid] = outcome['error']
-                print(json.dumps({'set': sid, 'error': outcome['error']}), flush=True)
+        results, errors = run_jobs(executor, ids, sources, args, started)
 
     report = {
         'import_version': importer.IMPORT_VERSION,

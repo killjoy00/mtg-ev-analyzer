@@ -146,6 +146,7 @@ class CorpusVersionTests(unittest.TestCase):
         """Nine places held a version literal. Any one missed during a bump
         reproduces exactly the failure this suite exists to prevent: puzzle ids
         the server cannot resolve, and old payloads reused under a new label."""
+        import re
         from set_policy import corpus_version
         root = Path(__file__).resolve().parents[1]
         current = corpus_version()
@@ -156,8 +157,11 @@ class CorpusVersionTests(unittest.TestCase):
                 continue
             text = path.read_text(encoding='utf-8', errors='ignore')
             for line in text.splitlines():
-                if 'elite-trophy-' in line and current not in line \
-                        and 'corpus_version' not in line:
+                # A copied CURRENT version is already a defect: it becomes
+                # stale at the next bump. Field names are not exemptions.
+                literal = re.search(r"(['\"])(elite-trophy-[a-z0-9-]+)\1", line)
+                canonical = path == root/'draft-run.mjs' and line.startswith('export const DRAFT_RUN_CORPUS_VERSION = ')
+                if literal and (not canonical or literal[2] != current):
                     stale.append(f'{path.relative_to(root)}: {line.strip()[:90]}')
         self.assertEqual(stale, [], 'stale corpus version literal(s) found')
 

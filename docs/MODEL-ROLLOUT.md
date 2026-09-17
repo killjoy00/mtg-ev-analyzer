@@ -60,6 +60,15 @@ before testing. A separate integration test completes an old-version run,
 opens its challenge, verifies rerolls cannot cross versions, and checks that
 a new Daily replaces an outdated schedule with the current corpus.
 
+The full importer schedules at most two environments at once and stops adding
+work after a 100-minute build budget. Active sets finish, the incomplete
+catalog is recorded, and Actions saves the verified checkpoints before the
+180-minute job limit. Rerun the same request to finish remaining environments;
+an incomplete build never reaches the database loader. Raw archives are
+discarded to bound disk use. Reuse requires matching output hashes, the full
+input signature, and unchanged ETags, byte lengths, and modification times
+for both official source objects. It never relies on a green workflow badge.
+
 ## Requesting existing workflows from a reviewed commit
 
 `.github/workflows/model-rollout-request.yml` accepts changes to
