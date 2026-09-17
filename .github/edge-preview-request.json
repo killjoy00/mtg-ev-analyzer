@@ -1,1 +1,1 @@
-{"operation":"check-access","reason":"Prepare a private gateway preview; verify the new scoped deployment credential before provisioning."}
+{"operation":"deploy-preview","reason":"2026-09-17: Cloudflare access passed; deploy the current revision to an isolated private preview and verify origin protection, gameplay and quotas."}
