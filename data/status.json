@@ -1,5 +1,7 @@
 {
   "catalog_signature": [
+    "mid:2024-01-11:272",
+    "vow:2024-01-11:298",
     "ecl:2026-05-18:300",
     "one:2023-03-01:297",
     "eoe:2025-09-03:300",
@@ -30,11 +32,29 @@
     "mom:2023-06-14:297",
     "ktk:2024-01-18:298",
     "stx:2024-01-11:299",
-    "mid:2024-01-11:272",
-    "vow:2024-01-11:298",
     "powered-cube:2025-12-01:300"
   ],
   "datasets": [
+    {
+      "data_date": "2024-01-11",
+      "error_codes": [],
+      "id": "mid",
+      "name": "MID",
+      "replay_count": 272,
+      "status": "warning",
+      "warning_codes": [
+        "low_replay_count"
+      ]
+    },
+    {
+      "data_date": "2024-01-11",
+      "error_codes": [],
+      "id": "vow",
+      "name": "VOW",
+      "replay_count": 298,
+      "status": "healthy",
+      "warning_codes": []
+    },
     {
       "data_date": "2026-05-18",
       "error_codes": [],
@@ -302,26 +322,6 @@
       "id": "stx",
       "name": "STX",
       "replay_count": 299,
-      "status": "healthy",
-      "warning_codes": []
-    },
-    {
-      "data_date": "2024-01-11",
-      "error_codes": [],
-      "id": "mid",
-      "name": "MID",
-      "replay_count": 272,
-      "status": "warning",
-      "warning_codes": [
-        "low_replay_count"
-      ]
-    },
-    {
-      "data_date": "2024-01-11",
-      "error_codes": [],
-      "id": "vow",
-      "name": "VOW",
-      "replay_count": 298,
       "status": "healthy",
       "warning_codes": []
     },
