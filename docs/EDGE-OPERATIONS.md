@@ -29,7 +29,11 @@ Neon lists 17 function names on each existing branch; only three are declared in
 - One globally addressed SQLite-backed Durable Object per hashed network enforces 120 requests/minute and a separate 10 guest-creation attempts/10 minutes shared across all three APIs. Transactions arbitrate concurrent requests; failures close the gateway. Invalid session bodies count before validation but do not create identities. Normal play has a separate budget. An alarm clears idle counters after 11 minutes. These are preview settings, not evidence that the same limits are fair for production shared networks.
 - Quotas are an abuse control, not proof of one human per identity, a botnet defense or a spending cap. Cloudflare service limits and request charges can still apply. No plan upgrade is automated.
 
-## One-time owner setup
+## Credential status and one-time owner setup
+
+The saved operations credential passed the [access check on 2026-09-17](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/35046802117). This establishes configuration read access and ownership checks; deployment and live acceptance must still pass before claiming a working preview.
+
+`CLOUDFLARE_EDGE_TOKEN` is the reusable operations credential, not a secret to create for each deployment. Future permission changes should update this token's policy where supported, or replace the value under the same GitHub secret name if rotation is necessary. Request additional permissions only for a concrete required operation. Routine reviewed deployments and retries are performed by the assistant; the owner does not need to trigger workflows.
 
 Keep the existing read-only `CLOUDFLARE_AUDIT_TOKEN`. Create a separate token for operations:
 
