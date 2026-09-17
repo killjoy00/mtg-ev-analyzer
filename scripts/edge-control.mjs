@@ -5,6 +5,7 @@ import path from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
+import {deployPreviewFunction} from './edge-neon-deploy.mjs';
 const HOST='api-preview.packone.pro',WORKER='pack1-gateway-preview';
 export function parseRequest(value) {
   if(!value||Array.isArray(value)||Object.keys(value).some(k=>!['operation','reason'].includes(k))||
@@ -102,14 +103,14 @@ async function main(action) {
   fs.writeFileSync(path.join(closedDir,'index.mjs'),`import {closedOrigin} from './closed-origin.mjs'; export default closedOrigin(${JSON.stringify(commit)});\n`);
   fs.writeFileSync(path.join(closedDir,'package.json'),'{"type":"module"}\n');
   for(const slug of sealed) {
-    run('neon',['functions','deploy',slug,'--src',closedDir,'--no-bundle','--project-id','patient-shadow-91417882','--branch',branch,'--runtime','nodejs24','--wait']);
+    await deployPreviewFunction({branch,slug,directory:closedDir,apiKey:process.env.NEON_API_KEY});
     const response=await fetch(`https://${branch}-${slug}.compute.c-5.us-east-2.aws.neon.tech/health?quick=1`,{redirect:'error',signal:AbortSignal.timeout(30000)});
     if(response.status!==403||(await response.json()).release_commit!==commit)throw Error('Origin closure verification failed; preview has not been attached.');
     console.log(`${slug}: inherited preview endpoint closed and revision verified.`);
   }
   variable('PREVIEW_SEALED_FUNCTIONS',sealed.join(','));
   for(const slug of ['pack1api','pack1growth','draftrunapi']) {
-    run('neon',['functions','deploy',slug,'--src',path.join(process.env.RUNNER_TEMP,'pack1-bundles',slug),'--no-bundle','--project-id','patient-shadow-91417882','--branch',branch,'--runtime','nodejs24','--env','PACK1_REQUIRE_INGRESS=1','--env',`PACK1_INGRESS_SECRET=${origin}`,'--wait']);
+    await deployPreviewFunction({branch,slug,directory:path.join(process.env.RUNNER_TEMP,'pack1-bundles',slug),environment:{PACK1_REQUIRE_INGRESS:'1',PACK1_INGRESS_SECRET:origin},apiKey:process.env.NEON_API_KEY});
     const base=`https://${branch}-${slug}.compute.c-5.us-east-2.aws.neon.tech`;
     const unauth=await fetch(base+'/health?quick=1',{redirect:'error',signal:AbortSignal.timeout(30000)});
     if(unauth.status!==403)throw Error('Origin did not reject direct access; preview has not been attached.');
