@@ -9,6 +9,9 @@
 -- 2. CONSTRAINTS ARE REPLACED, NOT ADDED. 0010 pinned each CHECK to the two
 --    fingerprints retired then, so appending a third to the policy alone would
 --    delete it once and let the database admit it ever after.
+-- 3. DAILY PLANS CONTAIN JSON REFERENCES, WITHOUT FOREIGN KEYS. Remove plans
+--    with a missing puzzle after retirement so the next request rebuilds them.
+--    This also repairs plans left dangling by an earlier partial application.
 
 -- statement
 DELETE FROM draft_run_decision_observations WHERE puzzle_id IN (SELECT puzzle_id FROM draft_run_verified_puzzles WHERE encode(sha256(convert_to(lower(set_id),'UTF8')),'hex') IN ('f8272fb2c87fbdf3e6c933649a30f2663ba60983247b85ec223fc22b08358988','79b159b843b0aaba706b57fc165afa2d49c3680c43503ed36af6b4f66cbade5b','ca2b25a9b0e7a993f09d627d5929fb8cbfaa95403ac921f231149dc98ddce93d'));
@@ -18,6 +21,16 @@ DELETE FROM draft_run_puzzle_ratings WHERE puzzle_id IN (SELECT puzzle_id FROM d
 DELETE FROM game_result_environments WHERE game_result_id IN (SELECT id FROM game_results WHERE encode(sha256(convert_to(lower(set_id),'UTF8')),'hex') IN ('f8272fb2c87fbdf3e6c933649a30f2663ba60983247b85ec223fc22b08358988','79b159b843b0aaba706b57fc165afa2d49c3680c43503ed36af6b4f66cbade5b','ca2b25a9b0e7a993f09d627d5929fb8cbfaa95403ac921f231149dc98ddce93d'));
 -- statement
 DELETE FROM draft_run_verified_puzzles WHERE encode(sha256(convert_to(lower(set_id),'UTF8')),'hex') IN ('f8272fb2c87fbdf3e6c933649a30f2663ba60983247b85ec223fc22b08358988','79b159b843b0aaba706b57fc165afa2d49c3680c43503ed36af6b4f66cbade5b','ca2b25a9b0e7a993f09d627d5929fb8cbfaa95403ac921f231149dc98ddce93d');
+-- statement
+-- schedule-integrity-repair: exercised against real SQL by the backend gate.
+DELETE FROM draft_run_schedules s
+WHERE EXISTS (
+  SELECT 1 FROM jsonb_array_elements_text(s.puzzle_ids) AS ids(puzzle_id)
+  WHERE NOT EXISTS (
+    SELECT 1 FROM draft_run_verified_puzzles p
+    WHERE p.puzzle_id = ids.puzzle_id AND p.corpus_version = s.corpus_version
+  )
+);
 -- statement
 DELETE FROM draft_run_environment_policy WHERE encode(sha256(convert_to(lower(set_id),'UTF8')),'hex') IN ('f8272fb2c87fbdf3e6c933649a30f2663ba60983247b85ec223fc22b08358988','79b159b843b0aaba706b57fc165afa2d49c3680c43503ed36af6b4f66cbade5b','ca2b25a9b0e7a993f09d627d5929fb8cbfaa95403ac921f231149dc98ddce93d');
 -- statement
