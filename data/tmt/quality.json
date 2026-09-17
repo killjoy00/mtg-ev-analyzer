@@ -1,24 +1,640 @@
 {
   "data_date": "2026-04-08",
-  "errors": [],
+  "errors": [
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/000.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/001.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/002.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/003.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/004.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/005.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/006.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/007.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/008.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/009.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/010.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/011.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/012.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/013.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/014.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/015.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/016.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/017.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/018.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/019.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/020.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/021.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/022.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/023.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/024.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/025.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/026.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/027.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/028.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/029.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/030.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/031.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/032.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/033.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/034.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/035.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/036.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/037.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/038.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/039.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/040.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/041.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/042.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/043.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/044.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/045.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/046.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/047.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/048.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/049.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/050.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/051.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/052.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/053.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/054.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/055.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/056.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/057.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/058.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/059.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/060.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/061.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/062.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/063.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/064.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/065.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/066.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/067.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/068.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/069.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/070.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/071.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/072.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/073.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/074.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/075.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/076.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/077.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/078.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/079.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/080.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/081.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/082.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/083.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/084.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/085.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/086.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/087.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/088.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/089.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/090.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/091.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/092.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/093.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/094.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/095.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/096.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/097.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/098.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/099.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/100.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/101.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/102.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/103.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/104.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/105.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/106.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/107.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/108.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/109.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/110.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/111.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/112.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/113.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/114.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/115.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/116.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/117.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/118.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/119.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/120.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/121.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/122.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/123.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/124.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/125.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/126.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/127.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/128.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/129.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/130.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/131.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/132.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/133.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/134.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/135.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/136.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/137.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/138.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/139.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/140.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/141.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/142.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/143.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/144.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/145.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/146.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/147.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/148.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/tmt/shards/149.json'."
+    },
+    {
+      "code": "actual_replay_count_mismatch",
+      "details": {
+        "actual": 0,
+        "declared": 300
+      },
+      "message": "Manifest replay count does not equal rows found in shards."
+    },
+    {
+      "code": "too_few_replays",
+      "details": {
+        "actual": 0
+      },
+      "message": "Fewer than 100 playable replay seats were published."
+    }
+  ],
   "metrics": {
     "cards": {
-      "candidate_occurrences": 89717,
-      "image_metadata_coverage": 1.0,
-      "rarity_metadata_coverage": 1.0,
-      "unique_candidates": 214
+      "candidate_occurrences": 0,
+      "image_metadata_coverage": 0.0,
+      "rarity_metadata_coverage": 0.0,
+      "unique_candidates": 0
     },
     "consensus": {
-      "historical_pack_score_p10": 73.47,
-      "historical_pack_score_p50": 86.69,
-      "historical_pack_score_p90": 94.83,
-      "opening_top_support_p10": 0.27,
-      "opening_top_support_p50": 0.39,
-      "opening_top_support_p90": 0.58
+      "historical_pack_score_p10": null,
+      "historical_pack_score_p50": null,
+      "historical_pack_score_p90": null,
+      "opening_top_support_p10": null,
+      "opening_top_support_p50": null,
+      "opening_top_support_p90": null
     },
     "path_model": {
       "bytes": 609529,
-      "candidate_card_coverage": 1.0,
+      "candidate_card_coverage": 0.0,
       "cards": 215,
       "excluded_replay_drafts": 300,
       "model_version": "strong-player-counterfactual-path-v3",
@@ -26,7 +642,7 @@
       "present": true
     },
     "replays": {
-      "actual": 300,
+      "actual": 0,
       "declared": 300
     },
     "training": {
@@ -38,6 +654,30 @@
   "name": "TMT",
   "schema_version": 1,
   "set_id": "tmt",
-  "status": "healthy",
-  "warnings": []
+  "status": "error",
+  "warnings": [
+    {
+      "code": "image_metadata_coverage",
+      "details": {
+        "coverage": 0.0,
+        "examples": []
+      },
+      "message": "Card image metadata coverage is below 95%."
+    },
+    {
+      "code": "rarity_metadata_coverage",
+      "details": {
+        "coverage": 0.0,
+        "examples": []
+      },
+      "message": "Card rarity metadata coverage is below 95%."
+    },
+    {
+      "code": "path_model_card_coverage",
+      "details": {
+        "coverage": 0.0
+      },
+      "message": "Path model covers less than 70% of candidate card names."
+    }
+  ]
 }

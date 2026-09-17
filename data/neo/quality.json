@@ -1,24 +1,632 @@
 {
   "data_date": "2022-03-13",
-  "errors": [],
+  "errors": [
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/000.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/001.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/002.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/003.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/004.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/005.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/006.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/007.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/008.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/009.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/010.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/011.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/012.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/013.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/014.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/015.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/016.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/017.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/018.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/019.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/020.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/021.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/022.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/023.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/024.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/025.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/026.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/027.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/028.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/029.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/030.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/031.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/032.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/033.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/034.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/035.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/036.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/037.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/038.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/039.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/040.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/041.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/042.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/043.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/044.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/045.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/046.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/047.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/048.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/049.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/050.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/051.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/052.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/053.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/054.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/055.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/056.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/057.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/058.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/059.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/060.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/061.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/062.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/063.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/064.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/065.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/066.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/067.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/068.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/069.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/070.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/071.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/072.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/073.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/074.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/075.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/076.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/077.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/078.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/079.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/080.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/081.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/082.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/083.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/084.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/085.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/086.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/087.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/088.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/089.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/090.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/091.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/092.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/093.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/094.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/095.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/096.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/097.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/098.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/099.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/100.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/101.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/102.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/103.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/104.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/105.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/106.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/107.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/108.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/109.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/110.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/111.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/112.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/113.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/114.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/115.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/116.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/117.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/118.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/119.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/120.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/121.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/122.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/123.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/124.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/125.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/126.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/127.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/128.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/129.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/130.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/131.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/132.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/133.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/134.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/135.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/136.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/137.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/138.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/139.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/140.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/141.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/142.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/143.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/144.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/145.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/146.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/neo/shards/147.json'."
+    },
+    {
+      "code": "actual_replay_count_mismatch",
+      "details": {
+        "actual": 0,
+        "declared": 296
+      },
+      "message": "Manifest replay count does not equal rows found in shards."
+    },
+    {
+      "code": "too_few_replays",
+      "details": {
+        "actual": 0
+      },
+      "message": "Fewer than 100 playable replay seats were published."
+    }
+  ],
   "metrics": {
     "cards": {
-      "candidate_occurrences": 106458,
-      "image_metadata_coverage": 1.0,
-      "rarity_metadata_coverage": 1.0,
-      "unique_candidates": 287
+      "candidate_occurrences": 0,
+      "image_metadata_coverage": 0.0,
+      "rarity_metadata_coverage": 0.0,
+      "unique_candidates": 0
     },
     "consensus": {
-      "historical_pack_score_p10": 74.44,
-      "historical_pack_score_p50": 85.89,
-      "historical_pack_score_p90": 93.63,
-      "opening_top_support_p10": 0.37,
-      "opening_top_support_p50": 0.55,
-      "opening_top_support_p90": 0.76
+      "historical_pack_score_p10": null,
+      "historical_pack_score_p50": null,
+      "historical_pack_score_p90": null,
+      "opening_top_support_p10": null,
+      "opening_top_support_p50": null,
+      "opening_top_support_p90": null
     },
     "path_model": {
       "bytes": 1262150,
-      "candidate_card_coverage": 1.0,
+      "candidate_card_coverage": 0.0,
       "cards": 287,
       "excluded_replay_drafts": 296,
       "model_version": "strong-player-counterfactual-path-v3",
@@ -26,7 +634,7 @@
       "present": true
     },
     "replays": {
-      "actual": 296,
+      "actual": 0,
       "declared": 296
     },
     "training": {
@@ -38,6 +646,30 @@
   "name": "NEO",
   "schema_version": 1,
   "set_id": "neo",
-  "status": "healthy",
-  "warnings": []
+  "status": "error",
+  "warnings": [
+    {
+      "code": "image_metadata_coverage",
+      "details": {
+        "coverage": 0.0,
+        "examples": []
+      },
+      "message": "Card image metadata coverage is below 95%."
+    },
+    {
+      "code": "rarity_metadata_coverage",
+      "details": {
+        "coverage": 0.0,
+        "examples": []
+      },
+      "message": "Card rarity metadata coverage is below 95%."
+    },
+    {
+      "code": "path_model_card_coverage",
+      "details": {
+        "coverage": 0.0
+      },
+      "message": "Path model covers less than 70% of candidate card names."
+    }
+  ]
 }

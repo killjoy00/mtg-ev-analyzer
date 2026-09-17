@@ -1,24 +1,640 @@
 {
   "data_date": "2025-12-01",
-  "errors": [],
+  "errors": [
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/000.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/001.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/002.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/003.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/004.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/005.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/006.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/007.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/008.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/009.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/010.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/011.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/012.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/013.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/014.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/015.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/016.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/017.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/018.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/019.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/020.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/021.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/022.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/023.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/024.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/025.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/026.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/027.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/028.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/029.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/030.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/031.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/032.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/033.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/034.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/035.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/036.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/037.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/038.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/039.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/040.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/041.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/042.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/043.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/044.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/045.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/046.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/047.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/048.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/049.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/050.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/051.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/052.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/053.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/054.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/055.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/056.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/057.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/058.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/059.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/060.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/061.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/062.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/063.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/064.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/065.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/066.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/067.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/068.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/069.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/070.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/071.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/072.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/073.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/074.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/075.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/076.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/077.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/078.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/079.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/080.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/081.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/082.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/083.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/084.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/085.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/086.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/087.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/088.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/089.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/090.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/091.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/092.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/093.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/094.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/095.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/096.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/097.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/098.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/099.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/100.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/101.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/102.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/103.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/104.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/105.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/106.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/107.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/108.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/109.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/110.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/111.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/112.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/113.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/114.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/115.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/116.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/117.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/118.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/119.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/120.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/121.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/122.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/123.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/124.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/125.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/126.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/127.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/128.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/129.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/130.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/131.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/132.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/133.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/134.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/135.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/136.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/137.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/138.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/139.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/140.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/141.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/142.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/143.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/144.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/145.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/146.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/147.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/148.json'."
+    },
+    {
+      "code": "shard_missing",
+      "message": "Missing shard './data/powered-cube/shards/149.json'."
+    },
+    {
+      "code": "actual_replay_count_mismatch",
+      "details": {
+        "actual": 0,
+        "declared": 300
+      },
+      "message": "Manifest replay count does not equal rows found in shards."
+    },
+    {
+      "code": "too_few_replays",
+      "details": {
+        "actual": 0
+      },
+      "message": "Fewer than 100 playable replay seats were published."
+    }
+  ],
   "metrics": {
     "cards": {
-      "candidate_occurrences": 103500,
-      "image_metadata_coverage": 1.0,
-      "rarity_metadata_coverage": 1.0,
-      "unique_candidates": 540
+      "candidate_occurrences": 0,
+      "image_metadata_coverage": 0.0,
+      "rarity_metadata_coverage": 0.0,
+      "unique_candidates": 0
     },
     "consensus": {
-      "historical_pack_score_p10": 69.15,
-      "historical_pack_score_p50": 81.63,
-      "historical_pack_score_p90": 90.77,
-      "opening_top_support_p10": 0.21,
-      "opening_top_support_p50": 0.32,
-      "opening_top_support_p90": 0.48
+      "historical_pack_score_p10": null,
+      "historical_pack_score_p50": null,
+      "historical_pack_score_p90": null,
+      "opening_top_support_p10": null,
+      "opening_top_support_p50": null,
+      "opening_top_support_p90": null
     },
     "path_model": {
       "bytes": 4668149,
-      "candidate_card_coverage": 1.0,
+      "candidate_card_coverage": 0.0,
       "cards": 540,
       "excluded_replay_drafts": 300,
       "model_version": "strong-player-counterfactual-path-v3",
@@ -26,7 +642,7 @@
       "present": true
     },
     "replays": {
-      "actual": 300,
+      "actual": 0,
       "declared": 300
     },
     "training": {
@@ -38,6 +654,30 @@
   "name": "Powered Cube",
   "schema_version": 1,
   "set_id": "powered-cube",
-  "status": "healthy",
-  "warnings": []
+  "status": "error",
+  "warnings": [
+    {
+      "code": "image_metadata_coverage",
+      "details": {
+        "coverage": 0.0,
+        "examples": []
+      },
+      "message": "Card image metadata coverage is below 95%."
+    },
+    {
+      "code": "rarity_metadata_coverage",
+      "details": {
+        "coverage": 0.0,
+        "examples": []
+      },
+      "message": "Card rarity metadata coverage is below 95%."
+    },
+    {
+      "code": "path_model_card_coverage",
+      "details": {
+        "coverage": 0.0
+      },
+      "message": "Path model covers less than 70% of candidate card names."
+    }
+  ]
 }
