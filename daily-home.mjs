@@ -11,6 +11,7 @@ const games = [
 
 export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = false) {
   const status = todayStatus(profile, day);
+  const capabilities=profile?.capabilities||[];
   const ordered = [...games].sort((a, b) => Number(status[a.key].complete) - Number(status[b.key].complete));
   return `<section class="daily-home" data-daily-home data-completed="${status.completed}">
     <header class="daily-home-heading"><p class="eyebrow">Pack One</p><h1>Eight picks. Your call.</h1><p>Match a trophy drafter. See how your choices compare.</p><time datetime="${day}">${day}</time></header>
@@ -22,7 +23,7 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
       </article>`;
     }).join('')}</div>
     ${status.completed === 2 ? `<section class="daily-home-practice"><h2>Keep drafting.</h2>${profile?.player?.claimed
-      ? '<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>'
+      ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${capabilities.includes('unlimited_cube_practice')?'<a class="button secondary" href="?game=draft-run&set=powered-cube">Powered Cube Practice</a>':''}${capabilities.includes('custom_corpus')?'<a class="button secondary" href="?game=draft-run&custom=1">Choose Your Sets</a>':''}`
       : '<p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>'}</section>` : ''}
     <p class="daily-home-scoring">100 = you matched the trophy drafter.<br>Other choices receive partial credit based on how strongly the model supports them.</p>
     ${unavailable ? '<p role="status">Daily progress is unavailable. Play now still resumes your saved attempt.</p>' : ''}
@@ -36,7 +37,7 @@ export function renderDailyHome(profile = null, unavailable = false) {
   }
   lastDay = easternDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, unavailable);
-  document.querySelector('[data-home-account]')?.addEventListener('click', () => document.querySelector('#account-nav')?.click());
+  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs')).renderAccount());
 }
 
 export function installDailyHome(identityReady = Promise.resolve()) {

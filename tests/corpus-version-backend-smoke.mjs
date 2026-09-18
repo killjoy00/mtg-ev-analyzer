@@ -1,3 +1,4 @@
+import {withPracticeAccess} from './practice-access-fixture.mjs';
 // Prove an old corpus remains readable, while new Daily plans use the release.
 // Synthetic versions and players are restricted to a disposable Neon branch.
 import fs from 'node:fs';
@@ -10,10 +11,11 @@ const {query,gameDateKey}=await import('../worker/growth-function.js');
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 const tag=crypto.randomUUID(),version=`qa-previous-${tag}`;
 async function call(path,body,token,status=200) {
-  const response=await api.fetch(new Request(`https://packone.pro${path}`,{
+  const request=new Request(`https://packone.pro${path}`,{
     method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(token?{authorization:`Bearer ${token}`}:{})},
     body:body===undefined?undefined:JSON.stringify(body),
-  }));
+  });
+  const response=await withPracticeAccess(request,query,r=>api.fetch(r));
   const data=await response.json();assert.equal(response.status,status,JSON.stringify(data));return data;
 }
 const player=await call('/v1/session',{displayName:`QA versions ${tag.slice(0,8)}`});
@@ -46,7 +48,7 @@ assert.equal((await query('SELECT corpus_version FROM draft_run_sessions WHERE i
 // This old version contains only the original eight sources. A reroll cannot
 // find another old source and must not silently cross into the new corpus.
 const unavailable=await call(`/v1/runs/${challenge.id}/reroll`,{revision:challenge.revision,round:0,puzzleId:challenge.current.puzzle_id,type:'pack'},player.token,409);
-assert.match(unavailable.error,/No comparable replacement/);
+assert.match(unavailable.error,/already been used/);
 
 const dailyPlayer=await call('/v1/session',{displayName:`QA daily ${tag.slice(0,8)}`});
 await call('/v1/runs',{daily:true,qa:true},dailyPlayer.token);

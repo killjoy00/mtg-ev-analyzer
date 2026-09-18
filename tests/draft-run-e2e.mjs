@@ -29,7 +29,7 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
   const path=new URL(route.request().url()).pathname;let body;
   if(path.endsWith('/share')){shareCalls++;body={id:shareId};}
   else if(path.endsWith('/view')){const req=route.request().postDataJSON();assert.equal(req.revision,revision);assert.equal(req.puzzleId,puzzles[answers.length].puzzle_id);views.push(req);body={ok:true};}
-  else if(path.includes('/challenges/'))body={id:shareId,name:'Your friend',score:88,environment,run_length:puzzles.length};
+  else if(path.includes('/challenges/')||path.includes('/shared-runs/'))body={id:shareId,name:'Your friend',score:88,environment,run_length:puzzles.length};
   else if(path.endsWith('/reroll')){
     const req=route.request().postDataJSON(),round=answers.length,old=puzzles[round];
     assert.equal(req.revision,revision);assert.equal(req.round,round);assert.ok(rerolls[req.type]>0);
@@ -78,10 +78,10 @@ try{
   assert.equal(await page.locator('.run-cards').evaluate(el=>getComputedStyle(el).gridTemplateColumns.split(' ').length),3);
   await page.locator('.run-card').last().scrollIntoViewIfNeeded();
   const dock=await page.locator('.run-lock').boundingBox();assert.ok(dock.y+dock.height<=845,'Rerolls and lock remain within the viewport');
-  await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-mobile-last-row.png`});
+  await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-mobile-last-row.png`});
   await page.evaluate(()=>window.scrollTo(0,0));
-  await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-mobile.png`,fullPage:true});
-  await page.setViewportSize({width:1440,height:1000});await noOverflow();await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-desktop.png`,fullPage:true});await page.setViewportSize({width:390,height:844});
+  await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-mobile.png`,fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});await noOverflow();await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-desktop.png`,fullPage:true});await page.setViewportSize({width:390,height:844});
   for(let round=0;round<puzzles.length;round++){
     const p=puzzles[round];if(cube)assert.equal(p.set_id,'powered-cube');assert.equal(await page.locator('.run-pool-cards>button').count(),p.pick_number-1);
     const selected=round===0?p.candidates.filter(c=>c.id!==p.historical_pick_id).sort((a,b)=>a.model_probability-b.model_probability)[0].id:p.historical_pick_id;
@@ -92,21 +92,21 @@ try{
     assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
     assert.equal(await page.locator('.run-pack-review').getAttribute('open'),null);assert.equal(answers.length,round+1);
     assert.equal(await page.locator('.run-card-score').count(),0);
-    if(round===0){await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-consensus-mobile.png`,fullPage:true});}
+    if(round===0){await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-consensus-mobile.png`,fullPage:true});}
     await page.locator('#run-next').click();
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
-  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),daily?4:5);assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());await noOverflow();
-  await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
-  await page.locator(daily?'#run-share':'#run-challenge').click();await page.waitForFunction(()=>Boolean(window.__runShare));
+  await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),4);assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());await noOverflow();
+  await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
+  await page.locator('#run-share').click();await page.waitForFunction(()=>Boolean(window.__runShare));
   const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.text,new RegExp('🟩{'+(puzzles.length-1)+'}','u'));assert.equal(shared.files,undefined);assert.doesNotMatch(shared.url,/profile|token/);
   if(daily){
     assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.url,/daily=1/);assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
     assert.equal(await page.locator('#run-challenge').count(),0);
   }else{
-    assert.match(shared.url,new RegExp('challenge='+shareId));
-    await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Can you beat 88/);await noOverflow();
-    await page.screenshot({path:`artifacts/ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
+    assert.match(shared.url,new RegExp('shared='+shareId));
+    await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Play this run and compare/);await noOverflow();
+    await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
   }
   await page.goto(base+'/?game=draft-run&board=daily'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
   assert.equal(await page.locator('.run-board-games a').count(),2);

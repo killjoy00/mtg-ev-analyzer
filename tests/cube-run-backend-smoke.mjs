@@ -1,3 +1,4 @@
+import {withPracticeAccess} from './practice-access-fixture.mjs';
 // Integration gate: isolated Neon development branch only.
 // Usage: node tests/cube-run-backend-smoke.mjs /path/to/dev.connection --dev-fixtures
 import fs from 'node:fs';
@@ -11,7 +12,7 @@ const tag=crypto.randomUUID().slice(0,8);
 async function call(service,path,body,token,status=200,headers={}) {
   const url=prefix?prefix+(service===growth?'pack1growth':'draftrunapi')+'.compute.c-5.us-east-2.aws.neon.tech'+path:'https://packone.pro'+path;
   const request=new Request(url,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...headers},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(45000)});
-  const response=await(prefix?fetch(request):service.fetch(request));
+  const response=await withPracticeAccess(request,query,r=>prefix?fetch(r):service.fetch(r));
   const result=await response.json();assert.equal(response.status,status,`${path}: ${JSON.stringify(result)}`);return result;
 }
 const guest=await call(growth,'/v1/session',{displayName:'QA Cube '+tag});
@@ -51,8 +52,8 @@ assert.equal(invitation.environment,'powered-cube');
 const friend=await call(runApi,'/v1/runs',{challenge:share.id,environment:'mixed'},owner.token);
 assert.equal(friend.environment,'powered-cube');assert.equal(friend.comparison.exact,true);
 const first=run.answers[0].puzzle;assert.equal(friend.current.puzzle_id,first.puzzle_id);
-const rerolledFriend=await call(runApi,`/v1/runs/${friend.id}/reroll`,{revision:friend.revision,round:0,puzzleId:friend.current.puzzle_id,type:'pack'},owner.token);
-assert.equal(rerolledFriend.comparison.exact,false);assert.equal(rerolledFriend.current.set_id,'powered-cube');
+const rerolledFriend=await call(runApi,`/v1/runs/${friend.id}/reroll`,{revision:friend.revision,round:0,puzzleId:friend.current.puzzle_id,type:'pack'},owner.token,409);
+assert.equal(friend.comparison.exact,true);assert.deepEqual(friend.rerolls,{set:0,pack:0});
 
 // Merge simultaneous Dailies independently; an unfinished target Cube wins.
 const authId=crypto.randomUUID(),authToken=crypto.randomUUID()+crypto.randomUUID();

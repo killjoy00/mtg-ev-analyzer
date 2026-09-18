@@ -1,3 +1,4 @@
+import {accountCapabilities,requireCapability,practiceCapability} from './capabilities.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity} from './account-identity.mjs';
 import {releaseMetadata} from './release.mjs';
@@ -30,7 +31,7 @@ async function puzzle(id,corpusVersion) {
 }
 
 function decode(row) {
-  return {...row,leaderboard_eligible:row.leaderboard_eligible===true||row.leaderboard_eligible==='t',revision:Number(row.revision),puzzle_ids:parse(row.puzzle_ids),daily_featured_sets:parse(row.daily_featured_sets||'[]'),answers:parse(row.answers),rerolls:parse(row.rerolls),difficulty_anchors:parse(row.difficulty_anchors||'[]'),seen_sources:parse(row.seen_sources),score:row.score==null?null:Number(row.score)};
+  return {...row,custom_set_ids:parse(row.custom_set_ids||'[]'),leaderboard_eligible:row.leaderboard_eligible===true||row.leaderboard_eligible==='t',revision:Number(row.revision),puzzle_ids:parse(row.puzzle_ids),daily_featured_sets:parse(row.daily_featured_sets||'[]'),answers:parse(row.answers),rerolls:parse(row.rerolls),difficulty_anchors:parse(row.difficulty_anchors||'[]'),seen_sources:parse(row.seen_sources),score:row.score==null?null:Number(row.score)};
 }
 
 async function session(id,owner) {
@@ -41,9 +42,9 @@ async function session(id,owner) {
 }
 
 async function share(id) {
-  if(!/^[a-f0-9]{24}$/.test(id||'')) fail('Invalid challenge.');
+  if(!/^[a-f0-9]{24}$/.test(id||'')) fail('Invalid shared run.');
   const r=await query('SELECT sh.id,sh.display_name,sh.score,sh.puzzle_ids,s.environment,s.corpus_version,s.scoring_version,s.difficulty_version,s.selection_version FROM draft_run_shares sh JOIN draft_run_sessions s ON s.id=sh.session_id WHERE sh.id=$1',[id]);
-  if(!r.rows[0]) fail('Challenge not found.',404);
+  if(!r.rows[0]) fail('Shared run not found.',404);
   return {...r.rows[0],score:Number(r.rows[0].score),puzzle_ids:parse(r.rows[0].puzzle_ids)};
 }
 
@@ -87,17 +88,23 @@ async function responseFor(s) {
     const row=r.rows[0],total=Number(row.total);
     standing={rank:Number(row.rank),total,percentile:total>=10?Math.max(1,Math.ceil(Number(row.through_ties)/total*100)):null,final:s.day<gameDateKey()};
   }
-  return {id:s.id,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day,leaderboard_eligible:s.leaderboard_eligible,environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
+  return {id:s.id,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:s.leaderboard_eligible,environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
 }
 
 async function start(request) {
   const owner=await player(request),body=await readJson(request),daily=body.daily===true;
   const account=await accountIdentity(request,query,owner);
+  const capabilities=await accountCapabilities(account,query);
   const source=body.challenge ? await share(String(body.challenge)) : null;
-  if(source && daily) fail('A friend challenge is a separate practice run.');
+  if(source && daily) fail('A shared run is separate from the Daily.');
   let environment;
   try { environment=draftRunEnvironment(source?.environment || body.environment || 'mixed'); }
   catch { fail('Invalid Draft Run environment.'); }
+  const setIds=body.setIds??[];
+  if(!Array.isArray(setIds)||setIds.some(s=>typeof s!=='string'||!/^[-a-z0-9]{2,40}$/.test(s)))fail('Choose valid sets.');
+  if(daily&&setIds.length)fail('Daily sets are fixed.');
+  if(environment==='powered-cube'&&setIds.length)fail('Custom sets use regular Draft Runs.');
+  if(!daily)requireCapability(capabilities,practiceCapability(environment,setIds));
   const day=daily?gameDateKey():null;
   if(day) {
     const old=await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3 ORDER BY daily_account_id NULLS LAST,created_at LIMIT 1',[owner,day,environment,account?.auth_user_id||null]);
@@ -124,15 +131,15 @@ async function start(request) {
     selectionVersion=schedule.selection_version||PREVIOUS_SELECTION_VERSION;
     featuredSets=parse(schedule.daily_featured_sets||'[]');
     seed=`daily:${environment}:${day}:${schedule.corpus_version}:${selectionVersion}`;
-  } else ids=(await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment)).map(p=>p.puzzle_id);
+  } else ids=(await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{setIds})).map(p=>p.puzzle_id);
   const choices=await loadPuzzleMetadata(query,corpusVersion,ids);
-  if(choices.some(p=>!p || (environment==='powered-cube')!==(p.set_id==='powered-cube'))) fail('This challenge uses an unavailable corpus.',409);
+  if(choices.some(p=>!p || (environment==='powered-cube')!==(p.set_id==='powered-cube'))) fail('This run uses an unavailable corpus.',409);
   const sources=choices.map(p=>p.source_draft_hash),anchors=choices.map(publicDifficulty);
-  const rerolls=day?{set:0,pack:0}:environment==='powered-cube'?{set:0,pack:2}:{set:1,pack:1};
-  const inserted=await query(`INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version,measurement_qa,daily_featured_sets,daily_account_id,leaderboard_eligible)
+  const rerolls=day||source?{set:0,pack:0}:environment==='powered-cube'||setIds.length?{set:0,pack:2}:{set:1,pack:1};
+  const inserted=await query(`INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version,measurement_qa,daily_featured_sets,daily_account_id,leaderboard_eligible,custom_set_ids)
     VALUES($1::uuid,$2::date,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12::jsonb,$13,
-      $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb,$16::uuid,$17::boolean)
-    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,corpusVersion,scoringVersion,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets),day?account?.auth_user_id||null:null,Boolean(day&&account)]);
+      $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb,$16::uuid,$17::boolean,$18::jsonb)
+    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,corpusVersion,scoringVersion,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets),day?account?.auth_user_id||null:null,Boolean(day&&account),JSON.stringify(setIds)]);
   let s=inserted.rows[0];
   if(!s && day) s=(await query('SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date AND environment=$3',[owner,day,environment])).rows[0];
   if(!s) fail('Could not start your run. Please retry.',409);
@@ -164,8 +171,8 @@ async function change(request,id,action) {
     if(!Number.isInteger(s.rerolls[type]) || s.rerolls[type]<1) fail('That reroll has already been used.',409);
     const [current]=await loadPuzzleMetadata(query,s.corpus_version,[body.puzzleId]);
     if(!current) fail('This puzzle is unavailable.',503);
-    if(type==='set'&&s.day&&s.daily_featured_sets.includes(current.set_id))fail('This set is one of today’s three guaranteed releases. Use a pack reroll here, or save the set reroll for another round.',409);
-    const replacement=await selectDatabaseReroll(query,s.corpus_version,current,{type,round,seed:s.seed,excludedSources:s.seen_sources,environment:environmentOf(s),difficultyVersion:s.difficulty_version||LEGACY_DIFFICULTY_VERSION,selectionVersion:s.selection_version||PREVIOUS_SELECTION_VERSION,daily:Boolean(s.day),day:s.day||gameDateKey(),anchor:s.difficulty_anchors[round]});
+    
+    const replacement=await selectDatabaseReroll(query,s.corpus_version,current,{type,round,seed:s.seed,excludedSources:s.seen_sources,environment:environmentOf(s),difficultyVersion:s.difficulty_version||LEGACY_DIFFICULTY_VERSION,selectionVersion:s.selection_version||PREVIOUS_SELECTION_VERSION,daily:Boolean(s.day),day:s.day||gameDateKey(),anchor:s.difficulty_anchors[round],setIds:s.custom_set_ids});
     if(!replacement) fail('No comparable replacement is available. Your reroll is still yours.',409);
     s.puzzle_ids[round]=replacement.puzzle_id;s.seen_sources.push(replacement.source_draft_hash);s.rerolls[type]-=1;
   }
@@ -178,8 +185,9 @@ async function change(request,id,action) {
 
 async function createShare(request,id) {
   const owner=await player(request),s=await session(id,owner);
-  if(s.answers.length!==runLength(s)) fail('Finish the run before challenging a friend.');
+  if(s.answers.length!==runLength(s)) fail('Finish the run before sharing it.');
   if(s.day)return json({daily:true,day:s.day,environment:environmentOf(s),url:`/?game=draft-run&daily=1${environmentOf(s)==='powered-cube'?'&set=powered-cube':''}`});
+  if(s.challenge_id){const original=await share(s.challenge_id);if(JSON.stringify(original.puzzle_ids)===JSON.stringify(s.puzzle_ids))return json({id:original.id});}
   const name=(await query('SELECT display_name FROM players WHERE id=$1::uuid',[owner])).rows[0]?.display_name||'A friend';
   const key=crypto.randomUUID().replaceAll('-','').slice(0,24);
   const r=await query(`INSERT INTO draft_run_shares(id,session_id,display_name,score,puzzle_ids) VALUES($1,$2::uuid,$3,$4::int,$5::jsonb) ON CONFLICT(session_id) DO UPDATE SET session_id=EXCLUDED.session_id RETURNING id`,[key,id,name,s.score,JSON.stringify(s.puzzle_ids)]);
@@ -191,7 +199,7 @@ async function dailyStatus(request) {
   const result=await query(`SELECT day::text date,environment set_id,'draft_run' mode,score,id run_id
     FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date
       AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)`,[owner,day]);
-  return json({day,player:{claimed:Boolean(account)},daily_history:result.rows.map(r=>({...r,score:Number(r.score)}))});
+  return json({day,capabilities:await accountCapabilities(account,query),player:{claimed:Boolean(account)},daily_history:result.rows.map(r=>({...r,score:Number(r.score)}))});
 }
 
 async function leaderboard(request) {
@@ -233,6 +241,8 @@ async function route(request) {
   }
   if(request.method==='POST'&&path==='/v1/session') return growth.fetch(request);
   if(request.method==='POST'&&path==='/v1/runs') return start(request);
+  if(request.method==='GET'&&path==='/v1/capabilities') {const owner=await player(request);return json({capabilities:await accountCapabilities(await accountIdentity(request,query,owner),query)});}
+  if(request.method==='GET'&&path==='/v1/practice-sets') {const owner=await player(request),caps=await accountCapabilities(await accountIdentity(request,query,owner),query);requireCapability(caps,'custom_corpus');return json({sets:liveRegularSets(await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION),gameDateKey())});}
   if(request.method==='GET'&&path==='/v1/daily-status') return dailyStatus(request);
   if(request.method==='GET'&&path==='/v1/leaderboard') return leaderboard(request);
   const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view))?$/);
@@ -246,13 +256,13 @@ async function route(request) {
     if(request.method==='POST'&&match[2]==='share') return createShare(request,match[1]);
     if(request.method==='POST'&&['pick','reroll'].includes(match[2])) return change(request,match[1],match[2]);
   }
-  const shared=path.match(/^\/v1\/challenges\/([a-f0-9]+)$/);
-  if(request.method==='GET'&&shared) { const s=await share(shared[1]);return json({id:s.id,name:s.display_name,score:s.score,environment:s.environment,run_length:s.puzzle_ids.length}); }
+  const shared=path.match(/^\/v1\/(?:challenges|shared-runs)\/([a-f0-9]+)$/);
+  if(request.method==='GET'&&shared) { const s=await share(shared[1]);const scores=await query(`SELECT p.display_name name,r.score FROM draft_run_sessions r JOIN players p ON p.id=r.player_id WHERE r.score IS NOT NULL AND r.puzzle_ids=$2::jsonb AND (r.challenge_id=$1 OR r.id=(SELECT session_id FROM draft_run_shares WHERE id=$1)) ORDER BY r.score DESC,r.created_at LIMIT 100`,[s.id,JSON.stringify(s.puzzle_ids)]);return json({id:s.id,name:s.display_name,score:s.score,scores:scores.rows,environment:s.environment,run_length:s.puzzle_ids.length}); }
   return json({error:'Not found.'},404);
 }
 
 export default {async fetch(request) {
   const denied=guardIngress(request);if(denied)return denied;
   try {const response=await route(request);response.headers.set('cache-control','no-store');return withCors(response,request);}
-  catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);const response=json({error:status===500?'Could not save your run. Please retry.':error.message},status);if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));return withCors(response,request);}
+  catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);const response=json({error:status===500?'Could not save your run. Please retry.':error.message,...(error.capability?{capability:error.capability}:{})},status);if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));return withCors(response,request);}
 }};
