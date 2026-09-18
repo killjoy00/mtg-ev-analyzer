@@ -1,5 +1,7 @@
 {
-  "operation": "traditional-puzzles",
-  "request_id": "traditional-puzzle-v3-20260918",
-  "reason": "Evaluate Traditional 3-0 puzzle inventory independently of training, requiring exact frozen Premier v3 support parity and predeclared scoring/quality gates. Produce unpublished candidate artifacts only."
+  "operation": "deploy",
+  "request_id": "rebuild-v3-production-20260918",
+  "reason": "Promote the identical bc1007e revision verified by development deployment 35367519625. Production additive staging 35366880767 verified all 32 complete v3 imports and preserved historical corpus data.",
+  "target": "production",
+  "commit": "bc1007e257401f2be8daba06a1a6c5e54eac19bb"
 }
