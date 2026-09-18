@@ -85,8 +85,8 @@ def cube_traditional_cohort(path,include_sources=False):
         for line in f:
             if not line.strip(): continue
             if modern:
-                row=dict(zip(header[:9],(v.decode().strip('"') for v in line.split(b',9)[:9])))
-                row.update(zip(header[-2:],(v.decode().strip().strip('"') for v in line.rsplit(b',2)[-2:])))
+                row=dict(zip(header[:9],(v.decode().strip('"') for v in line.split(b',',9)[:9])))
+                row.update(zip(header[-2:],(v.decode().strip().strip('"') for v in line.rsplit(b',',2)[-2:])))
             else:
                 values=next(csv.reader([line.decode()]))
                 if len(values)!=len(header): raise ValueError('Malformed archive row')
