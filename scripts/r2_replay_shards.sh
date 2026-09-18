@@ -7,6 +7,8 @@ mode="${1:-}"
 : "${AWS_ACCESS_KEY_ID:?AWS_ACCESS_KEY_ID is required}"
 : "${AWS_SECRET_ACCESS_KEY:?AWS_SECRET_ACCESS_KEY is required}"
 export AWS_DEFAULT_REGION="${AWS_DEFAULT_REGION:-auto}"
+export AWS_RETRY_MODE="${AWS_RETRY_MODE:-adaptive}"
+export AWS_MAX_ATTEMPTS="${AWS_MAX_ATTEMPTS:-10}"
 
 case "$mode" in
   hydrate)

@@ -8,7 +8,8 @@ test('historical share reader is isolated from normal navigation',()=>{
  const historical=fs.readFileSync('historical-share.mjs','utf8');
  assert.match(historical,/social\.mjs/);
 });
-test('profile archive keeps existing Cube entries on the current reader',()=>{
+test('profile coverage links do not expose retired practice modes or bypass capabilities',()=>{
  const source=fs.readFileSync('profile-product.mjs','utf8');
- assert.match(source,/\?game=draft-run&set=powered-cube/);
+ assert.match(source,/\/sets\/#\$\{encodeURIComponent\(entry.id\)\}/);
+ assert.doesNotMatch(source,/\?practice=|\?game=draft-run&set=/);
 });
