@@ -28,7 +28,7 @@ test('balanced runs enforce the easy cap and maintain a medium majority across s
     assert.equal(bands.filter(b=>b==='hard').length,2);
     assert.ok(bands.slice(5).every(b=>b!=='easy'));
     assert.equal(bands.slice(5).filter(b=>b==='hard').length,1);
-    assert.ok(run.every(p=>p.pick_number<=10));
+    assert.deepEqual(run.map(p=>p.pick_number),[1,2,3,4,5,6,7,8]);
     assert.ok(run.slice(7).every(p=>p.pick_number>=8));
     assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,8);
   }
@@ -47,7 +47,7 @@ test('Powered Cube starts at the first fully observed decision P1P2 when P1P1 is
     const bands=run.map(p=>rateDraftRunPuzzle(p).band);
     assert.equal(run.length,8);
     assert.equal(run[0].pick_number,2);
-    assert.ok(run.every(p=>p.pick_number>=2&&p.pick_number<=11));
+    assert.deepEqual(run.map(p=>p.pick_number),[2,3,4,5,6,7,8,9]);
     assert.ok(run.slice(7).every(p=>p.pick_number>=9));
     assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,8);
     assert.equal(bands.filter(b=>b==='easy').length,1);

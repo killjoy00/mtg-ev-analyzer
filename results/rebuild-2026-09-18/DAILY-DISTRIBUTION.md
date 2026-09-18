@@ -2,6 +2,8 @@
 
 100,000 deterministic Daily plans (800,000 decisions), using the 18 September 2026 Live metadata snapshot. Every plan has at least two decisions from the newest set and four from the previous-three pool. All 100,000 plans fit the actual v7 corpus pick-window/difficulty group availability on the isolated production clone.
 
+New v4 regular runs use exactly P1P1–P1P8; Powered Cube uses its first eight complete archived decisions, P1P2–P1P9. Historical v3/ten-pick windows remain available only for historical sessions. The feasibility simulation was repeated with these exact windows.
+
 The optional weight for release rank `r` (newest = 0) is `2^(-r/4)`: a half-life of four eligible releases. The previous-three pool uses the same decay across its three positions. Set sampling is with replacement; source drafts are sampled without replacement. Corpus size does not affect set weights.
 
 Newest four share: **87.5993%**. On 45737 days, at least one of the previous three sets does not appear. Their guarantee applies to the pool, not each member.

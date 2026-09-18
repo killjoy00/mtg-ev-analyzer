@@ -17,7 +17,7 @@ assert.deepEqual(imported.errors,{});
 const bySet=new Map(imported.sets.map(s=>[s.id,s]));
 if(process.argv.includes('--complete')) {
   // Discovery maps the official Cube_-_Powered archive to powered-cube.
-  assert.deepEqual([...bySet.keys()].sort(),baseline.sets.map(s=>s.id).sort(),'Every environment, including Cube, must finish before release');
+  assert.ok(baseline.sets.every(s=>bySet.has(s.id)),'Every baseline environment, including Cube, must finish before release');
 }
 const result=await query(`SELECT p.set_id,count(*)::int puzzles,
   count(*) FILTER(WHERE r.puzzle_id IS NULL)::int unrated,
@@ -25,16 +25,20 @@ const result=await query(`SELECT p.set_id,count(*)::int puzzles,
   FROM draft_run_verified_puzzles p LEFT JOIN draft_run_puzzle_ratings r
     ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$2
   WHERE p.corpus_version=$1 GROUP BY p.set_id`,[DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION]);
-const manifests=await query('SELECT set_id,corpus_version,manifest FROM draft_run_verified_sets');
-assert.deepEqual(result.rows.map(s=>s.set_id).sort(),baseline.sets.map(s=>s.id).sort(),'Staged coverage must match the registered environments');
+const manifests=await query('SELECT set_id,corpus_version,manifest FROM corpus_set_versions WHERE corpus_version=$1',[DRAFT_RUN_CORPUS_VERSION]);
+assert.ok(baseline.sets.every(s=>result.rows.some(r=>r.set_id===s.id)),'Every baseline environment must remain present');
+assert.ok(result.rows.every(r=>manifests.rows.some(m=>m.set_id===r.set_id)),'Every retained environment must have a versioned manifest');
 let total=0;
-for(const set of baseline.sets) {
+const baselineIds=new Set(baseline.sets.map(s=>s.id));
+for(const set of [...baseline.sets,...imported.sets.filter(s=>!baselineIds.has(s.id))]) {
   const rows=result.rows.find(r=>r.set_id===set.id),supplement=bySet.get(set.id);
   const stored=manifests.rows.find(r=>r.set_id===set.id);
   const manifest=typeof stored?.manifest==='string'?JSON.parse(stored.manifest):stored?.manifest;
   assert.equal(stored?.corpus_version,DRAFT_RUN_CORPUS_VERSION,`${set.id}: manifest version`);
-  assert.equal(manifest.model_version,baseline.model_version,`${set.id}: baseline model`);
-  assert.equal(manifest.sha256,set.sha256,`${set.id}: baseline checksum`);
+  if(baselineIds.has(set.id)){
+    assert.equal(manifest.model_version,baseline.model_version,`${set.id}: baseline model`);
+    assert.equal(manifest.sha256,set.sha256,`${set.id}: baseline checksum`);
+  }
   assert.equal(Number(rows.unrated),0,`${set.id}: unrated puzzles`);
   assert.equal(Number(rows.wrong_version),0,`${set.id}: mismatched payload versions`);
   if(supplement) {

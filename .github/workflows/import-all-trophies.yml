@@ -53,7 +53,6 @@ jobs:
         env:
           IMPORT_SETS: ${{ inputs.sets || 'all' }}
         run: |
-          python scripts/purge_retired_data.py
           python -u scripts/run_import_all_trophies.py --sets "$IMPORT_SETS" --workers 2 --max-seconds 6000 --discard-source-archives
       - name: Validate all outputs and accounting
         run: node scripts/load_all_trophies.mjs unused generated/trophy-import --validate-only

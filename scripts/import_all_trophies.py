@@ -174,6 +174,7 @@ def scan_metadata(path):
             if row.get('event_type') != 'PremierDraft': raise ValueError('Non-Premier draft in archive')
             did = row['draft_id']
             item = {'wins': int(float(row['event_match_wins'] or -1)),
+                    'losses': int(float(row['event_match_losses'])) if row.get('event_match_losses') else None,
                     'games': parse_games_lower_bound(row.get('user_n_games_bucket')),
                     'rate': parse_rate_bucket(row.get('user_game_win_rate_bucket'))}
             if did in drafts and drafts[did] != item: conflicts.add(did)
@@ -196,6 +197,7 @@ def eligible_trophies(drafts, cutoff, legacy=False, conflicts=()):
     for did, d in drafts.items():
         if d['wins'] != 7: continue
         if did in conflicts: rejected[did] = 'inconsistent_source_metadata'
+        elif d.get('losses') is not None and d['losses'] not in (0, 1, 2): rejected[did] = 'invalid_premier_trophy_outcome'
         elif (d.get('games') or 0) < 100: rejected[did] = 'experience_unverified_or_below_100'
         elif legacy and d.get('rank') not in ('diamond','mythic'): rejected[did] = 'rank_unverified_or_below_diamond'
         elif not legacy and (d.get('rate') is None or d['rate'] < cutoff): rejected[did] = 'win_rate_unverified_or_below_cutoff'
@@ -453,16 +455,16 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
                 included+=1;new+=1
             status='included' if included else 'excluded'
             reason=why or ('invalid_source_pick' if invalid[did] else None)
-            dispositions.append({'draft_id':did,'source_draft_hash':source_hash,'status':status,'qualified':True,'puzzles':included,'additional_puzzles':new,'trajectory_limit':reason,'excluded_decisions':dict(skipped),'source_fingerprint':fingerprint})
+            dispositions.append({'draft_id':did,'source_draft_hash':source_hash,'status':status,'qualified':True,'puzzles':included,'additional_puzzles':new,'trajectory_limit':reason,'excluded_decisions':dict(skipped),'source_fingerprint':fingerprint,'wins':d['wins'],'losses':d.get('losses'),'event_type':'PremierDraft'})
             if not included: reasons[reason or (next(iter(skipped)) if skipped else 'no_verified_decisions')]+=1
     for did,reason in sorted(rejected.items()):
-        dispositions.append({'draft_id':did,'status':'excluded','qualified':False,'reason':reason});reasons[reason]+=1
+        dispositions.append({'draft_id':did,'status':'excluded','qualified':False,'reason':reason,'source_draft_hash':hashlib.sha256(f'{sid}|{did}'.encode()).hexdigest()[:32],'wins':drafts[did]['wins'],'losses':drafts[did].get('losses'),'event_type':'PremierDraft'});reasons[reason]+=1
     if base_entry and len(retained)!=len(old_rows): raise ValueError(f'{sid}: failed to reverify {len(old_rows)-len(retained)} existing decisions')
     trophy_count=sum(d['wins']==7 for d in drafts.values())
     if len(dispositions)!=trophy_count: raise ValueError('Incomplete trophy accounting')
     puzzle_file=directory/'puzzles.jsonl.gz';ledger_file=directory/'trophies.jsonl.gz'
     write_gzip_jsonl(puzzle_file,sorted(additions,key=lambda p:p['puzzle_id']));write_gzip_jsonl(ledger_file,sorted(dispositions,key=lambda d:d['draft_id']))
-    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'input_signature':signature,'source_archive':source,'skill_source':skill_source,'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
+    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'input_signature':signature,'source_archive':source,'skill_source':skill_source,'schema_verified':True,'source_event_type':'PremierDraft','qualified_drafts':sum(1 for did,d in drafts.items() if did not in conflicts and (d.get('games') or 0)>=100 and (d.get('rank') in ('diamond','mythic') if legacy else d.get('rate') is not None and d['rate'] >= (cutoff or .6))),'trophy_outcomes':dict(Counter(f"7-{d.get('losses') if d.get('losses') is not None else 'unknown'}" for d in drafts.values() if d['wins']==7)),'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
     atomic_json(completed,info);print(json.dumps(info),flush=True);return info
 
 

@@ -23,6 +23,12 @@ class FullTrophyTests(unittest.TestCase):
         self.assertEqual(set(rejected),{'novice','low'})
         self.assertNotIn('loser',selected)
 
+    def test_all_legal_premier_trophy_records_qualify(self):
+        drafts={str(loss):{'wins':7,'losses':loss,'games':100,'rate':.7} for loss in (0,1,2,3)}
+        selected,rejected=eligible_trophies(drafts,.62)
+        self.assertEqual(set(selected),{'0','1','2'})
+        self.assertEqual(rejected,{'3':'invalid_premier_trophy_outcome'})
+
     def test_legacy_requires_actual_rank_and_experience(self):
         drafts={'ok':{'wins':7,'games':100,'rank':'diamond'},'no':{'wins':7,'games':100,'rank':'platinum'},'missing':{'wins':7,'games':None,'rank':'mythic'}}
         selected,rejected=eligible_trophies(drafts,None,True)
