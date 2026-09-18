@@ -1,7 +1,5 @@
 {
-  "request_id": "v7-all-development-20260918-01",
-  "reason": "KTK development import passed and a direct 5379-puzzle comparison confirms production still stores old context probabilities. Complete the 32-set v7 Draft Run corpus while reusing the KTK checkpoint and existing replay shards.",
-  "operation": "import",
-  "sets": "all",
-  "target": "development"
+  "request_id": "traditional-policy-20260918-01",
+  "reason": "Run the predeclared first-eight Premier versus Traditional experiment after harness CI. Offline artifacts only; no production pooling or puzzle publication.",
+  "operation": "format-research"
 }
