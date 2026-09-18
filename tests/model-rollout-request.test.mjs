@@ -16,3 +16,8 @@ test('rollout requests can target only fixed workflows on main',()=>{
     {...common,operation:'import',target:'another-database',sets:'all'},
   ])assert.throws(()=>rolloutDispatch(request));
 });
+test('format research dispatch cannot select arbitrary sets, code refs or targets',()=>{
+  const request={operation:'format-research',reason:'Predeclared protocol',request_id:'research-1'};
+  assert.deepEqual(rolloutDispatch(request),{workflow:'format-research.yml',body:{ref:'main',inputs:{}}});
+  for(const extra of [{sets:'all'},{target:'production'},{ref:'branch'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});

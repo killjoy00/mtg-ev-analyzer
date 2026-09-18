@@ -1,0 +1,60 @@
+name: Premier Traditional research
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: format-research
+  cancel-in-progress: false
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        set: [blb, dft, fin, hob]
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate research harness
+        run: python -m unittest discover -s tests -p test_format_research.py
+      - name: Measure predeclared set
+        env:
+          RESEARCH_SET: ${{ matrix.set }}
+        run: python -u scripts/format_research.py --set "$RESEARCH_SET"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: format-research-${{ matrix.set }}
+          retention-days: 90
+          path: |
+            generated/format-research/*/measurements.json.gz
+            generated/format-research/*/summary.json
+            generated/format-research/*/error.json
+  report:
+    needs: measure
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: format-research-*
+          path: generated/format-research
+      - name: Compare formats and matched residuals
+        run: |
+          mapfile -t measurements < <(find generated/format-research -name measurements.json.gz -o -name error.json)
+          python scripts/format_research.py --summarize "${measurements[@]}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: format-research-report
+          retention-days: 90
+          path: generated/format-research/report.json
