@@ -35,7 +35,7 @@ try {
   await page.getByRole('heading',{name:'Corpus operations'}).waitFor();
   await page.getByText('Quality gates',{exact:false}).click();
   await page.getByText('Blocked: images',{exact:true}).waitFor();
-  assert.equal(await page.locator('option[value=Live]').isDisabled(),true);
+  assert.equal(await page.locator('option[value=Live]').evaluate(option=>option.disabled),true);
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-corpus-${width}.png`,fullPage:true});}
   assert.deepEqual(errors,[]);
   console.log('Admin mobile layout, locked state, filters, review details and CSV export passed.');
