@@ -24,8 +24,8 @@ await query(`INSERT INTO draft_run_verified_puzzles(puzzle_id,set_id,source_draf
   SELECT md5($1 || p.puzzle_id),set_id,source_draft_hash,$1,pick_number,candidate_count,consensus_top_gap,support_entropy,interesting,
     payload || jsonb_build_object('puzzle_id',md5($1 || p.puzzle_id),'corpus_version',$1::text)
   FROM draft_run_verified_puzzles p WHERE p.puzzle_id IN (SELECT jsonb_array_elements_text($2::jsonb))`,[version,JSON.stringify(ids)]);
-await query(`INSERT INTO draft_run_puzzle_ratings(puzzle_id,difficulty_version,rating,band,top_two_ratio,target_support_ratio)
- SELECT md5($1||puzzle_id),difficulty_version,rating,band,top_two_ratio,target_support_ratio FROM draft_run_puzzle_ratings
+await query(`INSERT INTO draft_run_puzzle_ratings(puzzle_id,difficulty_version,rating,top_two_ratio,target_support_ratio)
+ SELECT md5($1||puzzle_id),difficulty_version,rating,top_two_ratio,target_support_ratio FROM draft_run_puzzle_ratings
  WHERE puzzle_id IN (SELECT jsonb_array_elements_text($2::jsonb)) ON CONFLICT DO NOTHING`,[version,JSON.stringify(ids)]);
 const oldRows=(await query('SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE corpus_version=$1',[version])).rows;
 const oldIds=(await query('SELECT md5($1 || id) AS id FROM jsonb_array_elements_text($2::jsonb) x(id)',[version,JSON.stringify(ids)])).rows.map(r=>r.id);
