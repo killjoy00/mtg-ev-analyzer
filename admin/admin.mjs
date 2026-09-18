@@ -1,3 +1,4 @@
+import {renderCorpus} from './corpus.mjs';
 import {storedAccountToken,signInAccount,signUpAccount,signOutAccount} from '../growth-api.mjs';
 const root=document.querySelector('#admin');
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
@@ -13,7 +14,7 @@ async function request(path,body) {
   const d=await r.json();if(!r.ok)throw Object.assign(Error(d.error||'Report unavailable.'),{status:r.status});return d;
 }
 function login(message='') {
-  root.innerHTML=`<section class="login"><h1>Decision quality</h1><p>${invite?'Your private invitation is ready. Sign in, or create your admin account below.':'Sign in with the account granted admin access.'}</p><form id="login"><label>Name<input name="name" autocomplete="name"></label><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="8" required></label><label>Setup code (first visit only)<input name="invite" autocomplete="off" spellcheck="false" value="${esc(invite||'')}" placeholder="Paste your private setup code"></label><div class="actions"><button type="submit">Sign in</button><button type="submit" name="create" value="yes" class="secondary">Create account</button></div></form><p id="status" class="error" role="alert">${esc(message)}</p><a href="/">Back to Pack One</a></section>`;
+  root.innerHTML=`<section class="login"><h1>Pack One administration</h1><p>${invite?'Your private invitation is ready. Sign in, or create your admin account below.':'Sign in with the account granted admin access.'}</p><form id="login"><label>Name<input name="name" autocomplete="name"></label><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="8" required></label><label>Setup code (first visit only)<input name="invite" autocomplete="off" spellcheck="false" value="${esc(invite||'')}" placeholder="Paste your private setup code"></label><div class="actions"><button type="submit">Sign in</button><button type="submit" name="create" value="yes" class="secondary">Create account</button></div></form><p id="status" class="error" role="alert">${esc(message)}</p><a href="/">Back to Pack One</a></section>`;
   document.querySelector('#login').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,data=Object.fromEntries(new FormData(form));form.querySelectorAll('button').forEach(b=>b.disabled=true);try{if(data.invite){if(!/^[a-f0-9]{64}$/.test(data.invite))throw Error('The setup code must contain 64 letters and numbers.');invite=data.invite;sessionStorage.setItem('pack1-admin-invite',invite);}const result=e.submitter?.name==='create'?await signUpAccount({...data,name:data.name||'Pack One Admin'}):await signInAccount(data);if(!result?.token){document.querySelector('#status').textContent='Account created. Complete any requested email verification, then sign in to continue.';return;}await load();}catch(err){document.querySelector('#status').textContent=err.message;}finally{form.querySelectorAll('button').forEach(b=>b.disabled=false);}};
 }
 function options(values,current){return values.map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');}
@@ -42,7 +43,7 @@ function render() {
 }
 async function load() {
   if(!storedAccountToken()){login();return;}
-  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}report=await request('/v1/admin/measurements?'+params);render();}
+  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}if(new URLSearchParams(location.search).get('area')==='corpus'){await renderCorpus(root,request);return;}report=await request('/v1/admin/measurements?'+params);render();}
   catch(err){if(err.status===401||err.status===403){login(err.message);return;}const status=document.querySelector('#status');if(status)status.textContent=err.message;else root.innerHTML=`<h1>Report unavailable</h1><p class="error">${esc(err.message)}</p><button id="retry">Try again</button>`;document.querySelector('#retry')?.addEventListener('click',load);}
 }
 await load();

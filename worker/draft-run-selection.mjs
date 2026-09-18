@@ -39,7 +39,7 @@ function environmentFilter(environment,params,previous=false) {
 
 export async function loadLiveSetMetadata(query,version) {
   const result=await query(`SELECT p.set_id,p.release_date::text,p.status,p.regular_run,p.set_name
-    FROM draft_run_environment_policy p JOIN draft_run_verified_sets v ON v.set_id=p.set_id
+    FROM draft_run_environment_policy p JOIN corpus_set_versions v ON v.set_id=p.set_id
     WHERE v.corpus_version=$1 AND p.status='Live' ORDER BY p.set_id`,[version]);
   return result.rows.map(p=>({...p,regular_run:p.regular_run===true||p.regular_run==='t'}));
 }
@@ -51,7 +51,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
   const random=seededRandom(seed),bands=runDifficultyBands(random,selectionVersion),selected=[],sources=[],sets=new Set();
   const windows=runPickWindows(environment,selectionVersion),released=new Set(releasedRunSets(day));
   const metadata=selectionVersion===DAILY_SELECTION_VERSION?await loadLiveSetMetadata(query,version):null;
-  const live=metadata?new Set(metadata.map(s=>s.set_id)):null;
+  const live=metadata?new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id)):null;
   const groupParams=[version];
   const groupWhere=`${base} AND ${environmentFilter(environment,groupParams)}`;
   const groups=(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));
@@ -103,7 +103,7 @@ export async function selectDatabaseReroll(query,version,source,options) {
   const params=[version,picks[0],picks.at(-1),toPgArray([...new Set([...(options.excludedSources||[]),source.source_draft_hash])])];
   let where=`${base} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params,previous)}`;
   if(options.setIds?.length){params.push(toPgArray(options.setIds));where+=` AND p.set_id=ANY($${params.length}::text[])`;}
-  if(selectionVersion===DAILY_SELECTION_VERSION)where+=" AND EXISTS(SELECT 1 FROM draft_run_environment_policy e WHERE e.set_id=p.set_id AND e.status='Live')";
+  if(selectionVersion===DAILY_SELECTION_VERSION)where+=" AND EXISTS(SELECT 1 FROM draft_run_environment_policy e WHERE e.set_id=p.set_id AND e.status='Live' AND (e.regular_run OR e.set_id='powered-cube'))";
   params.push(source.set_id);where+=` AND p.set_id${type==='set'?'<>':'='}$${params.length}`;
   if(!previous&&round>=earlyRoundsForSelection(selectionVersion))where+=" AND r.band<>'easy'";
   if(options.daily&&isEightPickVersion(selectionVersion)&&environment==='mixed') {

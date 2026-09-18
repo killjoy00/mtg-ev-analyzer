@@ -187,7 +187,7 @@ class SimulationTests(unittest.TestCase):
                 if env=='mixed':
                     self.assertTrue({'hob','msh','sos'} <= {slot[0] for slot in profile})
                     self.assertEqual(profile[0][1:3],[1,1])
-                    self.assertEqual(profile[-1][1:3],[8,10])
+                    self.assertEqual(profile[-1][1:3],[8,8])
                 else:
                     self.assertEqual({slot[0] for slot in profile},{'powered-cube'})
                     self.assertEqual(profile[0][1:3],[2,2])

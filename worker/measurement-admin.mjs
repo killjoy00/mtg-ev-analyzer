@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto';
+import {handleCorpusAdmin} from './corpus-admin.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 export function reportFilters(url,now=new Date()) {
   const end=url.searchParams.get('to')||now.toISOString().slice(0,10);
@@ -55,6 +56,7 @@ export async function handleAdmin(request,query,readJson) {
     return {ok:true};
   }
   if(!(await query('SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid',[id])).rows.length)fail('This account does not have admin access. Use your private invitation to claim access.',403);
+  if(url.pathname.startsWith('/v1/admin/corpus'))return handleCorpusAdmin(request,query,readJson,id);
   if(request.method!=='GET')fail('Method not allowed.',405);
   const filters=reportFilters(url);
   if(url.pathname==='/v1/admin/measurements') {

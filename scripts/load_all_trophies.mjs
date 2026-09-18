@@ -30,7 +30,6 @@ for(const s of catalog.sets) {
     sources.set(d.draft_id,d);total++;included+=d.status==='included';qualified+=Boolean(d.qualified);decisions+=d.puzzles||0;additional+=d.additional_puzzles||0;
   }
   if(total!==s.source_trophies||included!==s.included_trophies||qualified!==s.qualified_trophies||total-included!==s.excluded_trophies||decisions!==s.total_puzzles||additional!==s.additional_puzzles)throw Error('Trophy accounting mismatch: '+s.id);
-  if(s.additional_puzzles&&!allowed.has(s.id))throw Error('New environment requires catalog registration: '+s.id);
   const byHash=new Map([...sources.values()].filter(d=>d.qualified).map(d=>[d.source_draft_hash,d]));const counts=new Map();let count=0;let last='';
   for await(const p of records(fileFor(s,'puzzle_file'))) {
     if(!validateDraftRunPuzzle(p)||p.set_id!==s.id||!byHash.has(p.source_draft_hash)||p.puzzle_id<=last||[...p.candidates,...p.prior_picks].some(c=>!c.image_url?.startsWith('https://')))throw Error('Invalid puzzle: '+s.id);
@@ -60,7 +59,13 @@ async function loadSet(s) {
   if(batch.length)added+=await batchInsert(batch);
   const actual=remote?await importRequest(remote,{action:'finish-set',manifest:s}):(await query('SELECT count(*)::int puzzles FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2',[s.id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
   if(Number(actual.puzzles)!==s.total_puzzles)throw Error('Database count does not match verified import: '+s.id);
-  if(!remote)await query("UPDATE draft_run_verified_sets SET manifest=jsonb_set(manifest,'{full_import}',$2::jsonb) WHERE set_id=$1",[s.id,JSON.stringify(s)]);
+  if(!remote){
+    let ledgerBatch=[];
+    const save=async()=>{if(!ledgerBatch.length)return;await query(`INSERT INTO corpus_trophy_trajectories(set_id,corpus_version,source_draft_hash,event_type,wins,losses,qualified,included,puzzle_count,exclusion_reason) SELECT $1,$2,x.* FROM jsonb_to_recordset($3::jsonb) AS x(source_draft_hash text,event_type text,wins smallint,losses smallint,qualified boolean,included boolean,puzzle_count integer,exclusion_reason text) ON CONFLICT(set_id,corpus_version,source_draft_hash) DO UPDATE SET losses=EXCLUDED.losses,qualified=EXCLUDED.qualified,included=EXCLUDED.included,puzzle_count=EXCLUDED.puzzle_count,exclusion_reason=EXCLUDED.exclusion_reason`,[s.id,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(ledgerBatch)]);ledgerBatch=[];};
+    for await(const d of records(fileFor(s,'ledger_file'))){ledgerBatch.push({source_draft_hash:d.source_draft_hash||createHash('sha256').update(`${s.id}|${d.draft_id}`).digest('hex').slice(0,32),event_type:'PremierDraft',wins:d.wins??7,losses:d.losses??null,qualified:d.qualified,included:d.status==='included',puzzle_count:d.puzzles||0,exclusion_reason:d.reason||d.trajectory_limit||null});if(ledgerBatch.length===1000)await save();}await save();
+    await query("UPDATE draft_run_verified_sets SET manifest=jsonb_set(manifest,'{full_import}',$2::jsonb) WHERE set_id=$1",[s.id,JSON.stringify(s)]);
+    await query("UPDATE corpus_sources SET import_status='complete',last_error=NULL WHERE set_id=$1 AND event_type='PremierDraft'",[s.id]);
+  }
   console.log(s.id,added,'inserted;',actual.puzzles,'available');
 }
 let next=0;

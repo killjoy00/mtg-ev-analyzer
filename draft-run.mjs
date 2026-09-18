@@ -45,11 +45,12 @@ const PREVIOUS_CUBE_WINDOWS = Object.freeze([
   [2,2], [3,3], [4,4], [4,6], [5,7], [6,8], [6,9], [7,10], [8,11], [9,12],
 ]);
 const TEN_PICK_WINDOWS = Object.freeze([[1,1],[2,2],[3,3],[4,5],[5,6],[6,7],[7,8],[8,9],[8,10],[8,10]]);
-export const DRAFT_RUN_PICK_WINDOWS = Object.freeze([[1,1],[2,2],[3,3],[4,5],[5,6],[6,8],[7,9],[8,10]]);
+const HISTORICAL_EIGHT_WINDOWS = Object.freeze([[1,1],[2,2],[3,3],[4,5],[5,6],[6,8],[7,9],[8,10]]);
+export const DRAFT_RUN_PICK_WINDOWS = Object.freeze(Array.from({length:8},(_,i)=>[i+1,i+1]));
 export const CUBE_PICK_WINDOWS = Object.freeze(DRAFT_RUN_PICK_WINDOWS.map(([a,b])=>[a+1,b+1]));
 export function runPickWindows(environment='mixed',version=DRAFT_RUN_SELECTION_VERSION) {
   if(version===PREVIOUS_SELECTION_VERSION)return environment===POWERED_CUBE_ENVIRONMENT?PREVIOUS_CUBE_WINDOWS:PREVIOUS_PICK_WINDOWS;
-  const windows=isEightPickVersion(version)?DRAFT_RUN_PICK_WINDOWS:TEN_PICK_WINDOWS;
+  const windows=version===DAILY_SELECTION_VERSION?DRAFT_RUN_PICK_WINDOWS:version==='eight-pick-v3'?HISTORICAL_EIGHT_WINDOWS:TEN_PICK_WINDOWS;
   return environment===POWERED_CUBE_ENVIRONMENT?windows.map(([a,b])=>[a+1,b+1]):windows;
 }
 
