@@ -52,9 +52,11 @@ const later=await call('/v1/session',{displayName:'QA fixed later '+tag});
 assert.equal((await call('/v1/runs',{daily:true},later.token)).current.puzzle_id,schedule[0]);
 await query("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id='hob'");
 // A different corpus revision cannot replace an already-published Daily.
-const older=await selectDatabaseRun(query,'elite-trophy-verified-v6','fixed-old-cube','powered-cube',{selectionVersion:'eight-pick-v3'});
-await query(`INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,selection_version,difficulty_version) VALUES($1::date,'powered-cube','elite-trophy-verified-v6',$2::jsonb,'eight-pick-v3','support-ratio-v1') ON CONFLICT DO NOTHING`,[day,JSON.stringify(older.map(p=>p.puzzle_id))]);
+const retainedVersion=(await query("SELECT corpus_version FROM draft_run_verified_puzzles WHERE set_id='powered-cube' AND corpus_version<>$1 ORDER BY corpus_version LIMIT 1",[DRAFT_RUN_CORPUS_VERSION])).rows[0]?.corpus_version;
+assert.ok(retainedVersion,'A retained older corpus is required.');
+const older=await selectDatabaseRun(query,retainedVersion,'fixed-old-cube','powered-cube',{selectionVersion:'eight-pick-v3'});
+await query(`INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,selection_version,difficulty_version) VALUES($1::date,'powered-cube',$3,$2::jsonb,'eight-pick-v3','support-ratio-v1') ON CONFLICT DO NOTHING`,[day,JSON.stringify(older.map(p=>p.puzzle_id)),retainedVersion]);
 const cube=await call('/v1/runs',{daily:true,environment:'powered-cube'},later.token);
 assert.equal(cube.current.puzzle_id,older[0].puzzle_id);
-assert.equal((await query('SELECT corpus_version FROM draft_run_sessions WHERE id=$1::uuid',[cube.id])).rows[0].corpus_version,'elite-trophy-verified-v6');
+assert.equal((await query('SELECT corpus_version FROM draft_run_sessions WHERE id=$1::uuid',[cube.id])).rows[0].corpus_version,retainedVersion);
 console.log(JSON.stringify({fixedDaily:'passed',anonymousScoresUnranked:true,accountDailyUnique:true,noRerolls:true,quotas:true,sourceUnique:true,dailyShareDoesNotCreateRun:true,statusAndCorpusChangesPreserveSchedule:true,currentCorpus:DRAFT_RUN_CORPUS_VERSION}));
