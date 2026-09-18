@@ -11,6 +11,7 @@ export async function installHistoricalShare() {
     ['leaderboard-product.mjs', 'installLeaderboardProductLayer'],
     ['flow-fixes.mjs', 'installFlowFixes'],
     ['growth.mjs', 'installGrowthLayer'],
+    ['historical-growth.mjs', 'installHistoricalGrowthLayer'],
     ['retention.mjs', 'installRetentionLayer'],
     ['profile-product.mjs', 'installProfileProductLayer'],
   ];

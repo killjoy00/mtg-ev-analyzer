@@ -1,13 +1,11 @@
-# Pack One documentation
+# Documentation map
 
-Use these documents in this order when they overlap:
+Start with [CURRENT-STATE](CURRENT-STATE.md) for verified deployment boundaries and [CHARTER](CHARTER.md) for the product.
 
-1. **[CURRENT-STATE.md](CURRENT-STATE.md)** — product contract, merged implementation and explicit deployment status, including Today/Profile and the current Cube runtime owner.
-2. **[CHARTER.md](CHARTER.md)** — settled product rules and non-goals.
-3. **[DATA-MANAGEMENT.md](DATA-MANAGEMENT.md)** — corpus eligibility, selection policy, source caps and release controls.
-4. **[SCORING-AND-DIFFICULTY.md](SCORING-AND-DIFFICULTY.md)** — detailed scoring/difficulty history. Where rollout-era API wording conflicts with CURRENT-STATE, CURRENT-STATE wins; current unanswered puzzles do not expose difficulty or grading evidence before the pick is locked.
-5. **[LAUNCH_REVIEW.md](LAUNCH_REVIEW.md)** — release evidence and historical launch verification.
+- [Corpus/selection](DATA-MANAGEMENT.md), [Corpus Operations](CORPUS-OPERATIONS.md)
+- [Scoring](SCORING-AND-DIFFICULTY.md), [decision measurements](DECISION-MEASUREMENTS.md)
+- [17Lands policy](17LANDS-DATA-REVIEW-2026-09-18.md)
+- [Rebuild audit](REBUILD-2026-09-18.md), [Traditional results](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md), [scoring results](../results/rebuild-2026-09-18/SCORING-RESULTS.md), [Daily distribution](../results/rebuild-2026-09-18/DAILY-DISTRIBUTION.md)
+- [Backend operations](BACKEND-RELIABILITY.md), [request integrity](REQUEST-INTEGRITY.md), [remaining work](ROADMAP.md)
 
-Migration notes, older audits and reproduction guides remain useful evidence, but they are not a reason to restore retired product behavior.
-
-The [independent review and completion report, 2026-09-14](PRODUCT-REVIEW-2026-09-14.md) records which supplied recommendations were implemented, rejected or deferred, with PR/test evidence and outstanding access requirements. Follow [BACKEND-RELIABILITY.md](BACKEND-RELIABILITY.md) and [REQUEST-INTEGRITY.md](REQUEST-INTEGRITY.md) for the pending backend release and its remaining limitations. [DECISION-MEASUREMENTS.md](DECISION-MEASUREMENTS.md) defines human-calibration observations; they are distinct from the legacy retention views.
+Dated earlier reviews are historical evidence. Superseded core documents are retained in [the archive](archive/pre-rebuild-2026-09-18/). Earlier reproduction notes do not authorize restoring retired products or old selection/sharing rules.

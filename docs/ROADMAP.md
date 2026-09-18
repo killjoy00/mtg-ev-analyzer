@@ -1,18 +1,12 @@
-# Pack One roadmap
+# Remaining work and future scope
 
-## Do next
+Use [CURRENT-STATE](CURRENT-STATE.md) for deployment and [CHARTER](CHARTER.md) for the product.
 
-1. **Deploy and measure the merged reliability work.** PRs 83–85 implement feedback, phone layout, bounded SQL serving, completion recovery, request integrity and Today refresh. Backend migrations 0012/0013 and function deployment are still a release dependency. Follow [release/rollback steps](BACKEND-RELIABILITY.md); measure cold/warm new runs, rerolls, friend starts, boards, health and concurrency. Isolated new-run timings still included 6.4–6.8-second starts; do not declare latency solved.
-2. **Finish ingress and session protections.** Per-player quotas do not stop new-identity creation. Verify trusted client-IP handling and origin-bypass protection before edge quotas. Design first-party session handling with expiry/revocation and CSRF treatment while preserving guest access and identity continuity. See [request integrity](REQUEST-INTEGRITY.md).
-3. **Finish device and accessibility verification.** Test iPhone authentication, native sharing, resume, Eastern rollover, card zoom, dock occlusion, focus and assistive technology. Existing narrow-browser checks do not establish native-device behavior. Prioritize observed completion friction.
-4. **Establish trustworthy retention and learning evidence.** The private `/admin/` console reports first-encounter trophy matches, partial credit, foreground decision time, rerolls and likely abandonment with known-QA exclusions; see [measurement definitions](DECISION-MEASUREMENTS.md). The legacy retention view does not implement a QA-excluded first-Daily cohort. Define that cohort by actual first completion, mode/environment and a fully observed next Eastern day. Collect sufficient non-QA samples before tuning; review model/historical-choice disagreements separately. Keep trophy picks at 100 and all existing modes.
-5. **Keep source freshness and accounting routine.** Run inexpensive supported-archive version checks, import changed sources deliberately, retain per-draft/per-pick disposition ledgers and reconcile production IDs/counts. Distinguish scheduled legacy replay imports from dispatched trophy imports. Register new environments through the policy/catalog process and refresh full-name metadata. Keep retired sources permanently blocked.
+1. Finish reviewed additive backend staging, development verification and production deployment/smoke testing.
+2. Measure first-pack latency and mobile completion; extend browser checks with physical-device authentication, native sharing and accessibility testing when devices are available.
+3. Fill missing historical corpus audit evidence without rewriting puzzle payloads. New sets stay Candidate until explicit publication.
+4. Extend Traditional research with balanced training-size controls and rare-card residual coverage. Current evidence does not authorize pooling or puzzle publication.
+5. Use non-QA first-encounter measurements for later calibration. Trophy matches always remain 100.
+6. Connect future entitlement providers after the core game is excellent. Generic capabilities already support account regular practice and future Cube/custom grants; payments are separate.
 
-The [independent review and completion report](PRODUCT-REVIEW-2026-09-14.md) records evidence, rejected recommendations and access dependencies. Neither model agreement nor random-choice score loss establishes human difficulty or correctness.
-
-## Consider next
-
-- **Choose-your-sets Draft Run.** Let a player choose the environments for a eight-pick practice run, including HBG, SIR and PIO. Validate that the chosen pool can meet pick windows, difficulty mix and reroll requirements; persist the chosen-set list in friend links. Keep a separate custom/practice identity from the shared Daily leaderboard. Do not build this mode until separately prioritized.
-- **Recover excluded image cases.** Recheck exact card identities and source images for remaining qualified trophies without weakening image or trajectory standards.
-- **Player-calibrated difficulty.** Once there is sufficient first-attempt data, compare the current ambiguity proxy with measured results; introduce new versions rather than silently changing historical ratings.
-- **Retention and distribution.** Measure the new text-share and return-to-Daily flows, then test targeted community promotion with explicit publication direction. Existing stored friend links already preserve exact packs and a display name. Keep any simulated benchmark separate from real leaderboard entries and compute it for the relevant packs. Put monetization behind demonstrated repeat play rather than unsupported DAU/revenue thresholds.
+Retired modes and the old checklist homepage are not roadmap products. Historical corpus retention remains required.
