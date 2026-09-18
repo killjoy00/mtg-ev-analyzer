@@ -1,8 +1,8 @@
 {
   "operation": "puzzle-components",
-  "request_id": "cube-p2p7-stage-development-20260918",
-  "reason": "Stage owner-approved Traditional Cube P2–P7 Candidate inventory and the pinned Premier source exclusions. Verify immutable artifacts and historical preservation; do not publish or deploy.",
-  "target": "development",
+  "request_id": "cube-p2p7-stage-production-20260918",
+  "reason": "Development staging succeeded (35395596545). Additively stage the same pinned 1,320 Traditional Cube P2–P7 Candidate decisions and source exclusions in production; preserve all previous puzzles and Dailies. Publication remains a separate audited action.",
+  "target": "production",
   "action": "stage",
   "source": "powered-cube"
 }
