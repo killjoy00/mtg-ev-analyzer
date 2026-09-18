@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from import_all_trophies import eligible_trophies, trajectory, rows, collect, premier_sources, BASE
+from import_all_trophies import eligible_trophies, trajectory, rows, collect, premier_sources, BASE, scan_metadata
 from build_replays import PickExample
 
 class FullTrophyTests(unittest.TestCase):
@@ -28,6 +28,18 @@ class FullTrophyTests(unittest.TestCase):
         selected,rejected=eligible_trophies(drafts,.62)
         self.assertEqual(set(selected),{'0','1','2'})
         self.assertEqual(rejected,{'3':'invalid_premier_trophy_outcome'})
+
+    def test_frozen_reconstruction_does_not_weaken_current_source_identity(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            p=Path(tmp)/'draft.csv.gz'
+            with gzip.open(p,'wt',newline='') as f:
+                w=csv.writer(f);w.writerow(['draft_id','event_type','event_match_wins','event_match_losses','user_n_games_bucket','user_game_win_rate_bucket'])
+                w.writerow(['d','PremierDraft',7,1,100,.7]);w.writerow(['d','PremierDraft',7,2,100,.7])
+            self.assertEqual(scan_metadata(p)[3],{'d'})
+            self.assertEqual(scan_metadata(p,compare_losses=False)[3],set())
+            # The normal importer continues to reject inconsistent source outcomes.
+            drafts,_,_,conflicts=scan_metadata(p)
+            self.assertEqual(eligible_trophies(drafts,.6,conflicts=conflicts)[0],{})
 
     def test_legacy_requires_actual_rank_and_experience(self):
         drafts={'ok':{'wins':7,'games':100,'rank':'diamond'},'no':{'wins':7,'games':100,'rank':'platinum'},'missing':{'wins':7,'games':None,'rank':'mythic'}}

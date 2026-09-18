@@ -8,6 +8,25 @@ concurrency:
   group: traditional-puzzles
   cancel-in-progress: false
 jobs:
+  live-browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-save playwright@1.55.0
+      - name: Verify the released production revision
+        run: node tests/release-functions-smoke.mjs br-orange-feather-ayps8kep bc1007e257401f2be8daba06a1a6c5e54eac19bb
+      - name: Complete both actual Daily games on mobile and inspect desktop layout
+        run: node tests/production-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-browser-verification
+          retention-days: 90
+          path: artifacts/production
   measure:
     runs-on: ubuntu-latest
     timeout-minutes: 90
@@ -44,6 +63,7 @@ jobs:
             generated/traditional-puzzles/*/manifest.json
             generated/traditional-puzzles/*/puzzles.jsonl.gz
             generated/traditional-puzzles/*/trophies.jsonl.gz
+            generated/traditional-puzzles/*/premier-source-audit.json
   report:
     needs: measure
     runs-on: ubuntu-latest

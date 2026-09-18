@@ -110,13 +110,16 @@ def measure(sid,directory,frozen):
         raise ValueError('Incorrect frozen v7 artifact')
     draft=directory/'premier.csv.gz';game=directory/'premier-game.csv.gz'
     sources={'PremierDraft':{'draft':pinned_archive(pin['source_archive'],draft),'game':pinned_archive(pin['skill_source'],game)}}
-    drafts,header,_,conflicts=scan_metadata(draft)
+    # The frozen artifact predates loss-aware source identity. Reproduce its
+    # exact statistics, then audit current eligibility separately. Never change
+    # frozen scoring evidence to make a newer source-quality rule fit its label.
+    drafts,header,_,conflicts=scan_metadata(draft,compare_losses=False)
     skills={did:DraftSkill(d['rate'],d['games']) for did,d in drafts.items() if d['rate'] is not None and d['games'] is not None and did not in conflicts}
     training,_,_=select_strong_drafts(skills,100,.15,pin['training_cap'])
-    qualified,_=eligible_trophies(drafts,pin['win_rate_cutoff'],conflicts=conflicts)
+    qualified,_=eligible_trophies({did:{**d,'losses':None} for did,d in drafts.items()},pin['win_rate_cutoff'],conflicts=conflicts)
     counts,folds,output,_,training_picks,colour_examples=collect(draft,set(training),set(qualified),header)
     if len(training)!=pin['training_drafts'] or training_picks!=pin['training_picks'] or len(qualified)!=pin['qualified_trophies']:
-        raise ValueError('Frozen training/cohort counts changed')
+        raise ValueError(f'Frozen training/cohort counts changed: actual={len(training),training_picks,len(qualified)}, expected={pin["training_drafts"],pin["training_picks"],pin["qualified_trophies"]}')
     fit=build_colour_table(game,colour_examples,{did for did,_ in colour_examples},sid)
     models=[OutOfFoldModel(counts,f,fit) for f in folds]
     # The original supplement is the actual serving evidence. Check every
@@ -138,8 +141,19 @@ def measure(sid,directory,frozen):
                 raise ValueError('Reconstructed v3 evidence differs from immutable supplement')
             parity+=1
     if parity<200:raise ValueError('Insufficient frozen model parity coverage')
+    strict_drafts,_,_,strict_conflicts=scan_metadata(draft)
+    strict_qualified,strict_rejected=eligible_trophies(strict_drafts,pin['win_rate_cutoff'],conflicts=strict_conflicts)
+    strict_qualified={did:d for did,d in strict_qualified.items() if d.get('losses') in (0,1,2)}
+    audit=[{'source_draft_hash':hashlib.sha256(f'{sid}|{did}'.encode()).hexdigest()[:32],
+        'reason':strict_rejected.get(did,'unverified_trophy_losses'),'wins':drafts[did]['wins'],
+        'losses':strict_drafts[did].get('losses')} for did in sorted(set(qualified)-set(strict_qualified))]
+    atomic_json(directory/'premier-source-audit.json',{'set':sid,'corpus_version':pin['corpus_version'],
+        'source_archive':sources[EVENTS[0]]['draft'],'frozen_qualified':len(qualified),
+        'currently_qualified':len(strict_qualified),'blocked_sources':audit,
+        'outcomes':dict(Counter(f"7-{d.get('losses')}" for d in strict_drafts.values() if d['wins']==7))})
     groups={EVENTS[0]:{}}
     for did,examples in output.items():
+        if did not in strict_qualified:continue
         valid,prior,why=trajectory(examples,8)
         if len(valid)==8 and not prior and not why:groups[EVENTS[0]][did]=valid
     trad=directory/'traditional.csv.gz'
@@ -176,6 +190,9 @@ def measure(sid,directory,frozen):
     if len(ledger)!=len(trad_sources):raise ValueError('Traditional trophy accounting mismatch')
     report={'schema':1,'set':sid,'model_version':MODEL_VERSION,'model_source_event':'PremierDraft','model_training_changed':False,'source_hashes':sources,'frozen_input_signature':pin['input_signature'],'parity_picks':parity,'training_drafts':len(training),'training_picks':training_picks,'traditional_cohort':trad_cohort,'excluded':dict(excluded),'card_tags':metadata_for_set(sid,models[0]),'tests':records,'implementation':{name:digest(ROOT/'scripts'/name) for name in ('traditional_puzzles.py','build_replays.py','deck_fit.py','import_all_trophies.py')}}
     report['all_picks']=compare(records);report['late_picks']=compare([r for r in records if r['pick']>=7])
+    serving=[r for r in records if max(r['raw'])<=.75 and sorted(r['raw'],reverse=True)[1]/max(r['raw'])>=.2]
+    report['serving_picks']=compare(serving);report['serving_late_picks']=compare([r for r in serving if r['pick']>=7])
+    report['premier_source_audit']={'blocked_sources':len(audit),'reasons':dict(Counter(r['reason'] for r in audit))}
     unusable=1-len(puzzles)/8/max(1,trad_cohort['complete_trajectories'])
     report['quality']={'usable_traditional_puzzles':len(puzzles),'unusable_fraction':unusable,'pass':unusable<=THRESHOLDS['unusable_trajectory_fraction_max']}
     write_gzip_jsonl(directory/'puzzles.jsonl.gz',puzzles);write_gzip_jsonl(directory/'trophies.jsonl.gz',ledger)
@@ -192,8 +209,8 @@ def summarize(paths,out):
     if sorted(r['set'] for r in reports)!=sorted(SETS):raise ValueError('All predeclared set results are required')
     residuals=residual_report(reports)
     residuals['definition']=residuals['definition'].replace('calibrated combined-model','frozen Premier-only v3 model')
-    by_set={r['set']:{k:r[k] for k in ('all_picks','late_picks','quality','traditional_cohort','parity_picks','training_drafts','frozen_input_signature')} for r in reports}
-    passing=[sid for sid,r in by_set.items() if r['all_picks']['pass'] and r['late_picks']['pass'] and r['quality']['pass']]
+    by_set={r['set']:{k:r[k] for k in ('all_picks','late_picks','serving_picks','serving_late_picks','quality','traditional_cohort','premier_source_audit','parity_picks','training_drafts','frozen_input_signature')} for r in reports}
+    passing=[sid for sid,r in by_set.items() if all(r[k]['pass'] for k in ('all_picks','late_picks','serving_picks','serving_late_picks','quality'))]
     result={'schema':1,'thresholds':THRESHOLDS,'sets':by_set,'residuals':residuals,'passing_sets':passing,'expansion_supported':len(passing)>=THRESHOLDS['minimum_sets'] and not residuals['persistent_category_patterns'],'production_changed':False,'model_training_changed':False,'decision':'Candidate inventory only; require reviewed operational publication.'}
     atomic_json(out,result);print(json.dumps({k:v for k,v in result.items() if k not in ('sets','residuals')}))
 
