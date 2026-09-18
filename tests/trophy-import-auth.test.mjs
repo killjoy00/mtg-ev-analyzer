@@ -160,3 +160,13 @@ test('legacy image markers clear only after every served card has an HTTPS image
   assert.equal(wrote,false);
   await assert.rejects(normalizeResolvedImageMarkers(query,['msh']),/limited to verified legacy sets/);
 });
+
+import {verifyCorpusPublicationToken,CORPUS_PUBLICATION_AUDIENCE,CORPUS_PUBLICATION_WORKFLOW} from '../worker/trophy-import-auth.mjs';
+test('source publication requires its own signed main workflow and audience',async()=>{
+ const c={...claims,aud:CORPUS_PUBLICATION_AUDIENCE,workflow_ref:CORPUS_PUBLICATION_WORKFLOW,actor:'release-operator'};
+ const identity=await verifyCorpusPublicationToken(token(c),async()=>[jwk],1000);
+ assert.equal(identity.provider,'github_actions');assert.equal(identity.actor,'release-operator');
+ await assert.rejects(verifyCorpusPublicationToken(token(),async()=>[jwk],1000),/denied/);
+ await assert.rejects(verifyImportToken(token(c),async()=>[jwk],1000),/denied/);
+ for(const patch of [{ref:'refs/heads/pr'},{event_name:'pull_request'},{repository_id:'other'},{workflow_ref:IMPORT_WORKFLOW}])await assert.rejects(verifyCorpusPublicationToken(token({...c,...patch}),async()=>[jwk],1000),/denied/);
+});

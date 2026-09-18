@@ -1,0 +1,124 @@
+name: Reviewed puzzle source release
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+      action:
+        description: 'Stage ready Candidates, or explicitly publish already staged Candidates'
+        type: choice
+        options: [stage, publish]
+        default: stage
+        required: true
+      source:
+        type: choice
+        options: [powered-cube, regular-study]
+        default: powered-cube
+        required: true
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+concurrency:
+  group: packone-corpus-mutation
+  cancel-in-progress: false
+jobs:
+  source-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      TARGET: ${{ inputs.target }}
+      ACTION: ${{ inputs.action }}
+      SOURCE: ${{ inputs.source }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm install -g neon@4.17.4
+      - uses: actions/download-artifact@v4
+        if: inputs.source == 'powered-cube'
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35386149822
+          name: traditional-phase2-powered-cube
+          path: generated/cube-research
+      - uses: actions/download-artifact@v4
+        if: inputs.source == 'regular-study'
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35369484366
+          pattern: traditional-puzzles-*
+          path: generated/regular-study
+      - name: Verify pinned evidence before any database mutation
+        run: |
+          set -euo pipefail
+          case "$SOURCE" in
+            powered-cube)
+              python scripts/prepare-cube-admission.py generated/cube-research/powered-cube generated/admission
+              root=generated/admission ;;
+            regular-study) root=generated/regular-study ;;
+            *) exit 1 ;;
+          esac
+          echo "ARTIFACT_ROOT=$root" >> "$GITHUB_ENV"
+          node scripts/load-traditional-components.mjs unused "$root" --validate-only > generated/component-health.json
+          node scripts/load-source-exclusions.mjs unused results/rebuild-2026-09-18/frozen-premier-outcomes.json --validate-only
+      - name: Prepare explicit administrative connections
+        run: |
+          set -euo pipefail
+          umask 077
+          case "$TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          for pair in "target:$branch" 'development:br-twilight-hill-ayffyd2b'; do
+            name=${pair%%:*}; branch=${pair#*:}
+            connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+            echo "::add-mask::$connection"
+            printf '%s' "$connection" > "$RUNNER_TEMP/$name.connection"
+          done
+      - name: Require matching verified development inventory first
+        if: inputs.target == 'production'
+        run: |
+          status=Candidate
+          if [[ "$ACTION" == publish ]]; then status=Live; fi
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/development.connection" "$ARTIFACT_ROOT" "$status"
+      - name: Snapshot retained Premier Cube and existing universal Dailies
+        run: node scripts/verify-preserved-corpus.mjs "$RUNNER_TEMP/target.connection" "$RUNNER_TEMP/preserved.json" --capture
+      - name: Apply additive source migrations and stage Candidates
+        if: inputs.action == 'stage'
+        run: |
+          set -euo pipefail
+          connection=$(cat "$RUNNER_TEMP/target.connection")
+          for migration in migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql; do
+            psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
+          done
+          node scripts/load-source-exclusions.mjs "$RUNNER_TEMP/target.connection" results/rebuild-2026-09-18/frozen-premier-outcomes.json
+          node scripts/load-traditional-components.mjs "$RUNNER_TEMP/target.connection" "$ARTIFACT_ROOT"
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" "$ARTIFACT_ROOT" Candidate
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+      - name: Publish explicitly through the authenticated administrative lifecycle
+        if: inputs.action == 'publish'
+        run: node scripts/publish-puzzle-components.mjs "$RUNNER_TEMP/target.connection" "$ARTIFACT_ROOT"
+      - name: Verify existing payloads and Dailies remain unchanged
+        run: node scripts/verify-preserved-corpus.mjs "$RUNNER_TEMP/target.connection" "$RUNNER_TEMP/preserved.json"
+      - name: Verify Cube selection and historical preservation
+        if: inputs.action == 'publish' && inputs.source == 'powered-cube'
+        run: node scripts/verify-cube-expansion.mjs "$RUNNER_TEMP/target.connection"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: source-release-${{ inputs.source }}-${{ inputs.target }}-${{ inputs.action }}
+          path: |
+            generated/component-health.json
+            generated/admission/report.json
+            generated/cube-expansion-verification.json

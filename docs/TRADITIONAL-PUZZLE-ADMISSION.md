@@ -29,3 +29,7 @@ Schedules and sessions retain exact IDs, parent version and component snapshots.
 ## Premier source audit
 
 The full pinned 32-environment audit verifies **93,752** legal sources: 12,499 at 7–0, 32,631 at 7–1 and 48,622 at 7–2. Nine archived 7–3 records were admitted by the older wins-only importer (FIN 1, OTJ 1, DFT 2, TDM 2, ECL 1, FDN 2), representing 97 retained decisions across their original windows. Reviewed exclusions prevent new selection without deleting or rescoring old decisions. The current importer verifies losses and source consistency. [Machine-readable audit](../results/rebuild-2026-09-18/frozen-premier-outcomes.json).
+
+### Administrative release automation
+
+The separate `publish-puzzle-components.yml` workflow supports explicit staging and publication requests on reviewed main. It uses the existing Neon administrative credential and verifies a GitHub-signed OIDC token restricted to this repository, main, this exact workflow and the publication audience. It does not impersonate a Neon Auth user. Audit rows retain the workflow, subject, initiating actor, run and SHA separately from app-admin account IDs. Public admin routes still require a valid Neon Auth admin session. Staging cannot publish; a subsequent explicit publication request must pass the same exact-manifest health and lifecycle checks. Production additionally requires matching verified development inventory, Live for publication. Each operation checks existing Premier Cube payload hashes and universal Daily contents before and after.

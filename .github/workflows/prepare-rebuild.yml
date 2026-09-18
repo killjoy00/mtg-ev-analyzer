@@ -52,7 +52,7 @@ jobs:
           printf '%s' "$connection" > "$RUNNER_TEMP/target.connection"
           if ! command -v psql >/dev/null 2>&1; then sudo apt-get update; sudo apt-get install -y postgresql-client; fi
           # No historical/destructive migration replay and no branch restore.
-          for migration in migrations/0017_fixed_daily_lifecycle.sql migrations/0018_capabilities.sql migrations/0019_corpus_operations.sql migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql; do
+          for migration in migrations/0017_fixed_daily_lifecycle.sql migrations/0018_capabilities.sql migrations/0019_corpus_operations.sql migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql; do
             psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
           done
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs

@@ -21,7 +21,7 @@ async function keys() {
   return data.keys;
 }
 
-export async function verifyImportToken(token,getKeys=keys,now=Math.floor(Date.now()/1000)) {
+async function verifySignedWorkflow(token,getKeys,now,audience,workflows) {
   const denied=()=>{throw Object.assign(Error('Import identity denied'),{status:403});};
   if(typeof token!=='string'||token.length>16000)denied();
   const parts=token.split('.');
@@ -37,13 +37,13 @@ export async function verifyImportToken(token,getKeys=keys,now=Math.floor(Date.n
   const workflow=c.workflow_ref;
   const checks={
     issuer:c.iss===ISSUER,
-    audience:c.aud===IMPORT_AUDIENCE,
+    audience:c.aud===audience,
     subject:SUBJECTS.has(c.sub),
     repository:c.repository===REPO,
     repositoryId:c.repository_id==='1201587098',
     ownerId:c.repository_owner_id==='211694413',
     branch:c.ref==='refs/heads/main',
-    workflow:WORKFLOWS.has(workflow),
+    workflow:workflows.has(workflow),
     reusableWorkflow:!c.job_workflow_ref||c.job_workflow_ref===workflow,
     event:['push','workflow_dispatch','workflow_run'].includes(c.event_name),
     time:Number.isFinite(c.exp)&&Number.isFinite(c.nbf)&&Number.isFinite(c.iat)&&c.exp>now&&c.nbf<=now+30&&c.iat<=now+30&&c.exp-c.iat<=900,
@@ -54,4 +54,15 @@ export async function verifyImportToken(token,getKeys=keys,now=Math.floor(Date.n
     denied();
   }
   return {run_id:c.run_id,sha:c.sha,workflow_ref:workflow};
+}
+
+export function verifyImportToken(token,getKeys=keys,now=Math.floor(Date.now()/1000)) {
+ return verifySignedWorkflow(token,getKeys,now,IMPORT_AUDIENCE,WORKFLOWS);
+}
+export const CORPUS_PUBLICATION_AUDIENCE='pack-one-corpus-publication';
+export const CORPUS_PUBLICATION_WORKFLOW=`${REPO}/.github/workflows/publish-puzzle-components.yml@refs/heads/main`;
+export async function verifyCorpusPublicationToken(token,getKeys=keys,now=Math.floor(Date.now()/1000)) {
+ const verified=await verifySignedWorkflow(token,getKeys,now,CORPUS_PUBLICATION_AUDIENCE,new Set([CORPUS_PUBLICATION_WORKFLOW]));
+ const claims=JSON.parse(Buffer.from(token.split('.')[1],'base64url'));
+ return {...verified,provider:'github_actions',subject:claims.sub,actor:claims.actor};
 }

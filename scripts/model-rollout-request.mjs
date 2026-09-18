@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 
 export function rolloutDispatch(request) {
-  const {operation,reason,request_id,corpus_version,commit,sets,target}=request||{};
+  const {operation,reason,request_id,corpus_version,commit,sets,target,action,source}=request||{};
   const common=['operation','reason','request_id'];
   if(typeof reason!=='string'||!reason.trim()||!/^[-a-zA-Z0-9]+$/.test(request_id||''))throw Error('A named rollout request and reason are required.');
   let workflow,inputs={},extra=[];
@@ -17,6 +17,9 @@ export function rolloutDispatch(request) {
   } else if(operation==='prepare-rebuild') {
     if(!['development','production'].includes(target))throw Error('Invalid staging target.');
     workflow='prepare-rebuild.yml';inputs={target};extra=['target'];
+  } else if(operation==='puzzle-components') {
+    if(!['development','production'].includes(target)||!['stage','publish'].includes(action)||!['powered-cube','regular-study'].includes(source))throw Error('Invalid source release request.');
+    workflow='publish-puzzle-components.yml';inputs={target,action,source};extra=['target','action','source'];
   } else if(operation==='frozen-scoring') {
     workflow='frozen-scoring.yml';
   } else if(operation==='format-research') {
