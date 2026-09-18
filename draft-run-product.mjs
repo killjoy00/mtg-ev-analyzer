@@ -173,7 +173,7 @@ async function showBoard(period='daily') {
   app().innerHTML='<section class="message-card"><h1>Loading the board…</h1></section>';
   const data=await api(`/v1/leaderboard?period=${encodeURIComponent(period)}&environment=${environment}`,undefined,false);
   document.body.classList.remove('is-game');
-  const environmentActions=cube()?'':`<a class="button secondary" href="?modes=1#more-pack-one">Top 3 practice</a>`;
+  const environmentActions='';
   app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${cube()?'':'active'}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s shared starting packs.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a ${title()}</a>${environmentActions}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period});
 }
@@ -205,7 +205,7 @@ function renderLoadFailure(error,isBoard) {
 }
 
 export async function installDraftRunPage() {
-  styles();await loadSetNames();document.querySelector('#brand-home').onclick=()=>location.href='./';
+  styles();void loadSetNames().then(()=>{if(run&&app().querySelector('.draft-run-page'))render();});document.querySelector('#brand-home').onclick=()=>location.href='./';
   document.querySelector('#daily-nav').onclick=()=>location.href=gameUrl('daily=1');
   document.querySelector('#leaderboard-nav').onclick=()=>location.href=gameUrl('board=daily');
   const params=new URLSearchParams(location.search);

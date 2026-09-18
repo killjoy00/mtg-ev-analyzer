@@ -1,49 +1,14 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-
-const bootstrap = fs.readFileSync('bootstrap.mjs', 'utf8');
-const today = fs.readFileSync('home-today.mjs', 'utf8');
-const todayCss = fs.readFileSync('home-today.css', 'utf8');
-const profile = fs.readFileSync('profile-polish.mjs', 'utf8');
-const profileProduct = fs.readFileSync('profile-product.mjs', 'utf8');
-
-test('runtime uses the dedicated Cube home entry instead of retired Cube presentation code', () => {
-  assert.match(bootstrap, /cube-home\.mjs/);
-  assert.doesNotMatch(bootstrap, /cube-product\.mjs/);
-  assert.match(bootstrap, /installCubeHome/);
+test('historical share reader is isolated from normal navigation',()=>{
+ const boot=fs.readFileSync('bootstrap.mjs','utf8');
+ assert.match(boot,/if \(historicalShare\)/);
+ assert.doesNotMatch(boot,/cube-product\.mjs|home-today\.mjs|installCubeHome/);
+ const historical=fs.readFileSync('historical-share.mjs','utf8');
+ assert.match(historical,/social\.mjs/);
 });
-
-test('home exposes one compact two-Daily status surface', () => {
-  assert.match(bootstrap, /home-today\.mjs/);
-  assert.match(today, /Your Daily board/);
-  assert.match(today, /Draft Run/);
-  assert.match(today, /Powered Cube/);
-  assert.match(today, /loadMyProfile/);
-});
-
-test('Today board carries the approved progress, date, completion and action treatment', () => {
-  assert.match(today, /displayDate/);
-  assert.match(today, /today-game-state/);
-  assert.match(today, /role="progressbar"/);
-  assert.match(today, /Play \/ continue/);
-  assert.match(todayCss, /--today-green:/);
-  assert.match(todayCss, /font-family:Georgia/);
-  assert.match(todayCss, /border-radius:12px/);
-});
-
-test('profile polish adds only primary-mode career substance without another backend contract', () => {
-  assert.match(bootstrap, /profile-polish\.mjs/);
-  assert.match(profile, /Draft Run/);
-  assert.match(profile, /Powered Cube/);
-  assert.doesNotMatch(profile, /Best Daily/);
-  assert.doesNotMatch(profile, /Recent form/);
-  assert.doesNotMatch(profile, /Challenges/);
-  assert.doesNotMatch(profile, /profile-core\.mjs/);
-  assert.doesNotMatch(profile, /fetch\(/);
-});
-
-test('profile archive launches Powered Cube through the modern Draft Run route', () => {
-  assert.match(profileProduct, /\?game=draft-run&set=powered-cube/);
-  assert.doesNotMatch(profileProduct, /entry\.isCube\?'full':'top3'/);
+test('profile archive keeps existing Cube entries on the current reader',()=>{
+ const source=fs.readFileSync('profile-product.mjs','utf8');
+ assert.match(source,/\?game=draft-run&set=powered-cube/);
 });

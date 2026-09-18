@@ -20,19 +20,19 @@ await page.route('**/*.neon.tech/**',async route=>{
  }
  await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
 });
-async function progress(expected){await page.waitForFunction(text=>document.querySelector('.today-progress-label strong')?.textContent===text,expected);}
+async function progress(expected){await page.waitForFunction(text=>document.querySelector('[data-daily-home]')?.dataset.completed===text,expected);}
 try{
- await page.goto(process.env.PACK1_E2E_URL||'http://127.0.0.1:4173');await progress('0/2 complete');
- complete=true;await page.evaluate(()=>document.dispatchEvent(new CustomEvent('pack1:result-completed')));await progress('1/2 complete');
+ await page.goto(process.env.PACK1_E2E_URL||'http://127.0.0.1:4173');await progress('0');
+ complete=true;await page.evaluate(()=>document.dispatchEvent(new CustomEvent('pack1:result-completed')));await progress('1');
  // A slow older profile response must not undo a newer completed-result refresh.
  complete=false;holdNext=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
  for(let tries=0;!held&&tries<500;tries++)await new Promise(resolve=>setTimeout(resolve,10));
  assert.ok(held,'The older profile request should be held');
- complete=true;await page.evaluate(()=>document.dispatchEvent(new CustomEvent('pack1:result-completed')));await progress('1/2 complete');
- held();await page.waitForTimeout(100);await progress('1/2 complete');
- await page.evaluate(()=>{window.__todayNow=Date.parse('2026-09-15T04:00:00Z');window.dispatchEvent(new Event('focus'));});await progress('0/2 complete');
- assert.equal(await page.locator('.today-status time').getAttribute('datetime'),'2026-09-15');
+ complete=true;await page.evaluate(()=>document.dispatchEvent(new CustomEvent('pack1:result-completed')));await progress('1');
+ held();await page.waitForTimeout(100);await progress('1');
+ await page.evaluate(()=>{window.__todayNow=Date.parse('2026-09-15T04:00:00Z');window.dispatchEvent(new Event('focus'));});await progress('0');
+ assert.equal(await page.locator('.daily-home time').getAttribute('datetime'),'2026-09-15');
  fail=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Daily progress is unavailable.',{exact:false}).waitFor();
  assert.equal(starts,0,'Reading Today must never reserve a ranked Daily');
- console.log('Today refresh passed: completion, stale response, Eastern rollover, unavailable status and no Daily reservation.');
+ console.log('Daily home refresh passed: completion, stale response, Eastern rollover, unavailable status and no Daily reservation.');
 }finally{await browser.close();}

@@ -1,80 +1,50 @@
 import { installRenderLifecycle } from './render-lifecycle.mjs';
-import { installReplayDataWarmup } from './replay-data.mjs';
 
-const params = new URLSearchParams(window.location.search);
-// Retire the old Top 3 / Full Pack board without breaking saved bookmarks.
-// An old Cube-board URL keeps its Cube environment; every other old board
-// lands on Draft Run.
-if (params.has('legacy-board')) {
-  params.set('game', 'draft-run');
-  params.set('board', 'daily');
-  params.delete('legacy-board');
-  params.delete('mode');
-  params.delete('seed');
-  params.delete('daily');
+const params = new URLSearchParams(location.search);
+// Only previously published stored links load the historical game reader.
+const historicalShare = params.has('challenge') && params.get('game') !== 'draft-run';
+if (!historicalShare && (params.has('legacy-board') || params.has('mode') || params.has('seed') || (params.get('set') === 'powered-cube' && params.get('game') !== 'draft-run'))) {
+  const cube = params.get('set') === 'powered-cube';
+  for (const key of ['legacy-board', 'mode', 'seed', 'vs', 'by', 'modes']) params.delete(key);
+  params.set('game', 'draft-run'); params.set('daily', '1');
+  if (!cube) params.delete('set');
   history.replaceState({}, '', `${location.pathname}?${params}`);
+} else if (params.has('modes')) {
+  params.delete('modes');
+  history.replaceState({}, '', `${location.pathname}${params.size ? '?' + params : ''}`);
 }
-// Older Cube launch links now enter the dedicated trophy game. Stored legacy
-// friend links remain readable through their original challenge contract.
-if(params.get('set')==='powered-cube' && !params.has('challenge') && params.get('game')!=='draft-run') {
-  params.set('game','draft-run');params.delete('mode');params.delete('seed');
-  history.replaceState({},'',`${location.pathname}?${params}`);
-}
-const challengeMode = params.has('challenge');
-
 installRenderLifecycle();
-installReplayDataWarmup();
+document.querySelector('#brand-home').onclick = () => location.href = './';
+document.querySelector('#daily-nav').onclick = () => location.href = '?game=draft-run&daily=1';
+document.querySelector('#leaderboard-nav').onclick = () => location.href = '?game=draft-run&board=daily';
 
-const practice = await import('./practice-product.mjs');
-const product = await import('./product.mjs');
-const cubeHome = await import('./cube-home.mjs');
-const legacyCohort = await import('./legacy-product.mjs');
-const leaderboardProduct = await import('./leaderboard-product.mjs');
-const flow = await import('./flow-fixes.mjs');
-const growth = await import('./growth.mjs');
-const retention = await import('./retention.mjs');
-const profiles = await import('./profile-product.mjs');
-const profilePolish = await import('./profile-polish.mjs');
-const draftRun = await import('./draft-run-product.mjs');
-const progression = await import('./progression.mjs');
-const homeProduct = await import('./home-product.mjs');
-const homeToday = await import('./home-today.mjs');
-
-if (params.get('game') === 'draft-run') {
-  await growth.installGrowthLayer();
-  profiles.installProfileProductLayer();
-  profilePolish.installProfilePolish();
-  progression.installProgression();
-  await draftRun.installDraftRunPage();
-} else if (challengeMode) {
-  await import('./social.mjs');
-  practice.installPracticeProductLayer();
-  product.installProductLayer();
-  legacyCohort.installLegacyCohortLayer();
-  leaderboardProduct.installLeaderboardProductLayer();
-  flow.installFlowFixes();
-  await growth.installGrowthLayer();
-  retention.installRetentionLayer();
-  profiles.installProfileProductLayer();
-  profilePolish.installProfilePolish();
-  progression.installProgression();
+if (historicalShare) {
+  const { installHistoricalShare } = await import('./historical-share.mjs');
+  await installHistoricalShare();
 } else {
-  const seed = params.get('seed');
-  if (seed) product.seedGameRandom(seed);
-  await import('./app.js');
-  await import('./social.mjs');
-  practice.installPracticeProductLayer();
-  product.installProductLayer();
-  cubeHome.installCubeHome();
-  legacyCohort.installLegacyCohortLayer();
-  leaderboardProduct.installLeaderboardProductLayer();
-  flow.installFlowFixes();
-  await growth.installGrowthLayer();
-  retention.installRetentionLayer();
-  profiles.installProfileProductLayer();
-  profilePolish.installProfilePolish();
-  draftRun.installDraftRunHome();
-  progression.installProgression();
-  homeProduct.installHomeProductLayer();
-  homeToday.installHomeToday();
+  // Paint play links before identity/profile requests. Profiles load on demand.
+  const home = params.get('game') !== 'draft-run' && !params.has('profile')
+    ? await import('./daily-home.mjs') : null;
+  home?.renderDailyHome();
+  const identityReady = import('./growth.mjs').then(m => m.installGrowthLayer());
+  const account = document.createElement('button');
+  account.id = 'account-nav'; account.type = 'button';
+  account.className = 'top-nav-button'; account.textContent = 'Account';
+  account.onclick = async () => {
+    await identityReady;
+    const profiles = await import('./profile-product.mjs');
+    profiles.installProfileProductLayer();
+    (await import('./profile-polish.mjs')).installProfilePolish();
+    await profiles.renderMyProfile();
+  };
+  document.querySelector('.top-actions').append(account);
+  if (home) home.installDailyHome(identityReady);
+  else if (params.has('profile')) {
+    await identityReady;
+    (await import('./profile-product.mjs')).installProfileProductLayer();
+  } else {
+    const game = await import('./draft-run-product.mjs');
+    await identityReady;
+    await game.installDraftRunPage();
+  }
 }
