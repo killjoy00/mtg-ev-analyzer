@@ -31,6 +31,12 @@ test('Traditional inventory evaluation cannot publish or change training inputs'
   for(const extra of [{sets:'all'},{target:'production'},{training_cap:10000}])assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
 
+test('frozen outcome audit is read-only with fixed artifact and set coverage',()=>{
+  const request={operation:'audit-frozen-outcomes',reason:'Verify actual trophy source outcomes',request_id:'source-audit'};
+  assert.deepEqual(rolloutDispatch(request),{workflow:'audit-frozen-outcomes.yml',body:{ref:'main',inputs:{}}});
+  assert.throws(()=>rolloutDispatch({...request,target:'production'}));
+});
+
 
 test('rebuild preparation is target-only and cannot request arbitrary artifacts or migrations',()=>{
   const base={operation:'prepare-rebuild',request_id:'stage-v7',reason:'Reviewed additive release staging',target:'development'};

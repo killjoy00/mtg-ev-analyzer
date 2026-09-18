@@ -23,6 +23,8 @@ export function rolloutDispatch(request) {
     workflow='format-research.yml';
   } else if(operation==='traditional-puzzles') {
     workflow='traditional-puzzles.yml';
+  } else if(operation==='audit-frozen-outcomes') {
+    workflow='audit-frozen-outcomes.yml';
   } else if(operation==='browser') {
     workflow='e2e.yml';
   } else if(operation==='deploy') {

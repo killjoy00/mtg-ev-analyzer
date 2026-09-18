@@ -1,5 +1,5 @@
 {
-  "operation": "traditional-puzzles",
-  "request_id": "traditional-puzzle-v3-reconstruct-20260918",
-  "reason": "Evaluate Traditional 3-0 puzzle inventory independently of training, requiring exact frozen Premier v3 support parity and predeclared scoring/quality gates. Produce unpublished candidate artifacts only."
+  "operation": "audit-frozen-outcomes",
+  "request_id": "frozen-premier-source-audit-20260918",
+  "reason": "Read-only audit of every included source in all 32 complete v3 imports against pinned archives. Enumerate legal 7-0/7-1/7-2 trophies and identify inconsistent or unverified source outcomes without rewriting model evidence or historical play."
 }
