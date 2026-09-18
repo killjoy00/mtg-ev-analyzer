@@ -1,8 +1,8 @@
 {
   "operation": "puzzle-components",
-  "request_id": "cube-p2p7-stage-production-20260918",
-  "reason": "Development staging succeeded (35395596545). Additively stage the same pinned 1,320 Traditional Cube P2–P7 Candidate decisions and source exclusions in production; preserve all previous puzzles and Dailies. Publication remains a separate audited action.",
-  "target": "production",
-  "action": "stage",
+  "request_id": "cube-p2p7-publish-development-20260918",
+  "reason": "Development and production Candidate staging passed (35395596545, 35396010731), including preserved Premier payloads and existing Dailies. Explicitly promote the owner-approved 1,320-decision Cube P2–P7 component on development and verify 10,000 runs plus SQL parity.",
+  "target": "development",
+  "action": "publish",
   "source": "powered-cube"
 }
