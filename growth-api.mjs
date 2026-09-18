@@ -77,6 +77,15 @@ export async function linkAccount(authSessionToken = loadAuthToken()) {
   return data;
 }
 
+export async function loadDailyStatus() {
+  const base=String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
+  const token=await ensurePackSession(),auth=loadAuthToken();
+  const response=await fetch(`${base}/v1/daily-status`,{headers:{authorization:`Bearer ${token}`,...(auth?{'x-pack1-auth-session':auth}:{})},signal:AbortSignal.timeout(15000)});
+  const data=await response.json();
+  if(!response.ok)throw Error(data.error||'Daily progress is unavailable.');
+  return data;
+}
+
 export async function loadMyProfile() {
   return api('/v1/profile/me', { auth:true });
 }

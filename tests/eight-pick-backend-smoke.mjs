@@ -1,7 +1,9 @@
 // Destructive schedule fixtures: disposable development branch only.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
-import {dailyRequiredSets} from '../draft-run-policy.mjs';
+import {loadLiveSetMetadata} from '../worker/draft-run-selection.mjs';
+import {liveRegularSets} from '../daily-selection.mjs';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {gradeDraftRunPick,publicDraftRunPuzzle} from '../draft-run.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Requires an isolated database and --dev-fixtures.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
@@ -34,39 +36,25 @@ assert.deepEqual(parse((await stored(old.id)).puzzle_ids),parse(legacy.puzzle_id
 await query("DELETE FROM draft_run_schedules WHERE day=$1::date AND environment='mixed'",[day]);
 const owner=await guest();
 let run=await call('/v1/runs',{daily:true,qa:true},owner.token);
-assert.equal(run.run_length,8);assert.deepEqual(run.daily_featured_sets,dailyRequiredSets(day));
+assert.equal(run.run_length,8);assert.deepEqual(run.daily_featured_sets,liveRegularSets(await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION),day).slice(0,4).map(s=>s.set_id));
 const initial=await payloads(parse((await stored(run.id)).puzzle_ids));
 assert.equal(new Set(initial.map(p=>p.source_draft_hash)).size,8);
-assert.equal(new Set(initial.map(p=>p.set_id)).size,8);
-for(const set of run.daily_featured_sets)assert.equal(initial.filter(p=>p.set_id===set).length,1);
+assert.ok(initial.filter(p=>p.set_id===run.daily_featured_sets[0]).length>=2);
+assert.ok(initial.filter(p=>run.daily_featured_sets.slice(1).includes(p.set_id)).length>=4);
 const peer=await guest(),same=await call('/v1/runs',{daily:true,qa:true},peer.token);
 assert.deepEqual(parse((await stored(same.id)).puzzle_ids),parse((await stored(run.id)).puzzle_ids));
-let alternate=same;
-while(alternate.daily_featured_sets.includes(alternate.current.set_id)) {
-  alternate=await call(`/v1/runs/${alternate.id}/pick`,{revision:alternate.revision,round:alternate.answers.length,puzzleId:alternate.current.puzzle_id,cardId:alternate.current.candidates[0].id},peer.token);
-}
-assert.equal(alternate.set_reroll_allowed,true);
-alternate=await call(`/v1/runs/${alternate.id}/reroll`,{revision:alternate.revision,round:alternate.answers.length,puzzleId:alternate.current.puzzle_id,type:'set'},peer.token);
-assert.equal(alternate.rerolls.set,0);
-let protectedCount=0,usedPack=false;
 for(let round=0;round<8;round++) {
   const request=()=>({revision:run.revision,round,puzzleId:run.current.puzzle_id});
-  if(run.daily_featured_sets.includes(run.current.set_id)) {
-    assert.equal(run.set_reroll_allowed,false);protectedCount++;
-    const before=run.revision,tokens=run.rerolls.set;
-    await call(`/v1/runs/${run.id}/reroll`,{...request(),type:'set'},owner.token,409);
-    run=await call(`/v1/runs/${run.id}`,undefined,owner.token);
-    assert.equal(run.revision,before);assert.equal(run.rerolls.set,tokens);
-    if(!usedPack){const set=run.current.set_id;run=await call(`/v1/runs/${run.id}/reroll`,{...request(),type:'pack'},owner.token);assert.equal(run.current.set_id,set);usedPack=true;}
-  }
+  assert.equal(run.set_reroll_allowed,false);
+  for(const type of ['set','pack'])await call(`/v1/runs/${run.id}/reroll`,{...request(),type},owner.token,409);
   const [p]=await payloads([run.current.puzzle_id]);
   const pick={...request(),cardId:p.historical_pick_id};
   run=await call(`/v1/runs/${run.id}/pick`,pick,owner.token);
   assert.equal(run.complete,round===7);
   if(round===7)assert.equal((await call(`/v1/runs/${run.id}/pick`,pick,owner.token)).score,100);
 }
-assert.ok(protectedCount===3&&usedPack);assert.equal(run.score,100);
-for(const set of run.daily_featured_sets)assert.ok(run.answers.some(a=>a.puzzle.set_id===set));
+assert.equal(run.score,100);
+
 const measurements=(await query('SELECT run_complete,likely_abandoned,is_qa FROM draft_run_measurements WHERE session_id=$1::uuid',[run.id])).rows;
 assert.ok(measurements.length>=8);assert.ok(measurements.every(r=>r.run_complete==='t'&&r.likely_abandoned==='f'&&r.is_qa==='t'));
 assert.equal((await call('/v1/runs',{daily:true},owner.token)).id,run.id);
@@ -81,9 +69,6 @@ old=await call(`/v1/runs/${old.id}/pick`,{revision:old.revision,round:9,puzzleId
 assert.equal(old.complete,true);assert.equal(old.score,100);assert.equal(old.answers.length,10);
 for(const [result,user] of [[run,owner],[old,oldOwner]]) {
   const shared=await call(`/v1/runs/${result.id}/share`,{},user.token);
-  const info=await call(`/v1/challenges/${shared.id}`);assert.equal(info.run_length,result.run_length);
-  const friend=await call('/v1/runs',{challenge:shared.id,qa:true},peer.token);
-  assert.equal(friend.run_length,result.run_length);assert.equal(friend.comparison.exact,true);
-  assert.deepEqual(parse((await stored(friend.id)).puzzle_ids),parse((await stored(result.id)).puzzle_ids));
+  assert.equal(shared.daily,true);assert.equal(shared.id,undefined);
 }
-console.log('Eight-pick Daily guarantee, both rerolls, scoring, measurements, retries, first attempts and eight/ten-pick friend compatibility passed.');
+console.log('Eight-pick Daily quotas, no rerolls, scoring, measurements, retries, first attempts and historical ten-pick completion passed.');

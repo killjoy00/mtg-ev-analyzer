@@ -1,3 +1,4 @@
+import {DAILY_SELECTION_VERSION,dailySetPlan} from '../daily-selection.mjs';
 import {seededRandom} from '../gameplay.mjs';
 import {runPickWindows,eligiblePickForRound,selectDraftRunReroll,draftRunDifficulty} from '../draft-run.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_SETS,chooseRunSet,runDifficultyBands,maxRunPick,isEightPickVersion,earlyRoundsForSelection,dailyRequiredSets,releasedRunSets,requiredSetRounds} from '../draft-run-policy.mjs';
@@ -36,16 +37,25 @@ function environmentFilter(environment,params,previous=false) {
   return sql;
 }
 
+export async function loadLiveSetMetadata(query,version) {
+  const result=await query(`SELECT p.set_id,p.release_date::text,p.status,p.regular_run
+    FROM draft_run_environment_policy p JOIN draft_run_verified_sets v ON v.set_id=p.set_id
+    WHERE v.corpus_version=$1 AND p.status='Live' ORDER BY p.set_id`,[version]);
+  return result.rows.map(p=>({...p,regular_run:p.regular_run===true||p.regular_run==='t'}));
+}
+
 // Return compact group counts once, then one source trajectory per round. Every
 // eligible puzzle participates: there is no random prefix or candidate cap.
 // This consumes the same PRNG draws and sorted candidate order as selectDraftRun.
 export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION}={}) {
   const random=seededRandom(seed),bands=runDifficultyBands(random,selectionVersion),selected=[],sources=[],sets=new Set();
   const windows=runPickWindows(environment,selectionVersion),released=new Set(releasedRunSets(day));
+  const metadata=selectionVersion===DAILY_SELECTION_VERSION?await loadLiveSetMetadata(query,version):null;
+  const live=metadata?new Set(metadata.map(s=>s.set_id)):null;
   const groupParams=[version];
   const groupWhere=`${base} AND ${environmentFilter(environment,groupParams)}`;
-  const groups=(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>!daily||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id));
-  const required=daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
+  const groups=(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));
+  const required=daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION?dailySetPlan(metadata,day,random):daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
   const forced=requiredSetRounds(groups,bands,windows,random,required);
   const key=p=>`${p.set_id}:${p.pick_number}:${p.band}`;
   const remaining=new Map(groups.map(g=>[key(g),g]));
@@ -61,7 +71,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     let band=bands[round],available=availableFor(band);
     if(!available.length&&band==='easy'){band='medium';available=availableFor(band);}
     const fresh=available.filter(g=>!sets.has(g.set_id));
-    if(fresh.length)available=fresh;
+    if(fresh.length&&!forced.has(round))available=fresh;
     else {const different=available.filter(g=>g.set_id!==selected.at(-1)?.set_id);if(different.length)available=different;}
     const setId=chooseRunSet(available.map(g=>g.set_id).sort(),random,daily,selectionVersion,day);
     const count=Number(available.find(g=>g.set_id===setId)?.n||0);

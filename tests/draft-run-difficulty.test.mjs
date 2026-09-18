@@ -56,11 +56,11 @@ test('Powered Cube starts at the first fully observed decision P1P2 when P1P1 is
   }
 });
 
-test('set exclusions affect random runs and rerolls, with a stronger Daily-only recency bias',()=>{
+test('historical v3 selection retains exclusions and its original Daily recency bias',()=>{
   const pool=[];
   for(let pick=1;pick<=12;pick++)for(const set of ['hbg','sir','pio',...REGULAR_SET_ORDER])for(const rating of [30,65,90])pool.push(meta(`${pick}-${set}-${rating}`,rating,{set,pick}));
   for(let i=0;i<30;i++)for(const daily of [false,true]) {
-    const run=selectDraftRun(pool,`policy-${i}`,'mixed',{daily});
+    const run=selectDraftRun(pool,`policy-${i}`,'mixed',{daily,selectionVersion:'eight-pick-v3'});
     assert.ok(run.every(p=>!['hbg','sir','pio'].includes(p.set_id)&&p.pick_number<=10));
   }
   assert.equal(selectDraftRunReroll([meta('excluded',65,{set:'hbg'})],meta('source',65),{type:'set',round:0,seed:'exclude'}),null);

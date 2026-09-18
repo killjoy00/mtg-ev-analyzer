@@ -13,7 +13,7 @@ await page.route('**/*.neon.tech/**',async route=>{
  if(path==='/v1/runs')starts++;
  let body={ok:true};
  if(path==='/v1/session')body={token:'today-test'};
- if(path==='/v1/profile/me'){
+ if(path==='/v1/daily-status'){
    body=profile();
    if(holdNext){holdNext=false;await new Promise(resolve=>held=resolve);}
    if(fail)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Unavailable'})});

@@ -49,6 +49,10 @@ jobs:
         run: node tests/draft-run-e2e.mjs
       - name: Run Powered Cube eight-decision regression
         run: PACK1_TEST_ENVIRONMENT=powered-cube node tests/draft-run-e2e.mjs
+      - name: Run fixed Daily sharing regression
+        run: PACK1_TEST_DAILY=1 node tests/draft-run-e2e.mjs
+      - name: Run fixed Cube Daily sharing regression
+        run: PACK1_TEST_DAILY=1 PACK1_TEST_ENVIRONMENT=powered-cube node tests/draft-run-e2e.mjs
       - name: Run historical ten-decision compatibility regression
         run: PACK1_TEST_SELECTION_VERSION=first-pack-v2 node tests/draft-run-e2e.mjs
       - name: Run account browser contract
