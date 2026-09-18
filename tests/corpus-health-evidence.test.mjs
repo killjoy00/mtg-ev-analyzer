@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {probabilityMetrics,trajectoryHealth,matchesFrozenSourceAudit} from '../scripts/corpus-health-evidence.mjs';
 const puzzle=(pick,prior,historical)=>({source_draft_hash:'source',source_fingerprint:'fingerprint',pick_number:pick,prior_picks:prior.map(id=>({id})),historical_pick_id:historical,candidates:[{id:'a',model_probability:.7},{id:'b',model_probability:.3}]});
 test('health evaluates frozen calibrated probabilities separately from raw evidence',()=>{
- const metrics=probabilityMetrics(null,'elite-trophy-colour-stage-v7');metrics.add(puzzle(1,[],'a'));
+ const metrics=probabilityMetrics(null,DRAFT_RUN_CORPUS_VERSION);metrics.add(puzzle(1,[],'a'));
  const r=metrics.report();assert.equal(r.supportExponent,1.75);assert.equal(r.top1,1);assert.equal(r.meanRank,1);assert.ok(r.logLoss<r.rawLogLoss);assert.equal(r.bins.reduce((n,b)=>n+b.n,0),1);
 });
 test('trajectory health checks ordered pool inheritance regardless of payload arrival order',()=>{

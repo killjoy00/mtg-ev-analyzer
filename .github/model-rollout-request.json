@@ -1,8 +1,6 @@
 {
-  "operation": "puzzle-components",
-  "request_id": "cube-p2p7-stage-production-20260918",
-  "reason": "Development staging succeeded (35395596545). Additively stage the same pinned 1,320 Traditional Cube P2–P7 Candidate decisions and source exclusions in production; preserve all previous puzzles and Dailies. Publication remains a separate audited action.",
-  "target": "production",
-  "action": "stage",
-  "source": "powered-cube"
+  "operation": "corpus-health",
+  "request_id": "full-current-corpus-health-production-20260918",
+  "reason": "Reconcile the original charter with full retained production corpus verification: exact frozen source evidence, trajectory inheritance, source exclusions, coverage, metadata/images and frozen calibrated probability diagnostics. Persist health reports; never change Live status or historical payloads.",
+  "target": "production"
 }
