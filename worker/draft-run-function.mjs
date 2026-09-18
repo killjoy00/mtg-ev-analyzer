@@ -1,4 +1,5 @@
 import {accountCapabilities,requireCapability,practiceCapability} from './capabilities.mjs';
+import {componentBelongsTo} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity} from './account-identity.mjs';
 import {releaseMetadata} from './release.mjs';
@@ -26,12 +27,12 @@ const fail = (message,status=400) => { throw Object.assign(new Error(message),{s
 async function puzzle(id,corpusVersion) {
   const r=await query('SELECT payload FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[id]);
   const p=r.rows[0] ? parse(r.rows[0].payload) : null;
-  if(!validateDraftRunPuzzle(p,corpusVersion)) fail('This puzzle failed its data-quality check.',503);
+  if(!validateDraftRunPuzzle(p,p?.corpus_version)||!await componentBelongsTo(query,p,corpusVersion)) fail('This puzzle failed its data-quality check.',503);
   return p;
 }
 
 function decode(row) {
-  return {...row,custom_set_ids:parse(row.custom_set_ids||'[]'),leaderboard_eligible:row.leaderboard_eligible===true||row.leaderboard_eligible==='t',revision:Number(row.revision),puzzle_ids:parse(row.puzzle_ids),daily_featured_sets:parse(row.daily_featured_sets||'[]'),answers:parse(row.answers),rerolls:parse(row.rerolls),difficulty_anchors:parse(row.difficulty_anchors||'[]'),seen_sources:parse(row.seen_sources),score:row.score==null?null:Number(row.score)};
+  return {...row,source_components:parse(row.source_components||'[]'),custom_set_ids:parse(row.custom_set_ids||'[]'),leaderboard_eligible:row.leaderboard_eligible===true||row.leaderboard_eligible==='t',revision:Number(row.revision),puzzle_ids:parse(row.puzzle_ids),daily_featured_sets:parse(row.daily_featured_sets||'[]'),answers:parse(row.answers),rerolls:parse(row.rerolls),difficulty_anchors:parse(row.difficulty_anchors||'[]'),seen_sources:parse(row.seen_sources),score:row.score==null?null:Number(row.score)};
 }
 
 async function session(id,owner) {
@@ -73,7 +74,7 @@ async function persistResult(s) {
   ), events AS (INSERT INTO analytics_events(player_id,event_name,event_props)
     SELECT $1::uuid,event_name,$14::jsonb FROM result CROSS JOIN jsonb_array_elements_text($15::jsonb) n(event_name)
   ) UPDATE draft_run_sessions SET result_persisted_at=now() WHERE id=$17::uuid AND player_id=$1::uuid`,
-  [s.player_id,s.day,score,grade,JSON.stringify(s.answers.map(a=>a.selectedId)),JSON.stringify({run:s.id,scoring_version:s.scoring_version,historical_matches:s.answers.filter(a=>a.historicalMatch).length,run_length:runLength(s),selection_version:s.selection_version}),s.seed,s.challenge_id,exact?other.display_name:null,exact?other.score:null,outcome,`draft-run:${s.id}`,JSON.stringify(sets),JSON.stringify({mode:'draft_run',set_id:environmentOf(s),daily:Boolean(s.day),score,run_id:s.id,challenge:Boolean(other),outcome}),JSON.stringify(['game_completed',...(environmentOf(s)==='powered-cube'?['cube_completed']:[]),...(s.day?['daily_completed']:[]),...(exact?['challenge_complete']:[])]) ,environmentOf(s),s.id,s.leaderboard_eligible]);
+  [s.player_id,s.day,score,grade,JSON.stringify(s.answers.map(a=>a.selectedId)),JSON.stringify({run:s.id,corpus_version:s.corpus_version,source_components:s.source_components,scoring_version:s.scoring_version,historical_matches:s.answers.filter(a=>a.historicalMatch).length,run_length:runLength(s),selection_version:s.selection_version}),s.seed,s.challenge_id,exact?other.display_name:null,exact?other.score:null,outcome,`draft-run:${s.id}`,JSON.stringify(sets),JSON.stringify({mode:'draft_run',set_id:environmentOf(s),daily:Boolean(s.day),score,run_id:s.id,challenge:Boolean(other),outcome}),JSON.stringify(['game_completed',...(environmentOf(s)==='powered-cube'?['cube_completed']:[]),...(s.day?['daily_completed']:[]),...(exact?['challenge_complete']:[])]) ,environmentOf(s),s.id,s.leaderboard_eligible]);
 }
 
 async function responseFor(s) {
@@ -88,7 +89,7 @@ async function responseFor(s) {
     const row=r.rows[0],total=Number(row.total);
     standing={rank:Number(row.rank),total,percentile:total>=10?Math.max(1,Math.ceil(Number(row.through_ties)/total*100)):null,final:s.day<gameDateKey()};
   }
-  return {id:s.id,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:s.leaderboard_eligible,environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
+  return {id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:s.leaderboard_eligible,environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
 }
 
 async function start(request) {

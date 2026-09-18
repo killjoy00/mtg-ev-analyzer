@@ -3,14 +3,15 @@ import {seededRandom} from '../gameplay.mjs';
 import {runPickWindows,eligiblePickForRound,selectDraftRunReroll,draftRunDifficulty} from '../draft-run.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_SETS,chooseRunSet,runDifficultyBands,maxRunPick,isEightPickVersion,earlyRoundsForSelection,dailyRequiredSets,releasedRunSets,requiredSetRounds} from '../draft-run-policy.mjs';
 import {gameDateKey} from '../game-date.mjs';
+import {corpusMembership} from './corpus-components.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from '../draft-run-difficulty.mjs';
 
-const columns = `p.puzzle_id,p.set_id,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,
+const columns = `p.puzzle_id,p.set_id,p.corpus_version,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,
   p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band`;
 const from = `FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r
   ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'`;
-const base = `p.corpus_version=$1 AND p.interesting AND p.pack_number=1`;
-const servingBase = `${base} AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
+const base = `(${corpusMembership()}) AND p.interesting AND p.pack_number=1`;
+const servingBase = `(${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
   WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)`;
 export function decodePuzzleMetadata(p) {
   return {...p, rating:Number(p.rating), top_two_ratio:Number(p.top_two_ratio),

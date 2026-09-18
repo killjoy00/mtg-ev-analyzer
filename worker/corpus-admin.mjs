@@ -1,11 +1,12 @@
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {TRADITIONAL_GATE_VERSION} from '../corpus-components.mjs';
 import {CORPUS_GATE_VERSION,CORPUS_THRESHOLDS,CORPUS_TRANSITIONS} from '../corpus-quality.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
 export async function handleCorpusAdmin(request,query,readJson,accountId) {
  const path=new URL(request.url).pathname;
  if(request.method==='GET'&&path==='/v1/admin/corpus') {
-  const [sets,history]=await Promise.all([
+  const [sets,history,components,blockedSources]=await Promise.all([
    query(`WITH known AS (SELECT set_id FROM draft_run_verified_sets UNION SELECT set_id FROM corpus_sources)
     SELECT k.set_id,p.status,p.regular_run,coalesce(p.set_name,s.set_name,k.set_id) set_name,
     coalesce(p.release_date,s.release_date)::text release_date,coalesce(s.event_type,p.source_event_type) source_event_type,
@@ -14,13 +15,40 @@ export async function handleCorpusAdmin(request,query,readJson,accountId) {
     (SELECT count(*) FROM corpus_source_exclusions x WHERE x.set_id=k.set_id AND x.corpus_version=$1) excluded_source_trajectories,
     (h.manifest_hash=md5(v.manifest::text) AND h.checked_at>now()-interval '7 days' AND h.gate_version=$2) health_current
     FROM known k LEFT JOIN draft_run_environment_policy p USING(set_id)
-    LEFT JOIN corpus_sources s USING(set_id)
+    LEFT JOIN corpus_sources s ON s.set_id=k.set_id AND s.event_type='PremierDraft'
     LEFT JOIN corpus_set_versions v ON v.set_id=k.set_id AND v.corpus_version=$1
     LEFT JOIN LATERAL (SELECT * FROM corpus_health_checks c WHERE c.set_id=k.set_id AND c.corpus_version=$1 ORDER BY checked_at DESC,id DESC LIMIT 1) h ON true
     ORDER BY coalesce(p.release_date,s.release_date) DESC NULLS LAST,k.set_id,s.event_type`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION]),
-   query('SELECT set_id,auth_user_id,changed_at,old_status,new_status,reason FROM corpus_status_events ORDER BY changed_at DESC,id DESC LIMIT 100')
+   query('SELECT set_id,component_version,auth_user_id,changed_at,old_status,new_status,reason FROM corpus_status_events ORDER BY changed_at DESC,id DESC LIMIT 100'),
+   query(`SELECT c.*,v.manifest,h.checked_at,h.ready,h.report,
+     (h.manifest_hash=md5(v.manifest::text) AND h.checked_at>now()-interval '7 days' AND h.gate_version=$2) health_current
+     FROM corpus_components c JOIN corpus_set_versions v ON v.set_id=c.set_id AND v.corpus_version=c.component_version
+     LEFT JOIN LATERAL(SELECT * FROM corpus_health_checks q WHERE q.set_id=c.set_id AND q.corpus_version=c.component_version ORDER BY checked_at DESC,id DESC LIMIT 1) h ON true
+     WHERE c.parent_version=$1 ORDER BY c.set_id,c.component_version`,[DRAFT_RUN_CORPUS_VERSION,TRADITIONAL_GATE_VERSION]),
+   query("SELECT s.set_id,s.event_type,s.archive_url,s.import_status,s.last_error FROM corpus_sources s WHERE s.event_type='TradDraft' AND s.import_status='failed' AND NOT EXISTS(SELECT 1 FROM corpus_components c WHERE c.set_id=s.set_id AND c.parent_version=$1)",[DRAFT_RUN_CORPUS_VERSION])
   ]);
-  return {corpus_version:DRAFT_RUN_CORPUS_VERSION,thresholds:CORPUS_THRESHOLDS,gate_version:CORPUS_GATE_VERSION,sets:sets.rows.map(r=>({...r,manifest:parse(r.manifest),report:parse(r.report)})),history:history.rows,transitions:CORPUS_TRANSITIONS};
+  return {corpus_version:DRAFT_RUN_CORPUS_VERSION,thresholds:CORPUS_THRESHOLDS,gate_version:CORPUS_GATE_VERSION,sets:sets.rows.map(r=>({...r,manifest:parse(r.manifest),report:parse(r.report)})),components:components.rows.map(r=>({...r,manifest:parse(r.manifest),report:parse(r.report)})),blocked_sources:blockedSources.rows,history:history.rows,transitions:CORPUS_TRANSITIONS};
+ }
+ const component=path.match(/^\/v1\/admin\/corpus\/([a-z0-9-]{2,40})\/components\/([a-z0-9-]{2,80})\/status$/);
+ if(request.method==='POST'&&component) {
+  const b=await readJson(request),old=b.oldStatus,next=b.status;
+  if(!CORPUS_TRANSITIONS[old]?.includes(next))fail('Invalid lifecycle transition.');
+  if(b.corpusVersion!==DRAFT_RUN_CORPUS_VERSION)fail('The parent corpus changed. Refresh.',409);
+  if(b.reason!=null&&(typeof b.reason!=='string'||b.reason.length>1000))fail('Reason must be at most 1,000 characters.');
+  const result=await query(`WITH changed AS (
+   UPDATE corpus_components c SET status=$4,status_changed_at=now()
+   WHERE c.set_id=$1 AND c.component_version=$2 AND c.parent_version=$5 AND c.status=$3
+     AND ($4<>'Live' OR EXISTS(SELECT 1 FROM corpus_set_versions v JOIN LATERAL(
+       SELECT * FROM corpus_health_checks h WHERE h.set_id=v.set_id AND h.corpus_version=v.corpus_version ORDER BY checked_at DESC,id DESC LIMIT 1
+     ) h ON true JOIN draft_run_environment_policy p ON p.set_id=v.set_id
+     WHERE v.set_id=c.set_id AND v.corpus_version=c.component_version AND p.status='Live'
+       AND h.ready AND h.gate_version=$8 AND h.manifest_hash=md5(v.manifest::text) AND h.checked_at>now()-interval '7 days'))
+   RETURNING set_id,component_version,status
+  ), audit AS(INSERT INTO corpus_status_events(set_id,component_version,auth_user_id,old_status,new_status,reason)
+   SELECT set_id,component_version,$6::uuid,$3,status,$7 FROM changed RETURNING id)
+  SELECT changed.* FROM changed CROSS JOIN audit`,[component[1],component[2],old,next,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,TRADITIONAL_GATE_VERSION]);
+  if(!result.rows.length)fail('Status changed, or source publication is blocked by quality gates or parent status.',409);
+  return {ok:true,...result.rows[0]};
  }
  const match=path.match(/^\/v1\/admin\/corpus\/([a-z0-9-]{2,40})\/status$/);
  if(request.method==='POST'&&match) {

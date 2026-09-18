@@ -5,6 +5,7 @@ import { sortPackByRarity } from './replay-data.mjs';
 import {rateDraftRunPuzzle,DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from './draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,DRAFT_RUN_LENGTH,isEightPickVersion,earlyRoundsForSelection,eligibleRunPuzzle,regularRunSet,chooseRunSet,runDifficultyBands,dailyRequiredSets,releasedRunSets,requiredSetRounds} from './draft-run-policy.mjs';
 import {gameDateKey} from './game-date.mjs';
+import {FROZEN_CONTEXT_MODEL_VERSION,approvedTraditionalSource,supportedComponent} from './corpus-components.mjs';
 
 const EPSILON = 1e-9;
 export const DRAFT_RUN_SCORING_VERSION = 'trophy-consensus-v3';
@@ -18,7 +19,7 @@ export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v7';
 // Pooled validation fitted 2.0 for the old pair model and 1.75 for the
 // colour-stage model. Display calibration follows the puzzle's pinned model.
 export function supportSharpening(corpusVersion=DRAFT_RUN_CORPUS_VERSION) {
-  return String(corpusVersion).includes('-colour-stage-') ? 1.75 : 2;
+  return supportedComponent(corpusVersion)||String(corpusVersion).includes('-colour-stage-') ? 1.75 : 2;
 }
 export const SUPPORT_SHARPENING = supportSharpening();
 // Retained for callers expressing the equivalent inverse-display formula.
@@ -215,7 +216,12 @@ export function validateDraftRunPuzzle(puzzle, expectedVersion = DRAFT_RUN_CORPU
   return typeof expectedVersion === 'string' && expectedVersion.length > 0 &&
     puzzle?.corpus_version === expectedVersion &&
     Number(puzzle.pack_number??1)===1 &&
-    Number(puzzle.event_match_wins) === 7 && Number(puzzle.player_games_lower_bound) >= 100 &&
+    ((puzzle.source_event_type??'PremierDraft')==='PremierDraft'
+      ? Number(puzzle.event_match_wins)===7 && (puzzle.event_match_losses==null||[0,1,2].includes(Number(puzzle.event_match_losses)))
+      : puzzle.source_event_type==='TradDraft' && approvedTraditionalSource(puzzle) &&
+        puzzle.model_version===FROZEN_CONTEXT_MODEL_VERSION && puzzle.model_source_event==='PremierDraft' &&
+        Number(puzzle.event_match_wins)===3 && puzzle.event_match_losses===0 && pick<=8 && rateSkill) &&
+    Number(puzzle.player_games_lower_bound) >= 100 &&
     (legacySkill || rateSkill) && puzzle.source_evidence === 'official_archive_trajectory' &&
     Number.isInteger(pick) && pick >= (puzzle.set_id === POWERED_CUBE_ENVIRONMENT ? 2 : 1) &&
     pick <= (puzzle.set_id === POWERED_CUBE_ENVIRONMENT ? 12 : 11) && prior.length === pick - 1 &&

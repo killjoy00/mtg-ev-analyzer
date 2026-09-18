@@ -13,7 +13,7 @@ export function reportFilters(url,now=new Date()) {
   if(!['all','easy','medium','hard'].includes(band)||!['all',...Array.from({length:12},(_,i)=>String(i+1))].includes(pick))fail('Invalid difficulty or pick filter.');
   return {start,end,environment,type,set,version,band,pick,params:[start,end,environment,type,set,version,band,pick]};
 }
-const SCOPE=`FROM draft_run_measurements WHERE first_seen_at >= $1::date AND first_seen_at < $2::date+interval '1 day'
+const SCOPE=`FROM draft_run_source_measurements WHERE first_seen_at >= $1::date AND first_seen_at < $2::date+interval '1 day'
   AND ($3='all' OR environment=$3) AND ($4='all' OR run_type=$4) AND ($5='all' OR set_id=$5)
   AND ($6='all' OR selection_version=$6) AND ($7='all' OR band=$7) AND ($8='all' OR pick_number::text=$8)`;
 const METRICS=`count(*)::int exposures,count(DISTINCT player_id)::int players,
@@ -70,7 +70,7 @@ export async function handleAdmin(request,query,readJson) {
         count(DISTINCT session_id) FILTER(WHERE run_complete)::int completed_runs FROM primary_data`,filters.params),
       query(`${scope} SELECT dimension,label,${METRICS} FROM primary_data
         CROSS JOIN LATERAL (VALUES ('difficulty',coalesce(band,'unrated')),('set',set_id),('pick',pick_number::text),
-        ('round',round::text),('model_disagreement',model_disagreement::text),('version',selection_version||' / '||scoring_version||' / '||difficulty_version)) dimensions(dimension,label)
+        ('round',round::text),('source_event',source_event_type),('model_disagreement',model_disagreement::text),('version',selection_version||' / '||scoring_version||' / '||difficulty_version)) dimensions(dimension,label)
         GROUP BY dimension,label ORDER BY dimension,label`,filters.params),
       query(`${scope}, chosen AS (SELECT puzzle_id,${METRICS},bool_or(model_disagreement) model_disagreement
         FROM primary_data GROUP BY puzzle_id HAVING count(*) FILTER(WHERE outcome='pick')>=5
