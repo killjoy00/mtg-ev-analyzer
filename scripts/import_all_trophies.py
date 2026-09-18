@@ -154,7 +154,7 @@ def rows(path, wanted=None):
             yield row
 
 
-def scan_metadata(path):
+def scan_metadata(path, *, compare_losses=True):
     """Read all draft IDs, outcome and skill; no output/replay/training cap here."""
     drafts = {}; count = 0; conflicts = set()
     with csv_bytes(path) as f:
@@ -177,7 +177,8 @@ def scan_metadata(path):
                     'losses': int(float(row['event_match_losses'])) if row.get('event_match_losses') else None,
                     'games': parse_games_lower_bound(row.get('user_n_games_bucket')),
                     'rate': parse_rate_bucket(row.get('user_game_win_rate_bucket'))}
-            if did in drafts and drafts[did] != item: conflicts.add(did)
+            identity=('wins','losses','games','rate') if compare_losses else ('wins','games','rate')
+            if did in drafts and any(drafts[did].get(k)!=item.get(k) for k in identity): conflicts.add(did)
             else: drafts[did] = item
     return drafts, header, count, conflicts
 
