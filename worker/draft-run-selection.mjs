@@ -10,6 +10,8 @@ const columns = `p.puzzle_id,p.set_id,p.source_draft_hash,p.pack_number,p.pick_n
 const from = `FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r
   ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'`;
 const base = `p.corpus_version=$1 AND p.interesting AND p.pack_number=1`;
+const servingBase = `${base} AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
+  WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)`;
 export function decodePuzzleMetadata(p) {
   return {...p, rating:Number(p.rating), top_two_ratio:Number(p.top_two_ratio),
     target_support_ratio:p.target_support_ratio==null?null:Number(p.target_support_ratio),
@@ -53,7 +55,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
   const metadata=selectionVersion===DAILY_SELECTION_VERSION?await loadLiveSetMetadata(query,version):null;
   const live=metadata?new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id)):null;
   const groupParams=[version];
-  const groupWhere=`${base} AND ${environmentFilter(environment,groupParams)}`;
+  const groupWhere=`${servingBase} AND ${environmentFilter(environment,groupParams)}`;
   const groups=(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));
   if(setIds.length){const eligible=new Set(liveRegularSets(metadata||[],day).map(s=>s.set_id));if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live eligible sets.'),{status:400});}
   const required=setIds.length?balancedSetPlan(setIds,random):daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION?dailySetPlan(metadata,day,random):daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
@@ -63,7 +65,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
   for(let round=0;round<windows.length;round++) {
     const window=windows[round];
     const params=[version,window[0],window[1],toPgArray(sources)];
-    const where=`${base} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params)}`;
+    const where=`${servingBase} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params)}`;
     const availableFor=band=>{
       const counts=new Map();
       for(const g of groups)if(g.band===band&&g.pick_number>=window[0]&&g.pick_number<=window[1]&&g.n>0&&(forced.has(round)?g.set_id===forced.get(round):!required.includes(g.set_id)))counts.set(g.set_id,(counts.get(g.set_id)||0)+g.n);
@@ -101,7 +103,7 @@ export async function selectDatabaseReroll(query,version,source,options) {
   const picks=Array.from({length:12},(_,i)=>i+1).filter(p=>eligiblePickForRound(round,p,environment,selectionVersion)&&Math.abs(p-source.pick_number)<=1);
   if(!picks.length)return null;
   const params=[version,picks[0],picks.at(-1),toPgArray([...new Set([...(options.excludedSources||[]),source.source_draft_hash])])];
-  let where=`${base} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params,previous)}`;
+  let where=`${servingBase} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params,previous)}`;
   if(options.setIds?.length){params.push(toPgArray(options.setIds));where+=` AND p.set_id=ANY($${params.length}::text[])`;}
   if(selectionVersion===DAILY_SELECTION_VERSION)where+=" AND EXISTS(SELECT 1 FROM draft_run_environment_policy e WHERE e.set_id=p.set_id AND e.status='Live' AND (e.regular_run OR e.set_id='powered-cube'))";
   params.push(source.set_id);where+=` AND p.set_id${type==='set'?'<>':'='}$${params.length}`;

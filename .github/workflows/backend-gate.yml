@@ -109,7 +109,7 @@ jobs:
           # Keep this explicit list in sync until the parent is promoted; do not
           # replay arbitrary historical migrations or assume main == live SQL.
           mapfile -t pending < <({
-            printf '%s\n' migrations/0012_draft_run_serving_indexes.sql migrations/0013_player_request_limits.sql migrations/0014_eight_pick_runs.sql migrations/0015_draft_run_serving_statistics.sql migrations/0016_retire_third_source.sql migrations/0017_fixed_daily_lifecycle.sql migrations/0018_capabilities.sql migrations/0019_corpus_operations.sql
+            printf '%s\n' migrations/0012_draft_run_serving_indexes.sql migrations/0013_player_request_limits.sql migrations/0014_eight_pick_runs.sql migrations/0015_draft_run_serving_statistics.sql migrations/0016_retire_third_source.sql migrations/0017_fixed_daily_lifecycle.sql migrations/0018_capabilities.sql migrations/0019_corpus_operations.sql migrations/0020_source_eligibility.sql
             printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
           } | sort -u)
           if (( ${#pending[@]} == 0 )); then
@@ -130,6 +130,7 @@ jobs:
           # This loader is additive and verifies existing payload equality.
           node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
           node tests/staged-manifest-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/source-eligibility-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/retirement-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/corpus-version-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/serving-statistics-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
