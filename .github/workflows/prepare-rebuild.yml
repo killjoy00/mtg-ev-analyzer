@@ -73,3 +73,43 @@ jobs:
           node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/trophy-import --complete
       - name: Verify release schema again
         run: DATABASE_URL="$(cat "$RUNNER_TEMP/target.connection")" node scripts/verify-neon-schema.mjs
+  evidence:
+    if: inputs.target == 'development'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35349969472
+          name: format-research-report
+          path: generated/release-evidence/traditional
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35350883338
+          name: frozen-scoring-report
+          path: generated/release-evidence/scoring
+      - name: Preserve completed public research reports on a review branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib
+          root=pathlib.Path('results/rebuild-2026-09-18')
+          root.mkdir(parents=True,exist_ok=True)
+          for kind in ('traditional','scoring'):
+              report=json.loads(pathlib.Path('generated/release-evidence',kind,'report.json').read_text())
+              (root/(kind+'-report.json')).write_text(json.dumps(report,sort_keys=True,separators=(',',':'))+'\n')
+          PY
+          git switch -c "research/rebuild-evidence-$GITHUB_RUN_ID"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add results/rebuild-2026-09-18/traditional-report.json results/rebuild-2026-09-18/scoring-report.json
+          git commit -m "Preserve completed rebuild research evidence for review"
+          git push origin HEAD
