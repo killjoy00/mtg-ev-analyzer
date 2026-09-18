@@ -88,7 +88,7 @@ try{
     await page.locator(`[data-pick="${selected}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
     assert.equal(views.at(-1).puzzleId,p.puzzle_id,'Feedback must not record the next decision as viewed');
     assert.match(await page.locator('.run-feedback').innerText(),/100/);
-    await page.getByRole('heading',{name:'Elite consensus: '+gradeDraftRunPick(p,p.historical_pick_id).consensusName,exact:true}).waitFor();
+    await page.getByRole('heading',{name:'Model’s strongest choice: '+gradeDraftRunPick(p,p.historical_pick_id).consensusName,exact:true}).waitFor();
     assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
     assert.equal(await page.locator('.run-pack-review').getAttribute('open'),null);assert.equal(answers.length,round+1);
     assert.equal(await page.locator('.run-card-score').count(),0);

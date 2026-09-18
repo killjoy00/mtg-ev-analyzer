@@ -3,18 +3,22 @@
 import fs from 'node:fs';
 import {seededRandom} from '../gameplay.mjs';
 import {runPickWindows} from '../draft-run.mjs';
-import {runDifficultyBands,requiredSetRounds,chooseRunSet,dailyRequiredSets,
+import {dailySetPlan} from '../daily-selection.mjs';
+import snapshot from '../results/rebuild-2026-09-18/live-metadata.json' with {type:'json'};
+import {runDifficultyBands,requiredSetRounds,chooseRunSet,
   regularRunSet} from '../draft-run-policy.mjs';
 
 const input=JSON.parse(fs.readFileSync(0,'utf8'));
 const random=seededRandom(input.seed);
 const windows=runPickWindows(input.environment);
-const required=input.daily ? dailyRequiredSets(input.day) : [];
 const groups=input.groups.filter(g=>input.environment==='powered-cube'
   ? g.set_id==='powered-cube' : regularRunSet(g.set_id));
+// An explicitly restricted evaluation corpus, not a full production replay.
+const metadata=(input.metadata||snapshot).filter(s=>groups.some(g=>g.set_id===s.set_id));
 const profiles=[];
 for(let i=0;i<input.runs;i++) {
   const bands=runDifficultyBands(random);
+  const required=input.daily?dailySetPlan(metadata,input.day,random):[];
   // Same easy-to-medium fallback as run selection, within this sample.
   for(let j=0;j<bands.length;j++) if(bands[j]==='easy'&&!groups.some(g=>
     g.band==='easy'&&g.pick_number>=windows[j][0]&&g.pick_number<=windows[j][1])) bands[j]='medium';

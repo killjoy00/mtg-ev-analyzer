@@ -1,0 +1,57 @@
+name: Frozen context scoring validation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: frozen-scoring
+  cancel-in-progress: false
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        set: [tmt, hob, blb, msh, sos, powered-cube]
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Recompute frozen-model predictions
+        env:
+          RESEARCH_SET: ${{ matrix.set }}
+        run: python -u scripts/run_frozen_scoring.py --set "$RESEARCH_SET"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frozen-scoring-${{ matrix.set }}
+          retention-days: 90
+          path: generated/frozen-scoring/*/measurements.json.gz
+  report:
+    needs: measure
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: frozen-scoring-*
+          path: generated/frozen-scoring
+      - name: Select then assess partial-credit curves
+        run: |
+          mapfile -t measurements < <(find generated/frozen-scoring -name measurements.json.gz)
+          test "${#measurements[@]}" -eq 6
+          python scripts/scoring_experiment.py report "${measurements[@]}" --frozen-model v3-colour-and-pair --daily --day 2026-09-18 --runs 2000 --bootstrap-draws 200 --bootstrap-runs 500 --out generated/frozen-scoring/report.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: frozen-scoring-report
+          retention-days: 90
+          path: generated/frozen-scoring/report.json

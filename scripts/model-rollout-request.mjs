@@ -14,6 +14,8 @@ export function rolloutDispatch(request) {
   } else if(operation==='import') {
     if(!/^(all|[a-z0-9-]+(?:,[a-z0-9-]+)*)$/.test(sets||'')||!['build-only','development','production'].includes(target))throw Error('Invalid import request.');
     workflow='import-all-trophies.yml';inputs={sets,target};extra=['sets','target'];
+  } else if(operation==='frozen-scoring') {
+    workflow='frozen-scoring.yml';
   } else if(operation==='format-research') {
     workflow='format-research.yml';
   } else if(operation==='browser') {
