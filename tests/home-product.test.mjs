@@ -7,6 +7,7 @@ const row=set_id=>({date:day,mode:'draft_run',set_id,score:91});
 test('two direct Dailies dominate before completion, without practice or checklist',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.equal((html.match(/>Play now</g)||[]).length,2);
+ assert.match(html,/September 18’s Daily Runs/);assert.doesNotMatch(html,/100 = you matched/);
  assert.doesNotMatch(html,/progressbar|Daily board|More modes|Full Pack|Top 3|Keep drafting/);
 });
 test('either unfinished Daily precedes the compact result',()=>{
@@ -35,4 +36,8 @@ test('future practice options appear only after both Dailies and with their capa
  assert.doesNotMatch(dailyHomeMarkup(p,day),/Powered Cube Practice|Choose Your Sets/);
  p.daily_history.push(row('powered-cube'));assert.match(dailyHomeMarkup(p,day),/Powered Cube Practice/);assert.match(dailyHomeMarkup(p,day),/Choose Your Sets/);
  p.capabilities=['account','unlimited_regular_practice'];assert.doesNotMatch(dailyHomeMarkup(p,day),/Powered Cube Practice|Choose Your Sets/);
+});
+
+test('Method keeps one link directory',()=>{
+ const html=fs.readFileSync('methodology/index.html','utf8');assert.equal((html.match(/class="method-directory"/g)||[]).length,1);
 });

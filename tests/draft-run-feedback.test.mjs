@@ -7,8 +7,9 @@ import {escapeHtml} from '../html.mjs';
 test('locked feedback separates the trophy bonus from relative model support',()=>{
  const answer={consensusName:'Leader',consensusSupport:0.5,selectedSupport:0.05,selectedId:'trophy',historicalId:'trophy',historicalMatch:true,ranking:[{id:'trophy',name:'Trophy',support:0.05,score:100},{id:'leader',name:'Leader',support:0.5,score:95}]};
  const text=consensusFeedback(answer);
- assert.match(text,/10% of the leading/);assert.match(text,/earns 100 regardless/);
- assert.ok(text.indexOf('data-zoom="leader"')<text.indexOf('data-zoom="trophy"'));
+ assert.doesNotMatch(text,/10%/);assert.match(text,/earns 100 regardless/);
+ assert.ok(text.indexOf('data-zoom="trophy"')<text.indexOf('data-zoom="leader"'));
+ assert.match(text,/<td>—<\/td><td>100<\/td>/);
  assert.match(text,/does not establish a correct pick/);
  assert.match(text,/Trophy drafter: Trophy — 100/);
  assert.match(text,/Model’s strongest alternative: Leader — 95/);

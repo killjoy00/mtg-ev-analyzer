@@ -1,6 +1,8 @@
 import { escapeHtml as esc } from './html.mjs';
 import {
   loadMyProfile,
+  getAuthSession,
+  signOutAccount,
   loadProfileHistory,
   loadPublicProfile,
   lookupPublicProfiles,
@@ -23,7 +25,6 @@ import {
 import {
   shareAchievementCard,
   shareProfileCard,
-  shareProgressCard,
   shareResultCard,
 } from './share-cards.mjs';
 
@@ -78,22 +79,20 @@ function environmentCard(entry, favoriteId) {
   const classes = ['environment-progress-card', entry.played ? 'played' : 'unplayed'];
   if (entry.id === favoriteId) classes.push('favorite');
   if (entry.isCube) classes.push('cube');
-  const practiceHref = entry.isCube
-    ? '?game=draft-run&set=powered-cube'
-    : `?set=${encodeURIComponent(entry.id)}&mode=top3&seed=${encodeURIComponent(crypto.randomUUID())}`;
+  const coverageHref=`/sets/#${encodeURIComponent(entry.id)}`;
   return `<article class="${classes.join(' ')}" data-environment-id="${esc(entry.id)}">
     <div><span>${entry.isCube ? 'Special' : entry.played ? 'Played' : 'Unplayed'}</span>${entry.id === favoriteId ? '<b>Favorite</b>' : ''}</div>
     <h3>${esc(entry.name)}</h3>
     ${entry.played
       ? `<p><strong>${entry.games}</strong> games · <strong>${entry.averageScore.toFixed(1)}</strong> avg · <strong>${entry.bestScore}</strong> best</p>`
       : '<p>Ready for your first game.</p>'}
-    <a class="text-button" href="${practiceHref}">${entry.played?'Play again':'Try this set'}</a>
+    <a class="text-button" href="${coverageHref}">View set details</a>
   </article>`;
 }
 
 function modeCards(profile) {
   const rows = profile.by_mode || [];
-  const wanted = ['draft_run', 'top3', 'full'];
+  const wanted = ['draft_run'];
   return wanted.map((mode) => {
     const row = rows.find((item) => item.mode === mode) || { games: 0, average_score: 0, best_score: 0 };
     return `<article class="profile-mode-card"><span>${modeName(mode)}</span><strong>${row.games?Number(row.average_score || 0).toFixed(1):'—'}</strong><small>${Number(row.games || 0)} games${row.games?` · ${Number(row.best_score || 0)} best`:''}</small></article>`;
@@ -124,13 +123,13 @@ function dailyRow(row, names, index) {
   return `<li><div><strong>${esc(setName)} · ${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}</strong><span>${esc(row.date || '')}${row.final===false?' · Still open':''}</span></div><b>${Number(row.score || 0)}</b><em>${pct ? `Top ${pct}%${row.final===false?' so far':''} · #${Number(row.rank || 0)} of ${Number(row.total || 0)}` : `${Number(row.total || 0)} ranked players`}</em><button type="button" class="text-button" data-share-daily="${index}">Share</button></li>`;
 }
 
-function settingsMarkup(profile, progress) {
+function settingsMarkup(profile, progress, account) {
   if (!profile.player.claimed) {
-    return `<aside class="profile-claim"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="button secondary" id="profile-claim-account">Save my progress</button></aside>`;
+    return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="button secondary" id="profile-claim-account">Save my progress</button></aside>`;
   }
   const unlocked = unlockedAchievements(profile);
-  return `<details class="profile-settings">
-    <summary>Profile settings</summary>
+  return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
+    <header><div><p class="eyebrow">Your account</p><h2 id="profile-account-title">Account & profile</h2><p>${account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     <form id="profile-settings-form">
       <label><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required><small>Shown on Draft Run and Cube leaderboards.</small></label>
       <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''}><span><strong>Public profile</strong><small>Allows leaderboard visitors and shared links to open your Pack One record.</small></span></label>
@@ -138,9 +137,9 @@ function settingsMarkup(profile, progress) {
       <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
       <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status" aria-live="polite"></span></div>
     </form>
-  </details>`;
+  </section>`;
 }
-function profileMarkup(profile, catalog, { own = false, publicKey = null } = {}) {
+function profileMarkup(profile, catalog, { own = false, publicKey = null, account = null } = {}) {
   const names = catalogNames(catalog);
   const progress = environmentProgress(catalog, profile.by_set || []);
   const summary = profile.summary || {};
@@ -160,8 +159,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
       <div><p class="eyebrow">${own ? 'Account' : 'Player Profile'}</p><h1>${esc(profile.player.display_name)}</h1><p>${own ? 'Your Pack One career, achievements, and account in one place.' : 'A public Pack One career across the Limited archive.'}</p></div>
       <div class="profile-hero-actions">
         <button type="button" class="button primary" id="profile-share">${profile.player.profile_public ? 'Share profile' : 'Share my record'}</button>
-        <button type="button" class="button secondary" id="profile-share-progress">Share ${progress.played}/${progress.total}</button>
-        ${own ? '<button type="button" class="button secondary" id="profile-manage-account">Manage account</button><button type="button" class="button secondary" id="profile-home">Back to game</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}
+        ${own ? '<a class="button secondary" href="#profile-account">Account settings</a><button type="button" class="button secondary" id="profile-home">Back to game</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}
       </div>
     </header>
 
@@ -170,11 +168,11 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
       <div><span>Average</span><strong>${Number(summary.average_score || 0).toFixed(1)}</strong></div>
       <div><span>Best</span><strong>${Number(summary.best_score || 0)}</strong></div>
       <div><span>Daily streak</span><strong>${Number(summary.current_streak || 0)}</strong></div>
-      <div><span>Challenges</span><strong>${esc(formatChallengeRecord(summary))}</strong></div>
+      <div><span>Shared runs</span><strong>${esc(formatChallengeRecord(summary))}</strong></div>
       <div><span>Environments</span><strong>${progress.played}/${progress.total}</strong></div>
     </div>
 
-    ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Your first eight picks start here.</h2><p>Play a Draft Run to begin your record. Your games count as a guest.</p><a class="button primary" href="?game=draft-run">Play your first Draft Run</a></section>':''}
+    ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Your first eight picks start here.</h2><p>Play a Daily to begin your record.</p><a class="button primary" href="?game=draft-run&daily=1">Play Daily Draft Run</a></section>':''}
     ${own&&next.length?`<section class="profile-next"><h2>Within reach</h2>${next.map(a=>`<div><strong>${esc(a.label)}</strong><span>${esc(a.progress_text)}</span><p>${esc(a.description)}</p><progress value="${Number(a.current)}" max="${Number(a.target)}" aria-label="${esc(a.label)} progress"></progress></div>`).join('')}</section>`:''}
 
     ${showLeaderboardName || favorite || showcased || bestPct ? `<section class="profile-identity-strip">
@@ -185,7 +183,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
       ${form != null ? `<div><span>Last 10 average</span><strong>${form.toFixed(1)}</strong></div>` : ''}
     </section>` : ''}
 
-    ${own ? settingsMarkup(profile, progress) : ''}
+    ${own ? settingsMarkup(profile, progress, account) : ''}
     ${publicUrl ? `<p class="profile-public-url">Public profile: <button type="button" class="text-button" id="profile-copy-link">Copy link</button></p>` : ''}
 
     <section class="profile-section archive-progress-section">
@@ -196,7 +194,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null } = {})
 
     <section class="profile-grid-two">
       <div class="profile-section"><p class="eyebrow">Best environments</p><h2>Where you draft best</h2>${bestRows.length ? `<ol class="best-environment-list">${bestRows.map((row, index) => `<li><b>#${index + 1}</b><div><strong>${esc(names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase())}</strong><span>${Number(row.games || 0)} games</span></div><em>${Number(row.average_score || 0).toFixed(1)} avg</em></li>`).join('')}</ol>` : '<p class="profile-empty">Play at least three games in an environment to qualify it here.</p>'}</div>
-      <div class="profile-section"><p class="eyebrow">Mode split</p><h2>How you play</h2><div class="profile-mode-grid">${modeCards(profile)}</div>${profile.cube ? `<div class="cube-profile-callout"><span>Powered Cube</span><strong>${Number(profile.cube.average_score || 0).toFixed(1)} avg</strong><small>${Number(profile.cube.games || 0)} runs · ${Number(profile.cube.best_score || 0)} best</small></div>` : ''}</div>
+      <div class="profile-section"><p class="eyebrow">Draft Run</p><h2>Your run record</h2><div class="profile-mode-grid">${modeCards(profile)}</div>${profile.cube ? `<div class="cube-profile-callout"><span>Powered Cube</span><strong>${Number(profile.cube.average_score || 0).toFixed(1)} avg</strong><small>${Number(profile.cube.games || 0)} runs · ${Number(profile.cube.best_score || 0)} best</small></div>` : ''}</div>
     </section>
 
     <section class="profile-grid-two">
@@ -219,7 +217,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   const profileKey = publicKey || profile.player.profile_key || null;
 
   document.querySelector('#profile-home')?.addEventListener('click', () => { window.location.href = './'; });
-  document.querySelector('#profile-manage-account')?.addEventListener('click', () => void renderAccount());
+  document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderMyProfile();});
   document.querySelectorAll('[data-profile-section]').forEach(d=>d.addEventListener('toggle',()=>{if(d.open)track(d.dataset.profileSection==='achievements'?'achievement_viewed':'archive_viewed',{source:'profile'});}));
   document.querySelector('#profile-claim-account')?.addEventListener('click', () => void renderAccount());
   document.querySelector('#profile-copy-link')?.addEventListener('click', async (event) => {
@@ -228,9 +226,6 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   });
   document.querySelector('#profile-share')?.addEventListener('click', async (event) => {
     await performShare(event.currentTarget,()=>shareProfileCard(profile, progress, names),'profile_share',{public:profile.player.profile_public,environments:progress.played});
-  });
-  document.querySelector('#profile-share-progress')?.addEventListener('click', async (event) => {
-    await performShare(event.currentTarget,()=>shareProgressCard(profile, progress),'profile_progress_share',{environments:progress.played,total:progress.total});
   });
   async function performShare(button,makeCard,name,props) {
     const original=button.textContent;button.disabled=true;button.textContent='Making card…';
@@ -243,7 +238,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
         status.textContent='Copy this link: ';const a=document.createElement('a');
         a.href=profile.player.profile_public?`${location.origin}${location.pathname}?profile=${encodeURIComponent(profile.player.profile_key)}`:`${location.origin}${location.pathname}`;
         a.textContent=a.href;status.append(a);
-      } else if(!result?.cancelled) {track(name,{...props,method:result?.method});status.textContent=result?.method==='copy_fallback'?'Link copied.':'Ready to share.';}
+      } else if(!result?.cancelled) {track(name,{...props,method:result?.method});status.textContent=result?.method==='copy_fallback'?'Link copied.':'';}
     } catch {status.textContent='Couldn’t make the share card. Please try again.';}
     finally {button.disabled=false;button.textContent=original;}
   }
@@ -320,10 +315,10 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
   try {
     document.body.classList.remove('is-game');
     ensureProfileStyles();
-    const catalog = await loadCatalog();
+    const [catalog,account] = await Promise.all([loadCatalog(),own?getAuthSession():null]);
     const app = document.querySelector('#app');
     if (!app) return;
-    app.innerHTML = profileMarkup(profile, catalog, { own, publicKey });
+    app.innerHTML = profileMarkup(profile, catalog, { own, publicKey, account });
     window.PACK1_LAST_PROFILE = profile;
     await bindProfile(profile, catalog, { own, publicKey });
     track('profile_view', { own, public: profile.player?.profile_public || false });

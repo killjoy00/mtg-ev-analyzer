@@ -17,9 +17,7 @@ export async function renderAccount() {
   currentAccount=await getAuthSession();
   if(currentAccount?.session?.token && currentAccount?.user) {
     await linkAccount(currentAccount.session.token).catch(()=>null);
-    app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>Your record is saved.</h1><p>Signed in as <strong>${esc(currentAccount.user.email)}</strong>. Your Pack One identity follows you across devices.</p></header><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button primary" id="account-career">Back to my career</button><button class="button secondary" id="account-signout">Sign out</button></div><p class="account-note">Both Dailies are free without an account. Your free account adds unlimited regular Draft Runs.</p></section>`;
-    document.querySelector('#account-career')?.addEventListener('click',()=>document.querySelector('#account-nav')?.click());
-    document.querySelector('#account-signout')?.addEventListener('click',async()=>{await signOutAccount();currentAccount=null;event('auth_sign_out');void renderAccount();});
+    await (await import('./profile-product.mjs')).renderMyProfile();
     return;
   }
   app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>Save your progress.</h1><p>Both Dailies are free without an account. A free account saves your record, enables leaderboard participation, and adds unlimited regular Draft Runs.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">Keep playing as guest</button></div></section>`;

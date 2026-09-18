@@ -2,3 +2,8 @@
 @media(max-width:600px){.daily-home{margin-top:12px}.daily-home-heading{margin-bottom:24px}.daily-home-game{padding:22px;display:block}.daily-home-game h2{font-size:25px}.daily-home-game .button{display:block;width:100%;margin-top:20px}.daily-home-game.is-complete{display:flex;padding:16px;gap:12px}.daily-home-game.is-complete h2{font-size:17px}.daily-home-game.is-complete .button{width:auto;margin:0;padding:10px 12px}.daily-home-practice .button{display:block;width:100%;text-align:center}.top-actions{gap:6px}.top-nav-button{font-size:12px;padding:8px 6px}}
 
 .daily-home-practice .button+.button{margin-top:12px;margin-left:8px}@media(max-width:600px){.daily-home-practice .button+.button{margin-left:0}}
+
+.daily-home-heading time{display:block;margin-top:22px;font-size:14px;letter-spacing:.01em}
+.daily-home-practice{position:relative;overflow:hidden;margin-top:36px;padding:clamp(26px,5vw,42px);border:1px solid var(--line);border-left:4px solid var(--accent,#d65b34);border-radius:14px;background:linear-gradient(120deg,var(--surface),color-mix(in srgb,var(--accent,#d65b34) 9%,var(--surface)))}
+.daily-home-practice::after{content:'↗';position:absolute;right:24px;top:12px;font-size:90px;line-height:1;color:var(--accent,#d65b34);opacity:.12;pointer-events:none}
+.daily-home-practice .eyebrow{margin:0 0 12px}.daily-home-practice h2{position:relative;font-size:clamp(34px,6vw,46px);line-height:1.08;letter-spacing:-.035em;margin:0 0 28px}.daily-home-practice>p:not(.eyebrow){margin-bottom:24px}
