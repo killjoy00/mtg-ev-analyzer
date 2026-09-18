@@ -11,6 +11,7 @@ export async function handleCorpusAdmin(request,query,readJson,accountId) {
     coalesce(p.release_date,s.release_date)::text release_date,coalesce(s.event_type,p.source_event_type) source_event_type,
     s.archive_url,s.archive_available,s.archive_etag,s.archive_last_modified,s.last_checked_at,s.import_status,s.last_error,
     v.corpus_version,v.manifest,v.last_successful_import,h.checked_at last_health_verification,h.report,h.ready,
+    (SELECT count(*) FROM corpus_source_exclusions x WHERE x.set_id=k.set_id AND x.corpus_version=$1) excluded_source_trajectories,
     (h.manifest_hash=md5(v.manifest::text) AND h.checked_at>now()-interval '7 days' AND h.gate_version=$2) health_current
     FROM known k LEFT JOIN draft_run_environment_policy p USING(set_id)
     LEFT JOIN corpus_sources s USING(set_id)
