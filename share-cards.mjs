@@ -236,7 +236,7 @@ export function draftRunShareText(run) {
   const label=run.environment==='powered-cube'?'Powered Cube':'Draft Run';
   const squares=run.answers.map(a=>a.historicalMatch?'🟩':a.score>=85?'🟦':a.score>=60?'🟨':a.score>=25?'🟧':'⬛').join('');
   const date=run.day ? `Daily ${run.day}` : 'Practice';
-  return `Pack One · ${label} · ${date}\n${run.score}/100  ${squares}\n${matches}/${draftRunLength(run)} trophy picks matched. Can you beat it?`;
+  return `Pack One · ${label} · ${date}\n${run.score}/100  ${squares}\n${matches}/${draftRunLength(run)} trophy picks matched. ${run.day?'Play today’s Daily.':'Play this run and compare.'}`;
 }
 
 export async function shareDraftRunCard(run,url,{challenge=false,asImage=false}={}) {
@@ -245,6 +245,6 @@ export async function shareDraftRunCard(run,url,{challenge=false,asImage=false}=
   const cube=run.environment==='powered-cube',label=cube?'Powered Cube Run':'Draft Run';
   const text=draftRunShareText(run);
   if(!asImage) return shareBlob(null,{text,url,context:challenge?'draft_run_challenge':'draft_run_result'});
-  const blob=await cardBlob({eyebrow:`${run.day?'Daily ':''}${label}`,title:`${draftRunLength(run)} picks. Your call.`,bigValue:`${run.score}/100`,subtitle:`${matches} trophy picks matched`,pills:[run.day,percentile?`Top ${percentile}% ${run.standing.final?'finish':'so far'}`:null].filter(Boolean),rows:[{label:'The challenge',value:cube?`${draftRunLength(run)} Powered Cube trophy decisions`:`${draftRunLength(run)} decisions across Magic sets`},{label:'Your target',value:'Real picks from trophy drafters'}]});
+  const blob=await cardBlob({eyebrow:`${run.day?'Daily ':''}${label}`,title:`${draftRunLength(run)} picks. Your call.`,bigValue:`${run.score}/100`,subtitle:`${matches} trophy picks matched`,pills:[run.day,percentile?`Top ${percentile}% ${run.standing.final?'finish':'so far'}`:null].filter(Boolean),rows:[{label:'The run',value:cube?`${draftRunLength(run)} Powered Cube trophy decisions`:`${draftRunLength(run)} decisions across Magic sets`},{label:'Your target',value:'Real picks from trophy drafters'}]});
   return shareBlob(blob,{text,url,filename:'pack-one-draft-run.png',context:challenge?'draft_run_challenge':'draft_run_result'});
 }

@@ -1,3 +1,4 @@
+import {withPracticeAccess} from './practice-access-fixture.mjs';
 // Explicit integration test in the isolated development database only.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
@@ -13,7 +14,7 @@ if(httpBase&&!/^https:\/\/br-twilight-hill-ayffyd2b-draftrunapi\.compute\.c-5\.u
 async function call(path,body,token,account,status=200){
   console.log('Checking',path.replace(/[a-f0-9-]{32,}/g,'<fixture>'));
   const request=new Request((httpBase||'https://packone.pro')+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...(account?{'x-pack1-auth-session':account}:{})},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(90000)});
-  const response=await (httpBase?fetch(request):api.fetch(request));
+  const response=await withPracticeAccess(request,query,r=>httpBase?fetch(r):api.fetch(r));
   const data=await response.json();assert.equal(response.status,status,JSON.stringify(data));return data;
 }
 try {

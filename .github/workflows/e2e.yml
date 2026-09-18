@@ -41,6 +41,8 @@ jobs:
         run: node tests/e2e.mjs
       - name: Run Daily / Set Practice regression
         run: node tests/practice-e2e.mjs
+      - name: Run account practice and custom corpus regression
+        run: node tests/practice-access-e2e.mjs
       - name: Run Player Profile / Progression regression
         run: node tests/profile-e2e.mjs
       - name: Run Today refresh and Eastern rollover regression

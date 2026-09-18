@@ -29,3 +29,10 @@ test('home runtime isolates historical code and lazily loads profiles',()=>{
  assert.match(source,/historical-share\.mjs/);
  assert.match(source,/daily-home\.mjs/);
 });
+
+test('future practice options appear only after both Dailies and with their capability',()=>{
+ const p={player:{claimed:true},capabilities:['account','unlimited_regular_practice','unlimited_cube_practice','custom_corpus'],daily_history:[row('mixed')]};
+ assert.doesNotMatch(dailyHomeMarkup(p,day),/Powered Cube Practice|Choose Your Sets/);
+ p.daily_history.push(row('powered-cube'));assert.match(dailyHomeMarkup(p,day),/Powered Cube Practice/);assert.match(dailyHomeMarkup(p,day),/Choose Your Sets/);
+ p.capabilities=['account','unlimited_regular_practice'];assert.doesNotMatch(dailyHomeMarkup(p,day),/Powered Cube Practice|Choose Your Sets/);
+});
