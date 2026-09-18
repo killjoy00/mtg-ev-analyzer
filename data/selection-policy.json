@@ -1,5 +1,5 @@
 {
-  "selection_version": "eight-pick-v3",
+  "selection_version": "eight-pick-v4",
   "source_pack": 1,
   "max_pick": {
     "mixed": 10,
@@ -102,5 +102,12 @@
     "mid": "2021-09-24"
   },
   "release_dates_source": "https://api.scryfall.com/sets",
-  "release_dates_verified_at": "2026-09-14"
+  "release_dates_verified_at": "2026-09-14",
+  "daily_policy": {
+    "newest_minimum": 2,
+    "previous_pool_size": 3,
+    "previous_pool_minimum": 4,
+    "recency_half_life_releases": 4,
+    "sampling": "with replacement by set; without replacement by source draft"
+  }
 }

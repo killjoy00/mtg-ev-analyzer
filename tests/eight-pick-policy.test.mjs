@@ -11,27 +11,27 @@ const pool=releasedRunSets(day).flatMap(set=>Array.from({length:10},(_,i)=>i+1).
   difficulty_version:'support-ratio-v1',target_support_ratio:1,
 }))));
 
-test('every eight-pick Daily guarantees released top three and distinct sets/sources',()=>{
+test('historical v3 Daily guarantees released top three and distinct sets/sources',()=>{
   assert.deepEqual(dailyRequiredSets(day),['hob','msh','sos']);
   for(let i=0;i<100;i++) {
-    const run=selectDraftRun(pool,'required-'+i,'mixed',{daily:true,day});
+    const run=selectDraftRun(pool,'required-'+i,'mixed',{daily:true,day,selectionVersion:'eight-pick-v3'});
     assert.equal(run.length,8);assert.equal(new Set(run.map(p=>p.set_id)).size,8);
     assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,8);
     for(const id of dailyRequiredSets(day))assert.equal(run.filter(p=>p.set_id===id).length,1);
-    assert.deepEqual(run,selectDraftRun(pool,'required-'+i,'mixed',{daily:true,day}));
+    assert.deepEqual(run,selectDraftRun(pool,'required-'+i,'mixed',{daily:true,day,selectionVersion:'eight-pick-v3'}));
   }
   assert.deepEqual(['tmt','ecl','tla','eoe','ktk'].map(id=>dailySetWeight(id,undefined,day)),[4,4,4,2,1]);
 });
 
 test('release dates, not archive timestamps, determine the guarantee and exclude future releases',()=>{
   const earlier='2026-07-01';assert.deepEqual(dailyRequiredSets(earlier),['msh','sos','tmt']);
-  for(let i=0;i<20;i++)assert.ok(selectDraftRun(pool,'release-'+i,'mixed',{daily:true,day:earlier}).every(p=>p.set_id!=='hob'));
+  for(let i=0;i<20;i++)assert.ok(selectDraftRun(pool,'release-'+i,'mixed',{daily:true,day:earlier,selectionVersion:'eight-pick-v3'}).every(p=>p.set_id!=='hob'));
 });
 
 test('missing or infeasible required sets fail instead of silently weakening the guarantee',()=>{
-  assert.throws(()=>selectDraftRun(pool.filter(p=>p.set_id!=='hob'),'missing','mixed',{daily:true,day}),/latest released sets/);
+  assert.throws(()=>selectDraftRun(pool.filter(p=>p.set_id!=='hob'),'missing','mixed',{daily:true,day,selectionVersion:'eight-pick-v3'}),/latest released sets/);
   const constrained=pool.filter(p=>!dailyRequiredSets(day).includes(p.set_id)||p.pick_number===1);
-  assert.throws(()=>selectDraftRun(constrained,'impossible','mixed',{daily:true,day}),/latest released sets/);
+  assert.throws(()=>selectDraftRun(constrained,'impossible','mixed',{daily:true,day,selectionVersion:'eight-pick-v3'}),/latest released sets/);
 });
 
 test('ten-pick version retains its composition, windows and recency weighting',()=>{

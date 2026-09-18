@@ -1,5 +1,5 @@
 import {draftRunLength} from './draft-run-format.mjs';
-import { ensurePackSession } from './growth-api.mjs';
+import { ensurePackSession, storedAccountToken } from './growth-api.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { shareDraftRunCard } from './share-cards.mjs';
 import { trackEvent } from './retention-events.mjs';
@@ -39,7 +39,7 @@ function styles() {
 }
 async function api(path,body,auth=true) {
   const headers={'content-type':'application/json'};
-  if(auth) headers.authorization=`Bearer ${await ensurePackSession()}`;
+  if(auth){headers.authorization=`Bearer ${await ensurePackSession()}`;const token=storedAccountToken();if(token)headers['x-pack1-auth-session']=token;}
   const r=await fetch(base()+path,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000)});
   const data=await r.json();if(!r.ok) throw new Error(data.error||'Could not reach the game. Try again.');return data;
 }
@@ -83,7 +83,7 @@ function render() {
     ${answer?`<section class="run-feedback" aria-live="polite"><strong>${answer.score}<small>/100</small></strong><div><h2>${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2><p>${answer.historicalMatch?'Full points.':`You chose ${esc(answer.selectedName)}. ${answer.score>=85?'A strongly supported alternative.':answer.score>=60?'A plausible alternative.':'The model found less support for this choice.'}`}</p>${answer.modelTargetDisagreement?'<p>The trophy drafter made an unusual choice relative to the model. Strong alternatives still receive their normal credit.</p>':''}</div>${revealComparison(p,answer)}${consensusFeedback(answer)}<button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></section>`:
     ''}
     ${answer?`<details class="run-pack-review"><summary>Review the pack and earlier picks</summary>${pool(p)}${cardGrid(p,answer)}</details>`:cardGrid(p)}
-    ${answer?'<p class="run-note">Trophy pick: 100. Other choices earn up to 95 from contextual strong-player support. Matching the trophy drafter is the goal of this game.</p>':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div><div class="run-tools"><div>${cube()?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div>${run.set_reroll_allowed===false?'<small>This featured set stays in today’s Daily. You can still reroll its pack.</small>':''}${run.comparison?.exact?'<small>Rerolling makes this practice; your friend played different packs.</small>':''}</div></div>`}
+    ${answer?'<p class="run-note">Trophy pick: 100. Other choices earn up to 95 from contextual strong-player support. Matching the trophy drafter is the goal of this game.</p>':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day?'':`<div class="run-tools"><div>${cube()?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div>${run.comparison?.exact?'<small>Rerolling makes this practice; your friend played different packs.</small>':''}</div>`}</div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
   if(!answer) recordView();
@@ -146,26 +146,26 @@ function renderResult() {
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Eastern.'}</p>`:''}
     ${run.comparison?`<p class="run-friend">${run.comparison.exact?`${run.score>run.comparison.score?'You win':run.score===run.comparison.score?'A tie':'Your friend wins'} · ${run.score}–${run.comparison.score} against ${esc(run.comparison.name)}`:'Different packs played; no challenge win or loss recorded.'}</p>`:''}
-    <div class="run-result-actions"><a class="button primary" href="${gameUrl()}">Play another run</a><button class="button secondary" id="run-challenge">Challenge a friend</button><button class="button secondary" id="run-share">Share result</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">View your career</button></div>
+    <div class="run-result-actions"><a class="button primary" href="${gameUrl()}">Play another run</a>${run.day?'':'<button class="button secondary" id="run-challenge">Share this run and compare</button>'}<button class="button secondary" id="run-share">Share result</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">View your career</button></div>
     <details class="run-image-share"><summary>More sharing options</summary><button class="button secondary" id="run-share-image">Share result image</button></details><h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; alternatives earn up to 95 from held-out strong-player support.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult(false);
   document.querySelector('#run-share-image').onclick=()=>shareResult(false,true);
-  document.querySelector('#run-challenge').onclick=()=>shareResult(true);
+  document.querySelector('#run-challenge')?.addEventListener('click',()=>shareResult(true));
   document.querySelector('#run-career').onclick=()=>document.querySelector('#account-nav')?.click();
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
 async function shareResult(challenge,asImage=false) {
   const button=document.querySelector(challenge?'#run-challenge':asImage?'#run-share-image':'#run-share');button.disabled=true;
   try {
-    const share=await api(`/v1/runs/${run.id}/share`,{});
-    const url=`${location.origin}${location.pathname}${gameUrl('challenge='+share.id)}`;
+    const share=run.day?null:await api(`/v1/runs/${run.id}/share`,{});
+    const url=`${location.origin}${location.pathname}${gameUrl(run.day?'daily=1':'challenge='+share.id)}`;
     trackEvent('share_click',{surface:challenge?'draft_run_challenge':'draft_run_result'});
     const result=await shareDraftRunCard(run,url,{challenge,asImage});
     const status=document.querySelector('#run-share-status');
     if(result.failed) {status.textContent='Copy this link: ';const a=document.createElement('a');a.href=url;a.textContent=url;status.append(a);}
-    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and challenge link copied.':'Ready to share.';trackEvent(challenge?'challenge_created':'daily_result_shared',{mode:'draft_run',method:result.method});}
+    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and run link copied.':'Ready to share.';trackEvent(challenge?'challenge_created':'daily_result_shared',{mode:'draft_run',method:result.method});}
   } catch(e) {document.querySelector('#run-share-status').textContent=e.message;}
   finally {button.disabled=false;}
 }

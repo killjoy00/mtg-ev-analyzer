@@ -5,7 +5,7 @@ export const DRAFT_RUN_SELECTION_VERSION=policy.selection_version;
 export const PREVIOUS_SELECTION_VERSION='balanced-v1';
 export const TEN_PICK_SELECTION_VERSION='first-pack-v2';
 export const DRAFT_RUN_LENGTH=policy.run_length;
-export const isEightPickVersion=version=>version===DRAFT_RUN_SELECTION_VERSION;
+export const isEightPickVersion=version=>['eight-pick-v3','eight-pick-v4'].includes(version);
 export const runLengthForSelection=version=>isEightPickVersion(version)?DRAFT_RUN_LENGTH:10;
 export const earlyRoundsForSelection=version=>isEightPickVersion(version)?5:6;
 export const SELECTABLE_ONLY_SETS=new Set(policy.selectable_only_sets);

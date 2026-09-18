@@ -1,4 +1,4 @@
-import { loadMyProfile } from './growth-api.mjs';
+import { loadDailyStatus } from './growth-api.mjs';
 import { todayStatus, easternDateKey } from './today-status.mjs';
 
 let generation = 0;
@@ -45,7 +45,7 @@ export function installDailyHome(identityReady = Promise.resolve()) {
     if (!document.querySelector('[data-daily-home]')) return;
     const version = ++generation, day = easternDateKey();
     await identityReady;
-    const profile = await loadMyProfile().catch(() => null);
+    const profile = await loadDailyStatus().catch(() => null);
     if (version !== generation || day !== easternDateKey() || !document.querySelector('[data-daily-home]')) return;
     renderDailyHome(profile, !profile);
   }

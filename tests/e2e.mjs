@@ -12,7 +12,7 @@ await page.route('**/*.neon.tech/**',async route=>{
  const path=new URL(route.request().url()).pathname;
  let body={ok:true};
  if(path==='/v1/session')body={token:'home-test'};
- if(path==='/v1/profile/me'){
+ if(path==='/v1/daily-status'){
   if(releaseProfile===undefined)await new Promise(resolve=>releaseProfile=resolve);
   body={player:{claimed},daily_history:completed.map(set_id=>({date:day,mode:'draft_run',set_id,score:93}))};
  }

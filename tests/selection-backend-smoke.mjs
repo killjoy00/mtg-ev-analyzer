@@ -2,7 +2,7 @@
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import {selectDraftRun,selectDraftRunReroll} from '../draft-run.mjs';
-import {decodePuzzleMetadata,selectDatabaseRun,selectDatabaseReroll} from '../worker/draft-run-selection.mjs';
+import {loadLiveSetMetadata,decodePuzzleMetadata,selectDatabaseRun,selectDatabaseReroll} from '../worker/draft-run-selection.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('An isolated development branch is required.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query}=await import('../worker/growth-function.js');
@@ -20,11 +20,12 @@ try {
   await query(`CREATE TABLE ${rTable} AS SELECT r.* FROM draft_run_puzzle_ratings r JOIN ${pTable} p USING(puzzle_id)`);
   const fixtureQuery=(sql,params)=>query(sql.replaceAll('draft_run_verified_puzzles',pTable).replaceAll('draft_run_puzzle_ratings',rTable),params);
   const pool=(await query(`SELECT p.*,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio FROM ${pTable} p JOIN ${rTable} r USING(puzzle_id)`)).rows.map(decodePuzzleMetadata);
-  for(const selectionVersion of ['eight-pick-v3','first-pack-v2'])for(const environment of ['mixed','powered-cube'])for(const daily of [false,true])for(const seed of ['selection-check-a','selection-check-b']) {
-    const expected=selectDraftRun(pool,seed,environment,{daily,selectionVersion});
-    const actual=await selectDatabaseRun(fixtureQuery,version,seed,environment,{daily,selectionVersion});
+  const metadata=await loadLiveSetMetadata(query,version);
+  for(const selectionVersion of ['eight-pick-v4','eight-pick-v3','first-pack-v2'])for(const environment of ['mixed','powered-cube'])for(const daily of [false,true])for(const seed of ['selection-check-a','selection-check-b']) {
+    const expected=selectDraftRun(pool,seed,environment,{daily,selectionVersion,metadata:selectionVersion==='eight-pick-v4'?metadata:null});
+    const actual=await selectDatabaseRun(fixtureQuery,version,seed,environment,{daily,selectionVersion,metadata:selectionVersion==='eight-pick-v4'?metadata:null});
     assert.deepEqual(actual.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),`${selectionVersion}/${environment}/${daily}/${seed}: exact selector parity`);
-    for(const type of environment==='powered-cube'?['pack']:['pack','set'])for(const round of (selectionVersion==='eight-pick-v3'?[0,4,7]:[0,5,9])) {
+    for(const type of environment==='powered-cube'?['pack']:['pack','set'])for(const round of (selectionVersion.startsWith('eight-pick')?[0,4,7]:[0,5,9])) {
       const options={type,round,seed,environment,daily,selectionVersion,excludedSources:expected.map(p=>p.source_draft_hash)};
       assert.equal((await selectDatabaseReroll(fixtureQuery,version,expected[round],options))?.puzzle_id,
         selectDraftRunReroll(pool,expected[round],options)?.puzzle_id,`reroll parity: ${environment}/${type}/${round}`);
