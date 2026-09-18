@@ -3,7 +3,7 @@ import {TRADITIONAL_GATE_VERSION} from '../corpus-components.mjs';
 import {CORPUS_GATE_VERSION,CORPUS_THRESHOLDS,CORPUS_TRANSITIONS} from '../corpus-quality.mjs';
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
-export async function handleCorpusAdmin(request,query,readJson,accountId) {
+export async function handleCorpusAdmin(request,query,readJson,accountId,automationIdentity=null) {
  const path=new URL(request.url).pathname;
  if(request.method==='GET'&&path==='/v1/admin/corpus') {
   const [sets,history,components,blockedSources]=await Promise.all([
@@ -19,7 +19,7 @@ export async function handleCorpusAdmin(request,query,readJson,accountId) {
     LEFT JOIN corpus_set_versions v ON v.set_id=k.set_id AND v.corpus_version=$1
     LEFT JOIN LATERAL (SELECT * FROM corpus_health_checks c WHERE c.set_id=k.set_id AND c.corpus_version=$1 ORDER BY checked_at DESC,id DESC LIMIT 1) h ON true
     ORDER BY coalesce(p.release_date,s.release_date) DESC NULLS LAST,k.set_id,s.event_type`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION]),
-   query('SELECT set_id,component_version,auth_user_id,changed_at,old_status,new_status,reason FROM corpus_status_events ORDER BY changed_at DESC,id DESC LIMIT 100'),
+   query('SELECT set_id,component_version,auth_user_id,admin_identity,changed_at,old_status,new_status,reason FROM corpus_status_events ORDER BY changed_at DESC,id DESC LIMIT 100'),
    query(`SELECT c.*,v.manifest,h.checked_at,h.ready,h.report,
      (h.manifest_hash=md5(v.manifest::text) AND h.checked_at>now()-interval '7 days' AND h.gate_version=$2) health_current
      FROM corpus_components c JOIN corpus_set_versions v ON v.set_id=c.set_id AND v.corpus_version=c.component_version
@@ -31,6 +31,7 @@ export async function handleCorpusAdmin(request,query,readJson,accountId) {
  }
  const component=path.match(/^\/v1\/admin\/corpus\/([a-z0-9-]{2,40})\/components\/([a-z0-9-]{2,80})\/status$/);
  if(request.method==='POST'&&component) {
+  if(!accountId&&!automationIdentity)fail('Authenticated administrative identity required.',403);
   const b=await readJson(request),old=b.oldStatus,next=b.status;
   if(!CORPUS_TRANSITIONS[old]?.includes(next))fail('Invalid lifecycle transition.');
   if(b.corpusVersion!==DRAFT_RUN_CORPUS_VERSION)fail('The parent corpus changed. Refresh.',409);
@@ -44,9 +45,9 @@ export async function handleCorpusAdmin(request,query,readJson,accountId) {
      WHERE v.set_id=c.set_id AND v.corpus_version=c.component_version AND p.status='Live'
        AND h.ready AND h.gate_version=$8 AND h.manifest_hash=md5(v.manifest::text) AND h.checked_at>now()-interval '7 days'))
    RETURNING set_id,component_version,status
-  ), audit AS(INSERT INTO corpus_status_events(set_id,component_version,auth_user_id,old_status,new_status,reason)
-   SELECT set_id,component_version,$6::uuid,$3,status,$7 FROM changed RETURNING id)
-  SELECT changed.* FROM changed CROSS JOIN audit`,[component[1],component[2],old,next,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,TRADITIONAL_GATE_VERSION]);
+  ), audit AS(INSERT INTO corpus_status_events(set_id,component_version,auth_user_id,old_status,new_status,reason,admin_identity)
+   SELECT set_id,component_version,$6::uuid,$3,status,$7,$9::jsonb FROM changed RETURNING id)
+  SELECT changed.* FROM changed CROSS JOIN audit`,[component[1],component[2],old,next,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,TRADITIONAL_GATE_VERSION,automationIdentity?JSON.stringify(automationIdentity):null]);
   if(!result.rows.length)fail('Status changed, or source publication is blocked by quality gates or parent status.',409);
   return {ok:true,...result.rows[0]};
  }

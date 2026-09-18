@@ -45,3 +45,9 @@ test('rebuild preparation is target-only and cannot request arbitrary artifacts 
   assert.throws(()=>rolloutDispatch({...base,run_id:123}));
   assert.throws(()=>rolloutDispatch({...base,migration:'0016'}));
 });
+
+test('source release requires an explicit action and a reviewed fixed artifact group',()=>{
+ const r={operation:'puzzle-components',request_id:'cube-stage',reason:'Approved source admission',target:'development',action:'stage',source:'powered-cube'};
+ assert.equal(rolloutDispatch(r).workflow,'publish-puzzle-components.yml');
+ for(const extra of [{source:'all'},{action:'automatic'},{target:'arbitrary'},{artifact_id:123}])assert.throws(()=>rolloutDispatch({...r,...extra}));
+});
