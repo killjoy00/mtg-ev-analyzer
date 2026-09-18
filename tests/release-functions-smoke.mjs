@@ -1,7 +1,7 @@
-// HTTP acceptance using private QA guests and practice only. No ranked writes.
+// HTTP acceptance using private QA guests. Dailies are unranked and immutable.
 import assert from 'node:assert/strict';
 const [branch,commit]=process.argv.slice(2);
-if(!/^br-[a-z0-9-]+$/.test(branch||'')||!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Usage: release-functions-smoke.mjs BRANCH_ID FULL_COMMIT_SHA [--practice]');
+if(!/^br-[a-z0-9-]+$/.test(branch||'')||!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Usage: release-functions-smoke.mjs BRANCH_ID FULL_COMMIT_SHA [--daily] (legacy --practice also runs unranked Daily acceptance)');
 const timings=[];
 async function call(slug,path,body,token,status=200) {
   const start=performance.now();
@@ -42,28 +42,40 @@ async function verifyMarkers({settle=false}={}) {
 }
 await verifyMarkers({settle:true});
 const health=await call('draftrunapi','/health');
-assert.equal(health.ok,true);assert.equal(health.run_length,8);assert.equal(health.selection_version,'eight-pick-v3');
-assert.equal(health.unrated_puzzles,0);assert.deepEqual(health.missing_sets,[]);assert.equal(health.daily_featured_sets.length,3);
+assert.equal(health.ok,true);assert.equal(health.run_length,8);assert.equal(health.selection_version,'eight-pick-v4');
+assert.equal(health.unrated_puzzles,0);assert.deepEqual(health.missing_sets,[]);assert.equal(health.daily_featured_sets.length,4);
 await call('pack1growth','/v1/events',{events:[{event:'page_view',props:{}}]},null,401);
-if(process.argv.includes('--practice')) {
+if(process.argv.includes('--daily')||process.argv.includes('--practice')) {
   const guest=await call('pack1growth','/v1/session',{displayName:'QA release '+commit.slice(0,7)});
+  const friend=await call('pack1growth','/v1/session',{displayName:'QA universal '+commit.slice(0,7)});
   for(const environment of ['mixed','powered-cube']) {
-    let run=await call('draftrunapi','/v1/runs',{environment,qa:true},guest.token);
-    assert.equal(run.run_length,8);assert.equal(run.day,null);
-    run=await call('draftrunapi',`/v1/runs/${run.id}/reroll`,{revision:run.revision,round:0,puzzleId:run.current.puzzle_id,type:'pack'},guest.token);
+    await call('draftrunapi','/v1/runs',{environment,qa:true},guest.token,403);
+    let run=await call('draftrunapi','/v1/runs',{environment,daily:true,qa:true},guest.token);
+    assert.equal(run.run_length,8);assert.ok(run.day);
+    assert.equal(run.leaderboard_eligible,false);
+    assert.deepEqual(run.rerolls,{set:0,pack:0});
+    const same=await call('draftrunapi','/v1/runs',{environment,daily:true,qa:true},friend.token);
+    assert.equal(same.current.puzzle_id,run.current.puzzle_id);
+    await call('draftrunapi',`/v1/runs/${run.id}/reroll`,{revision:run.revision,round:0,puzzleId:run.current.puzzle_id,type:'pack'},guest.token,409);
     for(let round=0;round<8;round++) {
       if(environment==='powered-cube')assert.equal(run.current.set_id,environment);
+      if(run.selection_version==='eight-pick-v4')assert.equal(run.current.pick_number,round+(environment==='powered-cube'?2:1));
       const pick={revision:run.revision,round,puzzleId:run.current.puzzle_id,cardId:run.current.candidates[0].id};
       run=await call('draftrunapi',`/v1/runs/${run.id}/pick`,pick,guest.token);
+      const answer=run.answers[round];
+      if(answer.historicalMatch)assert.equal(answer.score,100);
+      else assert.ok(answer.score>=0&&answer.score<=95);
       assert.equal(run.complete,round===7);
       if(round===7)assert.equal((await call('draftrunapi',`/v1/runs/${run.id}/pick`,pick,guest.token)).score,run.score);
     }
     assert.equal(run.score,Math.round(run.answers.reduce((sum,a)=>sum+a.score,0)/8));
+    assert.equal(run.leaderboard_eligible,false);assert.equal(run.standing,null);
     const shared=await call('draftrunapi',`/v1/runs/${run.id}/share`,{},guest.token);
-    const info=await call('draftrunapi',`/v1/challenges/${shared.id}`);assert.equal(info.run_length,8);
-    const friend=await call('draftrunapi','/v1/runs',{challenge:shared.id,qa:true},guest.token);
-    assert.equal(friend.run_length,8);assert.equal(friend.comparison.exact,true);assert.equal(friend.current.puzzle_id,run.answers[0].puzzle.puzzle_id);
-    console.log(`${environment}: eight picks, reroll, completion retry, score and stored friend challenge passed`);
+    assert.equal(shared.daily,true);assert.equal(shared.id,undefined);
+    const url=new URL(shared.url,'https://packone.pro');assert.equal(url.searchParams.get('daily'),'1');assert.equal(url.searchParams.has('challenge'),false);
+    const resumed=await call('draftrunapi','/v1/runs',{environment,daily:true,qa:true},guest.token);
+    assert.equal(resumed.id,run.id);assert.equal(resumed.score,run.score);
+    console.log(environment+': guest practice denied, universal fixed Daily, no rerolls, completion retry, trophy scoring, unranked result, universal share and resume passed');
   }
 }
 // Catch a concurrent deployment during the acceptance pass, not just stale

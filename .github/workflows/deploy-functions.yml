@@ -72,12 +72,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node tests/release-functions-smoke.mjs br-twilight-hill-ayffyd2b "$RELEASE_COMMIT" --practice
+          node tests/release-functions-smoke.mjs br-twilight-hill-ayffyd2b "$RELEASE_COMMIT" --daily
           # The old frontend assumes ten picks. It must be replaced first.
           curl -fsS --max-time 30 https://packone.pro/draft-run-format.mjs -o "$RUNNER_TEMP/run-format.mjs"
           grep -q 'function draftRunLength' "$RUNNER_TEMP/run-format.mjs"
           curl -fsS --max-time 30 https://packone.pro/data/selection-policy.json -o "$RUNNER_TEMP/selection-policy.json"
-          node -e 'const p=require(process.argv[1]);if(p.run_length!==8||p.selection_version!=="eight-pick-v3")throw Error("Compatible frontend is not published")' "$RUNNER_TEMP/selection-policy.json"
+          node -e 'const p=require(process.argv[1]);if(p.run_length!==8||p.selection_version!=="eight-pick-v4")throw Error("Compatible frontend is not published")' "$RUNNER_TEMP/selection-policy.json"
 
       - name: Build and verify all bundles before upload
         run: node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$RELEASE_COMMIT"
@@ -94,5 +94,5 @@ jobs:
       # --settle: this runs seconds after the deploy call returned, and a
       # "completed" deployment is not yet guaranteed to be what every instance
       # answers with. The closing marker check inside the smoke stays strict.
-      - name: Verify revision, coverage and complete both practice flows
-        run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$RELEASE_COMMIT" --practice --settle
+      - name: Verify revision, coverage and complete both unranked Daily flows
+        run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$RELEASE_COMMIT" --daily --settle

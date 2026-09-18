@@ -1,5 +1,6 @@
 {
-  "request_id": "frozen-scoring-20260918-01",
-  "reason": "Recompute and validate only partial-credit curves against the frozen context model. Exact trophy matches remain 100 and alternatives remain capped at 95; no automatic production scoring changes.",
-  "operation": "frozen-scoring"
+  "operation": "prepare-rebuild",
+  "request_id": "rebuild-stage-dev-20260918",
+  "reason": "Stage previously verified v7 artifacts in development with additive migrations, preserving older serving manifests. No deployment.",
+  "target": "development"
 }
