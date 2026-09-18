@@ -103,13 +103,13 @@ jobs:
             fi
           done
 
-          # Merging a migration does not deploy it to the Neon parent. Replay
-          # the known idempotent release backlog on this disposable
-          # branch as well as this PR's additions. Never run this against prod.
-          # Keep this explicit list in sync until the parent is promoted; do not
-          # replay arbitrary historical migrations or assume main == live SQL.
+          # Production now has the reviewed rebuild through 0019. In particular,
+          # 0016 was intentionally not applied: retirement retains history.
+          # Replaying that obsolete deletion after 0019 violates retained-manifest
+          # foreign keys and tests the wrong release path. Only additive backlog
+          # plus this PR's new migrations belongs on the disposable clone.
           mapfile -t pending < <({
-            printf '%s\n' migrations/0012_draft_run_serving_indexes.sql migrations/0013_player_request_limits.sql migrations/0014_eight_pick_runs.sql migrations/0015_draft_run_serving_statistics.sql migrations/0016_retire_third_source.sql migrations/0017_fixed_daily_lifecycle.sql migrations/0018_capabilities.sql migrations/0019_corpus_operations.sql migrations/0020_source_eligibility.sql
+            printf '%s\n' migrations/0020_source_eligibility.sql
             printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
           } | sort -u)
           if (( ${#pending[@]} == 0 )); then
