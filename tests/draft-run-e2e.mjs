@@ -105,7 +105,7 @@ try{
   assert.equal(await page.locator('.run-board-games a').count(),2);
   assert.equal((await page.locator('.run-board-games a.active').innerText()).trim(),cube?'Cube':'Draft Run');
   assert.equal(await page.locator('.run-board-actions .button').count(),2);
-  assert.equal(await page.getByRole('link',{name:'Top 3 practice',exact:true}).count(),cube?0:1);
+  assert.equal(await page.getByRole('link',{name:'Top 3 practice',exact:true}).count(),0);
   assert.doesNotMatch(await page.locator('.run-board').innerText(),/Full Pack|Top 3, Full Pack|Cube boards/i);
   await noOverflow();
   await page.goto(base+'/?legacy-board=1'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();

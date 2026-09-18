@@ -4,9 +4,10 @@ const params = new URLSearchParams(location.search);
 // Only previously published stored links load the historical game reader.
 const historicalShare = params.has('challenge') && params.get('game') !== 'draft-run';
 if (!historicalShare && (params.has('legacy-board') || params.has('mode') || params.has('seed') || (params.get('set') === 'powered-cube' && params.get('game') !== 'draft-run'))) {
-  const cube = params.get('set') === 'powered-cube';
+  const cube = params.get('set') === 'powered-cube', legacyBoard = params.has('legacy-board');
   for (const key of ['legacy-board', 'mode', 'seed', 'vs', 'by', 'modes']) params.delete(key);
-  params.set('game', 'draft-run'); params.set('daily', '1');
+  params.set('game', 'draft-run');
+  if(legacyBoard)params.set('board','daily');else params.set('daily','1');
   if (!cube) params.delete('set');
   history.replaceState({}, '', `${location.pathname}?${params}`);
 } else if (params.has('modes')) {
