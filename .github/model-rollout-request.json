@@ -1,6 +1,7 @@
 {
-  "operation": "prepare-rebuild",
-  "request_id": "rebuild-stage-prod-20260918",
-  "reason": "Development staging completed successfully in run 35353001925. Apply only additive migrations and stage the identical verified v3-model corpus while preserving the old serving manifests; no function deployment.",
-  "target": "production"
+  "operation": "deploy",
+  "request_id": "rebuild-v3-development-20260918",
+  "reason": "Deploy the reviewed eight-pick rebuild with complete v3-model corpus to development after successful additive staging 35353001925. Validate both Dailies before requesting the identical revision in production.",
+  "target": "development",
+  "commit": "bc1007e257401f2be8daba06a1a6c5e54eac19bb"
 }
