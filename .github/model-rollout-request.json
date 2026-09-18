@@ -1,7 +1,7 @@
 {
-  "request_id": "v7-ktk-development-20260918-01",
-  "reason": "Exercise the regenerated v7 trophy import on KTK in development before the complete corpus rollout.",
+  "request_id": "v7-all-development-20260918-01",
+  "reason": "KTK development import passed and a direct 5379-puzzle comparison confirms production still stores old context probabilities. Complete the 32-set v7 Draft Run corpus while reusing the KTK checkpoint and existing replay shards.",
   "operation": "import",
-  "sets": "ktk",
+  "sets": "all",
   "target": "development"
 }
