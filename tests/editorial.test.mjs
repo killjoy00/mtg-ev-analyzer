@@ -16,9 +16,9 @@ for (const path of ['how-it-works/index.html','scoring/index.html','methodology/
   assert.ok(words >= 330, `${path} is too thin for the editorial shell: ${words} words`);
 }
 const home = await readFile('index.html','utf8');
-assert.match(home, /id="home-editorial"/);
-assert.match(home, /data-ad-slot="home"/);
-assert.match(home, /href="\/learn\/"/);
+assert.doesNotMatch(home, /id="home-editorial"/);
+assert.doesNotMatch(home, /data-ad-slot="home"/);
+assert.match(home, /href="\/methodology\/"/);
 assert.match(home, /Impact-Site-Verification: 3e227a68-dfc4-4be8-a619-b13df4f67e25/);
 assert.doesNotMatch(home, /impact-site-verification'\s+value=/i);
 const method = await readFile('methodology/index.html','utf8');
