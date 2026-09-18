@@ -18,7 +18,7 @@ try {
  await status('Candidate','Live',403);
  await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[user]);
  await query('INSERT INTO draft_run_verified_sets(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)',[sid,parent,JSON.stringify({fixture:pid})]);
- await query("INSERT INTO draft_run_environment_policy(set_id,regular_run,status,release_date) VALUES($1,true,'Candidate','2024-01-01')",[sid]);
+ await query("INSERT INTO draft_run_environment_policy(set_id,regular_run,maximum_pick,daily_weight,selection_version,status,release_date) VALUES($1,true,8,1,'eight-pick-v4','Candidate','2024-01-01')",[sid]);
  await query('INSERT INTO corpus_set_versions(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)',[sid,component,JSON.stringify({fixture:pid})]);
  await query("INSERT INTO corpus_components(set_id,parent_version,component_version,event_type,model_version) VALUES($1,$2,$3,'TradDraft',$4)",[sid,parent,component,model]);
  const original=parse((await query('SELECT payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND pick_number=1 AND interesting LIMIT 1',['blb',parent])).rows[0].payload);
