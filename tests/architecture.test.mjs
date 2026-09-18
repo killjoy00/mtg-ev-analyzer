@@ -12,6 +12,7 @@ const lifecycleModules = [
   'product.mjs',
   'flow-fixes.mjs',
   'growth.mjs',
+  'historical-growth.mjs',
   'retention.mjs',
   'social.mjs',
   'home-today.mjs',
@@ -51,4 +52,11 @@ test('the page has one stylesheet entrypoint and no inline style block', () => {
   assert.doesNotMatch(html, /<style(?:\s|>)/i);
   const stylesheets = [...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/gi)].map((match) => match[1]);
   assert.deepEqual(stylesheets, ['visual-c.css?v=1']);
+});
+
+test('current identity layer excludes retired game observers and result writers', () => {
+  assert.doesNotMatch(source('growth.mjs'), /onAppRender|saveGameResult|Full Pack|Top 3|captureResult/);
+  assert.match(source('historical-share.mjs'), /historical-growth/);
+  assert.doesNotMatch(source('bootstrap.mjs'), /historical-growth/);
+  assert.match(source('historical-growth.mjs'), /saveGameResult/);
 });

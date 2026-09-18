@@ -1,3 +1,5 @@
+> Historical review. Current authority: [CURRENT-STATE](CURRENT-STATE.md) and [CHARTER](CHARTER.md). Superseded product behavior below is not a current requirement.
+
 # Draft Run launch review
 
 Historical report. For the current eight-pick contract and deployment status, see [CURRENT-STATE.md](CURRENT-STATE.md) and the [follow-up review](EIGHT-PICK-REVIEW-2026-09-14.md).

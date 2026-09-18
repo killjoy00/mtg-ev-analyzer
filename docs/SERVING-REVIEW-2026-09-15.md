@@ -1,3 +1,5 @@
+> Historical review. Current authority: [CURRENT-STATE](CURRENT-STATE.md) and [CHARTER](CHARTER.md). Superseded product behavior below is not a current requirement.
+
 # Serving and release follow-up
 
 September 15, 2026. This continues the [eight-pick review](EIGHT-PICK-REVIEW-2026-09-14.md) and [initial product review](PRODUCT-REVIEW-2026-09-14.md). Trophy choices still earn 100, all existing modes remain, new runs still have eight picks, and historical ten-pick runs remain compatible.

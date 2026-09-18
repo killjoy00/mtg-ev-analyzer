@@ -1,6 +1,6 @@
 {
   "operation": "prepare-rebuild",
-  "request_id": "rebuild-stage-dev-20260918",
-  "reason": "Stage previously verified v7 artifacts in development with additive migrations, preserving older serving manifests. No deployment.",
-  "target": "development"
+  "request_id": "rebuild-stage-prod-20260918",
+  "reason": "Development staging completed successfully in run 35353001925. Apply only additive migrations and stage the identical verified v3-model corpus while preserving the old serving manifests; no function deployment.",
+  "target": "production"
 }
