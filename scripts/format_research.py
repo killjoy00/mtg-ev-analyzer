@@ -137,7 +137,8 @@ def run_set(sid,directory):
         groups[event],cohorts[event]=cohort(draft,event)
         split={name:sorted((did for did in groups[event] if draft_split(did)==name),key=lambda d:stable_score('format-training:'+d)) for name in ('train','validation','test')}
         split['train']=split['train'][:5000];cohorts[event]['splits']={k:len(v) for k,v in split.items()}
-        if len(split['train'])<100 or len(split['validation'])<20 or len(split['test'])<50: raise ValueError(f'{sid}/{event}: insufficient complete qualified trophy drafts: {cohorts[event]["splits"]}')
+        cohorts[event]['sufficient_for_pooling']=len(split['train'])>=100 and len(split['validation'])>=20 and len(split['test'])>=50
+        if len(split['train'])<100 or len(split['validation'])<20 or not split['test']: raise ValueError(f'{sid}/{event}: insufficient complete qualified trophy drafts: {cohorts[event]["splits"]}')
         cohorts[event]['training_ids_sha256']=hashlib.sha256('\n'.join(sorted(split['train'])).encode()).hexdigest()
         sources[event]['game']=archive(f'{BASE}/game_data/game_data_public.{sid.upper()}.{event}.csv.gz',game)
         played,hits=first_game_decks(game,set(split['train']),event)
@@ -181,8 +182,10 @@ def summarize(paths,out):
     for path in paths:
         if path.name=='error.json':missing.append(json.loads(path.read_text()));continue
         with gzip.open(path,'rt') as f: reports.append(json.load(f))
-    groups={r['set']:r['tests'] for r in reports};groups['pooled']=[x for r in reports for x in r['tests']]
-    output={};passed=len(reports)>=3
+    eligible=[r for r in reports if all(r['cohorts'][e]['sufficient_for_pooling'] for e in EVENTS)]
+    eligible_sets={r['set'] for r in eligible}
+    groups={r['set']:r['tests'] for r in reports};groups['pooled']=[x for r in eligible for x in r['tests']]
+    output={};passed=len(eligible)>=3
     for sid,records in groups.items():
         output[sid]={}
         for event in EVENTS:
@@ -191,10 +194,10 @@ def summarize(paths,out):
             comparisons={'combined_vs_same':paired_interval(rows,'combined',same),'cross_vs_same':paired_interval(rows,other,same),'event_gain':paired_interval(rows,'combined','event_feature'),'combined_top1':paired_interval(rows,'combined',same,2)}
             base=metrics[same]['metrics'].get('log_loss');combined=metrics['combined']['metrics'].get('log_loss')
             ok=bool(base and all(comparisons.values()) and comparisons['combined_vs_same']['high']<=.02*base and comparisons['cross_vs_same']['high']<=.05*base and comparisons['event_gain']['high']<.01*combined and comparisons['combined_top1']['low']>=-.01)
-            passed=passed and ok
+            if sid in eligible_sets or sid=='pooled':passed=passed and ok
             output[sid][event]={'calibrated':metrics,'raw':raw,'comparisons':comparisons,'prediction_criteria_pass':ok}
-    result={'schema':1,'sets':[r['set'] for r in reports],'missing':missing,'prediction_pooling_supported':passed,'prediction':output,'cohorts':{r['set']:r['cohorts'] for r in reports},'calibration':{r['set']:r['calibration'] for r in reports},'production_changed':False,'decision':'Pending residual analysis; no production pooling.'}
-    result['residuals']=residual_report(reports)
+    result={'schema':1,'sets':[r['set'] for r in reports],'eligible_sets':sorted(eligible_sets),'missing':missing,'prediction_pooling_supported':passed,'prediction':output,'cohorts':{r['set']:r['cohorts'] for r in reports},'calibration':{r['set']:r['calibration'] for r in reports},'production_changed':False,'decision':'Pending residual analysis; no production pooling.'}
+    result['residuals']=residual_report(eligible)
     supported=passed and result['residuals']['all_categories_have_three_sets'] and not result['residuals']['persistent_category_patterns']
     result['model_evidence_decision']='Pooling supported for a separately versioned validation rollout' if supported else 'Retain Premier-only evidence: pooling criteria not established'
     result['playable_puzzle_decision']='Remain Premier-only pending separate source/metadata/quality gates and an explicit publication decision'
