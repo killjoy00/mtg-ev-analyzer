@@ -21,6 +21,8 @@ export function rolloutDispatch(request) {
     workflow='frozen-scoring.yml';
   } else if(operation==='format-research') {
     workflow='format-research.yml';
+  } else if(operation==='traditional-puzzles') {
+    workflow='traditional-puzzles.yml';
   } else if(operation==='browser') {
     workflow='e2e.yml';
   } else if(operation==='deploy') {

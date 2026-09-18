@@ -1,7 +1,5 @@
 {
-  "operation": "deploy",
-  "request_id": "rebuild-v3-development-20260918",
-  "reason": "Deploy the reviewed eight-pick rebuild with complete v3-model corpus to development after successful additive staging 35353001925. Validate both Dailies before requesting the identical revision in production.",
-  "target": "development",
-  "commit": "bc1007e257401f2be8daba06a1a6c5e54eac19bb"
+  "operation": "traditional-puzzles",
+  "request_id": "traditional-puzzle-v3-20260918",
+  "reason": "Evaluate Traditional 3-0 puzzle inventory independently of training, requiring exact frozen Premier v3 support parity and predeclared scoring/quality gates. Produce unpublished candidate artifacts only."
 }

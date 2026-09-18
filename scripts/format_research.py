@@ -44,7 +44,7 @@ def first_game_decks(path,wanted,event):
         for card in cards:hits[card][colors]+=1
     return played,hits
 
-def cohort(path,event):
+def cohort(path,event,include_sources=False):
     drafts={};conflicts=set()
     with csv_bytes(path) as f:
         header=next(csv.reader([f.readline().decode('utf-8-sig')]))
@@ -76,13 +76,21 @@ def cohort(path,event):
         if int(float(row['pack_number']))!=0 or not 0<=int(float(row['pick_number']))<8: continue
         p=parse_example(row,pack,pool)
         if p: examples[p.draft_id].append(p)
-    clean={};excluded=Counter()
+    clean={};excluded=Counter();source_reasons={}
     for did in sorted(wanted):
         valid,prior,reason=trajectory(examples[did],8)
         if prior or len(valid)!=8 or valid[0].raw_pick_number!=0:
             excluded[reason or 'missing_complete_first_eight']+=1
+            source_reasons[did]=reason or 'missing_complete_first_eight'
         else: clean[did]=valid
-    return clean,dict(source_drafts=len(drafts),experienced=experienced,qualified_drafts=len(qualified),qualified_trophies=len(wanted),complete_trajectories=len(clean),excluded=dict(excluded),cutoff=cutoff,source_conflicts=len(conflicts),trophy_outcomes=dict(Counter(f"{d['wins']}-{d['losses']}" for d in drafts.values() if trophy(d))))
+    report=dict(source_drafts=len(drafts),experienced=experienced,qualified_drafts=len(qualified),qualified_trophies=len(wanted),complete_trajectories=len(clean),excluded=dict(excluded),cutoff=cutoff,source_conflicts=len(conflicts),trophy_outcomes=dict(Counter(f"{d['wins']}-{d['losses']}" for d in drafts.values() if trophy(d))))
+    if include_sources:
+        report['sources']={did:{**d,'qualified':did in qualified,'complete':did in clean,
+            'reason':'inconsistent_source_metadata' if did in conflicts else
+            'experience_unverified_or_below_100' if (d['games'] or 0)<100 else
+            'win_rate_unverified_or_below_cutoff' if d['rate'] is None or d['rate']<cutoff else source_reasons.get(did)}
+            for did,d in drafts.items() if trophy(d)}
+    return clean,report
 
 def normalize(values,exponent=1):
     # Log-space normalization avoids underflow in the conditional interpolation.

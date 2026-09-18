@@ -25,6 +25,12 @@ test('frozen scoring dispatch runs only the reviewed fixed protocol',()=>{
   assert.deepEqual(rolloutDispatch({operation:'frozen-scoring',reason:'Frozen model validation',request_id:'scoring-1'}),{workflow:'frozen-scoring.yml',body:{ref:'main',inputs:{}}});
 });
 
+test('Traditional inventory evaluation cannot publish or change training inputs',()=>{
+  const request={operation:'traditional-puzzles',reason:'Fixed Premier v3 puzzle gates',request_id:'traditional-v3'};
+  assert.deepEqual(rolloutDispatch(request),{workflow:'traditional-puzzles.yml',body:{ref:'main',inputs:{}}});
+  for(const extra of [{sets:'all'},{target:'production'},{training_cap:10000}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
 
 test('rebuild preparation is target-only and cannot request arbitrary artifacts or migrations',()=>{
   const base={operation:'prepare-rebuild',request_id:'stage-v7',reason:'Reviewed additive release staging',target:'development'};

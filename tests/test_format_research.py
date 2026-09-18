@@ -24,7 +24,10 @@ class FormatResearchTests(unittest.TestCase):
             self.assertEqual(set(drafts),{'p0','p1','p2'});self.assertTrue(all(len(v)==8 for v in drafts.values()))
             self.assertEqual(report['trophy_outcomes'],{'7-0':1,'7-1':1,'7-2':1})
             self.archive(path,'TradDraft',[('t0',3,0),('t1',3,1),('t2',2,0)])
-            drafts,_=cohort(path,'TradDraft');self.assertEqual(set(drafts),{'t0'})
+            drafts,report=cohort(path,'TradDraft',include_sources=True);self.assertEqual(set(drafts),{'t0'})
+            self.assertEqual(set(report['sources']),{'t0'})
+            self.assertEqual(report['sources']['t0']['games'],100)
+            self.assertEqual(report['sources']['t0']['rate'],.7)
             with self.assertRaisesRegex(ValueError,'identity'):cohort(path,'PremierDraft')
 
     def test_event_weight_zero_removes_event_information(self):

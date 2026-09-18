@@ -1,0 +1,68 @@
+name: Traditional puzzle inventory validation
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: traditional-puzzles
+  cancel-in-progress: false
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        set: [blb, dft, fin, hob]
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35289844612
+          name: verified-premier-trophies-35289844612-1
+          path: generated/frozen-v7
+      - name: Validate measurement gates
+        run: python -m unittest discover -s tests -p test_traditional_puzzles.py
+      - name: Verify frozen Premier parity and evaluate Traditional inventory
+        env:
+          RESEARCH_SET: ${{ matrix.set }}
+        run: python -u scripts/traditional_puzzles.py --set "$RESEARCH_SET"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traditional-puzzles-${{ matrix.set }}
+          retention-days: 90
+          path: |
+            generated/traditional-puzzles/*/measurements.json.gz
+            generated/traditional-puzzles/*/summary.json
+            generated/traditional-puzzles/*/manifest.json
+            generated/traditional-puzzles/*/puzzles.jsonl.gz
+            generated/traditional-puzzles/*/trophies.jsonl.gz
+  report:
+    needs: measure
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: traditional-puzzles-*
+          path: generated/traditional-puzzles
+      - name: Report per-set gates and matched residuals
+        run: |
+          mapfile -t measurements < <(find generated/traditional-puzzles -name measurements.json.gz)
+          python scripts/traditional_puzzles.py --summarize "${measurements[@]}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: traditional-puzzles-report
+          retention-days: 90
+          path: generated/traditional-puzzles/report.json
