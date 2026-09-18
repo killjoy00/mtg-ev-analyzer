@@ -43,7 +43,7 @@ test('progression UI keeps stats inside Account and preserves the career surface
   assert.doesNotMatch(product, /id = 'profile-nav'/);
   assert.doesNotMatch(product, /stats-nav.*remove/);
   assert.doesNotMatch(growth, /id='stats-nav'/);
-  assert.match(product, /profile-manage-account/);
+  assert.match(product, /profile-account/);
   assert.match(growth, /Back to my career/);
   assert.match(product, /environmentProgress/);
   assert.match(product, /data-share-achievement/);

@@ -148,24 +148,23 @@ function renderResult() {
     ${run.day&&!run.leaderboard_eligible?'<p>Daily leaderboards require an account. Your score is ready to share.</p>':''}
     ${run.comparison?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
     <div class="run-result-actions"><a class="button primary" href="${run.day?'./':gameUrl()}">${run.day?'Back to Dailies':'Start Another Draft Run'}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">View your career</button></div>
-    <details class="run-image-share"><summary>More sharing options</summary><button class="button secondary" id="run-share-image">Share result image</button></details><h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
+    <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; alternatives earn up to 95 from held-out strong-player support.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
-  document.querySelector('#run-share').onclick=()=>shareResult(false);
-  document.querySelector('#run-share-image').onclick=()=>shareResult(false,true);
+  document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-career').onclick=()=>document.querySelector('#account-nav')?.click();
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
-async function shareResult(challenge,asImage=false) {
-  const button=document.querySelector(challenge?'#run-challenge':asImage?'#run-share-image':'#run-share');button.disabled=true;
+async function shareResult() {
+  const button=document.querySelector('#run-share');button.disabled=true;
   try {
     const share=run.day?null:await api(`/v1/runs/${run.id}/share`,{});
     const url=`${location.origin}${location.pathname}${gameUrl(run.day?'daily=1':'shared='+share.id)}`;
-    trackEvent('share_click',{surface:challenge?'draft_run_challenge':'draft_run_result'});
-    const result=await shareDraftRunCard(run,url,{challenge,asImage});
+    trackEvent('share_click',{surface:'draft_run_result'});
+    const result=await shareDraftRunCard(run,url);
     const status=document.querySelector('#run-share-status');
     if(result.failed) {status.textContent='Copy this link: ';const a=document.createElement('a');a.href=url;a.textContent=url;status.append(a);}
-    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and run link copied.':'Ready to share.';trackEvent(challenge?'challenge_created':'daily_result_shared',{mode:'draft_run',method:result.method});}
+    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and run link copied.':'Ready to share.';trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:result.method});}
   } catch(e) {document.querySelector('#run-share-status').textContent=e.message;}
   finally {button.disabled=false;}
 }

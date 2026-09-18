@@ -146,7 +146,7 @@ try {
   assert.equal(await page.locator('.achievement-card.showcase').count(), 1);
   assert.equal(await page.locator('[data-profile-section="archive"]').getAttribute('open'), null, 'large archive starts collapsed');
   await page.locator('[data-profile-section="archive"] summary').click();
-  assert.ok(await page.locator('[data-environment-id="neo"] a').isVisible(), 'archive entries are directly playable');
+  assert.ok(await page.locator('[data-environment-id="neo"] a').isVisible(), 'archive entries link to set coverage');
   await page.locator('[data-profile-section="archive"] summary').click();
   await page.locator('[data-profile-section="achievements"] summary').click();
   assert.equal(await page.locator('.achievement-card.unlocked').first().isVisible(), true);
@@ -154,12 +154,15 @@ try {
   assert.match((await page.locator('.profile-identity-strip').textContent()) || '', /Leaderboard name\s*Profile Tester/i);
   await noOverflow();
   await page.screenshot({ path:'artifacts/ui-profile-mobile.png', fullPage:true });
+  for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}
+  await page.setViewportSize({width:390,height:844});
 
   await page.locator('#profile-load-more').click();
   await page.getByText('WOE', { exact:true }).last().waitFor({ timeout:5000 });
   await page.locator('#profile-load-more').waitFor({ state:'hidden', timeout:5000 });
 
-  await page.locator('.profile-settings summary').click();
+  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Account settings are on the profile');
+  assert.equal(await page.locator('#profile-manage-account,#profile-share-progress').count(),0);
   assert.equal(await page.locator('input[name="displayName"]').inputValue(), 'Profile Tester');
   await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
   await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
@@ -172,10 +175,10 @@ try {
   assert.equal((await page.locator('.profile-hero h1').textContent())?.trim(), 'Leaderboard Ace');
   assert.equal(await page.evaluate(() => localStorage.getItem('pack1-player-name-v1')), 'Leaderboard Ace');
 
-  await page.locator('#profile-share-progress').click();
+  await page.locator('#profile-share').click();
   await page.waitForFunction(() => (window.__pack1ShareCalls || 0) > 0, null, { timeout:5000 });
   shareCalls = await page.evaluate(() => window.__pack1ShareCalls || 0);
-  assert.equal(shareCalls, 1, 'archive progress share should invoke native share');
+  assert.equal(shareCalls, 1, 'profile sharing invokes native share');
 
   await page.goto(`${base}/?profile=${profileKey}`, { waitUntil:'domcontentloaded' });
   await page.locator('.player-profile-page').waitFor({ timeout:10000 });

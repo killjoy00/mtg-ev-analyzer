@@ -30,9 +30,11 @@ try {
     await form.locator('[name="password"]').fill('fixture-password-123');
     if(kind==='signup')await form.locator('[name="name"]').fill('Test Player');
     await form.getByRole('button',{name:kind==='signin'?'Sign in':'Create account',exact:true}).click();
-    await page.locator('#account-signout').waitFor();assert.ok(claims>0);
+    await page.locator('#profile-account #account-signout').waitFor();assert.ok(claims>0);
+    assert.equal(await page.locator('#profile-account #profile-settings-form').count(),1);
+    assert.match(await page.locator('#profile-account').textContent(),/qa@example.invalid/);
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-api-session-v1')),'claimed-fixture');
-    await page.locator('#account-signout').click();await page.locator('#account-signin').waitFor();
+    await page.locator('#account-signout').click();await page.locator('#profile-claim-account').waitFor();await page.locator('#profile-claim-account').click();await page.locator('#account-signin').waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-auth-session-v1')),null);
     assert.notEqual(await page.evaluate(()=>localStorage.getItem('pack1-api-session-v1')),'claimed-fixture');
   }
