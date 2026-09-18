@@ -24,3 +24,12 @@ test('format research dispatch cannot select arbitrary sets, code refs or target
 test('frozen scoring dispatch runs only the reviewed fixed protocol',()=>{
   assert.deepEqual(rolloutDispatch({operation:'frozen-scoring',reason:'Frozen model validation',request_id:'scoring-1'}),{workflow:'frozen-scoring.yml',body:{ref:'main',inputs:{}}});
 });
+
+
+test('rebuild preparation is target-only and cannot request arbitrary artifacts or migrations',()=>{
+  const base={operation:'prepare-rebuild',request_id:'stage-v7',reason:'Reviewed additive release staging',target:'development'};
+  assert.deepEqual(rolloutDispatch(base),{workflow:'prepare-rebuild.yml',body:{ref:'main',inputs:{target:'development'}}});
+  assert.throws(()=>rolloutDispatch({...base,target:'other'}));
+  assert.throws(()=>rolloutDispatch({...base,run_id:123}));
+  assert.throws(()=>rolloutDispatch({...base,migration:'0016'}));
+});

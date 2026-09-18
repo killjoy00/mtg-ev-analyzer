@@ -13,6 +13,9 @@ on:
       - 'game-date.mjs'
       - 'tests/*backend-smoke.mjs'
       - 'scripts/verify-neon-schema.mjs'
+      - 'scripts/*corpus*manifest.mjs'
+      - 'scripts/load*tro*.mjs'
+      - '.github/workflows/prepare-rebuild.yml'
       - '.github/workflows/backend-gate.yml'
 
 permissions:
@@ -126,6 +129,7 @@ jobs:
           # A corpus bump can be tested before production serves that version.
           # This loader is additive and verifies existing payload equality.
           node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
+          node tests/staged-manifest-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/retirement-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/corpus-version-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/serving-statistics-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures

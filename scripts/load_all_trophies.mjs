@@ -45,6 +45,8 @@ if(process.argv.includes('--validate-only'))process.exit(0);
 const remote=process.argv[2]?.startsWith('https://')?process.argv[2]:null;
 const {importRequest}=await import('./actions-import-auth.mjs');
 const query=remote?null:corpusDatabase(process.argv[2]);
+const stageOnly=process.argv.includes('--stage-only');
+if(stageOnly&&remote)throw Error('Stage-only requires the direct reviewed database loader.');
 async function batchInsert(puzzles) {
   if(remote)return Number((await importRequest(remote,{action:'batch',puzzles})).added);
   const {insertTrophyBatch}=await import('../worker/trophy-import.mjs');
@@ -52,7 +54,7 @@ async function batchInsert(puzzles) {
 }
 async function loadSet(s) {
   if(!s.total_puzzles)return;
-  const existing=remote?await importRequest(remote,{action:'status',setId:s.id}):(await query('SELECT corpus_version FROM draft_run_verified_sets WHERE set_id=$1',[s.id])).rows[0];
+  const existing=remote?await importRequest(remote,{action:'status',setId:s.id}):(await query('SELECT corpus_version FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2',[s.id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
   if(existing?.corpus_version!==DRAFT_RUN_CORPUS_VERSION)throw Error('Baseline environment missing: '+s.id);
   let batch=[],added=0;
   for await(const p of records(fileFor(s,'puzzle_file'))) {batch.push(p);if(batch.length===250){added+=await batchInsert(batch);batch=[];}}
@@ -63,7 +65,8 @@ async function loadSet(s) {
     let ledgerBatch=[];
     const save=async()=>{if(!ledgerBatch.length)return;await query(`INSERT INTO corpus_trophy_trajectories(set_id,corpus_version,source_draft_hash,event_type,wins,losses,qualified,included,puzzle_count,exclusion_reason) SELECT $1,$2,x.* FROM jsonb_to_recordset($3::jsonb) AS x(source_draft_hash text,event_type text,wins smallint,losses smallint,qualified boolean,included boolean,puzzle_count integer,exclusion_reason text) ON CONFLICT(set_id,corpus_version,source_draft_hash) DO UPDATE SET losses=EXCLUDED.losses,qualified=EXCLUDED.qualified,included=EXCLUDED.included,puzzle_count=EXCLUDED.puzzle_count,exclusion_reason=EXCLUDED.exclusion_reason`,[s.id,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(ledgerBatch)]);ledgerBatch=[];};
     for await(const d of records(fileFor(s,'ledger_file'))){ledgerBatch.push({source_draft_hash:d.source_draft_hash||createHash('sha256').update(`${s.id}|${d.draft_id}`).digest('hex').slice(0,32),event_type:'PremierDraft',wins:d.wins??7,losses:d.losses??null,qualified:d.qualified,included:d.status==='included',puzzle_count:d.puzzles||0,exclusion_reason:d.reason||d.trajectory_limit||null});if(ledgerBatch.length===1000)await save();}await save();
-    await query("UPDATE draft_run_verified_sets SET manifest=jsonb_set(manifest,'{full_import}',$2::jsonb) WHERE set_id=$1",[s.id,JSON.stringify(s)]);
+    if(stageOnly)await query("UPDATE corpus_set_versions SET manifest=jsonb_set(manifest,'{full_import}',$3::jsonb),manifest_updated_at=now(),last_successful_import=now() WHERE set_id=$1 AND corpus_version=$2",[s.id,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(s)]);
+    else await query("UPDATE draft_run_verified_sets SET manifest=jsonb_set(manifest,'{full_import}',$2::jsonb) WHERE set_id=$1",[s.id,JSON.stringify(s)]);
     await query("UPDATE corpus_sources SET import_status='complete',last_error=NULL WHERE set_id=$1 AND event_type='PremierDraft'",[s.id]);
   }
   console.log(s.id,added,'inserted;',actual.puzzles,'available');

@@ -7,6 +7,7 @@ import { validateDraftRunPuzzle } from '../draft-run.mjs';
 import {insertTrophyBatch} from '../worker/trophy-import.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 
+import {stageCorpusManifest} from './stage-corpus-manifest.mjs';
 const query=corpusDatabase(process.argv[2]);
 if (process.argv.includes('--schema')) {
   for(const sql of fs.readFileSync('migrations/0004_draft_run_product.sql','utf8').split('-- statement')) await query(sql);
@@ -24,11 +25,7 @@ const prepared=catalog.sets.map(set=>{
   return {set,rows};
 });
 async function loadSet({set,rows}) {
-  await query(`INSERT INTO draft_run_verified_sets(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)
-    ON CONFLICT(set_id) DO UPDATE SET corpus_version=EXCLUDED.corpus_version,
-      manifest=CASE WHEN draft_run_verified_sets.corpus_version=EXCLUDED.corpus_version
-        THEN draft_run_verified_sets.manifest || EXCLUDED.manifest ELSE EXCLUDED.manifest END`,
-    [set.id,catalog.corpus_version,JSON.stringify({...set,model_version:catalog.model_version})]);
+  await stageCorpusManifest(query,set.id,catalog.corpus_version,{...set,model_version:catalog.model_version},{preserveServing:process.argv.includes('--stage-only')});
   for(let i=0;i<rows.length;i+=250) {
     // The same immutable insert is used for baselines and supplements. A
     // conflicting payload is an error, not an apparently successful no-op.

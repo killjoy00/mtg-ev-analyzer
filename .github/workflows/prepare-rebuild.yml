@@ -1,0 +1,115 @@
+name: Stage reviewed rebuild corpus
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Apply additive 0017-0019 and stage the verified v7 artifact; no function deployment'
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: packone-corpus-mutation
+  cancel-in-progress: false
+jobs:
+  stage:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      TARGET: ${{ inputs.target }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35289844612
+          name: verified-premier-trophies-35289844612-1
+          path: generated/trophy-import
+      - name: Validate complete pinned artifact before any database mutation
+        run: node scripts/load_all_trophies.mjs unused generated/trophy-import --validate-only
+      - name: Prepare target and apply only reviewed additive migrations
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          test -n "$NEON_API_KEY"
+          case "$TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/target.connection"
+          if ! command -v psql >/dev/null 2>&1; then sudo apt-get update; sudo apt-get install -y postgresql-client; fi
+          # No historical/destructive migration replay and no branch restore.
+          for migration in migrations/0017_fixed_daily_lifecycle.sql migrations/0018_capabilities.sql migrations/0019_corpus_operations.sql; do
+            psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
+          done
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+      - name: Require identical complete development artifacts before production staging
+        if: inputs.target == 'production'
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          connection=$(neon connection-string br-twilight-hill-ayffyd2b --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/development.connection"
+          node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/development.connection" generated/trophy-import --complete
+      - name: Stage immutable baseline and full corpus without switching legacy serving manifests
+        run: |
+          node scripts/load_verified_draft_run.mjs "$RUNNER_TEMP/target.connection" --stage-only
+          node scripts/load_all_trophies.mjs "$RUNNER_TEMP/target.connection" generated/trophy-import --stage-only
+          node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/trophy-import --complete
+      - name: Verify release schema again
+        run: DATABASE_URL="$(cat "$RUNNER_TEMP/target.connection")" node scripts/verify-neon-schema.mjs
+  evidence:
+    if: inputs.target == 'development'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35349969472
+          name: format-research-report
+          path: generated/release-evidence/traditional
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35350883338
+          name: frozen-scoring-report
+          path: generated/release-evidence/scoring
+      - name: Preserve completed public research reports on a review branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json,pathlib
+          root=pathlib.Path('results/rebuild-2026-09-18')
+          root.mkdir(parents=True,exist_ok=True)
+          for kind in ('traditional','scoring'):
+              report=json.loads(pathlib.Path('generated/release-evidence',kind,'report.json').read_text())
+              (root/(kind+'-report.json')).write_text(json.dumps(report,sort_keys=True,separators=(',',':'))+'\n')
+          PY
+          git switch -c "research/rebuild-evidence-$GITHUB_RUN_ID"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add results/rebuild-2026-09-18/traditional-report.json results/rebuild-2026-09-18/scoring-report.json
+          git commit -m "Preserve completed rebuild research evidence for review"
+          git push origin HEAD

@@ -123,7 +123,7 @@ async function start(request) {
     if(!schedule) {
       featuredSets=environment==='mixed'?(await loadLiveSetMetadata(query,corpusVersion)).filter(p=>p.regular_run&&p.release_date&&p.release_date<=day).sort((a,b)=>b.release_date.localeCompare(a.release_date)||a.set_id.localeCompare(b.set_id)).slice(0,4).map(p=>p.set_id):[];
       const plan=(await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day})).map(p=>p.puzzle_id);
-      await query('INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,difficulty_version,selection_version,daily_featured_sets) VALUES($1::date,$2,$3,$4::jsonb,$5,$6,$7::jsonb) ON CONFLICT(day,environment) DO NOTHING',[day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets)]);
+      await query('INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,difficulty_version,selection_version,daily_featured_sets,scoring_version) VALUES($1::date,$2,$3,$4::jsonb,$5,$6,$7::jsonb,$8) ON CONFLICT(day,environment) DO NOTHING',[day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets),DRAFT_RUN_SCORING_VERSION]);
       schedule=(await query('SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets FROM draft_run_schedules WHERE day=$1::date AND environment=$2',[day,environment])).rows[0];
     }
     corpusVersion=schedule.corpus_version;scoringVersion=schedule.scoring_version;
