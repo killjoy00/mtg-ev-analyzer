@@ -287,12 +287,13 @@ def award_movement(rows, keys):
         for r in rows:
             if r['cohort'] != 'elite':
                 continue
-            base, cand = r['probabilities']['v2'], r['probabilities'][model]
+            base_model,base_exponent=BASELINE.split('|')
+            base, cand = r['probabilities'][base_model], r['probabilities'][model]
             bm, cm = max(base), max(cand)
             leader_changes += base.index(bm) != cand.index(cm)
             for i, p in enumerate(cand):
                 score = curve_score(p/cm, float(exponent))
-                change = score-curve_score(base[i]/bm, 1)
+                change = score-curve_score(base[i]/bm, float(base_exponent))
                 scores.append(score); changes.append(change)
                 if i == r['chosen']:
                     observed.append(change)
@@ -331,7 +332,7 @@ def tail_safe(key, grading, environment):
         g['below_25'] <= grading[BASELINE][name]['below_25']+TAIL_LIMIT for name, g in groups)
 
 
-def choose_curve(simulation, grading, environment):
+def choose_curve(simulation, grading, environment, frozen_model=None):
     """Fixed selection rule: no substantial severe-tail regression on any set.
 
     Require a positive paired bootstrap lower bound versus incumbent. A noisy
@@ -340,6 +341,8 @@ def choose_curve(simulation, grading, environment):
     """
     eligible = []
     for key, metrics in simulation['configurations'].items():
+        if frozen_model and key.split('|')[0] != frozen_model:
+            continue
         if key == BASELINE:
             continue
         ci = metrics['delta_ci95']
@@ -352,6 +355,9 @@ def choose_curve(simulation, grading, environment):
 
 
 def report(args):
+    global BASELINE
+    frozen_model=getattr(args,'frozen_model',None)
+    BASELINE=f'{frozen_model}|1' if frozen_model else 'v2|1'
     inputs, rows, identities = [], [], set()
     for path in args.measurements:
         with gzip.open(path, 'rt') as f:
@@ -368,6 +374,9 @@ def report(args):
             if r['role'] != validation_role(r['draft_id']):
                 raise ValueError('Incorrect validation partition')
         rows.extend(data['records'])
+    if frozen_model:
+        rows=[r for r in rows if (2<=r['pick']<=9 if r['set_id']=='powered-cube' else 1<=r['pick']<=8)]
+        for r in rows:r['band']=band(r['probabilities'][frozen_model])
     prepare_scores(rows)
     temps = {}
     calibration = [r for r in rows if r['role']=='calibration' and r['cohort']=='elite']
@@ -379,7 +388,7 @@ def report(args):
                      'scripts/grading_curve.py', 'scripts/pick_value.py', 'draft-run.mjs',
                      'draft-run-policy.mjs', 'draft-run-difficulty.mjs', 'data/selection-policy.json']},
                   runtime=dict(python=sys.version, node=subprocess.check_output(['node','--version'],text=True).strip()),
-                  inputs=inputs, protocol=dict(seed=SEED, exponents=EXPONENTS, temperatures=TEMPERATURES,
+                  inputs=inputs, protocol=dict(seed=SEED, exponents=EXPONENTS, temperatures=TEMPERATURES,frozen_model=frozen_model,baseline=BASELINE,
                     severe_tail_excess_limit=TAIL_LIMIT, runs=args.runs, bootstrap_draws=args.bootstrap_draws,
                     bootstrap_runs=args.bootstrap_runs, daily=args.daily, day=args.day,
                     point_units='raw support exponent; calibrated exponent = raw exponent / fitted temperature',
@@ -404,7 +413,7 @@ def report(args):
         result['partitions'][role] = entry
         if role == 'selection':
             # Freeze the choice before calculating any assessment result.
-            result['selected'] = {env:choose_curve(sim, entry['grading'], env)
+            result['selected'] = {env:choose_curve(sim, entry['grading'], env,frozen_model)
                                   for env,sim in entry['simulations'].items()}
         entry['award_movement'] = award_movement(subset, [BASELINE, 'v3-colour-and-pair|1',
                                                          *result['selected'].values()])
@@ -438,6 +447,7 @@ def main():
     r.add_argument('--bootstrap-runs',type=int,default=500)
     r.add_argument('--daily',action='store_true')
     r.add_argument('--day',default='2026-09-16')
+    r.add_argument('--frozen-model',choices=['v3-colour-and-pair'],help='Only calibrate partial-credit curves for the frozen context model; cannot select a different predictor')
     args = parser.parse_args()
     if args.command == 'measure':
         measure(args)

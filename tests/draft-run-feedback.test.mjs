@@ -10,6 +10,9 @@ test('locked feedback separates the trophy bonus from relative model support',()
  assert.match(text,/10% of the leading/);assert.match(text,/earns 100 regardless/);
  assert.ok(text.indexOf('data-zoom="leader"')<text.indexOf('data-zoom="trophy"'));
  assert.match(text,/does not establish a correct pick/);
+ assert.match(text,/Trophy drafter: Trophy — 100/);
+ assert.match(text,/Model’s strongest alternative: Leader — 95/);
+ assert.doesNotMatch(text,/95 ×/);
  assert.equal(consensusFeedback({}), '');
 });
 test('feedback and shared HTML escaping protect card names and attributes',()=>{

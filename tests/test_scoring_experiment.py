@@ -185,7 +185,9 @@ class SimulationTests(unittest.TestCase):
                 bands=Counter(slot[3] for slot in profile)
                 self.assertEqual(bands,Counter(easy=1,medium=5,hard=2))
                 if env=='mixed':
-                    self.assertTrue({'hob','msh','sos'} <= {slot[0] for slot in profile})
+                    counts=Counter(slot[0] for slot in profile)
+                    self.assertGreaterEqual(counts['hob'],2)
+                    self.assertGreaterEqual(sum(counts[s] for s in ['msh','sos','tmt']),4)
                     self.assertEqual(profile[0][1:3],[1,1])
                     self.assertEqual(profile[-1][1:3],[8,8])
                 else:
@@ -209,6 +211,14 @@ class SimulationTests(unittest.TestCase):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_frozen_model_cannot_be_replaced_by_another_predictor(self):
+        frozen='v3-colour-and-pair|1'
+        old='v2|.5'
+        sim={'configurations':{frozen:dict(auc=.6,delta_ci95=[0,0]),old:dict(auc=.9,delta_ci95=[.2,.4])}}
+        grade={key:{'set:blb':dict(n=100,below_25=.1)} for key in (frozen,old)}
+        with patch('scoring_experiment.BASELINE',frozen):
+            self.assertEqual(choose_curve(sim,grade,'mixed','v3-colour-and-pair'),frozen)
+
     def test_noisy_gain_cannot_replace_incumbent_and_tail_guard_is_per_environment(self):
         key='v3-colour-and-pair|1'
         sim={'configurations':{BASELINE:dict(auc=.6,delta_ci95=[0,0]),

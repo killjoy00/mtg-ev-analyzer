@@ -21,3 +21,6 @@ test('format research dispatch cannot select arbitrary sets, code refs or target
   assert.deepEqual(rolloutDispatch(request),{workflow:'format-research.yml',body:{ref:'main',inputs:{}}});
   for(const extra of [{sets:'all'},{target:'production'},{ref:'branch'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
+test('frozen scoring dispatch runs only the reviewed fixed protocol',()=>{
+  assert.deepEqual(rolloutDispatch({operation:'frozen-scoring',reason:'Frozen model validation',request_id:'scoring-1'}),{workflow:'frozen-scoring.yml',body:{ref:'main',inputs:{}}});
+});
