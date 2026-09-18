@@ -12,7 +12,7 @@ Pack One is the eight-pick game in [CHARTER](CHARTER.md): Daily Draft Run, Daily
 | Production Neon functions | Last audited release `18f625f320d137b6b5f660bd388c3fb2719b45f6`; backend rebuild not yet promoted |
 | Production corpus / selection | `elite-trophy-verified-v6` / `eight-pick-v3` at audit; historical data retained |
 | Rebuild target | `elite-trophy-colour-stage-v7`, model `strong-player-colour-stage-v3`, selection `eight-pick-v4` |
-| Migrations 0017–0019 | Verified on isolated Neon clones; production application pending reviewed release |
+| Migrations 0017–0019 | Verified on isolated Neon clones and development (run 35353001925); production application pending reviewed release |
 
 Do not infer backend deployment from Pages success or a checked-in catalog. Update this table using actual health/schema/corpus evidence after rollout.
 
@@ -31,3 +31,5 @@ GitHub Pages hosts the client. Production uses `pack1api`, `pack1growth` and `dr
 Neon stores immutable puzzles, source/import records, versioned manifests and audits. Schedules/sessions pin IDs and versions. Older puzzles, results, shared identities and already-created Dailies remain readable. Migration 0019 preserves manifests by set/version. The older deployed API still reads single-version manifests, so staging must explicitly preserve those until the version-aware runtime is deployed.
 
 Reuse the complete verified v7 development import through additive staging, verify signatures/counts, deploy to development, smoke-test, then deploy the same reviewed SHA to production. Never restore development over production or apply destructive historical migration 0016 as part of this rebuild.
+
+The owner subsequently authorized a separate Traditional-as-puzzle-source evaluation using the unchanged Premier-trained v3 model. This is active follow-up work: check partial-credit/disagreement/difficulty and source gates before publishing eligible Traditional inventory. Failure to establish combined-training interchangeability is not the gate for that separate use.
