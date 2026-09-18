@@ -30,6 +30,7 @@ try {
     for(const width of [320,390,768,1440]) {
      await page.setViewportSize({width,height:width<768?844:1000});await overflow();
      if(round===1){const pool=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(pool.width/pack.width-.85)<.03,`Pool ratio at ${width}: ${pool.width/pack.width}`);}
+     await page.evaluate(async()=>{await Promise.all([...document.querySelectorAll('.run-cards img,.run-pool img')].map(i=>i.decode()));await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));});
      if(width===390||width===1440)await page.screenshot({path:`artifacts/production/${environment}-pick-${round+1}-${width}.png`,fullPage:true});
     }
     await page.setViewportSize({width:390,height:844});
