@@ -47,6 +47,16 @@ export async function loadLiveSetMetadata(query,version) {
   return result.rows.map(p=>({...p,regular_run:p.regular_run===true||p.regular_run==='t'}));
 }
 
+// A set offered alone must supply all eight decisions, independently of its
+// eligibility to contribute a subset of picks to a mixed Daily.
+export async function loadCustomSetMetadata(query,version,day=gameDateKey()) {
+  const metadata=liveRegularSets(await loadLiveSetMetadata(query,version),day);
+  const coverage=(await query(`SELECT p.set_id,p.pick_number,r.band,count(DISTINCT p.source_draft_hash)::int sources ${from}
+    WHERE ${servingBase} AND p.pick_number BETWEEN 1 AND 8
+    GROUP BY p.set_id,p.pick_number,r.band HAVING count(DISTINCT p.source_draft_hash)>=16`,[version])).rows;
+  return metadata.filter(s=>Array.from({length:8},(_,i)=>i+1).every(pick=>['medium','hard'].every(band=>coverage.some(g=>g.set_id===s.set_id&&Number(g.pick_number)===pick&&g.band===band))));
+}
+
 // Return compact group counts once, then one source trajectory per round. Every
 // eligible puzzle participates: there is no random prefix or candidate cap.
 // This consumes the same PRNG draws and sorted candidate order as selectDraftRun.
@@ -58,7 +68,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
   const groupParams=[version];
   const groupWhere=`${servingBase} AND ${environmentFilter(environment,groupParams)}`;
   const groups=(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));
-  if(setIds.length){const eligible=new Set(liveRegularSets(metadata||[],day).map(s=>s.set_id));if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live eligible sets.'),{status:400});}
+  if(setIds.length){const eligible=new Set((await loadCustomSetMetadata(query,version,day)).map(s=>s.set_id));if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});}
   const required=setIds.length?balancedSetPlan(setIds,random):daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION?dailySetPlan(metadata,day,random):daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
   const forced=requiredSetRounds(groups,bands,windows,random,required);
   const key=p=>`${p.set_id}:${p.pick_number}:${p.band}`;

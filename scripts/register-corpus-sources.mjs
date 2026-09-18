@@ -1,8 +1,7 @@
-// Discovery is operational metadata. New environments remain Candidate.
+// Discovery is operational metadata. Candidate is earned after complete health verification.
 import fs from 'node:fs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
-import {DAILY_SELECTION_VERSION} from '../daily-selection.mjs';
 const query=corpusDatabase(process.argv[2]),records=JSON.parse(fs.readFileSync('generated/corpus-operations/discovery.json')).sets;
 const pending=[];
 for(const s of records) {
@@ -17,9 +16,7 @@ for(const s of records) {
  const manifest=typeof existing?.manifest==='string'?JSON.parse(existing.manifest):existing?.manifest;
  if(manifest?.full_import||manifest?.puzzles||existing?.status==='Retired')continue;
  await query(`INSERT INTO draft_run_verified_sets(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)
- ON CONFLICT(set_id) DO NOTHING`,[s.set_id,DRAFT_RUN_CORPUS_VERSION,JSON.stringify({id:s.set_id,name:s.set_name,discovered:true,source_event_type:s.event_type})]);
- await query(`INSERT INTO draft_run_environment_policy(set_id,regular_run,maximum_pick,daily_weight,selection_version,status,release_date,set_name,source_event_type)
- VALUES($1,$2::boolean,$3::int,1,$4,'Candidate',$5::date,$6,$7) ON CONFLICT(set_id) DO NOTHING`,[s.set_id,s.regular_run,s.set_id==='powered-cube'?9:8,DAILY_SELECTION_VERSION,s.release_date||null,s.set_name,s.event_type]);
+ ON CONFLICT(set_id) DO NOTHING`,[s.set_id,DRAFT_RUN_CORPUS_VERSION,JSON.stringify({id:s.set_id,name:s.set_name,discovered:true,source_event_type:s.event_type,regular_run:s.regular_run,release_date:s.release_date||null})]);
  await query("UPDATE corpus_sources SET import_status='building',last_error=NULL WHERE set_id=$1 AND event_type='PremierDraft'",[s.set_id]);
  pending.push(s.set_id);
 }

@@ -1,5 +1,6 @@
 // Read every included puzzle once; persist an operational report, never gameplay mutations.
 // node scripts/check-corpus-health.mjs CONNECTION [set-id ...]
+import {registerHealthyCandidate} from './corpus-candidate.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {DRAFT_RUN_CORPUS_VERSION,validateDraftRunPuzzle,interestingDraftRunPuzzle,runPickWindows} from '../draft-run.mjs';
 import catalog from '../corpus/draft-run/catalog.json' with {type:'json'};
@@ -41,5 +42,6 @@ for(const s of sets) {
  // Reject a report if an import changed the manifest while it was being scanned.
  const saved=await query(`INSERT INTO corpus_health_checks(set_id,corpus_version,manifest_hash,gate_version,ready,report) SELECT set_id,corpus_version,$3,$4,$5::boolean,$6::jsonb FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2 AND md5(manifest::text)=$3 RETURNING id`,[s.set_id,DRAFT_RUN_CORPUS_VERSION,s.manifest_hash,report.gate_version,report.ready,JSON.stringify(report)]);
  if(!saved.rows.length)throw Error('Manifest changed during health verification: '+s.set_id);
+ if(report.ready)await registerHealthyCandidate(query,s.set_id,s.manifest_hash);
  console.log(JSON.stringify({set:s.set_id,ready:report.ready,blocked:report.gates.filter(g=>!g.pass).map(g=>g.id),puzzles:total}));
 }

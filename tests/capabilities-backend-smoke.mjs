@@ -35,6 +35,12 @@ await call('/v1/practice-sets',undefined,user,403);
 await query("INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference) VALUES($1::uuid,'unlimited_cube_practice','test','current'),($1::uuid,'custom_corpus','test','current')",[user.id]);
 assert.equal((await call('/v1/runs',{environment:'powered-cube'},user)).environment,'powered-cube');
 const {sets}=await call('/v1/practice-sets',undefined,user);
+// These retained Live archives omit complete P1P1 packs; they remain useful
+// in mixed runs but must not be advertised as complete custom-set runs.
+for(const id of ['ecl','tla','tmt']){
+ assert.ok(!sets.some(s=>s.set_id===id));
+ await call('/v1/runs',{setIds:[id]},user,400);
+}
 for(const n of [1,2,3,4]){
   const ids=sets.slice(0,n).map(s=>s.set_id),custom=await call('/v1/runs',{setIds:ids},user);
   const stored=(await query('SELECT puzzle_ids FROM draft_run_sessions WHERE id=$1::uuid',[custom.id])).rows[0];
