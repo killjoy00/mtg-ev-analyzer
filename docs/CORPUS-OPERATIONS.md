@@ -4,7 +4,7 @@ The authenticated `/admin/?area=corpus` area complements the existing decision-q
 
 ## Lifecycle and preservation
 
-Every registered corpus set has one operational status: Candidate, Live, Paused or Retired. Discovery records without an ingested corpus are displayed as “Awaiting corpus.” Candidate is the non-serving staging state; its quality report explicitly distinguishes ready Candidates from blocked/incomplete ingestion. Only a ready Candidate can be promoted. A discovered archive never grants publication.
+Every registered corpus set has one operational status: Candidate, Live, Paused or Retired. Discovery records without an ingested corpus are displayed as “Awaiting corpus.” A newly ingested set becomes Candidate only after the complete quality report passes. Failed or unfinished imports remain discovery/import records and appear as Awaiting corpus with their blocking reasons. Candidate health can subsequently expire or fail a later check; promotion always requires current passing evidence. A discovered archive never grants publication.
 
 Allowed actions are Candidate → Live, Live → Paused, Paused → Live, and any non-retired state → Retired. Retirement is terminal in the admin UI. Promotion/reactivation requires passing, fresh health evidence for the serving corpus and exact manifest. A conditional update and audit insertion execute atomically; stale dashboard actions fail with 409. Events retain the administrator account ID, timestamp, previous/new status and optional reason.
 
@@ -14,7 +14,7 @@ No lifecycle action deletes or changes puzzles, results, shares, sessions or sch
 
 ## Automated ingestion
 
-The reviewed-main **Corpus Operations** workflow runs daily and can be dispatched for development or production. It discovers official 17Lands Premier archives, checks source ETag/last-modified metadata, obtains Scryfall set identity and release date, registers non-serving Candidates, runs the existing qualified-trophy/context-model importer, verifies checksums and ledger accounting, loads immutable puzzles, records source dispositions and executes health verification. The workflow never promotes a set.
+The reviewed-main **Corpus Operations** workflow runs daily and can be dispatched for development or production. It discovers official 17Lands Premier archives, checks source ETag/last-modified metadata, obtains Scryfall set identity and release date, records non-serving discoveries, runs the existing qualified-trophy/context-model importer, verifies checksums and ledger accounting, loads immutable puzzles, records source dispositions and executes health verification. Only passing imports become Candidate. The workflow never promotes a set to Live.
 
 Existing versions are frozen: discovery records source freshness, but an updated archive does not automatically retrain a model or replace decisions in an existing corpus version. Such changes need a reviewed versioned regeneration. New-set models use the current frozen model implementation and qualified-player standard. Traditional data remains outside production pending the separate research decision.
 
@@ -46,3 +46,5 @@ The current validation cohort is qualified trophy decisions. Its calibration sum
 Previously reviewed Live sets are grandfathered at migration. Missing modern health evidence is displayed and blocks a subsequent promotion/reactivation; it does not silently pause an already published corpus. Failures require diagnosis, not lowering a threshold to make a release pass.
 
 Premier trophies include 7–0, 7–1 and 7–2 with the existing experience/skill standard. New ledgers store wins/losses separately from immutable puzzle payloads. Imported older ledgers without losses report unknown; they must not be described as audited 7–0-only data. Outcomes and qualified/source/included/excluded totals appear wherever recorded.
+
+Custom-set practice requires complete P1P1–P1P8 coverage with at least 16 independent medium/hard sources at each position. Live sets with incomplete opening-pack archives can still contribute valid later decisions to mixed runs; they are not offered as self-contained custom-set runs. The full historical inventory is retained.

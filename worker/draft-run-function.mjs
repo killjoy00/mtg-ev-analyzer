@@ -10,7 +10,7 @@ import growth, { query, player, readJson, json, withCors, gameDateKey } from './
 import { handleTrophyImport } from './trophy-import.mjs';
 import {observeDecision,measurementInput,MEASUREMENT_CTE} from './decision-measurements.mjs';
 import {handleAdmin} from './measurement-admin.mjs';
-import {loadPuzzleMetadata,selectDatabaseRun,selectDatabaseReroll,loadLiveSetMetadata} from './draft-run-selection.mjs';
+import {loadPuzzleMetadata,selectDatabaseRun,selectDatabaseReroll,loadLiveSetMetadata,loadCustomSetMetadata} from './draft-run-selection.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,publicDifficulty,rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,regularRunSet,dailySetWeight,dailyRequiredSets,DRAFT_RUN_LENGTH} from '../draft-run-policy.mjs';
 import {
@@ -243,7 +243,7 @@ async function route(request) {
   if(request.method==='POST'&&path==='/v1/session') return growth.fetch(request);
   if(request.method==='POST'&&path==='/v1/runs') return start(request);
   if(request.method==='GET'&&path==='/v1/capabilities') {const owner=await player(request);return json({capabilities:await accountCapabilities(await accountIdentity(request,query,owner),query)});}
-  if(request.method==='GET'&&path==='/v1/practice-sets') {const owner=await player(request),caps=await accountCapabilities(await accountIdentity(request,query,owner),query);requireCapability(caps,'custom_corpus');return json({sets:liveRegularSets(await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION),gameDateKey())});}
+  if(request.method==='GET'&&path==='/v1/practice-sets') {const owner=await player(request),caps=await accountCapabilities(await accountIdentity(request,query,owner),query);requireCapability(caps,'custom_corpus');return json({sets:await loadCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION)});}
   if(request.method==='GET'&&path==='/v1/daily-status') return dailyStatus(request);
   if(request.method==='GET'&&path==='/v1/leaderboard') return leaderboard(request);
   const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view))?$/);
