@@ -14,13 +14,31 @@ No lifecycle action deletes or changes puzzles, results, shares, sessions or sch
 
 ## Automated ingestion
 
-The reviewed-main **Corpus Operations** workflow runs daily and can be dispatched for development or production. It discovers official 17Lands Premier archives, checks source ETag/last-modified metadata, obtains Scryfall set identity and release date, registers non-serving Candidates, runs the existing qualified-trophy/context-model importer, verifies checksums and ledger accounting, loads immutable puzzles, records source dispositions and executes health verification. The workflow never promotes a set.
+The reviewed-main **Corpus Operations** workflow is scheduled daily and can be dispatched for development or production. It discovers official 17Lands Premier archives, checks source ETag/last-modified metadata, obtains Scryfall set identity and release date, registers non-serving Candidates, runs the qualified-trophy/context-model importer, verifies checksums and ledger accounting, loads immutable puzzles, records source dispositions and executes health verification. The workflow never promotes a set.
 
-Existing versions are frozen: discovery records source freshness, but an updated archive does not automatically retrain a model or replace decisions in an existing corpus version. Such changes need a reviewed versioned regeneration. New-set models use the current frozen model implementation and qualified-player standard. Traditional data remains outside production pending the separate research decision.
+The workflow's code path is implemented, but operational closure requires successful end-to-end exercise against the intended environment and verification of a real Candidate/new-set lifecycle. Treat “workflow exists” separately from “new-set ingestion has been demonstrated in production.”
+
+Existing versions are frozen: discovery records source freshness, but an updated archive does not automatically retrain a model or replace decisions in an existing corpus version. Such changes need a reviewed versioned regeneration. New-set models use the current frozen model implementation and qualified-player standard.
 
 Completed build artifacts/checkpoints survive retries in Actions cache and artifacts. Source archives are disposable downloads; manifests, ledgers, hashes, puzzles and historical database records are retained. The importer no longer invokes historical data-purge commands.
 
 Regular chronology comes from set release metadata and Live eligibility. Powered Cube has a separate policy. Every new regular run uses P1P1–P1P8; Cube uses P1P2–P1P9, its first eight complete archived decisions. Old selection versions retain their old windows. Older source decisions remain stored for historical/model uses.
+
+## Premier source exclusions
+
+The completed frozen 32-set audit verifies included Premier source outcomes against pinned archives and identifies nine blocked source trajectories. PR132 adds `corpus_source_exclusions` as an append-only operational registry. New selection and practice rerolls omit registered exclusions; historical IDs, schedules, results, shares and scoring payloads remain readable.
+
+This mechanism is merged but not yet active in production: migration 0020 is not present there and the reviewed audit report has not been loaded. Merging the code is not equivalent to applying the exclusions.
+
+## Traditional Candidate inventory
+
+Traditional model-training policy and Traditional puzzle publication are independent.
+
+The model-training experiment did not establish every pooling criterion, so Premier-only v3 remains the production grader. A separate puzzle-source workflow then evaluated qualified Traditional 3-0 trajectories with that unchanged model and no Traditional training contribution.
+
+BLB, FIN and DFT passed the predeclared support/calibration/difficulty/source-quality gates; HOB failed. The result explicitly authorizes Candidate inventory for reviewed operational publication, not automatic serving. Production currently contains no Traditional trajectories.
+
+If published, Traditional inventory must retain event provenance, include only individually passing sets, satisfy the applicable serving gates and enter Live state only through an authenticated reviewed action.
 
 ## Publication gates (`corpus-gates-v1`)
 
@@ -45,4 +63,4 @@ The current validation cohort is qualified trophy decisions. Its calibration sum
 
 Previously reviewed Live sets are grandfathered at migration. Missing modern health evidence is displayed and blocks a subsequent promotion/reactivation; it does not silently pause an already published corpus. Failures require diagnosis, not lowering a threshold to make a release pass.
 
-Premier trophies include 7–0, 7–1 and 7–2 with the existing experience/skill standard. New ledgers store wins/losses separately from immutable puzzle payloads. Imported older ledgers without losses report unknown; they must not be described as audited 7–0-only data. Outcomes and qualified/source/included/excluded totals appear wherever recorded.
+Premier trophies include 7–0, 7–1 and 7–2 with the existing experience/skill standard. New ledgers store wins/losses separately from immutable puzzle payloads. Imported older ledgers without losses report unknown unless subsequently covered by a pinned-source audit. Outcomes and qualified/source/included/excluded totals appear wherever recorded.
