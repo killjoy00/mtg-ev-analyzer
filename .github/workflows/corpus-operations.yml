@@ -68,6 +68,8 @@ jobs:
         run: node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus.connection"
       - name: Record import failures
         if: always()
+        env:
+          WORKFLOW_STATUS: ${{ job.status }}
         run: node scripts/record-corpus-import-status.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
       - uses: actions/cache/save@v4
         if: always()
