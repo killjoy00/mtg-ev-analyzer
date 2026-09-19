@@ -1,5 +1,5 @@
 {
-  "operation": "production-browser",
-  "request_id": "three-dailies-live-browser-20260919",
-  "reason": "Verify all three production Dailies after exact release 8abee764: guest warning before picks, fixed latest-set-only decisions, sharing, images, responsive widths and completion states."
+  "operation": "patreon-sync",
+  "request_id": "real-elite-reconciliation-20260919",
+  "reason": "The authorized user connected, disconnected/reconnected and completed a three-set Elite practice run. Verify the creator API snapshot renews those exact-tier capabilities before public activation."
 }
