@@ -15,7 +15,7 @@ on:
         required: true
       source:
         type: choice
-        options: [powered-cube, regular-study]
+        options: [powered-cube, regular-study, regular-phase2]
         default: powered-cube
         required: true
 permissions:
@@ -28,7 +28,7 @@ concurrency:
 jobs:
   source-release:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 120
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       TARGET: ${{ inputs.target }}
@@ -58,6 +58,13 @@ jobs:
           run-id: 35369484366
           pattern: traditional-puzzles-*
           path: generated/regular-study
+      - uses: actions/download-artifact@v4
+        if: inputs.source == 'regular-phase2'
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35386149822
+          pattern: traditional-phase2-*
+          path: generated/regular-phase2
       - name: Verify pinned evidence before any database mutation
         run: |
           set -euo pipefail
@@ -66,6 +73,7 @@ jobs:
               python scripts/prepare-cube-admission.py generated/cube-research/powered-cube generated/admission
               root=generated/admission ;;
             regular-study) root=generated/regular-study ;;
+            regular-phase2) root=generated/regular-phase2 ;;
             *) exit 1 ;;
           esac
           echo "ARTIFACT_ROOT=$root" >> "$GITHUB_ENV"
@@ -90,7 +98,7 @@ jobs:
         if: inputs.target == 'production'
         run: |
           status=Candidate
-          if [[ "$ACTION" == publish ]]; then status=Live; fi
+          if [[ "$ACTION" == publish ]]; then status=eligible; fi
           node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/development.connection" "$ARTIFACT_ROOT" "$status"
       - name: Snapshot retained Premier Cube and existing universal Dailies
         run: node scripts/verify-preserved-corpus.mjs "$RUNNER_TEMP/target.connection" "$RUNNER_TEMP/preserved.json" --capture
@@ -99,7 +107,7 @@ jobs:
         run: |
           set -euo pipefail
           connection=$(cat "$RUNNER_TEMP/target.connection")
-          for migration in migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql migrations/0023_serving_policy_snapshots.sql; do
+          for migration in migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql migrations/0023_serving_policy_snapshots.sql migrations/0024_traditional_phase2_components.sql; do
             psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
           done
           node scripts/load-source-exclusions.mjs "$RUNNER_TEMP/target.connection" results/rebuild-2026-09-18/frozen-premier-outcomes.json
