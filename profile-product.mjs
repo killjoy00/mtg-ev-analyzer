@@ -144,10 +144,10 @@ function settingsMarkup(profile, progress, account, patreon) {
       <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
         ${patreon?.connected
           ? `<p><strong>${patreon.capabilities?.length?'Member access active':'Patreon connected'}</strong><br><span>${patreon.capabilities?.length?'Powered Cube practice and custom-set practice are unlocked.':'No current paid Patreon entitlement was detected.'}</span></p>`
-          : `<p><strong>${patreon?.configured===false?'Patreon connection is not available yet.':'Unlock member practice.'}</strong><br><span>Connect the Patreon account that supports Pack One.</span></p>`}
+          : `<p><strong>${patreon?.configured===true?'Unlock member practice.':'Patreon connection is not available yet.'}</strong><br><span>Connect the Patreon account that supports Pack One.</span></p>`}
       </div>
       <div class="profile-membership-actions">
-        ${patreon?.connected?'<button type="button" class="button secondary" id="patreon-disconnect">Disconnect Patreon</button>':patreon?.configured!==false?'<button type="button" class="button secondary" id="patreon-connect">Connect Patreon</button>':''}
+        ${patreon?.connected?'<button type="button" class="button secondary" id="patreon-disconnect">Disconnect Patreon</button>':patreon?.configured===true?'<button type="button" class="button secondary" id="patreon-connect">Connect Patreon</button>':''}
         <span id="patreon-status" aria-live="polite"></span>
       </div>
     </section>`:''}
