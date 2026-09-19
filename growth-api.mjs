@@ -145,6 +145,22 @@ export async function getAuthSession() {
   } catch { clearAuth(); }
   return null;
 }
+export async function loadPatreonStatus() {
+  const authSession=loadAuthToken();
+  if(!authSession) return {configured:false,connected:false,capabilities:[]};
+  return api('/v1/patreon/status',{auth:false,authSession});
+}
+export async function connectPatreon() {
+  const authSession=loadAuthToken();
+  if(!authSession) throw new Error('Sign in before connecting Patreon.');
+  return api('/v1/patreon/connect',{method:'POST',body:{},auth:false,authSession});
+}
+export async function disconnectPatreon() {
+  const authSession=loadAuthToken();
+  if(!authSession) throw new Error('Sign in before disconnecting Patreon.');
+  return api('/v1/patreon/disconnect',{method:'POST',body:{},auth:false,authSession});
+}
+
 export async function signUpAccount({ name, email, password }) {
   return saveAuth(await authRequest('/sign-up/email', { method:'POST', body:{ name, email, password } }));
 }
