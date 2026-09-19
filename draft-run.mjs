@@ -1,3 +1,4 @@
+import {meetsServingQuality} from './serving-quality.mjs';
 import {DAILY_SELECTION_VERSION,dailySetPlan,liveRegularSets} from './daily-selection.mjs';
 import { rankCandidates } from './scoring.mjs';
 import { seededRandom } from './gameplay.mjs';
@@ -244,7 +245,7 @@ export function selectDraftRun(pool, seed, environment = 'mixed', {daily=false,d
   const random = seededRandom(seed);
   const released=new Set(releasedRunSets(day));
   const live=metadata?new Set(metadata.filter(s=>s.status==='Live').map(s=>s.set_id)):null;
-  const sorted = poolForEnvironment(pool, environment).filter(p=>(!live||live.has(p.set_id))&&eligibleRunPuzzle(p)&&(environment==='powered-cube'||regularRunSet(p.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(p.set_id))).sort((a,b) => a.puzzle_id.localeCompare(b.puzzle_id));
+  const sorted = poolForEnvironment(pool, environment).filter(p=>meetsServingQuality(p)&&(!live||live.has(p.set_id))&&eligibleRunPuzzle(p)&&(environment==='powered-cube'||regularRunSet(p.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(p.set_id))).sort((a,b) => a.puzzle_id.localeCompare(b.puzzle_id));
   const bandsByPuzzle = new Map(sorted.map(p=>[p.puzzle_id,rateDraftRunPuzzle(p).band]));
   // Shuffle the composition, so difficulty does not disclose the round's role.
   // An unavailable easy slot can become medium; never exceed one easy choice.
@@ -284,7 +285,7 @@ export function selectDraftRunReroll(pool, source, { type, round, seed, excluded
   if (![LEGACY_DIFFICULTY_VERSION,DRAFT_RUN_DIFFICULTY_VERSION].includes(difficultyVersion)) throw Error('Unsupported difficulty version.');
   const previous=selectionVersion===PREVIOUS_SELECTION_VERSION;
   const released=new Set(releasedRunSets(day));
-  const eligible = poolForEnvironment(pool, environment).filter(p=>previous||(eligibleRunPuzzle(p)&&(environment==='powered-cube'||regularRunSet(p.set_id))&&(round<earlyRoundsForSelection(selectionVersion)||rateDraftRunPuzzle(p).band!=='easy'))).filter(p=>(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(p.set_id)) && !excluded.has(p.source_draft_hash) &&
+  const eligible = poolForEnvironment(pool, environment).filter(meetsServingQuality).filter(p=>previous||(eligibleRunPuzzle(p)&&(environment==='powered-cube'||regularRunSet(p.set_id))&&(round<earlyRoundsForSelection(selectionVersion)||rateDraftRunPuzzle(p).band!=='easy'))).filter(p=>(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(p.set_id)) && !excluded.has(p.source_draft_hash) &&
     (type === 'set' ? p.set_id !== source.set_id : p.set_id === source.set_id) &&
     eligiblePickForRound(round,p.pick_number,environment,selectionVersion) && Math.abs(p.pick_number-source.pick_number) <= 1)
     .filter(p => {

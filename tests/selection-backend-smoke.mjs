@@ -1,6 +1,7 @@
 // Execute only through the isolated database gate, never against production.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import {impliedTrophyScore,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
 import {selectDraftRun,selectDraftRunReroll} from '../draft-run.mjs';
 import {loadLiveSetMetadata,decodePuzzleMetadata,selectDatabaseRun,selectDatabaseReroll} from '../worker/draft-run-selection.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('An isolated development branch is required.');
@@ -24,6 +25,7 @@ try {
   for(const selectionVersion of ['eight-pick-v4','eight-pick-v3','first-pack-v2'])for(const environment of ['mixed','powered-cube'])for(const daily of [false,true])for(const seed of ['selection-check-a','selection-check-b']) {
     const expected=selectDraftRun(pool,seed,environment,{daily,selectionVersion,metadata:selectionVersion==='eight-pick-v4'?metadata:null});
     const actual=await selectDatabaseRun(fixtureQuery,version,seed,environment,{daily,selectionVersion,metadata:selectionVersion==='eight-pick-v4'?metadata:null});
+    assert.ok(actual.every(p=>impliedTrophyScore(p)>=20),'New selections respect the implied trophy score floor');
     assert.deepEqual(actual.map(p=>p.puzzle_id),expected.map(p=>p.puzzle_id),`${selectionVersion}/${environment}/${daily}/${seed}: exact selector parity`);
     for(const type of environment==='powered-cube'?['pack']:['pack','set'])for(const round of (selectionVersion.startsWith('eight-pick')?[0,4,7]:[0,5,9])) {
       const options={type,round,seed,environment,daily,selectionVersion,excludedSources:expected.map(p=>p.source_draft_hash)};

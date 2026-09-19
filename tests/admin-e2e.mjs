@@ -15,7 +15,7 @@ try {
   const requests=[];
   await page.route('**/v1/admin/**',async route=>{
     requests.push(route.request().url());
-    if(route.request().url().includes('/corpus'))return route.fulfill({json:{corpus_version:'fixture-version',gate_version:'corpus-gates-v1',thresholds:{healthMaxAgeDays:7},transitions:{Candidate:['Live','Retired']},history:[],sets:[{set_id:'test',set_name:'Candidate test set',status:'Candidate',source_event_type:'PremierDraft',release_date:'2026-09-01',manifest:{},report:{gates:[{id:'images',pass:false,requirement:'100% HTTPS image references',actual:.9}]},health_current:true,ready:false}]}});
+    if(route.request().url().includes('/corpus'))return route.fulfill({json:{corpus_version:'fixture-version',gate_version:'corpus-gates-v1',thresholds:{healthMaxAgeDays:7},transitions:{Candidate:['Live','Retired']},history:[],sets:[...['Bloomburrow','Aetherdrift','Final Fantasy','Powered Cube','The Hobbit','Kamigawa: Neon Dynasty'].map((set_name,i)=>({set_id:['blb','dft','fin','powered-cube','hob','neo'][i],set_name,status:i===4?'Paused':'Live',release_date:'2026-08-01',serving_count:10000-i*456,under_floor_count:200+i*19,import_status:'complete',health_current:true,ready:i!==4,manifest:{}})),{set_id:'test',set_name:'Candidate test set',status:'Candidate',source_event_type:'PremierDraft',release_date:'2026-09-01',manifest:{},report:{gates:[{id:'images',pass:false,requirement:'100% HTTPS image references',actual:.9}]},health_current:true,ready:false}]}});
     if(route.request().url().includes('/decisions/'))return route.fulfill({json:{puzzle:{prior_picks:[],historical_pick_id:'trophy',candidates:[{id:'trophy',name:'Trophy card',model_probability:.1},{id:'alternative',name:'Alternative card',model_probability:.5}]},choices:[{selected_id:'alternative',answers:20,average_score:95}]}});
     return route.fulfill({json:fixture});
   });
@@ -33,9 +33,16 @@ try {
   await page.screenshot({path:'artifacts/ui-admin-mobile.png',fullPage:true});
   await page.getByRole('link',{name:'Corpus',exact:true}).click();
   await page.getByRole('heading',{name:'Corpus operations'}).waitFor();
-  await page.getByText('Quality gates',{exact:false}).click();
-  await page.getByText('Blocked: images',{exact:true}).waitFor();
+  assert.equal(await page.locator('.corpus-table tbody tr').count(),7);
+  await page.getByLabel('Find a set').fill('missing');assert.ok((await page.locator('#corpus-rows').innerText()).includes('No sets match'));
+  await page.getByLabel('Find a set').fill('test');
+  await page.getByRole('button',{name:'Candidate test set TEST'}).click();
+  await page.getByRole('heading',{name:'Quality & coverage'}).waitFor();
+  assert.ok((await page.locator('.corpus-gates').innerText()).includes('images'));
   assert.equal(await page.locator('option[value=Live]').evaluate(option=>option.disabled),true);
+  for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-corpus-details-${width}.png`,fullPage:true});}
+  await page.getByRole('button',{name:'Close set details'}).click();
+  await page.getByLabel('Find a set').fill('');
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-corpus-${width}.png`,fullPage:true});}
   assert.deepEqual(errors,[]);
   console.log('Admin mobile layout, locked state, filters, review details and CSV export passed.');
