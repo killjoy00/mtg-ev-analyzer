@@ -1,9 +1,13 @@
 # Patreon membership release
 
-The integration ships disabled. `patreon-policy.mjs` must contain the verified
-campaign ID and the all-access tier ID before activation. Supporter membership
-does not grant premium capabilities, regardless of the amount paid. Regular
-practice remains free to authenticated Pack One accounts.
+The integration ships disabled pending the webhook signing secret and a real
+member canary. Read-only API discovery succeeded in run 35457627068 on 2026-09-19.
+The verified policy maps campaign **16808916** to **Elite Member 29631843 ($5)**.
+**Supporter 29631835 ($3)** and the free tier **29623888** grant no premium tools.
+Regular practice remains free to authenticated Pack One accounts.
+
+The OAuth client and both creator credentials are present in GitHub. Discovery
+found `PATREON_WEBHOOK_SECRET` missing. No secret values were exposed.
 
 ## Access policy
 
@@ -72,8 +76,9 @@ Register the webhook URL with `members:create`, `members:update`, `members:delet
    and all-access tier IDs from discovery in the policy.
 2. Confirm callback and webhook registration and save the webhook signing secret
    in GitHub. Do not paste credentials into chat.
-3. Run isolated SQL/backend and browser checks, then use a controlled real member
-   test to verify OAuth linking, supporter denial, premium access, downgrade or
+3. Run isolated SQL/backend and browser checks, then configure a temporary
+   development-only callback/client and enable the policy only on that isolated
+   test branch for a controlled real member test to verify OAuth linking, supporter denial, premium access, downgrade or
    expiration, disconnect, and reconnection. A creator login alone does not prove
    a paid subscriber's tier behavior.
 4. Verify reconciliation succeeds and that Admin → Users reports the provider,

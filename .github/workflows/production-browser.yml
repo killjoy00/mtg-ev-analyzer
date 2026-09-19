@@ -1,0 +1,27 @@
+name: Live production browser verification
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: production-browser-verification
+  cancel-in-progress: false
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install --no-save playwright@1.55.0
+      - name: Complete both unranked Dailies on the live site
+        run: node tests/production-browser-smoke.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-browser-verification
+          path: artifacts/production
+          retention-days: 30

@@ -63,3 +63,8 @@ test('Patreon discovery is read-only and cannot activate memberships',()=>{
  assert.equal(rolloutDispatch({...common,operation:'patreon-discovery'}).body.inputs.mode,'discover');
  assert.throws(()=>rolloutDispatch({...common,operation:'patreon-discovery',mode:'sync'}));
 });
+
+test('production browser verification cannot select a different origin or ref',()=>{
+ assert.equal(rolloutDispatch({...common,operation:'production-browser'}).workflow,'production-browser.yml');
+ assert.throws(()=>rolloutDispatch({...common,operation:'production-browser',origin:'https://example.com'}));
+});
