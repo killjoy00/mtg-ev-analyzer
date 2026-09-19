@@ -452,16 +452,16 @@
     }
   ],
   "normal_queue_counts": {
+    "blocked": 0,
     "live": 31,
-    "pending": 0,
-    "blocked": 0
+    "pending": 0
   },
   "overall": "warning",
   "published_dataset_count": 32,
   "quality_counts": {
+    "error": 0,
     "healthy": 31,
-    "warning": 1,
-    "error": 0
+    "warning": 1
   },
   "schema_version": 1,
   "special_modes": [
