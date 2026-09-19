@@ -1,8 +1,8 @@
 {
   "operation": "puzzle-components",
-  "request_id": "phase2-stage-development-isolated-20260919",
-  "reason": "Rerun idempotent development staging after PR157 removed the concurrent automatic image refresh. All 22 components verified Candidate on the first run; the strict retained-payload and Daily gates must now pass without another corpus writer.",
-  "target": "development",
+  "request_id": "phase2-stage-production-20260919",
+  "reason": "Stage the same 22 verified Candidate sources after successful isolated development staging run 35457309349. Do not publish yet. Retain Premier payloads, fixed Dailies, exclusions, and the existing Cube component.",
+  "target": "production",
   "action": "stage",
   "source": "regular-phase2"
 }
