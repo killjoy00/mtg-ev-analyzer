@@ -37,7 +37,7 @@ QUEUE_PATH = REPO_ROOT / "data" / "import-queue.json"
 # thinnest environments in the corpus got that way. Waiting lets the archive
 # accumulate before it is frozen. This is a policy number, not a fact about
 # the data: raise it for a deeper sample, lower it to publish sooner.
-DEFAULT_MINIMUM_AGE_DAYS = 21
+DEFAULT_MINIMUM_AGE_DAYS = 15
 
 
 def load_queue(path: Path = QUEUE_PATH) -> dict:

@@ -41,7 +41,8 @@ class DiscoveryTests(unittest.TestCase):
         ("MSH", "2026-06-26"),
     ]
 
-    def discover(self, queued, *, available, today, minimum_age_days=21):
+    def discover(self, queued, *, available, today,
+                 minimum_age_days=refresh_import_queue.DEFAULT_MINIMUM_AGE_DAYS):
         with contextlib.redirect_stdout(io.StringIO()):
             return refresh_import_queue.discover_new_codes(
                 queued,
@@ -60,13 +61,26 @@ class DiscoveryTests(unittest.TestCase):
 
     def test_waits_for_a_deeper_archive_before_freezing_a_set(self):
         # import_sets skips anything already catalogued, so a set imported in
-        # its release week keeps that week's depth for good.
-        found = self.discover(
-            ["HOB", "MSH"], available={"NEWA", "NEWB"}, today="2026-09-05",
+        # its release week keeps that week's depth for good. The threshold is
+        # a tunable policy number, so this asserts the boundary rather than a
+        # particular value: one day short waits, the threshold itself queues.
+        threshold = refresh_import_queue.DEFAULT_MINIMUM_AGE_DAYS
+        newa_release = dt.date.fromisoformat("2026-08-20")
+        newb_release = dt.date.fromisoformat("2026-09-01")
+        self.assertLess(
+            (newb_release - newa_release).days, threshold,
+            "this case needs NEWB to still be immature when NEWA matures",
         )
-        self.assertEqual(found, [], "nothing is 21 days old yet")
+
         found = self.discover(
-            ["HOB", "MSH"], available={"NEWA", "NEWB"}, today="2026-09-12",
+            ["HOB", "MSH"], available={"NEWA", "NEWB"},
+            today=(newa_release + dt.timedelta(days=threshold - 1)).isoformat(),
+        )
+        self.assertEqual(found, [], f"nothing is {threshold} days old yet")
+
+        found = self.discover(
+            ["HOB", "MSH"], available={"NEWA", "NEWB"},
+            today=(newa_release + dt.timedelta(days=threshold)).isoformat(),
         )
         self.assertEqual(found, ["NEWA"], "NEWA has matured, NEWB has not")
 
