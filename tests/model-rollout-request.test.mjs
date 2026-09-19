@@ -68,3 +68,9 @@ test('production browser verification cannot select a different origin or ref',(
  assert.equal(rolloutDispatch({...common,operation:'production-browser'}).workflow,'production-browser.yml');
  assert.throws(()=>rolloutDispatch({...common,operation:'production-browser',origin:'https://example.com'}));
 });
+
+test('Patreon sync runs only the reviewed membership reconciliation workflow',()=>{
+ const request={...common,operation:'patreon-sync'};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'patreon-reconcile.yml',body:{ref:'main',inputs:{mode:'sync'}}});
+ for(const extra of [{campaign:'other'},{account:'other'},{ref:'branch'},{mode:'discover'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});

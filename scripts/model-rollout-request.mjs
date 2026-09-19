@@ -33,6 +33,8 @@ export function rolloutDispatch(request) {
     workflow='audit-frozen-outcomes.yml';
   } else if(operation==='patreon-discovery') {
     workflow='patreon-reconcile.yml';inputs={mode:'discover'};
+  } else if(operation==='patreon-sync') {
+    workflow='patreon-reconcile.yml';inputs={mode:'sync'};
   } else if(operation==='production-browser') {
     workflow='production-browser.yml';
   } else if(operation==='browser') {
