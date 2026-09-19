@@ -23,16 +23,15 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from build_replays import (  # noqa: E402
     CountStore, OutOfFoldModel, build_colour_table, build_colour_tables_by_fold,
-    normalize_probabilities, stable_fold,
+    choose_output_ids, normalize_probabilities, stable_fold,
 )
 from import_all_trophies import (  # noqa: E402
-    TRAINING_DRAFT_CAP, collect_legacy_v3, collect_isolated, eligible_trophies,
-    scan_metadata,
+    collect_legacy_v3, collect_isolated, scan_metadata,
 )
 from build_replays import DraftSkill, select_strong_drafts  # noqa: E402
 
 
-SETS = ("tmt", "hob", "msh", "blb", "sos", "powered-cube")
+SETS = ("tmt", "hob", "msh", "blb", "sos")
 GRADE_THRESHOLDS = (50, 60, 65, 70, 75, 80, 85, 90, 95)
 
 
@@ -108,26 +107,44 @@ def model_probabilities(model, example):
 
 
 def reconstruct(set_id, draft_path, game_path):
+    """Rebuild the exact normal-set v3 replay-builder context plus strict v4.
+
+    The all-trophy corpus preserves rows from several historical publication
+    contexts. The pinned baseline here is the original 300-replay v3 build for
+    each set: its source IDs are deterministic, and those rows remain immutable
+    inside the current corpus. That gives an exact artifact parity target rather
+    than incorrectly pretending every later trophy row had one shared fit.
+    """
     drafts, header, _, conflicts = scan_metadata(draft_path)
-    # Public archives legitimately contain drafts whose skill buckets are
-    # missing. Production does not reject the archive for that; it excludes only
-    # those draft IDs from the training/qualified cohorts. Reconstruct the same
-    # cohort rather than requiring every source draft to carry skill metadata.
     skills = {
         did: DraftSkill(d["rate"], d["games"])
         for did, d in drafts.items()
         if did not in conflicts and d.get("rate") is not None and d.get("games") is not None
     }
-    training, calculated, _ = select_strong_drafts(
-        skills, 100, .15, TRAINING_DRAFT_CAP)
-    manifest_path = ROOT / "data" / set_id / "manifest.json"
-    manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
-    cutoff = max(.6, calculated, manifest.get("cohort", {}).get("win_rate_cutoff", 0))
-    qualified, _ = eligible_trophies(drafts, cutoff, False, conflicts)
+    manifest = json.loads((ROOT / "data" / set_id / "manifest.json").read_text())
+    training, cutoff, experienced = select_strong_drafts(skills, 100, .15, 5000)
+    cohort = manifest.get("cohort", {})
+    if len(training) != int(cohort.get("training_drafts", -1)):
+        raise ValueError(
+            f"{set_id}: pinned training cohort changed: {len(training)} vs "
+            f"{cohort.get('training_drafts')}")
+    if abs(cutoff - float(cohort.get("win_rate_cutoff", cutoff))) > 1e-9:
+        raise ValueError(
+            f"{set_id}: pinned win-rate cutoff changed: {cutoff} vs "
+            f"{cohort.get('win_rate_cutoff')}")
+    if experienced != int(cohort.get("experienced_drafts", experienced)):
+        raise ValueError(
+            f"{set_id}: pinned experienced cohort changed: {experienced} vs "
+            f"{cohort.get('experienced_drafts')}")
 
-    # Current v3, reconstructed exactly as the production importer did it.
+    # This is the deterministic source-ID selection used by build_replays.py.
+    output_ids = set(choose_output_ids(training, 300))
+
+    # Frozen v3: direct held counts are subtracted after global aggregation and
+    # one colour table is shared. This is retained only to reproduce the pinned
+    # artifact being compared.
     old_counts, old_held, old_output, _, _, old_colour_examples = collect_legacy_v3(
-        draft_path, set(training), set(qualified), header)
+        draft_path, set(training), output_ids, header)
     old_fit = build_colour_table(
         game_path, old_colour_examples,
         {draft_id for draft_id, _ in old_colour_examples}, set_id)
@@ -136,27 +153,27 @@ def reconstruct(set_id, draft_path, game_path):
         for fold in range(5)
     ]
 
-    # Candidate v4: every fold aggregate and fit is derived from its explicit
-    # training complement before any numeric statistic is calculated.
+    # Candidate v4: the same IDs, packs and answers, but every numeric model
+    # input is derived after removing the complete held fold.
     fold_training, new_output, _, _, new_colour_examples = collect_isolated(
-        draft_path, set(training), set(qualified), header)
+        draft_path, set(training), output_ids, header)
     new_fits = build_colour_tables_by_fold(
         game_path, new_colour_examples, fold_training, set_id)
     new_models = [
         OutOfFoldModel(fold.counts, CountStore.empty(), new_fits[fold.fold])
         for fold in fold_training
     ]
-    return drafts, qualified, old_output, new_output, old_models, new_models, new_fits
+    return output_ids, old_output, new_output, old_models, new_models, new_fits, manifest
 
 
 def run_set(set_id, work):
     paths = verify_sources(work, set_id)
-    _, qualified, old_output, new_output, old_models, new_models, new_fits = reconstruct(
+    output_ids, old_output, new_output, old_models, new_models, new_fits, manifest = reconstruct(
         set_id, paths["draft_data"], paths["game_data"])
     frozen = load_frozen(set_id)
     by_hash = {
         hashlib.sha256(f"{set_id}|{draft_id}".encode()).hexdigest()[:32]: draft_id
-        for draft_id in qualified
+        for draft_id in output_ids
     }
 
     parity_errors = []
@@ -173,7 +190,8 @@ def run_set(set_id, work):
     for puzzle in frozen:
         draft_id = by_hash.get(puzzle.get("source_draft_hash"))
         if draft_id is None:
-            parity_errors.append(f"unknown source {puzzle.get('source_draft_hash')}")
+            # Later all-trophy additions were built under their own immutable
+            # publication context. They are not part of this exact v3 baseline.
             continue
         raw_pick = int(puzzle["pick_number"]) - 1
         old_example = next((p for p in old_output.get(draft_id, [])
@@ -252,8 +270,12 @@ def run_set(set_id, work):
 
     if parity_errors:
         raise ValueError(
-            f"{set_id}: legacy reconstruction did not reproduce frozen v3: "
+            f"{set_id}: replay-builder reconstruction did not reproduce pinned v3: "
             + "; ".join(parity_errors[:5]))
+    if len(decision_rows) < 500:
+        raise ValueError(
+            f"{set_id}: only {len(decision_rows)} pinned baseline decisions matched; "
+            "expected broad coverage of the immutable 300-replay artifact.")
 
     n = len(decision_rows)
     abs_scores = [row["abs_delta"] for row in candidate_deltas]
@@ -263,6 +285,7 @@ def run_set(set_id, work):
         "decisions": n,
         "candidate_scores": len(candidate_deltas),
         "legacy_frozen_parity": True,
+        "baseline_replays": int(manifest.get("replay_count", 0)),
         "old_prediction": {
             "top1_accuracy": old_hits / n if n else 0,
             "log_loss": old_loss / n if n else 0,
@@ -339,7 +362,8 @@ def summarize(results):
         "old_model": "strong-player-colour-stage-v3",
         "corrected_model": "strong-player-colour-stage-v4",
         "pinned_source": "results/scoring-2026-09-16/downloads.json",
-        "frozen_corpus": "elite-trophy-colour-stage-v7",
+        "frozen_corpus": json.loads(
+            (ROOT / "corpus/draft-run/catalog.json").read_text())["corpus_version"],
         "legacy_frozen_parity_all_sets": all(r["legacy_frozen_parity"] for r in results),
         "decisions": n,
         "candidate_scores": cand_n,
