@@ -29,9 +29,10 @@ from import_all_trophies import (  # noqa: E402
     collect_legacy_v3, collect_isolated, scan_metadata,
 )
 from build_replays import DraftSkill, select_strong_drafts  # noqa: E402
+import powered_cube_shape  # noqa: E402
 
 
-SETS = ("tmt", "hob", "msh", "blb", "sos")
+SETS = ("tmt", "hob", "msh", "blb", "sos", "powered-cube")
 GRADE_THRESHOLDS = (50, 60, 65, 70, 75, 80, 85, 90, 95)
 
 
@@ -166,10 +167,55 @@ def reconstruct(set_id, draft_path, game_path):
     return output_ids, old_output, new_output, old_models, new_models, new_fits, manifest
 
 
+def reconstruct_v4_only(set_id, draft_path, game_path):
+    """Build only the corrected model while using the frozen artifact as v3."""
+    drafts, header, _, conflicts = scan_metadata(draft_path)
+    skills = {
+        did: DraftSkill(d["rate"], d["games"])
+        for did, d in drafts.items()
+        if did not in conflicts and d.get("rate") is not None and d.get("games") is not None
+    }
+    manifest = json.loads((ROOT / "data" / set_id / "manifest.json").read_text())
+    training, cutoff, experienced = select_strong_drafts(skills, 100, .15, 5000)
+    cohort = manifest.get("cohort", {})
+    if len(training) != int(cohort.get("training_drafts", -1)):
+        raise ValueError(f"{set_id}: pinned training cohort changed")
+    if abs(cutoff - float(cohort.get("win_rate_cutoff", cutoff))) > 1e-9:
+        raise ValueError(f"{set_id}: pinned win-rate cutoff changed")
+    if experienced != int(cohort.get("experienced_drafts", experienced)):
+        raise ValueError(f"{set_id}: pinned experienced cohort changed")
+
+    # Powered Cube v3 selected 1,200 source drafts before later playability
+    # filtering. Keep that exact exclusion for the colour fit, even though the
+    # frozen artifact contains only the published subset.
+    output_ids = set(choose_output_ids(training, 1200))
+    fold_training, new_output, _, _, new_colour_examples = collect_isolated(
+        draft_path, set(training), output_ids, header)
+    new_fits = build_colour_tables_by_fold(
+        game_path, new_colour_examples, fold_training, set_id)
+    new_models = [
+        OutOfFoldModel(fold.counts, CountStore.empty(), new_fits[fold.fold])
+        for fold in fold_training
+    ]
+    return output_ids, new_output, new_models, new_fits, manifest
+
+
 def run_set(set_id, work):
     paths = verify_sources(work, set_id)
-    output_ids, old_output, new_output, old_models, new_models, new_fits, manifest = reconstruct(
-        set_id, paths["draft_data"], paths["game_data"])
+    frozen_direct = set_id == "powered-cube"
+    draft_path = paths["draft_data"]
+    if frozen_direct:
+        raw_shape, _ = powered_cube_shape.analyze_raw_archive(draft_path)
+        model_path = work / set_id / "model.csv.gz"
+        powered_cube_shape.write_model_archive(draft_path, model_path, raw_shape)
+        draft_path = model_path
+        output_ids, new_output, new_models, new_fits, manifest = reconstruct_v4_only(
+            set_id, draft_path, paths["game_data"])
+        old_output = {}
+        old_models = []
+    else:
+        output_ids, old_output, new_output, old_models, new_models, new_fits, manifest = reconstruct(
+            set_id, draft_path, paths["game_data"])
     frozen = load_frozen(set_id)
     by_hash = {
         hashlib.sha256(f"{set_id}|{draft_id}".encode()).hexdigest()[:32]: draft_id
@@ -194,28 +240,36 @@ def run_set(set_id, work):
             # publication context. They are not part of this exact v3 baseline.
             continue
         raw_pick = int(puzzle["pick_number"]) - 1
-        old_example = next((p for p in old_output.get(draft_id, [])
-                            if p.raw_pack_number == 0 and p.raw_pick_number == raw_pick), None)
         new_example = next((p for p in new_output.get(draft_id, [])
                             if p.raw_pack_number == 0 and p.raw_pick_number == raw_pick), None)
-        if old_example is None or new_example is None:
+        if new_example is None:
             parity_errors.append(f"{draft_id}/pick {raw_pick}: source example missing")
             continue
 
         fold = stable_fold(draft_id, 5)
-        old_raw, old_p = model_probabilities(old_models[fold], old_example)
         new_raw, new_p = model_probabilities(new_models[fold], new_example)
         frozen_p = {card["name"]: float(card["model_probability"]) for card in puzzle["candidates"]}
-        for card, value in frozen_p.items():
-            if card not in old_p or abs(round(old_p[card], 6) - value) > 5e-7:
-                parity_errors.append(
-                    f"{draft_id}/p{raw_pick + 1}/{card}: frozen={value} reconstructed={old_p.get(card)}")
-                if len(parity_errors) >= 20:
-                    break
+        if frozen_direct:
+            old_p = frozen_p
+            if set(old_p) != set(new_example.candidates):
+                parity_errors.append(f"{draft_id}/p{raw_pick + 1}: frozen/new candidate set mismatch")
+        else:
+            old_example = next((p for p in old_output.get(draft_id, [])
+                                if p.raw_pack_number == 0 and p.raw_pick_number == raw_pick), None)
+            if old_example is None:
+                parity_errors.append(f"{draft_id}/pick {raw_pick}: legacy source example missing")
+                continue
+            old_raw, old_p = model_probabilities(old_models[fold], old_example)
+            for card, value in frozen_p.items():
+                if card not in old_p or abs(round(old_p[card], 6) - value) > 5e-7:
+                    parity_errors.append(
+                        f"{draft_id}/p{raw_pick + 1}/{card}: frozen={value} reconstructed={old_p.get(card)}")
+                    if len(parity_errors) >= 20:
+                        break
         if len(parity_errors) >= 20:
             break
 
-        cards = list(old_example.candidates)
+        cards = list(new_example.candidates)
         old_order = sorted(cards, key=lambda card: (-old_p[card], card))
         new_order = sorted(cards, key=lambda card: (-new_p[card], card))
         if old_order != new_order:
@@ -223,7 +277,7 @@ def run_set(set_id, work):
         if old_order[0] != new_order[0]:
             top1_changes += 1
 
-        historical = old_example.historical_pick
+        historical = new_example.historical_pick
         old_hit = old_order[0] == historical
         new_hit = new_order[0] == historical
         old_hits += int(old_hit); new_hits += int(new_hit)
