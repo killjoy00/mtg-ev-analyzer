@@ -6,6 +6,10 @@ on:
       - fix/164-holdout-isolation
   workflow_dispatch:
 
+concurrency:
+  group: holdout-isolation-validation
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
