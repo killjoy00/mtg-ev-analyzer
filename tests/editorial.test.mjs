@@ -57,6 +57,10 @@ assert.match(disclosure, /participates in TCGplayer's affiliate program through 
 assert.match(disclosure, /commission/i);
 assert.doesNotMatch(disclosure, /preparing to participate|When affiliate routing is active/i);
 assert.doesNotMatch(disclosure, /How links are labeled/i);
+const privacy = await readFile('privacy/index.html','utf8');
+assert.match(privacy, /TCGplayer links on Pack One are affiliate links routed through Pack One's approved Impact referral URL/i);
+assert.match(privacy, /may earn a commission from eligible purchases at no added cost to the buyer/i);
+assert.doesNotMatch(privacy, /may be affiliate links|whether affiliate routing was active/i);
 const sitemap = await readFile('sitemap.xml','utf8');
 assert.match(sitemap, /\/sets\/msh\//);
 assert.match(sitemap, /\/learn\/first-pick-discipline\//);
