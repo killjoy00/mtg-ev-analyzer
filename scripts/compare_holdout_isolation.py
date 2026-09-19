@@ -109,9 +109,10 @@ def model_probabilities(model, example):
 
 def reconstruct(set_id, draft_path, game_path):
     drafts, header, _, conflicts = scan_metadata(draft_path)
-    if any(d.get("rate") is None or d.get("games") is None
-           for did, d in drafts.items() if did not in conflicts):
-        raise ValueError(f"{set_id}: comparison expects modern win-rate archives")
+    # Public archives legitimately contain drafts whose skill buckets are
+    # missing. Production does not reject the archive for that; it excludes only
+    # those draft IDs from the training/qualified cohorts. Reconstruct the same
+    # cohort rather than requiring every source draft to carry skill metadata.
     skills = {
         did: DraftSkill(d["rate"], d["games"])
         for did, d in drafts.items()
