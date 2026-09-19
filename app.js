@@ -333,7 +333,7 @@ function challengeShareUrl(mode) {
 }
 
 // Retained game utilities support archived result contracts only. All current
-// navigation returns to the two fixed Dailies; retired mode menus cannot render.
+// navigation returns to the three fixed Dailies; retired mode menus cannot render.
 function renderHome() {
   window.location.replace('./');
 }
