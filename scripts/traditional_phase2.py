@@ -20,7 +20,7 @@ from build_replays import (
 from format_research import cohort
 from format_residuals import metadata_for_set, residual_report
 from import_all_trophies import (
-    ROOT, BASE, archive, scan_metadata, eligible_trophies, collect, trajectory,
+    ROOT, BASE, archive, scan_metadata, eligible_trophies, collect_legacy_v3, trajectory,
     metadata, resolve_images, digest, encoded, atomic_json, write_gzip_jsonl,
     csv_bytes, rows,
 )
@@ -166,7 +166,7 @@ def measure(sid,directory,frozen):
             if d['rate'] is not None and d['games'] is not None and did not in conflicts}
     training,_,_=select_strong_drafts(skills,100,.15,pin['training_cap'])
     qualified,_=eligible_trophies({did:{**d,'losses':None} for did,d in drafts.items()},pin['win_rate_cutoff'],conflicts=conflicts)
-    counts,folds,output,_,training_picks,colour_examples=collect(draft,set(training),set(qualified),header)
+    counts,folds,output,_,training_picks,colour_examples=collect_legacy_v3(draft,set(training),set(qualified),header)
     if len(training)!=pin['training_drafts'] or training_picks!=pin['training_picks'] or len(qualified)!=pin['qualified_trophies']:
         raise ValueError('Frozen training/cohort counts changed')
     fit=build_colour_table(game,colour_examples,{did for did,_ in colour_examples},sid)

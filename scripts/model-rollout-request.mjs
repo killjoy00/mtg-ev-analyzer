@@ -11,6 +11,8 @@ export function rolloutDispatch(request) {
   if(operation==='regenerate') {
     if(!/^elite-trophy-[a-z0-9-]+-v[0-9]+$/.test(corpus_version||''))throw Error('Invalid corpus version.');
     workflow='regenerate-draft-run-corpus.yml';inputs={corpus_version};extra=['corpus_version'];
+  } else if(operation==='rebuild-v4') {
+    workflow='rebuild-v4-draft-run-corpus.yml';
   } else if(operation==='import') {
     if(!/^(all|[a-z0-9-]+(?:,[a-z0-9-]+)*)$/.test(sets||'')||!['build-only','development','production'].includes(target))throw Error('Invalid import request.');
     workflow='import-all-trophies.yml';inputs={sets,target};extra=['sets','target'];

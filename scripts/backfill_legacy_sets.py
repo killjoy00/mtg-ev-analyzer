@@ -40,7 +40,7 @@ from pathlib import Path
 from typing import Optional, Sequence
 
 try:
-    from .build_replays import MODEL_VERSION, stable_score
+    from .build_replays import ISOLATED_MODEL_VERSION, stable_score
     from .fetch_card_metadata import aliases, compact_card, draft_candidate_names, fetch_named
     from .import_sets import (
         CATALOG_PATH,
@@ -57,7 +57,7 @@ try:
         validate_path_model,
     )
 except ImportError:  # Script execution from scripts/.
-    from build_replays import MODEL_VERSION, stable_score
+    from build_replays import ISOLATED_MODEL_VERSION, stable_score
     from fetch_card_metadata import aliases, compact_card, draft_candidate_names, fetch_named
     from import_sets import (
         CATALOG_PATH,
@@ -473,10 +473,10 @@ def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
         # of this guard is that the backfill must not QUIETLY change the model -
         # not that the model must be one particular version forever. Pinned to a
         # literal it fired on the first legitimate model change instead.
-        if manifest.get("model", {}).get("model_version") != MODEL_VERSION:
+        if manifest.get("model", {}).get("model_version") != ISOLATED_MODEL_VERSION:
             raise ValueError(
                 f"Legacy backfill wrote model {manifest.get('model', {}).get('model_version')!r}, "
-                f"expected {MODEL_VERSION!r}.")
+                f"expected {ISOLATED_MODEL_VERSION!r}.")
         if manifest.get("cohort", {}).get("selection_metric") != "earliest_game_arena_rank":
             raise ValueError("Legacy backfill did not replace the temporary selection metadata.")
         if "win_rate_cutoff" in manifest.get("cohort", {}):

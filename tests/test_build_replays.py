@@ -174,7 +174,7 @@ class PipelineTests(unittest.TestCase):
         rows = []
         skill = {
             "d1":"0.72 - 0.74","d2":"0.70 - 0.72","d3":"0.68 - 0.70",
-            "d4":"0.66 - 0.68","d5":"0.55 - 0.57","d6":"0.52 - 0.54"
+            "d4":"0.55 - 0.57","d5":"0.66 - 0.68","d6":"0.52 - 0.54"
         }
         picks = {"d1":"A","d2":"A","d3":"A","d4":"B","d5":"C","d6":"C"}
         for draft_id in skill:
@@ -198,12 +198,22 @@ class PipelineTests(unittest.TestCase):
             writer.writerows(rows)
 
     def make_args(self, tmp, csv_path):
+        game_path = Path(tmp) / "games.csv"
+        with game_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=[
+                "draft_id", "main_colors", "deck_A", "deck_B", "deck_C"])
+            writer.writeheader()
+            for draft_id in ("d1", "d2", "d3", "d4", "d5", "d6"):
+                writer.writerow({
+                    "draft_id": draft_id, "main_colors": "U",
+                    "deck_A": "1", "deck_B": "1", "deck_C": "0",
+                })
         return argparse.Namespace(
             input=str(csv_path), output_dir=str(Path(tmp)/"tst"), catalog=str(Path(tmp)/"catalog.json"),
             expansion="TST", format="PremierDraft", source_date="2026-01-01", minimum_games=100,
-            top_fraction=2/3, max_training_drafts=100, max_output_drafts=100, minimum_picks=2,
-            folds=3, shard_size=2, card_metadata=None,
-            deck_fit=str(self.make_deck_fit(Path(tmp) / "fit.json")),
+            top_fraction=2/3, max_training_drafts=100, max_output_drafts=4, minimum_picks=2,
+            folds=2, shard_size=2, card_metadata=None,
+            deck_fit=None, game_data=str(game_path),
         )
 
     @staticmethod
@@ -225,8 +235,9 @@ class PipelineTests(unittest.TestCase):
             dataset = build(self.make_args(tmp, csv_path))
             self.assertFalse(dataset["is_fixture"])
             self.assertTrue(dataset["model"]["pool_conditioned"])
-            self.assertEqual(dataset["model"]["holdout"], "3-fold by draft_id")
-            self.assertGreaterEqual(len(dataset["replays"]), 3)
+            self.assertEqual(dataset["model"]["holdout"], "2-fold by draft_id")
+            self.assertEqual(dataset["model"]["model_version"], "strong-player-colour-stage-v4")
+            self.assertEqual(len(dataset["replays"]), 4)
             first = dataset["replays"][0]["picks"][0]
             self.assertEqual(first["pack_number"], 1)
             self.assertEqual(first["pick_number"], 1)

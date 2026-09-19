@@ -1,0 +1,235 @@
+name: rebuild-v4-draft-run-corpus
+
+# A model-version change cannot reuse the existing replay shards. This workflow
+# rebuilds every supported environment from its public source, verifies that no
+# environment or source snapshot drifted, creates a separately versioned v8
+# corpus, and publishes the result to a review branch. It never changes live
+# serving or either Neon database.
+on:
+  workflow_dispatch:
+    inputs:
+      corpus_version:
+        description: Separate corpus identity for the corrected model
+        required: true
+        default: elite-trophy-colour-stage-v8
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: set-data-import-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    env:
+      EXPECTED_MODEL: strong-player-colour-stage-v4
+      EXPECTED_CORPUS: elite-trophy-colour-stage-v8
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Fast-forward to latest reviewed main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Validate immutable rollout inputs
+        env:
+          REQUESTED_CORPUS: ${{ inputs.corpus_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$REQUESTED_CORPUS" = "$EXPECTED_CORPUS"
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.build_replays import ISOLATED_MODEL_VERSION
+
+          catalog = json.loads(Path('data/catalog.json').read_text())
+          sets = catalog['sets']
+          versions = {row['model_version'] for row in sets}
+          if versions != {'strong-player-colour-stage-v3'}:
+              raise SystemExit(f'Expected the frozen v3 starting point, found {sorted(versions)}')
+          if ISOLATED_MODEL_VERSION != 'strong-player-colour-stage-v4':
+              raise SystemExit(f'Unexpected corrected builder: {ISOLATED_MODEL_VERSION}')
+          if len(sets) != 32 or sum(row.get('category') == 'special_mode' for row in sets) != 1:
+              raise SystemExit('Expected 31 regular environments plus Powered Cube.')
+          Path('generated').mkdir(exist_ok=True)
+          Path('generated/v4-original-catalog.json').write_text(
+              json.dumps(catalog, indent=2) + '\n')
+          print('Pinned', len(sets), 'v3 environments for exact-source reconciliation.')
+          PY
+
+      - name: Run pre-rebuild tests
+        run: npm test
+
+      - name: Rebuild every regular environment with v4
+        shell: bash
+        run: |
+          set -euo pipefail
+          regular_sets="$(python - <<'PY'
+          import json
+          from pathlib import Path
+          rows=json.loads(Path('generated/v4-original-catalog.json').read_text())['sets']
+          print(','.join(row['id'].upper() for row in rows
+                         if row.get('category') != 'special_mode'
+                         and row.get('cohort_selection') != 'earliest_game_arena_rank'))
+          PY
+          )"
+          python -u scripts/import_sets.py \
+            --sets "$regular_sets" \
+            --format PremierDraft \
+            --limit 100 \
+            --max-training-drafts 5000 \
+            --max-output-drafts 300 \
+            --minimum-replays 100 \
+            --minimum-picks 30 \
+            --folds 5 \
+            --shard-size 2 \
+            --max-path-bytes 4000000 \
+            --report generated/v4-regular-rebuild.json
+
+      - name: Rebuild legacy Arena-rank environments with v4
+        run: >-
+          python -u scripts/backfill_legacy_sets.py
+          --sets MID,VOW
+          --rebuild-published
+          --max-training-drafts 5000
+          --max-output-drafts 300
+          --minimum-replays 100
+          --minimum-picks 30
+          --folds 5
+          --shard-size 2
+          --max-path-bytes 4000000
+          --report generated/v4-legacy-rebuild.json
+
+      - name: Rebuild Powered Cube with v4
+        run: >-
+          python -u scripts/build_powered_cube_v3.py
+          --max-training-drafts 5000
+          --max-output-candidates 1200
+          --target-replays 300
+          --minimum-replays 100
+          --minimum-first-visible-candidates 14
+          --shard-size 2
+          --max-path-bytes 8000000
+
+      - name: Verify complete v4 provenance
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          before=json.loads(Path('generated/v4-original-catalog.json').read_text())['sets']
+          after=json.loads(Path('data/catalog.json').read_text())['sets']
+          old={row['id']:row for row in before}; new={row['id']:row for row in after}
+          if set(old) != set(new):
+              raise SystemExit(f'Environment drift: removed={sorted(set(old)-set(new))}, added={sorted(set(new)-set(old))}')
+          errors=[]
+          for sid in sorted(old):
+              manifest=json.loads(Path('data',sid,'manifest.json').read_text())
+              if manifest['model']['model_version'] != 'strong-player-colour-stage-v4':
+                  errors.append(f'{sid}: model={manifest["model"]["model_version"]}')
+              if new[sid]['model_version'] != 'strong-player-colour-stage-v4':
+                  errors.append(f'{sid}: catalog model={new[sid]["model_version"]}')
+              if manifest['source']['data_date'] != old[sid]['data_date']:
+                  errors.append(f'{sid}: source date {old[sid]["data_date"]} -> {manifest["source"]["data_date"]}')
+              if manifest['model'].get('holdout') != '5-fold by draft_id':
+                  errors.append(f'{sid}: holdout={manifest["model"].get("holdout")}')
+              if not list(Path('data',sid,'shards').glob('*.json')):
+                  errors.append(f'{sid}: no replay shards')
+          if errors:
+              raise SystemExit('V4 rebuild refused:\n'+'\n'.join(errors))
+          print(f'All {len(new)} environments are exact-source, five-fold v4 rebuilds.')
+          PY
+          python scripts/audit_datasets.py --fail-on-error
+
+      - name: Build the separately versioned v8 corpus
+        env:
+          NEW_VERSION: ${{ inputs.corpus_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/set_policy.py --set-corpus-version "$NEW_VERSION"
+          python scripts/build_verified_trophy_corpus.py
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          catalog=json.loads(Path('corpus/draft-run/catalog.json').read_text())
+          if catalog['corpus_version'] != 'elite-trophy-colour-stage-v8':
+              raise SystemExit('The rebuilt corpus is not v8.')
+          if catalog['model_version'] != 'strong-player-colour-stage-v4':
+              raise SystemExit('The rebuilt corpus is not uniformly v4.')
+          if len(catalog['sets']) != 32:
+              raise SystemExit('The rebuilt corpus omitted an environment.')
+          print(sum(row['puzzles'] for row in catalog['sets']), 'baseline v8 decisions')
+          PY
+
+      - name: Validate the complete candidate
+        run: npm test
+
+      - name: Publish versioned v4 replay shards
+        run: |
+          bash scripts/r2_replay_shards.sh upload
+          bash scripts/r2_replay_shards.sh verify
+
+      - name: Commit the reviewed candidate to a rollout branch
+        env:
+          NEW_VERSION: ${{ inputs.corpus_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="rollout/v4-v8-${GITHUB_RUN_ID}"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data corpus/draft-run draft-run.mjs
+          if git diff --cached --quiet; then
+            echo '::error::The rebuild produced no candidate changes.'
+            exit 1
+          fi
+          git commit -m "Build $NEW_VERSION with strong-player-colour-stage-v4 [data-generated]"
+          git push origin "HEAD:$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title "Release v4 model as $NEW_VERSION" \
+            --body "Automated full rebuild from the reviewed #164 correction. All 32 environments were rebuilt from their pinned public source dates, verified as model v4, regenerated as corpus v8, and passed the complete test suite. This PR does not switch Neon serving."
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v4-v8-rebuild-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            generated/v4-original-catalog.json
+            generated/v4-regular-rebuild.json
+            generated/v4-legacy-rebuild.json
+            generated/powered-cube-report.json
+            data/status.json
+            corpus/draft-run/catalog.json

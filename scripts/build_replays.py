@@ -29,7 +29,12 @@ from pathlib import Path
 from typing import Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 SCHEMA_VERSION = 2
+# v3 is the immutable model identity of the currently published corpus and is
+# retained for frozen historical reconstruction. v4 changes no scoring formula;
+# it changes model construction so every fold statistic is derived from that
+# fold's explicit training complement before any aggregation.
 MODEL_VERSION = "strong-player-colour-stage-v3"
+ISOLATED_MODEL_VERSION = "strong-player-colour-stage-v4"
 # Weight on the colour-commitment shift, frozen with the rest of the
 # specification in docs/MODEL-EVALUATION.md and validated on six held-out sets.
 FIT_STRENGTH = 0.75
@@ -217,6 +222,103 @@ class CountStore:
             base = base_of(card, example.raw_pack_number, example.raw_pick_number)
             for pool_card in pool_cards:
                 self.pair_expected[(card, pool_card)] += base
+
+
+@dataclass(frozen=True)
+class FoldTrainingData:
+    """Every numeric input for one grader, built from its allowed IDs only."""
+
+    fold: int
+    training_ids: frozenset[str]
+    held_out_ids: frozenset[str]
+    observed_ids: frozenset[str]
+    counts: CountStore
+
+
+def fold_partitions(training_ids: set[str], folds: int) -> List[Tuple[set[str], set[str]]]:
+    """Return (training, held-out) IDs for every fold with coverage assertions."""
+    if folds < 2:
+        raise ValueError("At least two folds are required for out-of-fold grading.")
+    ids = set(training_ids)
+    held = [{draft_id for draft_id in ids if stable_fold(draft_id, folds) == fold}
+            for fold in range(folds)]
+    if set().union(*held) != ids:
+        raise AssertionError("Fold assignment did not cover every training draft.")
+    if sum(len(group) for group in held) != len(ids):
+        raise AssertionError("A training draft was assigned to more than one held-out fold.")
+    result = []
+    for fold, held_ids in enumerate(held):
+        allowed = ids - held_ids
+        if allowed & held_ids:
+            raise AssertionError(f"Fold {fold}: training and held-out IDs overlap.")
+        result.append((allowed, held_ids))
+    return result
+
+
+def build_fold_training(training_examples: Sequence[Tuple[str, PickExample]],
+                        training_ids: set[str], folds: int) -> List[FoldTrainingData]:
+    """Construct every fold from its permitted observations, never by subtraction.
+
+    In v3, direct held-out counts were subtracted after global aggregation, but
+    pair_expected had already been calculated from global base rates. That left
+    a statistical trace of held answers. Here the held IDs are removed first;
+    direct counts, base rates, pair expectations, priors and fallbacks are then
+    all consequences of the same explicit training complement.
+    """
+    pairs = list(training_examples)
+    ids = set(training_ids)
+    foreign = {draft_id for draft_id, _ in pairs if draft_id not in ids}
+    if foreign:
+        raise AssertionError(f"Training examples include IDs outside the cohort: {sorted(foreign)[:3]}")
+
+    partitions = fold_partitions(ids, folds)
+    held_example_count = sum(
+        1 for draft_id, _ in pairs
+        if draft_id in partitions[stable_fold(draft_id, folds)][1]
+    )
+    if held_example_count != len(pairs):
+        raise AssertionError("Every training observation must belong to exactly one held-out fold.")
+
+    built: List[FoldTrainingData] = []
+    for fold, (allowed_ids, held_ids) in enumerate(partitions):
+        counts = CountStore.empty()
+        observed_ids = set()
+        for draft_id, example in pairs:
+            if draft_id not in allowed_ids:
+                continue
+            if draft_id in held_ids:
+                raise AssertionError(f"Fold {fold}: held-out observation reached direct aggregates.")
+            counts.observe(example)
+            observed_ids.add(draft_id)
+
+        base_model = OutOfFoldModel(counts, CountStore.empty())
+        memo: Dict[Tuple[str, int, int], float] = {}
+
+        def base_of(card: str, pack: int, pick: int) -> float:
+            key = (card, pack, pick)
+            value = memo.get(key)
+            if value is None:
+                value = base_model.base_tendency(card, pack, pick)
+                memo[key] = value
+            return value
+
+        for draft_id, example in pairs:
+            if draft_id not in allowed_ids:
+                continue
+            if draft_id in held_ids:
+                raise AssertionError(f"Fold {fold}: held-out observation reached pair expectations.")
+            counts.observe_expected(example, base_of)
+
+        if observed_ids - allowed_ids or observed_ids & held_ids:
+            raise AssertionError(f"Fold {fold}: aggregate provenance contains held-out IDs.")
+        built.append(FoldTrainingData(
+            fold=fold,
+            training_ids=frozenset(allowed_ids),
+            held_out_ids=frozenset(held_ids),
+            observed_ids=frozenset(observed_ids),
+            counts=counts,
+        ))
+    return built
 
 
 def _colour_helpers():
@@ -412,12 +514,15 @@ def choose_output_ids(strong_ids: Sequence[str], max_output_drafts: int) -> List
     return ordered[:max_output_drafts] if max_output_drafts else ordered
 
 
-def train_and_collect(path: Path, strong_ids: set[str], output_ids: set[str], fieldnames: Sequence[str], folds: int, colour_examples: Optional[list] = None) -> Tuple[CountStore, List[CountStore], Dict[str, List[PickExample]], int, int, int]:
+def train_and_collect(path: Path, strong_ids: set[str], output_ids: set[str],
+                      fieldnames: Sequence[str], folds: int,
+                      colour_examples: Optional[list] = None
+                      ) -> Tuple[List[FoldTrainingData], Dict[str, List[PickExample]], int, int, int]:
+    """Parse once, then build each grader from an explicit training complement."""
     pack_cols = candidate_columns(fieldnames)
     pool_cols = pool_columns(fieldnames)
-    all_counts = CountStore.empty()
-    fold_counts = [CountStore.empty() for _ in range(folds)]
     outputs: MutableMapping[str, List[PickExample]] = defaultdict(list)
+    training_examples: List[Tuple[str, PickExample]] = []
     min_pack = 10**9
     min_pick = 10**9
     parsed_examples = 0
@@ -434,40 +539,18 @@ def train_and_collect(path: Path, strong_ids: set[str], output_ids: set[str], fi
             parsed_examples += 1
             min_pack = min(min_pack, example.raw_pack_number)
             min_pick = min(min_pick, example.raw_pick_number)
-            all_counts.observe(example)
-            fold_counts[stable_fold(example.draft_id, folds)].observe(example)
+            training_examples.append((draft_id, example))
             if draft_id in output_ids:
                 outputs[draft_id].append(example)
-
-    # Second pass. The base rates summed here are only defined once the first
-    # pass has finished counting, so the archive is read twice rather than the
-    # stage anchor being approximated.
-    base_model = OutOfFoldModel(all_counts, CountStore.empty())
-    memo: Dict[Tuple[str, int, int], float] = {}
-
-    def base_of(card: str, pack: int, pick: int) -> float:
-        key = (card, pack, pick)
-        value = memo.get(key)
-        if value is None:
-            value = base_model.base_tendency(card, pack, pick)
-            memo[key] = value
-        return value
-
-    with open_text(path) as handle:
-        reader = csv.DictReader(handle)
-        for row in reader:
-            draft_id = (row.get("draft_id") or "").strip()
-            if draft_id not in strong_ids:
-                continue
-            example = parse_example(row, pack_cols, pool_cols)
-            if not example:
-                continue
-            all_counts.observe_expected(example, base_of)
-            fold_counts[stable_fold(example.draft_id, folds)].observe_expected(example, base_of)
-            if colour_examples is not None and draft_id not in output_ids:
+            if colour_examples is not None:
+                # Keep per-draft colour evidence for the whole training cohort.
+                # build_colour_tables_by_fold removes the complete held-out fold
+                # before aggregating it, so a served draft can train other folds
+                # but can never influence the grader that scores that draft.
                 colour_examples.append((draft_id, example))
 
-    return all_counts, fold_counts, dict(outputs), min_pack, min_pick, parsed_examples
+    fold_training = build_fold_training(training_examples, set(strong_ids), folds)
+    return fold_training, dict(outputs), min_pack, min_pick, parsed_examples
 
 
 def load_card_metadata(path: Optional[Path]) -> Dict[str, dict]:
@@ -546,6 +629,59 @@ def build_colour_table(game_archive: Path, examples, contributing: set, set_id: 
     return fit
 
 
+def build_colour_tables_by_fold(game_archive: Path,
+                                examples: Sequence[Tuple[str, PickExample]],
+                                fold_training: Sequence[FoldTrainingData],
+                                set_id: str) -> List[dict]:
+    """Build colour/stage reference tables from each fold's training IDs only.
+
+    The game archive is scanned once into per-draft observations. Card colours,
+    commitment curves, stage cells, play-rate fallbacks and every other fit
+    statistic are then re-aggregated separately for each permitted ID set.
+    """
+    from deck_fit import (card_colours, colour_hits_for_drafts, colour_mark,  # noqa: E402
+                          estimate, observe_examples, scan_deck_observations)
+
+    example_ids = {draft_id for draft_id, _ in examples}
+    allowed_union = set().union(*(set(fold.training_ids) for fold in fold_training))
+    scan_ids = example_ids & allowed_union
+    played, main_by_draft = scan_deck_observations(game_archive, scan_ids)
+    fits: List[dict] = []
+
+    for fold in fold_training:
+        contributing = example_ids & set(fold.training_ids)
+        if contributing & set(fold.held_out_ids):
+            raise AssertionError(f"Fold {fold.fold}: held-out IDs reached colour inputs.")
+        fold_played = {draft_id: played[draft_id] for draft_id in contributing
+                       if draft_id in played}
+        colour_hits = colour_hits_for_drafts(played, main_by_draft, contributing)
+        colours = card_colours(colour_hits)
+        by_bucket, by_card, by_stage = observe_examples(
+            ((draft_id, example) for draft_id, example in examples
+             if draft_id in contributing),
+            fold_played, colours)
+        if not by_card:
+            raise ValueError(
+                f"{game_archive}: fold {fold.fold} has no training draft matched "
+                "to game data. Wrong set, or mismatched draft/game archives?")
+        fit = estimate(by_bucket, by_card, colours, by_stage)
+        fit["set_id"] = set_id
+        fit["split"] = "fold-train"
+        fit["holdout_fold"] = fold.fold
+        fit["training_ids_sha256"] = hashlib.sha256(
+            "\n".join(sorted(fold.training_ids)).encode()).hexdigest()
+        fit["contributing_drafts"] = len(contributing)
+        fit["decks_matched"] = len(fold_played)
+        fit["cards_with_unknown_colour"] = sum(
+            1 for row in fit["cards"].values()
+            if row["colours"] == colour_mark(None))
+        fits.append(fit)
+
+    if len(fits) != len(fold_training):
+        raise AssertionError("Every fold must have exactly one colour fit.")
+    return fits
+
+
 def load_deck_fit(path: Path) -> dict:
     """The colour table, checked for the two things that would silently change
     the model: the wrong split, and a missing stage curve."""
@@ -561,10 +697,14 @@ def load_deck_fit(path: Path) -> dict:
 
 
 def build(args: argparse.Namespace) -> dict:
-    if not getattr(args, "deck_fit", None) and not getattr(args, "game_data", None):
-        raise ValueError("Pass --game-data (or --deck-fit). Building without a "
-                         "colour table silently ships a different model from the "
-                         "one that was validated.")
+    if getattr(args, "deck_fit", None):
+        raise ValueError(
+            "A single prebuilt --deck-fit cannot be shared across held-out folds. "
+            "Pass --game-data so each fold's colour statistics are built from its "
+            "explicit training IDs.")
+    if not getattr(args, "game_data", None):
+        raise ValueError("Pass --game-data. Fold-isolated colour tables must be "
+                         "derived from the same training complement as the pick model.")
     input_path = Path(args.input)
     skills, fieldnames = scan_draft_skill(input_path)
     strong_ids, cutoff, experienced_count = select_strong_drafts(skills, args.minimum_games, args.top_fraction, args.max_training_drafts)
@@ -574,15 +714,11 @@ def build(args: argparse.Namespace) -> dict:
     folds = min(args.folds, len(strong_ids))
     output_ids = choose_output_ids(strong_ids, args.max_output_drafts)
     colour_examples: List[Tuple[str, PickExample]] = []
-    all_counts, fold_counts, collected, min_pack, min_pick, parsed_examples = train_and_collect(
+    fold_training, collected, min_pack, min_pick, parsed_examples = train_and_collect(
         input_path, set(strong_ids), set(output_ids), fieldnames, folds, colour_examples)
     metadata = load_card_metadata(Path(args.card_metadata) if args.card_metadata else None)
-    if args.deck_fit:
-        deck_fit = load_deck_fit(Path(args.deck_fit))
-    else:
-        contributing = {draft_id for draft_id, _ in colour_examples}
-        deck_fit = build_colour_table(Path(args.game_data), colour_examples,
-                                      contributing, args.expansion.lower())
+    deck_fits = build_colour_tables_by_fold(
+        Path(args.game_data), colour_examples, fold_training, args.expansion.lower())
     pack_offset = 1 if min_pack == 0 else 0
     pick_offset = 1 if min_pick == 0 else 0
 
@@ -592,7 +728,10 @@ def build(args: argparse.Namespace) -> dict:
         if len(picks) < args.minimum_picks:
             continue
         fold = stable_fold(draft_id, folds)
-        model = OutOfFoldModel(all_counts, fold_counts[fold], deck_fit)
+        fold_data = fold_training[fold]
+        if draft_id not in fold_data.held_out_ids or draft_id in fold_data.training_ids:
+            raise AssertionError(f"{draft_id}: invalid fold provenance before scoring.")
+        model = OutOfFoldModel(fold_data.counts, CountStore.empty(), deck_fits[fold])
         replays.append(render_replay(draft_id, picks, model, pack_offset, pick_offset, metadata))
 
     if not replays:
@@ -614,7 +753,7 @@ def build(args: argparse.Namespace) -> dict:
             "training_picks": parsed_examples,
         },
         "model": {
-            "model_version": MODEL_VERSION,
+            "model_version": ISOLATED_MODEL_VERSION,
             "holdout": f"{folds}-fold by draft_id",
             "probabilities_are_calibrated": False,
             "description": "Hierarchical strong-player pick tendency, adjusted by a stage-matched card/pool co-pick lift and a stage-matched colour-commitment shift; normalized within each pack.",
@@ -699,10 +838,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                              "table is built from it, excluding the drafts this "
                              "build will serve.")
     parser.add_argument("--deck-fit",
-                        help="a prebuilt deck_fit.py table instead of --game-data. "
-                             "One of the two is required: without a colour table "
-                             "the colour term contributes nothing and what ships "
-                             "is a different model from the one validated.")
+                        help="legacy compatibility flag. Fold-isolated builds "
+                             "reject a shared fit; pass --game-data so every fold "
+                             "derives its own colour statistics.")
     return parser.parse_args(argv)
 
 

@@ -108,17 +108,16 @@ def stage_bucket(pool_size: int) -> str:
 # pass 1 and 2: decks and card colours, from game data
 # --------------------------------------------------------------------------
 
-def scan_decks(archive: Path, keep: Optional[Set[str]] = None
-               ) -> Tuple[Dict[str, set], Dict[str, Counter]]:
-    """draft_id -> cards played, and card -> counter of its decks' colours.
+def scan_deck_observations(archive: Path, keep: Optional[Set[str]] = None
+                           ) -> Tuple[Dict[str, set], Dict[str, str]]:
+    """Read deck membership and one deterministic colour identity per draft.
 
-    `keep` restricts both to those drafts. Colour identity is a fixed property
-    of a card, so reading it from every deck in the set would be a leak with no
-    plausible path to inflating anything - but "no plausible path" is not the
-    same as none, and the caller can afford to hold the split.
+    Keeping the per-draft observations separate is important for cross-fold
+    production builds: each fold can derive its own colour statistics from its
+    permitted training IDs without rereading the multi-million-row game archive.
     """
     played: Dict[str, set] = defaultdict(set)
-    colour_hits: Dict[str, Counter] = defaultdict(Counter)
+    seen_draft_colours: Dict[str, Counter] = defaultdict(Counter)
     with open_text(archive) as handle:
         reader = csv.reader(handle)
         header = next(reader)
@@ -132,7 +131,6 @@ def scan_decks(archive: Path, keep: Optional[Set[str]] = None
                 raise ValueError(f"game data has no {required} column")
         draft_at, colours_at = index["draft_id"], index["main_colors"]
 
-        seen_draft_colours: Dict[str, Counter] = defaultdict(Counter)
         for values in reader:
             if len(values) != len(header):
                 continue
@@ -143,20 +141,46 @@ def scan_decks(archive: Path, keep: Optional[Set[str]] = None
             seen_draft_colours[draft_id][main] += 1
             cards = played[draft_id]
             for position, name in deck_at:
-                # Parse the number rather than comparing the text. Some sets
-                # write these columns as floats, and "0.0" is not the string
-                # "0" - which silently marked every card in the set as played
-                # for every draft in dmu, and would for any set written the
-                # same way.
                 if count_of(values[position]) and name not in cards:
                     cards.add(name)
 
-    # One deck identity per draft: the build its games were most often played with.
-    for draft_id, counter in seen_draft_colours.items():
-        main = counter.most_common(1)[0][0]
-        for card in played[draft_id]:
+    # Counter.most_common is deterministic because the source row order is
+    # deterministic and Counter preserves first-seen order for ties.
+    main_by_draft = {
+        draft_id: counter.most_common(1)[0][0]
+        for draft_id, counter in seen_draft_colours.items()
+        if counter
+    }
+    return dict(played), main_by_draft
+
+
+def colour_hits_for_drafts(played: Mapping[str, set],
+                           main_by_draft: Mapping[str, str],
+                           keep: Optional[Set[str]] = None
+                           ) -> Dict[str, Counter]:
+    """Aggregate card-colour evidence from an explicit set of draft IDs."""
+    colour_hits: Dict[str, Counter] = defaultdict(Counter)
+    for draft_id in sorted(played):
+        if keep is not None and draft_id not in keep:
+            continue
+        main = main_by_draft.get(draft_id)
+        if main is None:
+            continue
+        for card in sorted(played[draft_id]):
             colour_hits[card][main] += 1
-    return dict(played), dict(colour_hits)
+    return dict(colour_hits)
+
+
+def scan_decks(archive: Path, keep: Optional[Set[str]] = None
+               ) -> Tuple[Dict[str, set], Dict[str, Counter]]:
+    """draft_id -> cards played, and card -> counter of its decks' colours.
+
+    `keep` restricts every derived statistic to those drafts. This wrapper is
+    retained for the independent evaluation harness; production cross-fold
+    builds use scan_deck_observations once and aggregate each fold explicitly.
+    """
+    played, main_by_draft = scan_deck_observations(archive, keep)
+    return played, colour_hits_for_drafts(played, main_by_draft, keep)
 
 
 def card_colours(colour_hits: Dict[str, Counter]) -> Dict[str, Optional[FrozenSet[str]]]:
