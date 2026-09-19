@@ -1,7 +1,8 @@
 {
-  "operation": "deploy",
-  "request_id": "tournament-release-development-20260919",
-  "reason": "Deploy reviewed release 662c6c9 after PR155, PR156, PR157 and PR158 gates passed. Includes serving optimization, Phase 2 component compatibility, exact-tier Patreon adapter disabled pending mapping/canary, and migration 0026 already applied.",
+  "operation": "puzzle-components",
+  "request_id": "phase2-publish-development-20260919",
+  "reason": "Publish only eligible Traditional components in development after successful staging run 35457309349 and exact backend release 662c6c9 smoke. Keep SIR Candidate because its parent is not Live; retain rejected source exclusions and fixed historical Dailies.",
   "target": "development",
-  "commit": "662c6c9adff21565df3ad953bbceccd87c808e95"
+  "action": "publish",
+  "source": "regular-phase2"
 }
