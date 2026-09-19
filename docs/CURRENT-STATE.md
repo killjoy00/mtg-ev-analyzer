@@ -54,3 +54,12 @@ GitHub Pages hosts the client. Production functions use Neon branch `br-orange-f
 Verify schema, deploy a reviewed main SHA to development, pass its acceptance flow, then deploy that identical SHA to production and verify all three markers plus gameplay. Never restore development over production. Corpus publication remains an explicit authenticated and audited operation.
 
 [Design system](DESIGN-SYSTEM.md), [initial rebuild audit](REBUILD-2026-09-18.md), [distribution](../results/rebuild-2026-09-18/DAILY-DISTRIBUTION.md), [Traditional research](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md), [scoring](../results/rebuild-2026-09-18/SCORING-RESULTS.md).
+
+## Pending September 19 feature release
+
+- Third Daily (`latest`) has its own fixed schedule, status, share link and leaderboard, using only the newest Live released regular set.
+- Elite custom-set picker is discoverable from the homepage; backend capability enforcement remains required.
+- Established account-linked player tokens qualify for Daily ranking without a redundant active Auth header. Guest-started attempts remain unranked after linking. The first pack displays ranked identity or a guest warning.
+- Owner-authorized Cube recovery: the September 19 first attempt scored 89, matched the universal schedule, had eight stored answers and a pre-existing account link/session. Only its ranking flag and missing scores entry were restored; career/result aggregates were not replayed. Audit event `daily_ranking_recovered` records the repair.
+- Patreon discovery 35459558651 confirmed all runtime/creator secrets. Production linking is prepared only for the owner-authorized canary account; public activation awaits real OAuth evidence.
+- Schema prerequisite: additive environment expansion in migration 0027.

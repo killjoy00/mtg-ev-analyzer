@@ -2,7 +2,7 @@
 
 [Play Pack One](https://packone.pro): eight decisions from real trophy drafts. Choose a card, then see the trophy drafter's pick and model-supported alternatives.
 
-The homepage starts with **Daily Draft Run** and **Daily Powered Cube**. Each is one universal, fixed challenge per Eastern date, with no rerolls. Both support anonymous play and result sharing. An authenticated account is required for durable leaderboard participation and adds unlimited regular random practice. Practice becomes prominent after both Dailies are completed.
+The homepage starts with **Daily Draft Run**, **Daily Powered Cube** and **Daily Latest Set**. Each is a separate universal, fixed challenge per Eastern date, with no rerolls. The latest-set game uses only the newest Live released set. All support anonymous play and sharing. A signed player linked to an account before starting is ranked; guest starts remain unranked after later sign-in. A valid account session adds unlimited regular practice. Elite members can choose sets for balanced random practice from the homepage.
 
 **100 means you matched the trophy drafter. Other choices earn up to 95 based on model support.** The model is the partial-credit engine.
 

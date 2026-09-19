@@ -12,6 +12,9 @@ const truthy=value=>value===true||value==='t'||value==='true'||value===1||value=
 const amount=value=>{const n=Number(value);return Number.isFinite(n)&&n>=0?Math.round(n):0;};
 const redirectUri=()=>String(process.env.PATREON_REDIRECT_URI||REDIRECT_URI);
 const oauthConfigured=()=>Boolean(process.env.PATREON_CLIENT_ID&&process.env.PATREON_CLIENT_SECRET);
+export function patreonAccountAllowed(authUserId,policy=PATREON_POLICY) {
+  return policy.enabled===true || Boolean(authUserId && policy.canaryAccountHashes?.includes(createHash('sha256').update(String(authUserId)).digest('hex')));
+}
 const configured=()=>validPatreonPolicy()&&oauthConfigured()&&Boolean(process.env.PATREON_WEBHOOK_SECRET);
 
 function redirect(status) {
@@ -44,7 +47,7 @@ function membership(resource,userId=null) {
 // SQL statement. Revision checks discard snapshots overtaken by a webhook or link.
 export async function applyPatreonMembership(query,authUserId,providerUserId,member,
   {link=false,revision=null,oauthStateHash=null,observedAt=new Date().toISOString(),policy=PATREON_POLICY}={}) {
-  const active=premiumPatreonMembership(member,policy);
+  const active=patreonAccountAllowed(authUserId,policy)&&premiumPatreonMembership(member,policy);
   const values=[authUserId,providerUserId,member?.memberId||null,member?.campaignId||null,
     member?.status||null,member?.entitledAmountCents||0,Boolean(member?.isFreeTrial),Boolean(member?.isGifted),
     JSON.stringify(member?.tierIds||[]),member?.lastChargeStatus||null,observedAt,revision,active,oauthStateHash];
@@ -146,7 +149,7 @@ async function status(query,authUserId) {
   ]);
   const row=provider.rows[0];
   return {
-    configured:configured(),
+    configured:configured()&&patreonAccountAllowed(authUserId),
     support_url:PATREON_POLICY.supportUrl,
     webhook_configured:Boolean(process.env.PATREON_WEBHOOK_SECRET),
     connected:Boolean(row),
@@ -199,6 +202,7 @@ export async function handlePatreon(request,{query,authSession,json}) {
     const consumed=await query(`UPDATE provider_oauth_states SET consumed_at=now() WHERE state_hash=$1 AND provider=$2 AND expires_at>now() AND consumed_at IS NULL
       RETURNING auth_user_id`,[hash,PROVIDER]);
     if(!consumed.rows[0])return redirect('expired');
+    if(!patreonAccountAllowed(consumed.rows[0].auth_user_id))return redirect('unavailable');
     try {
       const observedAt=new Date().toISOString();
       const tokens=await exchangeCode(code);
@@ -217,7 +221,7 @@ export async function handlePatreon(request,{query,authSession,json}) {
   const auth=await authSession(request),authUserId=auth.user_id;
   if(url.pathname==='/v1/patreon/status'&&request.method==='GET')return json(await status(query,authUserId));
   if(url.pathname==='/v1/patreon/connect'&&request.method==='POST') {
-    if(!configured())return json({error:'Patreon membership is not fully configured yet.'},503);
+    if(!configured()||!patreonAccountAllowed(authUserId))return json({error:'Patreon membership is not fully configured yet.'},503);
     const state=randomBytes(32).toString('hex'),hash=createHash('sha256').update(state).digest('hex');
     await query('DELETE FROM provider_oauth_states WHERE expires_at<=now()');
     await query(`INSERT INTO provider_oauth_states(state_hash,auth_user_id,provider,expires_at)

@@ -7,6 +7,7 @@ let lastDay;
 const games = [
   { key: 'draftRun', number: '01', label: 'The daily challenge', environment: 'mixed', title: 'Daily Draft Run', description: 'Eight decisions from real trophy drafts.', href: '?game=draft-run&daily=1' },
   { key: 'cube', number: '02', label: 'The powered table', environment: 'powered-cube', title: 'Daily Powered Cube', description: 'Eight decisions. Magic’s most powerful cards.', href: '?game=draft-run&set=powered-cube&daily=1' },
+  { key: 'latest', number: '03', label: 'The newest release', environment: 'latest', title: 'Daily Latest Set', description: 'Eight decisions. Only the latest set.', href: '?game=draft-run&set=latest&daily=1' },
 ];
 
 export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = false) {
@@ -23,9 +24,10 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
         <a class="button ${result.complete ? 'secondary' : 'primary'}" href="${game.href}">${result.complete ? 'View result' : 'Play now'}</a>
       </article>`;
     }).join('')}</div>
-    ${status.completed === 2 ? `<section class="daily-home-practice"><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2>${profile?.player?.claimed
-      ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${capabilities.includes('unlimited_cube_practice')?'<a class="button secondary" href="?game=draft-run&set=powered-cube">Powered Cube Practice</a>':''}${capabilities.includes('custom_corpus')?'<a class="button secondary" href="?game=draft-run&custom=1">Choose Your Sets</a>':''}`
+    ${status.completed === 3 ? `<section class="daily-home-practice"><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2>${profile?.player?.claimed
+      ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${capabilities.includes('unlimited_cube_practice')?'<a class="button secondary" href="?game=draft-run&set=powered-cube">Powered Cube Practice</a>':''}`
       : '<p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>'}</section>` : ''}
+    <section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Build a random run from your favourite sets.</p></div><a class="button secondary" href="?game=draft-run&custom=1">Choose your sets</a></section>
     ${unavailable ? '<p role="status">Daily progress is unavailable. Play now still resumes your saved attempt.</p>' : ''}
   </section>`;
 }

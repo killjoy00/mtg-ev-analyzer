@@ -12,15 +12,15 @@ const overflow=async()=>assert.ok(await page.evaluate(()=>document.documentEleme
 try {
  let t=Date.now();await page.goto('https://packone.pro',{waitUntil:'domcontentloaded'});await page.locator('.daily-home-game a').first().waitFor();
  metrics.push({action:'homepage_play_ctas',ms:Date.now()-t});
- assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),2);
+ assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),3);
  assert.ok(!requests.some(u=>/\/(app\.js|social\.mjs|home-today\.mjs|data\/catalog\.json|shards\/)/.test(u)),'No historical dependency tree on home');
  await page.screenshot({path:'artifacts/production/home-mobile.png',fullPage:true});
- for(const [index,environment] of ['mixed','powered-cube'].entries()) {
+ for(const [index,environment] of ['mixed','powered-cube','latest'].entries()) {
   t=Date.now();const startResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/v1/runs'&&r.request().method()==='POST');
   await page.locator(`[data-environment="${environment}"] a`).click();
   let state=await (await startResponse).json();await page.locator('.run-cards').waitFor();
   metrics.push({action:environment+'_first_pack',ms:Date.now()-t});
-  assert.equal(state.run_length,8);assert.equal(state.leaderboard_eligible,false);
+  assert.equal(state.run_length,8);assert.match(await page.locator('.run-ranking-state').innerText(),/Playing as guest/);assert.equal(state.leaderboard_eligible,false);
   assert.deepEqual(state.rerolls,{set:0,pack:0});assert.equal(await page.locator('[data-reroll]').count(),0);
   for(let round=0;round<8;round++) {
    await overflow();await page.locator('.run-card-select').first().waitFor();
@@ -41,11 +41,11 @@ try {
    const answer=state.answers[round];assert.equal(answer.historicalMatch?answer.score===100:answer.score>=0&&answer.score<=95,true);
    await page.locator('#run-next').click();
   }
-  await page.locator('.run-result-page').waitFor();assert.equal(state.complete,true);assert.equal(state.standing,null);
+  await page.locator('.run-result-page').waitFor();assert.equal(state.complete,true);if(environment==='latest')assert.ok(state.answers.every(a=>a.puzzle.set_id===state.daily_featured_sets[0]));assert.equal(state.standing,null);
   await page.screenshot({path:`artifacts/production/${environment}-result-mobile.png`,fullPage:true});
   await page.goto('https://packone.pro',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(n=>document.querySelector('[data-daily-home]')?.dataset.completed===String(n),index+1);
-  assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),1-index);
+  assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),2-index);
   await page.screenshot({path:`artifacts/production/home-completed-${index+1}.png`,fullPage:true});
  }
  assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,metrics}));

@@ -110,5 +110,5 @@ jobs:
       # --settle: this runs seconds after the deploy call returned, and a
       # "completed" deployment is not yet guaranteed to be what every instance
       # answers with. The closing marker check inside the smoke stays strict.
-      - name: Verify revision, coverage and complete both unranked Daily flows
+      - name: Verify revision, coverage and complete all three unranked Daily flows
         run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$RELEASE_COMMIT" --daily --settle

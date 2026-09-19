@@ -10,7 +10,8 @@ export function practiceCapability(environment,setIds=[]) {
 }
 export function requireCapability(capabilities,capability) {
   if(capabilities.includes(capability))return;
-  throw Object.assign(Error(capabilities.includes('account')?'This practice option is not available on your account.':'A free account is required for regular practice.'),{status:403,capability});
+  const message=PAID_CAPABILITIES.has(capability)?'Connect an Elite membership to use this practice option.':capabilities.includes('account')?'This practice option is not available on your account.':'A free account is required for regular practice.';
+  throw Object.assign(Error(message),{status:403,capability});
 }
 // Future providers implement verifyAndResolve(event). The adapter must verify
 // the provider's signature and resolve the existing account; never trust a

@@ -1,13 +1,17 @@
 # Patreon membership release
 
-The integration ships disabled pending the webhook signing secret and a real
-member canary. Read-only API discovery succeeded in run 35457627068 on 2026-09-19.
+Public linking remains disabled pending a real member canary. A controlled production
+connection is restricted to the account explicitly authorized by the owner; the
+policy stores only a hash of its managed Auth ID. Discovery run 35459558651 on
+2026-09-19 verified all five required secrets, including the saved webhook secret.
 The verified policy maps campaign **16808916** to **Elite Member 29631843 ($5)**.
 **Supporter 29631835 ($3)** and the free tier **29623888** grant no premium tools.
 Regular practice remains free to authenticated Pack One accounts.
 
-The OAuth client and both creator credentials are present in GitHub. Discovery
-found `PATREON_WEBHOOK_SECRET` missing. No secret values were exposed.
+The OAuth client, creator credentials and webhook signing secret are present in
+GitHub. No secret values were exposed. The connection requires the account owner
+to authorize Patreon through the normal OAuth flow; no email-based grants or
+account impersonation are used.
 
 ## Access policy
 
@@ -76,10 +80,11 @@ Register the webhook URL with `members:create`, `members:update`, `members:delet
    and all-access tier IDs from discovery in the policy.
 2. Confirm callback and webhook registration and save the webhook signing secret
    in GitHub. Do not paste credentials into chat.
-3. Run isolated SQL/backend and browser checks, then configure a temporary
-   development-only callback/client and enable the policy only on that isolated
-   test branch for a controlled real member test to verify OAuth linking, supporter denial, premium access, downgrade or
-   expiration, disconnect, and reconnection. A creator login alone does not prove
+3. Run isolated SQL/backend and browser checks, then deploy the controlled
+   production canary restricted by the owner-authorized managed account ID hash.
+   Verify real OAuth linking and premium access. Fixture checks cover supporter
+   denial, downgrade/expiration, disconnect and reconnection; verify real
+   disconnect/reconnect with the owner before public activation. A creator login alone does not prove
    a paid subscriber's tier behavior.
 4. Verify reconciliation succeeds and that Admin → Users reports the provider,
    effective capabilities, membership state, and last synchronization time.

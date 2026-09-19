@@ -36,16 +36,36 @@ assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uui
 assert.equal((await call('/v1/daily-status',undefined,guest.token)).daily_history.length,1);
 const shared=await call(`/v1/runs/${run.id}/share`,{},guest.token);assert.equal(shared.daily,true);assert.match(shared.url,/daily=1/);assert.equal(shared.id,undefined);
 assert.equal((await query('SELECT count(*) n FROM draft_run_shares WHERE session_id=$1::uuid',[run.id])).rows[0].n,'0');
-const owner=await call('/v1/session',{displayName:'QA fixed account '+tag});
+const owner=await call('/v1/session',{displayName:'QA ranked '+tag});
 const authId=crypto.randomUUID(),auth=crypto.randomUUID()+crypto.randomUUID();
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[authId,'QA fixed account',`qa-fixed-${tag}@example.invalid`]);
 await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[auth,authId]);
 await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[authId,owner.playerId]);
-let accountRun=await call('/v1/runs',{daily:true},owner.token,auth);
+let accountRun=await call('/v1/runs',{daily:true},owner.token);
+assert.equal(accountRun.ranked_name,'QA ranked '+tag);
 assert.equal(accountRun.current.puzzle_id,schedule[0]);assert.equal(accountRun.leaderboard_eligible,true);
 assert.equal((await call('/v1/runs',{daily:true},owner.token,auth)).id,accountRun.id);
-accountRun=await finish(accountRun,owner.token,auth);assert.ok(accountRun.standing);
+accountRun=await finish(accountRun,owner.token);assert.ok(accountRun.standing);
 assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid AND challenge_date=$2::date',[owner.playerId,day])).rows[0].n,'1');
+// A guest who links after starting remains unranked, including resume and completion.
+const guestAuthId=crypto.randomUUID();
+await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[guestAuthId,'QA late link',`qa-late-${tag}@example.invalid`]);
+await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[guestAuthId,guest.playerId]);
+const lateResume=await call('/v1/runs',{daily:true},guest.token);
+assert.equal(lateResume.id,run.id);assert.equal(lateResume.leaderboard_eligible,false);
+assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid',[guest.playerId])).rows[0].n,'0');
+// Linked player with no Auth header still cannot use paid or free account practice.
+await call('/v1/runs',{},owner.token,null,403);
+let latest=await call('/v1/runs',{daily:true,environment:'latest'},owner.token);
+assert.equal(latest.leaderboard_eligible,true);assert.deepEqual(latest.daily_featured_sets,['hob']);
+assert.deepEqual(latest.rerolls,{set:0,pack:0});
+latest=await finish(latest,owner.token);
+assert.ok(latest.answers.every(a=>a.puzzle.set_id==='hob'));
+assert.deepEqual(latest.answers.map(a=>a.puzzle.pick_number),[1,2,3,4,5,6,7,8]);
+assert.equal((await call('/v1/runs',{daily:true,environment:'latest'},owner.token)).id,latest.id);
+assert.match((await call(`/v1/runs/${latest.id}/share`,{},owner.token)).url,/set=latest/);
+assert.ok((await call('/v1/leaderboard?environment=latest')).rows.some(r=>r.display_name==='QA ranked '+tag));
+await call('/v1/runs',{environment:'latest'},owner.token,auth,400);
 // Newly paused data must not invalidate today's already-published schedule.
 await query("UPDATE draft_run_environment_policy SET status='Paused' WHERE set_id='hob'");
 const later=await call('/v1/session',{displayName:'QA fixed later '+tag});
