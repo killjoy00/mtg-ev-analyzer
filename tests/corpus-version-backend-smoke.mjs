@@ -19,7 +19,9 @@ async function call(path,body,token,status=200) {
   const data=await response.json();assert.equal(response.status,status,JSON.stringify(data));return data;
 }
 const player=await call('/v1/session',{displayName:`QA versions ${tag.slice(0,8)}`});
-let run=await call('/v1/runs',{qa:true},player.token);
+// This fixture invents an older Premier revision. Use the Premier-only HOB
+// corpus: published Traditional components must retain their approved versions.
+let run=await call('/v1/runs',{qa:true,setIds:['hob']},player.token);
 const session=(await query('SELECT puzzle_ids FROM draft_run_sessions WHERE id=$1::uuid',[run.id])).rows[0];
 const ids=parse(session.puzzle_ids);
 await query(`INSERT INTO draft_run_verified_puzzles(puzzle_id,set_id,source_draft_hash,corpus_version,pick_number,candidate_count,consensus_top_gap,support_entropy,interesting,payload)

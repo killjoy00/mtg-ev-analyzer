@@ -1,7 +1,7 @@
 # Pack One: light tournament direction
 
 The visual identity follows a printed tournament scorecard: clear numbering,
-compact display type, readable labels, fine rules, and two decisive play actions.
+compact display type, readable labels, fine rules, and three decisive play actions.
 Magic card art carries the imagery.
 
 | Element | Choice | Purpose |
@@ -13,8 +13,9 @@ Magic card art carries the imagery.
 | Primary blue | `#1e4d7a` | Play actions, progress, and Draft Run identity |
 | Cube accent | `#976822` | A restrained second environment cue |
 
-The two Dailies occupy numbered scorecard rows. Completed rows become compact;
-practice appears after both are complete. Mobile play controls remain at least
+The three Dailies occupy numbered scorecard rows, with a muted rust accent for
+Latest Set. Completed rows become compact; general practice appears after all
+three are complete. A compact Elite set-picker entry remains visible throughout. Mobile play controls remain at least
 44 pixels high, keyboard focus is visible, and prior cards retain the established
 85% size relationship to pack cards.
 
