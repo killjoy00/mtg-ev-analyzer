@@ -19,10 +19,11 @@ export function trajectoryHealth() {
  const sources=new Map();
  return {
   add(p){const rows=sources.get(p.source_draft_hash)||[];rows.push({pick:p.pick_number,historical:p.historical_pick_id,prior:p.prior_picks.map(c=>c.id),fingerprint:p.source_fingerprint});sources.set(p.source_draft_hash,rows);},
+  fingerprintVariations(){return [...sources.values()].filter(rows=>new Set(rows.map(r=>r.fingerprint)).size>1).length;},
   errors(){let errors=0;for(const rows of sources.values()){
    rows.sort((a,b)=>a.pick-b.pick);const seen=new Set();
    for(let i=0;i<rows.length;i++){const row=rows[i];if(seen.has(row.pick)||row.prior.length!==row.pick-1)errors++;seen.add(row.pick);
-    for(const earlier of rows.slice(0,i))if(earlier.fingerprint!==row.fingerprint||row.prior[earlier.pick-1]!==earlier.historical||earlier.prior.some((card,index)=>row.prior[index]!==card)){errors++;break;}
+    for(const earlier of rows.slice(0,i))if(row.prior[earlier.pick-1]!==earlier.historical||earlier.prior.some((card,index)=>row.prior[index]!==card)){errors++;break;}
    }
   }return errors;},
  };

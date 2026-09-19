@@ -1,5 +1,5 @@
 // Publication gates are operational policy, separate from score calibration.
-export const CORPUS_GATE_VERSION='corpus-gates-v1';
+export const CORPUS_GATE_VERSION='corpus-gates-v2';
 export const CORPUS_THRESHOLDS=Object.freeze({qualifiedTrophies:50,usablePuzzles:200,sourcesPerPickBand:16,imageCoverage:1,metadataCoverage:1,maxQualifiedExclusionRate:.25,maxExclusionIncrease:.10,maxCalibrationError:.15,healthMaxAgeDays:7});
 export function corpusGates(m) {
  const t=CORPUS_THRESHOLDS,g=[];

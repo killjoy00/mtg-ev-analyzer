@@ -17,3 +17,7 @@ test('source audit cannot certify a changed source or input signature',()=>{
  const a={production_changed:false,loss_field_available:true,input_signature:'input',source_archive:{sha256:'hash'},included_sources:10,archive_drafts:100};
  assert.ok(matchesFrozenSourceAudit(m,a));assert.ok(!matchesFrozenSourceAudit(m,{...a,input_signature:'changed'}));assert.ok(!matchesFrozenSourceAudit({...m,source_archive:{sha256:'other'}},a));
 });
+
+test('historical fingerprint recipe differences are visible separately from broken pick inheritance',()=>{
+ const h=trajectoryHealth();h.add(puzzle(1,[],'a'));h.add({...puzzle(2,['a'],'b'),source_fingerprint:'legacy-recipe'});assert.equal(h.errors(),0);assert.equal(h.fingerprintVariations(),1);
+});

@@ -1,6 +1,8 @@
 {
-  "operation": "corpus-health",
-  "request_id": "full-current-corpus-health-production-20260918",
-  "reason": "Reconcile the original charter with full retained production corpus verification: exact frozen source evidence, trajectory inheritance, source exclusions, coverage, metadata/images and frozen calibrated probability diagnostics. Persist health reports; never change Live status or historical payloads.",
-  "target": "production"
+  "operation": "puzzle-components",
+  "request_id": "regular-traditional-stage-development-20260919",
+  "reason": "Stage only the previously validated BLB/DFT/FIN Traditional trophy components; keep HOB blocked. Apply additive serving-policy snapshots and verify the new >=20 implied-score filter against real Daily/custom coverage. Publication is a separate operation.",
+  "target": "development",
+  "action": "stage",
+  "source": "regular-study"
 }
