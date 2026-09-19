@@ -45,7 +45,7 @@ const tcg = await readFile('tcgplayer.mjs','utf8');
 assert.match(tcg, /rel = 'sponsored noopener'/);
 assert.match(tcg, /tcgplayer_click/);
 const tcgConfig = await readFile('tcgplayer-config.js','utf8');
-assert.match(tcgConfig, /partner\\.tcgplayer\\.com\\/c\\/7742974\\/1780961\\/21018\\?u=\\{url\\}/);
+assert.match(tcgConfig, /partner\.tcgplayer\.com\/c\/7742974\/1780961\/21018\?u=\{url\}/);
 assert.doesNotMatch(tcgConfig, /impactDeepLinkTemplate:\\s*''/);
 const disclosure = await readFile('disclosure/index.html','utf8');
 assert.match(disclosure, /Impact/i);
