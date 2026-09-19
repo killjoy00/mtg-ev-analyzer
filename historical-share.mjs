@@ -5,7 +5,6 @@ export async function installHistoricalShare() {
   installReplayDataWarmup();
   await import('./social.mjs');
   const layers = [
-    ['practice-product.mjs', 'installPracticeProductLayer'],
     ['product.mjs', 'installProductLayer'],
     ['legacy-product.mjs', 'installLegacyCohortLayer'],
     ['leaderboard-product.mjs', 'installLeaderboardProductLayer'],
