@@ -13,7 +13,7 @@ score = Math.round(95 * (q_selected / q_leader)^gamma)
       = Math.round(95 * (p_selected / p_leader)^(gamma / T))
 ```
 
-Production currently corresponds to raw `gamma = 1`, displayed `T = 2`, and a displayed-ratio exponent of `0.5`. Changing display calibration need not change any points. Changing the predictor changes support ratios and therefore can change points even with the same curve. The comparison must measure those changes rather than infer them from improved top-1 accuracy.
+Current v7 production uses raw `gamma = 1`, displayed `T = 1.75`, and a displayed-ratio exponent of `1 / 1.75`. Earlier experiments used `T = 2`; the later frozen-v3 scoring study fitted `T = 1.5` diagnostically, without promoting it. Changing display calibration need not change any points. Changing the predictor changes support ratios and therefore can change points even with the same curve. The comparison must measure those changes rather than infer them from improved top-1 accuracy.
 
 The existing historical trophy choice still receives 100. This is a product rule, separate from model quality. Evaluating observed picks through that override would award every reference choice 100 and make the evaluation useless. The automated benchmark therefore measures underlying model credit, capped at 95, for all observed choices. It reports candidate-wide point movement separately.
 

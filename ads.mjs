@@ -1,31 +1,42 @@
-function previewCreative(slot, index) {
-  const variants = [
-    ['Draft night, organized.', 'A realistic display-ad preview lives here after approval.', 'Explore'],
-    ['Protect the cards you open.', 'Responsive inventory, visually separated from Pack One actions.', 'Shop now'],
-    ['Your next draft starts here.', 'Publisher content remains the focus; ads stay outside gameplay.', 'Learn more'],
-  ];
-  const [headline, copy, action] = variants[index % variants.length];
-  slot.innerHTML = `<div class="ad-preview-creative"><div><small>Advertisement · preview</small><strong>${headline}</strong><p>${copy}</p></div><b>${action}</b></div>`;
+import {loadPatreonStatus,storedAccountToken} from './growth-api.mjs';
+
+export async function advertisingAllowed({enabled,client,game=false,accountToken,checkMembership}) {
+  if(!enabled||!client||game)return false;
+  if(!accountToken)return true;
+  try{return (await checkMembership()).ads_allowed===true;}catch{return false;}
 }
 
-function loadGoogleAds(slots) {
-  const cfg = globalThis.PACKONE_ADSENSE || {};
-  if (!cfg.enabled || !cfg.client || document.body.classList.contains('is-game')) return;
-  const script = document.createElement('script');
-  script.async = true;
-  script.crossOrigin = 'anonymous';
-  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(cfg.client)}`;
-  document.head.appendChild(script);
-  slots.forEach((slot) => {
-    const key = slot.dataset.adSlot;
-    const id = cfg.slots?.[key] || cfg.slots?.articleTop || '';
-    if (!id) return;
-    slot.innerHTML = `<ins class="adsbygoogle" style="display:block" data-ad-client="${cfg.client}" data-ad-slot="${id}" data-ad-format="auto" data-full-width-responsive="true"></ins>`;
-    (globalThis.adsbygoogle = globalThis.adsbygoogle || []).push({});
-  });
+export async function initializeAds({doc=document,location=globalThis.location,
+  cfg=globalThis.PACKONE_ADSENSE||{},accountToken=storedAccountToken(),
+  checkMembership=loadPatreonStatus}={}) {
+  const slots=[...doc.querySelectorAll('[data-ad-slot]')];
+  // Hide before asynchronous work. Preview queries cannot bypass the release gate.
+  slots.forEach(slot=>{slot.hidden=true;slot.replaceChildren();});
+  const params=new URLSearchParams(location.search);
+  const game=doc.body.classList.contains('is-game')||params.has('game')||params.has('mode');
+  if(!slots.length||!await advertisingAllowed({enabled:cfg.enabled,client:cfg.client,game,accountToken,checkMembership}))return;
+  // Sign-in may have changed while the membership request was in flight.
+  if(accountToken!==storedAccountToken())return;
+  const usable=slots.map(slot=>({slot,id:cfg.slots?.[slot.dataset.adSlot]||cfg.slots?.articleTop})).filter(row=>row.id);
+  if(!usable.length)return;
+  const script=doc.createElement('script');
+  script.async=true;script.crossOrigin='anonymous';
+  script.src=`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${encodeURIComponent(cfg.client)}`;
+  const suppress=()=>{usable.forEach(({slot})=>{slot.hidden=true;slot.replaceChildren();});script.remove();};
+  globalThis.addEventListener?.('packone-account-changed',suppress,{once:true});
+  globalThis.addEventListener?.('storage',event=>{if(event.key==='pack1-auth-session-v1'||event.key===null)suppress();});
+  doc.head.appendChild(script);
+  for(const {slot,id} of usable){
+    const ad=doc.createElement('ins');ad.className='adsbygoogle';ad.style.display='block';
+    Object.assign(ad.dataset,{adClient:cfg.client,adSlot:id,adFormat:'auto',fullWidthResponsive:'true'});
+    slot.appendChild(ad);slot.hidden=false;
+    (globalThis.adsbygoogle=globalThis.adsbygoogle||[]).push({});
+  }
 }
 
-const slots = [...document.querySelectorAll('[data-ad-slot]')];
-if (new URLSearchParams(location.search).get('adpreview') === '1') slots.forEach(previewCreative);
-else if (!globalThis.PACKONE_ADSENSE?.enabled) slots.forEach(slot=>slot.hidden=true);
-else if (!new URLSearchParams(location.search).has('game') && !new URLSearchParams(location.search).has('mode')) loadGoogleAds(slots);
+export const adsReady=typeof document==='undefined'?Promise.resolve():(async()=>{
+  // Static editorial pages need the game's public API endpoints. Disabled ads
+  // neither load this configuration nor request membership or Google scripts.
+  if(globalThis.PACKONE_ADSENSE?.enabled&&!globalThis.PACK1_API)await import('./leaderboard-config.js');
+  await initializeAds();
+})();
