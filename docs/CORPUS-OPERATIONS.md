@@ -22,7 +22,7 @@ Completed build artifacts/checkpoints survive retries in Actions cache and artif
 
 Regular chronology comes from set release metadata and Live eligibility. Powered Cube has a separate policy. Every new regular run uses P1P1–P1P8; Cube uses P1P2–P1P9, its first eight complete archived decisions. Old selection versions retain their old windows. Older source decisions remain stored for historical/model uses.
 
-## Publication gates (`corpus-gates-v1`)
+## Publication gates (`corpus-gates-v2`)
 
 Thresholds are code-defined in `corpus-quality.mjs`, returned by the admin API and displayed with observed values and individual failure reasons. A check must be no older than seven days and match the exact manifest hash and gate version.
 
@@ -49,4 +49,11 @@ Premier trophies include 7–0, 7–1 and 7–2 with the existing experience/ski
 
 Custom-set practice requires complete P1P1–P1P8 coverage with at least 16 independent medium/hard sources at each position. Live sets with incomplete opening-pack archives can still contribute valid later decisions to mixed runs; they are not offered as self-contained custom-set runs. The full historical inventory is retained.
 
+## Serving score floor
+
+The owner’s September 19 update excludes new puzzles whose trophy choice has an implied model score below 20. The formula is the same rounded integer partial-credit calculation: `round(95 × trophy raw support / maximum raw support)`. A rounded score of 20 qualifies. Missing evidence fails closed. This is a selection filter, not a change to the model, probability calibration, corpus payloads, difficulty ratings or trophy-100 scoring. The version `trophy-implied-score-20-v1` is pinned on new sessions/schedules; shared recipients inherit the original run’s version. Earlier schedules and runs retain `legacy-interesting-v1` and their exact decisions. Rerolls select only currently eligible replacements.
+
+The Corpus area uses a searchable, sortable table with serving status, release chronology, actual post-filter serving counts, exclusions below 20, health and import state. Selecting a set opens detailed archive/model evidence, per-pick coverage, source-component admission, quality gates and authenticated status controls.
 Full verification checks ordered prior-pool inheritance across all retained decisions in each source. Source exclusions are retained in accounting but excluded from newly playable coverage and probability diagnostics. Frozen v7 manifests predate the explicit schema flag: their exact input signature, source checksum, source/draft accounting and successful loss-aware 32-set archive audit provide separate recorded source evidence; manifests are not relabeled or rewritten. Probability diagnostics use the frozen v3 display calibration (1.75), report raw log loss separately, and never change the partial-credit curve. A reviewed full-health workflow can refresh reports without discovery, reimport or Live publication.
+
+The v2 gates count only decisions meeting the new serving score floor for usable/pick coverage. Historical fingerprint variants are reported separately: the baseline and full importer used different serialization/scope recipes and preserved prior rows, while source identity, actual prior-pool inheritance and pick ordering are independently checked. A fingerprint difference alone is not a broken trajectory.

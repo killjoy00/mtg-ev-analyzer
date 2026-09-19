@@ -109,7 +109,7 @@ jobs:
           # foreign keys and tests the wrong release path. Only additive backlog
           # plus this PR's new migrations belongs on the disposable clone.
           mapfile -t pending < <({
-            printf '%s\n' migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql
+            printf '%s\n' migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql migrations/0023_serving_policy_snapshots.sql
             printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
           } | sort -u)
           if (( ${#pending[@]} == 0 )); then

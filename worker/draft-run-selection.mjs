@@ -1,3 +1,4 @@
+import {SERVING_QUALITY_SQL} from '../serving-quality.mjs';
 import {DAILY_SELECTION_VERSION,dailySetPlan,balancedSetPlan,liveRegularSets} from '../daily-selection.mjs';
 import {seededRandom} from '../gameplay.mjs';
 import {runPickWindows,eligiblePickForRound,selectDraftRunReroll,draftRunDifficulty} from '../draft-run.mjs';
@@ -11,7 +12,7 @@ const columns = `p.puzzle_id,p.set_id,p.corpus_version,p.source_draft_hash,p.pac
 const from = `FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r
   ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'`;
 const base = `(${corpusMembership()}) AND p.interesting AND p.pack_number=1`;
-const servingBase = `(${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
+const servingBase = `${SERVING_QUALITY_SQL} AND (${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
   WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)`;
 export function decodePuzzleMetadata(p) {
   return {...p, rating:Number(p.rating), top_two_ratio:Number(p.top_two_ratio),
@@ -94,7 +95,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     const result=await query(`WITH chosen AS (
       SELECT p.puzzle_id,p.source_draft_hash ${from} WHERE ${where} AND p.set_id=$${params.length-2} AND r.band=$${params.length-1}
       ORDER BY p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${params.length}::int
-    ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${base}`,params);
+    ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${base} AND ${SERVING_QUALITY_SQL}`,params);
     const trajectory=result.rows.map(decodePuzzleMetadata),p=trajectory.find(p=>p.puzzle_id===p.selected_id);
     if(!p)throw Object.assign(new Error('The corpus changed while starting this run. Please retry.'),{status:503});
     selected.push(p);sources.push(p.source_draft_hash);sets.add(p.set_id);

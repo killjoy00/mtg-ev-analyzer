@@ -1,8 +1,8 @@
 {
   "operation": "puzzle-components",
-  "request_id": "cube-p2p7-publish-production-20260919",
-  "reason": "Production runtime 9cc26f8 passed same-SHA development and production release checks (35407719445, 35408047051). Publish the staged owner-approved Cube P2–P7 source component after development's passing 10,000-run and SQL parity verification. Preserve existing Premier payloads and fixed Dailies.",
-  "target": "production",
-  "action": "publish",
-  "source": "powered-cube"
+  "request_id": "regular-traditional-stage-development-20260919",
+  "reason": "Stage only the previously validated BLB/DFT/FIN Traditional trophy components; keep HOB blocked. Apply additive serving-policy snapshots and verify the new >=20 implied-score filter against real Daily/custom coverage. Publication is a separate operation.",
+  "target": "development",
+  "action": "stage",
+  "source": "regular-study"
 }

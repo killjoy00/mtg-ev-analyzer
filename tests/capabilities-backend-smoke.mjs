@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import {SERVING_POLICY_VERSION} from '../serving-quality.mjs';
 import assert from 'node:assert/strict';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Use an isolated branch.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
@@ -27,7 +28,7 @@ assert.deepEqual((await call('/v1/capabilities',undefined,user)).capabilities,['
 await call('/v1/runs',{capabilities:['unlimited_regular_practice']},{token:user.token},403);
 await call('/v1/runs',{}, {...user,auth:'not-a-session'},401);
 let run=await call('/v1/runs',{},user);
-assert.equal(run.run_length,8);assert.equal(run.day,null);
+assert.equal(run.serving_policy_version,SERVING_POLICY_VERSION);assert.equal(run.run_length,8);assert.equal(run.day,null);
 assert.notEqual((await call('/v1/runs',{},user)).id,run.id,'Free account practice has no daily reservation');
 await call('/v1/runs',{environment:'powered-cube'},user,403);
 await call('/v1/runs',{setIds:['hob']},user,403);
@@ -64,7 +65,7 @@ run=await finish(run,user);
 const shared=await call(`/v1/runs/${run.id}/share`,{},user),peer=await account();
 assert.equal((await call(`/v1/runs/${run.id}/share`,{},user)).id,shared.id);
 let replay=await call('/v1/runs',{challenge:shared.id},peer);
-assert.deepEqual(replay.rerolls,{set:0,pack:0});assert.equal(replay.comparison.exact,true);
+assert.equal(replay.serving_policy_version,run.serving_policy_version);assert.deepEqual(replay.rerolls,{set:0,pack:0});assert.equal(replay.comparison.exact,true);
 assert.equal(replay.current.puzzle_id,run.answers[0].puzzle.puzzle_id);
 await call(`/v1/runs/${replay.id}/reroll`,{revision:replay.revision,round:0,puzzleId:replay.current.puzzle_id,type:'pack'},peer,409);
 replay=await finish(replay,peer);
