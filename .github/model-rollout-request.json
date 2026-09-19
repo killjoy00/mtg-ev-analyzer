@@ -1,6 +1,8 @@
 {
-  "operation": "corpus-health",
-  "request_id": "full-current-corpus-health-production-20260918",
-  "reason": "Reconcile the original charter with full retained production corpus verification: exact frozen source evidence, trajectory inheritance, source exclusions, coverage, metadata/images and frozen calibrated probability diagnostics. Persist health reports; never change Live status or historical payloads.",
-  "target": "production"
+  "operation": "puzzle-components",
+  "request_id": "cube-p2p7-publish-production-20260919",
+  "reason": "Production runtime 9cc26f8 passed same-SHA development and production release checks (35407719445, 35408047051). Publish the staged owner-approved Cube P2–P7 source component after development's passing 10,000-run and SQL parity verification. Preserve existing Premier payloads and fixed Dailies.",
+  "target": "production",
+  "action": "publish",
+  "source": "powered-cube"
 }
