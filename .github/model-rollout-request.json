@@ -1,7 +1,5 @@
 {
-  "operation": "deploy",
-  "target": "production",
-  "commit": "8abee764ba05c318c77670c115657304adb4deee",
-  "request_id": "three-dailies-production-20260919",
-  "reason": "Promote the identical PR160 release after development completed all three fixed Daily acceptance flows. Schema 0027 is applied and existing production schedules are unchanged."
+  "operation": "production-browser",
+  "request_id": "three-dailies-live-browser-20260919",
+  "reason": "Verify all three production Dailies after exact release 8abee764: guest warning before picks, fixed latest-set-only decisions, sharing, images, responsive widths and completion states."
 }
