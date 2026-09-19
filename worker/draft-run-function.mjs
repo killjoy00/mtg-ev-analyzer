@@ -245,6 +245,25 @@ async function route(request) {
   if(request.method==='POST'&&path==='/v1/session') return growth.fetch(request);
   if(request.method==='POST'&&path==='/v1/runs') return start(request);
   if(request.method==='GET'&&path==='/v1/capabilities') {const owner=await player(request);return json({capabilities:await accountCapabilities(await accountIdentity(request,query,owner),query)});}
+  if(request.method==='GET'&&path==='/v1/set-catalog') {
+    const result=await query(`SELECT e.set_id,e.set_name,e.release_date::text,e.regular_run,
+      v.manifest->>'source_date' data_date,
+      NULLIF(v.manifest->'full_import'->>'training_drafts','')::int training_drafts,
+      NULLIF(v.manifest->'full_import'->>'win_rate_cutoff','')::numeric win_rate_cutoff,
+      NULLIF(v.manifest->'full_import'->>'qualified_trophies','')::int qualified_trophy_drafts,
+      (COALESCE(NULLIF(v.manifest->'full_import'->>'total_puzzles','')::int,0)+COALESCE(c.component_puzzles,0))::int verified_decisions
+      FROM draft_run_environment_policy e
+      JOIN corpus_set_versions v ON v.set_id=e.set_id AND v.corpus_version=$1
+      LEFT JOIN LATERAL (
+        SELECT sum(NULLIF(cv.manifest->>'puzzles','')::int)::int component_puzzles
+        FROM corpus_components cc JOIN corpus_set_versions cv
+          ON cv.set_id=cc.set_id AND cv.corpus_version=cc.component_version
+        WHERE cc.set_id=e.set_id AND cc.parent_version=$1 AND cc.status='Live'
+      ) c ON true
+      WHERE e.status='Live'
+      ORDER BY e.release_date DESC NULLS LAST,e.set_id`,[DRAFT_RUN_CORPUS_VERSION]);
+    return json({corpus_version:DRAFT_RUN_CORPUS_VERSION,sets:result.rows.map(s=>({...s,regular_run:s.regular_run===true||s.regular_run==='t',training_drafts:Number(s.training_drafts||0),win_rate_cutoff:s.win_rate_cutoff==null?null:Number(s.win_rate_cutoff),qualified_trophy_drafts:Number(s.qualified_trophy_drafts||0),verified_decisions:Number(s.verified_decisions||0)}))});
+  }
   if(request.method==='GET'&&path==='/v1/practice-sets') {const owner=await player(request),caps=await accountCapabilities(await accountIdentity(request,query,owner),query);requireCapability(caps,'custom_corpus');return json({sets:await loadCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION)});}
   if(request.method==='GET'&&path==='/v1/daily-status') return dailyStatus(request);
   if(request.method==='GET'&&path==='/v1/leaderboard') return leaderboard(request);
