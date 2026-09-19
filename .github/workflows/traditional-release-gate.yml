@@ -1,0 +1,45 @@
+name: Traditional release evidence gate
+on:
+  pull_request:
+    paths:
+      - 'scripts/load-traditional-components.mjs'
+      - 'scripts/verify-puzzle-components.mjs'
+      - 'corpus-components.mjs'
+      - 'card-metadata.mjs'
+      - '.github/workflows/traditional-release-gate.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35386149822
+          pattern: traditional-phase2-*
+          path: generated/regular-phase2
+      - name: Reconstruct all fixed source gates without database changes
+        run: node scripts/load-traditional-components.mjs unused generated/regular-phase2 --validate-only > generated/phase2-health.json
+      - name: Verify the exact approved admission scope
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const health=JSON.parse(fs.readFileSync('generated/phase2-health.json'));
+          const expected='msh sos eoe fin tdm dft fdn dsk blb mh3 otj mkm lci woe ltr mom one bro dmu snc neo sir'.split(' ').sort();
+          assert.deepEqual(health.filter(s=>s.ready).map(s=>s.set).sort(),expected);
+          assert.deepEqual(health.filter(s=>!s.ready).map(s=>s.set).sort(),['hbg','hob','ktk','pio']);
+          console.log(JSON.stringify(health.map(({set,ready,puzzles,usable_puzzles,metadata})=>({set,ready,puzzles,usable_puzzles,metadata}))));
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traditional-release-health
+          path: generated/phase2-health.json

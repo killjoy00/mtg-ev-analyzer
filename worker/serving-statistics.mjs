@@ -7,6 +7,16 @@ export const SERVING_STATISTICS_COLUMNS=Object.freeze({
 export const SERVING_ANALYZE_SQL=Object.freeze(Object.entries(SERVING_STATISTICS_COLUMNS)
   .map(([table,columns])=>`ANALYZE public.${table} (${columns.join(', ')})`));
 
+// Small registries seldom reach the automatic ANALYZE threshold, but their
+// cardinality estimates determine the plan for joins over millions of ratings.
+export const SOURCE_ANALYZE_SQL=Object.freeze([
+  'ANALYZE public.corpus_components (parent_version, component_version, set_id, status)',
+  'ANALYZE public.corpus_source_exclusions (corpus_version, set_id, source_draft_hash)',
+]);
+export async function refreshSourceStatistics(query) {
+  for(const sql of SOURCE_ANALYZE_SQL)await query(sql);
+}
+
 export const SERVING_STATISTICS_READY_SQL=`SELECT ${Object.entries(SERVING_STATISTICS_COLUMNS)
   .map(([table,columns])=>`(SELECT count(*)=${columns.length} FROM pg_stats WHERE schemaname='public' AND tablename='${table}' AND attname IN (${columns.map(column=>`'${column}'`).join(',')})) AS ${table}`)
   .join(',\n')}`;
@@ -20,6 +30,7 @@ export async function verifyServingStatistics(query) {
 
 export async function refreshServingStatistics(query) {
   for(const sql of SERVING_ANALYZE_SQL)await query(sql);
+  await refreshSourceStatistics(query);
   // ANALYZE can warn and skip a table when the role lacks permission. Do not
   // report successful readiness if the required statistics are still absent.
   await verifyServingStatistics(query);

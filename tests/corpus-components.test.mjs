@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {gradeDraftRunPick,validateDraftRunPuzzle,supportSharpening,DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
-import {TRADITIONAL_COMPONENT_VERSION as component,FROZEN_CONTEXT_MODEL_VERSION as model} from '../corpus-components.mjs';
+import {TRADITIONAL_COMPONENT_VERSION as component,TRADITIONAL_PHASE2_COMPONENT_VERSION as phase2Component,FROZEN_CONTEXT_MODEL_VERSION as model,supportedComponent} from '../corpus-components.mjs';
 import {componentBelongsTo,corpusMembership} from '../worker/corpus-components.mjs';
 const original=JSON.parse(gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/blb.json.gz',import.meta.url)))).find(p=>p.pick_number===1);
 const candidate=()=>({...structuredClone(original),corpus_version:component,source_event_type:'TradDraft',model_source_event:'PremierDraft',model_version:model,event_match_wins:3,event_match_losses:0});
@@ -29,6 +29,7 @@ test('frozen inventory evidence clears only three sets; incomplete assets block 
   assert.equal(sourceQuality(report,sid,metrics).ready,sid!=='hob');
   assert.equal(sourceQuality(report,sid,{...metrics,imagesComplete:n-1}).ready,false);
   assert.equal(sourceQuality(report,sid,{...metrics,puzzles:n-8}).ready,false);
+  if(sid==='blb'){const phase2Report=structuredClone(report);phase2Report.expansion_supported=false;phase2Report.automatic_expansion_supported=true;assert.equal(sourceQuality(phase2Report,sid,metrics).ready,true);}
  }
 });
 test('loader rejects changed parent evidence before any component mutation',async()=>{

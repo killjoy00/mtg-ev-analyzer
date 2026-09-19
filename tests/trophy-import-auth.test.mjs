@@ -5,7 +5,7 @@ import zlib from 'node:zlib';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from '../worker/trophy-import-auth.mjs';
 import {insertTrophyBatch,handleTrophyImport,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
-import {SERVING_ANALYZE_SQL,SERVING_STATISTICS_COLUMNS,SERVING_STATISTICS_READY_SQL} from '../worker/serving-statistics.mjs';
+import {SERVING_ANALYZE_SQL,SOURCE_ANALYZE_SQL,SERVING_STATISTICS_COLUMNS,SERVING_STATISTICS_READY_SQL} from '../worker/serving-statistics.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
@@ -87,7 +87,7 @@ test('only the signed main trophy import can request fixed serving statistics ma
   await assert.rejects(handleTrophyImport(request({...current,workflow_ref:IMAGE_REFRESH_WORKFLOW}),query),/denied/);
   assert.equal(calls.length,0);
   assert.deepEqual(await handleTrophyImport(request(current),query),{analyzed_tables:Object.keys(SERVING_STATISTICS_COLUMNS)});
-  assert.deepEqual(calls,[...SERVING_ANALYZE_SQL,SERVING_STATISTICS_READY_SQL]);
+  assert.deepEqual(calls,[...SERVING_ANALYZE_SQL,...SOURCE_ANALYZE_SQL,SERVING_STATISTICS_READY_SQL]);
   await assert.rejects(handleTrophyImport(request(current),async()=>{throw Error('maintenance failed');}),/maintenance failed/);
 });
 
