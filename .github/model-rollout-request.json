@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "target": "development",
+  "target": "production",
   "commit": "4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5",
-  "request_id": "patreon-ad-free-development-20260919",
-  "reason": "PR163 passed full unit, browser and isolated database gates. Verify both-tier ad suppression without enabling Google delivery; no model, schema, or historical score change."
+  "request_id": "patreon-ad-free-production-20260919",
+  "reason": "Development acceptance 35463356101 passed all three complete Daily flows for the exact PR163 revision. Promote both-tier advertising suppression while Google ads remain disabled; preserve model, schema and historical scores."
 }
