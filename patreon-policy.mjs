@@ -1,8 +1,8 @@
 // Activation requires the real campaign/tier IDs and the canary in docs/PATREON.md.
 // A supporter tier never implies premium access, regardless of payment amount.
 export const PATREON_POLICY = Object.freeze({
-  enabled: false,
-  canaryAccountHashes: ['a007f11502778068559236547ed05bb5e0d643af84e469e000cda86c3d542ea8'],
+  enabled: true,
+  canaryAccountHashes: [],
   campaignId: '16808916',
   premiumTierIds: ['29631843'], // Elite Member; Supporter 29631835 is excluded.
   supportUrl: 'https://www.patreon.com/c/PackOne',

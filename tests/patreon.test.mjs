@@ -8,7 +8,7 @@ const policy={enabled:true,campaignId:'100',premiumTierIds:['200']};
 const member=(tier='200',attrs={})=>({type:'member',id:'m1',attributes:{patron_status:'active_patron',last_charge_status:'Paid',currently_entitled_amount_cents:500,...attrs},relationships:{user:{data:{id:'u1'}},campaign:{data:{id:'100'}},currently_entitled_tiers:{data:[{id:tier}]}}});
 
 test('only the exact premium campaign and tier unlock tools, never the supporter amount',()=>{
-  assert.equal(PATREON_POLICY.enabled,false);
+  assert.equal(PATREON_POLICY.enabled,true);
   assert.equal(validPatreonPolicy(PATREON_POLICY),true);
   assert.equal(premiumPatreonMembership(parsePatreonMembership(member()),policy),true);
   assert.equal(premiumPatreonMembership(parsePatreonMembership(member('201',{currently_entitled_amount_cents:100000})),policy),false);
@@ -33,7 +33,7 @@ test('raw webhook bytes must match the HMAC signature',()=>{
   assert.equal(verifyPatreonSignature(Buffer.concat([raw,Buffer.from(' ')]),signature,secret),false);
 });
 
-test('disabled linking does not touch provider API or create OAuth state',async()=>{
+test('unconfigured linking does not touch provider API or create OAuth state',async()=>{
   const response=await handlePatreon(new Request('https://packone.pro/v1/patreon/connect',{method:'POST'}),{
     query:()=>{throw Error('Unexpected write');},authSession:async()=>({user_id:'fixture'}),json:(d,s)=>Response.json(d,{status:s||200}),
   });assert.equal(response.status,503);
@@ -64,4 +64,12 @@ test('controlled linking accepts only the authorized account, never an email or 
  assert.equal(patreonAccountAllowed('other-account',canary),false);
  assert.equal(patreonAccountAllowed(null,canary),false);
  assert.equal(patreonAccountAllowed('any-account',policy),true);
+});
+
+test('public activation permits account linking but grants only the real Elite tier',()=>{
+ assert.equal(patreonAccountAllowed('new-account'),true);
+ const active={campaignId:PATREON_POLICY.campaignId,tierIds:['29631843'],status:'active_patron'};
+ assert.equal(premiumPatreonMembership(active),true);
+ assert.equal(premiumPatreonMembership({...active,tierIds:['29631835'],entitledAmountCents:100000}),false);
+ assert.equal(premiumPatreonMembership({...active,tierIds:[]}),false);
 });
