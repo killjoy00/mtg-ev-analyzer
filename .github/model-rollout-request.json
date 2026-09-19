@@ -1,7 +1,7 @@
 {
   "operation": "puzzle-components",
-  "request_id": "phase2-stage-development-20260919",
-  "reason": "Stage the 22 independently verified Phase 2 Traditional sources from PR155 in development. Preserve fixed Dailies, Premier corpus, retained Cube component, and Candidate-only SIR. Includes reviewed additive migrations 0024-0025.",
+  "request_id": "phase2-stage-development-isolated-20260919",
+  "reason": "Rerun idempotent development staging after PR157 removed the concurrent automatic image refresh. All 22 components verified Candidate on the first run; the strict retained-payload and Daily gates must now pass without another corpus writer.",
   "target": "development",
   "action": "stage",
   "source": "regular-phase2"
