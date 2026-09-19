@@ -18,7 +18,7 @@ test('either unfinished Daily precedes the compact result',()=>{
   assert.match(html,/View result/);assert.doesNotMatch(html,/Keep drafting/);
  }
 });
-test('both complete reveals account practice or account creation',()=>{
+test('all three complete reveals account practice or account creation',()=>{
  const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
  const freeHtml=dailyHomeMarkup(p,day);
  assert.match(freeHtml,/Start Another Draft Run/);
