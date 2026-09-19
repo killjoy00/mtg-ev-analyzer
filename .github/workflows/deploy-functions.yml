@@ -31,6 +31,9 @@ jobs:
       PROJECT_ID: patient-shadow-91417882
       RELEASE_COMMIT: ${{ inputs.commit }}
       RELEASE_TARGET: ${{ inputs.target }}
+      PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
+      PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
+      PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -87,8 +90,17 @@ jobs:
         run: |
           set -euo pipefail
           while IFS=: read -r slug entry; do
+            extra=()
+            if [[ "$slug" == "pack1growth" && "$RELEASE_TARGET" == "production" ]]; then
+              test -n "$PATREON_CLIENT_ID" || { echo '::error::PATREON_CLIENT_ID is missing.'; exit 1; }
+              test -n "$PATREON_CLIENT_SECRET" || { echo '::error::PATREON_CLIENT_SECRET is missing.'; exit 1; }
+              extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET")
+              if [[ -n "${PATREON_WEBHOOK_SECRET:-}" ]]; then
+                extra+=(--env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
+              fi
+            fi
             neon functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle \
-              --project-id "$PROJECT_ID" --branch "$TARGET_BRANCH" --runtime nodejs24 --wait
+              --project-id "$PROJECT_ID" --branch "$TARGET_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
 
       # --settle: this runs seconds after the deploy call returned, and a
