@@ -2,6 +2,9 @@ import { escapeHtml as esc } from './html.mjs';
 import {
   loadMyProfile,
   getAuthSession,
+  loadPatreonStatus,
+  connectPatreon,
+  disconnectPatreon,
   signOutAccount,
   loadProfileHistory,
   loadPublicProfile,
@@ -123,7 +126,7 @@ function dailyRow(row, names, index) {
   return `<li><div><strong>${esc(setName)} · ${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}</strong><span>${esc(row.date || '')}${row.final===false?' · Still open':''}</span></div><b>${Number(row.score || 0)}</b><em>${pct ? `Top ${pct}%${row.final===false?' so far':''} · #${Number(row.rank || 0)} of ${Number(row.total || 0)}` : `${Number(row.total || 0)} ranked players`}</em><button type="button" class="text-button" data-share-daily="${index}">Share</button></li>`;
 }
 
-function settingsMarkup(profile, progress, account) {
+function settingsMarkup(profile, progress, account, patreon) {
   if (!profile.player.claimed) {
     return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="button secondary" id="profile-claim-account">Save my progress</button></aside>`;
   }
@@ -137,9 +140,20 @@ function settingsMarkup(profile, progress, account) {
       <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
       <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status" aria-live="polite"></span></div>
     </form>
+    ${account?.user?`<section class="profile-membership" aria-labelledby="patreon-membership-title">
+      <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
+        ${patreon?.connected
+          ? `<p><strong>${patreon.capabilities?.length?'Member access active':'Patreon connected'}</strong><br><span>${patreon.capabilities?.length?'Powered Cube practice and custom-set practice are unlocked.':'No current paid Patreon entitlement was detected.'}</span></p>`
+          : `<p><strong>${patreon?.configured===false?'Patreon connection is not available yet.':'Unlock member practice.'}</strong><br><span>Connect the Patreon account that supports Pack One.</span></p>`}
+      </div>
+      <div class="profile-membership-actions">
+        ${patreon?.connected?'<button type="button" class="button secondary" id="patreon-disconnect">Disconnect Patreon</button>':patreon?.configured!==false?'<button type="button" class="button secondary" id="patreon-connect">Connect Patreon</button>':''}
+        <span id="patreon-status" aria-live="polite"></span>
+      </div>
+    </section>`:''}
   </section>`;
 }
-function profileMarkup(profile, catalog, { own = false, publicKey = null, account = null } = {}) {
+function profileMarkup(profile, catalog, { own = false, publicKey = null, account = null, patreon = null } = {}) {
   const names = catalogNames(catalog);
   const progress = environmentProgress(catalog, profile.by_set || []);
   const summary = profile.summary || {};
@@ -183,7 +197,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
       ${form != null ? `<div><span>Last 10 average</span><strong>${form.toFixed(1)}</strong></div>` : ''}
     </section>` : ''}
 
-    ${own ? settingsMarkup(profile, progress, account) : ''}
+    ${own ? settingsMarkup(profile, progress, account, patreon) : ''}
     ${publicUrl ? `<p class="profile-public-url">Public profile: <button type="button" class="text-button" id="profile-copy-link">Copy link</button></p>` : ''}
 
     <section class="profile-section archive-progress-section">
@@ -218,6 +232,16 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
 
   document.querySelector('#profile-home')?.addEventListener('click', () => { window.location.href = './'; });
   document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderMyProfile();});
+  document.querySelector('#patreon-connect')?.addEventListener('click',async e=>{
+    const button=e.currentTarget,status=document.querySelector('#patreon-status');button.disabled=true;if(status)status.textContent='Opening Patreon…';
+    try{const result=await connectPatreon();if(!result?.url)throw Error('Patreon did not return a connection URL.');track('patreon_connect_started');location.href=result.url;}
+    catch(error){button.disabled=false;if(status)status.textContent=error.message;}
+  });
+  document.querySelector('#patreon-disconnect')?.addEventListener('click',async e=>{
+    const button=e.currentTarget,status=document.querySelector('#patreon-status');button.disabled=true;if(status)status.textContent='Disconnecting…';
+    try{await disconnectPatreon();track('patreon_disconnected');await renderMyProfile();}
+    catch(error){button.disabled=false;if(status)status.textContent=error.message;}
+  });
   document.querySelectorAll('[data-profile-section]').forEach(d=>d.addEventListener('toggle',()=>{if(d.open)track(d.dataset.profileSection==='achievements'?'achievement_viewed':'archive_viewed',{source:'profile'});}));
   document.querySelector('#profile-claim-account')?.addEventListener('click', () => void renderAccount());
   document.querySelector('#profile-copy-link')?.addEventListener('click', async (event) => {
@@ -315,10 +339,14 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
   try {
     document.body.classList.remove('is-game');
     ensureProfileStyles();
-    const [catalog,account] = await Promise.all([loadCatalog(),own?getAuthSession():null]);
+    const [catalog,account,patreon] = await Promise.all([
+      loadCatalog(),
+      own?getAuthSession():null,
+      own?loadPatreonStatus().catch(()=>null):null,
+    ]);
     const app = document.querySelector('#app');
     if (!app) return;
-    app.innerHTML = profileMarkup(profile, catalog, { own, publicKey, account });
+    app.innerHTML = profileMarkup(profile, catalog, { own, publicKey, account, patreon });
     window.PACK1_LAST_PROFILE = profile;
     await bindProfile(profile, catalog, { own, publicKey });
     track('profile_view', { own, public: profile.player?.profile_public || false });
