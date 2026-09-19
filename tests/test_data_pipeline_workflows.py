@@ -132,16 +132,15 @@ class ReplayBuilderCallerTests(unittest.TestCase):
 
     def test_every_caller_supplies_the_colour_table_input(self):
         missing = [str(p.relative_to(ROOT)) for p in self.callers()
-                   if "--game-data" not in p.read_text(encoding="utf-8")
-                   and "--deck-fit" not in p.read_text(encoding="utf-8")]
+                   if "--game-data" not in p.read_text(encoding="utf-8")]
         self.assertEqual(missing, [],
-                         "caller(s) of the replay builder omit --game-data/--deck-fit")
+                         "caller(s) of the fold-isolated replay builder omit --game-data")
 
     def test_the_requirement_this_guards_is_still_real(self):
         """If the builder ever stops requiring it, this whole class is noise
         and should go - it should not sit here passing vacuously."""
         text = (ROOT / "scripts" / "build_replays.py").read_text(encoding="utf-8")
-        self.assertIn("Pass --game-data (or --deck-fit)", text)
+        self.assertIn("Pass --game-data. Fold-isolated colour tables", text)
 
     def test_the_callers_are_actually_found(self):
         """A scan that silently matches nothing would pass the test above."""
