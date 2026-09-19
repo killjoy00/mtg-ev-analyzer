@@ -9,5 +9,7 @@ export function impliedTrophyScore(puzzle) {
  return ratio!=null&&Number.isFinite(ratio)&&ratio>=0&&ratio<=1?Math.round(95*ratio):null;
 }
 export function meetsServingQuality(puzzle) {const score=impliedTrophyScore(puzzle);return score!=null&&score>=MINIMUM_IMPLIED_TROPHY_SCORE;}
-// Same float64 conversion and integer rounding as the JS metadata decoder.
-export const SERVING_QUALITY_SQL='floor(95 * r.target_support_ratio::text::float8 + 0.5) >= 20';
+// Ratings store float64 ratios. For valid nonnegative ratios, round(95*r)>=20
+// iff r>=19.5/95. A bare column lets the planner use its real distribution.
+export const MINIMUM_TROPHY_SUPPORT_RATIO=(MINIMUM_IMPLIED_TROPHY_SCORE-.5)/95;
+export const SERVING_QUALITY_SQL=`r.target_support_ratio >= ${MINIMUM_TROPHY_SUPPORT_RATIO}::float8`;

@@ -18,7 +18,7 @@ export function rolloutDispatch(request) {
     if(!['development','production'].includes(target))throw Error('Invalid staging target.');
     workflow='prepare-rebuild.yml';inputs={target};extra=['target'];
   } else if(operation==='puzzle-components') {
-    if(!['development','production'].includes(target)||!['stage','publish'].includes(action)||!['powered-cube','regular-study'].includes(source))throw Error('Invalid source release request.');
+    if(!['development','production'].includes(target)||!['stage','publish'].includes(action)||!['powered-cube','regular-study','regular-phase2'].includes(source))throw Error('Invalid source release request.');
     workflow='publish-puzzle-components.yml';inputs={target,action,source};extra=['target','action','source'];
   } else if(operation==='corpus-health') {
     if(!['development','production'].includes(target))throw Error('Invalid health target.');
