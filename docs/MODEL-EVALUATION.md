@@ -1,5 +1,7 @@
 # Model evaluation harness
 
+Current comprehensive review: [Model and scoring, September 19](reports/MODEL-AND-SCORING-2026-09-19.md). It distinguishes the independent evaluation split from the newly identified production fold-reference issue in [#164](https://github.com/killjoy00/mtg-ev-analyzer/issues/164).
+
 See [Automated scoring validation](AUTOMATED-SCORING.md) for the current disjoint
 calibration, curve-selection and assessment workflow, strict train-table
 provenance, and eight-pick cohort simulation. Human grading is not a prerequisite.

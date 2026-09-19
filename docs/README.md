@@ -9,3 +9,8 @@ Start with [CURRENT-STATE](CURRENT-STATE.md) for verified deployment boundaries 
 - [Backend operations](BACKEND-RELIABILITY.md), [request integrity](REQUEST-INTEGRITY.md), [remaining work](ROADMAP.md)
 
 Dated earlier reviews are historical evidence. Superseded core documents are retained in [the archive](archive/pre-rebuild-2026-09-18/). Earlier reproduction notes do not authorize restoring retired products or old selection/sharing rules.
+
+## September 19 closeout reports
+
+- [Handoff closeout audit](reports/HANDOFF-CLOSEOUT-2026-09-19.md): completed requirements, live release evidence and open acceptance boundaries.
+- [Model and scoring report](reports/MODEL-AND-SCORING-2026-09-19.md): formulas, training, validation, measured results and the production fold-reference finding in issue #164.

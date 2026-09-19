@@ -8,14 +8,14 @@ Pack One remains the eight-decision game in [CHARTER](CHARTER.md): three univers
 
 | Layer | Verified release |
 | --- | --- |
-| Browser | GitHub Pages serves main. PR156 released the light tournament design: self-hosted Barlow Condensed and Source Sans 3, numbered Daily scorecards, larger controls, and matching editorial typography. PR160 adds the third Daily, visible ranked/guest state and Elite set picker. Application release: `8abee764ba05c318c77670c115657304adb4deee`. |
-| Production functions | `draftrunapi` deployment 24, `pack1growth` 15, and `pack1api` 18 all answer with release `8abee764ba05c318c77670c115657304adb4deee`. Development run 35460748733 and production run 35460832627 passed all three complete Daily flows. |
+| Browser | GitHub Pages serves main. PR156 released the light tournament design: self-hosted Barlow Condensed and Source Sans 3, numbered Daily scorecards, larger controls, and matching editorial typography. PR160 adds the third Daily, visible ranked/guest state and Elite set picker. PR162 publicly activates Patreon; PR163 adds both-tier ad suppression with Google delivery still disabled. Current application release: `4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5`. |
+| Production functions | `draftrunapi` deployment 26, `pack1growth` 17, and `pack1api` 20 all answer with release `4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5`. Development run 35463356101 and production run 35463480967 passed all three complete Daily flows. Independent health-marker reads passed afterward. |
 | Schema | Reviewed additive migrations through 0027 are applied to development and production. Historical migration 0016 was not replayed. |
 | Corpus / selection | `elite-trophy-colour-stage-v7` / `eight-pick-v4`; 29 Live environments: 28 regular sets and Powered Cube. |
 | Model / scoring | `strong-player-colour-stage-v3`, trained on Premier evidence. No Traditional pooling, model retraining, or scoring-curve change. |
 | New-run eligibility | `trophy-implied-score-20-v1`; the indexed threshold is equivalent to the rounded implied-score floor. Historical games retain their recorded policy. |
 | Traditional sources | Phase 2 components are explicitly published only for eligible Live parents. SIR remains Candidate. The existing `traditional-cube-p2p7-v3-v1` component remains Live. |
-| Patreon | Public linking is disabled; controlled linking is enabled only for the owner-authorized account. Campaign `16808916`, Elite Member `29631843`; Supporter `29631835` grants no premium capabilities. All runtime secrets are installed on production growth. Real OAuth authorization remains outstanding. |
+| Patreon | Public linking is live. Campaign `16808916`, Elite `29631843` grants both premium practice capabilities; Supporter `29631835` does not. Both paid tiers suppress future display ads while signed in and connected. Google delivery remains disabled. Real OAuth, reconnect, custom practice and creator API sync passed; actual billing transitions and signed webhook delivery remain unobserved. |
 
 Pages success does not imply backend deployment or corpus publication. All three backend health markers were read independently after production deployment.
 
@@ -41,9 +41,11 @@ Approved regular Phase 2 scope: MSH, SOS, EOE, FIN, TDM, DFT, FDN, DSK, BLB, MH3
 
 Expansion affects newly generated games. It does not regenerate today's Daily or alter stored scores, shares, historical puzzles, or model evidence.
 
-## Remaining activation work
+## Remaining validation and deferred work
 
-The webhook secret is installed, and the Connect button is enabled only for the owner-authorized test account. The owner must approve the normal Patreon OAuth connection; then verify the real membership, capabilities and reconciliation before enabling public linking. Fixture tests cannot establish real provider behavior. [Owner setup steps](PATREON-OWNER-SETUP.md) and [integration runbook](PATREON.md) record the exact URLs, secret name, policy, failure behavior, and canary requirements. No subscription purchase was made.
+The September 19 model review found indirect held-fold influence in the production stage-reference statistic. Direct-count subtraction does not establish complete isolation. [Issue #164](https://github.com/killjoy00/mtg-ev-analyzer/issues/164) records a synthetic reproduction and requires a measured correction in a new model/corpus version. Production score impact remains unmeasured; existing scores and the frozen model were not changed.
+
+Public Patreon activation passed real connect/reconnect, premium practice and authoritative creator API reconciliation. The next actual billing/tier change and signed provider delivery still need observation. Google ad activation is explicitly deferred pending approval and owner direction; TCGplayer's Impact template remains empty. Physical-device/native-share/accessibility validation and the next new archive arrival remain prospective checks. [Owner operations](PATREON-OWNER-SETUP.md), [Patreon runbook](PATREON.md), [roadmap](ROADMAP.md) and [monetization decisions](../MONETIZATION.md) state these boundaries.
 
 The temporary performance/SQL test branch `release-tournament-20260919` (`br-cold-flower-ay5yimu1`) is isolated from serving and suspends while idle.
 
@@ -61,7 +63,15 @@ Verify schema, deploy a reviewed main SHA to development, pass its acceptance fl
 - Elite custom-set picker is discoverable from the homepage; backend capability enforcement remains required.
 - Established account-linked player tokens qualify for Daily ranking without a redundant active Auth header. Guest-started attempts remain unranked after linking. The first pack displays ranked identity or a guest warning.
 - Owner-authorized Cube recovery: the September 19 first attempt scored 89, matched the universal schedule, had eight stored answers and a pre-existing account link/session. Only its ranking flag and missing scores entry were restored; career/result aggregates were not replayed. Audit event `daily_ranking_recovered` records the repair.
-- Patreon discovery 35459558651 confirmed all runtime/creator secrets. Production linking is enabled only for the owner-authorized canary account; public activation awaits real OAuth evidence.
+- Patreon discovery 35459558651 confirmed all runtime/creator secrets. The owner-authorized canary subsequently passed and public linking is now enabled; see the activation evidence below.
 - Schema prerequisite: additive environment expansion in migration 0027.
 
-PR160 passed unit/browser gates and the isolated database suite (35460401581, 35460401422, 35460401447). Live browser run 35460997062 completed all three Dailies at 320/390/768/1440 widths with images, guest notices, pool proportions, result states and zero browser errors. Today’s Latest Set schedule has eight HOB decisions from eight distinct drafts. All 19 previous schedules have identical fingerprints. The public Cube board shows the recovered 89. Unsigned production webhooks correctly return 401; an actual signed provider delivery and real membership canary are not yet claimed. [Feature release evidence](../results/release-2026-09-19/three-dailies-verification.json).
+PR160 passed unit/browser gates and the isolated database suite (35460401581, 35460401422, 35460401447). Live browser run 35460997062 completed all three Dailies at 320/390/768/1440 widths with images, guest notices, pool proportions, result states and zero browser errors. Today’s Latest Set schedule has eight HOB decisions from eight distinct drafts. All 19 previous schedules have identical fingerprints. The public Cube board shows the recovered 89. Unsigned production webhooks correctly return 401; an actual signed provider delivery was not observed. The later real member connection/reconnection, custom practice and API sync passed, as recorded separately below. [Feature release evidence](../results/release-2026-09-19/three-dailies-verification.json).
+
+## Final Patreon and ad-protection release
+
+Public Patreon activation PR162 passed development 35462022892 and production 35462227708. Reconciliation 35461859312 confirmed the exact real Elite tier and renewed two capabilities. The owner completed a three-set custom run using eight distinct drafts exclusively within the selected sets.
+
+PR163 passed full unit 35462928388, browser 35462928378 and isolated database 35462928376 gates. Its intercepted browser tests cover disabled delivery, Supporter/Elite suppression, stale/unknown/failed membership handling, nonmembers, guests and account changes. Existing ad slots start hidden in HTML. The published `ad-config.js` remains disabled, and the live editorial preview URL shows no ad slot. No Google ads or affiliate commissions were activated.
+
+[Activation and final deployment evidence](../results/release-2026-09-19/patreon-activation.json), [handoff closeout](reports/HANDOFF-CLOSEOUT-2026-09-19.md), and [detailed model/scoring report](reports/MODEL-AND-SCORING-2026-09-19.md). Historical release snapshots are retained with their original as-of state.

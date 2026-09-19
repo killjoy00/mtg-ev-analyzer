@@ -1,68 +1,46 @@
-# Finish Patreon setup
+# Patreon setup and owner operations
 
-The site is prepared for your published **$3 Supporter** and **$5 Elite Member**
-tiers. Supporter helps fund the site; Elite Member unlocks Cube practice and
-custom-set practice. Your existing API client credentials work.
+Setup is complete. Public Patreon linking is live. Your real Elite connection,
+disconnect/reconnect, custom-set practice and creator API reconciliation passed
+on September 19, 2026. No further setup or credentials are needed now.
 
-The webhook secret was verified on 2026-09-19. Public account linking remains
-disabled while the owner-authorized account completes the controlled membership
-test. You do not need to recreate the tiers or API client.
+## Normal member connection
 
-## Current next step
+1. Open [Pack One](https://packone.pro/) and sign in.
+2. Open **Account** on Pack One, then find **Patreon** and select **Connect Patreon**.
+3. Authorize the Patreon account with the intended membership and return to Pack One.
+4. Elite members can select **Choose your sets** on the homepage or start Cube practice.
 
-1. Open [Pack One](https://packone.pro/) and sign in to the authorized account.
-2. Open **Account**, find **Patreon**, then select **Connect Patreon**.
-3. Sign in to the Patreon account holding Elite Member access and authorize the connection.
-4. Return to the homepage, select **Choose your sets**, select sets and start a random run.
-5. Tell me the connection is complete so I can verify the provider record and hourly reconciliation.
+This Account menu is on Pack One, not in Patreon's own navigation. Supporter helps
+fund the site and includes future ad-free browsing; Elite also unlocks premium
+practice. Google ads remain disabled for everyone pending approval.
 
-The following setup steps are retained for reference; the webhook-secret step is complete.
+## Existing provider configuration
 
-## 1. Confirm the OAuth callback
+The existing API client, published tiers and saved secrets are in use. Do not
+recreate them or paste credentials into chat. The callback is:
 
-1. Sign in to [Patreon’s API clients page](https://www.patreon.com/portal/registration/register-clients).
-2. Open the existing Pack One client.
-3. Confirm its redirect/callback URL is exactly:
+`https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/patreon/callback`
 
-```text
-https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/patreon/callback
-```
+The registered webhook endpoint is:
 
-4. Save if you changed it.
+`https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/patreon/webhook`
 
-## 2. Create or check the webhook
+Selected member events are `members:create`, `members:update`, `members:delete`.
+The signing secret is saved as `PATREON_WEBHOOK_SECRET` in repository Actions
+secrets. Existing client and creator-token secrets remain separate.
 
-1. Open [Patreon’s My Webhooks page](https://www.patreon.com/portal/registration/register-webhooks).
-2. Select the Pack One campaign. Create a webhook, or edit the existing one if
-   it already uses the endpoint below.
-3. Enter this exact endpoint:
+## If access later looks stale
 
-```text
-https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/patreon/webhook
-```
+1. Confirm the member is signed in to the correct Pack One account and has connected Patreon.
+2. Check **Admin > Users**, open the account and inspect membership, capabilities,
+   expiration and **Last synced**.
+3. Check the **Patreon membership reconciliation** workflow. The normal sync runs
+   hourly; GitHub may delay schedules. Use **Run workflow > sync** to reconcile now.
+4. If the workflow reports expired creator credentials, update the existing
+   creator token secrets using the values from the owner's Patreon API client,
+   then rerun sync. Never send secret values through chat or commit them.
 
-4. Select the v2 member events: `members:create`, `members:update`, and
-   `members:delete`.
-5. Save and copy the webhook signing secret shown by Patreon. Do not paste it
-   into chat. An endpoint test can report unavailable while linking is disabled;
-   the final connection check happens after the secret is installed.
-
-## 3. Save the signing secret in GitHub
-
-1. Open [the repository’s Actions secrets](https://github.com/killjoy00/mtg-ev-analyzer/settings/secrets/actions).
-2. Choose **New repository secret**.
-3. Enter the name `PATREON_WEBHOOK_SECRET`.
-4. Paste the signing secret from Patreon into the secret field and save it.
-   If this secret already exists, update it instead of creating a second name.
-
-## 4. Tell me setup is ready
-
-Reply **“Webhook saved”** and identify the Pack One account available for the real
-membership test. A creator account alone does not demonstrate subscriber access;
-we need to verify a real Elite Member connection and confirm Supporter access is
-excluded. Do not send passwords, access tokens, or the signing secret.
-
-I can then install the runtime secret, prepare the controlled member test, verify
-linking, access changes, disconnect/reconnect and reconciliation, and enable the
-public connection button after those checks pass. No purchase or subscription
-change has been made on your behalf.
+The initial real billing-change/signed-webhook observation is still outstanding;
+fixture coverage and successful API reconciliation are documented separately in
+[the runbook](PATREON.md). No purchase or subscription change was made on your behalf.

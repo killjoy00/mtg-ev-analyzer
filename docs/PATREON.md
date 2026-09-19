@@ -1,12 +1,17 @@
 # Patreon membership release
 
-Public linking remains disabled pending a real member canary. A controlled production
-connection is restricted to the account explicitly authorized by the owner; the
-policy stores only a hash of its managed Auth ID. Discovery run 35459558651 on
-2026-09-19 verified all five required secrets, including the saved webhook secret.
+Public linking is enabled after the real member checks on September 19, 2026.
+The owner completed OAuth, disconnect/reconnect and an Elite custom practice run.
+Creator API reconciliation run 35461859312 confirmed the exact Elite tier and
+renewed both premium grants. Public release 053541429b7adf01168eb27b344204e706ca67f9
+passed development 35462022892 and production 35462227708; all three health markers
+were verified independently. Discovery run 35459558651 verified the required secrets.
 The verified policy maps campaign **16808916** to **Elite Member 29631843 ($5)**.
 **Supporter 29631835 ($3)** and the free tier **29623888** grant no premium tools.
-Regular practice remains free to authenticated Pack One accounts.
+Regular practice remains free to authenticated Pack One accounts. Both paid tiers
+include display-ad suppression when signed in and connected; Google ads remain
+disabled pending approval and a separate owner activation. This benefit is
+independent of premium practice grants.
 
 The OAuth client, creator credentials and webhook signing secret are present in
 GitHub. No secret values were exposed. The connection requires the account owner
@@ -74,7 +79,7 @@ Register the webhook URL with `members:create`, `members:update`, `members:delet
 
 `https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/patreon/webhook`
 
-## Activation gate
+## Release checklist and observed evidence
 
 1. Confirm the published supporter and all-access tiers, then record the campaign
    and all-access tier IDs from discovery in the policy.
@@ -89,10 +94,30 @@ Register the webhook URL with `members:create`, `members:update`, `members:delet
 4. Verify reconciliation succeeds and that Admin → Users reports the provider,
    effective capabilities, membership state, and last synchronization time.
 5. Record the real canary evidence, enable the reviewed policy, and deploy the
-   same checked commit to development and production. Until then the public site
-   offers the Patreon support link and accurately says linking is coming soon.
+   same checked commit to development and production. These activation steps
+   passed on September 19; public account linking is now available.
 
 Automated fixture tests cover tier/campaign denial, gifts/trials, cancellations,
 invalid signatures, failed pagination, duplicate identity, downgrade/upgrade,
 stale snapshots, grant expiry, disconnect, and manual-grant preservation. They do
 not substitute for the real provider canary.
+
+## Remaining real-provider acceptance
+
+A real billing/tier change and an actual signed provider webhook delivery have
+not been observed. Real connection/reconnection and authoritative API sync do not
+substitute for those events. Automated fixtures cover tier changes, revocation,
+signatures, ordering, expiry and manual-grant preservation. Observe the next
+legitimate provider change without purchasing or cancelling subscriptions solely
+for testing. Started practice retains its recorded session; new paid practice
+starts require current capabilities.
+
+## Ad-free membership
+
+`adFreeTierIds` explicitly includes Supporter and Elite. The provider status
+response supplies `ad_free` and `ads_allowed`; it never grants Supporter the Elite
+practice capabilities. A stale snapshot, pending sync, failed request or unknown
+response suppresses advertising. This conservative advertising behavior does not
+extend expired premium gameplay grants. Sign-in and a connected membership are
+required on the current browser; a signed-out visitor cannot be identified as a
+member. All Google delivery remains off in `ad-config.js`.

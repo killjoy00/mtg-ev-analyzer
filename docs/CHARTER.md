@@ -26,7 +26,7 @@ Daily Latest Set has a separate immutable schedule and leaderboard under `latest
 
 The full historical corpus is retained. Lifecycle controls new-play eligibility, not existence of historical evidence. Existing fingerprint exclusions remain compatibility constraints, not authorization for additional deletion.
 
-Premier trophies include **7-0, 7-1 and 7-2**. Retain the experienced/high-quality drafter standard: at least 100 prior games and the existing per-set qualified cohort. Legacy archives without win-rate fields retain their documented independently observed rank cohort. The broader qualified cohort trains the production model; puzzle sources are trophies and cannot train their own held-out grader.
+Premier trophies include **7-0, 7-1 and 7-2**. Retain the experienced/high-quality drafter standard: at least 100 prior games and the existing per-set qualified cohort. Legacy archives without win-rate fields retain their documented independently observed rank cohort. The broader qualified cohort trains the production model; puzzle sources are trophies. Strict exclusion of a source from its own grader remains a requirement. The September 19 audit found indirect held-fold influence in the production stage reference; [issue #164](https://github.com/killjoy00/mtg-ev-analyzer/issues/164) requires a versioned correction and assessment before the next model release. Do not present current direct-count exclusion as complete isolation or silently rewrite the frozen corpus.
 
 Qualified Traditional 3-0 trophy drafts may contribute playable decisions only after source-specific evidence, staging and explicit publication pass. The production scoring model remains Premier-trained. Pooling model evidence and publishing playable Traditional puzzles are distinct decisions. [Experiment and limitations](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md).
 
@@ -36,7 +36,7 @@ An exact historical trophy match always earns **100**, even when the model disag
 
 ## Practice and capabilities
 
-Anonymous users receive all three Dailies. A free authenticated account adds `unlimited_regular_practice`. Elite grants add `unlimited_cube_practice` and `custom_corpus`; provider names and tiers do not belong in core product logic. Backend identity and entitlement state are authoritative. The Patreon adapter is implemented with explicit campaign and premium-tier matching, with a controlled connection test restricted to the owner-authorized account pending real membership evidence. Public linking remains disabled. Supporter membership grants no premium capabilities.
+Anonymous users receive all three Dailies. A free authenticated account adds `unlimited_regular_practice`. Elite grants add `unlimited_cube_practice` and `custom_corpus`; provider names and tiers do not belong in core product logic. Backend identity and entitlement state are authoritative. Public Patreon linking is active with exact campaign and tier matching. Supporter grants no premium practice capabilities; both Supporter and Elite include display-ad suppression while signed in and connected. Google ads remain disabled pending approval. Real OAuth, reconnect, paid practice and authoritative API sync are verified; actual billing transitions and signed webhook delivery remain separate acceptance observations.
 
 Custom practice accepts one or more Live eligible regular sets, assigning eight decisions as evenly as possible: 8; 4/4; 3/3/2; 2/2/2/2. Corpus size does not weight this allocation. Non-Daily unshared practice can retain matched rerolls.
 

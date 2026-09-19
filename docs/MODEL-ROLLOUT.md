@@ -1,5 +1,10 @@
 # Model rollout: September 2026
 
+Historical rollout record. Its retirement/reset instructions describe that earlier
+release and must not be replayed. Current product and remaining work are in
+[CURRENT-STATE](CURRENT-STATE.md) and [ROADMAP](ROADMAP.md). Top 3 and Full Pack are
+retired current products; only historical compatibility remains.
+
 The target is `strong-player-colour-stage-v3` in the parallel corpus
 `elite-trophy-colour-stage-v7`. Scoring remains `trophy-consensus-v3`:
 the verified trophy choice earns 100, and alternatives earn
