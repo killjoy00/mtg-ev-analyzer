@@ -22,7 +22,7 @@ from format_research import cohort, normalize
 from format_residuals import metadata_for_set, residual_report
 from grading_curve import js_round
 from import_all_trophies import (ROOT, BASE, archive, scan_metadata, eligible_trophies,
-    collect, trajectory, metadata, resolve_images, digest, encoded, atomic_json,
+    collect_legacy_v3, trajectory, metadata, resolve_images, digest, encoded, atomic_json,
     write_gzip_jsonl)
 
 SETS=('blb','dft','fin','hob')
