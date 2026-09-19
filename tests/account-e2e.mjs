@@ -16,6 +16,7 @@ await page.route('https://**-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**'
   if(path==='/v1/account/link'){claims++;assert.equal(route.request().headers()['x-pack1-auth-session'],'auth-fixture');body={token:'claimed-fixture',merged:true};}
   if(path==='/v1/account/session'){status=signed?200:401;body=signed?{session:{token:'auth-fixture'},user:{email:'qa@example.invalid',name:'Test Player'}}:{error:'Signed out'};}
   if(path==='/v1/account/signout')signed=false;
+  if(path==='/v1/patreon/status')body={configured:true,webhook_configured:false,connected:false,membership:null,capabilities:[]};
   if(path==='/v1/profile/me')body={player:{claimed:signed,profile_public:false,display_name:'Test Player'},summary:{games:3},achievements:[]};
   await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 });
@@ -33,6 +34,8 @@ try {
     await page.locator('#profile-account #account-signout').waitFor();assert.ok(claims>0);
     assert.equal(await page.locator('#profile-account #profile-settings-form').count(),1);
     assert.match(await page.locator('#profile-account').textContent(),/qa@example.invalid/);
+    assert.equal(await page.locator('#patreon-connect').count(),1);
+    assert.match(await page.locator('.profile-membership').textContent(),/Supporter membership supports the site/);
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-api-session-v1')),'claimed-fixture');
     await page.locator('#account-signout').click();await page.locator('#profile-claim-account').waitFor();await page.locator('#profile-claim-account').click();await page.locator('#account-signin').waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-auth-session-v1')),null);
@@ -40,5 +43,5 @@ try {
   }
   assert.deepEqual(errors,[]);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
-  console.log('Account browser contract passed: guest access, sign in/up, linking and sign-out credential separation.');
+  console.log('Account browser contract passed: guest access, sign in/up, linking, Patreon connection surface and sign-out credential separation.');
 }finally{await browser.close();}

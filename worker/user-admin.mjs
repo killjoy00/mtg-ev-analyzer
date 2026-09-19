@@ -17,7 +17,7 @@ export function userAdminFilters(url) {
   const search=String(url.searchParams.get('search')||'').trim();
   const status=String(url.searchParams.get('status')||'all');
   if(search.length>100)fail('Search is too long.');
-  if(!['all','paid','admin'].includes(status))fail('Invalid user filter.');
+  if(!['all','paid','patreon','admin'].includes(status))fail('Invalid user filter.');
   return {search,status};
 }
 
@@ -28,6 +28,7 @@ function normalizeUser(row) {
     banned:bool(row.banned),
     linked:Boolean(row.claimed_at),
     is_admin:bool(row.is_admin),
+    patreon_connected:bool(row.patreon_connected),
     active_entitlements:num(row.active_entitlements),
     capabilities:parse(row.capabilities)||[],
     runs:num(row.runs),
@@ -43,7 +44,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
   if(detail) {
     if(!UUID.test(detail[1]))fail('Invalid user.',400);
     const id=detail[1];
-    const [account,stats,entitlements,runs,events,authActivity]=await Promise.all([
+    const [account,stats,entitlements,providers,runs,events,authActivity]=await Promise.all([
       query(`SELECT u.id,u.name,u.email,u."emailVerified" email_verified,u."createdAt" created_at,u."updatedAt" updated_at,
           u.banned,u."banReason" ban_reason,u."banExpires" ban_expires,
           a.claimed_at,p.display_name profile_name,p.profile_public,
@@ -66,6 +67,8 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
           (revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())) active
         FROM entitlement_grants WHERE auth_user_id=$1::uuid
         ORDER BY granted_at DESC,capability,provider`,[id]),
+      query(`SELECT provider,membership_status,currently_entitled_amount_cents,is_free_trial,is_gifted,connected_at,last_synced_at
+        FROM provider_accounts WHERE auth_user_id=$1::uuid ORDER BY provider`,[id]),
       query(`SELECT environment,day::text,score,created_at,updated_at,
           CASE WHEN day IS NOT NULL THEN 'Daily'
             WHEN challenge_id IS NOT NULL THEN 'Shared run'
@@ -101,6 +104,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
       user,
       stats:summary,
       entitlements:entitlements.rows.map(row=>({...row,active:bool(row.active)})),
+      providers:providers.rows.map(row=>({...row,currently_entitled_amount_cents:num(row.currently_entitled_amount_cents),is_free_trial:bool(row.is_free_trial),is_gifted:bool(row.is_gifted)})),
       recent_runs:runs.rows.map(row=>({...row,score:row.score==null?null:Number(row.score),answered:num(row.answered),total:num(row.total),leaderboard_eligible:bool(row.leaderboard_eligible)})),
       recent_events:recentEvents,
     };
@@ -111,6 +115,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
   const where=`WHERE ($1='' OR coalesce(u.name,'') ILIKE '%'||$1||'%' OR coalesce(u.email,'') ILIKE '%'||$1||'%')
     AND ($2='all'
       OR ($2='paid' AND EXISTS(SELECT 1 FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())))
+      OR ($2='patreon' AND EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon'))
       OR ($2='admin' AND EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id)))`;
   const [summary,count,rows]=await Promise.all([
     query(`WITH activity AS (
@@ -125,12 +130,14 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
         count(*) FILTER(WHERE u."createdAt">=now()-interval '30 days')::int new_30d,
         count(*) FILTER(WHERE activity.last_active>=now()-interval '30 days')::int active_30d,
         count(*) FILTER(WHERE EXISTS(SELECT 1 FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())))::int paid,
+        count(*) FILTER(WHERE EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon'))::int patreon,
         count(*) FILTER(WHERE EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id))::int admins
       FROM neon_auth."user" u JOIN activity ON activity.id=u.id`),
     query(`SELECT count(*)::int total FROM neon_auth."user" u ${where}`,params),
     query(`SELECT u.id,u.name,u.email,u."emailVerified" email_verified,u."createdAt" created_at,u.banned,
         a.claimed_at,p.display_name profile_name,
         EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id) is_admin,
+        EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon') patreon_connected,
         (SELECT count(*)::int FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())) active_entitlements,
         COALESCE((SELECT jsonb_agg(eg.capability ORDER BY eg.capability) FROM entitlement_grants eg
           WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())),'[]'::jsonb) capabilities,

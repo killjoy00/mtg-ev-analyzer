@@ -109,7 +109,7 @@ jobs:
           # foreign keys and tests the wrong release path. Only additive backlog
           # plus this PR's new migrations belongs on the disposable clone.
           mapfile -t pending < <({
-            printf '%s\n' migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql migrations/0023_serving_policy_snapshots.sql migrations/0024_serving_quality_lookup.sql migrations/0025_traditional_phase2_components.sql
+            printf '%s\n' migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql migrations/0023_serving_policy_snapshots.sql migrations/0024_serving_quality_lookup.sql migrations/0025_traditional_phase2_components.sql migrations/0026_provider_accounts.sql
             printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
           } | sort -u)
           if (( ${#pending[@]} == 0 )); then
@@ -141,6 +141,7 @@ jobs:
           node tests/decision-measurements-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/fixed-daily-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/corpus-admin-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/patreon-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/capabilities-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/eight-pick-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/request-integrity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures

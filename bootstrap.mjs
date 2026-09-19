@@ -39,7 +39,15 @@ if (historicalShare) {
     await profiles.renderMyProfile();
   };
   document.querySelector('.top-actions').append(account);
-  if (home) home.installDailyHome(identityReady);
+  if (params.has('patreon')) {
+    await identityReady;
+    const profiles=await import('./profile-product.mjs');
+    profiles.installProfileProductLayer();
+    (await import('./profile-polish.mjs')).installProfilePolish();
+    await profiles.renderMyProfile();
+    const clean=new URL(location.href);clean.searchParams.delete('patreon');
+    history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
+  } else if (home) home.installDailyHome(identityReady);
   else if (params.has('profile')) {
     await identityReady;
     (await import('./profile-product.mjs')).installProfileProductLayer();

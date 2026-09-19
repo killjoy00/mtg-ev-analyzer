@@ -58,3 +58,8 @@ test('corpus health allows only explicit known targets and no source mutations',
  assert.equal(rolloutDispatch(r).workflow,'corpus-health.yml');
  assert.throws(()=>rolloutDispatch({...r,action:'publish'}));assert.throws(()=>rolloutDispatch({...r,target:'unknown'}));
 });
+
+test('Patreon discovery is read-only and cannot activate memberships',()=>{
+ assert.equal(rolloutDispatch({...common,operation:'patreon-discovery'}).body.inputs.mode,'discover');
+ assert.throws(()=>rolloutDispatch({...common,operation:'patreon-discovery',mode:'sync'}));
+});
