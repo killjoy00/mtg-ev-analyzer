@@ -11,7 +11,8 @@ const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});}
 const truthy=value=>value===true||value==='t'||value==='true'||value===1||value==='1';
 const amount=value=>{const n=Number(value);return Number.isFinite(n)&&n>=0?Math.round(n):0;};
 const redirectUri=()=>String(process.env.PATREON_REDIRECT_URI||REDIRECT_URI);
-const configured=()=>Boolean(process.env.PATREON_CLIENT_ID&&process.env.PATREON_CLIENT_SECRET);
+const oauthConfigured=()=>Boolean(process.env.PATREON_CLIENT_ID&&process.env.PATREON_CLIENT_SECRET);
+const configured=()=>oauthConfigured()&&Boolean(process.env.PATREON_WEBHOOK_SECRET);
 
 function redirect(status) {
   const url=new URL(RETURN_ORIGIN);
@@ -191,7 +192,7 @@ export async function handlePatreon(request,{query,authSession,json}) {
   const url=new URL(request.url);
   if(url.pathname==='/v1/patreon/webhook'&&request.method==='POST')return webhook(request,query,json);
   if(url.pathname==='/v1/patreon/callback'&&request.method==='GET') {
-    if(!configured())return redirect('unavailable');
+    if(!oauthConfigured())return redirect('unavailable');
     const state=String(url.searchParams.get('state')||''),code=String(url.searchParams.get('code')||'');
     if(!/^[a-f0-9]{64}$/.test(state)||!code)return redirect('error');
     const hash=createHash('sha256').update(state).digest('hex');
@@ -215,7 +216,7 @@ export async function handlePatreon(request,{query,authSession,json}) {
   const auth=await authSession(request),authUserId=auth.user_id;
   if(url.pathname==='/v1/patreon/status'&&request.method==='GET')return json(await status(query,authUserId));
   if(url.pathname==='/v1/patreon/connect'&&request.method==='POST') {
-    if(!configured())return json({error:'Patreon connection is not configured.'},503);
+    if(!configured())return json({error:'Patreon membership is not fully configured yet.'},503);
     const state=randomBytes(32).toString('hex'),hash=createHash('sha256').update(state).digest('hex');
     await query('DELETE FROM provider_oauth_states WHERE expires_at<=now()');
     await query(`INSERT INTO provider_oauth_states(state_hash,auth_user_id,provider,expires_at)
