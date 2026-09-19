@@ -36,13 +36,13 @@ function card(entry, { special = false } = {}) {
   const id = String(entry.set_id || '').toLowerCase();
   const practiceUrl = special
     ? '/?game=draft-run&set=powered-cube'
-    : '/?game=draft-run&custom=1';
+    : '/?game=draft-run';
   return `<article class="content-card set-catalog-card" data-set-id="${esc(id)}">
     <p class="kicker">Data through ${esc(dateLabel(entry.data_date))}</p>
     <h2>${esc(entry.set_name || id.toUpperCase())}</h2>
     <p>${formatNumber(entry.verified_decisions)} verified first-pack decisions · ${formatNumber(entry.qualified_trophy_drafts)} qualified Premier trophy drafts.</p>
     <p>${esc(cohortLabel(entry))}${entry.training_drafts ? ` · ${formatNumber(entry.training_drafts)} training drafts` : ''}.</p>
-    <div class="set-card-actions"><a href="${practiceUrl}">${special ? 'Play Cube Run' : 'Choose in Set Practice'}</a>${detailPages.has(id) ? `<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>` : ''}</div>
+    <div class="set-card-actions"><a href="${practiceUrl}">${special ? 'Play Cube Run' : 'Play Draft Run'}</a>${detailPages.has(id) ? `<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>` : ''}</div>
   </article>`;
 }
 
@@ -69,7 +69,7 @@ async function renderCatalog() {
       specialSection.hidden = false;
     }
   } catch (error) {
-    grid.innerHTML = '<p class="set-archive-error">Current serving coverage could not be loaded. Open <a href="/?game=draft-run&custom=1">Set Practice</a> to see the playable environments.</p>';
+    grid.innerHTML = '<p class="set-archive-error">Current serving coverage could not be loaded. Open <a href="/?game=draft-run">Draft Run</a> to keep playing.</p>';
   }
 }
 
