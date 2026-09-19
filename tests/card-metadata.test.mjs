@@ -18,11 +18,15 @@ test('legacy metadata repair reaches pack and pool without mutating frozen evide
 });
 
 test('metadata repair preserves authoritative complete cards and leaves unknown identities alone',()=>{
- const complete={name:'Deduce',type_line:'Existing type',rarity:'rare'};
+ const complete={name:'Deduce',type_line:'Existing type',rarity:'rare',mana_cost:'{X}'};
  assert.equal(effectiveCardMetadata(complete),complete);
  const unknown={name:'Unlisted card',type_line:''};
  assert.equal(effectiveCardMetadata(unknown),unknown);
  const missing={name:'Fynn, the Fangbearer',rarity:'special'};
  assert.equal(effectiveCardMetadata(missing).rarity,'special');
  assert.equal(effectiveCardMetadata(missing).type_line,'Legendary Creature — Human Warrior');
+ const archived={name:'Fynn, the Fangbearer',id:'fynn-the-fangbearer',image_url:'https://example.com/fynn.jpg'};
+ assert.equal(effectiveCardMetadata(archived).rarity,'uncommon');
+ assert.equal(effectiveCardMetadata(archived).mana_cost,'{1}{G}');
+ assert.equal('rarity' in archived,false);
 });

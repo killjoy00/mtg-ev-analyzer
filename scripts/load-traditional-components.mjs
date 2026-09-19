@@ -55,7 +55,7 @@ export async function validateComponents(root) {
    if(p.pick_number!==prior.length+1||JSON.stringify(p.prior_picks.map(c=>c.name))!==JSON.stringify(prior))throw Error('Broken Traditional trajectory');
    prior.push(p.candidates.find(c=>c.id===p.historical_pick_id).name);groups.set(p.source_draft_hash,prior);
    puzzles++;usable+=Number(interestingDraftRunPuzzle(p));
-   const cards=[...p.candidates,...p.prior_picks];storedMetadataComplete+=Number(cards.every(c=>c.name&&c.rarity&&c.type_line));metadataComplete+=Number(cards.every(c=>c.name&&c.rarity&&effectiveCardMetadata(c).type_line));imagesComplete+=Number(cards.every(c=>c.image_url?.startsWith('https://')));
+   const cards=[...p.candidates,...p.prior_picks];storedMetadataComplete+=Number(cards.every(c=>c.name&&c.rarity&&c.type_line));metadataComplete+=Number(cards.map(effectiveCardMetadata).every(c=>c.name&&c.rarity&&c.type_line));imagesComplete+=Number(cards.every(c=>c.image_url?.startsWith('https://')));
   }
   if(puzzles!==manifest.puzzles||groups.size!==included||[...groups.values()].some(p=>p.length!==(cube?7:8)))throw Error('Incomplete first-eight source accounting');
   const health=sourceQuality(report,sid,{puzzles,usable,metadataComplete,storedMetadataComplete,imagesComplete});
