@@ -24,20 +24,14 @@ After approval, and only when the owner asks to activate ads:
 
 No ad activation or Google account change was performed.
 
-## TCGplayer / Impact: optional, low priority
+## TCGplayer / Impact: active affiliate trial
 
-Current revealed-card comparisons and selected set articles link to TCGplayer card searches. `tcgplayer-config.js` contains an empty `impactDeepLinkTemplate`, so affiliate routing is inactive. The code records `tcgplayer_click` with card, set (when supplied), surface and affiliate-active status. Clicks alone do not establish conversions or revenue.
+TCGplayer approved Pack One's Impact referral application on September 19, 2026. Existing revealed-card comparisons and selected set articles now route their card-search links through the approved referral URL using the Impact deep-link form `https://partner.tcgplayer.com/c/7742974/1780961/21018?u={url}`. Pack One preserves the card-specific TCGplayer destination by URL-encoding it into `{url}`.
 
-Recommendation: keep the small, relevant card-search links; do not add banners, store pages, pricing feeds or extra purchase prompts now. If approved, test affiliate routing on those existing links and compare actual Impact conversions against outbound clicks. Draft-learning visitors may not be shopping, so revenue is unproven. Stop expanding the experiment if observed returns do not justify it.
+The code continues to record `tcgplayer_click` with card, set (when supplied), surface and affiliate-active status. Applicable links use `rel="sponsored noopener"`, and visible copy identifies them as affiliate links or places an affiliate disclosure directly beside the link group. Pack One may earn a commission from eligible purchases at no added cost to the buyer.
 
-TCGplayer documents its [Impact-based affiliate program](https://docs.tcgplayer.com/docs/tcgplayer-affiliate-program). Its [partner guidelines](https://help.tcgplayer.com/hc/en-us/articles/31411199594391-TCGplayer-Partner-Guidelines) require clear disclosure and prohibit self-use of affiliate links. Current account approval and commission terms must be confirmed in the owner's Impact account; no rate or earnings forecast is assumed here.
+Keep this as a small, relevant experiment: no banners, store page, pricing feed or extra purchase prompts. Compare actual Impact conversions against outbound clicks before expanding placement. Affiliate links are not for the owner's personal purchases.
 
-If the owner later chooses to activate:
-
-1. Follow the official TCGplayer affiliate-program page to the Impact application and confirm approval for Pack One.
-2. Copy the public deep-link template supplied for that partnership. It must contain `{url}` for the encoded destination; do not share login credentials or API secrets.
-3. Add that template to `tcgplayer-config.js`, keep `rel="sponsored"`, and place clear affiliate disclosure beside applicable links.
-4. Verify destination routing and Impact reporting using the partner's approved validation process. Do not make a self-purchase to test commission credit.
-5. Evaluate a small measured trial before expanding placements. Card links are optional navigation, separate from Google display ads.
+TCGplayer documents its [Impact-based affiliate program](https://docs.tcgplayer.com/docs/tcgplayer-affiliate-program). Its [partner guidelines](https://help.tcgplayer.com/hc/en-us/articles/31411199594391-TCGplayer-Partner-Guidelines) require clear disclosure and prohibit personal use of affiliate links.
 
 The live domain remains `packone.pro`; no domain migration is pending.
