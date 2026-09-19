@@ -142,6 +142,7 @@ jobs:
           node tests/fixed-daily-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/corpus-admin-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/patreon-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/patreon-webhook-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/capabilities-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/eight-pick-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/request-integrity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
