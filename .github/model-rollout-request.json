@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "target": "development",
+  "target": "production",
   "commit": "053541429b7adf01168eb27b344204e706ca67f9",
-  "request_id": "patreon-public-development-20260919",
-  "reason": "Real Elite OAuth, disconnect/reconnect, custom practice and creator API reconciliation passed. Deploy the reviewed public-linking policy to development before identical production promotion."
+  "request_id": "patreon-public-production-20260919",
+  "reason": "Public Patreon activation after real Elite OAuth, reconnect, completed custom practice, authoritative creator API reconciliation, passing unit/browser checks, and development acceptance run 35462022892."
 }
