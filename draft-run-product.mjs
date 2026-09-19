@@ -61,7 +61,7 @@ function revealComparison(p,answer) {
   const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
   const mine=byId.get(answer.selectedId),trophy=byId.get(answer.historicalId);
   if(!mine) return '';
-  const cell=(card,label,cls)=>`<figure class="run-compare-card ${cls}"><span>${label}</span><button type="button" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><a class="run-card-shop" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-surface="draft_run_reveal">Find on TCGplayer</a></figure>`;
+  const cell=(card,label,cls)=>`<figure class="run-compare-card ${cls}"><span>${label}</span><button type="button" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(card.name)}">${image(card)}</button><figcaption>${esc(card.name)}</figcaption><a class="run-card-shop" href="${esc(tcgplayerUrl(card.name))}" target="_blank" rel="sponsored noopener" data-tcgplayer-card="${esc(card.name)}" data-tcgplayer-surface="draft_run_reveal">Find on TCGplayer (affiliate link)</a></figure>`;
   if(answer.historicalMatch||!trophy||trophy.id===mine.id)
     return `<div class="run-compare is-match">${cell(mine,'Your pick · trophy pick','is-mine')}</div>`;
   return `<div class="run-compare">${cell(mine,'Your pick','is-mine')}${cell(trophy,'Trophy pick','is-trophy')}</div>`;
