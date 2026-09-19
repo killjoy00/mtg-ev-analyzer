@@ -1,10 +1,13 @@
 name: Frozen context scoring validation
 on:
+  push:
+    branches:
+      - measure/164-strict-eval
   workflow_dispatch:
 permissions:
   contents: read
 concurrency:
-  group: frozen-scoring
+  group: frozen-scoring-164-strict-eval
   cancel-in-progress: false
 jobs:
   measure:
@@ -16,7 +19,6 @@ jobs:
         set: [tmt, hob, blb, msh, sos, powered-cube]
     steps:
       - uses: actions/checkout@v4
-      - run: test "$GITHUB_REF" = refs/heads/main
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
