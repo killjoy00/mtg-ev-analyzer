@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "target": "development",
+  "target": "production",
   "commit": "8abee764ba05c318c77670c115657304adb4deee",
-  "request_id": "three-dailies-development-20260919",
-  "reason": "Deploy PR160 after passing unit, browser and isolated SQL gates. Verify all three fixed Dailies, linked-player ranking and account-restricted Patreon runtime."
+  "request_id": "three-dailies-production-20260919",
+  "reason": "Promote the identical PR160 release after development completed all three fixed Daily acceptance flows. Schema 0027 is applied and existing production schedules are unchanged."
 }
