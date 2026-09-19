@@ -1,3 +1,4 @@
+import {effectiveCardMetadata} from '../card-metadata.mjs';
 import {meetsServingQuality,SERVING_QUALITY_SQL,SERVING_POLICY_VERSION} from '../serving-quality.mjs';
 // Read every included puzzle once; persist an operational report, never gameplay mutations.
 // node scripts/check-corpus-health.mjs CONNECTION [set-id ...]
@@ -21,7 +22,7 @@ for(const s of sets) {
  const audit=frozenAudit.sets.find(a=>a.set===s.set_id),sourceAuditMatches=matchesFrozenSourceAudit(f,audit);
  const excluded=new Set((await query('SELECT source_draft_hash FROM corpus_source_exclusions WHERE set_id=$1 AND corpus_version=$2',[s.set_id,DRAFT_RUN_CORPUS_VERSION])).rows.map(x=>x.source_draft_hash));
  if(sourceAuditMatches&&audit.blocked_sources.some(x=>!excluded.has(x.source_draft_hash)))throw Error('Missing audited source exclusion: '+s.set_id);
- let after='',total=0,usable=0,cards=0,images=0,metadata=0,broken=0,invalidSupport=0,excludedDecisions=0;
+ let after='',total=0,usable=0,cards=0,images=0,metadata=0,storedMetadata=0,broken=0,invalidSupport=0,excludedDecisions=0;
  const byPick={},probabilitiesAudit=probabilityMetrics(null,DRAFT_RUN_CORPUS_VERSION),trajectoryAudit=trajectoryHealth();
  for(;;) {
   const page=(await query('SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND puzzle_id>$3 ORDER BY puzzle_id LIMIT 1000',[s.set_id,DRAFT_RUN_CORPUS_VERSION,after])).rows;
@@ -31,7 +32,7 @@ for(const s of sets) {
    if(!validateDraftRunPuzzle(p)){broken++;continue;}
    if(excluded.has(p.source_draft_hash)){excludedDecisions++;continue;}
    trajectoryAudit.add(p);
-   for(const c of [...p.candidates,...p.prior_picks]){cards++;images+=/^https:\/\//.test(c.image_url||'');metadata+=Boolean(c.id&&c.name&&c.type_line);}
+   for(const c of [...p.candidates,...p.prior_picks]){cards++;images+=/^https:\/\//.test(c.image_url||'');storedMetadata+=Boolean(c.id&&c.name&&c.type_line);metadata+=Boolean(c.id&&c.name&&effectiveCardMetadata(c).type_line);}
    const probabilities=p.candidates.map(c=>c.model_probability),valid=probabilities.every(x=>Number.isFinite(x)&&x>=0&&x<=1)&&Math.abs(probabilities.reduce((a,b)=>a+b,0)-1)<=.01;
    if(!valid){invalidSupport++;continue;}
    if(!picks.has(p.pick_number))continue;
@@ -43,7 +44,7 @@ for(const s of sets) {
   minimumPickBandSources:Math.min(...[...picks].flatMap(p=>['medium','hard'].map(b=>Number(groups.find(g=>Number(g.pick_number)===p&&g.band===b)?.sources||0)))),
   accountingValid:Number(ledger.trophies)===f.source_trophies&&Number(ledger.included)===f.included_trophies&&Number(ledger.qualified)===f.qualified_trophies&&Number(ledger.puzzles)===total&&total===f.total_puzzles,
   servingPolicyVersion:SERVING_POLICY_VERSION,fingerprintVariations:trajectoryAudit.fingerprintVariations(),brokenTrajectories:broken+trajectoryAudit.errors(),excludedDecisions,sourceAudit:sourceAuditMatches?{sourceArchiveSha256:audit.source_archive.sha256,outcomes:audit.approved_outcomes,approvedSources:audit.approved_sources,excludedSources:audit.blocked_sources.length}:null,qualifiedExclusionRate:Number(ledger.qualified)?Number(ledger.qualified_excluded)/Number(ledger.qualified):null,previousQualifiedExclusionRate:parse(previous?.report)?.metrics?.qualifiedExclusionRate,
-  metadataCoverage:cards?metadata/cards:0,imageCoverage:cards?images/cards:0,invalidSupport,puzzlesByPick:byPick,totalPuzzles:total,
+  metadataCoverage:cards?metadata/cards:0,storedMetadataCoverage:cards?storedMetadata/cards:0,metadataRepairs:metadata-storedMetadata,imageCoverage:cards?images/cards:0,invalidSupport,puzzlesByPick:byPick,totalPuzzles:total,
   validation:{heldout:f.holdout==='5-fold by draft_id',cohort:'Qualified trophy decisions, first eight; source-held-out model probabilities with the frozen display calibration. Raw log loss is also reported. Not population-wide calibration.',...probabilitiesAudit.report()}};
  const report=corpusGates(metrics);
  // Reject a report if an import changed the manifest while it was being scanned.

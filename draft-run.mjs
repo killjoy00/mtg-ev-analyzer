@@ -1,3 +1,4 @@
+import {effectiveCardMetadata} from './card-metadata.mjs';
 import {meetsServingQuality} from './serving-quality.mjs';
 import {DAILY_SELECTION_VERSION,dailySetPlan,liveRegularSets} from './daily-selection.mjs';
 import { rankCandidates } from './scoring.mjs';
@@ -308,7 +309,7 @@ export function selectDraftRunReroll(pool, source, { type, round, seed, excluded
 }
 
 export function publicDraftRunPuzzle(puzzle) {
-  const card = c => Object.fromEntries(['id','name','image_url','mana_cost','rarity','type_line'].filter(k => c[k]).map(k => [k,c[k]]));
+  const card = original => {const c=effectiveCardMetadata(original);return Object.fromEntries(['id','name','image_url','mana_cost','rarity','type_line'].filter(k => c[k]).map(k => [k,c[k]]));};
   return {
     puzzle_id:puzzle.puzzle_id, set_id:puzzle.set_id, pack_number:1, pick_number:Number(puzzle.pick_number),
     prior_picks:puzzle.prior_picks.map(card), candidates:sortPackByRarity(puzzle.candidates.map(card)),

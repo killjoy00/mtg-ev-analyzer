@@ -13,6 +13,23 @@ from import_all_trophies import eligible_trophies, trajectory, rows, collect, pr
 from build_replays import PickExample
 
 class FullTrophyTests(unittest.TestCase):
+    def test_existing_image_does_not_hide_missing_card_metadata(self):
+        from unittest.mock import patch
+        from import_all_trophies import resolve_images
+        card={'name':'Deduce','type_line':'Instant','mana_cost':'{1}{U}','rarity':'common','image_uris':{'normal':'https://example.com/deduce.jpg'}}
+        complete={'image_url':'https://example.com/complete.jpg','type_line':'Land'}
+        with tempfile.TemporaryDirectory() as tmp:
+            cache=Path(tmp)/'images.json'
+            cache.write_text(json.dumps({'Deduce':{'image_url':'https://example.com/old.jpg'}}))
+            with patch('import_all_trophies.request',return_value=io.StringIO(json.dumps(card))) as request, patch('import_all_trophies.time.sleep'):
+                known=resolve_images({'Deduce','Complete'},{'Complete':complete},cache)
+            self.assertEqual(request.call_count,1)
+            self.assertIn('exact=Deduce',request.call_args.args[0])
+            self.assertEqual(known['Deduce']['type_line'],'Instant')
+            self.assertEqual(known['Complete'],complete)
+            with patch('import_all_trophies.request',side_effect=AssertionError('Complete metadata must use cache')):
+                self.assertEqual(resolve_images({'Deduce','Complete'},known,cache),known)
+
     def test_trophies_have_no_replay_or_training_cap(self):
         drafts={f'd{i}':{'wins':7,'games':100,'rate':.65} for i in range(6001)}
         drafts['loser']={'wins':6,'games':100,'rate':.9}
