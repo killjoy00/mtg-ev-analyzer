@@ -286,7 +286,7 @@ def resolve_images(names, known, cache_path):
     import urllib.parse
     cache = {k:v for k,v in json.loads(cache_path.read_text()).items() if v} if cache_path.exists() else {}
     known = {**known, **{k:v for k,v in cache.items() if v}}
-    for name in sorted(names - known.keys() - cache.keys()):
+    for name in sorted(name for name in names if not (known.get(name, {}).get('image_url', '').startswith('https://') and known.get(name, {}).get('type_line'))):
         # Exact identities only. A fuzzy card with a similar name is not a substitute.
         time.sleep(.15)
         try:
