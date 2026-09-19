@@ -17,6 +17,10 @@ jobs:
   compare:
     runs-on: ubuntu-latest
     timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        set: [tmt, hob, msh, blb, sos]
     steps:
       - uses: actions/checkout@v4
 
@@ -38,7 +42,10 @@ jobs:
 
           root = pathlib.Path("generated/holdout-isolation")
           pins = json.loads(pathlib.Path("results/scoring-2026-09-16/downloads.json").read_text())
+          target = "${{ matrix.set }}"
           for pin in pins:
+              if pin["set_id"] != target:
+                  continue
               directory = root / pin["set_id"]
               directory.mkdir(parents=True, exist_ok=True)
               path = directory / f'{pin["kind"]}.csv.gz'
