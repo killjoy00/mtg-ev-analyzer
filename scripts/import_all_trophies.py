@@ -22,8 +22,9 @@ import urllib.request
 import urllib.error
 import urllib.parse
 
-from build_replays import (CountStore, OutOfFoldModel, DraftSkill, MODEL_VERSION, stable_fold,
-    build_colour_table,
+from build_replays import (CountStore, OutOfFoldModel, DraftSkill, MODEL_VERSION,
+    ISOLATED_MODEL_VERSION, stable_fold, build_colour_table,
+    build_colour_tables_by_fold, build_fold_training,
     select_strong_drafts, parse_example, candidate_columns, pool_columns,
     render_replay, parse_rate_bucket, parse_games_lower_bound, slugify)
 from backfill_legacy_sets import arena_rank_proxy, arena_rank_tier, _game_order
@@ -245,6 +246,32 @@ def collect(path, training_ids, output_ids, header):
     return all_counts, folds, output, invalid, picks, colour_examples
 
 
+def collect_isolated(path, training_ids, output_ids, header, folds=5):
+    """Candidate v4 collector: held IDs are removed before any model statistic."""
+    output = defaultdict(list); invalid = Counter(); picks = 0
+    colour_examples = []; training_examples = []
+    pack_cols, pool_cols = candidate_columns(header), pool_columns(header)
+    if not pack_cols or not pool_cols:
+        raise ValueError('Missing pack or pool columns')
+
+    wanted = set(training_ids) | set(output_ids)
+    for row in rows(path, wanted):
+        did = row['draft_id']; example = parse_example(row, pack_cols, pool_cols)
+        if example is None:
+            if did in output_ids:
+                invalid[did] += 1
+            continue
+        if did in training_ids:
+            training_examples.append((did, example)); picks += 1
+            if did not in output_ids:
+                colour_examples.append((did, example))
+        if did in output_ids and example.raw_pack_number == 0 and example.raw_pick_number <= 11:
+            output[did].append(example)
+
+    fold_training = build_fold_training(training_examples, set(training_ids), folds)
+    return fold_training, output, invalid, picks, colour_examples
+
+
 def trajectory(examples, last_pick):
     """Return only a contiguous, source-verified prefix; never invent a missing card."""
     if any(p.raw_pack_number != 0 for p in examples): return [], [], 'non_first_pack'
@@ -363,6 +390,12 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     started = time.monotonic(); root = ROOT; directory = Path(output_dir)/sid; directory.mkdir(parents=True, exist_ok=True)
     catalog = json.loads((root/'corpus/draft-run/catalog.json').read_text())
     base_entry = next((s for s in catalog['sets'] if s['id']==sid), None)
+    if base_entry and catalog.get('model_version') != ISOLATED_MODEL_VERSION:
+        raise ValueError(
+            f'{sid}: corrected model {ISOLATED_MODEL_VERSION} cannot be written into '
+            f'published corpus {catalog.get("corpus_version")} whose baseline is '
+            f'{catalog.get("model_version")}. Build and validate a separately versioned '
+            'corpus before importing corrected puzzles.')
     manifest_path = root/'data'/sid/'manifest.json'
     manifest = json.loads(manifest_path.read_text()) if manifest_path.exists() else {}
     expansion = discovered_expansion or manifest.get('source',{}).get('archive_expansion') or sid.upper()
@@ -427,15 +460,22 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     print(f'{sid}: {len(drafts)} drafts, {len(qualified)} qualifying trophies, {len(training)} training drafts',flush=True)
     additions=[]; dispositions=[]; reasons=Counter(); retained=set(); missing_names=set(); training_picks=0
     if qualified:
-        all_counts, folds, output, invalid, training_picks, colour_examples = collect(path,set(training),set(qualified),header)
-        deck_fit = build_colour_table(directory/'games.csv.gz', colour_examples,
-                                      {did for did,_ in colour_examples}, sid)
+        # v4 is deliberately a separate model identity. The historical collect()
+        # function above remains only so frozen v3 research can reproduce the
+        # published evidence exactly; the live candidate never uses subtraction.
+        fold_training, output, invalid, training_picks, colour_examples = collect_isolated(
+            path, set(training), set(qualified), header)
+        deck_fits = build_colour_tables_by_fold(
+            directory/'games.csv.gz', colour_examples, fold_training, sid)
         all_names = {name for examples in output.values() for p in examples for name in list(p.candidates)+list(p.pool)}
         known = resolve_images(all_names, metadata(root), directory/'images.json')
         for did,d in sorted(qualified.items()):
             valid, prior, why = trajectory(output.get(did,[]),12 if sid=='powered-cube' else 11)
             source_hash=hashlib.sha256(f'{sid}|{did}'.encode()).hexdigest()[:32]
-            model=OutOfFoldModel(all_counts,folds[stable_fold(did,5)],deck_fit)
+            fold=stable_fold(did,5); fold_data=fold_training[fold]
+            if did in training and (did not in fold_data.held_out_ids or did in fold_data.training_ids):
+                raise AssertionError(f'{sid}/{did}: held-out draft reached its training fold')
+            model=OutOfFoldModel(fold_data.counts,CountStore.empty(),deck_fits[fold])
             rendered=render_replay(did,valid,model,1,1,known)['picks']
             fingerprint=hashlib.sha256(encoded([{'pick':p.raw_pick_number,'choice':p.historical_pick,'pack':p.candidates,'pool':p.pool} for p in valid])).hexdigest()
             included=0; new=0; skipped=Counter()
@@ -465,7 +505,7 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     if len(dispositions)!=trophy_count: raise ValueError('Incomplete trophy accounting')
     puzzle_file=directory/'puzzles.jsonl.gz';ledger_file=directory/'trophies.jsonl.gz'
     write_gzip_jsonl(puzzle_file,sorted(additions,key=lambda p:p['puzzle_id']));write_gzip_jsonl(ledger_file,sorted(dispositions,key=lambda d:d['draft_id']))
-    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'input_signature':signature,'source_archive':source,'skill_source':skill_source,'schema_verified':True,'source_event_type':'PremierDraft','qualified_drafts':sum(1 for did,d in drafts.items() if did not in conflicts and (d.get('games') or 0)>=100 and (d.get('rank') in ('diamond','mythic') if legacy else d.get('rate') is not None and d['rate'] >= (cutoff or .6))),'trophy_outcomes':dict(Counter(f"7-{d.get('losses') if d.get('losses') is not None else 'unknown'}" for d in drafts.values() if d['wins']==7)),'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
+    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'input_signature':signature,'source_archive':source,'skill_source':skill_source,'schema_verified':True,'source_event_type':'PremierDraft','qualified_drafts':sum(1 for did,d in drafts.items() if did not in conflicts and (d.get('games') or 0)>=100 and (d.get('rank') in ('diamond','mythic') if legacy else d.get('rate') is not None and d['rate'] >= (cutoff or .6))),'trophy_outcomes':dict(Counter(f"7-{d.get('losses') if d.get('losses') is not None else 'unknown'}" for d in drafts.values() if d['wins']==7)),'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':ISOLATED_MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
     atomic_json(completed,info);print(json.dumps(info),flush=True);return info
 
 
