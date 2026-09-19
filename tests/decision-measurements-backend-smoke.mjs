@@ -7,7 +7,7 @@ if(!process.argv.includes('--dev-fixtures'))throw Error('Requires --dev-fixtures
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query}=await import('../worker/growth-function.js');
 const {default:api}=await import('../worker/draft-run-function.mjs');
-const tag=crypto.randomUUID(),user=crypto.randomUUID(),accountToken=crypto.randomUUID(),invite=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','');
+const tag=crypto.randomUUID(),user=crypto.randomUUID(),accountUser=crypto.randomUUID(),accountToken=crypto.randomUUID(),invite=crypto.randomUUID().replaceAll('-','')+crypto.randomUUID().replaceAll('-','');
 let guest,run,repeat;
 const httpBase=process.env.PACK1_MEASUREMENT_HTTP;
 if(httpBase&&!/^https:\/\/br-twilight-hill-ayffyd2b-draftrunapi\.compute\.c-5\.us-east-2\.aws\.neon\.tech$/.test(httpBase))throw Error('HTTP integration is restricted to development.');
@@ -26,6 +26,9 @@ try {
   await call('/v1/admin/claim',{invite},null,accountToken);
   await call('/v1/admin/claim',{invite},null,accountToken);
   guest=await call('/v1/session',{displayName:'Measurement fixture '+tag.slice(0,5)});
+  await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[accountUser,'QA users '+tag.slice(0,6),`qa-user-${tag}@example.invalid`]);
+  await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[accountUser,guest.playerId]);
+  await query("INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference) VALUES($1::uuid,'custom_corpus','test-admin-users',$2)",[accountUser,tag]);
   run=await call('/v1/runs',{environment:'mixed'},guest.token);
   let viewId=crypto.randomUUID();
   const first=run.current.puzzle_id;
@@ -55,6 +58,11 @@ try {
   assert.equal((await query('SELECT likely_abandoned FROM draft_run_measurements WHERE session_id=$1::uuid AND revision=$2',[run.id,run.revision])).rows[0].likely_abandoned,'t');
   await call(`/v1/runs/${run.id}/view`,{revision:run.revision,puzzleId:run.current.puzzle_id,viewId},guest.token);
   assert.equal((await query('SELECT likely_abandoned FROM draft_run_measurements WHERE session_id=$1::uuid AND revision=$2',[run.id,run.revision])).rows[0].likely_abandoned,'f');
+  const users=await call('/v1/admin/users?search='+encodeURIComponent('qa-user-'+tag),undefined,null,accountToken);
+  assert.equal(users.users.length,1);assert.equal(users.users[0].id,accountUser);assert.equal(users.users[0].active_entitlements,1);assert.ok(Number(users.users[0].runs)>=1);
+  const userDetail=await call('/v1/admin/users/'+accountUser,undefined,null,accountToken);
+  assert.equal(userDetail.user.email,`qa-user-${tag}@example.invalid`);assert.ok(Number(userDetail.stats.runs)>=1);assert.ok(userDetail.entitlements.some(x=>x.capability==='custom_corpus'&&x.active));
+  assert.ok(userDetail.recent_events.some(x=>x.event_name==='game_started'));
   let report=await call('/v1/admin/measurements',undefined,null,accountToken);
   assert.ok(Number(report.summary.answers)>=1);assert.ok(Number(report.coverage.repeats_excluded)>=1);
   await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE id=ANY($1::uuid[])',['{'+[run.id,repeat].join(',')+'}']);
@@ -64,6 +72,8 @@ try {
   console.log('PASS: admin authorization, single-use claim, view/answer retry deduplication, repeat exclusion, reload timing, rerolls, inactivity/resume and QA exclusion.');
 } finally {
   if(run)await query('UPDATE draft_run_sessions SET measurement_qa=true WHERE player_id=(SELECT player_id FROM draft_run_sessions WHERE id=$1::uuid)',[run.id]);
+  await query('DELETE FROM entitlement_grants WHERE auth_user_id=$1::uuid',[accountUser]);
+  await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[accountUser]);
   await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[user]);
   await query('DELETE FROM neon_auth.session WHERE token=$1',[accountToken]);
 }
