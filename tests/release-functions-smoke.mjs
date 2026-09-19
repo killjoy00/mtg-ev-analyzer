@@ -48,8 +48,8 @@ await call('pack1growth','/v1/events',{events:[{event:'page_view',props:{}}]},nu
 if(process.argv.includes('--daily')||process.argv.includes('--practice')) {
   const guest=await call('pack1growth','/v1/session',{displayName:'QA release '+commit.slice(0,7)});
   const friend=await call('pack1growth','/v1/session',{displayName:'QA universal '+commit.slice(0,7)});
-  for(const environment of ['mixed','powered-cube']) {
-    await call('draftrunapi','/v1/runs',{environment,qa:true},guest.token,403);
+  for(const environment of ['mixed','powered-cube','latest']) {
+    await call('draftrunapi','/v1/runs',{environment,qa:true},guest.token,environment==='latest'?400:403);
     let run=await call('draftrunapi','/v1/runs',{environment,daily:true,qa:true},guest.token);
     assert.equal(run.run_length,8);assert.ok(run.day);
     assert.equal(run.leaderboard_eligible,false);
@@ -59,6 +59,7 @@ if(process.argv.includes('--daily')||process.argv.includes('--practice')) {
     await call('draftrunapi',`/v1/runs/${run.id}/reroll`,{revision:run.revision,round:0,puzzleId:run.current.puzzle_id,type:'pack'},guest.token,409);
     for(let round=0;round<8;round++) {
       if(environment==='powered-cube')assert.equal(run.current.set_id,environment);
+      if(environment==='latest')assert.equal(run.current.set_id,run.daily_featured_sets[0]);
       if(run.selection_version==='eight-pick-v4')assert.equal(run.current.pick_number,round+(environment==='powered-cube'?2:1));
       const pick={revision:run.revision,round,puzzleId:run.current.puzzle_id,cardId:run.current.candidates[0].id};
       run=await call('draftrunapi',`/v1/runs/${run.id}/pick`,pick,guest.token);

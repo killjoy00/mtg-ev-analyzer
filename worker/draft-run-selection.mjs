@@ -1,5 +1,5 @@
 import {SERVING_QUALITY_SQL} from '../serving-quality.mjs';
-import {DAILY_SELECTION_VERSION,dailySetPlan,balancedSetPlan,liveRegularSets} from '../daily-selection.mjs';
+import {DAILY_SELECTION_VERSION,dailySetPlan,latestSetPlan,balancedSetPlan,liveRegularSets} from '../daily-selection.mjs';
 import {seededRandom} from '../gameplay.mjs';
 import {runPickWindows,eligiblePickForRound,selectDraftRunReroll,draftRunDifficulty} from '../draft-run.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_SETS,chooseRunSet,runDifficultyBands,maxRunPick,isEightPickVersion,earlyRoundsForSelection,dailyRequiredSets,releasedRunSets,requiredSetRounds} from '../draft-run-policy.mjs';
@@ -68,12 +68,12 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
   const windows=runPickWindows(environment,selectionVersion),released=new Set(releasedRunSets(day));
   const metadata=selectionVersion===DAILY_SELECTION_VERSION?await loadLiveSetMetadata(query,version):null;
   const live=metadata?new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id)):null;
-  const required=setIds.length?balancedSetPlan(setIds,random):daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION?dailySetPlan(metadata,day,random):daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
+  const required=environment==='latest'?latestSetPlan(metadata,day):setIds.length?balancedSetPlan(setIds,random):daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION?dailySetPlan(metadata,day,random):daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
   const groupParams=[version];
   let groupWhere=`${servingBase} AND ${environmentFilter(environment,groupParams)}`;
   // Current Daily/custom plans assign every set slot before availability checks.
   // Unrelated sets cannot affect these draws. Preserve historical partial plans.
-  if(setIds.length||daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION){
+  if(environment==='latest'||setIds.length||daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION){
     groupParams.push(toPgArray([...new Set(required)]));groupWhere+=` AND p.set_id=ANY($${groupParams.length}::text[])`;
   }
   const groups=(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));

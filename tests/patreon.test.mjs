@@ -1,14 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {createHmac} from 'node:crypto';
+import {createHmac,createHash} from 'node:crypto';
 import {premiumPatreonMembership,validPatreonPolicy,PATREON_POLICY} from '../patreon-policy.mjs';
-import {parsePatreonMembership,rawMembershipFromIdentity,verifyPatreonSignature,handlePatreon} from '../worker/patreon.mjs';
+import {parsePatreonMembership,rawMembershipFromIdentity,verifyPatreonSignature,handlePatreon,patreonAccountAllowed} from '../worker/patreon.mjs';
 import {reconcilePatreon} from '../scripts/patreon-reconcile.mjs';
 const policy={enabled:true,campaignId:'100',premiumTierIds:['200']};
 const member=(tier='200',attrs={})=>({type:'member',id:'m1',attributes:{patron_status:'active_patron',last_charge_status:'Paid',currently_entitled_amount_cents:500,...attrs},relationships:{user:{data:{id:'u1'}},campaign:{data:{id:'100'}},currently_entitled_tiers:{data:[{id:tier}]}}});
 
 test('only the exact premium campaign and tier unlock tools, never the supporter amount',()=>{
-  assert.equal(validPatreonPolicy(PATREON_POLICY),false);
+  assert.equal(PATREON_POLICY.enabled,false);
+  assert.equal(validPatreonPolicy(PATREON_POLICY),true);
   assert.equal(premiumPatreonMembership(parsePatreonMembership(member()),policy),true);
   assert.equal(premiumPatreonMembership(parsePatreonMembership(member('201',{currently_entitled_amount_cents:100000})),policy),false);
   assert.equal(premiumPatreonMembership({...parsePatreonMembership(member()),campaignId:'999'},policy),false);
@@ -55,4 +56,12 @@ test('reconciliation follows all pages and includes missing members for revocati
   const result=await reconcilePatreon(query,{policy,getPage:async()=>++page===1?{data:[member()],links:{next:'page2'}}:{data:[]}});
   assert.equal(result.applied,2);assert.equal(result.pages,2);
   assert.equal(writes[0][12],true);assert.equal(writes[1][12],false);assert.equal(writes[1][11],4);
+});
+
+test('controlled linking accepts only the authorized account, never an email or player claim',()=>{
+ const canary={...policy,enabled:false,canaryAccountHashes:[createHash('sha256').update('allowed-account').digest('hex')]};
+ assert.equal(patreonAccountAllowed('allowed-account',canary),true);
+ assert.equal(patreonAccountAllowed('other-account',canary),false);
+ assert.equal(patreonAccountAllowed(null,canary),false);
+ assert.equal(patreonAccountAllowed('any-account',policy),true);
 });

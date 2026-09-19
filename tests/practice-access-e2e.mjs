@@ -29,7 +29,7 @@ try{
  assert.equal(await page.locator('input:checked').count(),1);
  await page.getByLabel('Marvel Super Heroes').check();
  await page.screenshot({path:'artifacts/custom-sets-mobile.png',fullPage:true});
- await page.getByRole('button',{name:'Start Draft Run',exact:true}).click();
+ await page.getByRole('button',{name:'Start random run',exact:true}).click();
  await page.locator('.run-cards').waitFor();assert.deepEqual(selected,['hob','msh']);
  assert.equal(await page.locator('[data-reroll="set"]').count(),0);
  assert.ok(await page.locator('[data-reroll="pack"]').isVisible());

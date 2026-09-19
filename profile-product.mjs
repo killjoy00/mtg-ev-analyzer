@@ -115,13 +115,13 @@ function achievementCard(achievement, { own = false, showcaseId = null } = {}) {
 }
 
 function historyRow(row, names) {
-  const setName = names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase();
+  const setName = row.set_id==='latest'?'Latest Set':names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase();
   const date = row.played_at ? new Date(row.played_at).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   return `<li data-history-cursor="${esc(row.cursor || '')}"><div><strong>${esc(setName)}</strong><span>${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}${row.is_daily ? ' · Daily' : ''}${date ? ` · ${esc(date)}` : ''}</span></div><b>${Number(row.score || 0)}</b><em>${esc(row.grade || '')}${row.outcome ? ` · ${esc(row.outcome)}` : ''}</em></li>`;
 }
 
 function dailyRow(row, names, index) {
-  const setName = names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase();
+  const setName = row.set_id==='latest'?'Latest Set':names.get(String(row.set_id || '').toLowerCase()) || String(row.set_id || '').toUpperCase();
   const pct = Number(row.percentile);
   return `<li><div><strong>${esc(setName)} · ${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}</strong><span>${esc(row.date || '')}${row.final===false?' · Still open':''}</span></div><b>${Number(row.score || 0)}</b><em>${pct ? `Top ${pct}%${row.final===false?' so far':''} · #${Number(row.rank || 0)} of ${Number(row.total || 0)}` : `${Number(row.total || 0)} ranked players`}</em><button type="button" class="text-button" data-share-daily="${index}">Share</button></li>`;
 }

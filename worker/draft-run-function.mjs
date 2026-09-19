@@ -2,7 +2,7 @@ import {SERVING_POLICY_VERSION,LEGACY_SERVING_POLICY_VERSION,SERVING_QUALITY_SQL
 import {accountCapabilities,requireCapability,practiceCapability} from './capabilities.mjs';
 import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
-import {accountIdentity} from './account-identity.mjs';
+import {accountIdentity,linkedPlayerIdentity} from './account-identity.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
@@ -90,13 +90,14 @@ async function responseFor(s) {
     const row=r.rows[0],total=Number(row.total);
     standing={rank:Number(row.rank),total,percentile:total>=10?Math.max(1,Math.ceil(Number(row.through_ties)/total*100)):null,final:s.day<gameDateKey()};
   }
-  return {id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:s.leaderboard_eligible,environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
+  const rankedName=s.day&&s.leaderboard_eligible?(await linkedPlayerIdentity(query,s.player_id))?.display_name||null:null;
+  return {ranked_name:rankedName,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:s.leaderboard_eligible,environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
 }
 
 async function start(request) {
   const owner=await player(request),body=await readJson(request),daily=body.daily===true;
-  const account=await accountIdentity(request,query,owner);
-  const capabilities=await accountCapabilities(account,query);
+  const account=daily?await linkedPlayerIdentity(query,owner):await accountIdentity(request,query,owner);
+  const capabilities=daily?[]:await accountCapabilities(account,query);
   const source=body.challenge ? await share(String(body.challenge)) : null;
   if(source && daily) fail('A shared run is separate from the Daily.');
   let environment;
@@ -105,7 +106,8 @@ async function start(request) {
   const setIds=body.setIds??[];
   if(!Array.isArray(setIds)||setIds.some(s=>typeof s!=='string'||!/^[-a-z0-9]{2,40}$/.test(s)))fail('Choose valid sets.');
   if(daily&&setIds.length)fail('Daily sets are fixed.');
-  if(environment==='powered-cube'&&setIds.length)fail('Custom sets use regular Draft Runs.');
+  if(environment==='latest'&&!daily)fail('Latest-set runs are Daily only. Choose sets for custom practice.');
+  if(environment!=='mixed'&&setIds.length)fail('Custom sets use regular Draft Runs.');
   if(!daily)requireCapability(capabilities,practiceCapability(environment,setIds));
   const day=daily?gameDateKey():null;
   if(day) {
@@ -124,7 +126,7 @@ async function start(request) {
   else if(day) {
     let schedule=(await query('SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets,serving_policy_version FROM draft_run_schedules WHERE day=$1::date AND environment=$2',[day,environment])).rows[0];
     if(!schedule) {
-      featuredSets=environment==='mixed'?(await loadLiveSetMetadata(query,corpusVersion)).filter(p=>p.regular_run&&p.release_date&&p.release_date<=day).sort((a,b)=>b.release_date.localeCompare(a.release_date)||a.set_id.localeCompare(b.set_id)).slice(0,4).map(p=>p.set_id):[];
+      featuredSets=environment!=='powered-cube'?(await loadLiveSetMetadata(query,corpusVersion)).filter(p=>p.regular_run&&p.release_date&&p.release_date<=day).sort((a,b)=>b.release_date.localeCompare(a.release_date)||a.set_id.localeCompare(b.set_id)).slice(0,environment==='latest'?1:4).map(p=>p.set_id):[];
       const plan=(await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day})).map(p=>p.puzzle_id);
       await query('INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,difficulty_version,selection_version,daily_featured_sets,scoring_version,serving_policy_version) VALUES($1::date,$2,$3,$4::jsonb,$5,$6,$7::jsonb,$8,$9) ON CONFLICT(day,environment) DO NOTHING',[day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets),DRAFT_RUN_SCORING_VERSION,SERVING_POLICY_VERSION]);
       schedule=(await query('SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets,serving_policy_version FROM draft_run_schedules WHERE day=$1::date AND environment=$2',[day,environment])).rows[0];
@@ -144,7 +146,7 @@ async function start(request) {
       $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb,$16::uuid,$17::boolean,$18::jsonb,$19)
     ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,corpusVersion,scoringVersion,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets),day?account?.auth_user_id||null:null,Boolean(day&&account),JSON.stringify(setIds),servingPolicy]);
   let s=inserted.rows[0];
-  if(!s && day) s=(await query('SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date AND environment=$3',[owner,day,environment])).rows[0];
+  if(!s && day) s=(await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3',[owner,day,environment,account?.auth_user_id||null])).rows[0];
   if(!s) fail('Could not start your run. Please retry.',409);
   if(inserted.rows.length) await query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,value,$3::jsonb FROM jsonb_array_elements_text($2::jsonb)',[owner,JSON.stringify([day?'daily_started':'game_started',...(environment==='powered-cube'?['cube_started']:[])]),JSON.stringify({mode:'draft_run',set_id:environment,daily,challenge:Boolean(source),run_id:s.id})]);
   return json(await responseFor(decode(s)));
@@ -189,7 +191,7 @@ async function change(request,id,action) {
 async function createShare(request,id) {
   const owner=await player(request),s=await session(id,owner);
   if(s.answers.length!==runLength(s)) fail('Finish the run before sharing it.');
-  if(s.day)return json({daily:true,day:s.day,environment:environmentOf(s),url:`/?game=draft-run&daily=1${environmentOf(s)==='powered-cube'?'&set=powered-cube':''}`});
+  if(s.day)return json({daily:true,day:s.day,environment:environmentOf(s),url:`/?game=draft-run&daily=1${environmentOf(s)!=='mixed'?'&set='+environmentOf(s):''}`});
   if(s.challenge_id){const original=await share(s.challenge_id);if(JSON.stringify(original.puzzle_ids)===JSON.stringify(s.puzzle_ids))return json({id:original.id});}
   const name=(await query('SELECT display_name FROM players WHERE id=$1::uuid',[owner])).rows[0]?.display_name||'A friend';
   const key=crypto.randomUUID().replaceAll('-','').slice(0,24);

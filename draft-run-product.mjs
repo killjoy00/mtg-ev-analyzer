@@ -17,12 +17,12 @@ function recordView(touch=false) {
   const key=`${run.id}:${run.revision}`,viewId=clock.show(key);
   if(viewKey!==key||touch){viewKey=key;viewPromise=api(`/v1/runs/${run.id}/view`,{revision:run.revision,puzzleId:run.current.puzzle_id,viewId}).catch(()=>null);}
 }
-let environment=new URLSearchParams(location.search).get('set')==='powered-cube'?'powered-cube':'mixed';
+let environment=['powered-cube','latest'].includes(new URLSearchParams(location.search).get('set'))?new URLSearchParams(location.search).get('set'):'mixed';
 const runLength=()=>draftRunLength(run);
 const cube=()=> (run?.environment||environment)==='powered-cube';
-const title=()=>cube()?'Powered Cube Run':'Draft Run';
-const gameUrl=(params='')=>`?game=draft-run${cube()?'&set=powered-cube':''}${params?'&'+params:''}`;
-const boardUrl=(target,period='daily')=>`?game=draft-run${target==='powered-cube'?'&set=powered-cube':''}&board=${period}`;
+const title=()=>cube()?'Powered Cube Run':environment==='latest'?'Latest Set Run':'Draft Run';
+const gameUrl=(params='')=>`?game=draft-run${environment!=='mixed'?'&set='+environment:''}${params?'&'+params:''}`;
+const boardUrl=(target,period='daily')=>`?game=draft-run${target!=='mixed'?'&set='+target:''}&board=${period}`;
 let catalogNames = new Map();
 const setName=id=>catalogNames.get(id) || (id==='powered-cube'?'Powered Cube':id.toUpperCase());
 async function loadSetNames() {
@@ -77,7 +77,7 @@ function render() {
   const p=answer?.puzzle||run.current;
   document.body.classList.add('is-game');
   app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
-    ${run.day&&!run.leaderboard_eligible?'<p>Daily leaderboards require an account. Your score is ready to share.</p>':''}
+    ${run.day?`<p class="run-ranking-state" role="status">${run.leaderboard_eligible?`Ranked as ${esc(run.ranked_name||'your account')}`:'Playing as guest — this score will not appear on the leaderboard.'}</p>`:''}
     ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed — this result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
     ${answer?`<section class="run-feedback" aria-live="polite"><strong>${answer.score}<small>/100</small></strong><div><h2>${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2><p>${answer.historicalMatch?'Full points.':`You chose ${esc(answer.selectedName)}. ${answer.score>=85?'A strongly supported alternative.':answer.score>=60?'A plausible alternative.':'The model found less support for this choice.'}`}</p>${answer.modelTargetDisagreement?'<p>The trophy drafter made an unusual choice relative to the model. Strong alternatives still receive their normal credit.</p>':''}</div>${revealComparison(p,answer)}${consensusFeedback(answer)}<button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></section>`:
@@ -145,7 +145,7 @@ function renderResult() {
   app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${run.day?'Daily ':''}${title()} complete</p><h1>Your ${cube()?'Cube Run':'Draft Run'}.</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${matches} trophy picks matched</span></div>
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Eastern.'}</p>`:''}
-    ${run.day&&!run.leaderboard_eligible?'<p>Daily leaderboards require an account. Your score is ready to share.</p>':''}
+    ${run.day?`<p class="run-ranking-state" role="status">${run.leaderboard_eligible?`Ranked as ${esc(run.ranked_name||'your account')}`:'Playing as guest — this score will not appear on the leaderboard.'}</p>`:''}
     ${run.comparison?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
     <div class="run-result-actions"><a class="button primary" href="${run.day?'./':gameUrl()}">${run.day?'Back to Dailies':'Start Another Draft Run'}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">View your career</button></div>
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
@@ -173,14 +173,14 @@ async function showBoard(period='daily') {
   const data=await api(`/v1/leaderboard?period=${encodeURIComponent(period)}&environment=${environment}`,undefined,false);
   document.body.classList.remove('is-game');
   const environmentActions='';
-  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${cube()?'':'active'}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s shared starting packs.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${gameUrl()}">Practice a ${title()}</a>${environmentActions}</div></section>`;
+  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s shared starting packs.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${environment==='latest'?'?game=draft-run&custom=1':gameUrl()}">${environment==='latest'?'Choose sets for practice':`Practice a ${title()}`}</a>${environmentActions}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period});
 }
 async function launch(options={}) {
   app().innerHTML='<section class="message-card"><h1>Finding your packs…</h1></section>';
   run=options.id?await api(`/v1/runs/${options.id}`):await api('/v1/runs',{daily:options.daily===true,challenge:options.challenge,environment,setIds:options.setIds});
   environment=run.environment||environment;
-  const url=new URL(location.href);if(cube())url.searchParams.set('set','powered-cube');else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.delete('shared');url.searchParams.delete('custom');url.searchParams.set('run',run.id);history.replaceState({},'',url);
+  const url=new URL(location.href);if(environment!=='mixed')url.searchParams.set('set',environment);else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.delete('shared');url.searchParams.delete('custom');url.searchParams.set('run',run.id);history.replaceState({},'',url);
   selection=null;review=null;render();
 }
 // Raw exception text ("Failed to fetch") is developer output, not an
@@ -195,7 +195,8 @@ function failureMessage(error) {
 
 function renderLoadFailure(error,isBoard) {
   if(error.capability||error.status===401){
-    app().innerHTML=`<section class="message-card"><h1>${storedAccountToken()?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${!storedAccountToken()?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<p><a class="button secondary" href="./">Back to Dailies</a></p></section>`;
+    app().innerHTML=`<section class="message-card"><h1>${storedAccountToken()?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${error.capability==='custom_corpus'||error.capability==='unlimited_cube_practice'?'<p>Elite membership includes custom sets and unlimited Cube practice.</p><button class="button secondary" id="practice-membership">Manage membership</button>':''}${!storedAccountToken()?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<p><a class="button secondary" href="./">Back to Dailies</a></p></section>`;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs')).renderAccount();});
     document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs')).renderAccount();});return;
   }
   console.warn('Draft Run page failed to load',error?.message);
@@ -227,6 +228,6 @@ export async function installDraftRunPage() {
 
 async function customPractice() {
   const {sets}=await api('/v1/practice-sets');
-  app().innerHTML=`<section class="practice-picker"><h1>Choose your sets</h1><p>Eight decisions, balanced across the sets you choose.</p><form id="practice-sets"><fieldset><legend>Live Draft sets</legend>${sets.map((s,i)=>`<label><input type="checkbox" name="set" value="${esc(s.set_id)}" ${i===0?'checked':''}>${esc(s.set_name||s.set_id.toUpperCase())}</label>`).join('')}</fieldset><button class="button primary">Start Draft Run</button></form><p id="run-error" role="alert"></p><a href="./">Back to Dailies</a></section>`;
-  document.querySelector('#practice-sets').onsubmit=async event=>{event.preventDefault();const setIds=new FormData(event.currentTarget).getAll('set');if(!setIds.length){document.querySelector('#run-error').textContent='Choose at least one set.';return;}try{await launch({setIds});}catch(e){renderLoadFailure(e,false);}};
+  app().innerHTML=`<section class="practice-picker"><p class="eyebrow">Elite practice</p><h1>Choose your sets</h1><p>A fresh random run of eight decisions, balanced across your selected sets.</p><form id="practice-sets"><fieldset><legend>Choose one or more sets</legend>${sets.map((s,i)=>`<label><input type="checkbox" name="set" value="${esc(s.set_id)}" ${i===0?'checked':''}>${esc(s.set_name||s.set_id.toUpperCase())}</label>`).join('')}</fieldset><button class="button primary">Start random run</button></form><p id="run-error" role="alert"></p><a href="./">Back to Dailies</a></section>`;
+  document.querySelector('#practice-sets').onsubmit=async event=>{event.preventDefault();const setIds=new FormData(event.currentTarget).getAll('set');if(!setIds.length){document.querySelector('#run-error').textContent='Choose at least one set.';return;}try{environment='mixed';await launch({setIds});}catch(e){renderLoadFailure(e,false);}};
 }

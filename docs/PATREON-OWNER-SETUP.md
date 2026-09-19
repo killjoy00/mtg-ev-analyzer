@@ -4,8 +4,19 @@ The site is prepared for your published **$3 Supporter** and **$5 Elite Member**
 tiers. Supporter helps fund the site; Elite Member unlocks Cube practice and
 custom-set practice. Your existing API client credentials work.
 
-Account linking remains disabled until the missing webhook secret is saved and a
-real membership test passes. You do not need to recreate the tiers or API client.
+The webhook secret was verified on 2026-09-19. Public account linking remains
+disabled while the owner-authorized account completes the controlled membership
+test. You do not need to recreate the tiers or API client.
+
+## Current next step
+
+1. Open [Pack One](https://packone.pro/) and sign in to the authorized account.
+2. Open **Account**, find **Patreon**, then select **Connect Patreon**.
+3. Sign in to the Patreon account holding Elite Member access and authorize the connection.
+4. Return to the homepage, select **Choose your sets**, select sets and start a random run.
+5. Tell me the connection is complete so I can verify the provider record and hourly reconciliation.
+
+The following setup steps are retained for reference; the webhook-secret step is complete.
 
 ## 1. Confirm the OAuth callback
 

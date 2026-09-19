@@ -214,7 +214,7 @@ export async function shareResultCard(profile, result, environmentName = null) {
   const percentileText = Number.isFinite(percentile) && percentile > 0 ? `Top ${percentile}%` : null;
   const blob = await cardBlob({
     eyebrow: result?.is_daily || result?.date ? 'Daily result' : 'Game result',
-    title: result?.mode === 'draft_run' ? (result?.set_id === 'powered-cube' ? 'Powered Cube Run' : 'Draft Run') : `${env} · ${result?.mode === 'top3' ? 'Top 3' : result?.set_id === 'powered-cube' ? 'Cube Pack Run' : 'Full Pack'}`,
+    title: result?.mode === 'draft_run' ? (result?.set_id === 'latest' ? 'Latest Set Run' : result?.set_id === 'powered-cube' ? 'Powered Cube Run' : 'Draft Run') : `${env} · ${result?.mode === 'top3' ? 'Top 3' : result?.set_id === 'powered-cube' ? 'Cube Pack Run' : 'Full Pack'}`,
     bigValue: `${Number(result?.score || 0)}/100`,
     subtitle: `${name} · ${result?.grade || ''}`,
     pills: [percentileText, result?.date].filter(Boolean),
@@ -233,7 +233,7 @@ export async function shareResultCard(profile, result, environmentName = null) {
 
 export function draftRunShareText(run) {
   const matches=run.answers.filter(a=>a.historicalMatch).length;
-  const label=run.environment==='powered-cube'?'Powered Cube':'Draft Run';
+  const label=run.environment==='latest'?'Latest Set':run.environment==='powered-cube'?'Powered Cube':'Draft Run';
   const squares=run.answers.map(a=>a.historicalMatch?'🟩':a.score>=85?'🟦':a.score>=60?'🟨':a.score>=25?'🟧':'⬛').join('');
   const date=run.day ? `Daily ${run.day}` : 'Practice';
   return `Pack One · ${label} · ${date}\n${run.score}/100  ${squares}\n${matches}/${draftRunLength(run)} trophy picks matched. ${run.day?'Play today’s Daily.':'Play this run and compare.'}`;
@@ -242,9 +242,9 @@ export function draftRunShareText(run) {
 export async function shareDraftRunCard(run,url,{challenge=false,asImage=false}={}) {
   const matches=run.answers.filter(a=>a.historicalMatch).length;
   const percentile=run.standing?.percentile;
-  const cube=run.environment==='powered-cube',label=cube?'Powered Cube Run':'Draft Run';
+  const cube=run.environment==='powered-cube',label=run.environment==='latest'?'Latest Set Run':cube?'Powered Cube Run':'Draft Run';
   const text=draftRunShareText(run);
   if(!asImage) return shareBlob(null,{text,url,context:challenge?'draft_run_challenge':'draft_run_result'});
-  const blob=await cardBlob({eyebrow:`${run.day?'Daily ':''}${label}`,title:`${draftRunLength(run)} picks. Your call.`,bigValue:`${run.score}/100`,subtitle:`${matches} trophy picks matched`,pills:[run.day,percentile?`Top ${percentile}% ${run.standing.final?'finish':'so far'}`:null].filter(Boolean),rows:[{label:'The run',value:cube?`${draftRunLength(run)} Powered Cube trophy decisions`:`${draftRunLength(run)} decisions across Magic sets`},{label:'Your target',value:'Real picks from trophy drafters'}]});
+  const blob=await cardBlob({eyebrow:`${run.day?'Daily ':''}${label}`,title:`${draftRunLength(run)} picks. Your call.`,bigValue:`${run.score}/100`,subtitle:`${matches} trophy picks matched`,pills:[run.day,percentile?`Top ${percentile}% ${run.standing.final?'finish':'so far'}`:null].filter(Boolean),rows:[{label:'The run',value:run.environment==='latest'?`${draftRunLength(run)} decisions from the latest set`:cube?`${draftRunLength(run)} Powered Cube trophy decisions`:`${draftRunLength(run)} decisions across Magic sets`},{label:'Your target',value:'Real picks from trophy drafters'}]});
   return shareBlob(blob,{text,url,filename:'pack-one-draft-run.png',context:challenge?'draft_run_challenge':'draft_run_result'});
 }

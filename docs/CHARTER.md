@@ -2,17 +2,17 @@
 
 Authoritative rebuild contract, 2026-09-18. Deployment evidence is separate in [CURRENT-STATE](CURRENT-STATE.md).
 
-## One game, two environments
+## One game, three Dailies
 
 A Draft Run contains exactly eight independent decisions from distinct, qualified trophy source drafts. Each shows the real pack and the drafter's earlier pool. The player's earlier answers do not modify subsequent historical states. Regular Draft Run and Powered Cube are separate environments.
 
-The homepage presents Daily Draft Run and Daily Powered Cube immediately. After one is completed, its result is compact and the other remains the strongest action. After both, results remain visible and applicable practice becomes prominent. There is no checklist layer or wall of practice options.
+The homepage presents Daily Draft Run, Daily Powered Cube and Daily Latest Set immediately. Completed results become compact and unfinished Dailies stay first. After all three, applicable practice becomes prominent. A compact Elite custom-set entry remains available from the start.
 
 ## Daily access and comparison
 
-Both Dailies are free once per Eastern date. Browser/device identity provides best-effort anonymous enforcement. Managed authentication and database uniqueness provide authoritative account enforcement across devices. A started attempt resumes. Guests can complete, score and share, but do not become durable identified leaderboard entries. Signing in later does not retroactively make a guest Daily ranked.
+All three Dailies are free once per Eastern date. Browser/device identity provides best-effort anonymous enforcement. Managed authentication and database uniqueness provide authoritative account enforcement across devices. A started attempt resumes. Guests can complete, score and share, but do not become durable identified leaderboard entries. A signed player already linked to an account is ranked at first Daily creation even if its active Auth header is missing. Account operations and practice still require a valid Auth session. Signing in later does not retroactively make a guest Daily ranked. Before the first pick, the run explicitly shows the ranked name or guest warning.
 
-A Daily schedule is universal and immutable after generation, including puzzle IDs, corpus/scoring/selection/difficulty versions. Its corpus pins the model. Neither Daily permits rerolls. Later corpus lifecycle changes affect only newly generated schedules and sessions. An already-generated historical schedule retains its original shape for everyone joining that day.
+A Daily schedule is universal and immutable after generation, including puzzle IDs, corpus/scoring/selection/difficulty versions. Its corpus pins the model. No Daily permits rerolls. Later corpus lifecycle changes affect only newly generated schedules and sessions. An already-generated historical schedule retains its original shape for everyone joining that day.
 
 Daily sharing publishes a score and the universal Daily entry link; it never creates a private match or changes eligibility. Practice sharing means **share this run and compare**: a stable run identity supplies the exact same eight decisions. Shared recipients cannot reroll them. Historical published links remain readable.
 
@@ -21,6 +21,8 @@ Daily sharing publishes a score and the universal Daily entry link; it never cre
 Regular decisions use P1P1 through P1P8, one per round. Powered Cube's archive omits complete P1P1, so its eight complete decisions use P1P2 through P1P9, with true numbering and the inherited first card visible. Never invent a missing opening pack.
 
 Regular Daily composition uses only released, Live eligible regular sets, ordered by metadata release date: two decisions from the newest set; four sampled with replacement from its three immediate predecessors; two further draws from all eligible regular sets. Both weighted pools use `2 ** (-rank / 4)`, with rank zero at the newest member of that pool. The predecessor weights are approximately 1, 0.841 and 0.707. Optional full-corpus weight halves every four releases. This guarantees at least six of eight decisions from the newest four, keeps older sets possible, and does not force a pick from each predecessor. Every source must differ and satisfy usability, pick-window and difficulty gates. New selection also requires the trophy pick’s implied model score, `round(95 × raw trophy support / strongest raw support)`, to be at least 20. This eligibility filter never changes the 100-point trophy award or an existing fixed game. [Distribution simulation](../results/rebuild-2026-09-18/DAILY-DISTRIBUTION.md).
+
+Daily Latest Set has a separate immutable schedule and leaderboard under `latest`. It uses eight independent P1P1–P1P8 decisions exclusively from the newest released Live regular set, ordered by release metadata. If that set cannot meet selection gates, the Daily is unavailable; it never silently mixes or substitutes older sets.
 
 The full historical corpus is retained. Lifecycle controls new-play eligibility, not existence of historical evidence. Existing fingerprint exclusions remain compatibility constraints, not authorization for additional deletion.
 
@@ -34,7 +36,7 @@ An exact historical trophy match always earns **100**, even when the model disag
 
 ## Practice and capabilities
 
-Anonymous users receive the two Dailies. A free authenticated account adds `unlimited_regular_practice`. Future grants may add `unlimited_cube_practice` and `custom_corpus`; provider names and tiers do not belong in core product logic. Backend identity and entitlement state are authoritative. The Patreon adapter is implemented with explicit campaign and premium-tier matching, but linking remains disabled pending the webhook secret and real membership canary. Supporter membership grants no premium capabilities.
+Anonymous users receive all three Dailies. A free authenticated account adds `unlimited_regular_practice`. Elite grants add `unlimited_cube_practice` and `custom_corpus`; provider names and tiers do not belong in core product logic. Backend identity and entitlement state are authoritative. The Patreon adapter is implemented with explicit campaign and premium-tier matching, with a controlled connection test restricted to the owner-authorized account pending real membership evidence. Public linking remains disabled. Supporter membership grants no premium capabilities.
 
 Custom practice accepts one or more Live eligible regular sets, assigning eight decisions as evenly as possible: 8; 4/4; 3/3/2; 2/2/2/2. Corpus size does not weight this allocation. Non-Daily unshared practice can retain matched rerolls.
 

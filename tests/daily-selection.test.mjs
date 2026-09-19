@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {dailySetPlan,liveRegularSets,recencyWeight,balancedSetPlan} from '../daily-selection.mjs';
+import {dailySetPlan,latestSetPlan,liveRegularSets,recencyWeight,balancedSetPlan} from '../daily-selection.mjs';
 import {seededRandom} from '../gameplay.mjs';
 const sets=Array.from({length:20},(_,i)=>({set_id:`set-${i}`,release_date:`${2026-i}-01-01`,status:'Live',regular_run:true}));
 test('every Daily has two newest and four from the previous-three pool',()=>{
@@ -30,4 +30,12 @@ test('custom corpus gives balanced counts without archive-size weights',()=>{
   const counts=ids.map(id=>plan.filter(s=>s===id).length);
   assert.equal(plan.length,8);assert.ok(Math.max(...counts)-Math.min(...counts)<=1);
  }
+});
+
+test('latest Daily uses only the newest Live released regular set',()=>{
+ assert.deepEqual(latestSetPlan([...sets].reverse(),'2026-09-19'),Array(8).fill('set-0'));
+ const future={set_id:'future',release_date:'2026-10-01',status:'Live',regular_run:true};
+ assert.deepEqual(latestSetPlan([...sets,future],'2026-09-19'),Array(8).fill('set-0'));
+ assert.deepEqual(latestSetPlan([...sets,future],'2026-10-01'),Array(8).fill('future'));
+ assert.throws(()=>latestSetPlan([],'2026-09-19'),/not available/);
 });

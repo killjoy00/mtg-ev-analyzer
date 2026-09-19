@@ -21,6 +21,11 @@ export function dailySetPlan(metadata, day, random) {
   return [ids[0], ids[0], ...Array.from({length:4}, () => weightedSet(previous,random)),
     ...Array.from({length:2}, () => weightedSet(ids,random))];
 }
+export function latestSetPlan(metadata, day) {
+  const newest=liveRegularSets(metadata,day)[0];
+  if(!newest)throw Object.assign(Error('The latest-set Daily is not available yet.'),{status:503});
+  return Array(8).fill(newest.set_id);
+}
 // Balance custom practice by selected set, never by archive size. Used by the
 // future capability-gated entry point; not exposed by the Daily selector.
 export function balancedSetPlan(ids, random) {

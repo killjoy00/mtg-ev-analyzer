@@ -24,11 +24,13 @@ function statusFor(profile, environment, dateKey) {
 export function todayStatus(profile, dateKey = easternDateKey()) {
   const draftRun = statusFor(profile, 'mixed', dateKey);
   const cube = statusFor(profile, 'powered-cube', dateKey);
+  const latest = statusFor(profile, 'latest', dateKey);
   return {
     dateKey,
     draftRun,
     cube,
-    completed: Number(draftRun.complete) + Number(cube.complete),
+    latest,
+    completed: Number(draftRun.complete) + Number(cube.complete) + Number(latest.complete),
     streak: Number(profile?.summary?.current_streak || 0),
   };
 }

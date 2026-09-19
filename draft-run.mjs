@@ -58,7 +58,7 @@ export function runPickWindows(environment='mixed',version=DRAFT_RUN_SELECTION_V
 }
 
 export function draftRunEnvironment(value = 'mixed') {
-  if (!['mixed', POWERED_CUBE_ENVIRONMENT].includes(value)) throw new Error('Invalid Draft Run environment.');
+  if (!['mixed', 'latest', POWERED_CUBE_ENVIRONMENT].includes(value)) throw new Error('Invalid Draft Run environment.');
   return value;
 }
 

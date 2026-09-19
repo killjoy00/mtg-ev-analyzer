@@ -2,13 +2,14 @@
 // A supporter tier never implies premium access, regardless of payment amount.
 export const PATREON_POLICY = Object.freeze({
   enabled: false,
+  canaryAccountHashes: ['a007f11502778068559236547ed05bb5e0d643af84e469e000cda86c3d542ea8'],
   campaignId: '16808916',
   premiumTierIds: ['29631843'], // Elite Member; Supporter 29631835 is excluded.
   supportUrl: 'https://www.patreon.com/c/PackOne',
 });
 
 export function validPatreonPolicy(policy = PATREON_POLICY) {
-  return policy.enabled === true && /^\d+$/.test(policy.campaignId) &&
+  return (policy.enabled === true || (policy.canaryAccountHashes?.length > 0 && policy.canaryAccountHashes.every(hash => /^[a-f0-9]{64}$/.test(hash)))) && /^\d+$/.test(policy.campaignId) &&
     policy.premiumTierIds.length > 0 && policy.premiumTierIds.every(id => /^\d+$/.test(id));
 }
 

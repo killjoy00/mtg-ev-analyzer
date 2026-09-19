@@ -22,16 +22,16 @@ try{
  await page.setViewportSize({width:390,height:844});
  await page.goto(process.env.PACK1_E2E_URL||'http://127.0.0.1:4173',{waitUntil:'domcontentloaded'});
  await page.locator('.daily-home-game a').first().waitFor();
- assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),2,'Play links do not wait for profile');
+ assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),3,'Play links do not wait for profile');
  assert.ok(!requests.some(u=>/\/(app\.js|social\.mjs|home-today\.mjs|data\/catalog\.json|shards\/)/.test(u)),'Home excludes the legacy replay dependency tree');
  await page.waitForFunction(()=>Boolean(document.querySelector('#account-nav')));
  while(!releaseProfile)await new Promise(r=>setTimeout(r,10));releaseProfile();
- for(const sets of [[],['mixed'],['powered-cube'],['mixed','powered-cube']]){
+ for(const sets of [[],['mixed'],['powered-cube'],['mixed','powered-cube'],['mixed','powered-cube','latest']]){
   completed=sets;claimed=true;
   await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
   await page.waitForFunction(n=>document.querySelector('[data-daily-home]')?.dataset.completed===String(n),sets.length);
   assert.equal(await page.locator('.daily-home-game.is-complete').count(),sets.length);
-  assert.equal(await page.locator('.daily-home-practice').count(),sets.length===2?1:0);
+  assert.equal(await page.locator('.daily-home-practice').count(),sets.length===3?1:0);
   if(sets.length===1)assert.equal(await page.locator('.daily-home-game').first().getAttribute('class'),'daily-home-game is-unplayed');
   for(const width of [320,390,768,1440]){
    await page.setViewportSize({width,height:900});

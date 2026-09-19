@@ -13,7 +13,7 @@ let shareCalls=0;
 let puzzles=selectDraftRun(corpus,'browser-contract',environment,{selectionVersion}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
 const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
-const snapshot=()=>({id,environment,run_length:puzzles.length,set_reroll_allowed:!daily,day:daily?'2026-09-10':null,revision,round:answers.length+1,answers,rerolls,complete:answers.length===puzzles.length,score:answers.length===puzzles.length?Math.round(answers.reduce((n,a)=>n+a.score,0)/puzzles.length):null,current:answers.length===puzzles.length?null:publicDraftRunPuzzle(puzzles[answers.length]),standing:answers.length===puzzles.length?{rank:1,total:20,percentile:5,final:false}:null});
+const snapshot=()=>({id,environment,leaderboard_eligible:daily,ranked_name:daily?'QA ranked player':null,run_length:puzzles.length,set_reroll_allowed:!daily,day:daily?'2026-09-10':null,revision,round:answers.length+1,answers,rerolls,complete:answers.length===puzzles.length,score:answers.length===puzzles.length?Math.round(answers.reduce((n,a)=>n+a.score,0)/puzzles.length):null,current:answers.length===puzzles.length?null:publicDraftRunPuzzle(puzzles[answers.length]),standing:answers.length===puzzles.length?{rank:1,total:20,percentile:5,final:false}:null});
 const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});
 page.on('pageerror',e=>errors.push(e.message));
@@ -55,7 +55,7 @@ try{
   const displayNames=JSON.parse(fs.readFileSync('data/set-display-names.json','utf8')).names;
   await page.waitForFunction(name=>document.querySelector('.run-heading')?.textContent.includes(name),displayNames[puzzles[0].set_id]);
   assert.equal(await page.locator('#home-editorial').count(),0);
-  if(daily)assert.equal(await page.locator('[data-reroll]').count(),0,'No Daily rerolls');
+  if(daily){assert.equal(await page.locator('[data-reroll]').count(),0,'No Daily rerolls');assert.equal(await page.locator('.run-ranking-state').innerText(),'Ranked as QA ranked player');}
   if(!daily){
   const originalSet=puzzles[0].set_id;
   if(cube){
