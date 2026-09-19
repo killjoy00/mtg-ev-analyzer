@@ -1,8 +1,7 @@
 {
-  "operation": "puzzle-components",
-  "request_id": "phase2-publish-development-20260919",
-  "reason": "Publish only eligible Traditional components in development after successful staging run 35457309349 and exact backend release 662c6c9 smoke. Keep SIR Candidate because its parent is not Live; retain rejected source exclusions and fixed historical Dailies.",
+  "operation": "deploy",
+  "request_id": "tournament-verified-tiers-development-20260919",
+  "reason": "Deploy the final reviewed release with verified Elite Member tier mapping from successful Patreon discovery. Policy remains disabled. PR159 unit/browser gates passed; database schema through 0026 is present.",
   "target": "development",
-  "action": "publish",
-  "source": "regular-phase2"
+  "commit": "4df2c41ae18d2cc0391ffbb5be771777b35c34cf"
 }
