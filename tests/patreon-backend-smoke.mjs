@@ -1,0 +1,39 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+if(!process.argv.includes('--dev-fixtures'))throw Error('Requires an isolated fixture database.');
+process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
+const {query,default:growth}=await import('../worker/growth-function.js');
+const {applyPatreonMembership}=await import('../worker/patreon.mjs');
+const user=crypto.randomUUID(),other=crypto.randomUUID(),token=crypto.randomUUID(),hash='a'.repeat(64);
+const policy={enabled:true,campaignId:'100',premiumTierIds:['200']};
+const member={memberId:'test-'+user,userId:'provider-'+user,campaignId:'100',tierIds:['200'],status:'active_patron',lastChargeStatus:'Paid',entitledAmountCents:500};
+async function active(provider='patreon'){return Number((await query("SELECT count(*)::int n FROM entitlement_grants WHERE auth_user_id=$1::uuid AND provider=$2 AND revoked_at IS NULL AND expires_at>now()",[user,provider])).rows[0].n);}
+async function revision(){return (await query("SELECT sync_revision FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider='patreon'",[user])).rows[0].sync_revision;}
+async function sync(m,rev){return applyPatreonMembership(query,user,member.userId,m,{revision:rev??await revision(),policy});}
+try {
+  for(const id of [user,other])await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,\'QA Patreon\',$2,true)',[id,`qa-patreon-${id}@example.invalid`]);
+  await query('INSERT INTO neon_auth.session(id,"userId",token,"updatedAt","expiresAt") VALUES($1::uuid,$2::uuid,$3,now(),now()+interval \'1 hour\')',[crypto.randomUUID(),user,token]);
+  await query("INSERT INTO provider_oauth_states(state_hash,auth_user_id,provider,expires_at,consumed_at) VALUES($1,$2::uuid,'patreon',now()+interval '10 minutes',now())",[hash,user]);
+  assert.equal(await applyPatreonMembership(query,user,member.userId,member,{link:true,oauthStateHash:hash,policy}),true);
+  assert.equal(await active(),2);
+  await query("INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference,expires_at) VALUES($1::uuid,'custom_corpus','manual','QA',now()+interval '1 day')",[user]);
+  await assert.rejects(query("INSERT INTO provider_accounts(auth_user_id,provider,provider_user_id) VALUES($1::uuid,'patreon',$2)",[other,member.userId]));
+  await sync({...member,tierIds:['201']});assert.equal(await active(),0,'Supporter downgrade revokes');
+  await sync(member);assert.equal(await active(),2,'Upgrade restores');
+  const stale=await revision();await query("UPDATE provider_accounts SET sync_revision=sync_revision+1 WHERE auth_user_id=$1::uuid",[user]);
+  assert.equal(await sync(null,stale),false);assert.equal(await active(),2,'Outdated snapshot cannot overwrite current state');
+  await sync(null);assert.equal(await active(),0,'Deleted membership revokes');
+  await sync(member);assert.equal(await active(),2);
+  await query("UPDATE entitlement_grants SET expires_at=now()-interval '1 second' WHERE auth_user_id=$1::uuid AND provider='patreon'",[user]);
+  assert.equal(await active(),0,'Stale access expires');
+  await sync(member);
+  const response=await growth.fetch(new Request('https://packone.pro/v1/patreon/disconnect',{method:'POST',headers:{'x-pack1-auth-session':token,'content-type':'application/json'},body:'{}'}));
+  assert.equal(response.status,200);assert.equal(await active(),0);assert.equal(await active('manual'),1,'Manual grants survive');
+  assert.equal(await applyPatreonMembership(query,user,member.userId,member,{link:true,oauthStateHash:hash,policy}),false,'Disconnect cancels an in-flight callback');
+  assert.equal(Number((await query('SELECT count(*)::int n FROM neon_auth."user" WHERE id=$1::uuid',[user])).rows[0].n),1);
+  console.log('Patreon SQL lifecycle passed: exact tier, upgrade/downgrade, unique account, stale snapshot, cancellation, expiry, disconnect, manual grant preservation.');
+} finally {
+  await query('DELETE FROM entitlement_grants WHERE auth_user_id IN ($1::uuid,$2::uuid)',[user,other]);
+  await query('DELETE FROM neon_auth.session WHERE "userId" IN ($1::uuid,$2::uuid)',[user,other]);
+  await query('DELETE FROM neon_auth."user" WHERE id IN ($1::uuid,$2::uuid)',[user,other]);
+}

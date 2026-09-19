@@ -3,6 +3,7 @@ import {guardIngress} from './ingress-auth.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
+import {handlePatreon} from './patreon.mjs';
 const ALLOWED_ORIGINS = new Set([
   'https://packone.pro',
   'https://killjoy00.github.io',
@@ -784,6 +785,7 @@ async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true });
+  if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/events') return handleEvents(request);
   if (request.method === 'POST' && url.pathname === '/v1/results') return handleResult(request);

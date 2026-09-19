@@ -31,6 +31,9 @@ jobs:
       PROJECT_ID: patient-shadow-91417882
       RELEASE_COMMIT: ${{ inputs.commit }}
       RELEASE_TARGET: ${{ inputs.target }}
+      PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
+      PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
+      PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -79,6 +82,15 @@ jobs:
           curl -fsS --max-time 30 https://packone.pro/data/selection-policy.json -o "$RUNNER_TEMP/selection-policy.json"
           node -e 'const p=require(process.argv[1]);if(p.run_length!==8||p.selection_version!=="eight-pick-v4")throw Error("Compatible frontend is not published")' "$RUNNER_TEMP/selection-policy.json"
 
+      - name: Check optional Patreon activation before any upload
+        run: |
+          set -euo pipefail
+          enabled=$(node --input-type=module -e "import {validPatreonPolicy} from './patreon-policy.mjs';console.log(validPatreonPolicy())")
+          echo "PATREON_RUNTIME_ENABLED=$enabled" >> "$GITHUB_ENV"
+          if [[ "$enabled" == true && "$RELEASE_TARGET" == production ]]; then
+            test -n "$PATREON_CLIENT_ID" && test -n "$PATREON_CLIENT_SECRET" && test -n "$PATREON_WEBHOOK_SECRET" || { echo '::error::Activated Patreon requires all runtime secrets.'; exit 1; }
+          fi
+
       - name: Build and verify all bundles before upload
         run: node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$RELEASE_COMMIT"
 
@@ -87,8 +99,12 @@ jobs:
         run: |
           set -euo pipefail
           while IFS=: read -r slug entry; do
+            extra=()
+            if [[ "$slug" == pack1growth && "$RELEASE_TARGET" == production && "$PATREON_RUNTIME_ENABLED" == true ]]; then
+              extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
+            fi
             neon functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle \
-              --project-id "$PROJECT_ID" --branch "$TARGET_BRANCH" --runtime nodejs24 --wait
+              --project-id "$PROJECT_ID" --branch "$TARGET_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
 
       # --settle: this runs seconds after the deploy call returned, and a
