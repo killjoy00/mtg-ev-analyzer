@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "target": "production",
-  "commit": "053541429b7adf01168eb27b344204e706ca67f9",
-  "request_id": "patreon-public-production-20260919",
-  "reason": "Public Patreon activation after real Elite OAuth, reconnect, completed custom practice, authoritative creator API reconciliation, passing unit/browser checks, and development acceptance run 35462022892."
+  "target": "development",
+  "commit": "4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5",
+  "request_id": "patreon-ad-free-development-20260919",
+  "reason": "PR163 passed full unit, browser and isolated database gates. Verify both-tier ad suppression without enabling Google delivery; no model, schema, or historical score change."
 }
