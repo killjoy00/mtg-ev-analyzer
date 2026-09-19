@@ -112,7 +112,7 @@ try{
     await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-invite-mobile.png`,fullPage:true});
   }
   await page.goto(base+'/?game=draft-run&board=daily'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
-  assert.equal(await page.locator('.run-board-games a').count(),2);
+  assert.equal(await page.locator('.run-board-games a').count(),3);
   assert.equal((await page.locator('.run-board-games a.active').innerText()).trim(),cube?'Cube':'Draft Run');
   assert.equal(await page.locator('.run-board-actions .button').count(),2);
   assert.equal(await page.getByRole('link',{name:'Top 3 practice',exact:true}).count(),0);
