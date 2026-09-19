@@ -26,7 +26,7 @@ from build_replays import (  # noqa: E402
     normalize_probabilities, stable_fold,
 )
 from import_all_trophies import (  # noqa: E402
-    TRAINING_DRAFT_CAP, collect, collect_isolated, eligible_trophies,
+    TRAINING_DRAFT_CAP, collect_legacy_v3, collect_isolated, eligible_trophies,
     scan_metadata,
 )
 from build_replays import DraftSkill, select_strong_drafts  # noqa: E402
@@ -125,7 +125,7 @@ def reconstruct(set_id, draft_path, game_path):
     qualified, _ = eligible_trophies(drafts, cutoff, False, conflicts)
 
     # Current v3, reconstructed exactly as the production importer did it.
-    old_counts, old_held, old_output, _, _, old_colour_examples = collect(
+    old_counts, old_held, old_output, _, _, old_colour_examples = collect_legacy_v3(
         draft_path, set(training), set(qualified), header)
     old_fit = build_colour_table(
         game_path, old_colour_examples,
