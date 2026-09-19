@@ -5,6 +5,7 @@ export const PATREON_POLICY = Object.freeze({
   canaryAccountHashes: [],
   campaignId: '16808916',
   premiumTierIds: ['29631843'], // Elite Member; Supporter 29631835 is excluded.
+  adFreeTierIds: ['29631835', '29631843'], // Both paid tiers suppress display ads.
   supportUrl: 'https://www.patreon.com/c/PackOne',
 });
 
@@ -14,8 +15,16 @@ export function validPatreonPolicy(policy = PATREON_POLICY) {
 }
 
 export function premiumPatreonMembership(member, policy = PATREON_POLICY) {
+  return qualifyingMembership(member, policy.premiumTierIds, policy);
+}
+
+export function adFreePatreonMembership(member, policy = PATREON_POLICY) {
+  return qualifyingMembership(member, policy.adFreeTierIds || [], policy);
+}
+
+function qualifyingMembership(member, tierIds, policy) {
   if (!validPatreonPolicy(policy) || !member || member.campaignId !== policy.campaignId) return false;
-  if (!member.tierIds?.some(id => policy.premiumTierIds.includes(id))) return false;
+  if (!member.tierIds?.some(id => tierIds.includes(id))) return false;
   if (member.status === 'declined_patron' || /declined|refunded|fraud|deleted/i.test(member.lastChargeStatus || '')) return false;
   // Current tier entitlement, including a still-entitled cancelled subscription,
   // is authoritative. Monetary totals and lifetime support cannot unlock tools.

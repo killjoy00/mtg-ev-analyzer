@@ -62,6 +62,8 @@ jobs:
         run: PACK1_TEST_SELECTION_VERSION=first-pack-v2 node tests/draft-run-e2e.mjs
       - name: Run account browser contract
         run: node tests/account-e2e.mjs
+      - name: Verify display-ad membership suppression with intercepted requests
+        run: node tests/ads-e2e.mjs
       - name: Run admin reporting browser contract
         run: node tests/admin-e2e.mjs
       - name: Upload UI screenshots

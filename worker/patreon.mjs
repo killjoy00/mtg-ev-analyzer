@@ -1,4 +1,4 @@
-import {PATREON_POLICY,validPatreonPolicy,premiumPatreonMembership} from '../patreon-policy.mjs';
+import {PATREON_POLICY,validPatreonPolicy,premiumPatreonMembership,adFreePatreonMembership} from '../patreon-policy.mjs';
 import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 
 const PROVIDER='patreon';
@@ -142,13 +142,14 @@ export function verifyPatreonSignature(raw,signature,secret) {
 
 async function status(query,authUserId) {
   const [provider,grants]=await Promise.all([
-    query(`SELECT membership_status,currently_entitled_amount_cents,is_free_trial,is_gifted,tier_ids,connected_at,last_synced_at,sync_requested_at
+    query(`SELECT provider_campaign_id,membership_status,last_charge_status,currently_entitled_amount_cents,is_free_trial,is_gifted,tier_ids,connected_at,last_synced_at,sync_requested_at
       FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider=$2`,[authUserId,PROVIDER]),
     query(`SELECT capability FROM entitlement_grants WHERE auth_user_id=$1::uuid AND provider=$2
       AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now()) ORDER BY capability`,[authUserId,PROVIDER]),
   ]);
   const row=provider.rows[0];
   return {
+    ...patreonAdvertisingStatus(row),
     configured:configured()&&patreonAccountAllowed(authUserId),
     support_url:PATREON_POLICY.supportUrl,
     webhook_configured:Boolean(process.env.PATREON_WEBHOOK_SECRET),
@@ -165,6 +166,18 @@ async function status(query,authUserId) {
     }:null,
     capabilities:grants.rows.map(row=>row.capability),
   };
+}
+
+export function patreonAdvertisingStatus(row,now=Date.now(),policy=PATREON_POLICY) {
+  if(!row)return {ad_free:false,ads_allowed:true};
+  const tiers=typeof row.tier_ids==='string'?JSON.parse(row.tier_ids):row.tier_ids||[];
+  const adFree=adFreePatreonMembership({campaignId:row.provider_campaign_id,
+    tierIds:tiers,status:row.membership_status,lastChargeStatus:row.last_charge_status,
+    isFreeTrial:truthy(row.is_free_trial),isGifted:truthy(row.is_gifted)},policy);
+  const age=now-new Date(row.last_synced_at).getTime();
+  // Stale membership cannot expose a paying member to ads during a sync outage.
+  const fresh=Number.isFinite(age)&&age>=0&&age<3*60*60*1000&&!row.sync_requested_at;
+  return {ad_free:adFree,ads_allowed:fresh&&!adFree};
 }
 
 async function webhook(request,query,json) {

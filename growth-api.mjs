@@ -16,9 +16,10 @@ function saveAuth(data) {
     localStorage.setItem(AUTH_TOKEN_KEY, data.token);
     if (data.user) localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
   } catch {}
+  globalThis.dispatchEvent?.(new Event('packone-account-changed'));
   return data;
 }
-function clearAuth() { try { localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem(AUTH_USER_KEY); } catch {} }
+function clearAuth() { try { localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem(AUTH_USER_KEY); } catch {} globalThis.dispatchEvent?.(new Event('packone-account-changed')); }
 export function savePackToken(token) { try { localStorage.setItem(TOKEN_KEY, token); } catch {} return token; }
 export function packApiConfigured() { return /^https:\/\//.test(baseUrl()); }
 
