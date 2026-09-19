@@ -10,7 +10,7 @@ The rebuild, serving optimization, eligible Traditional publication, three Daili
 4. Observe a real Patreon billing/tier change and signed provider webhook delivery. Exact tier boundaries, revocation, ordering, expiry and manual-grant preservation have automated coverage; real OAuth, reconnect, premium practice and authoritative API reconciliation have passed. Do not purchase or modify subscriptions merely to manufacture evidence.
 5. Watch hourly membership reconciliation and token-expiry failures. Use the reviewed sync workflow for recovery; keep stale-sync visibility in Admin Users.
 6. Keep Google ads disabled pending owner approval after Google's review. Both paid Patreon tiers must be ad-free when signed in and connected. Consent setup and real ad-slot activation remain future work.
-7. Treat TCGplayer as a small optional experiment after Impact approval and a verified public tracking template. Current links are ordinary searches, with no verified commissions.
+7. Keep TCGplayer as a small measured affiliate experiment. Impact approval and the public deep-link template are active; compare outbound clicks with Impact conversion reporting before expanding placement.
 8. Gather non-QA first-encounter measurements before changing scoring or making skill-ranking claims. A dedicated probability-calibration change, new model family or Traditional training pool needs new versioned evidence; trophy matches remain 100.
 
 Historical compatibility and audit evidence remain preserved. No old game mode, fixed-schedule rewrite, automatic Candidate promotion, or model retraining is implied by this roadmap.
