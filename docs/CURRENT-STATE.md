@@ -4,18 +4,18 @@ Updated 2026-09-19. Implementation, backend deployment, database publication, an
 
 ## Published product
 
-Pack One remains the eight-decision game in [CHARTER](CHARTER.md): two universal Eastern-date Dailies, no Daily rerolls, trophy-match 100, alternatives capped at 95, guest play/share, and authenticated durable leaderboards. Free accounts have unlimited regular practice. Previously created games keep their IDs and versions.
+Pack One remains the eight-decision game in [CHARTER](CHARTER.md): three universal Eastern-date Dailies (mixed, Powered Cube and Latest Set), no Daily rerolls, trophy-match 100, alternatives capped at 95, guest play/share, and durable leaderboards for players linked to an account before their first Daily start. Free accounts have unlimited regular practice. Previously created games keep their IDs and versions.
 
 | Layer | Verified release |
 | --- | --- |
-| Browser | GitHub Pages serves main. PR156 released the light tournament design: self-hosted Barlow Condensed and Source Sans 3, numbered Daily scorecards, larger controls, and matching editorial typography. Final application source: `4df2c41ae18d2cc0391ffbb5be771777b35c34cf`. |
-| Production functions | `draftrunapi` deployment 23, `pack1growth` 14, and `pack1api` 17 all answer with release `4df2c41ae18d2cc0391ffbb5be771777b35c34cf`. Development run 35457998020 and production run 35458052419 passed complete Daily acceptance. |
-| Schema | Reviewed additive migrations through 0026 are applied to development and production. Historical migration 0016 was not replayed. |
+| Browser | GitHub Pages serves main. PR156 released the light tournament design: self-hosted Barlow Condensed and Source Sans 3, numbered Daily scorecards, larger controls, and matching editorial typography. PR160 adds the third Daily, visible ranked/guest state and Elite set picker. Application release: `8abee764ba05c318c77670c115657304adb4deee`. |
+| Production functions | `draftrunapi` deployment 24, `pack1growth` 15, and `pack1api` 18 all answer with release `8abee764ba05c318c77670c115657304adb4deee`. Development run 35460748733 and production run 35460832627 passed all three complete Daily flows. |
+| Schema | Reviewed additive migrations through 0027 are applied to development and production. Historical migration 0016 was not replayed. |
 | Corpus / selection | `elite-trophy-colour-stage-v7` / `eight-pick-v4`; 29 Live environments: 28 regular sets and Powered Cube. |
 | Model / scoring | `strong-player-colour-stage-v3`, trained on Premier evidence. No Traditional pooling, model retraining, or scoring-curve change. |
 | New-run eligibility | `trophy-implied-score-20-v1`; the indexed threshold is equivalent to the rounded implied-score floor. Historical games retain their recorded policy. |
 | Traditional sources | Phase 2 components are explicitly published only for eligible Live parents. SIR remains Candidate. The existing `traditional-cube-p2p7-v3-v1` component remains Live. |
-| Patreon | Implemented and explicitly disabled. Campaign `16808916`, Elite Member tier `29631843`; Supporter `29631835` grants no premium capabilities. OAuth client and creator credentials work. Webhook signing secret and real member canary remain outstanding. |
+| Patreon | Public linking is disabled; controlled linking is enabled only for the owner-authorized account. Campaign `16808916`, Elite Member `29631843`; Supporter `29631835` grants no premium capabilities. All runtime secrets are installed on production growth. Real OAuth authorization remains outstanding. |
 
 Pages success does not imply backend deployment or corpus publication. All three backend health markers were read independently after production deployment.
 
@@ -43,7 +43,7 @@ Expansion affects newly generated games. It does not regenerate today's Daily or
 
 ## Remaining activation work
 
-Patreon needs the webhook signing secret and a controlled real subscriber test before the Connect button is enabled. Fixture tests cannot establish real provider behavior. [Owner setup steps](PATREON-OWNER-SETUP.md) and [integration runbook](PATREON.md) record the exact URLs, secret name, policy, failure behavior, and canary requirements. No subscription purchase was made.
+The webhook secret is installed, and the Connect button is enabled only for the owner-authorized test account. The owner must approve the normal Patreon OAuth connection; then verify the real membership, capabilities and reconciliation before enabling public linking. Fixture tests cannot establish real provider behavior. [Owner setup steps](PATREON-OWNER-SETUP.md) and [integration runbook](PATREON.md) record the exact URLs, secret name, policy, failure behavior, and canary requirements. No subscription purchase was made.
 
 The temporary performance/SQL test branch `release-tournament-20260919` (`br-cold-flower-ay5yimu1`) is isolated from serving and suspends while idle.
 
@@ -55,11 +55,13 @@ Verify schema, deploy a reviewed main SHA to development, pass its acceptance fl
 
 [Design system](DESIGN-SYSTEM.md), [initial rebuild audit](REBUILD-2026-09-18.md), [distribution](../results/rebuild-2026-09-18/DAILY-DISTRIBUTION.md), [Traditional research](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md), [scoring](../results/rebuild-2026-09-18/SCORING-RESULTS.md).
 
-## Pending September 19 feature release
+## Live September 19 feature release
 
 - Third Daily (`latest`) has its own fixed schedule, status, share link and leaderboard, using only the newest Live released regular set.
 - Elite custom-set picker is discoverable from the homepage; backend capability enforcement remains required.
 - Established account-linked player tokens qualify for Daily ranking without a redundant active Auth header. Guest-started attempts remain unranked after linking. The first pack displays ranked identity or a guest warning.
 - Owner-authorized Cube recovery: the September 19 first attempt scored 89, matched the universal schedule, had eight stored answers and a pre-existing account link/session. Only its ranking flag and missing scores entry were restored; career/result aggregates were not replayed. Audit event `daily_ranking_recovered` records the repair.
-- Patreon discovery 35459558651 confirmed all runtime/creator secrets. Production linking is prepared only for the owner-authorized canary account; public activation awaits real OAuth evidence.
+- Patreon discovery 35459558651 confirmed all runtime/creator secrets. Production linking is enabled only for the owner-authorized canary account; public activation awaits real OAuth evidence.
 - Schema prerequisite: additive environment expansion in migration 0027.
+
+PR160 passed unit/browser gates and the isolated database suite (35460401581, 35460401422, 35460401447). Live browser run 35460997062 completed all three Dailies at 320/390/768/1440 widths with images, guest notices, pool proportions, result states and zero browser errors. Today’s Latest Set schedule has eight HOB decisions from eight distinct drafts. All 19 previous schedules have identical fingerprints. The public Cube board shows the recovered 89. Unsigned production webhooks correctly return 401; an actual signed provider delivery and real membership canary are not yet claimed. [Feature release evidence](../results/release-2026-09-19/three-dailies-verification.json).
