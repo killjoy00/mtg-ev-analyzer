@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from import_all_trophies import eligible_trophies, trajectory, rows, collect, premier_sources, BASE, scan_metadata
+from import_all_trophies import eligible_trophies, trajectory, rows, collect_legacy_v3, premier_sources, BASE, scan_metadata
 from build_replays import PickExample
 
 class FullTrophyTests(unittest.TestCase):
@@ -96,7 +96,7 @@ class FullTrophyTests(unittest.TestCase):
             with gzip.open(p,'wt',newline='') as f:
                 w=csv.writer(f);w.writerow(header)
                 w.writerow(['training',0,0,'A',1,1,1,1,0]);w.writerow(['trophy',0,0,'B',1,1,1,1,0])
-            counts,folds,output,invalid,n,colour=collect(p,{'training'},{'trophy'},header)
+            counts,folds,output,invalid,n,colour=collect_legacy_v3(p,{'training'},{'trophy'},header)
             self.assertEqual(n,1);self.assertEqual(set(output),{'trophy'})
             self.assertEqual(output['trophy'][0].historical_pick,'B')
             # The colour table may learn from the training draft but never from
@@ -120,7 +120,7 @@ class FullTrophyTests(unittest.TestCase):
             with gzip.open(p,'wt',newline='') as f:
                 w=csv.writer(f);w.writerow(header)
                 for pack in (0,1,2):w.writerow(['trophy',pack,0,'A',1,1,1,1,0])
-            *_,output,invalid,n,colour=collect(p,set(),{'trophy'},header)
+            *_,output,invalid,n,colour=collect_legacy_v3(p,set(),{'trophy'},header)
             self.assertEqual(colour,[])
             self.assertEqual(len(output['trophy']),1)
             self.assertEqual(output['trophy'][0].raw_pack_number,0)
