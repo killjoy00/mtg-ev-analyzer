@@ -1,5 +1,7 @@
 {
-  "operation": "patreon-sync",
-  "request_id": "real-elite-reconciliation-20260919",
-  "reason": "The authorized user connected, disconnected/reconnected and completed a three-set Elite practice run. Verify the creator API snapshot renews those exact-tier capabilities before public activation."
+  "operation": "deploy",
+  "target": "development",
+  "commit": "053541429b7adf01168eb27b344204e706ca67f9",
+  "request_id": "patreon-public-development-20260919",
+  "reason": "Real Elite OAuth, disconnect/reconnect, custom practice and creator API reconciliation passed. Deploy the reviewed public-linking policy to development before identical production promotion."
 }
