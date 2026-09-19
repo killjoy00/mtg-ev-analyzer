@@ -16,6 +16,16 @@ test('rollout requests can target only fixed workflows on main',()=>{
     {...common,operation:'import',target:'another-database',sets:'all'},
   ])assert.throws(()=>rolloutDispatch(request));
 });
+test('the issue 164 v4 rebuild is pinned to the dedicated workflow and v8 identity',()=>{
+  const request={...common,operation:'rebuild-v4',corpus_version:'elite-trophy-colour-stage-v8'};
+  assert.deepEqual(rolloutDispatch(request),{
+    workflow:'rebuild-v4-draft-run-corpus.yml',
+    body:{ref:'main',inputs:{corpus_version:'elite-trophy-colour-stage-v8'}},
+  });
+  for(const corpus_version of ['elite-trophy-colour-stage-v7','elite-trophy-colour-stage-v9','anything'])
+    assert.throws(()=>rolloutDispatch({...request,corpus_version}));
+  assert.throws(()=>rolloutDispatch({...request,target:'production'}));
+});
 test('format research dispatch cannot select arbitrary sets, code refs or targets',()=>{
   const request={operation:'format-research',reason:'Predeclared protocol',request_id:'research-1'};
   assert.deepEqual(rolloutDispatch(request),{workflow:'format-research.yml',body:{ref:'main',inputs:{}}});
