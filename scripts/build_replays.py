@@ -542,9 +542,11 @@ def train_and_collect(path: Path, strong_ids: set[str], output_ids: set[str],
             training_examples.append((draft_id, example))
             if draft_id in output_ids:
                 outputs[draft_id].append(example)
-            elif colour_examples is not None:
-                # Preserve the existing stronger rule: no served draft informs
-                # any colour fit, even when it is outside the fold being scored.
+            if colour_examples is not None:
+                # Keep per-draft colour evidence for the whole training cohort.
+                # build_colour_tables_by_fold removes the complete held-out fold
+                # before aggregating it, so a served draft can train other folds
+                # but can never influence the grader that scores that draft.
                 colour_examples.append((draft_id, example))
 
     fold_training = build_fold_training(training_examples, set(strong_ids), folds)
@@ -836,10 +838,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                              "table is built from it, excluding the drafts this "
                              "build will serve.")
     parser.add_argument("--deck-fit",
-                        help="a prebuilt deck_fit.py table instead of --game-data. "
-                             "One of the two is required: without a colour table "
-                             "the colour term contributes nothing and what ships "
-                             "is a different model from the one validated.")
+                        help="legacy compatibility flag. Fold-isolated builds "
+                             "reject a shared fit; pass --game-data so every fold "
+                             "derives its own colour statistics.")
     return parser.parse_args(argv)
 
 
