@@ -5,6 +5,7 @@ on:
   pull_request:
   push:
     branches: [main]
+    paths-ignore: ['.github/model-rollout-request.json']
 
 permissions:
   contents: read

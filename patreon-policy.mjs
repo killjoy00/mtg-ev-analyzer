@@ -2,8 +2,8 @@
 // A supporter tier never implies premium access, regardless of payment amount.
 export const PATREON_POLICY = Object.freeze({
   enabled: false,
-  campaignId: '',
-  premiumTierIds: [],
+  campaignId: '16808916',
+  premiumTierIds: ['29631843'], // Elite Member; Supporter 29631835 is excluded.
   supportUrl: 'https://www.patreon.com/c/PackOne',
 });
 
