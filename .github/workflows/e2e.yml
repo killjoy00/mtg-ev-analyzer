@@ -39,6 +39,8 @@ jobs:
           curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ -o /dev/null
       - name: Run browser regression
         run: node tests/e2e.mjs
+      - name: Run set archive regression
+        run: node tests/sets-e2e.mjs
       - name: Run Daily / Set Practice regression
         run: node tests/practice-e2e.mjs
       - name: Run account practice and custom corpus regression
