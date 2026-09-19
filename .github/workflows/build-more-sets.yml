@@ -62,6 +62,38 @@ jobs:
           git fetch origin "$GITHUB_REF_NAME"
           git reset --hard "origin/$GITHUB_REF_NAME"
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      # Until this ran, a set entered Pack One only when somebody remembered to
+      # edit data/import-queue.json by hand. Nothing watched for a release, so a
+      # newly published environment could sit unimported indefinitely - which is
+      # exactly what had happened. Discovery is committed rather than consumed
+      # in place so the queue stays a reviewable record of what was admitted.
+      - name: Queue newly released environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/refresh_import_queue.py
+          if git diff --quiet -- data/import-queue.json; then
+            echo 'No new environments to queue.'
+            exit 0
+          fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- data/import-queue.json
+          git commit -m 'Queue newly released 17Lands environments [data-generated]'
+          for attempt in 1 2 3; do
+            if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
+              exit 0
+            fi
+            git rebase --abort >/dev/null 2>&1 || true
+            sleep $((attempt * 5))
+          done
+          echo 'Could not publish the refreshed import queue.' >&2
+          exit 1
+
       - name: Route catalog ownership
         id: route
         env:
@@ -74,23 +106,46 @@ jobs:
 
           read -r pending cube_live < <(python - <<'PY'
           import json
+          import sys
           from pathlib import Path
+
+          sys.path.insert(0, 'scripts')
+          from set_policy import supported_set
+
+          # Pending is counted here from the queue and the catalog directly.
+          # Reading it out of data/status.json meant trusting a file the audit
+          # rewrites, and the audit counted retired environments as pending -
+          # so the router would dispatch an import for a set the importer
+          # refuses to load, and the run would die on the queue.
+          queue_path, catalog_path = Path('data/import-queue.json'), Path('data/catalog.json')
+          queued = [
+              str(code).upper()
+              for code in (json.loads(queue_path.read_text()).get('sets') or [])
+              if supported_set(code)
+          ] if queue_path.exists() else []
+          catalog = json.loads(catalog_path.read_text()) if catalog_path.exists() else {}
+          live_codes = {
+              str(item.get('id') or '').upper()
+              for item in (catalog.get('sets') or [])
+              if item.get('id') and not item.get('is_fixture')
+          }
+          pending = sum(1 for code in queued if code not in live_codes)
 
           status_path = Path('data/status.json')
           if status_path.exists():
               status = json.loads(status_path.read_text())
-              pending = int((status.get('normal_queue_counts') or {}).get('pending') or 0)
               cube_live = any(
                   item.get('id') == 'powered-cube' and item.get('status') == 'live'
                   for item in status.get('special_modes', [])
               )
           else:
-              pending = 1
+              pending = max(pending, 1)
               cube_live = False
 
           print(pending, 1 if cube_live else 0)
           PY
           )
+          echo "Queue reports ${pending} environment(s) pending import."
 
           if [[ "$cube_live" != '1' ]]; then
             echo "Powered Cube is not live; backlog will not enter the shared catalog lock."

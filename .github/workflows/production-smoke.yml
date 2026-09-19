@@ -17,7 +17,9 @@ jobs:
   production-contract:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    # The corpus aggregate below may retry a cold compute three times at ninety
+    # seconds, which does not fit in the five minutes this job used to take.
+    timeout-minutes: 12
     env:
       PACKONE_ORIGIN: https://packone.pro
       REPLAY_ORIGIN: https://data.packone.pro
@@ -31,6 +33,19 @@ jobs:
             [pack1api]="https://br-orange-feather-ayps8kep-pack1api.compute.c-5.us-east-2.aws.neon.tech"
             [pack1growth]="https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech"
             [draftrunapi]="https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech"
+          )
+
+          # draftrunapi's full /health aggregates every archived puzzle row, so
+          # it answers in seconds warm and can pass twenty on a cold compute.
+          # Asking it here only proved how long a scan takes: the check failed
+          # on a healthy production release and passed on the next three pushes
+          # unchanged. The marker below carries the same liveness, CORS and
+          # release-commit contract in under a second; the corpus aggregate is
+          # then checked on its own, with a timeout that matches the query.
+          declare -A health_paths=(
+            [pack1api]="/health"
+            [pack1growth]="/health"
+            [draftrunapi]="/health?quick=1"
           )
 
           header_value() {
@@ -95,7 +110,7 @@ jobs:
             get_headers="$(mktemp)"
             get_body="$(mktemp)"
             get_status="$(curl --silent --show-error --max-time 20 -o "$get_body" -D "$get_headers" -w '%{http_code}' \
-              "$base/health" -H "Origin: $PACKONE_ORIGIN")"
+              "$base${health_paths[$name]}" -H "Origin: $PACKONE_ORIGIN")"
 
             if [ "$get_status" != "200" ]; then
               echo "$name health returned HTTP $get_status, expected 200"
@@ -118,3 +133,49 @@ jobs:
 
             echo "$name: preflight + GET contract OK"
           done
+
+      - name: Verify the served Draft Run corpus is complete
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # The contract step above deliberately asks draftrunapi for the quick
+          # marker, which says nothing about the corpus. This is where the
+          # aggregate is actually read: it returns 503 on an unrated puzzle, a
+          # catalog set missing from the pool, fewer than four regular sets, or
+          # a corpus version the served catalog does not carry. The previous
+          # step has already woken the compute, so this runs warm.
+          base='https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech'
+          body="$(mktemp)"
+          status='000'
+          for attempt in 1 2 3; do
+            status="$(curl --silent --show-error --max-time 90 -o "$body" -w '%{http_code}' \
+              "$base/health" -H "Origin: $PACKONE_ORIGIN" || echo '000')"
+            [ "$status" = '200' ] && break
+            echo "draft-run corpus health attempt ${attempt}/3 returned HTTP ${status}"
+            sleep $((attempt * 5))
+          done
+
+          if [ "$status" != '200' ]; then
+            echo "draft-run corpus health returned HTTP $status, expected 200"
+            cat "$body"
+            exit 1
+          fi
+
+          python - "$body" <<'PY'
+          import json, sys
+          payload = json.load(open(sys.argv[1]))
+          if not payload.get('ok'):
+              raise SystemExit(f'draft-run corpus health is not ok: {json.dumps(payload)[:800]}')
+          for field in ('unrated_puzzles', 'missing_sets'):
+              if payload.get(field):
+                  raise SystemExit(f'draft-run corpus reports {field}={payload[field]!r}')
+          if not payload.get('puzzles'):
+              raise SystemExit('draft-run corpus reports no serving puzzles')
+          print(
+              'draft-run corpus OK: '
+              f"corpus={payload.get('corpus_version')} scoring={payload.get('scoring_version')} "
+              f"puzzles={payload.get('puzzles')} sets={payload.get('sets')} "
+              f"regular={payload.get('regular_sets')}"
+          )
+          PY

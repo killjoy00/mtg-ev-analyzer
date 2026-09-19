@@ -319,7 +319,17 @@ def current_failures(path: Optional[Path]) -> dict[str, str]:
 
 def queue_status(catalog: dict, import_report: Optional[Path], prior_status: dict) -> list[dict]:
     queue = read_json(QUEUE_PATH, {}) or {}
-    codes = [str(code).upper() for code in queue.get("sets") or []]
+    # A retired environment can never become live, so counting it as pending
+    # reports work that will never be done - and the router dispatches an
+    # import on that count. The importer itself refuses the same code, so the
+    # run it dispatches dies on the queue before it builds anything.
+    try:
+        from .set_policy import supported_set
+    except ImportError:
+        from set_policy import supported_set
+    codes = [
+        str(code).upper() for code in queue.get("sets") or [] if supported_set(code)
+    ]
     live = {str(item.get("id") or "").upper() for item in catalog.get("sets") or [] if item.get("id")}
     failures = current_failures(import_report)
     prior_by_code = {
