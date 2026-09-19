@@ -95,22 +95,3 @@ export async function renderUsers(root,request) {
   }
   await load();
 }
-+(Number(item.currently_entitled_amount_cents)/100).toFixed(2)):'Free'}</td><td>${esc(dateTime(item.last_synced_at))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No external membership provider is connected.</p>'}
-        </section>
-        <section class="user-section"><h3>Access</h3>
-          ${entitlements.length?`<div class="scroll"><table><thead><tr><th>Capability</th><th>Provider</th><th>Status</th><th>Granted</th><th>Expires</th></tr></thead><tbody>${entitlements.map(item=>`<tr><td>${esc(capabilityLabel(item.capability))}</td><td>${esc(item.provider)}</td><td>${item.active?badge('Active','live'):badge('Inactive','blocked')}</td><td>${esc(dateOnly(item.granted_at))}</td><td>${esc(dateOnly(item.expires_at))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No paid entitlements. Regular practice is included with the account.</p>'}
-        </section>
-        <section class="user-section"><h3>Recent runs</h3>
-          ${runs.length?`<div class="scroll"><table class="user-runs"><thead><tr><th>When</th><th>Type</th><th>Environment</th><th>Progress</th><th>Score</th></tr></thead><tbody>${runs.map(run=>`<tr><td>${esc(dateTime(run.updated_at))}</td><td>${esc(run.run_type)}</td><td>${esc(run.environment==='powered-cube'?'Powered Cube':'Regular')}</td><td>${fmt(run.answered)}/${fmt(run.total)}</td><td>${fmt(run.score)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No Draft Runs linked to this account yet.</p>'}
-        </section>
-        <section class="user-section"><h3>Recent activity</h3>
-          ${events.length?`<div class="scroll"><table class="user-events"><thead><tr><th>When</th><th>Event</th><th>Context</th></tr></thead><tbody>${events.map(event=>`<tr><td>${esc(dateTime(event.created_at))}</td><td>${esc(event.event_name)}</td><td><small>${props(event.event_props)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No recent tracked activity for this account.</p>'}
-        </section>`;
-      document.querySelector('#user-detail-close').onclick=()=>dialog.close();
-    } catch(error) {
-      body.innerHTML=`<div class="user-detail-heading"><h2>User unavailable</h2><button type="button" class="secondary" id="user-detail-close">Close</button></div><p class="error">${esc(error.message)}</p>`;
-      document.querySelector('#user-detail-close').onclick=()=>dialog.close();
-    }
-  }
-  await load();
-}
