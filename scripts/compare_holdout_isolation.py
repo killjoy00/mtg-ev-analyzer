@@ -66,6 +66,21 @@ def grade_bucket(value):
     return 0
 
 
+def difficulty(probabilities):
+    ordered = sorted(probabilities.values(), reverse=True)
+    if len(ordered) < 2 or ordered[0] <= 0:
+        return 0
+    return round(100 * ordered[1] / ordered[0])
+
+
+def difficulty_band(value):
+    if value < 50:
+        return "easy"
+    if value < 80:
+        return "medium"
+    return "hard"
+
+
 def downloads():
     rows = json.loads((ROOT / "results/scoring-2026-09-16/downloads.json").read_text())
     return {(row["set_id"], row["kind"]): row for row in rows}
@@ -183,6 +198,8 @@ def run_set(set_id, work):
     top1_changes = 0
     grade_crossings = 0
     serving_floor_crossings = 0
+    difficulty_band_crossings = 0
+    selection_state_changes = 0
     old_hits = new_hits = 0
     old_loss = new_loss = 0.0
     old_rank_sum = new_rank_sum = 0
@@ -237,8 +254,16 @@ def run_set(set_id, work):
         new_leader = new_p[new_order[0]]
         old_implied = implied_trophy_score(old_p[historical], old_leader)
         new_implied = implied_trophy_score(new_p[historical], new_leader)
-        if (old_implied >= 20) != (new_implied >= 20):
+        floor_changed = (old_implied >= 20) != (new_implied >= 20)
+        if floor_changed:
             serving_floor_crossings += 1
+        old_difficulty = difficulty(old_p)
+        new_difficulty = difficulty(new_p)
+        band_changed = difficulty_band(old_difficulty) != difficulty_band(new_difficulty)
+        if band_changed:
+            difficulty_band_crossings += 1
+        if floor_changed or band_changed:
+            selection_state_changes += 1
 
         per_candidate_abs = []
         for card in cards:
@@ -264,6 +289,12 @@ def run_set(set_id, work):
             "old_implied_trophy_score": old_implied,
             "new_implied_trophy_score": new_implied,
             "implied_score_delta": new_implied - old_implied,
+            "old_difficulty": old_difficulty,
+            "new_difficulty": new_difficulty,
+            "difficulty_delta": new_difficulty - old_difficulty,
+            "old_difficulty_band": difficulty_band(old_difficulty),
+            "new_difficulty_band": difficulty_band(new_difficulty),
+            "selection_state_changed": floor_changed or band_changed,
             "max_candidate_score_abs_delta": max(per_candidate_abs) if per_candidate_abs else 0,
             "max_probability_abs_delta": max(abs(new_p[c] - old_p[c]) for c in cards),
         })
@@ -299,6 +330,8 @@ def run_set(set_id, work):
         "ranking_changed": ranking_movements,
         "top1_changed": top1_changes,
         "serving_floor_20_crossings": serving_floor_crossings,
+        "difficulty_band_crossings": difficulty_band_crossings,
+        "selection_state_changes": selection_state_changes,
         "grade_boundary_crossings": grade_crossings,
         "candidate_score_abs_change": {
             "median": percentile(abs_scores, .5),
@@ -334,6 +367,8 @@ def summarize(results):
 
     abs_scores = [row["abs_delta"] for row in candidate_deltas]
     implied_abs = [abs(row["implied_score_delta"]) for row in decisions]
+    difficulty_abs = [abs(row["difficulty_delta"]) for row in decisions]
+    probability_abs = [row["max_probability_abs_delta"] for row in decisions]
 
     by_stage = defaultdict(list); by_colour = defaultdict(list); by_card = defaultdict(list)
     for row in decisions:
@@ -357,6 +392,8 @@ def summarize(results):
     changed_scores = sum(row["abs_delta"] > 0 for row in candidate_deltas)
     grade_crossings = sum(result["grade_boundary_crossings"] for result in results)
     floor_crossings = sum(result["serving_floor_20_crossings"] for result in results)
+    difficulty_crossings = sum(result["difficulty_band_crossings"] for result in results)
+    selection_changes = sum(result["selection_state_changes"] for result in results)
     return {
         "schema": 1,
         "old_model": "strong-player-colour-stage-v3",
@@ -396,6 +433,25 @@ def summarize(results):
             "max_abs": max(implied_abs, default=0),
             "serving_floor_20_crossings": floor_crossings,
             "serving_floor_20_crossing_pct": floor_crossings / n if n else 0,
+        },
+        "probability_change": {
+            "median_decision_max_abs": percentile(probability_abs, .5),
+            "p90_decision_max_abs": percentile(probability_abs, .9),
+            "p95_decision_max_abs": percentile(probability_abs, .95),
+            "max_decision_max_abs": max(probability_abs, default=0),
+        },
+        "selection_movement": {
+            "difficulty_band_crossings": difficulty_crossings,
+            "difficulty_band_crossing_pct": difficulty_crossings / n if n else 0,
+            "difficulty_abs_change": {
+                "median": percentile(difficulty_abs, .5),
+                "p90": percentile(difficulty_abs, .9),
+                "p95": percentile(difficulty_abs, .95),
+                "max": max(difficulty_abs, default=0),
+            },
+            "serving_floor_20_crossings": floor_crossings,
+            "selection_relevant_state_changes": selection_changes,
+            "selection_relevant_state_change_pct": selection_changes / n if n else 0,
         },
         "largest_change_groups": {
             "sets": sorted([
