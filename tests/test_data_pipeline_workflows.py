@@ -7,9 +7,38 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 BACKLOG = ROOT / ".github" / "workflows" / "build-more-sets.yml"
 CUBE = ROOT / ".github" / "workflows" / "build-powered-cube.yml"
+V4_REBUILD = ROOT / ".github" / "workflows" / "rebuild-v4-draft-run-corpus.yml"
 
 
 class DataPipelineWorkflowTests(unittest.TestCase):
+    def test_v4_rebuild_is_atomic_and_refuses_mixed_models(self):
+        text = V4_REBUILD.read_text()
+        self.assertIn("strong-player-colour-stage-v4", text)
+        self.assertIn("elite-trophy-colour-stage-v8", text)
+        self.assertIn("scripts/import_sets.py", text)
+        self.assertIn("scripts/backfill_legacy_sets.py", text)
+        self.assertIn("scripts/build_powered_cube_v3.py", text)
+        self.assertIn("scripts/build_verified_trophy_corpus.py", text)
+        self.assertIn("bash scripts/r2_replay_shards.sh upload", text)
+        self.assertIn("gh pr create", text)
+        self.assertNotIn("git push origin HEAD:main", text)
+
+        verify = text.index("Verify complete v4 provenance")
+        corpus = text.index("Build the separately versioned v8 corpus")
+        tests = text.index("Validate the complete candidate")
+        upload = text.index("Publish versioned v4 replay shards")
+        commit = text.index("Commit the reviewed candidate to a rollout branch")
+        self.assertLess(verify, corpus)
+        self.assertLess(corpus, tests)
+        self.assertLess(tests, upload)
+        self.assertLess(upload, commit)
+
+    def test_replay_storage_keeps_v3_and_v4_separate(self):
+        text = (ROOT / "scripts" / "r2_replay_shards.sh").read_text()
+        self.assertIn('strong-player-colour-stage-v3', text)
+        self.assertIn('replay-models/$model_version/data', text)
+        self.assertIn('s3://${R2_BUCKET}/${replay_prefix}', text)
+
     def test_backlog_routes_before_shared_lock(self):
         text = BACKLOG.read_text()
         route = text.index("  route:")
