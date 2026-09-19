@@ -9,11 +9,12 @@ import {TRADITIONAL_COMPONENT_VERSION,CUBE_TRADITIONAL_COMPONENT_VERSION,FROZEN_
 import {insertTrophyBatch} from '../worker/trophy-import.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
+import {effectiveCardMetadata} from '../card-metadata.mjs';
 const hash=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
 const files=root=>fs.readdirSync(root,{withFileTypes:true}).flatMap(e=>e.isDirectory()?files(path.join(root,e.name)):[path.join(root,e.name)]);
 async function* records(file){const reader=readline.createInterface({input:fs.createReadStream(file).pipe(zlib.createGunzip()),crlfDelay:Infinity});for await(const line of reader)if(line.trim())yield JSON.parse(line);}
-export function sourceQuality(report,sid,{puzzles,usable,metadataComplete,imagesComplete}) {
+export function sourceQuality(report,sid,{puzzles,usable,metadataComplete,storedMetadataComplete=metadataComplete,imagesComplete}) {
  const s=report.sets[sid];if(!s)throw Error('Missing per-set evidence');
  const checks=sid==='powered-cube'?['all_picks','serving_picks','quality','snapshot']:['all_picks','late_picks','serving_picks','serving_late_picks','quality'];
  const gates=Object.fromEntries(checks.map(k=>[k,s[k]?.pass===true]));
@@ -21,6 +22,7 @@ export function sourceQuality(report,sid,{puzzles,usable,metadataComplete,images
   frozen_model_parity:s.parity_picks>=200,source_accounting:puzzles===s.quality?.usable_traditional_puzzles,
   metadata_complete:metadataComplete===puzzles,images_complete:imagesComplete===puzzles,usable_inventory:usable>=200});
  return {ready:Object.values(gates).every(Boolean),gates,usable_puzzles:usable,puzzles,
+  metadata:{stored_complete_puzzles:storedMetadataComplete,resolved_complete_puzzles:metadataComplete,repaired_puzzles:metadataComplete-storedMetadataComplete,repair_source:'corpus/card-metadata-repairs.json'},
   thresholds:report.thresholds,scoring_checks:Object.fromEntries(checks.filter(k=>k.includes('picks')).map(k=>[k,{gates:s[k].gates,intervals:s[k].intervals_traditional_minus_premier,difficulty_total_variation:s[k].difficulty_total_variation}])),
   parity_picks:s.parity_picks,premier_source_audit:s.premier_source_audit};
 }
@@ -45,7 +47,7 @@ export async function validateComponents(root) {
    const q=d.qualified??true;qualified+=Number(q);included+=Number(d.status==='included');ledger.set(d.source_draft_hash,{...d,qualified:q});
   }
   if(ledger.size!==s.traditional_cohort.trophy_outcomes['3-0']||qualified!==s.traditional_cohort.qualified_trophies||included*width!==manifest.puzzles)throw Error('Traditional trophy accounting mismatch');
-  const groups=new Map(),ids=new Set();let puzzles=0,usable=0,metadataComplete=0,imagesComplete=0;
+  const groups=new Map(),ids=new Set();let puzzles=0,usable=0,metadataComplete=0,storedMetadataComplete=0,imagesComplete=0;
   for await(const p of records(path.join(dir,'puzzles.jsonl.gz'))) {
    const source=ledger.get(p.source_draft_hash);
    if(!validateDraftRunPuzzle(p,component)||p.set_id!==sid||ids.has(p.puzzle_id)||source?.status!=='included'||source.source_fingerprint!==p.source_fingerprint||p.player_win_rate_bucket<s.traditional_cohort.cutoff||Math.abs(p.candidates.reduce((n,c)=>n+c.model_probability,0)-1)>.00005)throw Error('Invalid component puzzle or support evidence');
@@ -53,10 +55,10 @@ export async function validateComponents(root) {
    if(p.pick_number!==prior.length+1||JSON.stringify(p.prior_picks.map(c=>c.name))!==JSON.stringify(prior))throw Error('Broken Traditional trajectory');
    prior.push(p.candidates.find(c=>c.id===p.historical_pick_id).name);groups.set(p.source_draft_hash,prior);
    puzzles++;usable+=Number(interestingDraftRunPuzzle(p));
-   const cards=[...p.candidates,...p.prior_picks];metadataComplete+=Number(cards.every(c=>c.name&&c.rarity&&c.type_line));imagesComplete+=Number(cards.every(c=>c.image_url?.startsWith('https://')));
+   const cards=[...p.candidates,...p.prior_picks];storedMetadataComplete+=Number(cards.every(c=>c.name&&c.rarity&&c.type_line));metadataComplete+=Number(cards.every(c=>c.name&&c.rarity&&effectiveCardMetadata(c).type_line));imagesComplete+=Number(cards.every(c=>c.image_url?.startsWith('https://')));
   }
   if(puzzles!==manifest.puzzles||groups.size!==included||[...groups.values()].some(p=>p.length!==(cube?7:8)))throw Error('Incomplete first-eight source accounting');
-  const health=sourceQuality(report,sid,{puzzles,usable,metadataComplete,imagesComplete});
+  const health=sourceQuality(report,sid,{puzzles,usable,metadataComplete,storedMetadataComplete,imagesComplete});
   prepared.push({sid,dir,ledger,health,manifest:{...manifest,model_source_corpus:parent,research_report_sha256:hash(reports[0]),qualified_trophies:qualified,included_trophies:included,excluded_trophies:ledger.size-included,source_trophies:ledger.size}});
  }
  if(prepared.length!==(cube?1:4)||new Set(prepared.map(s=>s.sid)).size!==(cube?1:4))throw Error('All four candidate artifacts required');
