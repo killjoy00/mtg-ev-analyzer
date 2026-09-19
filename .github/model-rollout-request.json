@@ -1,5 +1,7 @@
 {
-  "operation": "patreon-discovery",
-  "request_id": "patreon-campaign-discovery-20260919",
-  "reason": "Read public campaign and tier IDs using the existing operational credential. Report secret availability only as booleans. Do not change Patreon configuration, billing, memberships, or Pack One entitlement activation."
+  "operation": "deploy",
+  "request_id": "tournament-release-development-20260919",
+  "reason": "Deploy reviewed release 662c6c9 after PR155, PR156, PR157 and PR158 gates passed. Includes serving optimization, Phase 2 component compatibility, exact-tier Patreon adapter disabled pending mapping/canary, and migration 0026 already applied.",
+  "target": "development",
+  "commit": "662c6c9adff21565df3ad953bbceccd87c808e95"
 }
