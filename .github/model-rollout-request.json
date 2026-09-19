@@ -1,8 +1,8 @@
 {
   "operation": "puzzle-components",
-  "request_id": "regular-traditional-stage-development-20260919",
-  "reason": "Stage only the previously validated BLB/DFT/FIN Traditional trophy components; keep HOB blocked. Apply additive serving-policy snapshots and verify the new >=20 implied-score filter against real Daily/custom coverage. Publication is a separate operation.",
+  "request_id": "phase2-stage-development-20260919",
+  "reason": "Stage the 22 independently verified Phase 2 Traditional sources from PR155 in development. Preserve fixed Dailies, Premier corpus, retained Cube component, and Candidate-only SIR. Includes reviewed additive migrations 0024-0025.",
   "target": "development",
   "action": "stage",
-  "source": "regular-study"
+  "source": "regular-phase2"
 }
