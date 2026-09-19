@@ -1,7 +1,7 @@
 {
   "operation": "puzzle-components",
-  "request_id": "regular-traditional-stage-development-20260919",
-  "reason": "Stage only the previously validated BLB/DFT/FIN Traditional trophy components; keep HOB blocked. Apply additive serving-policy snapshots and verify the new >=20 implied-score filter against real Daily/custom coverage. Publication is a separate operation.",
+  "request_id": "regular-traditional-stage-development-performance-20260919",
+  "reason": "Reverify the unchanged Candidate inventory with additive serving lookup index 0024, refreshed source statistics, and deterministic query optimization before production staging.",
   "target": "development",
   "action": "stage",
   "source": "regular-study"

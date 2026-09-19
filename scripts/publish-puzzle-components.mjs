@@ -1,5 +1,6 @@
 // Offline administrative release only. No new public API accepts workflow identity.
 import {corpusDatabase} from './neon-corpus-db.mjs';
+import {refreshSourceStatistics} from '../worker/serving-statistics.mjs';
 import {validateComponents} from './load-traditional-components.mjs';
 import {verifyComponents} from './verify-puzzle-components.mjs';
 import {verifyCorpusPublicationToken,CORPUS_PUBLICATION_AUDIENCE} from '../worker/trophy-import-auth.mjs';
@@ -20,3 +21,4 @@ for(const s of prepared.filter(s=>s.health.ready)) {
  console.log(JSON.stringify(result));
 }
 await verifyComponents(query,prepared,'Live');
+await refreshSourceStatistics(query);

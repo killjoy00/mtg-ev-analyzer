@@ -99,7 +99,7 @@ jobs:
         run: |
           set -euo pipefail
           connection=$(cat "$RUNNER_TEMP/target.connection")
-          for migration in migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql migrations/0023_serving_policy_snapshots.sql; do
+          for migration in migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql migrations/0023_serving_policy_snapshots.sql migrations/0024_serving_quality_lookup.sql; do
             psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
           done
           node scripts/load-source-exclusions.mjs "$RUNNER_TEMP/target.connection" results/rebuild-2026-09-18/frozen-premier-outcomes.json

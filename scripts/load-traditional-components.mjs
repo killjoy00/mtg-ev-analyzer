@@ -8,6 +8,7 @@ import {DRAFT_RUN_CORPUS_VERSION as parent,validateDraftRunPuzzle,interestingDra
 import {TRADITIONAL_COMPONENT_VERSION,CUBE_TRADITIONAL_COMPONENT_VERSION,FROZEN_CONTEXT_MODEL_VERSION as model,TRADITIONAL_GATE_VERSION as gate} from '../corpus-components.mjs';
 import {insertTrophyBatch} from '../worker/trophy-import.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
+import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
 const hash=file=>createHash('sha256').update(fs.readFileSync(file)).digest('hex');
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
 const files=root=>fs.readdirSync(root,{withFileTypes:true}).flatMap(e=>e.isDirectory()?files(path.join(root,e.name)):[path.join(root,e.name)]);
@@ -92,6 +93,7 @@ export async function importComponents(query,prepared) {
   await query("INSERT INTO corpus_sources(set_id,event_type,archive_url,archive_available,archive_etag,archive_last_modified,import_status) VALUES($1,'TradDraft',$2,true,$3,$4,'complete') ON CONFLICT(set_id,event_type) DO UPDATE SET import_status='complete',archive_url=EXCLUDED.archive_url,archive_etag=EXCLUDED.archive_etag,archive_last_modified=EXCLUDED.archive_last_modified",[s.sid,a.url,a.etag,a.last_modified]);
   console.log(JSON.stringify({set:s.sid,status:'Candidate',ready:s.health.ready,puzzles:s.manifest.puzzles,usable:s.health.usable_puzzles}));
  }
+ await refreshServingStatistics(query);
 }
 const sorted=value=>Array.isArray(value)?value.map(sorted):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(k=>[k,sorted(value[k])])):value;
 const hashObject=value=>createHash('sha256').update(JSON.stringify(sorted(value))).digest('hex');
