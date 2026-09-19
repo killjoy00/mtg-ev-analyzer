@@ -5,8 +5,8 @@ let generation = 0;
 let installed = false;
 let lastDay;
 const games = [
-  { key: 'draftRun', environment: 'mixed', title: 'Daily Draft Run', description: 'Eight decisions from real trophy drafts.', href: '?game=draft-run&daily=1' },
-  { key: 'cube', environment: 'powered-cube', title: 'Daily Powered Cube', description: 'Eight decisions. Magic’s most powerful cards.', href: '?game=draft-run&set=powered-cube&daily=1' },
+  { key: 'draftRun', number: '01', label: 'The daily challenge', environment: 'mixed', title: 'Daily Draft Run', description: 'Eight decisions from real trophy drafts.', href: '?game=draft-run&daily=1' },
+  { key: 'cube', number: '02', label: 'The powered table', environment: 'powered-cube', title: 'Daily Powered Cube', description: 'Eight decisions. Magic’s most powerful cards.', href: '?game=draft-run&set=powered-cube&daily=1' },
 ];
 
 export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = false) {
@@ -15,11 +15,11 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
   const capabilities=profile?.capabilities||[];
   const ordered = [...games].sort((a, b) => Number(status[a.key].complete) - Number(status[b.key].complete));
   return `<section class="daily-home" data-daily-home data-completed="${status.completed}">
-    <header class="daily-home-heading"><p class="eyebrow">Pack One</p><h1>Eight picks. Your call.</h1><p>Match a trophy drafter. See how your choices compare.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
+    <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Match a trophy drafter. See how your choices compare.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
     <div class="daily-home-games">${ordered.map(game => {
       const result = status[game.key];
       return `<article class="daily-home-game ${result.complete ? 'is-complete' : 'is-unplayed'}" data-environment="${game.environment}">
-        <div><h2>${game.title}</h2><p>${result.complete ? `Complete · <strong>${result.score}/100</strong>` : game.description}</p></div>
+        <span class="daily-home-number" aria-hidden="true">${game.number}</span><div class="daily-home-game-copy"><p class="daily-home-label">${game.label}</p><h2>${game.title}</h2><p>${result.complete ? `Complete · <strong>${result.score}/100</strong>` : game.description}</p></div>
         <a class="button ${result.complete ? 'secondary' : 'primary'}" href="${game.href}">${result.complete ? 'View result' : 'Play now'}</a>
       </article>`;
     }).join('')}</div>
@@ -33,7 +33,7 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
 export function renderDailyHome(profile = null, unavailable = false) {
   if (!document.querySelector('[data-daily-home-style]')) {
     const link = document.createElement('link'); link.rel = 'stylesheet';
-    link.href = './daily-home.css'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
+    link.href = './daily-home.css?v=2'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
   }
   lastDay = easternDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, unavailable);
