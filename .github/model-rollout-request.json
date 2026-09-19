@@ -1,8 +1,8 @@
 {
   "operation": "puzzle-components",
-  "request_id": "regular-traditional-stage-development-20260919",
-  "reason": "Stage only the previously validated BLB/DFT/FIN Traditional trophy components; keep HOB blocked. Apply additive serving-policy snapshots and verify the new >=20 implied-score filter against real Daily/custom coverage. Publication is a separate operation.",
-  "target": "development",
+  "request_id": "regular-traditional-stage-production-20260919",
+  "reason": "Stage the previously validated BLB/DFT/FIN Traditional components only after matching development Candidate verification. Apply additive serving-policy snapshots and verify the >=20 filter against actual Daily/custom coverage. Keep all existing puzzles, results and Dailies; publication remains separate.",
+  "target": "production",
   "action": "stage",
   "source": "regular-study"
 }
