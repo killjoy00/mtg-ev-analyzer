@@ -20,6 +20,9 @@ export function rolloutDispatch(request) {
   } else if(operation==='puzzle-components') {
     if(!['development','production'].includes(target)||!['stage','publish'].includes(action)||!['powered-cube','regular-study'].includes(source))throw Error('Invalid source release request.');
     workflow='publish-puzzle-components.yml';inputs={target,action,source};extra=['target','action','source'];
+  } else if(operation==='corpus-health') {
+    if(!['development','production'].includes(target))throw Error('Invalid health target.');
+    workflow='corpus-health.yml';inputs={target};extra=['target'];
   } else if(operation==='frozen-scoring') {
     workflow='frozen-scoring.yml';
   } else if(operation==='format-research') {

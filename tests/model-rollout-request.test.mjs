@@ -51,3 +51,9 @@ test('source release requires an explicit action and a reviewed fixed artifact g
  assert.equal(rolloutDispatch(r).workflow,'publish-puzzle-components.yml');
  for(const extra of [{source:'all'},{action:'automatic'},{target:'arbitrary'},{artifact_id:123}])assert.throws(()=>rolloutDispatch({...r,...extra}));
 });
+
+test('corpus health allows only explicit known targets and no source mutations',()=>{
+ const r={operation:'corpus-health',request_id:'health-1',reason:'Full current corpus verification',target:'production'};
+ assert.equal(rolloutDispatch(r).workflow,'corpus-health.yml');
+ assert.throws(()=>rolloutDispatch({...r,action:'publish'}));assert.throws(()=>rolloutDispatch({...r,target:'unknown'}));
+});

@@ -1,7 +1,6 @@
 {
-  "operation": "deploy",
-  "request_id": "cube-runtime-production-20260918",
-  "reason": "Development deployment 35407719445 passed complete Daily/revision/coverage smoke checks. Promote the same reviewed 9cc26f8 runtime to production, enabling registered source components with the unchanged Premier v3 grader. Production source publication remains separately audited.",
-  "target": "production",
-  "commit": "9cc26f8b9fbf09e8a8a47ac310b1ec34352ce332"
+  "operation": "corpus-health",
+  "request_id": "full-current-corpus-health-production-20260918",
+  "reason": "Reconcile the original charter with full retained production corpus verification: exact frozen source evidence, trajectory inheritance, source exclusions, coverage, metadata/images and frozen calibrated probability diagnostics. Persist health reports; never change Live status or historical payloads.",
+  "target": "production"
 }
