@@ -41,6 +41,6 @@ test('Elite set picker stays discoverable before any Daily completion',()=>{
  assert.match(dailyHomeMarkup(p,day),/Powered Cube Practice/);
 });
 
-test('Method keeps one link directory',()=>{
- const html=fs.readFileSync('methodology/index.html','utf8');assert.equal((html.match(/class="method-directory"/g)||[]).length,1);
+test('Method has no secondary link directory',()=>{
+ const html=fs.readFileSync('methodology/index.html','utf8');assert.equal((html.match(/class="method-directory"/g)||[]).length,0);
 });
