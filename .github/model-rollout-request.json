@@ -1,5 +1,5 @@
 {
-  "operation": "production-browser",
-  "request_id": "tournament-live-browser-20260919",
-  "reason": "Verify the published tournament UI against actual production APIs at release 4df2c41: both unranked Daily completions, images, card/pool proportions, mobile/desktop overflow, completion states and browser errors. Save screenshots and latency measurements."
+  "operation": "patreon-discovery",
+  "request_id": "verify-saved-webhook-20260919",
+  "reason": "Confirm saved webhook secret availability and published tier mapping before the authorized Elite membership test."
 }
