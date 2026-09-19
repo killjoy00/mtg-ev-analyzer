@@ -269,8 +269,9 @@ def collect_isolated(path, training_ids, output_ids, header, folds=5):
             continue
         if did in training_ids:
             training_examples.append((did, example)); picks += 1
-            if did not in output_ids:
-                colour_examples.append((did, example))
+            # Retain observations until the per-fold builder removes held IDs.
+            # A served draft can train other folds, but never its own grader.
+            colour_examples.append((did, example))
         if did in output_ids and example.raw_pack_number == 0 and example.raw_pick_number <= 11:
             output[did].append(example)
 
