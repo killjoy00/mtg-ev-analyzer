@@ -5,6 +5,7 @@ import {verifyServingStatistics} from '../worker/serving-statistics.mjs';
 const result=await query(`SELECT
   (SELECT count(*)=2 FROM information_schema.columns WHERE table_name IN ('draft_run_sessions','draft_run_schedules') AND column_name='serving_policy_version') serving_policy,
   to_regclass('corpus_source_exclusions') IS NOT NULL source_eligibility,
+  EXISTS(SELECT 1 FROM pg_constraint WHERE conname='draft_run_source_evidence_required' AND pg_get_constraintdef(oid) LIKE '%traditional-premier-v3-phase2-v1%') traditional_phase2_components,
   EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='corpus_status_events' AND column_name='admin_identity') corpus_admin_identity,
   to_regclass('corpus_components') IS NOT NULL source_components,
   to_regclass('draft_run_source_measurements') IS NOT NULL source_measurements,
@@ -22,6 +23,6 @@ const result=await query(`SELECT
   (SELECT count(*)=2 FROM pg_constraint WHERE conname IN ('draft_run_sessions_puzzle_ids_check','draft_run_schedules_puzzle_ids_check')
     AND pg_get_constraintdef(oid) ~ '\\m8\\M' AND pg_get_constraintdef(oid) ~ '\\m10\\M') lengths,
   position('jsonb_array_length(s.puzzle_ids)' in pg_get_viewdef('draft_run_measurements'::regclass))>0 measurements`);
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0023 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0024 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');
