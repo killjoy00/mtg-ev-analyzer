@@ -1,7 +1,5 @@
 {
-  "operation": "deploy",
-  "target": "production",
-  "commit": "4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5",
-  "request_id": "patreon-ad-free-production-20260919",
-  "reason": "Development acceptance 35463356101 passed all three complete Daily flows for the exact PR163 revision. Promote both-tier advertising suppression while Google ads remain disabled; preserve model, schema and historical scores."
+  "operation": "rebuild-v4",
+  "request_id": "issue-164-v4-rebuild-20260919",
+  "reason": "Issue #164 holdout-isolation correction is merged and fully green. Rebuild every replay shard with strong-player-colour-stage-v4 and generate the separately versioned v8 baseline for review without changing live serving."
 }
