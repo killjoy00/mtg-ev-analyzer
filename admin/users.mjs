@@ -21,19 +21,22 @@ export async function renderUsers(root,request) {
   }
   function access(user) {
     if(user.banned)return badge('Banned','blocked');
-    if(user.active_entitlements>0)return [badge('Paid','live'),...(user.capabilities||[]).map(value=>badge(capabilityLabel(value)))].join(' ');
-    return badge('Free account');
+    const items=[];
+    if(user.patreon_connected)items.push(badge('Patreon','candidate'));
+    if(user.active_entitlements>0)items.push(badge('Paid','live'),...(user.capabilities||[]).map(value=>badge(capabilityLabel(value))));
+    if(!items.length)items.push(badge('Free account'));
+    return items.join(' ');
   }
   function render() {
     const s=data.summary||{};
     root.innerHTML=`<section class="users-page">
       <div class="users-heading"><div><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div><button type="button" class="secondary" id="users-signout">Sign out</button></div>
       <div class="cards user-cards">
-        ${[['Accounts',s.total],['New · 30d',s.new_30d],['Active · 30d',s.active_30d],['Paid',s.paid],['Admins',s.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
+        ${[['Accounts',s.total],['New · 30d',s.new_30d],['Active · 30d',s.active_30d],['Patreon',s.patreon],['Paid',s.paid],['Admins',s.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
       </div>
       <form id="user-filters" class="filters user-filters">
         <label>Find a user<input type="search" name="search" value="${esc(filters.search)}" placeholder="Name or email"></label>
-        <label>Status<select name="status"><option value="all" ${filters.status==='all'?'selected':''}>All accounts</option><option value="paid" ${filters.status==='paid'?'selected':''}>Paid</option><option value="admin" ${filters.status==='admin'?'selected':''}>Admins</option></select></label>
+        <label>Status<select name="status"><option value="all" ${filters.status==='all'?'selected':''}>All accounts</option><option value="paid" ${filters.status==='paid'?'selected':''}>Paid</option><option value="patreon" ${filters.status==='patreon'?'selected':''}>Patreon connected</option><option value="admin" ${filters.status==='admin'?'selected':''}>Admins</option></select></label>
         <button>Refresh</button>
       </form>
       <p class="muted users-count">Showing ${fmt(data.users.length)} of ${fmt(data.total_matching)} matching accounts${data.truncated?' · refine the search to see more':''}.</p>
@@ -58,7 +61,7 @@ export async function renderUsers(root,request) {
     body.innerHTML='<p>Loading user…</p>';dialog.showModal();
     try {
       const detail=await request('/v1/admin/users/'+encodeURIComponent(id)),u=detail.user,stats=detail.stats;
-      const entitlements=detail.entitlements||[],runs=detail.recent_runs||[],events=detail.recent_events||[];
+      const entitlements=detail.entitlements||[],providers=detail.providers||[],runs=detail.recent_runs||[],events=detail.recent_events||[];
       body.innerHTML=`<div class="user-detail-heading"><div><p class="muted">Authenticated account</p><h2>${esc(u.name||'Unnamed account')}</h2><p>${esc(u.email||'No email')}</p></div><button type="button" class="secondary" id="user-detail-close">Close</button></div>
         <dl class="user-metrics">
           <dt>Email verified</dt><dd>${u.email_verified?'Yes':'No'}</dd>
@@ -72,6 +75,25 @@ export async function renderUsers(root,request) {
         <div class="cards user-detail-cards">
           ${[['Runs',stats.runs],['Completed',stats.completed_runs],['Dailies',stats.dailies],['Practice',stats.practice_runs],['Avg. score',stats.average_score],['Best',stats.best_score]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
         </div>
+        <section class="user-section"><h3>Connected providers</h3>
+          ${providers.length?`<div class="scroll"><table><thead><tr><th>Provider</th><th>Membership</th><th>Entitled amount</th><th>Last synced</th></tr></thead><tbody>${providers.map(item=>`<tr><td>${esc(item.provider)}</td><td>${esc(item.membership_status||'Connected')}</td><td>${item.is_gifted?'Gifted':item.is_free_trial?'Free trial':item.currently_entitled_amount_cents?('`<div class="scroll"><table><thead><tr><th>Capability</th><th>Provider</th><th>Status</th><th>Granted</th><th>Expires</th></tr></thead><tbody>${entitlements.map(item=>`<tr><td>${esc(capabilityLabel(item.capability))}</td><td>${esc(item.provider)}</td><td>${item.active?badge('Active','live'):badge('Inactive','blocked')}</td><td>${esc(dateOnly(item.granted_at))}</td><td>${esc(dateOnly(item.expires_at))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No paid entitlements. Regular practice is included with the account.</p>'}
+        </section>
+        <section class="user-section"><h3>Recent runs</h3>
+          ${runs.length?`<div class="scroll"><table class="user-runs"><thead><tr><th>When</th><th>Type</th><th>Environment</th><th>Progress</th><th>Score</th></tr></thead><tbody>${runs.map(run=>`<tr><td>${esc(dateTime(run.updated_at))}</td><td>${esc(run.run_type)}</td><td>${esc(run.environment==='powered-cube'?'Powered Cube':'Regular')}</td><td>${fmt(run.answered)}/${fmt(run.total)}</td><td>${fmt(run.score)}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No Draft Runs linked to this account yet.</p>'}
+        </section>
+        <section class="user-section"><h3>Recent activity</h3>
+          ${events.length?`<div class="scroll"><table class="user-events"><thead><tr><th>When</th><th>Event</th><th>Context</th></tr></thead><tbody>${events.map(event=>`<tr><td>${esc(dateTime(event.created_at))}</td><td>${esc(event.event_name)}</td><td><small>${props(event.event_props)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No recent tracked activity for this account.</p>'}
+        </section>`;
+      document.querySelector('#user-detail-close').onclick=()=>dialog.close();
+    } catch(error) {
+      body.innerHTML=`<div class="user-detail-heading"><h2>User unavailable</h2><button type="button" class="secondary" id="user-detail-close">Close</button></div><p class="error">${esc(error.message)}</p>`;
+      document.querySelector('#user-detail-close').onclick=()=>dialog.close();
+    }
+  }
+  await load();
+}
++(Number(item.currently_entitled_amount_cents)/100).toFixed(2)):'Free'}</td><td>${esc(dateTime(item.last_synced_at))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No external membership provider is connected.</p>'}
+        </section>
         <section class="user-section"><h3>Access</h3>
           ${entitlements.length?`<div class="scroll"><table><thead><tr><th>Capability</th><th>Provider</th><th>Status</th><th>Granted</th><th>Expires</th></tr></thead><tbody>${entitlements.map(item=>`<tr><td>${esc(capabilityLabel(item.capability))}</td><td>${esc(item.provider)}</td><td>${item.active?badge('Active','live'):badge('Inactive','blocked')}</td><td>${esc(dateOnly(item.granted_at))}</td><td>${esc(dateOnly(item.expires_at))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No paid entitlements. Regular practice is included with the account.</p>'}
         </section>
