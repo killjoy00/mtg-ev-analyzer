@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "tournament-verified-tiers-development-20260919",
-  "reason": "Deploy the final reviewed release with verified Elite Member tier mapping from successful Patreon discovery. Policy remains disabled. PR159 unit/browser gates passed; database schema through 0026 is present.",
-  "target": "development",
+  "request_id": "tournament-verified-tiers-production-20260919",
+  "reason": "Promote final reviewed release 4df2c41. The shared deployment queue and strict same-revision development smoke must pass before production uploads. Schema 0024-0026 is applied; verified production sources remain Candidate until this backend is live.",
+  "target": "production",
   "commit": "4df2c41ae18d2cc0391ffbb5be771777b35c34cf"
 }
