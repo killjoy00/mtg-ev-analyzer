@@ -207,7 +207,13 @@ def eligible_trophies(drafts, cutoff, legacy=False, conflicts=()):
     return result, rejected
 
 
-def collect(path, training_ids, output_ids, header):
+def collect_legacy_v3(path, training_ids, output_ids, header):
+    """Reproduce the frozen v3 subtraction path; never use for new scoring.
+
+    This intentionally preserves issue #164's historical construction so
+    published v3 evidence remains reproducible. Production candidate code must
+    call collect_isolated().
+    """
     all_counts = CountStore.empty(); folds = [CountStore.empty() for _ in range(5)]
     output = defaultdict(list); invalid = Counter(); picks = 0
     # Training examples from drafts that will NOT be served. A served puzzle's
