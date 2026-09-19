@@ -3,11 +3,11 @@ name: holdout-isolation-validation
 on:
   push:
     branches:
-      - fix/164-holdout-isolation
+      - measure/164-selection-movement
   workflow_dispatch:
 
 concurrency:
-  group: holdout-isolation-validation
+  group: holdout-isolation-selection-validation
   cancel-in-progress: true
 
 permissions:
@@ -53,12 +53,13 @@ jobs:
         run: |
           python scripts/compare_holdout_isolation.py \
             --work generated/holdout-isolation \
+            --sets "${{ matrix.set }}" \
             --out generated/holdout-isolation/report.json
           echo '--- HOLDOUT ISOLATION REPORT ---'
           cat generated/holdout-isolation/report.json
 
       - uses: actions/upload-artifact@v4
         with:
-          name: holdout-isolation-report
+          name: holdout-isolation-selection-${{ matrix.set }}
           path: generated/holdout-isolation/report.json
           if-no-files-found: error
