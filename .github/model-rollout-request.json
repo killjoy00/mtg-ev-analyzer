@@ -1,8 +1,5 @@
 {
-  "operation": "puzzle-components",
-  "request_id": "phase2-publish-production-20260919",
-  "reason": "Publish only eligible verified Phase 2 source components after development publication run 35457838857, production staging run 35457565478, and exact final backend production acceptance run 35458052419. Retain SIR Candidate, the existing Cube component, all exclusions, and immutable Dailies.",
-  "target": "production",
-  "action": "publish",
-  "source": "regular-phase2"
+  "operation": "production-browser",
+  "request_id": "tournament-live-browser-20260919",
+  "reason": "Verify the published tournament UI against actual production APIs at release 4df2c41: both unranked Daily completions, images, card/pool proportions, mobile/desktop overflow, completion states and browser errors. Save screenshots and latency measurements."
 }
