@@ -9,8 +9,9 @@ from scripts.build_replays import (
     FIT_STRENGTH,
     PAIR_MIN_SEEN,
     PAIR_PRIOR_STRENGTH,
+    CountStore,
     OutOfFoldModel,
-    build_colour_table,
+    build_colour_tables_by_fold,
     normalize_probabilities,
     render_replay,
     stable_fold,
@@ -113,14 +114,18 @@ class HoldoutIsolationTests(unittest.TestCase):
         # global reference/colour fit can leak into this fold's grader.
         output_ids = {held_ids[0]}
         colour_examples = []
-        all_counts, fold_counts, outputs, _, _, parsed = train_and_collect(
+        fold_training, outputs, _, _, parsed = train_and_collect(
             draft_path, set(all_ids), output_ids, header, self.FOLDS, colour_examples)
         self.assertEqual(parsed, len(all_ids))
 
-        fit = build_colour_table(
-            game_path, colour_examples,
-            {draft_id for draft_id, _ in colour_examples}, "fixture")
-        model = OutOfFoldModel(all_counts, fold_counts[self.TARGET_FOLD], fit)
+        fits = build_colour_tables_by_fold(
+            game_path, colour_examples, fold_training, "fixture")
+        fold_data = fold_training[self.TARGET_FOLD]
+        self.assertFalse(set(fold_data.training_ids) & set(fold_data.held_out_ids))
+        self.assertTrue(set(held_ids).issubset(fold_data.held_out_ids))
+        self.assertFalse(set(held_ids) & set(fold_data.observed_ids))
+        fit = fits[self.TARGET_FOLD]
+        model = OutOfFoldModel(fold_data.counts, CountStore.empty(), fit)
         held_example = outputs[held_ids[0]][0]
 
         raw = {
@@ -205,6 +210,13 @@ class HoldoutIsolationTests(unittest.TestCase):
             picked_b["base_tendencies"],
         )
         self.assertEqual(picked_a, picked_b)
+
+    def test_rebuilding_identical_inputs_is_exactly_deterministic(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            directory = Path(tmp)
+            first = self.snapshot(directory, "A")
+            second = self.snapshot(directory, "A")
+        self.assertEqual(first, second)
 
 
 if __name__ == "__main__":
