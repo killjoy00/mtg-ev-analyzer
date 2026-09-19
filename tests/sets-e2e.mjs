@@ -32,7 +32,7 @@ try {
   await page.route('**/*.neon.tech/**',async route=>{
     const url=new URL(route.request().url());
     if(url.pathname==='/v1/set-catalog') {
-      await route.fulfill({contentType:'application/json',body:JSON.stringify({corpus_version:'elite-trophy-colour-stage-v7',sets:[...regular,cube]})});
+      await route.fulfill({contentType:'application/json',body:JSON.stringify({corpus_version:'test-corpus',sets:[...regular,cube]})});
       return;
     }
     await route.fulfill({status:404,contentType:'application/json',body:'{"error":"not mocked"}'});
