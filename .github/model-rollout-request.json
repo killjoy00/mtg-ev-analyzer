@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "cube-runtime-development-20260918",
-  "reason": "Deploy the reviewed and CI-verified 9cc26f8 release to development after additive source schema and inventory staging. Includes Cube source components, authenticated publication, provenance, measurement/admin support and requested design cleanup; frozen v3 grader unchanged.",
-  "target": "development",
+  "request_id": "cube-runtime-production-20260918",
+  "reason": "Development deployment 35407719445 passed complete Daily/revision/coverage smoke checks. Promote the same reviewed 9cc26f8 runtime to production, enabling registered source components with the unchanged Premier v3 grader. Production source publication remains separately audited.",
+  "target": "production",
   "commit": "9cc26f8b9fbf09e8a8a47ac310b1ec34352ce332"
 }
