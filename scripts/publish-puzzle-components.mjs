@@ -11,12 +11,20 @@ const r=await fetch(endpoint,{headers:{authorization:`Bearer ${process.env.ACTIO
 if(!r.ok)throw Error('Administrative workflow identity unavailable');
 const identity=await verifyCorpusPublicationToken((await r.json()).value);
 await verifyComponents(query,prepared);
+const live=[],pending=[];
 for(const s of prepared.filter(s=>s.health.ready)) {
  const component=s.manifest.component_version;
  const row=(await query('SELECT status FROM corpus_components WHERE set_id=$1 AND component_version=$2',[s.sid,component])).rows[0];
- if(row.status==='Live'){console.log(s.sid+': already Live with identical verified artifact');continue;}
+ if(!row)throw Error(s.sid+': reviewed Candidate is missing');
+ if(row.status==='Live'){console.log(s.sid+': already Live with identical verified artifact');live.push(s);continue;}
  if(row.status!=='Candidate')throw Error('Publication only accepts reviewed Candidates');
+ const parentStatus=(await query('SELECT status FROM draft_run_environment_policy WHERE set_id=$1',[s.sid])).rows[0]?.status;
+ if(parentStatus!=='Live') {
+  console.log(JSON.stringify({set:s.sid,component,status:'Candidate',publication:'deferred',reason:'Parent environment is not Live'}));
+  pending.push(s);continue;
+ }
  const result=await handleCorpusAdmin(new Request(`https://packone.pro/v1/admin/corpus/${s.sid}/components/${component}/status`,{method:'POST'}),query,async()=>({oldStatus:'Candidate',status:'Live',corpusVersion:parent,reason:'Owner-authorized puzzle-source expansion; frozen Premier v3 unchanged. Reviewed publication '+identity.run_id}),null,identity);
- console.log(JSON.stringify(result));
+ console.log(JSON.stringify(result));live.push(s);
 }
-await verifyComponents(query,prepared,'Live');
+await verifyComponents(query,live,'Live');
+await verifyComponents(query,pending,'Candidate');
