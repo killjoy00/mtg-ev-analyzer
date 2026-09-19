@@ -29,9 +29,10 @@ from import_all_trophies import (  # noqa: E402
     collect_legacy_v3, collect_isolated, scan_metadata,
 )
 from build_replays import DraftSkill, select_strong_drafts  # noqa: E402
+import powered_cube_shape  # noqa: E402
 
 
-SETS = ("tmt", "hob", "msh", "blb", "sos")
+SETS = ("tmt", "hob", "msh", "blb", "sos", "powered-cube")
 GRADE_THRESHOLDS = (50, 60, 65, 70, 75, 80, 85, 90, 95)
 
 
@@ -138,7 +139,8 @@ def reconstruct(set_id, draft_path, game_path):
             f"{cohort.get('experienced_drafts')}")
 
     # This is the deterministic source-ID selection used by build_replays.py.
-    output_ids = set(choose_output_ids(training, 300))
+    output_limit = 1200 if set_id == "powered-cube" else 300
+    output_ids = set(choose_output_ids(training, output_limit))
 
     # Frozen v3: direct held counts are subtracted after global aggregation and
     # one colour table is shared. This is retained only to reproduce the pinned
@@ -168,8 +170,14 @@ def reconstruct(set_id, draft_path, game_path):
 
 def run_set(set_id, work):
     paths = verify_sources(work, set_id)
+    draft_path = paths["draft_data"]
+    if set_id == "powered-cube":
+        raw_shape, _ = powered_cube_shape.analyze_raw_archive(draft_path)
+        model_path = work / set_id / "model.csv.gz"
+        powered_cube_shape.write_model_archive(draft_path, model_path, raw_shape)
+        draft_path = model_path
     output_ids, old_output, new_output, old_models, new_models, new_fits, manifest = reconstruct(
-        set_id, paths["draft_data"], paths["game_data"])
+        set_id, draft_path, paths["game_data"])
     frozen = load_frozen(set_id)
     by_hash = {
         hashlib.sha256(f"{set_id}|{draft_id}".encode()).hexdigest()[:32]: draft_id
