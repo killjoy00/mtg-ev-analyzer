@@ -19,10 +19,15 @@ test('either unfinished Daily precedes the compact result',()=>{
  }
 });
 test('both complete reveals account practice or account creation',()=>{
- const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true}};
- assert.match(dailyHomeMarkup(p,day),/Start Another Draft Run/);
- p.player.claimed=false;assert.match(dailyHomeMarkup(p,day),/Create a free account/);
- assert.doesNotMatch(dailyHomeMarkup(p,day),/Start Another Draft Run/);
+ const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
+ const freeHtml=dailyHomeMarkup(p,day);
+ assert.match(freeHtml,/Start Another Draft Run/);
+ assert.match(freeHtml,/Become Elite/);
+ assert.match(freeHtml,/Elite adds unlimited Powered Cube and custom-set drafts/);
+ p.player.claimed=false;const guestHtml=dailyHomeMarkup(p,day);
+ assert.match(guestHtml,/Create a free account/);
+ assert.doesNotMatch(guestHtml,/Start Another Draft Run/);
+ assert.doesNotMatch(guestHtml,/Elite adds unlimited Powered Cube and custom-set drafts/);
 });
 test('home runtime isolates historical code and lazily loads profiles',()=>{
  const source=fs.readFileSync('bootstrap.mjs','utf8');
@@ -31,14 +36,24 @@ test('home runtime isolates historical code and lazily loads profiles',()=>{
  assert.match(source,/daily-home\.mjs/);
 });
 
-test('Elite set picker stays discoverable before any Daily completion',()=>{
+test('Daily home differentiates free and Elite practice',()=>{
  const p={player:{claimed:true},capabilities:['account'],daily_history:[]};
- assert.match(dailyHomeMarkup(p,day),/Elite practice/);
- assert.match(dailyHomeMarkup(p,day),/Choose your sets/);
- assert.doesNotMatch(dailyHomeMarkup(p,day),/Powered Cube Practice/);
+ const freeHtml=dailyHomeMarkup(p,day);
+ assert.match(freeHtml,/Elite practice/);
+ assert.match(freeHtml,/Draft beyond the Dailies/);
+ assert.match(freeHtml,/Become Elite/);
+ assert.doesNotMatch(freeHtml,/Choose your sets/);
+ assert.doesNotMatch(freeHtml,/Powered Cube Practice/);
+
+ p.capabilities.push('custom_corpus','unlimited_cube_practice');
+ const eliteHtml=dailyHomeMarkup(p,day);
+ assert.match(eliteHtml,/Choose your sets/);
+ assert.doesNotMatch(eliteHtml,/Become Elite/);
+
  p.daily_history=['mixed','powered-cube','latest'].map(row);
- p.capabilities.push('unlimited_cube_practice');
- assert.match(dailyHomeMarkup(p,day),/Powered Cube Practice/);
+ const completedEliteHtml=dailyHomeMarkup(p,day);
+ assert.match(completedEliteHtml,/Powered Cube Practice/);
+ assert.doesNotMatch(completedEliteHtml,/Elite adds unlimited Powered Cube and custom-set drafts/);
 });
 
 test('Method has no secondary link directory',()=>{
