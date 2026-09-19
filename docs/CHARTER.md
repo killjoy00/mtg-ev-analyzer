@@ -26,7 +26,7 @@ The full historical corpus is retained. Lifecycle controls new-play eligibility,
 
 Premier trophies include **7-0, 7-1 and 7-2**. Retain the experienced/high-quality drafter standard: at least 100 prior games and the existing per-set qualified cohort. Legacy archives without win-rate fields retain their documented independently observed rank cohort. The broader qualified cohort trains the production model; puzzle sources are trophies and cannot train their own held-out grader.
 
-Traditional 3-0 first-eight research is separate from production. Pooling model evidence and publishing playable Traditional puzzles are distinct decisions. [Experiment and limitations](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md).
+Qualified Traditional 3-0 trophy drafts may contribute playable decisions only after source-specific evidence, staging and explicit publication pass. The production scoring model remains Premier-trained. Pooling model evidence and publishing playable Traditional puzzles are distinct decisions. [Experiment and limitations](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md).
 
 ## Scoring
 
@@ -34,7 +34,7 @@ An exact historical trophy match always earns **100**, even when the model disag
 
 ## Practice and capabilities
 
-Anonymous users receive the two Dailies. A free authenticated account adds `unlimited_regular_practice`. Future grants may add `unlimited_cube_practice` and `custom_corpus`; provider names and tiers do not belong in core product logic. Backend identity and entitlement state are authoritative. The provider adapter exists; no Patreon integration or payment UI is active.
+Anonymous users receive the two Dailies. A free authenticated account adds `unlimited_regular_practice`. Future grants may add `unlimited_cube_practice` and `custom_corpus`; provider names and tiers do not belong in core product logic. Backend identity and entitlement state are authoritative. The Patreon adapter is implemented with explicit campaign and premium-tier matching, but linking remains disabled pending the webhook secret and real membership canary. Supporter membership grants no premium capabilities.
 
 Custom practice accepts one or more Live eligible regular sets, assigning eight decisions as evenly as possible: 8; 4/4; 3/3/2; 2/2/2/2. Corpus size does not weight this allocation. Non-Daily unshared practice can retain matched rerolls.
 
