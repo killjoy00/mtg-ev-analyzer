@@ -1,22 +1,7 @@
 name: refresh Powered Cube card images
 
+# Image maintenance is an explicit operation, never a side effect of a code merge.
 on:
-  push:
-    branches: [main]
-    paths:
-      - scripts/refresh_powered_cube_images.py
-      - scripts/refresh_powered_cube_backend_images.mjs
-      - scripts/verify-image-refresh-release.mjs
-      - scripts/fetch_card_metadata.py
-      - worker/trophy-import.mjs
-      - worker/trophy-import-auth.mjs
-      - tests/test_powered_cube_images.py
-      - tests/trophy-import-auth.test.mjs
-      - tests/image-refresh-release.test.mjs
-      - .github/workflows/refresh-powered-cube-images.yml
-  workflow_run:
-    workflows: ["build-powered-cube"]
-    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -24,12 +9,11 @@ permissions:
   id-token: write
 
 concurrency:
-  group: set-data-import-${{ github.ref }}
+  group: packone-corpus-mutation
   cancel-in-progress: false
 
 jobs:
   refresh:
-    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -98,7 +82,10 @@ jobs:
         run: node scripts/refresh_powered_cube_backend_images.mjs "$DEV_IMPORT_API"
 
       - name: Verify development gameplay
-        run: node tests/trophy-import-http-smoke.mjs "$DEV_IMPORT_API"
+        run: |
+          set -euo pipefail
+          commit=$(curl -fsS --max-time 30 "$DEV_IMPORT_API/health?quick=1" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).release_commit))")
+          node tests/release-functions-smoke.mjs br-twilight-hill-ayffyd2b "$commit" --daily
 
       - name: Refresh production Draft Run image metadata
         run: |
@@ -106,7 +93,10 @@ jobs:
           node scripts/refresh_powered_cube_backend_images.mjs "$PROD_IMPORT_API"
 
       - name: Verify production gameplay
-        run: node tests/trophy-import-http-smoke.mjs "$PROD_IMPORT_API"
+        run: |
+          set -euo pipefail
+          commit=$(curl -fsS --max-time 30 "$PROD_IMPORT_API/health?quick=1" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).release_commit))")
+          node tests/release-functions-smoke.mjs br-orange-feather-ayps8kep "$commit" --daily
 
       - name: Commit refreshed Cube image source of truth
         shell: bash
@@ -129,3 +119,4 @@ jobs:
           git fetch origin main
           git -C "$publish_dir" rebase origin/main
           git -C "$publish_dir" push origin HEAD:main
+
