@@ -25,9 +25,13 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
       </article>`;
     }).join('')}</div>
     ${status.completed === 3 ? `<section class="daily-home-practice"><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2>${profile?.player?.claimed
-      ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${capabilities.includes('unlimited_cube_practice')?'<a class="button secondary" href="?game=draft-run&set=powered-cube">Powered Cube Practice</a>':''}`
+      ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${capabilities.includes('custom_corpus')
+        ? (capabilities.includes('unlimited_cube_practice')?'<a class="button secondary" href="?game=draft-run&set=powered-cube">Powered Cube Practice</a>':'')
+        : '<button class="button secondary" data-home-elite>Become Elite</button><p>Elite adds unlimited Powered Cube and custom-set drafts.</p>'}`
       : '<p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>'}</section>` : ''}
-    <section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Build a random run from your favourite sets.</p></div><a class="button secondary" href="?game=draft-run&custom=1">Choose your sets</a></section>
+    ${capabilities.includes('custom_corpus')
+      ? '<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Build a random run from your favourite sets.</p></div><a class="button secondary" href="?game=draft-run&custom=1">Choose your sets</a></section>'
+      : '<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Draft beyond the Dailies. Unlock unlimited Powered Cube and custom-set drafts.</p></div><button class="button secondary" data-home-elite>Become Elite</button></section>'}
     ${unavailable ? '<p role="status">Daily progress is unavailable. Play now still resumes your saved attempt.</p>' : ''}
   </section>`;
 }
@@ -40,6 +44,7 @@ export function renderDailyHome(profile = null, unavailable = false) {
   lastDay = easternDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, unavailable);
   document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs')).renderAccount());
+  document.querySelectorAll('[data-home-elite]').forEach(button => button.addEventListener('click', async () => (await import('./growth.mjs')).renderAccount()));
 }
 
 export function installDailyHome(identityReady = Promise.resolve()) {
