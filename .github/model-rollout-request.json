@@ -1,8 +1,5 @@
 {
-  "operation": "puzzle-components",
-  "request_id": "phase2-stage-production-20260919",
-  "reason": "Stage the same 22 verified Candidate sources after successful isolated development staging run 35457309349. Do not publish yet. Retain Premier payloads, fixed Dailies, exclusions, and the existing Cube component.",
-  "target": "production",
-  "action": "stage",
-  "source": "regular-phase2"
+  "operation": "patreon-discovery",
+  "request_id": "patreon-campaign-discovery-20260919",
+  "reason": "Read public campaign and tier IDs using the existing operational credential. Report secret availability only as booleans. Do not change Patreon configuration, billing, memberships, or Pack One entitlement activation."
 }
