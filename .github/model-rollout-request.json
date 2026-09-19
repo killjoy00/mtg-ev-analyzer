@@ -1,7 +1,8 @@
 {
-  "operation": "deploy",
-  "request_id": "tournament-verified-tiers-production-20260919",
-  "reason": "Promote final reviewed release 4df2c41. The shared deployment queue and strict same-revision development smoke must pass before production uploads. Schema 0024-0026 is applied; verified production sources remain Candidate until this backend is live.",
+  "operation": "puzzle-components",
+  "request_id": "phase2-publish-production-20260919",
+  "reason": "Publish only eligible verified Phase 2 source components after development publication run 35457838857, production staging run 35457565478, and exact final backend production acceptance run 35458052419. Retain SIR Candidate, the existing Cube component, all exclusions, and immutable Dailies.",
   "target": "production",
-  "commit": "4df2c41ae18d2cc0391ffbb5be771777b35c34cf"
+  "action": "publish",
+  "source": "regular-phase2"
 }
