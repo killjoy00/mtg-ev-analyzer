@@ -217,8 +217,8 @@ export async function handlePatreon(request,{query,authSession,json}) {
   if(url.pathname==='/v1/patreon/connect'&&request.method==='POST') {
     if(!configured())return json({error:'Patreon connection is not configured.'},503);
     const state=randomBytes(32).toString('hex'),hash=createHash('sha256').update(state).digest('hex');
-    await query(`DELETE FROM provider_oauth_states WHERE expires_at<=now();
-      INSERT INTO provider_oauth_states(state_hash,auth_user_id,provider,expires_at)
+    await query('DELETE FROM provider_oauth_states WHERE expires_at<=now()');
+    await query(`INSERT INTO provider_oauth_states(state_hash,auth_user_id,provider,expires_at)
       VALUES($1,$2::uuid,$3,now()+interval '10 minutes')`,[hash,authUserId,PROVIDER]);
     const target=new URL(`${PATREON_ORIGIN}/oauth2/authorize`);
     target.searchParams.set('response_type','code');
@@ -229,9 +229,9 @@ export async function handlePatreon(request,{query,authSession,json}) {
     return json({url:target.toString()});
   }
   if(url.pathname==='/v1/patreon/disconnect'&&request.method==='POST') {
-    await query(`DELETE FROM provider_oauth_states WHERE auth_user_id=$1::uuid AND provider=$2;
-      DELETE FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider=$2;
-      UPDATE entitlement_grants SET revoked_at=COALESCE(revoked_at,now())
+    await query('DELETE FROM provider_oauth_states WHERE auth_user_id=$1::uuid AND provider=$2',[authUserId,PROVIDER]);
+    await query('DELETE FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider=$2',[authUserId,PROVIDER]);
+    await query(`UPDATE entitlement_grants SET revoked_at=COALESCE(revoked_at,now())
       WHERE auth_user_id=$1::uuid AND provider=$2 AND revoked_at IS NULL`,[authUserId,PROVIDER]);
     return json({ok:true});
   }
