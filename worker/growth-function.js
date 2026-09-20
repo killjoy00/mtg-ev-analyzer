@@ -12,7 +12,6 @@ const ALLOWED_ORIGINS = new Set([
 ]);
 const TOKEN_PREFIX = 'p1_';
 const NEON_AUTH_BASE='https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
-const GOOGLE_CALLBACK='https://api.packone.pro/growth/v1/account/google/callback';
 const ACCOUNT_RETURN='https://packone.pro/';
 const STATIC_ORIGIN = 'https://packone.pro';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
@@ -628,22 +627,6 @@ async function handleAccountMigration(request) {
   return withAccountCookies(json({ok:true,user:{id:legacy.user_id,email:legacy.email,name:legacy.name},migrated:true}),session);
 }
 
-async function handleGoogleStart(request) {
-  requireTrustedOrigin(request);
-  await readJson(request);
-  const data=await neonAuth('/sign-in/social',{method:'POST',body:{
-    provider:'google',
-    callbackURL:GOOGLE_CALLBACK,
-    newUserCallbackURL:GOOGLE_CALLBACK,
-    errorCallbackURL:ACCOUNT_RETURN+'?auth=google-error',
-    disableRedirect:true,
-  }});
-  const target=new URL(String(data?.url||''));
-  if(target.protocol!=='https:'||target.hostname!=='accounts.google.com')
-    throw Object.assign(Error('Google sign in is temporarily unavailable.'),{status:502});
-  return json({url:target.toString()});
-}
-
 async function handleGoogleCallback(request) {
   const url=new URL(request.url);
   const verifier=String(url.searchParams.get('neon_auth_session_verifier')||'');
@@ -978,7 +961,6 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/signup') return handleAccountSignup(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signin') return handleAccountSignin(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
-  if (request.method === 'POST' && url.pathname === '/v1/account/google/start') return handleGoogleStart(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/link-browser') return handleLink(request,{browser:true});
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/events') return handleEvents(request);
