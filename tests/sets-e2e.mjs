@@ -49,7 +49,7 @@ try {
   assert.equal(await regularCta.getAttribute('href'),'/?game=draft-run');
   assert.equal(await page.locator('a[href*="custom=1"]').count(),0,'public set archive must not route free users into custom-corpus practice');
 
-  const cubeCta=page.locator('#special-format-grid').getByRole('link',{name:'Play Cube Run'});
+  const cubeCta=page.locator('#special-format-grid').getByRole('link',{name:'Elite Cube Practice'});
   assert.equal(await cubeCta.getAttribute('href'),'/?game=draft-run&set=powered-cube');
   assert.ok(await page.locator('#special-formats').isVisible());
 
