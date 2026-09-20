@@ -57,13 +57,18 @@ export async function accountSession(request,query,{required=true,allowLegacy=tr
       WHERE s.session_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()
       LIMIT 1`,[hash]);
     const account=result.rows[0];
-    if(!account)throw Object.assign(Error('Account session expired.'),{status:401});
-    if(csrf&&!SAFE_METHODS.has(request.method)) {
-      const supplied=String(request.headers.get('x-pack1-csrf')||'');
-      if(!validOpaque(supplied)||!sameDigest(digest(supplied),account.csrf_hash))
-        throw Object.assign(Error('Account request could not be verified.'),{status:403});
+    if(account) {
+      if(csrf&&!SAFE_METHODS.has(request.method)) {
+        const supplied=String(request.headers.get('x-pack1-csrf')||'');
+        if(!validOpaque(supplied)||!sameDigest(digest(supplied),account.csrf_hash))
+          throw Object.assign(Error('Account request could not be verified.'),{status:403});
+      }
+      return {...account,source:'cookie'};
     }
-    return {...account,source:'cookie'};
+    // A cookie that matches no row carries no information. It is HttpOnly, so a
+    // browser holding a revoked or expired one cannot clear it, and treating it
+    // as a hard failure locked guest-capable surfaces, sign-out and the legacy
+    // migration below. Fall through and let the caller's own rules decide.
   }
   if(allowLegacy) {
     const token=String(request.headers.get('x-pack1-auth-session')||'').slice(0,512);
@@ -75,7 +80,7 @@ export async function accountSession(request,query,{required=true,allowLegacy=tr
       throw Object.assign(Error('Account session expired.'),{status:401});
     }
   }
-  if(required)throw Object.assign(Error('Account session required.'),{status:401});
+  if(required)throw Object.assign(Error(opaque?'Account session expired.':'Account session required.'),{status:401});
   return null;
 }
 

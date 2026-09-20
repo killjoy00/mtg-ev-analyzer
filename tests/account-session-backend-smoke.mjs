@@ -95,5 +95,42 @@ assert.ok(cookies(signout).some(row=>row.startsWith('__Host-pack1_account=')&&/M
 assert.ok(cookies(signout).some(row=>row.startsWith('__Host-pack1_player=')&&/Max-Age=0/.test(row)));
 assert.equal((await growth.fetch(new Request('https://packone.pro/v1/account/session',{headers:{origin,cookie:cookieHeader(rotated,rotatedCsrf)}}))).status,401);
 
+// A second sign-out with the now-revoked cookie must still clear it. The cookie
+// is HttpOnly, so a 401 here leaves the browser permanently holding a dead
+// session it cannot drop.
+const repeatSignout=await growth.fetch(new Request('https://packone.pro/v1/account/signout',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
+  body:'{}',
+}));
+await json(repeatSignout);
+assert.ok(cookies(repeatSignout).some(row=>row.startsWith('__Host-pack1_account=')&&/Max-Age=0/.test(row)),'revoked session can still clear its cookie');
+
+// Guest migration seeds an empty browser. It must never move an established
+// player cookie onto a different legacy bearer: that breaks the account link
+// and 401s every account surface with "Sign in again to continue".
+const strayPlayer=await json(await growth.fetch(new Request('https://packone.pro/v1/session',{
+  method:'POST',headers:{'content-type':'application/json',origin},
+  body:JSON.stringify({displayName:'QA stray '+tag}),
+})));
+const clobber=await growth.fetch(new Request('https://packone.pro/v1/player/migrate',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,'x-pack1-player-session':strayPlayer.token},
+  body:'{}',
+}));
+const kept=await json(clobber);
+assert.equal(kept.migrated,false,'an established player is not migrated over');
+assert.equal(kept.playerId,player.slice('p1_'.length).split('.')[0],'the linked player is preserved');
+assert.equal(cookies(clobber).some(row=>row.startsWith('__Host-pack1_player=')),false,'no player cookie is rewritten');
+
+// An empty browser still migrates its stored guest as before.
+const seeded=await json(await growth.fetch(new Request('https://packone.pro/v1/player/migrate',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json','x-pack1-player-session':strayPlayer.token},
+  body:'{}',
+})));
+assert.equal(seeded.migrated,true);
+assert.equal(seeded.playerId,strayPlayer.playerId);
+
 await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[authId]);
-console.log('First-party account session migration, CSRF, rotation, no-token JSON and sign-out passed.');
+console.log('First-party account session migration, CSRF, rotation, no-token JSON, repeat sign-out and player-cookie preservation passed.');

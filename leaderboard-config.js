@@ -2,10 +2,14 @@
 // the first-party gateway so browser account credentials remain cookies scoped
 // to packone.pro. Local development keeps the direct origins because Secure
 // production cookies are intentionally unavailable over localhost.
-const firstParty = ['packone.pro','www.packone.pro'].includes(location.hostname);
+// Only the apex host is first-party: the gateway and the account worker both
+// trust https://packone.pro alone, and www redirects here before any script runs.
+const firstParty = location.hostname === 'packone.pro';
 window.PACK1_API = {
   firstParty,
-  url: 'https://br-orange-feather-ayps8kep-pack1api.compute.c-5.us-east-2.aws.neon.tech',
+  url: firstParty
+    ? 'https://api.packone.pro/legacy'
+    : 'https://br-orange-feather-ayps8kep-pack1api.compute.c-5.us-east-2.aws.neon.tech',
   growthUrl: firstParty
     ? 'https://api.packone.pro/growth'
     : 'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech',

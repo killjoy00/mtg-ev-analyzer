@@ -585,6 +585,14 @@ async function handlePlayerMigration(request) {
   if(!id)throw Object.assign(Error('Guest session could not be migrated.'),{status:401});
   const meta=await profileMetaByPlayer(id);
   if(!meta)throw Object.assign(Error('Guest record could not be migrated.'),{status:401});
+  // Migration seeds a browser that has no first-party player yet. An already
+  // established cookie may be the player an account is linked to, so a stray
+  // legacy bearer must never replace it - that swap breaks the account link.
+  const current=await player(request,false);
+  if(current&&current!==id) {
+    const established=await profileMetaByPlayer(current);
+    if(established)return json({ok:true,playerId:current,displayName:established.display_name,profileKey:established.profile_key||null,migrated:false});
+  }
   return withPlayerCookie(json({ok:true,playerId:id,displayName:meta.display_name,profileKey:meta.profile_key||null,migrated:true}),legacy);
 }
 
@@ -836,8 +844,11 @@ async function handleAccount(request) {
 }
 
 async function handleSignout(request) {
-  const auth = await authSession(request);
-  await revokeAccountSession(query,auth);
+  // Sign-out must always be able to clear the cookies it set, including when
+  // the session behind them is already expired or revoked. A live session is
+  // still CSRF-checked, so this stays a deliberate first-party request.
+  const auth = await authSession(request,{required:false});
+  if(auth)await revokeAccountSession(query,auth);
   return clearPlayerCookie(clearAccountCookies(json({ ok: true })));
 }
 
