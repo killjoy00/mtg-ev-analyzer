@@ -91,6 +91,7 @@ test('production gateway accepts a shaped mobile player session only on approved
   const request=new Request('https://api.packone.pro/draft/v1/runs',{
     method:'POST',body:JSON.stringify({daily:true}),headers:{
       'content-type':'application/json','cf-connecting-ip':'192.0.2.44','x-pack1-mobile-session':token,
+      'x-idempotency-key':'practice_retry_key_12345',
     },
   });
   const result=await gateway(request,prod,async(url,options)=>{
@@ -98,6 +99,7 @@ test('production gateway accepts a shaped mobile player session only on approved
     assert.equal(url,'https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/v1/runs');
     assert.equal(options.headers.get('authorization'),'Bearer '+token);
     assert.equal(options.headers.get('x-pack1-mobile-session'),null);
+    assert.equal(options.headers.get('x-idempotency-key'),'practice_retry_key_12345');
     return Response.json({ok:true});
   });
   assert.equal(result.status,200);assert.equal(calls,1);
