@@ -20,6 +20,10 @@ export default function RootLayout() {
         <Stack.Screen name="practice" options={{ title: 'Practice' }} />
         <Stack.Screen name="leaderboard" options={{ title: 'Leaderboard' }} />
         <Stack.Screen name="career" options={{ title: 'Career' }} />
+        <Stack.Screen name="how-to" options={{ title: 'How to Play' }} />
+        <Stack.Screen name="scoring" options={{ title: 'Scoring' }} />
+        <Stack.Screen name="method" options={{ title: 'Method' }} />
+        <Stack.Screen name="sets" options={{ title: 'Sets' }} />
         <Stack.Screen name="account" options={{ title: 'Account' }} />
       </Stack>
     </>
