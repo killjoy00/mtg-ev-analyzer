@@ -170,7 +170,7 @@ async function shareResult() {
     const result=await shareDraftRunCard(run,url);
     const status=document.querySelector('#run-share-status');
     if(result.failed) {status.textContent='Copy this link: ';const a=document.createElement('a');a.href=url;a.textContent=url;status.append(a);}
-    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and run link copied.':'Ready to share.';trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:result.method});}
+    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and run link copied.':'';trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:result.method});}
   } catch(e) {document.querySelector('#run-share-status').textContent=e.message;}
   finally {button.disabled=false;}
 }
