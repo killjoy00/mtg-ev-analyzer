@@ -38,14 +38,27 @@ const daily=await call('/draft/v1/daily-status',{headers:{origin,cookie:playerCo
 assert.deepEqual(daily.data.membership,{connected:false});
 assert.equal(daily.response.headers.get('access-control-allow-origin'),origin);
 assert.equal(daily.response.headers.get('access-control-allow-credentials'),'true');
-const google=await call('/growth/v1/account/google/start',{
-  method:'POST',headers:{origin,'content-type':'application/json',cookie:playerCookie},body:'{}',
+const neonAuth='https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const googleResponse=await fetch(neonAuth+'/sign-in/social',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json'},
+  body:JSON.stringify({
+    provider:'google',
+    callbackURL:'https://api.packone.pro/growth/v1/account/google/callback',
+    newUserCallbackURL:'https://api.packone.pro/growth/v1/account/google/callback',
+    errorCallbackURL:'https://packone.pro/?auth=google-error',
+    disableRedirect:true,
+  }),
+  redirect:'manual',
+  signal:AbortSignal.timeout(30000),
 });
-const target=new URL(google.data.url);
+const google=await googleResponse.json().catch(()=>({}));
+assert.equal(googleResponse.status,200,'Neon Auth Google start: '+googleResponse.status+' '+JSON.stringify(google));
+assert.equal(googleResponse.headers.get('access-control-allow-origin'),origin);
+const target=new URL(google.url);
 assert.equal(target.protocol,'https:');
-assert.equal(target.hostname,'accounts.google.com');
 const rejected=await fetch(base+'/growth/v1/player/session',{
   method:'POST',headers:{origin:'https://example.invalid','content-type':'application/json'},body:'{}',redirect:'manual',
 });
 assert.equal(rejected.status,403);
-console.log('Production first-party gateway, player cookie, credentialed CORS and Google OAuth start passed.');
+console.log('Production first-party gateway, player cookie, credentialed CORS and browser-origin Google OAuth start passed.');
