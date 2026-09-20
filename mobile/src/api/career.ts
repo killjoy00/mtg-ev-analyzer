@@ -46,7 +46,6 @@ export type CareerHistoryPage = {
 export function loadCareerProfile(session: MobileSession) {
   return requestJson<CareerProfile>('/growth/v1/profile/me', {
     mobileSessionToken: session.playerToken,
-    mobileAccountToken: session.accountToken,
   });
 }
 
@@ -55,6 +54,5 @@ export function loadCareerHistory(session: MobileSession, cursor?: string | null
   if (cursor) query.set('cursor', cursor);
   return requestJson<CareerHistoryPage>(`/growth/v1/profile/history?${query.toString()}`, {
     mobileSessionToken: session.playerToken,
-    mobileAccountToken: session.accountToken,
   });
 }
