@@ -4,8 +4,8 @@ import fs from 'node:fs/promises';
 import {chromium} from 'playwright';
 const browser=await chromium.launch({headless:true,channel:'chrome'});
 const page=await browser.newPage({viewport:{width:390,height:844}});
-const errors=[],requests=[],metrics=[];
-page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
+const errors=[],requests=[],metrics=[],eventStatuses=[];
+page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));page.on('response',r=>{try{const u=new URL(r.url());if(u.hostname==='api.packone.pro'&&u.pathname==='/growth/v1/events')eventStatuses.push(r.status());}catch{}});
 await fs.mkdir('artifacts/production',{recursive:true});
 await page.addInitScript(()=>localStorage.setItem('pack1-player-name-v1','QA production mobile'));
 const overflow=async()=>assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal overflow');
@@ -15,6 +15,10 @@ try {
  assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),3);
  const config=await page.evaluate(()=>window.PACK1_API);
  assert.equal(config.firstParty,true);assert.equal(config.growthUrl,'https://api.packone.pro/growth');assert.equal(config.draftRunUrl,'https://api.packone.pro/draft');
+ const apiCookies=await page.context().cookies('https://api.packone.pro');
+ const playerCookie=apiCookies.find(cookie=>cookie.name==='__Host-pack1_player');
+ assert.ok(playerCookie,'Live browser received the first-party player cookie');
+ assert.equal(playerCookie.httpOnly,true);assert.equal(playerCookie.secure,true);
  assert.ok(!requests.some(u=>/\/(app\.js|social\.mjs|home-today\.mjs|data\/catalog\.json|shards\/)/.test(u)),'No historical dependency tree on home');
  assert.ok(!requests.some(u=>/-pack1growth\.compute\.c-5\.us-east-2\.aws\.neon\.tech|draftrunapi\.compute\.c-5\.us-east-2\.aws\.neon\.tech/.test(u)),'Production browser uses the first-party account/gameplay gateway');
  await page.locator('#account-nav').click();await page.locator('#profile-claim-account').waitFor();await page.locator('#profile-claim-account').click();await page.locator('#account-google').waitFor();
@@ -55,6 +59,7 @@ try {
   assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),2-index);
   await page.screenshot({path:`artifacts/production/home-completed-${index+1}.png`,fullPage:true});
  }
- assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,metrics}));
+ assert.ok(eventStatuses.length>0,'Live browser emitted at least one telemetry event through the first-party gateway');assert.ok(eventStatuses.every(status=>status>=200&&status<300),'Telemetry events stayed authenticated: '+JSON.stringify(eventStatuses));
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,metrics,eventStatuses}));
  await fs.writeFile('artifacts/production/measurements.json',JSON.stringify({passed:true,metrics},null,2));
 } finally {await browser.close();}
