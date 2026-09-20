@@ -93,10 +93,7 @@ export default function AccountScreen() {
         params: { environment: returnEnvironment },
       }), 600);
     } else if (params.returnTo === 'practice') {
-      setTimeout(() => router.replace({
-        pathname: '/draft-run',
-        params: { mode: 'practice' },
-      }), 300);
+      setTimeout(() => router.replace('/practice'), 300);
     }
   };
 
