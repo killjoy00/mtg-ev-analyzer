@@ -15,10 +15,10 @@ function handoffToPatreon(source='account') {
   location.assign(PATREON_POLICY.supportUrl);
 }
 
-function renderAccountError(app, error) {
+function renderAccountError(app, error, retry=()=>renderAccount()) {
   document.body.classList.remove('is-game');
   app.innerHTML=`<section class="message-card"><p class="eyebrow">Account</p><h1>Account access is temporarily unavailable.</h1><p>${esc(error?.message||'Please try again.')}</p><button class="button primary" id="account-retry">Try again</button><a class="button secondary" href="./">Back to Dailies</a></section>`;
-  document.querySelector('#account-retry')?.addEventListener('click',()=>void renderAccount());
+  document.querySelector('#account-retry')?.addEventListener('click',()=>void retry());
 }
 
 async function claimCurrentSession() {
@@ -40,7 +40,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   try {
     currentAccount=await getAuthSession();
   } catch(error) {
-    renderAccountError(app,error);
+    renderAccountError(app,error,()=>renderAccount({intent,source}));
     return;
   }
   if(currentAccount?.session?.token && currentAccount?.user) {
@@ -48,7 +48,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     try {
       await linkAccount(currentAccount.session.token,{validateDailyRunId:validationRunId});
     } catch(error) {
-      renderAccountError(app,error);
+      renderAccountError(app,error,()=>renderAccount({intent,source}));
       return;
     }
     pendingDailyRunValidation=null;
@@ -68,7 +68,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       ? 'Create or sign in to your free Pack One account first. Then we’ll send you to Patreon to choose Elite.'
       : 'All three Dailies are free without an account. A free account saves your record, enables leaderboard participation, and adds unlimited regular Draft Runs.';
   app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>${heading}</h1><p>${intro}</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite?'Not now — keep playing':'Keep playing as guest'}</button></div></section>`;
-  document.querySelector('#account-career')?.addEventListener('click',async()=>{await (await import('./profile-product.mjs')).renderMyProfile();});
+  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;await (await import('./profile-product.mjs')).renderMyProfile();});
   document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;document.querySelector('#brand-home')?.click();});
   document.querySelector('#account-signup')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget,err=form.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(form));const auth=await signUpAccount(data);event('auth_sign_up');if(!auth?.token){err.textContent='Account created. Check your email to finish verification, then sign in.';return;}await claimCurrentSession();if(upgradingElite){handoffToPatreon(source);return;}await renderAccount();}catch(error){err.textContent=error.message;}});
   document.querySelector('#account-signin')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget,err=form.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(form));const auth=await signInAccount(data);if(!auth?.token)throw Error('Sign in did not return an account session.');await claimCurrentSession();event('auth_sign_in');if(upgradingElite){handoffToPatreon(source);return;}await renderAccount();}catch(error){err.textContent=error.message;}});
