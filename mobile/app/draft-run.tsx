@@ -591,7 +591,7 @@ export default function DraftRunScreen() {
                 />
               ) : (
                 <View style={styles.zoomFallback}>
-                  <Text style={styles.zoomName}>{zoomedCard?.name}</Text>
+                  <Text style={styles.zoomFallbackName}>{zoomedCard?.name}</Text>
                 </View>
               )}
               <Text style={styles.zoomName}>{zoomedCard?.name}</Text>
@@ -697,12 +697,13 @@ const styles = StyleSheet.create({
     borderTopColor: colors.accent,
     backgroundColor: colors.surface,
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.lg,
   },
   feedbackScore: { flexDirection: 'row', alignItems: 'baseline' },
   feedbackScoreNumber: { color: colors.ink, fontSize: 44, lineHeight: 48, fontWeight: '800' },
   feedbackScoreSuffix: { color: colors.muted, fontSize: 14, fontWeight: '700' },
-  feedbackCopy: { flex: 1, gap: spacing.xs, justifyContent: 'center' },
+  feedbackCopy: { flex: 1, minWidth: 220, gap: spacing.xs, justifyContent: 'center' },
   feedbackTitle: { color: colors.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
   feedbackBody: { color: colors.muted, fontSize: 14, lineHeight: 20 },
   resultPage: { padding: spacing.lg, paddingTop: spacing.xxl, gap: spacing.lg },
@@ -729,6 +730,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surface,
     padding: spacing.lg,
   },
+  zoomFallbackName: { color: colors.ink, fontSize: 18, lineHeight: 24, fontWeight: '800', textAlign: 'center' },
   zoomName: { color: '#fff', fontSize: 18, lineHeight: 24, fontWeight: '800', textAlign: 'center' },
   zoomClose: {
     minHeight: 50,
