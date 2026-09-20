@@ -170,7 +170,7 @@ async function shareResult() {
     const result=await shareDraftRunCard(run,url);
     const status=document.querySelector('#run-share-status');
     if(result.failed) {status.textContent='Copy this link: ';const a=document.createElement('a');a.href=url;a.textContent=url;status.append(a);}
-    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and run link copied.':'Ready to share.';trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:result.method});}
+    else if(!result.cancelled) {status.textContent=result.method==='copy_fallback'?'Result and run link copied.':'';trackEvent(run.day?'daily_result_shared':'shared_run_shared',{mode:'draft_run',method:result.method});}
   } catch(e) {document.querySelector('#run-share-status').textContent=e.message;}
   finally {button.disabled=false;}
 }
@@ -203,7 +203,7 @@ function renderLoadFailure(error,isBoard) {
   if(error.capability||error.status===401){
     const premium=['custom_corpus','unlimited_cube_practice'].includes(error.capability);
     const signedIn=hasAccountSession();
-    app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p><button class="button primary" id="practice-membership">'+(signedIn?'Become Elite on Patreon':'Sign in to become Elite')+'</button>':''}${!premium&&!signedIn?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<p><a class="button secondary" href="./">Back to Dailies</a></p></section>`;
+    app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite on Patreon':'Sign in to become Elite')+'</button>':''}${!premium&&!signedIn?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
     document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs')).beginEliteUpgrade({source:'practice_gate'});});
     document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs')).renderAccount();});return;
   }

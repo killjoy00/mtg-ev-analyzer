@@ -64,6 +64,7 @@ try {
   assert.doesNotMatch(await page.locator('.profile-claim').textContent(),/Save my progress/);
   await page.locator('#profile-claim-account').click();
   await page.locator('#account-signin').waitFor();
+  assert.match(await page.locator('.account-page header').textContent(),/A free account saves your record and enables leaderboard participation\./);
   await page.screenshot({path:'artifacts/ui-account-mobile.png',fullPage:true});
 
   for(const kind of ['signin','signup']) {
