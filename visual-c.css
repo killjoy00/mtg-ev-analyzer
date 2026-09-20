@@ -32,15 +32,17 @@ body {
 
 body {
   color: var(--ink);
-  font-size: 14px;
-  line-height: 1.45;
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.5;
 }
+button, input, select, textarea { font: inherit; }
 
 .topbar {
-  min-height: 60px;
+  min-height: 72px;
   padding-top: 8px;
   padding-bottom: 8px;
-  border-top: 4px solid var(--green);
+  border-top: 3px solid var(--green);
   border-bottom: 1px solid var(--line);
   background: #fff;
   backdrop-filter: none;
@@ -52,38 +54,40 @@ body {
 
 .brand-mark {
   position: relative;
-  width: 32px;
-  height: 32px;
+  width: 36px;
+  height: 40px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 1px;
-  border: 1px solid var(--green);
-  background: linear-gradient(135deg, #fff 0 54%, var(--green-soft) 54% 100%);
-  color: var(--green-dark);
-  font-family: Georgia, "Times New Roman", serif;
+  border: 0;
+  border-radius: 2px;
+  background: var(--green);
+  color: #fff;
+  font-family: var(--display);
 }
 
 .brand-mark > span {
-  font-size: 18px;
-  font-style: italic;
-  font-weight: 700;
+  font-size: 26px;
+  font-style: normal;
+  font-weight: 600;
   line-height: 1;
 }
 
 .brand-mark > sup {
   position: relative;
-  top: -3px;
+  top: -6px;
   font-family: var(--sans);
-  font-size: 9px;
+  font-size: 12px;
   font-weight: 900;
   line-height: 1;
 }
 
 .brand-copy strong {
-  font-size: 16px;
-  font-weight: 800;
-  letter-spacing: -.01em;
+  font-family: var(--display);
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: .015em;
 }
 
 .brand-copy small {
@@ -95,18 +99,19 @@ body {
 }
 
 .top-actions {
-  gap: 8px;
+  gap: 18px;
 }
 
 .top-nav-button {
   display: inline-flex;
   align-items: center;
-  min-height: 32px;
-  padding: 6px 5px;
+  min-height: 44px;
+  padding: 10px 6px;
   border-radius: 0;
   color: #444d55;
-  font-size: 11px;
-  font-weight: 700;
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
   text-decoration: none;
 }
 
@@ -123,29 +128,35 @@ body {
 }
 
 .app {
-  padding-top: 40px;
+  padding-top: 38px;
 }
 
 h1 {
+  font-family: var(--display);
   font-size: clamp(36px, 4.5vw, 54px);
   line-height: 1;
-  font-weight: 800;
-  letter-spacing: -.025em;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 h2 {
-  font-weight: 800;
-  letter-spacing: -.02em;
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 h3 {
-  font-weight: 800;
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 .eyebrow {
   color: var(--green);
-  font-size: 10px;
-  letter-spacing: .14em;
+  font-family: var(--sans);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .12em;
 }
 
 .message-card,
@@ -217,8 +228,11 @@ h3 {
 }
 
 .button {
-  border-radius: 0;
-  font-weight: 800;
+  min-height: 44px;
+  border-radius: 3px;
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .button:hover:not(:disabled) {
@@ -226,17 +240,20 @@ h3 {
 }
 
 .button.primary {
-  border-color: var(--green);
+  border: 1px solid var(--green);
   background: var(--green);
+  color: #fff;
 }
 
 .button.primary:hover:not(:disabled) {
+  border-color: var(--green-dark);
   background: var(--green-dark);
 }
 
 .button.secondary {
   border-color: var(--line-strong);
-  background: #fff;
+  border-radius: 3px;
+  background: var(--surface);
 }
 
 .button.secondary:hover:not(:disabled) {
@@ -337,8 +354,8 @@ h3 {
 /* A visible focus ring. The browser default is a 1px near-black outline, which
    disappears against the dark primary buttons. */
 :focus-visible {
-  outline: 3px solid var(--green);
-  outline-offset: 2px;
+  outline: 3px solid #2a68a5;
+  outline-offset: 4px;
 }
 .button.primary:focus-visible,
 .card-choice:focus-visible {
@@ -390,15 +407,17 @@ body .run-invite {
 }
 
 body .run-heading h1 {
-  font-size: 32px;
-  font-weight: 800;
-  letter-spacing: -.025em;
+  font-family: var(--display);
+  font-size: 36px;
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 body .run-heading h1 span {
   color: var(--muted);
+  font-family: var(--sans);
   font-size: 16px;
-  font-weight: 450;
+  font-weight: 400;
 }
 
 body .run-steps {
@@ -407,10 +426,10 @@ body .run-steps {
 }
 
 body .run-steps li {
-  padding: 8px 0 7px;
+  padding: 9px 0;
   border-bottom: 1px solid #c9ced1;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 14px;
 }
 
 body .run-steps .done {
@@ -426,6 +445,16 @@ body .run-steps .current {
 body .run-pool {
   border-bottom-color: var(--line);
 }
+body .run-pool h2 {
+  font-family: var(--sans);
+  font-size: 16px;
+  font-weight: 600;
+}
+body .run-pool small,
+body .run-tools small,
+body .run-note {
+  font-size: 14px;
+}
 
 body .run-pool-cards img {
   border-radius: 0;
@@ -438,15 +467,15 @@ body .run-tools {
 body .run-tools p,
 body .run-context-empty {
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
 }
 
 body .run-tools .button.secondary {
-  min-height: 38px;
-  padding: 8px 12px;
+  min-height: 44px;
+  padding: 9px 12px;
   text-transform: uppercase;
   letter-spacing: .04em;
-  font-size: 11px;
+  font-size: 14px;
 }
 
 body .run-cards {
@@ -463,8 +492,9 @@ body .run-card {
 
 body .run-card.selected {
   padding-top: 4px;
+  border-color: var(--green);
   border-top: 3px solid var(--green);
-  background: transparent;
+  background: var(--green-soft);
 }
 
 body .run-card.trophy-pick {
@@ -479,39 +509,58 @@ body .run-card-select img {
 
 body .run-card-select > span {
   margin-top: 7px;
-  font-size: 12px;
-  font-weight: 800;
+  font-size: 14px;
+  line-height: 1.25;
+  font-weight: 600;
   letter-spacing: -.01em;
 }
 
 body .run-zoom {
-  padding-top: 5px;
+  min-height: 44px;
+  padding: 6px 3px;
   color: var(--muted);
-  font-size: 10px;
+  font-size: 13px;
   text-transform: uppercase;
   letter-spacing: .06em;
 }
+body .run-card-outcome {
+  font-size: 12px;
+  letter-spacing: .02em;
+}
 
 body .run-lock {
-  border: 0;
-  border-top: 1px solid #8c959b;
+  border: 1px solid var(--line);
+  border-top: 2px solid var(--ink);
   border-radius: 0;
   background: #fff;
   box-shadow: none;
 }
 
 body .run-lock > span {
-  font-size: 11px;
+  font-size: 16px;
   font-weight: 800;
   text-transform: uppercase;
   letter-spacing: .05em;
 }
+body .run-lock span { font-size: 16px; }
 
 body .run-feedback {
   border: 1px solid var(--line);
   border-left: 3px solid var(--green);
   border-radius: 0;
-  background: #fff;
+  background: var(--green-soft);
+}
+body .run-feedback h2 {
+  font-family: var(--sans);
+  font-size: 20px;
+  letter-spacing: 0;
+}
+body .run-feedback p { font-size: 15px; }
+body .run-feedback > strong,
+body .run-final-score > strong {
+  font-family: var(--display);
+  font-weight: 600;
+  letter-spacing: 0;
 }
 
 body .run-friend {
@@ -542,10 +591,14 @@ body .run-review-list li {
   justify-content: space-between;
   gap: 24px;
   border-top: 1px solid var(--line);
+  font-size: 14px;
 }
 
 .app-footer nav { display: flex; flex-wrap: wrap; gap: 18px; }
 .app-footer a { color: var(--muted); font-size: 11px; font-weight: 700; text-decoration: none; }
+.app-footer strong { font-family: var(--display); font-size: 22px; }
+.app-footer p { max-width: 66ch; font-size: 14px; line-height: 1.5; }
+.app-footer nav a { display: inline-block; padding-block: 8px; font-size: 14px; }
 .app-footer a:hover { color: var(--green-dark); text-decoration: underline; text-underline-offset: 4px; }
 .is-game .app-footer { display: none; }
 
@@ -666,44 +719,7 @@ body .run-review-list li {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
 }
 
-/* Shared tournament typography and controls, including dynamically loaded pages. */
-body{font-family:var(--sans);font-size:16px;line-height:1.5}
-h1,h2,h3{font-family:var(--display);font-weight:600;letter-spacing:0}
-button,input,select,textarea{font:inherit}
-.topbar{min-height:72px;border-top-width:3px}
-.brand-mark{width:36px;height:40px;border-radius:2px;background:var(--green);color:#fff;border:0;font-family:var(--display)}
-.brand-mark>span{font-style:normal;font-size:26px;font-weight:600}
-.brand-mark>sup{font-size:12px;top:-6px}
-.brand-copy strong{font-family:var(--display);font-size:26px;font-weight:600;letter-spacing:.015em}
-.top-actions{gap:18px}
-.top-nav-button{font-family:var(--sans);font-size:15px;font-weight:600;min-height:44px;padding:10px 6px}
-.app{padding-top:38px}
-.button{font-family:var(--sans);font-size:16px;font-weight:600;min-height:44px;border-radius:3px}
-.button.primary{background:var(--green);color:#fff;border:1px solid var(--green)}
-.button.primary:hover{background:var(--green-dark);border-color:var(--green-dark)}
-.button.secondary{border-radius:3px;background:var(--surface)}
-.eyebrow{font-family:var(--sans);font-size:12px;font-weight:700;letter-spacing:.12em}
-a:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid #2a68a5;outline-offset:4px}
-body .run-heading h1{font-family:var(--display);font-weight:600;letter-spacing:0;font-size:36px}
-body .run-heading h1 span{font-family:var(--sans);font-size:16px;font-weight:400}
-body .run-steps li{font-size:14px;padding:9px 0}
-body .run-pool h2{font-family:var(--sans);font-size:16px;font-weight:600}
-body .run-pool small,body .run-context-empty,body .run-tools p,body .run-tools small,body .run-note{font-size:14px}
-body .run-card-select>span,body .run-pool-cards span{font-size:14px;line-height:1.25;font-weight:600}
-body .run-zoom{font-size:13px;min-height:32px;padding:6px 3px}
-body .run-card-outcome{font-size:12px;letter-spacing:.02em}
-body .run-tools .button.secondary{font-size:14px;padding:9px 12px}
-body .run-card.selected{background:var(--green-soft);border-color:var(--green)}
-body .run-feedback{background:var(--green-soft)}
-body .run-feedback h2{font-family:var(--sans);font-size:20px;letter-spacing:0}
-body .run-feedback p{font-size:15px}
-body .run-feedback>strong,body .run-final-score>strong{font-family:var(--display);font-weight:600;letter-spacing:0}
-body .run-lock{border:1px solid var(--line);border-top:2px solid var(--ink);box-shadow:none}
-body .run-lock span{font-size:16px}
-.app-footer{font-size:14px;border-top:1px solid var(--line)}
-.app-footer strong{font-family:var(--display);font-size:22px}
-.app-footer p{font-size:14px;line-height:1.5;max-width:66ch}
-.app-footer nav a{font-size:14px;display:inline-block;padding-block:8px}
+/* Narrow-screen tournament refinements. */
 @media(max-width:600px){
  .topbar{padding:12px 16px 0;gap:12px;min-height:0}
  .brand-copy strong{font-size:25px}.brand-mark{width:30px;height:34px}
@@ -714,7 +730,7 @@ body .run-lock span{font-size:16px}
  body .run-heading h1{font-size:30px}body .run-heading h1 span{font-size:15px}
  body .run-steps{gap:3px}body .run-steps li{font-size:12px;min-width:0}
  body .run-card-select>span,body .run-pool-cards span{font-size:12px;line-height:1.3}
- body .run-zoom{font-size:12px;min-height:36px}
+ body .run-zoom{font-size:12px;min-height:44px}
  body .run-lock{margin-inline:-6px;padding-inline:10px}
  body .run-lock span{font-size:14px}
  .app-footer{padding:24px 16px 30px}
