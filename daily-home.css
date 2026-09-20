@@ -38,5 +38,5 @@
 }
 
 .daily-home-game[data-environment="latest"]{border-left-color:#8c4b36}.daily-home-game[data-environment="latest"] .daily-home-number{color:#b79b91}
-.daily-home-custom{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:24px 0;border-bottom:1px solid var(--line)}.daily-home-custom p{margin:0 0 6px}.daily-home-custom .button{white-space:nowrap;text-decoration:none}
-@media(max-width:600px){.daily-home-custom{align-items:flex-start;flex-direction:column}.daily-home-custom .button{width:100%;justify-content:center}}
+.daily-home-custom,.daily-home-regular{display:flex;align-items:center;justify-content:space-between;gap:20px;padding:24px 0;border-bottom:1px solid var(--line)}.daily-home-custom p,.daily-home-regular p{margin:0 0 6px}.daily-home-custom .button,.daily-home-regular .button{white-space:nowrap;text-decoration:none}
+@media(max-width:600px){.daily-home-custom,.daily-home-regular{align-items:flex-start;flex-direction:column}.daily-home-custom .button,.daily-home-regular .button{width:100%;justify-content:center}}
