@@ -119,31 +119,22 @@ function cookieLines(session) {
   ];
 }
 
-// The deployed Neon runtime keeps only the last Set-Cookie entry when a Headers
-// object is copied, so stacking two cookie wrappers silently dropped the first
-// one's cookies in production while Node kept all of them and every test
-// passed. Cookies therefore ride on the response as an authoritative list and
-// every wrapper rewrites that whole list instead of trusting the copy to carry
-// what is already there. Any wrapper that copies a response's headers after
-// this point must re-apply setCookies(response) the same way.
-const RESPONSE_COOKIES=new WeakMap();
-
-export function setCookies(response) {
-  return RESPONSE_COOKIES.get(response)||[];
-}
-
-export function applyCookies(headers,lines) {
-  headers.delete('set-cookie');
-  for(const line of lines)headers.append('set-cookie',line);
-  return headers;
-}
+// This runtime serializes only the LAST Set-Cookie entry when a response
+// carries several, however they were written - verified against the deployed
+// functions: three appended cookies arrive as one, and the Response
+// constructor's array form behaves the same. The only shape that survives is a
+// single header whose value joins the cookies, which edge/gateway.mjs splits
+// back into separate Set-Cookie headers for the browser. Two consequences:
+// cookies here must use Max-Age and never Expires, whose value contains the
+// comma the gateway splits on; and browsers must reach these functions through
+// the gateway, which the first-party configuration already requires.
+export const COOKIE_SEPARATOR=', ';
 
 export function withCookies(response,lines) {
-  const all=[...setCookies(response),...lines];
-  const headers=applyCookies(new Headers(response.headers),all);
-  const next=new Response(response.body,{status:response.status,statusText:response.statusText,headers});
-  RESPONSE_COOKIES.set(next,all);
-  return next;
+  const headers=new Headers(response.headers);
+  const carried=headers.get('set-cookie');
+  headers.set('set-cookie',[...(carried?[carried]:[]),...lines].join(COOKIE_SEPARATOR));
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 
 export function withAccountCookies(response,session) {

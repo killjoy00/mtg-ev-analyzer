@@ -75,14 +75,24 @@ function cookieValue(cookieHeader,name) {
   }
   return null;
 }
+// Neon functions can only emit one Set-Cookie header, so several cookies arrive
+// joined in a single value. Split every line, not just the one read through the
+// fallback: runtimes that expose getSetCookie return that joined value as a
+// single entry, so splitting only there never ran. The lookahead keeps this a
+// no-op for a lone cookie, and the account cookies use Max-Age precisely so no
+// Expires comma can be mistaken for this boundary.
+const COOKIE_BOUNDARY=/,\s*(?=__(?:Host|Secure)-pack1_)/;
 function upstreamSetCookies(headers) {
-  if(typeof headers.getSetCookie==='function')return headers.getSetCookie();
-  if(typeof headers.getAll==='function') {
-    try {const rows=headers.getAll('set-cookie');if(rows?.length)return rows;} catch {}
+  let lines=[];
+  if(typeof headers.getSetCookie==='function')lines=headers.getSetCookie();
+  else if(typeof headers.getAll==='function') {
+    try {lines=headers.getAll('set-cookie')||[];} catch {lines=[];}
   }
-  const value=headers.get('set-cookie');
-  if(!value)return [];
-  return value.split(/,(?=\s*__(?:Host|Secure)-pack1_)/);
+  if(!lines.length) {
+    const value=headers.get('set-cookie');
+    lines=value?[value]:[];
+  }
+  return lines.flatMap(line=>String(line).split(COOKIE_BOUNDARY));
 }
 function publicCookie(line) {
   return /^(?:__Host-pack1_(?:account|player)|__Secure-pack1_csrf)=/.test(String(line||''));
