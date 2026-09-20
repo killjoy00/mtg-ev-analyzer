@@ -233,7 +233,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   const profileKey = publicKey || profile.player.profile_key || null;
 
   document.querySelector('#profile-home')?.addEventListener('click', () => { window.location.href = './'; });
-  document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderMyProfile();});
+  document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderAccount();});
   document.querySelector('#patreon-connect')?.addEventListener('click',async e=>{
     const button=e.currentTarget,status=document.querySelector('#patreon-status');button.disabled=true;if(status)status.textContent='Opening Patreon…';
     try{const result=await connectPatreon();if(!result?.url)throw Error('Patreon did not return a connection URL.');track('patreon_connect_started');location.href=result.url;}
