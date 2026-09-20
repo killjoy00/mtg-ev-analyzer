@@ -129,7 +129,7 @@ function dailyRow(row, names, index) {
 
 function settingsMarkup(profile, progress, account, patreon) {
   if (!profile.player.claimed) {
-    return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="button secondary" id="profile-claim-account">Save my progress</button></aside>`;
+    return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div></aside>`;
   }
   const unlocked = unlockedAchievements(profile);
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
@@ -177,13 +177,15 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
   const daily = (profile.daily_history || []).slice(0, 12);
   const recent = (profile.recent || []).slice(0, 20);
   const publicUrl = profile.player.profile_public && profile.player.profile_key ? `${location.origin}${location.pathname}?profile=${encodeURIComponent(profile.player.profile_key)}` : '';
+  const heroActions = own && !profile.player.claimed
+    ? '<button type="button" class="button primary" id="profile-claim-account">Sign In</button><button type="button" class="button secondary" id="profile-share">Share my record</button><button type="button" class="button secondary" id="profile-home">Back to game</button>'
+    : `<button type="button" class="button primary" id="profile-share">${profile.player.profile_public ? 'Share profile' : 'Share my record'}</button>${own ? '<a class="button secondary" href="#profile-account">Account settings</a><button type="button" class="button secondary" id="profile-home">Back to game</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}`;
 
   return `<section class="player-profile-page growth-page" data-profile-key="${esc(publicKey || profile.player.profile_key || '')}">
     <header class="profile-hero">
       <div><p class="eyebrow">${own ? 'Account' : 'Player Profile'}</p><h1>${esc(profile.player.display_name)}</h1><p>${own ? 'Your Pack One career, achievements, and account in one place.' : 'A public Pack One career across the Limited archive.'}</p></div>
       <div class="profile-hero-actions">
-        <button type="button" class="button primary" id="profile-share">${profile.player.profile_public ? 'Share profile' : 'Share my record'}</button>
-        ${own ? '<a class="button secondary" href="#profile-account">Account settings</a><button type="button" class="button secondary" id="profile-home">Back to game</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}
+        ${heroActions}
       </div>
     </header>
 
