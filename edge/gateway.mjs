@@ -97,6 +97,18 @@ function upstreamSetCookies(headers) {
 function publicCookie(line) {
   return /^(?:__Host-pack1_(?:account|player)|__Secure-pack1_csrf)=/.test(String(line||''));
 }
+// The CSRF token is a double-submit value the page reads from document.cookie on
+// packone.pro, so it has to be scoped to the parent domain. The account worker
+// writes Domain=packone.pro, but the Neon runtime strips a Domain its own host
+// does not own. This gateway does own it - api.packone.pro is a subdomain - so
+// restore the attribute here. Without it the cookie is host-only to
+// api.packone.pro, the page cannot read the token, and every account write is
+// refused as unverified. __Host- cookies must stay host-only and are untouched.
+function scopedCookie(line) {
+  const value=String(line||'');
+  if(!value.startsWith('__Secure-pack1_csrf=')||/;\s*Domain=/i.test(value))return value;
+  return value.replace(/;\s*Path=\//i,'; Path=/; Domain=packone.pro');
+}
 function safeRedirect(value) {
   try {const url=new URL(value);return url.origin==='https://packone.pro'&&url.protocol==='https:'?url.toString():null;} catch{return null;}
 }
@@ -197,7 +209,7 @@ export async function gateway(request,env,fetcher=fetch) {
 
     const publicHeaders=new Headers();
     for(const name of ['content-type','retry-after'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
-    if(match[1]==='growth')for(const line of upstreamSetCookies(result.headers))if(publicCookie(line))publicHeaders.append('set-cookie',line);
+    if(match[1]==='growth')for(const line of upstreamSetCookies(result.headers))if(publicCookie(line))publicHeaders.append('set-cookie',scopedCookie(line));
     if(result.status>=300&&result.status<400) {
       const target=safeRedirect(result.headers.get('location'));
       if(!target)return finish(response(502,'Unexpected upstream redirect.'));

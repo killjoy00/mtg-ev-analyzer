@@ -141,6 +141,44 @@ test('the gateway splits the one joined Set-Cookie a Neon function can emit',asy
   for(const row of set)assert.match(row,/Max-Age=0/,'each cookie keeps its own attributes');
 });
 
+test('the gateway restores the parent domain the runtime strips from the CSRF cookie',async()=>{
+  // The worker writes Domain=packone.pro and the Neon runtime removes it,
+  // because that host does not own the domain. Host-only, the page on
+  // packone.pro cannot read the token and every account write is refused.
+  const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+  const account='__Host-pack1_account='+'a'.repeat(43)+'; Path=/; Max-Age=604800; Secure; HttpOnly; SameSite=Strict';
+  const csrf='__Secure-pack1_csrf='+'b'.repeat(43)+'; Path=/; Max-Age=604800; Secure; SameSite=Strict';
+  const result=await gateway(
+    new Request('https://api.packone.pro/growth/v1/account/migrate',{method:'POST',
+      headers:{'content-type':'application/json',origin:'https://packone.pro','cf-connecting-ip':'192.0.2.79'},body:'{}'}),
+    prod,
+    async()=>Response.json({ok:true},{headers:{'set-cookie':[account,csrf].join(', ')}}),
+  );
+  const set=result.headers.getSetCookie?.()||[result.headers.get('set-cookie')].filter(Boolean);
+  const relayedCsrf=set.find(row=>row.startsWith('__Secure-pack1_csrf='));
+  assert.match(relayedCsrf,/; Domain=packone\.pro/,'the page must be able to read the CSRF token');
+  assert.match(relayedCsrf,/Path=\/;/,'Path is preserved alongside the restored Domain');
+  assert.match(relayedCsrf,/Max-Age=604800/);
+  // A __Host- cookie is invalid with a Domain, so it must be left alone.
+  const relayedAccount=set.find(row=>row.startsWith('__Host-pack1_account='));
+  assert.doesNotMatch(relayedAccount,/Domain=/i,'__Host- cookies stay host-only');
+});
+
+test('a CSRF cookie that already carries a domain is relayed unchanged',async()=>{
+  const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+  const csrf='__Secure-pack1_csrf=x; Path=/; Domain=packone.pro; Max-Age=0; Secure; SameSite=Strict';
+  const result=await gateway(
+    new Request('https://api.packone.pro/growth/v1/account/signout',{method:'POST',
+      headers:{'content-type':'application/json',origin:'https://packone.pro','cf-connecting-ip':'192.0.2.80'},body:'{}'}),
+    prod,
+    async()=>Response.json({ok:true},{headers:{'set-cookie':csrf}}),
+  );
+  const set=result.headers.getSetCookie?.()||[result.headers.get('set-cookie')].filter(Boolean);
+  assert.deepEqual(set,[csrf]);
+});
+
 test('splitting a lone upstream cookie is a no-op and still drops foreign ones',async()=>{
   const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),
     NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
