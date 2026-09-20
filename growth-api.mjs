@@ -78,7 +78,7 @@ async function ensureBrowserPlayerSession() {
 export async function ensurePackSession() {
   if(firstPartyAuthEnabled()) {
     if(sessionPromise)return sessionPromise;
-    sessionPromise=ensureBrowserPlayerSession().finally(()=>{sessionPromise=null;});
+    sessionPromise=ensureBrowserPlayerSession().catch(error=>{sessionPromise=null;throw error;});
     return sessionPromise;
   }
   const existing=loadPackToken();
