@@ -48,7 +48,13 @@ test('Daily home differentiates free and Elite practice',()=>{
  p.capabilities.push('custom_corpus','unlimited_cube_practice');
  const eliteHtml=dailyHomeMarkup(p,day);
  assert.match(eliteHtml,/Choose your sets/);
+ assert.match(eliteHtml,/favorite sets/);
+ assert.doesNotMatch(eliteHtml,/favourite/);
  assert.doesNotMatch(eliteHtml,/Become Elite/);
+
+ const guestWithCapability=dailyHomeMarkup({player:{claimed:false},capabilities:['custom_corpus','unlimited_cube_practice'],daily_history:[]},day);
+ assert.doesNotMatch(guestWithCapability,/Choose your sets/);
+ assert.doesNotMatch(guestWithCapability,/Build a random run/);
 
  p.daily_history=['mixed','powered-cube','latest'].map(row);
  const completedEliteHtml=dailyHomeMarkup(p,day);

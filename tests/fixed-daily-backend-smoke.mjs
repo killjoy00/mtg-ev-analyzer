@@ -5,16 +5,19 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const originalFetch=globalThis.fetch;globalThis.fetch=(url,options={})=>originalFetch(url,{...options,signal:AbortSignal.timeout(30000)});
 const RealDate=Date,instant=RealDate.parse('2040-01-10T16:00:00Z');
 globalThis.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[instant]));}static now(){return instant;}};
-const {query}=await import('../worker/growth-function.js');
+const growthModule=await import('../worker/growth-function.js');
+const {query}=growthModule, growth=growthModule.default;
 const {default:api}=await import('../worker/draft-run-function.mjs');
 const {DRAFT_RUN_CORPUS_VERSION}=await import('../draft-run.mjs');
 const {selectDatabaseRun}=await import('../worker/draft-run-selection.mjs');
 const tag=crypto.randomUUID().slice(0,8),day='2040-01-10';
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
-async function call(path,body,token,auth,status=200){
- const r=await api.fetch(new Request('https://packone.pro'+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...(auth?{'x-pack1-auth-session':auth}:{})},body:body===undefined?undefined:JSON.stringify(body)}));
+async function callWith(target,path,body,token,auth,status=200){
+ const r=await target.fetch(new Request('https://packone.pro'+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...(auth?{'x-pack1-auth-session':auth}:{})},body:body===undefined?undefined:JSON.stringify(body)}));
  console.log('Checked',path,r.status);const data=await r.json();assert.equal(r.status,status,JSON.stringify(data));return data;
 }
+const call=(path,body,token,auth,status=200)=>callWith(api,path,body,token,auth,status);
+const callGrowth=(path,body,token,auth,status=200)=>callWith(growth,path,body,token,auth,status);
 const guest=await call('/v1/session',{displayName:'QA fixed '+tag});
 const before=(await query('SELECT count(*) n FROM draft_run_schedules WHERE day=$1::date',[day])).rows[0].n;
 assert.equal((await call('/v1/daily-status',undefined,guest.token)).daily_history.length,0);
@@ -47,13 +50,15 @@ assert.equal(accountRun.current.puzzle_id,schedule[0]);assert.equal(accountRun.l
 assert.equal((await call('/v1/runs',{daily:true},owner.token,auth)).id,accountRun.id);
 accountRun=await finish(accountRun,owner.token);assert.ok(accountRun.standing);
 assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid AND challenge_date=$2::date',[owner.playerId,day])).rows[0].n,'1');
-// A guest who links after starting remains unranked, including resume and completion.
-const guestAuthId=crypto.randomUUID();
+// A completed guest Daily can be validated by the explicit sign-in/link action.
+const guestAuthId=crypto.randomUUID(),guestAuth=crypto.randomUUID()+crypto.randomUUID();
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[guestAuthId,'QA late link',`qa-late-${tag}@example.invalid`]);
-await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[guestAuthId,guest.playerId]);
+await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[guestAuth,guestAuthId]);
+const validated=await callGrowth('/v1/account/link',{validateDailyRunId:run.id},guest.token,guestAuth);
+assert.equal(validated.validatedDailyScore,true);
 const lateResume=await call('/v1/runs',{daily:true},guest.token);
-assert.equal(lateResume.id,run.id);assert.equal(lateResume.leaderboard_eligible,false);
-assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid',[guest.playerId])).rows[0].n,'0');
+assert.equal(lateResume.id,run.id);assert.equal(lateResume.leaderboard_eligible,true);assert.ok(lateResume.standing);
+assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid',[guest.playerId])).rows[0].n,'1');
 // Linked player with no Auth header still cannot use paid or free account practice.
 await call('/v1/runs',{},owner.token,null,403);
 let latest=await call('/v1/runs',{daily:true,environment:'latest'},owner.token);
@@ -79,4 +84,4 @@ await query(`INSERT INTO draft_run_schedules(day,environment,corpus_version,puzz
 const cube=await call('/v1/runs',{daily:true,environment:'powered-cube'},later.token);
 assert.equal(cube.current.puzzle_id,older[0].puzzle_id);
 assert.equal((await query('SELECT corpus_version FROM draft_run_sessions WHERE id=$1::uuid',[cube.id])).rows[0].corpus_version,retainedVersion);
-console.log(JSON.stringify({fixedDaily:'passed',anonymousScoresUnranked:true,accountDailyUnique:true,noRerolls:true,quotas:true,sourceUnique:true,dailyShareDoesNotCreateRun:true,statusAndCorpusChangesPreserveSchedule:true,currentCorpus:DRAFT_RUN_CORPUS_VERSION}));
+console.log(JSON.stringify({fixedDaily:'passed',anonymousScoresUnranked:true,guestScoreValidatesAfterSignIn:true,accountDailyUnique:true,noRerolls:true,quotas:true,sourceUnique:true,dailyShareDoesNotCreateRun:true,statusAndCorpusChangesPreserveSchedule:true,currentCorpus:DRAFT_RUN_CORPUS_VERSION}));

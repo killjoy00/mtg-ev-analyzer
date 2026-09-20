@@ -12,6 +12,7 @@ const ALLOWED_ORIGINS = new Set([
 const TOKEN_PREFIX = 'p1_';
 const STATIC_ORIGIN = 'https://packone.pro';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
+const DAILY_RUN_ID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
 let catalogCache = { at: 0, data: null };
 let signingKeyCache = { at: 0, key: null };
 
@@ -626,7 +627,54 @@ async function handleStats(request) {
   return json({ summary: summary.rows[0] || {}, bySet: bySet.rows, byMode: byMode.rows, recent: recent.rows });
 }
 
+async function validateDailyRunScore(runId, playerId, authUserId) {
+  const result = await query(
+    `WITH candidate AS MATERIALIZED (
+       SELECT s.*
+       FROM draft_run_sessions s
+       WHERE s.id=$1::uuid AND s.player_id=$2::uuid AND s.day=$4::date
+         AND s.score IS NOT NULL AND NOT s.leaderboard_eligible
+         AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
+         AND NOT EXISTS (
+           SELECT 1 FROM scores x
+           WHERE x.player_id=s.player_id AND x.challenge_date=s.day
+             AND x.set_id=s.environment AND x.mode='draft_run'
+         )
+       FOR UPDATE
+     ), ranked AS (
+       INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json,is_featured)
+       SELECT c.player_id,c.day,c.environment,'draft_run',c.score,
+              CASE WHEN c.score>=90 THEN 'A' WHEN c.score>=80 THEN 'B' WHEN c.score>=65 THEN 'C' WHEN c.score>=50 THEN 'D' ELSE 'F' END,
+              COALESCE((SELECT jsonb_agg(a.value->>'selectedId') FROM jsonb_array_elements(c.answers) a(value)),'[]'::jsonb),
+              jsonb_build_object('run',c.id,'corpus_version',c.corpus_version,'scoring_version',c.scoring_version,
+                'selection_version',c.selection_version,'validated_after_sign_in',true),
+              true
+       FROM candidate c
+       ON CONFLICT(player_id,challenge_date,set_id,mode) DO NOTHING
+       RETURNING player_id
+     ), promoted AS (
+       UPDATE draft_run_sessions s
+       SET leaderboard_eligible=true,daily_account_id=$3::uuid,updated_at=now()
+       FROM candidate c
+       WHERE s.id=c.id AND EXISTS(SELECT 1 FROM ranked)
+       RETURNING s.id
+     ), event AS (
+       INSERT INTO analytics_events(player_id,event_name,event_props)
+       SELECT $2::uuid,'daily_score_validated',jsonb_build_object('run_id',$1::text)
+       FROM promoted
+     )
+     SELECT count(*) n FROM promoted`,
+    [runId, playerId, authUserId, gameDateKey()],
+  );
+  return Number(result.rows[0]?.n || 0) > 0;
+}
+
 async function handleLink(request) {
+  const payload = await readJson(request);
+  const validateDailyRunId = payload.validateDailyRunId == null ? null : String(payload.validateDailyRunId);
+  if (validateDailyRunId && !DAILY_RUN_ID_RE.test(validateDailyRunId)) {
+    throw Object.assign(new Error('Invalid Daily run.'), { status: 400 });
+  }
   const current = await player(request);
   const auth = await authSession(request);
   const old = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
@@ -651,10 +699,14 @@ async function handleLink(request) {
     }
   }
 
+  const validatedDailyScore = validateDailyRunId
+    ? await validateDailyRunScore(validateDailyRunId, id, auth.user_id)
+    : false;
   const profile = await profileMetaByPlayer(id);
   return json({
     ok: true,
     merged,
+    validatedDailyScore,
     playerId: id,
     token: await tokenFor(id),
     displayName: profile?.display_name || auth.name || 'Pack Player',
