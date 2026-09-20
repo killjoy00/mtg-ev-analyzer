@@ -31,5 +31,13 @@ test('guest Daily results offer score validation instead of a career action', as
 
 test('desktop reveal keeps Next pick in the top action row', async () => {
   const css = await readFile('draft-run.css', 'utf8');
-  assert.match(css, /@media\(min-width:601px\)[\s\S]*\.run-feedback>#run-next\{grid-column:3;grid-row:1/);
+  assert.match(css, /@media\(min-width:601px\)[\s\S]*\.run-feedback>\.run-next-dock\{grid-column:3;grid-row:1/);
+});
+
+
+test('mobile reveal keeps Next pick in a bottom safe-area dock', async () => {
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.draft-run-page:has\(\.run-next-dock\)\{padding-bottom:calc\(72px \+ env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /\.run-next-dock\{position:fixed;z-index:40;left:0;right:0;bottom:0/);
+  assert.match(css, /\.run-next-dock #run-next\{width:100%\}/);
 });
