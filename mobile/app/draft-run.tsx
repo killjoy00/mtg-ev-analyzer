@@ -91,9 +91,6 @@ export default function DraftRunScreen() {
   const scroll = useRef<ScrollView>(null);
 
   const begin = useCallback(async () => {
-    setState({ status: 'loading' });
-    setSelected(null);
-    setMode('pick');
     try {
       const session = await ensureGuestSession();
       const run = await startDailyDraftRun(session.token);
@@ -168,7 +165,16 @@ export default function DraftRunScreen() {
         <View style={styles.center}>
           <Text style={styles.errorTitle}>Couldn&apos;t load Draft Run</Text>
           <Text style={styles.errorBody}>{state.message}</Text>
-          <Pressable accessibilityRole="button" onPress={() => void begin()} style={styles.primaryButton}>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => {
+              setState({ status: 'loading' });
+              setSelected(null);
+              setMode('pick');
+              void begin();
+            }}
+            style={styles.primaryButton}
+          >
             <Text style={styles.primaryButtonText}>Try again</Text>
           </Pressable>
         </View>
