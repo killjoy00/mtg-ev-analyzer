@@ -79,7 +79,9 @@ if(process.argv.includes('--daily')||process.argv.includes('--practice')) {
     console.log(environment+': guest practice denied, universal fixed Daily, no rerolls, completion retry, trophy scoring, unranked result, universal share and resume passed');
   }
 }
-// Catch a concurrent deployment during the acceptance pass, not just stale
-// code at the beginning. Image maintenance must never redeploy this backend.
-await verifyMarkers();
+// Neon can briefly route an old instance even after the new revision has
+// already answered successfully. Give the closing marker check the same bounded
+// settling window; a genuinely different concurrent deployment will never
+// converge back to this exact commit and still fails.
+await verifyMarkers({settle:true});
 console.log(JSON.stringify({branch,commit,timings},null,2));
