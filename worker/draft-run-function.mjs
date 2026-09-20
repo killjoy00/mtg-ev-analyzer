@@ -21,6 +21,7 @@ import {
 } from '../draft-run.mjs';
 
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const IDEMPOTENCY_KEY = /^[A-Za-z0-9_-]{43}$/;
 const environmentOf = s => s.environment || 'mixed';
 const runLength = s => s.puzzle_ids.length;
 const parse = value => typeof value === 'string' ? JSON.parse(value) : value;
@@ -110,6 +111,20 @@ async function start(request) {
   if(environment==='latest'&&!daily)fail('Latest-set runs are Daily only. Choose sets for custom practice.');
   if(environment!=='mixed'&&setIds.length)fail('Custom sets use regular Draft Runs.');
   if(!daily)requireCapability(capabilities,practiceCapability(environment,setIds));
+  const rawIdempotency=String(request.headers.get('x-idempotency-key')||'');
+  if(rawIdempotency&&daily)fail('Practice idempotency keys are not valid for Daily runs.');
+  if(rawIdempotency&&!IDEMPOTENCY_KEY.test(rawIdempotency))fail('Invalid practice idempotency key.');
+  const startIdempotencyHash=rawIdempotency?digest(rawIdempotency):null;
+  const startRequestHash=startIdempotencyHash?digest(JSON.stringify({
+    version:1,environment,setIds,challenge:source?.id||null,qa:body.qa===true,
+  })):null;
+  if(startIdempotencyHash) {
+    const previous=(await query('SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND start_idempotency_hash=$2 LIMIT 1',[owner,startIdempotencyHash])).rows[0];
+    if(previous) {
+      if(previous.start_request_hash!==startRequestHash)fail('This practice start key was already used for a different request.',409);
+      return json(await responseFor(decode(previous)));
+    }
+  }
   const day=daily?gameDateKey():null;
   if(day) {
     const old=await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3 ORDER BY daily_account_id NULLS LAST,created_at LIMIT 1',[owner,day,environment,account?.auth_user_id||null]);
@@ -119,7 +134,7 @@ async function start(request) {
     }
   }
   await consumePlayerLimit(query,owner,'runs',{limit:30,seconds:600});
-  let seed=day ? `daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}` : crypto.randomUUID();
+  let seed=day ? `daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}` : startIdempotencyHash ? `practice:${startIdempotencyHash}` : crypto.randomUUID();
   let corpusVersion=source?.corpus_version||DRAFT_RUN_CORPUS_VERSION,scoringVersion=source?.scoring_version||DRAFT_RUN_SCORING_VERSION;
   let servingPolicy=source?.serving_policy_version|| (source?LEGACY_SERVING_POLICY_VERSION:SERVING_POLICY_VERSION);
   let ids,featuredSets=[],difficultyVersion=source?.difficulty_version||DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion=source?.selection_version||DRAFT_RUN_SELECTION_VERSION;
@@ -144,12 +159,16 @@ async function start(request) {
   if(choices.some(p=>!p || (environment==='powered-cube')!==(p.set_id==='powered-cube'))) fail('This run uses an unavailable corpus.',409);
   const sources=choices.map(p=>p.source_draft_hash),anchors=choices.map(publicDifficulty);
   const rerolls=day||source?{set:0,pack:0}:environment==='powered-cube'||setIds.length?{set:0,pack:2}:{set:1,pack:1};
-  const inserted=await query(`INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version,measurement_qa,daily_featured_sets,daily_account_id,leaderboard_eligible,custom_set_ids,serving_policy_version)
+  const inserted=await query(`INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version,measurement_qa,daily_featured_sets,daily_account_id,leaderboard_eligible,custom_set_ids,serving_policy_version,start_idempotency_hash,start_request_hash)
     VALUES($1::uuid,$2::date,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12::jsonb,$13,
-      $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb,$16::uuid,$17::boolean,$18::jsonb,$19)
-    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,corpusVersion,scoringVersion,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets),day?account?.auth_user_id||null:null,Boolean(day&&account),JSON.stringify(setIds),servingPolicy]);
+      $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb,$16::uuid,$17::boolean,$18::jsonb,$19,$20,$21)
+    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,corpusVersion,scoringVersion,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets),day?account?.auth_user_id||null:null,Boolean(day&&account),JSON.stringify(setIds),servingPolicy,startIdempotencyHash,startRequestHash]);
   let s=inserted.rows[0];
   if(!s && day) s=(await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3',[owner,day,environment,account?.auth_user_id||null])).rows[0];
+  if(!s && startIdempotencyHash) {
+    s=(await query('SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND start_idempotency_hash=$2 LIMIT 1',[owner,startIdempotencyHash])).rows[0];
+    if(s&&s.start_request_hash!==startRequestHash)fail('This practice start key was already used for a different request.',409);
+  }
   if(!s) fail('Could not start your run. Please retry.',409);
   if(inserted.rows.length) await query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,value,$3::jsonb FROM jsonb_array_elements_text($2::jsonb)',[owner,JSON.stringify([day?'daily_started':'game_started',...(environment==='powered-cube'?['cube_started']:[])]),JSON.stringify({mode:'draft_run',set_id:environment,daily,challenge:Boolean(source),run_id:s.id})]);
   return json(await responseFor(decode(s)));

@@ -180,7 +180,7 @@ export async function gateway(request,env,fetcher=fetch) {
     if(!match||!permitted(match[1],match[2],method,url.search,mode))return finish(response(404,'Not found.'));
     if(request.method==='OPTIONS') {
       const requested=(request.headers.get('access-control-request-headers')||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
-      const allowed=['authorization','content-type','x-pack1-auth-session','x-pack1-player-session','x-pack1-csrf','x-pack1-mobile-session','x-pack1-mobile-account','x-pack1-preview-key'];
+      const allowed=['authorization','content-type','x-pack1-auth-session','x-pack1-player-session','x-pack1-csrf','x-pack1-mobile-session','x-pack1-mobile-account','x-idempotency-key','x-pack1-preview-key'];
       if(!origin||requested.some(x=>!allowed.includes(x)))return finish(response(403,'Preflight not allowed.'));
       return finish(new Response(null,{status:204,headers:{
         'access-control-allow-methods':'GET,POST,PATCH,OPTIONS',
@@ -195,6 +195,10 @@ export async function gateway(request,env,fetcher=fetch) {
     const mobileAccount=request.headers.get('x-pack1-mobile-account');
     if(mobileAccount&&(!validMobileAccount(mobileAccount)||!mobileAccountRoute(match[1],match[2],method)))
       return finish(response(validMobileAccount(mobileAccount)?403:401,validMobileAccount(mobileAccount)?'Mobile account session not allowed on this route.':'Invalid mobile account session.'));
+    const idempotencyKey=request.headers.get('x-idempotency-key');
+    const idempotencyRoute=match[1]==='draft'&&match[2]==='/v1/runs'&&method==='POST';
+    if(idempotencyKey&&(!/^[A-Za-z0-9_-]{43}$/.test(idempotencyKey)||!idempotencyRoute))
+      return finish(response(idempotencyRoute?400:403,idempotencyRoute?'Invalid idempotency key.':'Idempotency key not allowed on this route.'));
 
     const network=ipNetwork(request.headers.get('cf-connecting-ip')||'');
     const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
@@ -213,6 +217,7 @@ export async function gateway(request,env,fetcher=fetch) {
     else if(mobileSession)headers.set('authorization','Bearer '+mobileSession);
     else if(preview&&request.headers.has('authorization'))headers.set('authorization',request.headers.get('authorization'));
     if(mobileAccount)headers.set('x-pack1-mobile-account',mobileAccount);
+    if(idempotencyKey)headers.set('x-idempotency-key',idempotencyKey);
     if(request.headers.has('x-pack1-csrf'))headers.set('x-pack1-csrf',request.headers.get('x-pack1-csrf'));
     if(match[1]==='growth'&&match[2]==='/v1/account/migrate'&&request.headers.has('x-pack1-auth-session'))
       headers.set('x-pack1-auth-session',request.headers.get('x-pack1-auth-session'));

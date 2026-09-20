@@ -85,3 +85,10 @@ Policy URLs:
 **Decision:** a Google-only account can be deleted only after a fresh Google OAuth round trip that resolves to the same Pack One auth user as the currently signed-in account.  
 **Mechanism:** deletion OAuth flows are marked with purpose `delete` and the expected Pack One auth-user ID. The callback refuses to mint a handoff if Google resolves to a different user. The deletion endpoint requires the current revocable Pack One account session, the same player identity that initiated reauthentication, and the one-time Google handoff; handoff consumption and account deletion occur in one database statement.  
 **UX:** password accounts continue to require the current password. Google-only accounts get an explicit destructive confirmation before the system browser opens. Apple remains unavailable until its provider is configured.
+
+## 2026-09-20 — native practice start idempotency
+
+**Decision:** native non-Daily Draft Run creation uses a client-generated random 256-bit `x-idempotency-key`. The gateway accepts and forwards that header only for `POST /draft/v1/runs`; the Draft Run service stores only the SHA-256 digest and a digest of the normalized start request.
+**Retry semantics:** an exact retry returns the original run. Concurrent requests with the same key converge on one row through a player-scoped unique index. Reusing a key for a different environment, custom-set selection, challenge, or QA intent returns `409` rather than silently returning a mismatched run.
+**Web compatibility:** the key remains optional server-side so existing browser practice behavior is unchanged. Native practice must always generate a fresh key for each intentional new run and reuse it for retries of that same start attempt.
+**Reason:** a mobile timeout can occur after the server commits a practice run but before the response reaches the app. Without a server-side idempotency contract, retrying would create a second run and duplicate analytics/history.

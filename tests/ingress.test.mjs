@@ -102,6 +102,32 @@ test('production gateway accepts a shaped mobile guest session only on Draft Run
   });
   assert.equal(result.status,200);assert.equal(calls,1);
 
+  const accountToken='a'.repeat(43);
+  const startKey='i'.repeat(43);
+  const practice=new Request('https://api.packone.pro/draft/v1/runs',{
+    method:'POST',body:'{}',headers:{
+      'content-type':'application/json','cf-connecting-ip':'192.0.2.55',
+      'x-pack1-mobile-session':token,'x-pack1-mobile-account':accountToken,'x-idempotency-key':startKey,
+    },
+  });
+  const practiceResult=await gateway(practice,prod,async(url,options)=>{
+    assert.equal(url,'https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/v1/runs');
+    assert.equal(options.headers.get('authorization'),'Bearer '+token);
+    assert.equal(options.headers.get('x-pack1-mobile-account'),accountToken);
+    assert.equal(options.headers.get('x-idempotency-key'),startKey);
+    return Response.json({ok:true});
+  });
+  assert.equal(practiceResult.status,200);
+
+  const malformedKey=new Request('https://api.packone.pro/draft/v1/runs',{method:'POST',body:'{}',headers:{
+    'content-type':'application/json','cf-connecting-ip':'192.0.2.56','x-pack1-mobile-session':token,'x-idempotency-key':'short',
+  }});
+  assert.equal((await gateway(malformedKey,prod,()=>{throw Error('Must not forward');})).status,400);
+  const wrongRouteKey=new Request('https://api.packone.pro/draft/v1/runs/00000000-0000-4000-8000-000000000000',{headers:{
+    'cf-connecting-ip':'192.0.2.57','x-pack1-mobile-session':token,'x-idempotency-key':startKey,
+  }});
+  assert.equal((await gateway(wrongRouteKey,prod,()=>{throw Error('Must not forward');})).status,403);
+
   const noFetch=()=>{throw Error('Must not forward');};
   const invalid=new Request('https://api.packone.pro/draft/v1/runs',{method:'POST',body:'{}',headers:{
     'content-type':'application/json','cf-connecting-ip':'192.0.2.45','x-pack1-mobile-session':'not-a-session',
@@ -112,7 +138,6 @@ test('production gateway accepts a shaped mobile guest session only on Draft Run
   }});
   assert.equal((await gateway(account,prod,noFetch)).status,403);
 
-  const accountToken='a'.repeat(43);
   const mobileLink=new Request('https://api.packone.pro/growth/v1/mobile/account/link',{
     method:'POST',body:'{}',headers:{
       'content-type':'application/json','cf-connecting-ip':'192.0.2.47',
