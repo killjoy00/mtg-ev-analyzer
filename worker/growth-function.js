@@ -13,6 +13,8 @@ const ALLOWED_ORIGINS = new Set([
 const TOKEN_PREFIX = 'p1_';
 const NEON_AUTH_BASE='https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const ACCOUNT_RETURN='https://packone.pro/';
+const MOBILE_GOOGLE_CALLBACK='https://api.packone.pro/growth/v1/mobile/account/google/callback';
+const MOBILE_GOOGLE_RETURN='packone://account';
 const STATIC_ORIGIN = 'https://packone.pro';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 const DAILY_RUN_ID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -649,6 +651,100 @@ async function handleMobileAccountSignin(request) {
   return mobileAccountJson(established.auth,established.session);
 }
 
+function opaqueMobileToken() {
+  return base64Url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+function mobileGoogleReturn(params={}) {
+  const target=new URL(MOBILE_GOOGLE_RETURN);
+  for(const [key,value] of Object.entries(params))if(value!=null)target.searchParams.set(key,String(value));
+  return new Response(null,{status:302,headers:{location:target.toString(),'cache-control':'no-store','referrer-policy':'no-referrer'}});
+}
+
+async function handleMobileGoogleStart(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-google-auth',{limit:10,seconds:600});
+  const flowToken=opaqueMobileToken();
+  const flowHash=digest(flowToken);
+  await query(`INSERT INTO mobile_oauth_handoffs(flow_hash,guest_player_id,provider,expires_at)
+    VALUES($1,$2::uuid,'google',now()+interval '10 minutes')`,[flowHash,owner]);
+  const callback=MOBILE_GOOGLE_CALLBACK+'?flow='+encodeURIComponent(flowToken);
+  const errorCallback=callback+'&oauth_error=1';
+  try {
+    const data=await neonAuth('/sign-in/social',{method:'POST',body:{
+      provider:'google',
+      callbackURL:callback,
+      newUserCallbackURL:callback,
+      errorCallbackURL:errorCallback,
+      disableRedirect:true,
+    }});
+    let target=null;
+    try {target=new URL(String(data?.url||''));} catch {}
+    if(!target||target.protocol!=='https:')throw Object.assign(Error('Google sign in is temporarily unavailable.'),{status:502});
+    return json({url:target.toString()});
+  } catch(error) {
+    await query('DELETE FROM mobile_oauth_handoffs WHERE flow_hash=$1 AND authenticated_at IS NULL',[flowHash]).catch(()=>{});
+    throw error;
+  }
+}
+
+async function handleMobileGoogleCallback(request) {
+  const url=new URL(request.url);
+  const flowToken=String(url.searchParams.get('flow')||'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(flowToken))return mobileGoogleReturn({google:'error'});
+  if(url.searchParams.get('oauth_error')==='1'||url.searchParams.has('error')) {
+    await query('UPDATE mobile_oauth_handoffs SET consumed_at=COALESCE(consumed_at,now()) WHERE flow_hash=$1',[digest(flowToken)]).catch(()=>{});
+    return mobileGoogleReturn({google:'error'});
+  }
+  const verifier=String(url.searchParams.get('neon_auth_session_verifier')||'');
+  if(!/^[A-Za-z0-9._~-]{16,2048}$/.test(verifier))return mobileGoogleReturn({google:'error'});
+  let auth=null;
+  try {
+    const data=await neonAuth('/get-session?neon_auth_session_verifier='+encodeURIComponent(verifier));
+    auth=authIdentity(data);
+    if(!auth)throw Object.assign(Error('Google sign in did not create a session.'),{status:502});
+    const handoffToken=opaqueMobileToken();
+    const updated=await query(`UPDATE mobile_oauth_handoffs
+      SET handoff_hash=$2,auth_user_id=$3::uuid,authenticated_at=now()
+      WHERE flow_hash=$1 AND provider='google' AND consumed_at IS NULL
+        AND authenticated_at IS NULL AND expires_at>now()
+      RETURNING guest_player_id`,[digest(flowToken),digest(handoffToken),auth.user_id]);
+    if(!updated.rows[0])throw Object.assign(Error('Google sign in handoff expired.'),{status:409});
+    return mobileGoogleReturn({googleHandoff:handoffToken});
+  } catch(error) {
+    console.error('Mobile Google OAuth callback failed',Number(error?.status||500));
+    return mobileGoogleReturn({google:'error'});
+  } finally {
+    if(auth?.token)await consumeNeonSession(query,auth.token).catch(()=>{});
+  }
+}
+
+async function handleMobileGoogleFinish(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-google-auth',{limit:10,seconds:600});
+  const payload=await readJson(request);
+  const handoffToken=String(payload.handoffToken||'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(handoffToken))throw Object.assign(Error('Invalid Google sign in handoff.'),{status:400});
+  const accountToken=opaqueMobileToken();
+  const csrf=opaqueMobileToken();
+  const result=await query(`WITH claimed AS (
+      UPDATE mobile_oauth_handoffs SET consumed_at=now()
+      WHERE handoff_hash=$1 AND guest_player_id=$2::uuid AND provider='google'
+        AND authenticated_at IS NOT NULL AND consumed_at IS NULL AND expires_at>now()
+      RETURNING auth_user_id
+    ), inserted AS (
+      INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at)
+      SELECT $3,c.auth_user_id,$4,now()+interval '7 days' FROM claimed c
+      RETURNING auth_user_id,expires_at
+    )
+    SELECT i.auth_user_id user_id,u.email,u.name,i.expires_at
+    FROM inserted i JOIN neon_auth."user" u ON u.id=i.auth_user_id`,
+    [digest(handoffToken),owner,digest(accountToken),digest(csrf)]);
+  const auth=result.rows[0];
+  if(!auth)throw Object.assign(Error('This Google sign in handoff expired or was already used.'),{status:409});
+  return mobileAccountJson(auth,{token:accountToken,expiresAt:auth.expires_at});
+}
+
 async function mobilePasswordDeletionAvailable(authUserId) {
   const result=await query(`SELECT EXISTS(
     SELECT 1 FROM neon_auth.account
@@ -1107,6 +1203,7 @@ async function route(request) {
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true });
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/account/google/callback') return handleMobileGoogleCallback(request);
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);
@@ -1123,6 +1220,8 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/signout') return handleSignout(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signup') return handleMobileAccountSignup(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signin') return handleMobileAccountSignin(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/start') return handleMobileGoogleStart(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/finish') return handleMobileGoogleFinish(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccountSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/link') return handleLink(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signout') return handleMobileSignout(request);

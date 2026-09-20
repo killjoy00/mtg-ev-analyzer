@@ -71,3 +71,11 @@ Policy URLs:
 **Alternative:** preserve historical scores under an anonymous player.  
 **Reason:** the first mobile deletion contract should be unambiguous full account deletion; leaderboard continuity does not outweigh keeping deleted player-owned records.  
 **Authentication:** email/password deletion requires password reauthentication. Provider-only accounts remain blocked until Google/Apple provider reauthentication is implemented. Better Auth's documented built-in deletion is disabled by default; Pack One's managed Neon Auth stores users/accounts/sessions directly in Postgres with user-linked auth rows cascading from `neon_auth.user`. Sources checked 2026-09-19: Better Auth User & Accounts deletion documentation; Neon managed Better Auth architecture/schema.
+
+## 2026-09-20 — native Google OAuth handoff
+
+**Decision:** reuse Pack One's existing server-side Google provider rather than shipping Google OAuth client secrets or a second account system in the app. The app opens the provider authorization URL in the system authentication browser. Pack One's HTTPS callback exchanges the Neon Auth verifier, then redirects to the fixed `packone://account` deep link with a short-lived one-time handoff token.  
+**Security:** the OAuth start creates a random 256-bit flow token bound to the initiating Pack One guest/player. The callback replaces it with a second random 256-bit handoff token; only digests are stored. The finish route requires the same signed player credential, consumes the handoff atomically, and only then issues the revocable Pack One mobile account session. Intercepting the custom-scheme URL without the initiating device's player credential is insufficient to finish sign-in.  
+**Alternative:** embed a Google native client ID and exchange a provider ID token directly from the app.  
+**Reason:** production already has a working server-side Google provider. Reusing it reduces provider configuration and keeps the Pack One backend authoritative for account/session issuance. Current Better Auth and Expo guidance supports native social OAuth via system-browser/deep-link returns; Pack One keeps its own handoff layer because the managed auth server is not controlled by the mobile app.  
+**Apple:** still blocked on provider configuration; do not present Apple login until the production provider exists.

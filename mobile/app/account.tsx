@@ -1,4 +1,5 @@
 import { useLocalSearchParams, router } from 'expo-router';
+import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,11 +14,13 @@ import {
 
 import {
   deleteMobileAccount,
+  finishGoogleSignIn,
   linkMobileAccount,
   loadMobileAccount,
   signInWithEmail,
   signOutMobileAccount,
   signUpWithEmail,
+  startGoogleSignIn,
 } from '@/src/api/account';
 import { ensureGuestSession } from '@/src/api/guest';
 import { type MobileSession } from '@/src/storage/session';
@@ -78,6 +81,31 @@ export default function AccountScreen() {
       : 'Signed in to your Pack One account.');
     if (result.linked.validatedDailyScore) {
       setTimeout(() => router.replace('/draft-run'), 600);
+    }
+  };
+
+  const continueWithGoogle = async () => {
+    if (!session || busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const start = await startGoogleSignIn(session.playerToken);
+      const result = await WebBrowser.openAuthSessionAsync(start.url, 'packone://account');
+      if (result.type !== 'success') {
+        setMessage(result.type === 'cancel' ? 'Google sign in was cancelled.' : 'Google sign in did not finish.');
+        return;
+      }
+      const callback = new URL(result.url);
+      const handoffToken = callback.searchParams.get('googleHandoff');
+      if (!handoffToken || callback.searchParams.get('google') === 'error') {
+        throw new Error('Google sign in did not finish. Please try again.');
+      }
+      const googleAccount = await finishGoogleSignIn(session.playerToken, handoffToken);
+      await finishAccount(session, googleAccount);
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Google sign in failed.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -198,6 +226,19 @@ export default function AccountScreen() {
           </View>
         ) : (
           <View style={styles.panel}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              onPress={() => void continueWithGoogle()}
+              style={[styles.googleButton, busy && styles.disabled]}
+            >
+              <Text style={styles.googleButtonText}>Continue with Google</Text>
+            </Pressable>
+            <View style={styles.dividerRow}>
+              <View style={styles.dividerLine} />
+              <Text style={styles.dividerText}>or use email</Text>
+              <View style={styles.dividerLine} />
+            </View>
             <View style={styles.modeRow}>
               <Pressable
                 accessibilityRole="button"
@@ -267,7 +308,7 @@ export default function AccountScreen() {
         <View style={styles.providerNote}>
           <Text style={styles.panelTitle}>Provider sign-in</Text>
           <Text style={styles.body}>
-            Google and Apple will attach to this same Pack One account identity. They are not separate mobile accounts.
+            Google uses the same Pack One account identity as web. Sign in with Apple will use this same account model once the Apple provider is configured.
           </Text>
         </View>
       </ScrollView>
@@ -283,6 +324,11 @@ const styles = StyleSheet.create({
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md },
   panelTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
+  googleButton: { minHeight: 52, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
+  googleButtonText: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  dividerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
+  dividerLine: { flex: 1, height: 1, backgroundColor: colors.line },
+  dividerText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   modeRow: { flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.line },
   modeButton: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   modeButtonActive: { borderBottomWidth: 3, borderColor: colors.accent },

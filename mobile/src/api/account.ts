@@ -1,7 +1,7 @@
 import { requestJson } from '@/src/api/client';
 import { clearSession, writeSession, type MobileAccountUser, type MobileSession } from '@/src/storage/session';
 
-type AccountSessionResponse = {
+export type AccountSessionResponse = {
   user: MobileAccountUser;
   session: {
     token?: string;
@@ -27,6 +27,22 @@ type SignupResponse = AccountSessionResponse & {
   ok?: boolean;
   verificationRequired?: boolean;
 };
+
+export async function startGoogleSignIn(playerToken: string) {
+  return requestJson<{ url: string }>('/growth/v1/mobile/account/google/start', {
+    method: 'POST',
+    mobileSessionToken: playerToken,
+    body: {},
+  });
+}
+
+export async function finishGoogleSignIn(playerToken: string, handoffToken: string) {
+  return requestJson<AccountSessionResponse>('/growth/v1/mobile/account/google/finish', {
+    method: 'POST',
+    mobileSessionToken: playerToken,
+    body: { handoffToken },
+  });
+}
 
 export async function signInWithEmail(playerToken: string, email: string, password: string) {
   return requestJson<AccountSessionResponse>('/growth/v1/mobile/account/signin', {

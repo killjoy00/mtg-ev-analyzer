@@ -38,10 +38,11 @@ function permitted(service,path,method,search,mode) {
       '/v1/account/signup','/v1/account/signin','/v1/account/migrate',
       '/v1/account/link','/v1/account/link-browser','/v1/account/signout',
       '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/delete',
+      '/v1/mobile/account/google/start','/v1/mobile/account/google/finish',
       '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect',
     ].includes(path))return true;
     if(method==='GET'&&[
-      '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback','/v1/mobile/account/session',
+      '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback','/v1/mobile/account/google/callback','/v1/mobile/account/session',
       '/v1/stats','/v1/profile/me','/v1/profile/history','/v1/patreon/status',
     ].includes(path))return true;
     if(method==='GET'&&/^\/v1\/profile\/[a-f0-9]{16}(?:\/history)?$/.test(path))return true;
@@ -96,7 +97,7 @@ function validMobileAccount(value) {
 }
 function mobileSessionRoute(service,path,method) {
   if(service==='growth') {
-    if(method==='POST'&&['/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/delete'].includes(path))return true;
+    if(method==='POST'&&['/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/delete','/v1/mobile/account/google/start','/v1/mobile/account/google/finish'].includes(path))return true;
     return method==='GET'&&path==='/v1/mobile/account/session';
   }
   if(service!=='draft')return false;
@@ -115,8 +116,13 @@ function mobileAccountRoute(service,path,method) {
     ['/v1/daily-status','/v1/capabilities','/v1/practice-sets'].includes(path)
   );
 }
-function safeRedirect(value) {
-  try {const url=new URL(value);return url.origin==='https://packone.pro'&&url.protocol==='https:'?url.toString():null;} catch{return null;}
+function safeRedirect(value,{mobileOAuth=false}={}) {
+  try {
+    const url=new URL(value);
+    if(url.origin==='https://packone.pro'&&url.protocol==='https:')return url.toString();
+    if(mobileOAuth&&url.protocol==='packone:'&&url.hostname==='account'&&(url.pathname===''||url.pathname==='/'))return url.toString();
+    return null;
+  } catch{return null;}
 }
 
 export class NetworkQuota {
@@ -220,7 +226,9 @@ export async function gateway(request,env,fetcher=fetch) {
     for(const name of ['content-type','retry-after'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
     if(match[1]==='growth')for(const line of upstreamSetCookies(result.headers))if(publicCookie(line))publicHeaders.append('set-cookie',line);
     if(result.status>=300&&result.status<400) {
-      const target=safeRedirect(result.headers.get('location'));
+      const target=safeRedirect(result.headers.get('location'),{
+        mobileOAuth:match[1]==='growth'&&match[2]==='/v1/mobile/account/google/callback',
+      });
       if(!target)return finish(response(502,'Unexpected upstream redirect.'));
       publicHeaders.set('location',target);
       return finish(new Response(null,{status:result.status,headers:publicHeaders}));

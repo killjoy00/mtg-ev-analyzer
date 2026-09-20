@@ -139,6 +139,36 @@ test('production gateway accepts a shaped mobile guest session only on Draft Run
     return Response.json({ok:true,deleted:true});
   });
   assert.equal(deleted.status,200);
+
+  for(const oauthPath of ['/growth/v1/mobile/account/google/start','/growth/v1/mobile/account/google/finish']) {
+    const oauthRequest=new Request('https://api.packone.pro'+oauthPath,{
+      method:'POST',body:JSON.stringify(oauthPath.endsWith('/finish')?{handoffToken:'h'.repeat(43)}:{}),headers:{
+        'content-type':'application/json','cf-connecting-ip':'192.0.2.50','x-pack1-mobile-session':token,
+      },
+    });
+    const oauthResult=await gateway(oauthRequest,prod,async(url,options)=>{
+      assert.equal(url,'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech'+oauthPath.slice('/growth'.length));
+      assert.equal(options.headers.get('authorization'),'Bearer '+token);
+      return Response.json(oauthPath.endsWith('/finish')?{user:{id:'u'},session:{token:'s'}}:{url:'https://accounts.google.com/o/oauth2/auth'});
+    });
+    assert.equal(oauthResult.status,200);
+  }
+
+  const mobileCallback=new Request('https://api.packone.pro/growth/v1/mobile/account/google/callback?flow='+'f'.repeat(43)+'&neon_auth_session_verifier='+'v'.repeat(20),{
+    headers:{'cf-connecting-ip':'192.0.2.51'},
+  });
+  const callbackResult=await gateway(mobileCallback,prod,async()=>new Response(null,{
+    status:302,headers:{location:'packone://account?googleHandoff='+'h'.repeat(43)},
+  }));
+  assert.equal(callbackResult.status,302);
+  assert.equal(callbackResult.headers.get('location'),'packone://account?googleHandoff='+'h'.repeat(43));
+
+  const hostileCallback=await gateway(mobileCallback,prod,async()=>new Response(null,{
+    status:302,headers:{location:'packone://evil?googleHandoff='+'h'.repeat(43)},
+  }));
+  assert.equal(hostileCallback.status,502);
+  assert.equal(hostileCallback.headers.get('location'),null);
+
   const badAccount=new Request('https://api.packone.pro/draft/v1/runs',{method:'POST',body:'{}',headers:{
     'content-type':'application/json','cf-connecting-ip':'192.0.2.48','x-pack1-mobile-session':token,'x-pack1-mobile-account':'bad',
   }});

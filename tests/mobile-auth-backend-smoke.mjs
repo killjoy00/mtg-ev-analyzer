@@ -60,6 +60,20 @@ await call(growth,'/v1/mobile/account/delete',{password:'irrelevant'},{playerTok
 await call(growth,'/v1/mobile/account/signout',{},{playerToken:linked.token,accountToken});
 await call(growth,'/v1/mobile/account/session',undefined,{playerToken:linked.token,accountToken,status:401});
 
+const googleHandoff=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+await query(`INSERT INTO mobile_oauth_handoffs(
+    flow_hash,handoff_hash,guest_player_id,auth_user_id,provider,expires_at,authenticated_at
+  ) VALUES($1,$2,$3::uuid,$4::uuid,'google',now()+interval '5 minutes',now())`,
+  [digest('f'.repeat(43)),digest(googleHandoff),guest.playerId,userId]);
+const otherGuest=await call(growth,'/v1/session',{displayName:'QA wrong OAuth guest'});
+await call(growth,'/v1/mobile/account/google/finish',{handoffToken:googleHandoff},{playerToken:otherGuest.token,status:409});
+const googleSession=await call(growth,'/v1/mobile/account/google/finish',{handoffToken:googleHandoff},{playerToken:linked.token});
+assert.equal(googleSession.user.id,userId);
+assert.match(googleSession.session.token,/^[A-Za-z0-9_-]{43}$/);
+await call(growth,'/v1/mobile/account/google/finish',{handoffToken:googleHandoff},{playerToken:linked.token,status:409});
+await call(growth,'/v1/mobile/account/session',undefined,{playerToken:linked.token,accountToken:googleSession.session.token});
+await call(growth,'/v1/mobile/account/signout',{},{playerToken:linked.token,accountToken:googleSession.session.token});
+
 await query(`INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference)
   VALUES($1::uuid,'custom_corpus','test','mobile-delete')`,[userId]);
 assert.equal(await deleteMobileAccountData(userId,guest.playerId,email),true);
@@ -75,4 +89,4 @@ for(const [sql,params,label] of [
   assert.equal((await query(sql,params)).rows[0].n,'0',label+' should be deleted');
 }
 
-console.log('Mobile auth passed: revocable native account session, guest-bound one-use run claim, ranked promotion, signout, and full account-data deletion.');
+console.log('Mobile auth passed: revocable native account session, guest-bound one-use run claim, Google OAuth handoff finish, ranked promotion, signout, and full account-data deletion.');
