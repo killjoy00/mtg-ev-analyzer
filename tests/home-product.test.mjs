@@ -22,8 +22,8 @@ test('all three complete reveals account practice or account creation',()=>{
  const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
  const freeHtml=dailyHomeMarkup(p,day);
  assert.match(freeHtml,/Start Another Draft Run/);
- assert.match(freeHtml,/Become Elite/);
- assert.match(freeHtml,/Elite adds unlimited Powered Cube and custom-set drafts/);
+ assert.equal((freeHtml.match(/Become Elite/g)||[]).length,1);
+ assert.doesNotMatch(freeHtml,/Elite adds unlimited Powered Cube and custom-set drafts/);
  p.player.claimed=false;const guestHtml=dailyHomeMarkup(p,day);
  assert.match(guestHtml,/Create a free account/);
  assert.doesNotMatch(guestHtml,/Start Another Draft Run/);
@@ -42,7 +42,7 @@ test('home runtime isolates historical code and lazily loads profiles',()=>{
 test('Daily home differentiates free and Elite practice',()=>{
  const p={player:{claimed:true},capabilities:['account'],daily_history:[]};
  const freeHtml=dailyHomeMarkup(p,day);
- assert.match(freeHtml,/Free practice/);
+ assert.match(freeHtml,/<h2 class="eyebrow">Free practice<\/h2>/);
  assert.match(freeHtml,/Practice a Draft Run/);
  assert.ok(freeHtml.indexOf('Practice a Draft Run')<freeHtml.indexOf('Elite practice'),'regular practice appears before the Elite upsell');
  assert.match(freeHtml,/Elite practice/);
@@ -104,10 +104,10 @@ test('a connected member is asked to upgrade, not to become',()=>{
  const unconnected=dailyHomeMarkup({...base,membership:{connected:false}},day);
  assert.match(unconnected,/Become Elite/);assert.doesNotMatch(unconnected,/Upgrade to Elite/);
 
- // Both slots agree once the Dailies are done.
+ // The dedicated Elite row is the only paid ask once the Dailies are done.
  const done={...base,membership:{connected:true},daily_history:['mixed','powered-cube','latest'].map(row)};
  const doneHtml=dailyHomeMarkup(done,day);
- assert.equal((doneHtml.match(/Upgrade to Elite/g)||[]).length,2);
+ assert.equal((doneHtml.match(/Upgrade to Elite/g)||[]).length,1);
  assert.doesNotMatch(doneHtml,/Become Elite/);
 
  // An Elite member is never asked for either.
