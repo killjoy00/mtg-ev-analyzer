@@ -73,6 +73,8 @@ try{
   }
   await noOverflow();
   await page.waitForFunction(()=>[...document.querySelectorAll('.run-cards img')].every(img=>img.complete&&img.naturalWidth>0),null,{timeout:30000});
+  const zoomTarget=await page.locator('.run-zoom').first().boundingBox();assert.ok(zoomTarget&&zoomTarget.height>=43.5,'Enlarge control meets the 44px target');
+  if(!daily){const rerollTarget=await page.locator('.run-lock .run-tools .button').first().boundingBox();assert.ok(rerollTarget&&rerollTarget.height>=43.5,'Reroll control meets the 44px target');}
   await page.locator('.run-zoom').first().click();await page.locator('.run-card-dialog').waitFor();await page.getByRole('button',{name:'Close',exact:true}).click();
   // Offscreen images can finish loading before asynchronous decoding paints them.
   await page.evaluate(()=>Promise.all([...document.querySelectorAll('.run-cards img')].map(img=>img.decode())));
