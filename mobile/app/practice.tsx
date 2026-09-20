@@ -18,6 +18,7 @@ import {
   type PracticeSet,
 } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
+import { useAppResume } from '@/src/hooks/useAppResume';
 import type { MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
 
@@ -39,6 +40,11 @@ function hasCapability(capabilities: PracticeCapability[], capability: PracticeC
 export default function PracticeScreen() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [selectedSets, setSelectedSets] = useState<string[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useAppResume(() => {
+    setReloadKey((value) => value + 1);
+  });
 
   useEffect(() => {
     let active = true;
@@ -79,7 +85,7 @@ export default function PracticeScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const toggleSet = (setId: string) => {
     setSelectedSets((current) => current.includes(setId)
