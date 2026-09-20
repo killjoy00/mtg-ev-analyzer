@@ -32,7 +32,7 @@ import { colors, spacing } from '@/src/theme';
 type Mode = 'signin' | 'signup';
 
 export default function AccountScreen() {
-  const params = useLocalSearchParams<{ claimToken?: string; environment?: string }>();
+  const params = useLocalSearchParams<{ claimToken?: string; environment?: string; returnTo?: string }>();
   const claimToken = typeof params.claimToken === 'string' ? params.claimToken : undefined;
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const returnEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
@@ -92,6 +92,11 @@ export default function AccountScreen() {
         pathname: '/draft-run',
         params: { environment: returnEnvironment },
       }), 600);
+    } else if (params.returnTo === 'practice') {
+      setTimeout(() => router.replace({
+        pathname: '/draft-run',
+        params: { mode: 'practice' },
+      }), 300);
     }
   };
 
