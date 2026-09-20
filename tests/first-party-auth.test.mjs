@@ -23,13 +23,13 @@ globalThis.dispatchEvent=()=>{};
 const calls=[];
 globalThis.fetch=async(url,options={})=>{
   const u=new URL(url),path=u.pathname,headers=new Headers(options.headers||{});
-  calls.push({path,method:options.method||'GET',headers,credentials:options.credentials,body:options.body});
+  calls.push({host:u.host,path,method:options.method||'GET',headers,credentials:options.credentials,body:options.body});
   if(path==='/growth/v1/player/migrate')return Response.json({ok:true,migrated:true});
   if(path==='/growth/v1/player/session')return Response.json({ok:true,playerId:'player'});
   if(path==='/growth/v1/account/migrate')return Response.json({ok:true,migrated:true,user:{id:'user',email:'qa@example.invalid',name:'QA'}});
   if(path==='/growth/v1/account/session')return Response.json({user:{id:'user',email:'qa@example.invalid',name:'QA'},session:{expiresAt:'2099-01-01T00:00:00Z'}});
   if(path==='/growth/v1/profile')return Response.json({player:{display_name:'QA Changed'}});
-  if(path==='/growth/v1/account/google/start')return Response.json({url:'https://accounts.google.com/o/oauth2/v2/auth?client_id=fixture'});
+  if(path==='/pack1/auth/sign-in/social')return Response.json({url:'https://oauth.neon.tech/authorize?provider=google&state=fixture'});
   throw Error('Unexpected '+path);
 };
 const auth=await import('../growth-api.mjs');
@@ -57,10 +57,16 @@ test('first-party writes use CSRF without exposing an account bearer',async()=>{
   assert.equal(auth.storedAccountToken(),'first-party');
 });
 
-test('Google starts through the first-party account endpoint',async()=>{
+test('Google starts on the Neon Auth browser origin so OAuth state cookies are preserved',async()=>{
   await auth.startGoogleSignIn();
-  const call=calls.findLast(row=>row.path==='/growth/v1/account/google/start');
+  const call=calls.findLast(row=>row.path==='/pack1/auth/sign-in/social');
+  assert.equal(call.host,'ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech');
   assert.equal(call.method,'POST');
   assert.equal(call.credentials,'include');
-  assert.match(assigned,/^https:\/\/accounts\.google\.com\//);
+  const body=JSON.parse(call.body);
+  assert.equal(body.provider,'google');
+  assert.equal(body.callbackURL,'https://api.packone.pro/growth/v1/account/google/callback');
+  assert.equal(body.newUserCallbackURL,body.callbackURL);
+  assert.equal(body.disableRedirect,true);
+  assert.equal(assigned,'https://oauth.neon.tech/authorize?provider=google&state=fixture');
 });
