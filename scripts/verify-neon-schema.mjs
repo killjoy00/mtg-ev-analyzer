@@ -17,6 +17,8 @@ const result=await query(`SELECT
   to_regclass('corpus_sources') IS NOT NULL corpus_sources,
   to_regclass('player_request_limits') IS NOT NULL limits,
   to_regclass('entitlement_grants') IS NOT NULL capabilities,
+  to_regclass('account_sessions') IS NOT NULL account_sessions,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='account_sessions' AND column_name='csrf_hash') account_session_csrf,
   to_regclass('provider_accounts') IS NOT NULL provider_accounts,
   to_regclass('provider_oauth_states') IS NOT NULL provider_oauth_states,
   to_regclass('provider_webhook_receipts') IS NOT NULL provider_webhook_receipts,
@@ -28,6 +30,6 @@ const result=await query(`SELECT
   (SELECT count(*)=2 FROM pg_constraint WHERE conname IN ('draft_run_sessions_puzzle_ids_check','draft_run_schedules_puzzle_ids_check')
     AND pg_get_constraintdef(oid) ~ '\\m8\\M' AND pg_get_constraintdef(oid) ~ '\\m10\\M') lengths,
   position('jsonb_array_length(s.puzzle_ids)' in pg_get_viewdef('draft_run_measurements'::regclass))>0 measurements`);
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0027 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0028 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');

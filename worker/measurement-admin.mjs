@@ -1,3 +1,4 @@
+import {accountSession} from './account-session.mjs';
 import {createHash} from 'node:crypto';
 import {handleCorpusAdmin} from './corpus-admin.mjs';
 import {handleUserAdmin} from './user-admin.mjs';
@@ -36,11 +37,10 @@ const METRICS=`count(*)::int exposures,count(DISTINCT player_id)::int players,
   round((percentile_cont(.5) WITHIN GROUP(ORDER BY active_ms) FILTER(WHERE outcome='pick'))::numeric/1000,1) median_seconds,
   round((percentile_cont(.9) WITHIN GROUP(ORDER BY active_ms) FILTER(WHERE outcome='pick'))::numeric/1000,1) p90_seconds`;
 async function account(request,query) {
-  const token=request.headers.get('x-pack1-auth-session');
-  if(!token||token.length>512)fail('Sign in to your admin account.',401);
-  const {rows}=await query(`SELECT "userId" id FROM neon_auth.session WHERE token=$1 AND "expiresAt">now()`,[token]);
-  if(!rows[0])fail('Your account session expired. Please sign in.',401);
-  return rows[0].id;
+  let auth;
+  try {auth=await accountSession(request,query,{allowLegacy:true});}
+  catch(error){fail(error.message,error.status||401);}
+  return auth.user_id;
 }
 export async function handleAdmin(request,query,readJson) {
   const url=new URL(request.url),id=await account(request,query);

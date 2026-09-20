@@ -1,5 +1,5 @@
 import {draftRunLength} from './draft-run-format.mjs';
-import { ensurePackSession, storedAccountToken } from './growth-api.mjs';
+import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, storedAccountToken } from './growth-api.mjs';
 import { shareDraftRunCard } from './share-cards.mjs';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
@@ -37,9 +37,15 @@ function styles() {
   const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
-  const headers={'content-type':'application/json'};
-  if(auth){headers.authorization=`Bearer ${await ensurePackSession()}`;const token=storedAccountToken();if(token)headers['x-pack1-auth-session']=token;}
-  const r=await fetch(base()+path,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000)});
+  const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
+  if(firstPartyAuthEnabled()) {
+    if(auth)await ensurePackSession();
+    const csrf=accountCsrfToken();if(method==='POST'&&csrf)headers['x-pack1-csrf']=csrf;
+  } else if(auth) {
+    headers.authorization=`Bearer ${await ensurePackSession()}`;
+    const token=storedAccountToken();if(token)headers['x-pack1-auth-session']=token;
+  }
+  const r=await fetch(base()+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(30000)});
   const data=await r.json();if(!r.ok) throw Object.assign(new Error(data.error||'Could not reach the game. Try again.'),{status:r.status,capability:data.capability});return data;
 }
 function image(card,extra='') {
@@ -196,7 +202,7 @@ function failureMessage(error) {
 function renderLoadFailure(error,isBoard) {
   if(error.capability||error.status===401){
     const premium=['custom_corpus','unlimited_cube_practice'].includes(error.capability);
-    const signedIn=Boolean(storedAccountToken());
+    const signedIn=hasAccountSession();
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p><button class="button primary" id="practice-membership">'+(signedIn?'Become Elite on Patreon':'Sign in to become Elite')+'</button>':''}${!premium&&!signedIn?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<p><a class="button secondary" href="./">Back to Dailies</a></p></section>`;
     document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs')).beginEliteUpgrade({source:'practice_gate'});});
     document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs')).renderAccount();});return;

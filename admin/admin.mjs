@@ -1,6 +1,6 @@
 import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs';
-import {storedAccountToken,signInAccount,signUpAccount,signOutAccount} from '../growth-api.mjs';
+import {accountCsrfToken,firstPartyAuthEnabled,hasAccountSession,storedAccountToken,signInAccount,signUpAccount,signOutAccount} from '../growth-api.mjs';
 const root=document.querySelector('#admin');
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const fmt=x=>x==null?'—':Number(x).toLocaleString(undefined,{maximumFractionDigits:1});
@@ -11,12 +11,15 @@ const hash=new URLSearchParams(location.hash.slice(1));
 if(hash.has('invite')){invite=hash.get('invite');sessionStorage.setItem('pack1-admin-invite',invite);history.replaceState({},'',location.pathname);}
 invite=invite||sessionStorage.getItem('pack1-admin-invite');
 async function request(path,body) {
-  const r=await fetch(base+path,{method:body?'POST':'GET',headers:{'content-type':'application/json','x-pack1-auth-session':storedAccountToken()||''},body:body?JSON.stringify(body):undefined,signal:AbortSignal.timeout(45000)});
+  const method=body?'POST':'GET',headers={'content-type':'application/json'};
+  if(firstPartyAuthEnabled()){const csrf=accountCsrfToken();if(body&&csrf)headers['x-pack1-csrf']=csrf;}
+  else headers['x-pack1-auth-session']=storedAccountToken()||'';
+  const r=await fetch(base+path,{method,headers,body:body?JSON.stringify(body):undefined,credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(45000)});
   const d=await r.json();if(!r.ok)throw Object.assign(Error(d.error||'Report unavailable.'),{status:r.status});return d;
 }
 function login(message='') {
   root.innerHTML=`<section class="login"><h1>Pack One administration</h1><p>${invite?'Your private invitation is ready. Sign in, or create your admin account below.':'Sign in with the account granted admin access.'}</p><form id="login"><label>Name<input name="name" autocomplete="name"></label><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="8" required></label><label>Setup code (first visit only)<input name="invite" autocomplete="off" spellcheck="false" value="${esc(invite||'')}" placeholder="Paste your private setup code"></label><div class="actions"><button type="submit">Sign in</button><button type="submit" name="create" value="yes" class="secondary">Create account</button></div></form><p id="status" class="error" role="alert">${esc(message)}</p><a href="/">Back to Pack One</a></section>`;
-  document.querySelector('#login').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,data=Object.fromEntries(new FormData(form));form.querySelectorAll('button').forEach(b=>b.disabled=true);try{if(data.invite){if(!/^[a-f0-9]{64}$/.test(data.invite))throw Error('The setup code must contain 64 letters and numbers.');invite=data.invite;sessionStorage.setItem('pack1-admin-invite',invite);}const result=e.submitter?.name==='create'?await signUpAccount({...data,name:data.name||'Pack One Admin'}):await signInAccount(data);if(!result?.token){document.querySelector('#status').textContent='Account created. Complete any requested email verification, then sign in to continue.';return;}await load();}catch(err){document.querySelector('#status').textContent=err.message;}finally{form.querySelectorAll('button').forEach(b=>b.disabled=false);}};
+  document.querySelector('#login').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,data=Object.fromEntries(new FormData(form));form.querySelectorAll('button').forEach(b=>b.disabled=true);try{if(data.invite){if(!/^[a-f0-9]{64}$/.test(data.invite))throw Error('The setup code must contain 64 letters and numbers.');invite=data.invite;sessionStorage.setItem('pack1-admin-invite',invite);}const result=e.submitter?.name==='create'?await signUpAccount({...data,name:data.name||'Pack One Admin'}):await signInAccount(data);if(!(firstPartyAuthEnabled()?result?.user:result?.token)){document.querySelector('#status').textContent='Account created. Complete any requested email verification, then sign in to continue.';return;}await load();}catch(err){document.querySelector('#status').textContent=err.message;}finally{form.querySelectorAll('button').forEach(b=>b.disabled=false);}};
 }
 function options(values,current){return values.map(([v,label])=>`<option value="${esc(v)}" ${v===current?'selected':''}>${esc(label)}</option>`).join('');}
 function table(rows,label) {
@@ -43,7 +46,7 @@ function render() {
   document.querySelectorAll('[data-puzzle]').forEach(el=>el.ontoggle=async()=>{if(!el.open||el.dataset.loaded)return;const target=el.querySelector('.detail');target.textContent='Loading decision…';try{const data=await request(`/v1/admin/decisions/${el.dataset.puzzle}?${params}`),p=data.puzzle;target.innerHTML=`<p>Earlier picks: ${esc(p.prior_picks.map(c=>c.name).join(', ')||'None')}</p><div class="decision-cards">${p.candidates.map(card=>{const count=data.choices.find(c=>c.selected_id===card.id);return `<article>${/^https:\/\//.test(card.image_url||'')?`<img src="${esc(card.image_url)}" alt="${esc(card.name)}" loading="lazy">`:''}<p><strong>${esc(card.name)}</strong>${card.id===p.historical_pick_id?' · Trophy pick':''}<br>${fmt(count?.answers||0)} choices · Model support ${pct(100*card.model_probability)}<br>Average awarded: ${fmt(count?.average_score)}</p></article>`;}).join('')}</div>`;el.dataset.loaded='1';}catch(err){target.textContent=err.message;}});
 }
 async function load() {
-  if(!storedAccountToken()){login();return;}
+  if(!hasAccountSession()){login();return;}
   try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request);return;}report=await request('/v1/admin/measurements?'+params);render();}
   catch(err){if(err.status===401||err.status===403){login(err.message);return;}const status=document.querySelector('#status');if(status)status.textContent=err.message;else root.innerHTML=`<h1>Report unavailable</h1><p class="error">${esc(err.message)}</p><button id="retry">Try again</button>`;document.querySelector('#retry')?.addEventListener('click',load);}
 }
