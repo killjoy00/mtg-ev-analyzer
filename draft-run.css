@@ -60,7 +60,8 @@
   .run-feedback{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:start}
   .run-feedback>strong{grid-column:1;grid-row:1}
   .run-feedback>.run-feedback-copy{grid-column:2;grid-row:1;min-width:0}
-  .run-feedback>#run-next{grid-column:3;grid-row:1;align-self:start;white-space:nowrap}
+  .run-feedback>.run-next-dock{grid-column:3;grid-row:1;align-self:start}
+  .run-next-dock #run-next{white-space:nowrap}
   .run-feedback>.run-compare,.run-feedback>.run-consensus{grid-column:1/-1}
 }
 .run-pack-review{margin:16px 0}.run-image-share{margin:12px 0}
@@ -77,6 +78,9 @@ body:has(.run-result-page) #home-editorial{display:none}
   .run-lock{margin-top:12px;padding-top:8px}.run-lock span{font-size:13px}
   .run-lock .run-tools .button{min-height:36px}.run-lock .run-tools>div{gap:8px}
   .run-compare-card{padding:8px}.run-compare-card>span{font-size:11px}
+  .draft-run-page:has(.run-next-dock){padding-bottom:calc(72px + env(safe-area-inset-bottom))}
+  .run-next-dock{position:fixed;z-index:40;left:0;right:0;bottom:0;padding:10px 8px;background:var(--surface);border-top:1px solid var(--line);box-shadow:0 -4px 16px #00000012;padding-left:max(8px,env(safe-area-inset-left));padding-right:max(8px,env(safe-area-inset-right));padding-bottom:max(10px,env(safe-area-inset-bottom))}
+  .run-next-dock #run-next{width:100%}
 }
 
 @media(max-width:600px){body .run-steps{margin:8px 0 12px}body .run-steps li{font-size:12px}body .run-card-select>span{font-size:12px}body .run-zoom{font-size:12px}body .run-tools .button.secondary{font-size:12px}}
