@@ -19,7 +19,7 @@ import {
   issueDraftRunClaim,
   rerollDraftRun,
   startDailyDraftRun,
-  startRegularPracticeDraftRun,
+  startPracticeDraftRun,
   submitDraftRunPick,
   type DailyEnvironment,
   type DraftRunCard,
@@ -92,12 +92,22 @@ function CardTile({
   );
 }
 
-async function loadDraftSurface(environment: DailyEnvironment, practice: boolean) {
+async function loadDraftSurface(
+  environment: DailyEnvironment,
+  practice: boolean,
+  setIds: string[],
+) {
   const session = await ensureGuestSession();
   if (practice) {
     if (!session.accountToken) return { status: 'signin-required' as const };
-    const key = await practiceIdempotencyKey();
-    const run = await startRegularPracticeDraftRun(session, key);
+    const practiceEnvironment = environment === 'powered-cube' ? 'powered-cube' : 'mixed';
+    const practiceSets = practiceEnvironment === 'mixed' ? setIds : [];
+    const fingerprint = `${practiceEnvironment}:${practiceSets.join(',')}`;
+    const key = await practiceIdempotencyKey(fingerprint);
+    const run = await startPracticeDraftRun(session, key, {
+      environment: practiceEnvironment,
+      setIds: practiceSets,
+    });
     if (run.complete) await clearPracticeIdempotencyKey();
     return { status: 'ready' as const, run, token: session.playerToken };
   }
@@ -106,18 +116,25 @@ async function loadDraftSurface(environment: DailyEnvironment, practice: boolean
 }
 
 export default function DraftRunScreen() {
-  const params = useLocalSearchParams<{ environment?: string; mode?: string }>();
+  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string }>();
   const practice = params.mode === 'practice';
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
+  const rawSetIds = typeof params.setIds === 'string' ? params.setIds : '';
+  const setIds = rawSetIds
+    .split(',')
+    .filter((setId) => /^[-a-z0-9]{2,40}$/.test(setId))
+    .sort();
+  const setIdsKey = setIds.join(',');
   const environment: DailyEnvironment = practice
-    ? 'mixed'
+    ? requestedEnvironment === 'powered-cube' ? 'powered-cube' : 'mixed'
     : isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
   const surfaceMeta = practice
-    ? {
-        eyebrow: 'PRACTICE DRAFT RUN',
-        resultTitle: 'Practice complete.',
-      }
+    ? setIds.length
+      ? { eyebrow: 'CUSTOM PRACTICE', resultTitle: 'Custom practice complete.' }
+      : environment === 'powered-cube'
+        ? { eyebrow: 'POWERED CUBE PRACTICE', resultTitle: 'Powered Cube practice complete.' }
+        : { eyebrow: 'PRACTICE DRAFT RUN', resultTitle: 'Practice complete.' }
     : dailyMeta;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [mode, setMode] = useState<ViewMode>('pick');
@@ -129,7 +146,7 @@ export default function DraftRunScreen() {
 
   useEffect(() => {
     let active = true;
-    void loadDraftSurface(environment, practice)
+    void loadDraftSurface(environment, practice, setIds)
       .then((loaded) => {
         if (!active) return;
         if (loaded.status === 'signin-required') {
@@ -149,7 +166,7 @@ export default function DraftRunScreen() {
     return () => {
       active = false;
     };
-  }, [environment, practice]);
+  }, [environment, practice, setIdsKey]);
 
   const retry = async ({ freshPractice = false }: { freshPractice?: boolean } = {}) => {
     setState({ status: 'loading' });
@@ -158,7 +175,7 @@ export default function DraftRunScreen() {
     setActionError(null);
     if (practice && freshPractice) await clearPracticeIdempotencyKey();
     try {
-      const loaded = await loadDraftSurface(environment, practice);
+      const loaded = await loadDraftSurface(environment, practice, setIds);
       if (loaded.status === 'signin-required') {
         setState({ status: 'signin-required' });
         return;
@@ -257,7 +274,7 @@ export default function DraftRunScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
-          <Text style={styles.loadingText}>Finding today&apos;s packs…</Text>
+          <Text style={styles.loadingText}>{practice ? 'Building your practice run…' : 'Finding today\'s packs…'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -323,7 +340,7 @@ export default function DraftRunScreen() {
           {practice ? (
             <View style={styles.guestNote}>
               <Text style={styles.guestNoteTitle}>Saved to your career</Text>
-              <Text style={styles.resultBody}>Regular practice uses your Pack One account and is not ranked on the Daily leaderboard.</Text>
+              <Text style={styles.resultBody}>Practice is saved to your Pack One career and is not ranked on the Daily leaderboard.</Text>
               <Pressable
                 accessibilityRole="button"
                 disabled={busy}
