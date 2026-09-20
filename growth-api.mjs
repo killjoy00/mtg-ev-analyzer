@@ -3,6 +3,8 @@ const AUTH_TOKEN_KEY = 'pack1-auth-session-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 const CSRF_COOKIE = '__Secure-pack1_csrf';
 const AUTH_BASE = 'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const GOOGLE_CALLBACK = 'https://api.packone.pro/growth/v1/account/google/callback';
+const ACCOUNT_RETURN = 'https://packone.pro/';
 let sessionPromise = null, migrationPromise = null;
 
 function baseUrl() { return String(window.PACK1_API?.growthUrl || window.PACK1_API?.url || '').replace(/\/$/, ''); }
@@ -284,9 +286,24 @@ export async function signInAccount({email,password}) {
 export async function startGoogleSignIn() {
   if(!firstPartyAuthEnabled())throw new Error('Google sign in is not available on this release yet.');
   await ensurePackSession();
-  const data=await api('/v1/account/google/start',{method:'POST',body:{},auth:false});
-  if(!/^https:\/\/accounts\.google\.com\//.test(String(data?.url||'')))throw new Error('Google sign in is temporarily unavailable.');
-  location.assign(data.url);
+  const response=await fetch(`${AUTH_BASE}/sign-in/social`,{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    credentials:'include',
+    body:JSON.stringify({
+      provider:'google',
+      callbackURL:GOOGLE_CALLBACK,
+      newUserCallbackURL:GOOGLE_CALLBACK,
+      errorCallbackURL:ACCOUNT_RETURN+'?auth=google-error',
+      disableRedirect:true,
+    }),
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.message||data.error||'Google sign in is temporarily unavailable.');
+  let target=null;
+  try {target=new URL(String(data?.url||''));} catch {}
+  if(!target||target.protocol!=='https:')throw new Error('Google sign in is temporarily unavailable.');
+  location.assign(target.toString());
 }
 export async function signOutAccount() {
   if(firstPartyAuthEnabled()) {
