@@ -9,10 +9,21 @@ async function call(path,options={}) {
   assert.equal(response.headers.get('cache-control'),'no-store');
   return {response,data};
 }
-for(const service of ['legacy','growth','draft']) {
-  const {data}=await call('/'+service+'/health?quick=1');
-  assert.equal(data.release_commit,commit,service+' exact release');
+const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+async function exactRelease(service) {
+  let last=null,error=null;
+  for(let attempt=0;attempt<15;attempt++) {
+    try {
+      const {data}=await call('/'+service+'/health?quick=1');
+      last=data.release_commit||null;error=null;
+      if(last===commit)return;
+    } catch(cause) {error=cause;}
+    if(attempt<14)await sleep(2000);
+  }
+  if(error)throw error;
+  assert.equal(last,commit,service+' exact release');
 }
+for(const service of ['legacy','growth','draft'])await exactRelease(service);
 const origin='https://packone.pro';
 const created=await call('/growth/v1/player/session',{
   method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({displayName:'QA secure auth release'}),expected:201,
