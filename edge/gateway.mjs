@@ -87,6 +87,16 @@ function upstreamSetCookies(headers) {
 function publicCookie(line) {
   return /^(?:__Host-pack1_(?:account|player)|__Secure-pack1_csrf)=/.test(String(line||''));
 }
+function validMobileSession(value) {
+  return /^p1_[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/i.test(String(value||''));
+}
+function mobileSessionRoute(service,path,method) {
+  if(service!=='draft')return false;
+  if(method==='POST'&&path==='/v1/runs')return true;
+  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
+  return method==='GET'&&['/v1/daily-status','/v1/capabilities'].includes(path);
+}
 function safeRedirect(value) {
   try {const url=new URL(value);return url.origin==='https://packone.pro'&&url.protocol==='https:'?url.toString():null;} catch{return null;}
 }
@@ -144,7 +154,7 @@ export async function gateway(request,env,fetcher=fetch) {
     if(!match||!permitted(match[1],match[2],method,url.search,mode))return finish(response(404,'Not found.'));
     if(request.method==='OPTIONS') {
       const requested=(request.headers.get('access-control-request-headers')||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
-      const allowed=['authorization','content-type','x-pack1-auth-session','x-pack1-player-session','x-pack1-csrf','x-pack1-preview-key'];
+      const allowed=['authorization','content-type','x-pack1-auth-session','x-pack1-player-session','x-pack1-csrf','x-pack1-mobile-session','x-pack1-preview-key'];
       if(!origin||requested.some(x=>!allowed.includes(x)))return finish(response(403,'Preflight not allowed.'));
       return finish(new Response(null,{status:204,headers:{
         'access-control-allow-methods':'GET,POST,PATCH,OPTIONS',
@@ -153,6 +163,9 @@ export async function gateway(request,env,fetcher=fetch) {
       }}));
     }
     if(preview&&request.headers.get('x-pack1-preview-key')!==env.PREVIEW_KEY)return finish(response(403,'Preview access required.'));
+    const mobileSession=request.headers.get('x-pack1-mobile-session');
+    if(mobileSession&&(!validMobileSession(mobileSession)||!mobileSessionRoute(match[1],match[2],method)))
+      return finish(response(validMobileSession(mobileSession)?403:401,validMobileSession(mobileSession)?'Mobile session not allowed on this route.':'Invalid mobile session.'));
 
     const network=ipNetwork(request.headers.get('cf-connecting-ip')||'');
     const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
@@ -168,6 +181,7 @@ export async function gateway(request,env,fetcher=fetch) {
     if(cookies)headers.set('cookie',cookies);
     const playerToken=cookieValue(cookies,'__Host-pack1_player');
     if(playerToken)headers.set('authorization','Bearer '+playerToken);
+    else if(mobileSession)headers.set('authorization','Bearer '+mobileSession);
     else if(preview&&request.headers.has('authorization'))headers.set('authorization',request.headers.get('authorization'));
     if(request.headers.has('x-pack1-csrf'))headers.set('x-pack1-csrf',request.headers.get('x-pack1-csrf'));
     if(match[1]==='growth'&&match[2]==='/v1/account/migrate'&&request.headers.has('x-pack1-auth-session'))

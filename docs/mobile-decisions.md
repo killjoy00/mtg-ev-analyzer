@@ -47,3 +47,10 @@ Policy URLs:
 **Decision:** the app renders state; Pack One servers own scoring, leaderboard legitimacy, entitlement and account linkage.  
 **Reason:** preserves one product across web/iOS/Android and limits modified-client abuse.  
 **Migration:** no scoring fork and no direct mobile database credentials.
+
+## 2026-09-19 — guest mobile session transport
+
+**Decision:** use the existing signed `p1_` guest player session for the Phase 2 guest-only vertical slice, transported to the first-party gateway in `x-pack1-mobile-session`. The gateway maps it to upstream bearer auth only on fixed Draft Run player routes.  
+**Alternative:** forward arbitrary caller `Authorization` in production.  
+**Reason:** production intentionally strips caller authorization today. A shaped, route-scoped guest header preserves that boundary and cannot be used on account routes. Browser cookie identity still wins when present.  
+**Migration:** account auth will use a separately designed revocable native session; this guest bridge is not the final account-token contract.

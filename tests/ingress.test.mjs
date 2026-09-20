@@ -83,6 +83,36 @@ test('production gateway turns Pack One cookies into upstream identity and relay
 });
 
 
+test('production gateway accepts a shaped mobile guest session only on Draft Run player routes',async()=>{
+  const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'e'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+  const token='p1_00000000-0000-4000-8000-000000000000.'+'x'.repeat(43);
+  let calls=0;
+  const request=new Request('https://api.packone.pro/draft/v1/runs',{
+    method:'POST',body:JSON.stringify({daily:true}),headers:{
+      'content-type':'application/json','cf-connecting-ip':'192.0.2.44','x-pack1-mobile-session':token,
+    },
+  });
+  const result=await gateway(request,prod,async(url,options)=>{
+    calls++;
+    assert.equal(url,'https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/v1/runs');
+    assert.equal(options.headers.get('authorization'),'Bearer '+token);
+    assert.equal(options.headers.get('x-pack1-mobile-session'),null);
+    return Response.json({ok:true});
+  });
+  assert.equal(result.status,200);assert.equal(calls,1);
+
+  const noFetch=()=>{throw Error('Must not forward');};
+  const invalid=new Request('https://api.packone.pro/draft/v1/runs',{method:'POST',body:'{}',headers:{
+    'content-type':'application/json','cf-connecting-ip':'192.0.2.45','x-pack1-mobile-session':'not-a-session',
+  }});
+  assert.equal((await gateway(invalid,prod,noFetch)).status,401);
+  const account=new Request('https://api.packone.pro/growth/v1/account/session',{headers:{
+    'cf-connecting-ip':'192.0.2.46','x-pack1-mobile-session':token,
+  }});
+  assert.equal((await gateway(account,prod,noFetch)).status,403);
+});
+
 test('gateway rejects disallowed paths, origins, hosts, missing identity and partial config without forwarding',async()=>{
   const noFetch=()=>{throw Error('Must not forward');};
   for(const path of ['/draft/v1/trophy-import','/draft/v1/admin/report','/draft/health','/growth/https://other.test','/growth/v1/%73ession'])
@@ -103,6 +133,7 @@ test('quota failure, oversized bodies and invalid preflights fail before upstrea
   const r=await gateway(req(),blocked,noFetch);assert.equal(r.status,429);assert.equal(r.headers.get('retry-after'),'60');
   assert.equal((await gateway(req('/growth/v1/session',{body:'x'.repeat(131073)}),env,noFetch)).status,413);
   for(const [headers,status] of [[{'origin':'https://packone.pro','access-control-request-method':'POST','access-control-request-headers':'content-type,x-pack1-preview-key'},204],
+    [{'origin':'https://packone.pro','access-control-request-method':'POST','access-control-request-headers':'content-type,x-pack1-mobile-session,x-pack1-preview-key'},204],
     [{'origin':'https://packone.pro','access-control-request-method':'POST','access-control-request-headers':'x-pack1-ingress-secret'},403]])
     assert.equal((await gateway(req('/growth/v1/session',{method:'OPTIONS',body:undefined,headers}),env,noFetch)).status,status);
 });

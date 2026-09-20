@@ -14,7 +14,7 @@ export class ApiError extends Error {
 type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
-  token?: string | null;
+  mobileSessionToken?: string | null;
   idempotencyKey?: string | null;
   timeoutMs?: number;
 };
@@ -37,7 +37,7 @@ export async function requestJson<T>(
   const headers = new Headers({ accept: 'application/json' });
 
   if (options.body !== undefined) headers.set('content-type', 'application/json');
-  if (options.token) headers.set('authorization', `Bearer ${options.token}`);
+  if (options.mobileSessionToken) headers.set('x-pack1-mobile-session', options.mobileSessionToken);
   if (options.idempotencyKey) headers.set('x-idempotency-key', options.idempotencyKey);
 
   try {

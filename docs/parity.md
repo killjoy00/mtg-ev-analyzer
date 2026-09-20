@@ -4,11 +4,11 @@ Updated 2026-09-19. “Foundation” means scaffolding exists but the feature is
 
 | Feature | Web | iOS | Android | v1 intent |
 | --- | --- | --- | --- | --- |
-| Guest play | ✓ | — | — | Required |
+| Guest play | ✓ | Vertical slice | Vertical slice | Required |
 | Email account | ✓ | — | — | Required |
 | Google login | ✓ | — | — | Required |
 | Apple login | — | — | — | Required on mobile |
-| Draft Run / Dailies | ✓ | Foundation | Foundation | Required |
+| Draft Run / Dailies | ✓ | Guest vertical slice | Guest vertical slice | Required |
 | Powered Cube | ✓ | — | — | Required |
 | Latest Set | ✓ | — | — | Required |
 | Practice | ✓ | — | — | Required |

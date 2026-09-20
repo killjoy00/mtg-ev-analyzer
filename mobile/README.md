@@ -11,10 +11,10 @@ Foundation only. The app currently provides:
 - Pack One design tokens carried from the web visual system
 - typed API transport with timeouts, bearer-token support and idempotency-key support
 - SecureStore-only session persistence
-- a read-only Draft Run service connection check
+- a guest Daily Draft Run vertical slice (guest session → start/resume → choose → confirm → feedback → next pick → result)
 - EAS development/preview/production profiles
 
-The guest Draft Run production loop is the next milestone. Do not add database credentials, Patreon credentials, store credentials, or privileged API secrets to this directory. Any value prefixed with `EXPO_PUBLIC_` must be treated as public.
+The current vertical slice uses the existing guest player-session authority through a gateway-scoped mobile-session header. Account authentication and guest-result claiming are the next milestones. Do not add database credentials, Patreon credentials, store credentials, or privileged API secrets to this directory. Any value prefixed with `EXPO_PUBLIC_` must be treated as public.
 
 ## Environment
 
