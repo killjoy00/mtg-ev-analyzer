@@ -41,3 +41,16 @@ test('mobile reveal keeps Next pick in a bottom safe-area dock', async () => {
   assert.match(css, /\.run-next-dock\{position:fixed;z-index:40;left:0;right:0;bottom:0/);
   assert.match(css, /\.run-next-dock #run-next\{width:100%\}/);
 });
+
+
+test('Draft Run repeats preserve the practice context', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  assert.match(source, /run\.custom_set_ids\?\.length[\s\S]*\?game=draft-run&custom=1[\s\S]*Choose Sets for Another Run/);
+  assert.match(source, /label:\`Start Another \$\{title\(\)\}\`/);
+});
+
+test('secondary gameplay controls keep mobile-sized targets', async () => {
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /body \.run-zoom\{[^}]*min-height:44px/);
+  assert.match(css, /\.run-lock \.run-tools \.button\{min-height:44px/);
+});

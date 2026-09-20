@@ -159,6 +159,13 @@ try {
   assert.equal(await page.locator('.achievement-card.unlocked').first().isVisible(), true);
   assert.equal(await page.locator('#profile-settings-form').count(), 1);
   assert.match((await page.locator('.profile-identity-strip').textContent()) || '', /Leaderboard name\s*Profile Tester/i);
+  await page.locator('.profile-career-snapshot').waitFor();
+  assert.equal(await page.locator('.profile-identity-strip').evaluate(node=>node.tagName),'DIV','career stats should not create an unlabeled document section');
+  assert.equal(await page.locator('.profile-career-snapshot').evaluate(node=>getComputedStyle(node).backgroundImage),'none','career snapshot stays flat');
+  const flatRadii=await page.locator('.environment-progress-card,.achievement-card,.profile-mode-card,.cube-profile-callout,.profile-account').evaluateAll(nodes=>nodes.map(node=>getComputedStyle(node).borderRadius));
+  assert.ok(flatRadii.every(radius=>radius==='0px'),'profile cards use the flat tournament treatment');
+  const achievementTargets=await page.locator('.achievement-actions .text-button').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));
+  assert.ok(achievementTargets.length>0&&achievementTargets.every(height=>height>=43.5),'achievement actions meet the 44px control target');
   await noOverflow();
   await page.screenshot({ path:'artifacts/ui-profile-mobile.png', fullPage:true });
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}

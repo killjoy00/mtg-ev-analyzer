@@ -42,7 +42,7 @@ function card(entry, { special = false } = {}) {
     <h2>${esc(entry.set_name || id.toUpperCase())}</h2>
     <p>${formatNumber(entry.verified_decisions)} verified first-pack decisions · ${formatNumber(entry.qualified_trophy_drafts)} qualified Premier trophy drafts.</p>
     <p>${esc(cohortLabel(entry))}${entry.training_drafts ? ` · ${formatNumber(entry.training_drafts)} training drafts` : ''}.</p>
-    <div class="set-card-actions"><a href="${practiceUrl}">${special ? 'Play Cube Run' : 'Play Draft Run'}</a>${detailPages.has(id) ? `<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>` : ''}</div>
+    <div class="set-card-actions"><a href="${practiceUrl}">${special ? 'Elite Cube Practice' : 'Play Draft Run'}</a>${detailPages.has(id) ? `<a href="/sets/${encodeURIComponent(id)}/">Data notes</a>` : ''}</div>
   </article>`;
 }
 

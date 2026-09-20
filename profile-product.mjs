@@ -46,7 +46,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = './profile.css';
+  link.href = './profile.css?v=2';
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -201,13 +201,13 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
     ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Your first eight picks start here.</h2><p>Play a Daily to begin your record.</p><a class="button primary" href="?game=draft-run&daily=1">Play Daily Draft Run</a></section>':''}
     ${own&&next.length?`<section class="profile-next"><h2>Within reach</h2>${next.map(a=>`<div><strong>${esc(a.label)}</strong><span>${esc(a.progress_text)}</span><p>${esc(a.description)}</p><progress value="${Number(a.current)}" max="${Number(a.target)}" aria-label="${esc(a.label)} progress"></progress></div>`).join('')}</section>`:''}
 
-    ${showLeaderboardName || favorite || showcased || bestPct ? `<section class="profile-identity-strip">
+    ${showLeaderboardName || favorite || showcased || bestPct ? `<div class="profile-identity-strip">
       ${showLeaderboardName ? `<div><span>Leaderboard name</span><strong>${esc(profile.player.display_name)}</strong></div>` : ''}
       ${favorite ? `<div><span>Favorite environment</span><strong>${esc(favorite.name)}</strong></div>` : ''}
       ${showcased ? `<div><span>Showcase</span><strong>${esc(showcased.label)}</strong></div>` : ''}
       ${bestPct ? `<div><span>Best Daily finish</span><strong>Top ${bestPct}%</strong></div>` : ''}
       ${form != null ? `<div><span>Last 10 average</span><strong>${form.toFixed(1)}</strong></div>` : ''}
-    </section>` : ''}
+    </div>` : ''}
 
     ${own ? settingsMarkup(profile, progress, account, patreon) : ''}
     ${publicUrl ? `<p class="profile-public-url">Public profile: <button type="button" class="text-button" id="profile-copy-link">Copy link</button></p>` : ''}

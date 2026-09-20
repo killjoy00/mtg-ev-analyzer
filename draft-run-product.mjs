@@ -1,5 +1,5 @@
 import {draftRunLength} from './draft-run-format.mjs';
-import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, storedAccountToken } from './growth-api.mjs';
+import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, loadDailyStatus, storedAccountToken } from './growth-api.mjs';
 import { shareDraftRunCard } from './share-cards.mjs';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
@@ -34,7 +34,7 @@ async function loadSetNames() {
 const app=()=>document.querySelector('#app');
 function styles() {
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=2';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -144,16 +144,22 @@ async function mutate(action,body) {
     document.querySelector('#run-error').textContent=message;
   } finally {busy=false;}
 }
+function resultRepeatAction() {
+  if(run.day)return {href:'./',label:'Back to Dailies'};
+  if(run.custom_set_ids?.length)return {href:'?game=draft-run&custom=1',label:'Choose Sets for Another Run'};
+  return {href:gameUrl(),label:`Start Another ${title()}`};
+}
 function renderResult() {
   document.body.classList.remove('is-game');
   poolObserver?.disconnect();poolObserver=null;
   const matches=run.answers.filter(a=>a.historicalMatch).length;
+  const repeat=resultRepeatAction();
   app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${run.day?'Daily ':''}${title()} complete</p><h1>Your ${cube()?'Cube Run':'Draft Run'}.</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${matches} trophy picks matched</span></div>
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Eastern.'}</p>`:''}
     ${run.day?`<p class="run-ranking-state" role="status">${run.leaderboard_eligible?`Ranked as ${esc(run.ranked_name||'your account')}`:'Playing as guest — sign in after the run to add this score to the leaderboard.'}</p>`:''}
     ${run.comparison?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
-    <div class="run-result-actions"><a class="button primary" href="${run.day?'./':gameUrl()}">${run.day?'Back to Dailies':'Start Another Draft Run'}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?'Sign in to add score':'View your career'}</button></div>
+    <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?'Sign in to add score':'View your career'}</button></div>
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; alternatives earn up to 95 from held-out strong-player support.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
@@ -176,10 +182,20 @@ async function shareResult() {
 }
 async function showBoard(period='daily') {
   app().innerHTML='<section class="message-card"><h1>Loading the board…</h1></section>';
-  const data=await api(`/v1/leaderboard?period=${encodeURIComponent(period)}&environment=${environment}`,undefined,false);
+  const [data,access]=await Promise.all([
+    api(`/v1/leaderboard?period=${encodeURIComponent(period)}&environment=${environment}`,undefined,false),
+    loadDailyStatus().catch(()=>null),
+  ]);
   document.body.classList.remove('is-game');
-  const environmentActions='';
-  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s shared starting packs.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a><a class="button secondary" href="${environment==='latest'?'?game=draft-run&custom=1':gameUrl()}">${environment==='latest'?'Choose sets for practice':`Practice a ${title()}`}</a>${environmentActions}</div></section>`;
+  const claimed=Boolean(access?.player?.claimed),capabilities=access?.capabilities||[];
+  const customPractice=claimed&&capabilities.includes('custom_corpus');
+  const cubePractice=claimed&&capabilities.includes('unlimited_cube_practice');
+  const practiceAction=environment==='latest'
+    ? (customPractice?'<a class="button secondary" href="?game=draft-run&custom=1">Choose sets for practice</a>':'<a class="button secondary" href="?game=draft-run">Practice a Draft Run</a>')
+    : cube()
+      ? (cubePractice?`<a class="button secondary" href="${gameUrl()}">Practice a Powered Cube Run</a>`:'<a class="button secondary" href="?game=draft-run">Practice a Draft Run</a>')
+      : `<a class="button secondary" href="${gameUrl()}">Practice a Draft Run</a>`;
+  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s shared starting packs.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period});
 }
 async function launch(options={}) {
