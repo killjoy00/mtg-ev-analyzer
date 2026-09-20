@@ -2,6 +2,7 @@ import { requestJson } from '@/src/api/client';
 import type { MobileSession } from '@/src/storage/session';
 
 export type DailyEnvironment = 'mixed' | 'powered-cube' | 'latest';
+export type PracticeEnvironment = 'mixed' | 'powered-cube';
 
 export const DAILY_ENVIRONMENTS: readonly DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
 
@@ -90,6 +91,13 @@ export type DraftRunState = {
   } | null;
 };
 
+export type PracticeSet = {
+  set_id: string;
+  set_name: string;
+  release_date?: string | null;
+  regular_run?: boolean;
+};
+
 export type DraftRunHealth = {
   ok: boolean;
   service?: string;
@@ -115,19 +123,55 @@ export function startDailyDraftRun(
   });
 }
 
-export function startRegularPracticeDraftRun(
+export function loadPracticeCapabilities(session: MobileSession) {
+  return requestJson<{ capabilities: string[] }>('/draft/v1/capabilities', {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
+}
+
+export function loadPracticeSets(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in to load custom practice sets.');
+  return requestJson<{ sets: PracticeSet[] }>('/draft/v1/practice-sets', {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 30_000,
+  });
+}
+
+export function startPracticeDraftRun(
   session: MobileSession,
-  idempotencyKey: string,
+  {
+    environment = 'mixed',
+    setIds = [],
+    idempotencyKey,
+  }: {
+    environment?: PracticeEnvironment;
+    setIds?: string[];
+    idempotencyKey: string;
+  },
 ) {
-  if (!session.accountToken) throw new Error('Sign in to start regular practice.');
+  if (!session.accountToken) throw new Error('Sign in to start practice.');
   return requestJson<DraftRunState>('/draft/v1/runs', {
     method: 'POST',
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
     idempotencyKey,
-    body: { daily: false, environment: 'mixed' },
+    body: {
+      daily: false,
+      environment,
+      ...(setIds.length ? { setIds } : {}),
+    },
     timeoutMs: 30_000,
   });
+}
+
+export function startRegularPracticeDraftRun(
+  session: MobileSession,
+  idempotencyKey: string,
+) {
+  return startPracticeDraftRun(session, { idempotencyKey });
 }
 
 export function loadDraftRun(id: string, mobileSessionToken: string) {
