@@ -42,6 +42,9 @@ test('home runtime isolates historical code and lazily loads profiles',()=>{
 test('Daily home differentiates free and Elite practice',()=>{
  const p={player:{claimed:true},capabilities:['account'],daily_history:[]};
  const freeHtml=dailyHomeMarkup(p,day);
+ assert.match(freeHtml,/Free practice/);
+ assert.match(freeHtml,/Practice a Draft Run/);
+ assert.ok(freeHtml.indexOf('Practice a Draft Run')<freeHtml.indexOf('Elite practice'),'regular practice appears before the Elite upsell');
  assert.match(freeHtml,/Elite practice/);
  assert.match(freeHtml,/Draft beyond the Dailies/);
  assert.match(freeHtml,/Become Elite/);
@@ -81,6 +84,7 @@ test('a guest is not asked to pay on the Daily home',()=>{
  }
  const done=dailyHomeMarkup({player:{claimed:false},capabilities:[],daily_history:complete},day);
  assert.match(done,/Create a free account/);
+ assert.doesNotMatch(done,/Practice a Draft Run/);
 });
 
 // A Supporter holds no paid capability, so before membership was surfaced they
