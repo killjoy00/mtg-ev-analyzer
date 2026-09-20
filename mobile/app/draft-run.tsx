@@ -120,17 +120,17 @@ export default function DraftRunScreen() {
   const practice = params.mode === 'practice';
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const rawSetIds = typeof params.setIds === 'string' ? params.setIds : '';
-  const setIds = rawSetIds
+  const setIdsKey = rawSetIds
     .split(',')
     .filter((setId) => /^[-a-z0-9]{2,40}$/.test(setId))
-    .sort();
-  const setIdsKey = setIds.join(',');
+    .sort()
+    .join(',');
   const environment: DailyEnvironment = practice
     ? requestedEnvironment === 'powered-cube' ? 'powered-cube' : 'mixed'
     : isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
   const surfaceMeta = practice
-    ? setIds.length
+    ? setIdsKey
       ? { eyebrow: 'CUSTOM PRACTICE', resultTitle: 'Custom practice complete.' }
       : environment === 'powered-cube'
         ? { eyebrow: 'POWERED CUBE PRACTICE', resultTitle: 'Powered Cube practice complete.' }
@@ -146,7 +146,7 @@ export default function DraftRunScreen() {
 
   useEffect(() => {
     let active = true;
-    void loadDraftSurface(environment, practice, setIds)
+    void loadDraftSurface(environment, practice, setIdsKey ? setIdsKey.split(',') : [])
       .then((loaded) => {
         if (!active) return;
         if (loaded.status === 'signin-required') {
@@ -175,7 +175,7 @@ export default function DraftRunScreen() {
     setActionError(null);
     if (practice && freshPractice) await clearPracticeIdempotencyKey();
     try {
-      const loaded = await loadDraftSurface(environment, practice, setIds);
+      const loaded = await loadDraftSurface(environment, practice, setIdsKey ? setIdsKey.split(',') : []);
       if (loaded.status === 'signin-required') {
         setState({ status: 'signin-required' });
         return;
@@ -286,7 +286,7 @@ export default function DraftRunScreen() {
         <View style={styles.center}>
           <Text style={styles.eyebrow}>PRACTICE DRAFT RUN</Text>
           <Text style={styles.errorTitle}>Keep drafting with a free account.</Text>
-          <Text style={styles.errorBody}>A free account is required for regular practice.</Text>
+          <Text style={styles.errorBody}>A Pack One account is required for practice.</Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push({ pathname: '/account', params: { returnTo: 'practice' } })}
