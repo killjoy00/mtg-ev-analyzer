@@ -56,6 +56,12 @@ try {
   await page.locator('.player-profile-page').waitFor();
   assert.match(await page.locator('.profile-claim').textContent(),/Guest record/);
   assert.equal(await page.locator('#profile-nav').count(),0);
+  assert.equal((await page.locator('.profile-hero-actions #profile-claim-account').textContent())?.trim(),'Sign In');
+  assert.match(await page.locator('.profile-hero-actions #profile-claim-account').getAttribute('class'),/primary/);
+  assert.equal((await page.locator('.profile-hero-actions #profile-share').textContent())?.trim(),'Share my record');
+  assert.match(await page.locator('.profile-hero-actions #profile-share').getAttribute('class'),/secondary/);
+  assert.equal(await page.locator('.profile-claim #profile-claim-account').count(),0);
+  assert.doesNotMatch(await page.locator('.profile-claim').textContent(),/Save my progress/);
   await page.locator('#profile-claim-account').click();
   await page.locator('#account-signin').waitFor();
   await page.screenshot({path:'artifacts/ui-account-mobile.png',fullPage:true});
