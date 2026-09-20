@@ -791,6 +791,13 @@ async function handleMobileAccountSession(request) {
   });
 }
 
+async function handleMobileSignout(request) {
+  await player(request);
+  const auth=await authSession(request,{allowLegacy:false,csrf:false});
+  await revokeAccountSession(query,auth);
+  return json({ok:true});
+}
+
 export async function deleteMobileAccountData(authUserId,playerId,email) {
   const result=await query('SELECT delete_pack1_account($1::uuid,$2::uuid,$3) deleted',[authUserId,playerId,email||null]);
   return result.rows[0]?.deleted===true||result.rows[0]?.deleted==='t';
