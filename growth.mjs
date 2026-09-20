@@ -53,7 +53,10 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     }
     pendingDailyRunValidation=null;
     if(intent==='elite') { handoffToPatreon(source); return; }
-    await (await import('./profile-product.mjs')).renderMyProfile();
+    const profiles=await import('./profile-product.mjs');
+    profiles.installProfileProductLayer();
+    (await import('./profile-polish.mjs')).installProfilePolish();
+    await profiles.renderMyProfile();
     return;
   }
   const validatingDaily=Boolean(pendingDailyRunValidation);
