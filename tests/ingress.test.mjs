@@ -48,6 +48,41 @@ test('gateway constructs a fixed upstream and strips caller-controlled infrastru
   assert.equal(result.headers.get('access-control-allow-origin'),'https://packone.pro');
 });
 
+test('production gateway turns Pack One cookies into upstream identity and relays only Pack One cookies',async()=>{
+  const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+  const player='p1_00000000-0000-4000-8000-000000000000.'+'x'.repeat(43);
+  const account='a'.repeat(43),csrf='b'.repeat(43);
+  const request=new Request('https://api.packone.pro/growth/v1/account/link-browser',{
+    method:'POST',body:'{}',headers:{
+      'content-type':'application/json','cf-connecting-ip':'192.0.2.2','origin':'https://packone.pro',
+      cookie:`noise=drop; __Host-pack1_player=${player}; __Host-pack1_account=${account}; __Secure-pack1_csrf=${csrf}`,
+      'x-pack1-csrf':csrf,'authorization':'Bearer caller-must-not-win',
+    },
+  });
+  const result=await gateway(request,prod,async(url,options)=>{
+    assert.equal(url,'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/account/link-browser');
+    assert.equal(options.headers.get('authorization'),'Bearer '+player);
+    assert.equal(options.headers.get('x-pack1-csrf'),csrf);
+    assert.doesNotMatch(options.headers.get('cookie'),/noise/);
+    assert.match(options.headers.get('cookie'),/__Host-pack1_account=/);
+    const headers=new Headers();
+    headers.append('set-cookie','__Host-pack1_account='+'c'.repeat(43)+'; Path=/; Secure; HttpOnly; SameSite=Strict');
+    headers.append('set-cookie','unrelated=bad; Path=/');
+    headers.set('location','https://packone.pro/?auth=google');
+    return new Response(null,{status:302,headers});
+  });
+  assert.equal(result.status,302);
+  assert.equal(result.headers.get('location'),'https://packone.pro/?auth=google');
+  assert.equal(result.headers.get('access-control-allow-credentials'),'true');
+  const set=result.headers.getSetCookie?.()||[result.headers.get('set-cookie')].filter(Boolean);
+  assert.ok(set.some(row=>row.startsWith('__Host-pack1_account=')));
+  assert.ok(!set.some(row=>row.startsWith('unrelated=')));
+  const badBranch=await gateway(new Request('https://api.packone.pro/growth/v1/account/session',{headers:{'cf-connecting-ip':'192.0.2.2'}}),{...prod,NEON_BRANCH_ID:'br-twilight-hill-ayffyd2b'},()=>{throw Error('no');});
+  assert.equal(badBranch.status,503);
+});
+
+
 test('gateway rejects disallowed paths, origins, hosts, missing identity and partial config without forwarding',async()=>{
   const noFetch=()=>{throw Error('Must not forward');};
   for(const path of ['/draft/v1/trophy-import','/draft/v1/admin/report','/draft/health','/growth/https://other.test','/growth/v1/%73ession'])
