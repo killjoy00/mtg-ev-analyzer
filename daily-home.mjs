@@ -33,16 +33,14 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
         <a class="button ${result.complete ? 'secondary' : 'primary'}" href="${game.href}">${result.complete ? 'View result' : 'Play now'}</a>
       </article>`;
     }).join('')}</div>
-    ${claimed && !elite && status.completed < 3 ? '<section class="daily-home-regular"><div><p class="eyebrow">Free practice</p><p>Keep drafting with unlimited regular Draft Runs.</p></div><a class="button primary" href="?game=draft-run">Practice a Draft Run</a></section>' : ''}
+    ${claimed && !elite && status.completed < 3 ? '<section class="daily-home-regular"><div><h2 class="eyebrow">Free practice</h2><p>Keep drafting with unlimited regular Draft Runs.</p></div><a class="button primary" href="?game=draft-run">Practice a Draft Run</a></section>' : ''}
     ${status.completed === 3 ? `<section class="daily-home-practice"><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2>${claimed
-      ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${elite
-        ? (capabilities.includes('unlimited_cube_practice')?'<a class="button secondary" href="?game=draft-run&set=powered-cube">Powered Cube Practice</a>':'')
-        : `${eliteCta}<p>Elite adds unlimited Powered Cube and custom-set drafts.</p>`}`
+      ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${elite&&capabilities.includes('unlimited_cube_practice')?'<a class="button secondary" href="?game=draft-run&set=powered-cube">Powered Cube Practice</a>':''}`
       : '<p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>'}</section>` : ''}
     ${elite
-      ? '<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Build a random run from your favorite sets.</p></div><a class="button secondary" href="?game=draft-run&custom=1">Choose your sets</a></section>'
+      ? '<section class="daily-home-custom"><div><h2 class="eyebrow">Elite practice</h2><p>Build a random run from your favorite sets.</p></div><a class="button secondary" href="?game=draft-run&custom=1">Choose your sets</a></section>'
       : claimed
-        ? `<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Draft beyond the Dailies. Unlock unlimited Powered Cube and custom-set drafts.</p></div>${eliteCta}</section>`
+        ? `<section class="daily-home-custom"><div><h2 class="eyebrow">Elite practice</h2><p>Draft beyond the Dailies. Unlock unlimited Powered Cube and custom-set drafts.</p></div>${eliteCta}</section>`
         : ''}
     ${unavailable ? '<p role="status">Daily progress is unavailable. Play now still resumes your saved attempt.</p>' : ''}
   </section>`;
