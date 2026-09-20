@@ -14,6 +14,7 @@ This document separates values that can be committed safely from irreversible st
 - EAS remote app-version management is enabled, and production builds auto-increment developer-facing build versions.
 - A production Expo config fails closed until the final iOS bundle identifier, Android package, and Expo project ID are provided.
 - Mobile CI validates development, preview, successful production-shaped config, and the missing-production-identity failure case.
+- The EAS `eas-build-pre-install` hook runs a production preflight before dependencies are installed, so missing release artwork or production identity stops the build early.
 
 ## Production EAS environment values still required
 
@@ -47,7 +48,9 @@ Before a store build, add:
 - `mobile/assets/images/adaptive-icon.png` — Android adaptive foreground PNG
 - `mobile/assets/images/monochrome-icon.png` — Android 13+ themed icon source
 
-Then configure those paths in the Expo app config and add the `expo-splash-screen` config plugin. Test the splash screen in a preview or production build, not Expo Go/development-client rendering.
+The production Expo config is already wired to those paths and the `expo-splash-screen` config plugin. The files remain intentionally absent until approved artwork exists. Test the splash screen in a preview or production build, not Expo Go/development-client rendering.
+
+Before attempting a production build locally, `npm run release:check` performs the same identity/artwork gate. EAS production builds run it automatically.
 
 ## Store listing URLs already available
 
