@@ -30,7 +30,7 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.page}>
         <Brand />
         <View style={styles.hero}>
-          <Text style={styles.eyebrow}>NATIVE FOUNDATION</Text>
+          <Text style={styles.eyebrow}>DRAFT DECISION LAB</Text>
           <Text style={styles.title}>Make the pick. See what strong drafters did.</Text>
           <Text style={styles.lede}>
             Pack One mobile uses the same gameplay, scoring, account, and leaderboard authority as packone.pro.
@@ -92,6 +92,17 @@ export default function HomeScreen() {
           <Text style={styles.cardKicker}>YOUR RESULTS</Text>
           <Text style={styles.utilityTitle}>Career</Text>
           <Text style={styles.cardBody}>Review your Pack One scores, streaks, and completed game history.</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open How to Play"
+          onPress={() => router.push('/how-to')}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>LEARN</Text>
+          <Text style={styles.utilityTitle}>How to Play</Text>
+          <Text style={styles.cardBody}>Learn the eight-decision format, scoring, method, and current supported sets.</Text>
         </Pressable>
 
         <Pressable
