@@ -1,4 +1,4 @@
-.profile-career-snapshot{grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch;margin:8px 0 24px;padding:16px;border-block:1px solid var(--line);background:linear-gradient(90deg,var(--surface-soft),transparent)}
+.profile-career-snapshot{grid-template-columns:repeat(4,minmax(0,1fr));align-items:stretch;margin:8px 0 24px;padding:16px;border-block:1px solid var(--line);background:transparent}
 .profile-career-snapshot>.profile-snapshot-heading{grid-column:1/-1;padding:0 0 4px;background:transparent}
 .profile-snapshot-heading span{display:block;color:var(--ink);font-size:13px;font-weight:800;letter-spacing:0;text-transform:none}
 .profile-snapshot-heading small{display:block;margin-top:2px;color:var(--muted);font-size:11px}
