@@ -9,7 +9,7 @@ const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).fla
 const environment=process.env.PACK1_TEST_ENVIRONMENT||'mixed',cube=environment==='powered-cube';
 const selectionVersion=process.env.PACK1_TEST_SELECTION_VERSION||'eight-pick-v3';
 const daily=process.env.PACK1_TEST_DAILY==='1';
-let shareCalls=0;
+let shareCalls=0,eliteAccess=false;
 let puzzles=selectDraftRun(corpus,'browser-contract',environment,{selectionVersion}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
 const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
@@ -38,7 +38,8 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
     const req=route.request().postDataJSON(),p=puzzles[answers.length];assert.equal(req.revision,revision);assert.equal(req.puzzleId,p.puzzle_id);
     assert.equal(req.viewId,views.at(-1).viewId);assert.ok(Number.isInteger(req.activeMs)&&req.activeMs>=0);
     answers.push({...gradeDraftRunPick(p,req.cardId),puzzle:publicDraftRunPuzzle(p),ranking:p.candidates.map(c=>({id:c.id,name:c.name,support:c.model_probability,score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
-  }else if(path==='/v1/leaderboard')body={rows:[],period:'daily'};
+  }else if(path==='/v1/daily-status')body=eliteAccess?{player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice']}:{player:{claimed:false},capabilities:[]};
+  else if(path==='/v1/leaderboard')body={rows:[],period:'daily'};
   else body=snapshot();
   await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
 });
@@ -100,6 +101,7 @@ try{
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
   await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0);assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),4);assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());await noOverflow();
+  assert.equal((await page.locator('.run-result-actions .button').first().textContent())?.trim(),daily?'Back to Dailies':cube?'Start Another Powered Cube Run':'Start Another Draft Run');
   const actionStyles=await page.locator('.run-result-actions .button').evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return [style.display,style.alignItems,style.justifyContent];}));
   assert.ok(actionStyles.every(([display,align,justify])=>display==='flex'&&align==='center'&&justify==='center'),'Result actions use the same centered layout');
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
@@ -118,9 +120,21 @@ try{
   assert.equal(await page.locator('.run-board-games a').count(),3);
   assert.equal((await page.locator('.run-board-games a.active').innerText()).trim(),cube?'Cube':'Draft Run');
   assert.equal(await page.locator('.run-board-actions .button').count(),2);
+  assert.equal((await page.locator('.run-board-actions .button').nth(1).textContent())?.trim(),'Practice a Draft Run');
+  const boardActionStyles=await page.locator('.run-board-actions .button').evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return [style.display,style.alignItems,style.justifyContent];}));
+  assert.ok(boardActionStyles.every(([display,align,justify])=>display==='flex'&&align==='center'&&justify==='center'),'Leaderboard actions use the same centered layout');
   assert.equal(await page.getByRole('link',{name:'Top 3 practice',exact:true}).count(),0);
   assert.doesNotMatch(await page.locator('.run-board').innerText(),/Full Pack|Top 3, Full Pack|Cube boards/i);
   await noOverflow();
+
+  eliteAccess=false;
+  await page.goto(base+'/?game=draft-run&set=latest&board=daily');await page.locator('.run-board').waitFor();
+  assert.equal(await page.getByRole('link',{name:'Practice a Draft Run',exact:true}).getAttribute('href'),'?game=draft-run');
+  assert.equal(await page.getByRole('link',{name:'Choose sets for practice',exact:true}).count(),0);
+  eliteAccess=true;
+  await page.goto(base+'/?game=draft-run&set=latest&board=daily');await page.locator('.run-board').waitFor();
+  assert.equal(await page.getByRole('link',{name:'Choose sets for practice',exact:true}).getAttribute('href'),'?game=draft-run&custom=1');
+
   await page.goto(base+'/?legacy-board=1'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
   const retiredBoardUrl=new URL(page.url());assert.equal(retiredBoardUrl.searchParams.get('game'),'draft-run');assert.equal(retiredBoardUrl.searchParams.get('board'),'daily');assert.equal(retiredBoardUrl.searchParams.has('legacy-board'),false);
   assert.deepEqual(errors,[]);
