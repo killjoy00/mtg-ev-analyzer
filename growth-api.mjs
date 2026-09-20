@@ -71,9 +71,9 @@ export async function loadAccountDailyDates() {
   if (!authSession || !packApiConfigured()) return [];
   try { const data = await api('/v1/account/daily-dates', { auth:false, authSession }); return Array.isArray(data.dates) ? data.dates : []; } catch { return []; }
 }
-export async function linkAccount(authSessionToken = loadAuthToken()) {
+export async function linkAccount(authSessionToken = loadAuthToken(), { validateDailyRunId = null } = {}) {
   if (!authSessionToken) throw new Error('Account session required.');
-  const data = await api('/v1/account/link', { method:'POST', body:{}, auth:true, authSession:authSessionToken });
+  const data = await api('/v1/account/link', { method:'POST', body:{ ...(validateDailyRunId ? { validateDailyRunId } : {}) }, auth:true, authSession:authSessionToken });
   if (data.token) savePackToken(data.token);
   return data;
 }
