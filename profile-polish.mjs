@@ -8,7 +8,7 @@ function ensureStyles() {
   if (document.querySelector('link[data-profile-polish-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = './profile-polish.css';
+  link.href = './profile-polish.css?v=2';
   link.dataset.profilePolishCss = '1';
   document.head.appendChild(link);
 }
@@ -27,7 +27,7 @@ function stat(label, value, detail = '') {
 function ensureStrip(page) {
   let strip = page.querySelector('.profile-identity-strip');
   if (!strip) {
-    strip = document.createElement('section');
+    strip = document.createElement('div');
     strip.className = 'profile-identity-strip';
     page.querySelector('.profile-scoreboard')?.insertAdjacentElement('afterend', strip);
   }
