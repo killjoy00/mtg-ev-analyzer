@@ -661,13 +661,20 @@ function mobileGoogleReturn(params={}) {
   return new Response(null,{status:302,headers:{location:target.toString(),'cache-control':'no-store','referrer-policy':'no-referrer'}});
 }
 
-async function handleMobileGoogleStart(request) {
+async function startMobileGoogle(request,{purpose='signin'}={}) {
   const owner=await player(request);
   await consumePlayerLimit(query,owner,'mobile-google-auth',{limit:10,seconds:600});
+  let expectedAuthUserId=null;
+  if(purpose==='delete') {
+    const current=await authSession(request,{allowLegacy:false,csrf:false});
+    expectedAuthUserId=current.user_id;
+  }
   const flowToken=opaqueMobileToken();
   const flowHash=digest(flowToken);
-  await query(`INSERT INTO mobile_oauth_handoffs(flow_hash,guest_player_id,provider,expires_at)
-    VALUES($1,$2::uuid,'google',now()+interval '10 minutes')`,[flowHash,owner]);
+  await query(`INSERT INTO mobile_oauth_handoffs(
+      flow_hash,guest_player_id,provider,purpose,expected_auth_user_id,expires_at
+    ) VALUES($1,$2::uuid,'google',$3,$4::uuid,now()+interval '10 minutes')`,
+    [flowHash,owner,purpose,expectedAuthUserId]);
   const callback=MOBILE_GOOGLE_CALLBACK+'?flow='+encodeURIComponent(flowToken);
   const errorCallback=callback+'&oauth_error=1';
   try {
@@ -686,6 +693,14 @@ async function handleMobileGoogleStart(request) {
     await query('DELETE FROM mobile_oauth_handoffs WHERE flow_hash=$1 AND authenticated_at IS NULL',[flowHash]).catch(()=>{});
     throw error;
   }
+}
+
+async function handleMobileGoogleStart(request) {
+  return startMobileGoogle(request);
+}
+
+async function handleMobileGoogleDeleteStart(request) {
+  return startMobileGoogle(request,{purpose:'delete'});
 }
 
 async function handleMobileGoogleCallback(request) {
@@ -708,8 +723,12 @@ async function handleMobileGoogleCallback(request) {
       SET handoff_hash=$2,auth_user_id=$3::uuid,authenticated_at=now()
       WHERE flow_hash=$1 AND provider='google' AND consumed_at IS NULL
         AND authenticated_at IS NULL AND expires_at>now()
-      RETURNING guest_player_id`,[digest(flowToken),digest(handoffToken),auth.user_id]);
-    if(!updated.rows[0])throw Object.assign(Error('Google sign in handoff expired.'),{status:409});
+        AND (purpose='signin' OR expected_auth_user_id=$3::uuid)
+      RETURNING guest_player_id,purpose`,[digest(flowToken),digest(handoffToken),auth.user_id]);
+    if(!updated.rows[0]) {
+      await query('UPDATE mobile_oauth_handoffs SET consumed_at=COALESCE(consumed_at,now()) WHERE flow_hash=$1',[digest(flowToken)]).catch(()=>{});
+      throw Object.assign(Error('Google sign in did not match the Pack One account being reauthenticated.'),{status:409});
+    }
     return mobileGoogleReturn({googleHandoff:handoffToken});
   } catch(error) {
     console.error('Mobile Google OAuth callback failed',Number(error?.status||500));
@@ -729,7 +748,7 @@ async function handleMobileGoogleFinish(request) {
   const csrf=opaqueMobileToken();
   const result=await query(`WITH claimed AS (
       UPDATE mobile_oauth_handoffs SET consumed_at=now()
-      WHERE handoff_hash=$1 AND guest_player_id=$2::uuid AND provider='google'
+      WHERE handoff_hash=$1 AND guest_player_id=$2::uuid AND provider='google' AND purpose='signin'
         AND authenticated_at IS NOT NULL AND consumed_at IS NULL AND expires_at>now()
       RETURNING auth_user_id
     ), inserted AS (
@@ -745,12 +764,21 @@ async function handleMobileGoogleFinish(request) {
   return mobileAccountJson(auth,{token:accountToken,expiresAt:auth.expires_at});
 }
 
-async function mobilePasswordDeletionAvailable(authUserId) {
-  const result=await query(`SELECT EXISTS(
-    SELECT 1 FROM neon_auth.account
-    WHERE "userId"=$1::uuid AND "providerId"='credential' AND password IS NOT NULL
-  ) available`,[authUserId]);
-  return result.rows[0]?.available===true||result.rows[0]?.available==='t';
+async function mobileDeletionOptions(authUserId) {
+  const result=await query(`SELECT
+    EXISTS(
+      SELECT 1 FROM neon_auth.account
+      WHERE "userId"=$1::uuid AND "providerId"='credential' AND password IS NOT NULL
+    ) password_supported,
+    EXISTS(
+      SELECT 1 FROM neon_auth.account
+      WHERE "userId"=$1::uuid AND "providerId"='google'
+    ) google_supported`,[authUserId]);
+  const row=result.rows[0]||{};
+  return {
+    passwordSupported:row.password_supported===true||row.password_supported==='t',
+    googleSupported:row.google_supported===true||row.google_supported==='t',
+  };
 }
 
 async function handleMobileAccountSession(request) {
@@ -759,7 +787,7 @@ async function handleMobileAccountSession(request) {
   return json({
     user:{id:auth.user_id,email:auth.email,name:auth.name},
     session:{expiresAt:auth.expires_at},
-    deletion:{passwordSupported:await mobilePasswordDeletionAvailable(auth.user_id)},
+    deletion:await mobileDeletionOptions(auth.user_id),
   });
 }
 
@@ -772,31 +800,54 @@ async function handleMobileAccountDelete(request) {
   const owner=await player(request);
   await consumePlayerLimit(query,owner,'mobile-account-delete',{limit:5,seconds:3600});
   const auth=await authSession(request,{allowLegacy:false,csrf:false});
-  if(!await mobilePasswordDeletionAvailable(auth.user_id))
-    throw Object.assign(Error('This account requires provider reauthentication before deletion.'),{status:409});
   const admin=await query('SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid LIMIT 1',[auth.user_id]);
   if(admin.rows[0])throw Object.assign(Error('Remove Pack One admin access before deleting this account.'),{status:409});
   const payload=await readJson(request);
   const password=String(payload.password||'');
-  if(!password||password.length>256)throw Object.assign(Error('Enter your current password to delete your account.'),{status:400});
-  const verified=authIdentity(await neonAuth('/sign-in/email',{method:'POST',body:{
-    email:auth.email,
-    password,
-    rememberMe:false,
-  }}));
-  if(!verified||verified.user_id!==auth.user_id)
-    throw Object.assign(Error('Account reauthentication failed.'),{status:401});
-  await consumeNeonSession(query,verified.token);
-  if(!await deleteMobileAccountData(auth.user_id,owner,auth.email))
-    throw Object.assign(Error('Pack One account linkage changed. Sign in again before deleting.'),{status:409});
-  return json({ok:true,deleted:true});
-}
+  const googleHandoff=String(payload.googleHandoff||'');
+  const options=await mobileDeletionOptions(auth.user_id);
 
-async function handleMobileSignout(request) {
-  await player(request);
-  const auth=await authSession(request,{allowLegacy:false,csrf:false});
-  await revokeAccountSession(query,auth);
-  return json({ok:true});
+  if(password) {
+    if(!options.passwordSupported)
+      throw Object.assign(Error('This account requires provider reauthentication before deletion.'),{status:409});
+    if(password.length>256)throw Object.assign(Error('Enter your current password to delete your account.'),{status:400});
+    const verified=authIdentity(await neonAuth('/sign-in/email',{method:'POST',body:{
+      email:auth.email,
+      password,
+      rememberMe:false,
+    }}));
+    if(!verified||verified.user_id!==auth.user_id)
+      throw Object.assign(Error('Account reauthentication failed.'),{status:401});
+    await consumeNeonSession(query,verified.token);
+    if(!await deleteMobileAccountData(auth.user_id,owner,auth.email))
+      throw Object.assign(Error('Pack One account linkage changed. Sign in again before deleting.'),{status:409});
+    return json({ok:true,deleted:true});
+  }
+
+  if(googleHandoff) {
+    if(!options.googleSupported)
+      throw Object.assign(Error('Google reauthentication is not available for this account.'),{status:409});
+    if(!/^[A-Za-z0-9_-]{43}$/.test(googleHandoff))
+      throw Object.assign(Error('Invalid Google deletion handoff.'),{status:400});
+    const result=await query(`WITH reauth AS (
+        UPDATE mobile_oauth_handoffs SET consumed_at=now()
+        WHERE handoff_hash=$1 AND guest_player_id=$2::uuid AND provider='google'
+          AND purpose='delete' AND auth_user_id=$3::uuid AND expected_auth_user_id=$3::uuid
+          AND authenticated_at IS NOT NULL AND consumed_at IS NULL AND expires_at>now()
+        RETURNING auth_user_id
+      )
+      SELECT delete_pack1_account($3::uuid,$2::uuid,$4) deleted FROM reauth`,
+      [digest(googleHandoff),owner,auth.user_id,auth.email||null]);
+    const deleted=result.rows[0]?.deleted===true||result.rows[0]?.deleted==='t';
+    if(!deleted)throw Object.assign(Error('Google reauthentication expired or did not match this Pack One account.'),{status:409});
+    return json({ok:true,deleted:true});
+  }
+
+  throw Object.assign(Error(options.passwordSupported
+    ? 'Enter your current password to delete your account.'
+    : options.googleSupported
+      ? 'Reauthenticate with Google to delete your account.'
+      : 'Provider reauthentication is required before deletion.'),{status:400});
 }
 
 async function handleAccountMigration(request) {
@@ -1221,6 +1272,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signup') return handleMobileAccountSignup(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signin') return handleMobileAccountSignin(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/start') return handleMobileGoogleStart(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/delete/start') return handleMobileGoogleDeleteStart(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/finish') return handleMobileGoogleFinish(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccountSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/link') return handleLink(request,{mobile:true});

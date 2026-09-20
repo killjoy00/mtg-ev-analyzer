@@ -154,6 +154,20 @@ test('production gateway accepts a shaped mobile guest session only on Draft Run
     assert.equal(oauthResult.status,200);
   }
 
+  const deleteReauth=new Request('https://api.packone.pro/growth/v1/mobile/account/google/delete/start',{
+    method:'POST',body:'{}',headers:{
+      'content-type':'application/json','cf-connecting-ip':'192.0.2.52',
+      'x-pack1-mobile-session':token,'x-pack1-mobile-account':accountToken,
+    },
+  });
+  const deleteReauthResult=await gateway(deleteReauth,prod,async(url,options)=>{
+    assert.equal(url,'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/mobile/account/google/delete/start');
+    assert.equal(options.headers.get('authorization'),'Bearer '+token);
+    assert.equal(options.headers.get('x-pack1-mobile-account'),accountToken);
+    return Response.json({url:'https://accounts.google.com/o/oauth2/auth'});
+  });
+  assert.equal(deleteReauthResult.status,200);
+
   const mobileCallback=new Request('https://api.packone.pro/growth/v1/mobile/account/google/callback?flow='+'f'.repeat(43)+'&neon_auth_session_verifier='+'v'.repeat(20),{
     headers:{'cf-connecting-ip':'192.0.2.51'},
   });

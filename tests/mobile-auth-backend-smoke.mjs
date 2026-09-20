@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {digest} from '../worker/account-session.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Use an isolated branch.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
-const {query,deleteMobileAccountData}=await import('../worker/growth-function.js');
+const {query}=await import('../worker/growth-function.js');
 const growth=(await import('../worker/growth-function.js')).default;
 const draft=(await import('../worker/draft-run-function.mjs')).default;
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
@@ -72,11 +72,29 @@ assert.equal(googleSession.user.id,userId);
 assert.match(googleSession.session.token,/^[A-Za-z0-9_-]{43}$/);
 await call(growth,'/v1/mobile/account/google/finish',{handoffToken:googleHandoff},{playerToken:linked.token,status:409});
 await call(growth,'/v1/mobile/account/session',undefined,{playerToken:linked.token,accountToken:googleSession.session.token});
-await call(growth,'/v1/mobile/account/signout',{},{playerToken:linked.token,accountToken:googleSession.session.token});
+
+await query(`INSERT INTO neon_auth.account("accountId","providerId","userId","updatedAt")
+  VALUES($1,'google',$2::uuid,now())`,['qa-google-'+userId,userId]);
+const providerSession=await call(growth,'/v1/mobile/account/session',undefined,{playerToken:linked.token,accountToken:googleSession.session.token});
+assert.equal(providerSession.deletion.passwordSupported,false);
+assert.equal(providerSession.deletion.googleSupported,true);
 
 await query(`INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference)
   VALUES($1::uuid,'custom_corpus','test','mobile-delete')`,[userId]);
-assert.equal(await deleteMobileAccountData(userId,guest.playerId,email),true);
+
+const deleteHandoff=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+await query(`INSERT INTO mobile_oauth_handoffs(
+    flow_hash,handoff_hash,guest_player_id,auth_user_id,provider,purpose,expected_auth_user_id,
+    expires_at,authenticated_at
+  ) VALUES($1,$2,$3::uuid,$4::uuid,'google','delete',$4::uuid,now()+interval '5 minutes',now())`,
+  [digest('d'.repeat(43)),digest(deleteHandoff),guest.playerId,userId]);
+
+await call(growth,'/v1/mobile/account/delete',{googleHandoff:deleteHandoff},{
+  playerToken:otherGuest.token,accountToken:googleSession.session.token,status:409,
+});
+await call(growth,'/v1/mobile/account/delete',{googleHandoff:deleteHandoff},{
+  playerToken:linked.token,accountToken:googleSession.session.token,
+});
 for(const [sql,params,label] of [
   ['SELECT count(*) n FROM neon_auth."user" WHERE id=$1::uuid',[userId],'auth user'],
   ['SELECT count(*) n FROM players WHERE id=$1::uuid',[guest.playerId],'player'],
@@ -89,4 +107,4 @@ for(const [sql,params,label] of [
   assert.equal((await query(sql,params)).rows[0].n,'0',label+' should be deleted');
 }
 
-console.log('Mobile auth passed: revocable native account session, guest-bound one-use run claim, Google OAuth handoff finish, ranked promotion, signout, and full account-data deletion.');
+console.log('Mobile auth passed: revocable native account session, guest-bound one-use run claim, Google OAuth sign-in + deletion handoffs, ranked promotion, signout, and full account-data deletion.');

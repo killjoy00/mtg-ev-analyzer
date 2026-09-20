@@ -79,3 +79,9 @@ Policy URLs:
 **Alternative:** embed a Google native client ID and exchange a provider ID token directly from the app.  
 **Reason:** production already has a working server-side Google provider. Reusing it reduces provider configuration and keeps the Pack One backend authoritative for account/session issuance. Current Better Auth and Expo guidance supports native social OAuth via system-browser/deep-link returns; Pack One keeps its own handoff layer because the managed auth server is not controlled by the mobile app.  
 **Apple:** still blocked on provider configuration; do not present Apple login until the production provider exists.
+
+## 2026-09-20 — Google reauthentication for destructive deletion
+
+**Decision:** a Google-only account can be deleted only after a fresh Google OAuth round trip that resolves to the same Pack One auth user as the currently signed-in account.  
+**Mechanism:** deletion OAuth flows are marked with purpose `delete` and the expected Pack One auth-user ID. The callback refuses to mint a handoff if Google resolves to a different user. The deletion endpoint requires the current revocable Pack One account session, the same player identity that initiated reauthentication, and the one-time Google handoff; handoff consumption and account deletion occur in one database statement.  
+**UX:** password accounts continue to require the current password. Google-only accounts get an explicit destructive confirmation before the system browser opens. Apple remains unavailable until its provider is configured.

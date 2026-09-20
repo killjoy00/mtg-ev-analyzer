@@ -9,6 +9,7 @@ export type AccountSessionResponse = {
   };
   deletion?: {
     passwordSupported: boolean;
+    googleSupported: boolean;
   };
 };
 
@@ -32,6 +33,16 @@ export async function startGoogleSignIn(playerToken: string) {
   return requestJson<{ url: string }>('/growth/v1/mobile/account/google/start', {
     method: 'POST',
     mobileSessionToken: playerToken,
+    body: {},
+  });
+}
+
+export async function startGoogleDeletion(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in before deleting your account.');
+  return requestJson<{ url: string }>('/growth/v1/mobile/account/google/delete/start', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
     body: {},
   });
 }
@@ -109,13 +120,16 @@ export async function signOutMobileAccount(session: MobileSession) {
   await clearSession();
 }
 
-export async function deleteMobileAccount(session: MobileSession, password: string) {
+export async function deleteMobileAccount(
+  session: MobileSession,
+  proof: { password?: string; googleHandoff?: string },
+) {
   if (!session.accountToken) throw new Error('Sign in before deleting your account.');
   const result = await requestJson<{ ok: boolean; deleted: boolean }>('/growth/v1/mobile/account/delete', {
     method: 'POST',
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
-    body: { password },
+    body: proof,
   });
   if (!result.deleted) throw new Error('Pack One did not confirm account deletion.');
   await clearSession();

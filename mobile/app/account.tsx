@@ -3,6 +3,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -20,6 +21,7 @@ import {
   signInWithEmail,
   signOutMobileAccount,
   signUpWithEmail,
+  startGoogleDeletion,
   startGoogleSignIn,
 } from '@/src/api/account';
 import { ensureGuestSession } from '@/src/api/guest';
@@ -41,6 +43,7 @@ export default function AccountScreen() {
   const [signedInLabel, setSignedInLabel] = useState<string | null>(null);
   const [deletePassword, setDeletePassword] = useState('');
   const [passwordDeletionSupported, setPasswordDeletionSupported] = useState(false);
+  const [googleDeletionSupported, setGoogleDeletionSupported] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -54,6 +57,7 @@ export default function AccountScreen() {
           if (!active || !account) return;
           setSignedInLabel(account.user.email ?? account.user.name ?? 'Pack One account');
           setPasswordDeletionSupported(account.deletion?.passwordSupported === true);
+          setGoogleDeletionSupported(account.deletion?.googleSupported === true);
         } catch {
           // An expired account token leaves the player session intact; the form
           // below can establish a fresh account session.
@@ -76,6 +80,7 @@ export default function AccountScreen() {
     setSignedInLabel(result.session.accountUser?.email ?? result.session.accountUser?.name ?? 'Pack One account');
     const accountState = await loadMobileAccount(result.session);
     setPasswordDeletionSupported(accountState?.deletion?.passwordSupported === true);
+    setGoogleDeletionSupported(accountState?.deletion?.googleSupported === true);
     setMessage(result.linked.validatedDailyScore
       ? 'Score validated and added to today\'s leaderboard.'
       : 'Signed in to your Pack One account.');
@@ -84,22 +89,26 @@ export default function AccountScreen() {
     }
   };
 
+  const openGoogleHandoff = async (url: string) => {
+    const result = await WebBrowser.openAuthSessionAsync(url, 'packone://account');
+    if (result.type !== 'success') {
+      throw new Error(result.type === 'cancel' ? 'Google sign in was cancelled.' : 'Google sign in did not finish.');
+    }
+    const callback = new URL(result.url);
+    const handoffToken = callback.searchParams.get('googleHandoff');
+    if (!handoffToken || callback.searchParams.get('google') === 'error') {
+      throw new Error('Google sign in did not finish. Please try again.');
+    }
+    return handoffToken;
+  };
+
   const continueWithGoogle = async () => {
     if (!session || busy) return;
     setBusy(true);
     setMessage(null);
     try {
       const start = await startGoogleSignIn(session.playerToken);
-      const result = await WebBrowser.openAuthSessionAsync(start.url, 'packone://account');
-      if (result.type !== 'success') {
-        setMessage(result.type === 'cancel' ? 'Google sign in was cancelled.' : 'Google sign in did not finish.');
-        return;
-      }
-      const callback = new URL(result.url);
-      const handoffToken = callback.searchParams.get('googleHandoff');
-      if (!handoffToken || callback.searchParams.get('google') === 'error') {
-        throw new Error('Google sign in did not finish. Please try again.');
-      }
+      const handoffToken = await openGoogleHandoff(start.url);
       const googleAccount = await finishGoogleSignIn(session.playerToken, handoffToken);
       await finishAccount(session, googleAccount);
     } catch (error: unknown) {
@@ -138,12 +147,13 @@ export default function AccountScreen() {
     setBusy(true);
     setMessage(null);
     try {
-      await deleteMobileAccount(session, deletePassword);
+      await deleteMobileAccount(session, { password: deletePassword });
       const fresh = await ensureGuestSession();
       setSession(fresh);
       setSignedInLabel(null);
       setDeletePassword('');
       setPasswordDeletionSupported(false);
+      setGoogleDeletionSupported(false);
       setMessage('Your Pack One account and career were permanently deleted.');
       router.replace('/');
     } catch (error: unknown) {
@@ -151,6 +161,40 @@ export default function AccountScreen() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const deleteWithGoogle = async () => {
+    if (!session || busy || !googleDeletionSupported) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const start = await startGoogleDeletion(session);
+      const handoffToken = await openGoogleHandoff(start.url);
+      await deleteMobileAccount(session, { googleHandoff: handoffToken });
+      const fresh = await ensureGuestSession();
+      setSession(fresh);
+      setSignedInLabel(null);
+      setDeletePassword('');
+      setPasswordDeletionSupported(false);
+      setGoogleDeletionSupported(false);
+      setMessage('Your Pack One account and career were permanently deleted.');
+      router.replace('/');
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Could not delete your account.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmGoogleDeletion = () => {
+    Alert.alert(
+      'Permanently delete Pack One account?',
+      'This deletes your profile, career, scores, Draft Runs, challenges, provider links, and entitlements. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Continue with Google', style: 'destructive', onPress: () => void deleteWithGoogle() },
+      ],
+    );
   };
 
   const signOut = async () => {
@@ -217,9 +261,18 @@ export default function AccountScreen() {
                     <Text style={styles.dangerButtonText}>Permanently delete account</Text>
                   </Pressable>
                 </>
+              ) : googleDeletionSupported ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy}
+                  onPress={confirmGoogleDeletion}
+                  style={[styles.dangerButton, busy && styles.disabled]}
+                >
+                  <Text style={styles.dangerButtonText}>Reauthenticate with Google to delete</Text>
+                </Pressable>
               ) : (
                 <Text style={styles.providerDeleteNote}>
-                  Provider reauthentication is required before this account can be deleted in-app. Google and Apple deletion support is the next auth step.
+                  This provider cannot be reauthenticated for deletion in the app yet. Sign in with Apple support remains blocked on provider configuration.
                 </Text>
               )}
             </View>
