@@ -20,6 +20,9 @@ assert.doesNotMatch(home, /id="home-editorial"/);
 assert.doesNotMatch(home, /data-ad-slot="home"/);
 assert.match(home, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/);
 assert.doesNotMatch(home, /href="\/methodology\/"[^>]*>Method<\/a>/);
+assert.match(home, /class="topbar"/);
+assert.match(home, /id="daily-nav"[^>]*>Daily Run<\/button>/);
+assert.match(home, /id="leaderboard-nav"[^>]*>Leaders<\/button>/);
 assert.match(home, /Impact-Site-Verification: 3e227a68-dfc4-4be8-a619-b13df4f67e25/);
 assert.doesNotMatch(home, /impact-site-verification'\s+value=/i);
 const howTo = await readFile('how-it-works/index.html','utf8');
@@ -35,16 +38,35 @@ assert.match(howTo, /<h2>Method<\/h2>/);
 assert.match(howTo, /href="\/methodology\/">View method<\/a>/);
 assert.match(howTo, /<h2>Sets<\/h2>/);
 assert.match(howTo, /href="\/sets\/">View sets<\/a>/);
-const footerPages = ['about/index.html','contact/index.html','disclosure/index.html','privacy/index.html','terms/index.html'];
-for (const path of footerPages) {
+const staticTopbarPages = [
+  'how-it-works/index.html',
+  'scoring/index.html',
+  'methodology/index.html',
+  'learn/index.html',
+  'learn/first-pick-discipline/index.html',
+  'learn/reading-consensus/index.html',
+  'learn/staying-open/index.html',
+  'sets/index.html',
+  'sets/msh/index.html',
+  'sets/sos/index.html',
+  'sets/tmt/index.html',
+  'sets/ecl/index.html',
+  'about/index.html',
+  'contact/index.html',
+  'disclosure/index.html',
+  'privacy/index.html',
+  'terms/index.html',
+  'admin/index.html'
+];
+for (const path of staticTopbarPages) {
   const html = await readFile(path, 'utf8');
   assert.match(html, /href="\/visual-c\.css\?v=2"/, `${path} needs the app header styles`);
   assert.match(html, /class="topbar"/, `${path} needs the standard app topbar`);
   assert.match(html, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/, `${path} needs Daily Run navigation`);
   assert.match(html, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, `${path} needs Leaders navigation`);
-  assert.match(html, /href="\/how-it-works\/">How To Play\?<\/a>/, `${path} needs How To Play navigation`);
+  assert.match(html, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/, `${path} needs How To Play navigation`);
   assert.match(html, /id="account-nav" href="\/\?account=1">Account<\/a>/, `${path} needs Account navigation`);
-  assert.doesNotMatch(html, /class="site-header"/, `${path} must not use the legacy editorial header`);
+  assert.doesNotMatch(html, /class="site-header"|class="admin-brand"/, `${path} must not use a legacy top-level header`);
 }
 const bootstrap = await readFile('bootstrap.mjs','utf8');
 assert.match(bootstrap, /else if \(params\.has\('account'\)\)[\s\S]*?await profiles\.renderMyProfile\(\)/);
