@@ -2,6 +2,7 @@ import {createHash,randomBytes,timingSafeEqual} from 'node:crypto';
 
 export const ACCOUNT_COOKIE='__Host-pack1_account';
 export const CSRF_COOKIE='__Secure-pack1_csrf';
+export const PLAYER_COOKIE='__Host-pack1_player';
 export const ACCOUNT_SESSION_SECONDS=7*24*60*60;
 const SAFE_METHODS=new Set(['GET','HEAD','OPTIONS']);
 
@@ -29,6 +30,11 @@ function sameDigest(a,b) {
 export function accountCookie(request) {
   const value=cookieValue(request,ACCOUNT_COOKIE);
   return validOpaque(value)?value:null;
+}
+
+export function playerCookie(request) {
+  const value=cookieValue(request,PLAYER_COOKIE);
+  return /^p1_[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/i.test(String(value||''))?value:null;
 }
 
 export function csrfCookie(request) {
@@ -115,6 +121,18 @@ function cookieLines(session) {
 export function withAccountCookies(response,session) {
   const headers=new Headers(response.headers);
   for(const line of cookieLines(session))headers.append('set-cookie',line);
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+}
+
+export function withPlayerCookie(response,token,maxAge=365*24*60*60) {
+  const headers=new Headers(response.headers);
+  headers.append('set-cookie',`${PLAYER_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; Secure; HttpOnly; SameSite=Strict`);
+  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+}
+
+export function clearPlayerCookie(response) {
+  const headers=new Headers(response.headers);
+  headers.append('set-cookie',`${PLAYER_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict`);
   return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
 }
 
