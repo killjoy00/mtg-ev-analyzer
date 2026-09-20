@@ -71,8 +71,8 @@ export default function AccountScreen() {
     const result = await linkMobileAccount(current, account, claimToken);
     setSession(result.session);
     setSignedInLabel(result.session.accountUser?.email ?? result.session.accountUser?.name ?? 'Pack One account');
-    const current = await loadMobileAccount(result.session);
-    setPasswordDeletionSupported(current?.deletion?.passwordSupported === true);
+    const accountState = await loadMobileAccount(result.session);
+    setPasswordDeletionSupported(accountState?.deletion?.passwordSupported === true);
     setMessage(result.linked.validatedDailyScore
       ? 'Score validated and added to today\'s leaderboard.'
       : 'Signed in to your Pack One account.');
