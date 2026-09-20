@@ -11,7 +11,7 @@ V4_REBUILD = ROOT / ".github" / "workflows" / "rebuild-v4-draft-run-corpus.yml"
 
 
 class DataPipelineWorkflowTests(unittest.TestCase):
-    def test_v4_rebuild_is_atomic_and_refuses_mixed_models(self):
+    def test_v4_rebuild_is_checkpointed_and_refuses_mixed_release(self):
         text = V4_REBUILD.read_text()
         self.assertIn("strong-player-colour-stage-v4", text)
         self.assertIn("elite-trophy-colour-stage-v8", text)
@@ -23,15 +23,35 @@ class DataPipelineWorkflowTests(unittest.TestCase):
         self.assertIn("gh pr create", text)
         self.assertNotIn("git push origin HEAD:main", text)
 
-        verify = text.index("Verify complete v4 provenance")
-        corpus = text.index("Build the separately versioned v8 corpus")
-        tests = text.index("Validate the complete candidate")
-        upload = text.index("Publish versioned v4 replay shards")
-        commit = text.index("Commit the reviewed candidate to a rollout branch")
+        # Expensive work must survive a later runner timeout without exposing a
+        # mixed-model candidate as a release PR.
+        self.assertIn("max-parallel: 1", text)
+        self.assertIn("Checkpoint rebuilt environments", text)
+        self.assertIn("Checkpoint legacy environments", text)
+        self.assertIn("Checkpoint Powered Cube", text)
+        self.assertIn("v4-original-catalog.json", text)
+        self.assertGreaterEqual(text.count('git push origin "HEAD:$BRANCH"'), 4)
+
+        finalize = text.split("  finalize:", 1)[1]
+        verify = finalize.index("Verify complete v4 provenance")
+        corpus = finalize.index("Build the separately versioned v8 corpus")
+        tests = finalize.index("Validate the complete candidate")
+        upload = finalize.index("Publish versioned v4 replay shards")
+        commit = finalize.index("Commit final corpus candidate")
+        release_pr = finalize.index("Open rollout pull request")
         self.assertLess(verify, corpus)
         self.assertLess(corpus, tests)
         self.assertLess(tests, upload)
         self.assertLess(upload, commit)
+        self.assertLess(commit, release_pr)
+
+    def test_v4_rebuild_push_launch_is_explicitly_gated(self):
+        text = V4_REBUILD.read_text()
+        triggers = text.split("permissions:", 1)[0]
+        self.assertIn(".github/workflows/rebuild-v4-draft-run-corpus.yml", triggers)
+        self.assertIn("[launch-v4-rebuild]", text)
+        self.assertIn("github.event_name == 'workflow_dispatch'", text)
+        self.assertIn("contains(github.event.head_commit.message, '[launch-v4-rebuild]')", text)
 
     def test_replay_storage_keeps_v3_and_v4_separate(self):
         text = (ROOT / "scripts" / "r2_replay_shards.sh").read_text()
