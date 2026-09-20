@@ -4,7 +4,7 @@ import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {handlePatreon} from './patreon.mjs';
-import {accountSession,clearAccountCookies,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,withAccountCookies} from './account-session.mjs';
+import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 const ALLOWED_ORIGINS = new Set([
   'https://packone.pro',
   'https://killjoy00.github.io',
@@ -565,6 +565,30 @@ async function historyPage(playerId, cursor, limit = 25) {
   return { rows, next_cursor: rows.length === safeLimit ? rows.at(-1)?.cursor || null : null };
 }
 
+async function handleBrowserPlayerSession(request) {
+  requireTrustedOrigin(request);
+  const current=await player(request,false);
+  if(current) {
+    const meta=await profileMetaByPlayer(current);
+    return json({ok:true,playerId:current,displayName:meta?.display_name||'Pack Player',profileKey:meta?.profile_key||null});
+  }
+  const payload=await readJson(request);
+  const id=crypto.randomUUID(),token=await tokenFor(id);
+  const displayName=await upsertPlayer(id,payload.displayName||'Pack Player');
+  const meta=await profileMetaByPlayer(id);
+  return withPlayerCookie(json({ok:true,playerId:id,displayName,profileKey:meta?.profile_key||null},201),token);
+}
+
+async function handlePlayerMigration(request) {
+  requireTrustedOrigin(request);
+  const legacy=String(request.headers.get('x-pack1-player-session')||'');
+  const id=await verifyToken(legacy);
+  if(!id)throw Object.assign(Error('Guest session could not be migrated.'),{status:401});
+  const meta=await profileMetaByPlayer(id);
+  if(!meta)throw Object.assign(Error('Guest record could not be migrated.'),{status:401});
+  return withPlayerCookie(json({ok:true,playerId:id,displayName:meta.display_name,profileKey:meta.profile_key||null,migrated:true}),legacy);
+}
+
 async function handleAccountSignup(request) {
   requireTrustedOrigin(request);
   const payload=await readJson(request);
@@ -767,7 +791,7 @@ async function validateDailyRunScore(runId, playerId, authUserId) {
   return Number(result.rows[0]?.n || 0) > 0;
 }
 
-async function handleLink(request) {
+async function handleLink(request,{browser=false}={}) {
   const payload = await readJson(request);
   const validateDailyRunId = payload.validateDailyRunId == null ? null : String(payload.validateDailyRunId);
   if (validateDailyRunId && !DAILY_RUN_ID_RE.test(validateDailyRunId)) {
@@ -801,16 +825,18 @@ async function handleLink(request) {
     ? await validateDailyRunScore(validateDailyRunId, id, auth.user_id)
     : false;
   const profile = await profileMetaByPlayer(id);
+  const playerToken=await tokenFor(id);
   let response=json({
     ok: true,
     merged,
     validatedDailyScore,
     playerId: id,
-    token: await tokenFor(id),
+    ...(browser?{}:{token:playerToken}),
     displayName: profile?.display_name || auth.name || 'Pack Player',
     profileKey: profile?.profile_key || null,
     email: auth.email,
   });
+  if(browser)response=withPlayerCookie(response,playerToken);
   if(auth.source==='cookie') {
     const rotated=await issueAccountSession(query,auth,{replaceHash:auth.session_hash});
     response=withAccountCookies(response,rotated);
@@ -829,7 +855,7 @@ async function handleAccount(request) {
 async function handleSignout(request) {
   const auth = await authSession(request);
   await revokeAccountSession(query,auth);
-  return clearAccountCookies(json({ ok: true }));
+  return clearPlayerCookie(clearAccountCookies(json({ ok: true })));
 }
 
 async function handleDates(request) {
@@ -947,10 +973,13 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true });
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
+  if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
+  if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signup') return handleAccountSignup(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signin') return handleAccountSignin(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/google/start') return handleGoogleStart(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/link-browser') return handleLink(request,{browser:true});
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/events') return handleEvents(request);
   if (request.method === 'POST' && url.pathname === '/v1/results') return handleResult(request);
