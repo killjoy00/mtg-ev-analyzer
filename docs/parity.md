@@ -20,10 +20,10 @@ Updated 2026-09-20. “Foundation” means scaffolding exists but the feature is
 | Restore purchases | — | — | — | Required mobile |
 | Patreon entitlement recognition | ✓ | Existing account grants | Existing account grants | Required |
 | Account deletion | — | Password + Google reauth | Password + Google reauth | Required |
-| How to Play | ✓ | — | — | Required |
-| Scoring | ✓ | — | — | Required |
-| Method | ✓ | — | — | Required |
-| Sets | ✓ | — | — | Required |
+| How to Play | ✓ | Native guide | Native guide | Required |
+| Scoring | ✓ | Native guide | Native guide | Required |
+| Method | ✓ | Native guide | Native guide | Required |
+| Sets | ✓ | Live native archive | Live native archive | Required |
 | Deep links | Web URLs | — | — | Required |
 | Native crash diagnostics | n/a | — | — | Required before beta |
 
