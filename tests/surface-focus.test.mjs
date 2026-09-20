@@ -51,6 +51,6 @@ test('Draft Run repeats preserve the practice context', async () => {
 
 test('secondary gameplay controls keep mobile-sized targets', async () => {
   const css = await readFile('draft-run.css', 'utf8');
-  assert.match(css, /\.run-zoom\{[^}]*min-height:44px/);
+  assert.match(css, /body \.run-zoom\{[^}]*min-height:44px/);
   assert.match(css, /\.run-lock \.run-tools \.button\{min-height:44px/);
 });
