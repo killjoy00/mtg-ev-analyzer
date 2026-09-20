@@ -27,7 +27,8 @@ if (historicalShare) {
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account')
     ? await import('./daily-home.mjs') : null;
   home?.renderDailyHome();
-  const identityReady = import('./growth.mjs').then(m => m.installGrowthLayer());
+  const growthReady = import('./growth.mjs');
+  const identityReady = growthReady.then(m => m.installGrowthLayer());
   const account = document.createElement('button');
   account.id = 'account-nav'; account.type = 'button';
   account.className = 'top-nav-button'; account.textContent = 'Account';
@@ -39,7 +40,10 @@ if (historicalShare) {
     await profiles.renderMyProfile();
   };
   document.querySelector('.top-actions').append(account);
-  if (params.has('patreon')) {
+  if (params.has('auth')) {
+    await identityReady;
+    await (await growthReady).resumeAccountAuth(params.get('auth'));
+  } else if (params.has('patreon')) {
     await identityReady;
     const profiles=await import('./profile-product.mjs');
     profiles.installProfileProductLayer();
