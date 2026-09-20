@@ -9,4 +9,4 @@ Expected final files:
 - `images/adaptive-icon.png` — Android adaptive foreground
 - `images/monochrome-icon.png` — Android 13+ themed icon
 
-The visual source should use the approved Pack One brand mark. Do not ship Expo/default artwork or a temporary AI-generated mark just to unblock a build.
+The production Expo config is already wired to these exact paths. The visual source should use the approved Pack One brand mark. Do not ship Expo/default artwork or a temporary generated mark just to unblock a build. Production EAS builds fail before install while any required file is missing.
