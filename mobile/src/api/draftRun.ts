@@ -68,6 +68,11 @@ export type DraftRunState = {
   id: string;
   environment: string;
   run_length: number;
+  set_reroll_allowed: boolean;
+  rerolls: {
+    set: number;
+    pack: number;
+  };
   day: string | null;
   revision: number;
   round: number;
@@ -128,6 +133,25 @@ export function startRegularPracticeDraftRun(
 export function loadDraftRun(id: string, mobileSessionToken: string) {
   return requestJson<DraftRunState>(`/draft/v1/runs/${encodeURIComponent(id)}`, {
     mobileSessionToken,
+    timeoutMs: 30_000,
+  });
+}
+
+export function rerollDraftRun(
+  run: DraftRunState,
+  type: 'set' | 'pack',
+  mobileSessionToken: string,
+) {
+  if (!run.current) throw new Error('This run is already complete.');
+  return requestJson<DraftRunState>(`/draft/v1/runs/${encodeURIComponent(run.id)}/reroll`, {
+    method: 'POST',
+    mobileSessionToken,
+    body: {
+      type,
+      revision: run.revision,
+      round: run.answers.length,
+      puzzleId: run.current.puzzle_id,
+    },
     timeoutMs: 30_000,
   });
 }
