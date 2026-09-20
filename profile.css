@@ -11,6 +11,12 @@
 .profile-identity-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:20px; }
 .profile-identity-strip > div { padding:14px 16px; border-radius:0; background:var(--surface-soft); }
 .profile-identity-strip strong { display:block; margin-top:4px; font-size:15px; }
+.profile-career-snapshot { grid-template-columns:repeat(4,minmax(0,1fr)); align-items:stretch; margin:8px 0 24px; padding:16px; border-block:1px solid var(--line); background:transparent; }
+.profile-career-snapshot > .profile-snapshot-heading { grid-column:1/-1; padding:0 0 4px; background:transparent; }
+.profile-snapshot-heading span { display:block; color:var(--ink); font-size:13px; font-weight:800; letter-spacing:0; text-transform:none; }
+.profile-snapshot-heading small { display:block; margin-top:2px; color:var(--muted); font-size:11px; }
+.profile-career-snapshot > .profile-snapshot-stat { background:var(--surface); border:1px solid var(--line); }
+.profile-career-snapshot > .profile-snapshot-stat small { display:block; margin-top:4px; color:var(--muted); font-size:10px; line-height:1.35; }
 .profile-claim { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:0 0 24px; padding:20px; border:1px solid #d4c6a9; border-radius:var(--radius); background:#fbf7ed; }
 .profile-claim span { color:#6c501f; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
 .profile-claim strong { display:block; margin:4px 0; }
@@ -92,6 +98,8 @@
 }
 
 @media (max-width: 760px) {
+  .profile-career-snapshot { grid-template-columns:repeat(2,minmax(0,1fr)); padding:12px; }
+  .profile-career-snapshot > .profile-snapshot-heading { grid-column:1/-1; }
   .profile-hero { display:block; }
   .profile-hero-actions { justify-content:flex-start; margin-top:18px; }
   .profile-scoreboard { grid-template-columns:repeat(2,minmax(0,1fr)); }
@@ -108,6 +116,8 @@
 }
 
 @media (max-width: 430px) {
+  .profile-career-snapshot { gap:8px; }
+  .profile-career-snapshot > div { padding:12px; }
   .environment-progress-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
   .profile-scoreboard > div { padding:14px; }
   .profile-section { padding:17px; }
