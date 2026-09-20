@@ -3,24 +3,30 @@ import { getAuthSession, linkAccount, signInAccount, signOutAccount, signUpAccou
 import { trackEvent as event } from './retention-events.mjs';
 
 let currentAccount = null;
+let pendingDailyRunValidation = null;
 
 function formMarkup(kind) {
   return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="email"></label>${kind==='signup'?'<label>Display name<input required name="name" minlength="2" maxlength="24" autocomplete="nickname"></label>':''}<label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button><p class="form-error" aria-live="polite"></p></form>`;
 }
 async function claimCurrentSession() {
   const session=await getAuthSession(); if(!session?.session?.token || !session?.user) return null;
-  const linked=await linkAccount(session.session.token); currentAccount=session; return linked;
+  const validationRunId=pendingDailyRunValidation;
+  const linked=await linkAccount(session.session.token,{validateDailyRunId:validationRunId}); pendingDailyRunValidation=null; currentAccount=session; return linked;
 }
-export async function renderAccount() {
+export async function renderAccount({ validateDailyRunId = null } = {}) {
+  if(validateDailyRunId) pendingDailyRunValidation=validateDailyRunId;
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
   currentAccount=await getAuthSession();
   if(currentAccount?.session?.token && currentAccount?.user) {
-    await linkAccount(currentAccount.session.token).catch(()=>null);
+    const validationRunId=pendingDailyRunValidation;
+    await linkAccount(currentAccount.session.token,{validateDailyRunId:validationRunId}).catch(()=>null);
+    pendingDailyRunValidation=null;
     await (await import('./profile-product.mjs')).renderMyProfile();
     return;
   }
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>Save your progress.</h1><p>All three Dailies are free without an account. A free account saves your record, enables leaderboard participation, and adds unlimited regular Draft Runs.</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">Keep playing as guest</button></div></section>`;
+  const validatingDaily=Boolean(pendingDailyRunValidation);
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>${validatingDaily?'Add your score to the leaderboard.':'Save your progress.'}</h1><p>${validatingDaily?'Sign in or create a free account to validate this Daily score and add it to today’s leaderboard.':'All three Dailies are free without an account. A free account saves your record, enables leaderboard participation, and adds unlimited regular Draft Runs.'}</p></header><div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">Keep playing as guest</button></div></section>`;
   document.querySelector('#account-career')?.addEventListener('click',()=>document.querySelector('#account-nav')?.click());
   document.querySelector('#account-home')?.addEventListener('click',()=>document.querySelector('#brand-home')?.click());
   document.querySelector('#account-signup')?.addEventListener('submit',async(e)=>{e.preventDefault();const f=e.currentTarget,err=f.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(f));await signUpAccount(data);await claimCurrentSession();event('auth_sign_up');await renderAccount();}catch(x){err.textContent=x.message;}});
