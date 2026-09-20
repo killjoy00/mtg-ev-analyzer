@@ -69,19 +69,18 @@ test('Method has no secondary link directory',()=>{
  const html=fs.readFileSync('methodology/index.html','utf8');assert.equal((html.match(/class="method-directory"/g)||[]).length,0);
 });
 
-// Guests do get the Elite ask. PR #178 built the guest handoff - one sign-in,
-// then straight on to Patreon - and this button is its only entry point, so
-// pin it rather than let a later conversion tidy-up quietly remove the flow.
-test('the guest Elite handoff keeps its entry point',()=>{
+// Guests should see the free-account rung before any paid ask. The guest
+// Elite handoff still exists for an explicit premium action, but it is not
+// advertised on the landing page.
+test('a guest is not asked to pay on the Daily home',()=>{
  const complete=['mixed','powered-cube','latest'].map(row);
  for(const profile of [null,{player:{claimed:false},capabilities:[],daily_history:[]},
                        {player:{claimed:false},capabilities:[],daily_history:complete}]){
   const html=dailyHomeMarkup(profile,day);
-  assert.match(html,/data-home-elite/);
-  assert.match(html,/Become Elite/,'a guest has no membership to upgrade');
+  assert.doesNotMatch(html,/data-home-elite|Become Elite|Upgrade to Elite/);
  }
- // The free-account rung still appears alongside it once the Dailies are done.
- assert.match(dailyHomeMarkup({player:{claimed:false},capabilities:[],daily_history:complete},day),/Create a free account/);
+ const done=dailyHomeMarkup({player:{claimed:false},capabilities:[],daily_history:complete},day);
+ assert.match(done,/Create a free account/);
 });
 
 // A Supporter holds no paid capability, so before membership was surfaced they
