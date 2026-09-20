@@ -44,7 +44,7 @@ export function renderDailyHome(profile = null, unavailable = false) {
   lastDay = easternDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, unavailable);
   document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs')).renderAccount());
-  document.querySelectorAll('[data-home-elite]').forEach(button => button.addEventListener('click', async () => (await import('./growth.mjs')).renderAccount()));
+  document.querySelectorAll('[data-home-elite]').forEach(button => button.addEventListener('click', async () => (await import('./growth.mjs')).beginEliteUpgrade({source:'home'})));
 }
 
 export function installDailyHome(identityReady = Promise.resolve()) {

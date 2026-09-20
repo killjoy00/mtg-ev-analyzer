@@ -13,6 +13,7 @@ let updatePayload = null;
 let shareCalls = 0;
 
 await page.addInitScript(() => {
+  localStorage.setItem('pack1-auth-session-v1','profile-auth-fixture');
   Object.defineProperty(navigator, 'share', { configurable:true, value: async () => { window.__pack1ShareCalls = (window.__pack1ShareCalls || 0) + 1; } });
   Object.defineProperty(navigator, 'canShare', { configurable:true, value: () => false });
 });
@@ -86,8 +87,13 @@ await page.route(`${growthOrigin}/**`, async (route) => {
   if (url.pathname === '/v1/session') {
     body = { token:'p1_00000000-0000-4000-8000-000000000000.e2e', playerId:'00000000-0000-4000-8000-000000000000', displayName:'Profile Tester', profileKey };
   } else if (url.pathname === '/v1/account/session') {
-    status = 401;
-    body = { error:'Account session required.' };
+    assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
+    body = { session:{ token:'profile-auth-fixture' }, user:{ email:'profile@example.invalid', name:'Profile Tester' } };
+  } else if (url.pathname === '/v1/account/link') {
+    assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
+    body = { token:'p1_00000000-0000-4000-8000-000000000000.e2e', merged:false };
+  } else if (url.pathname === '/v1/patreon/status') {
+    body = { configured:true, connected:false, membership:null, capabilities:[], support_url:'https://www.patreon.com/c/PackOne' };
   } else if (url.pathname === '/v1/profile/me') {
     body = fixture;
   } else if (url.pathname === `/v1/profile/${profileKey}`) {
@@ -95,6 +101,7 @@ await page.route(`${growthOrigin}/**`, async (route) => {
   } else if (url.pathname === '/v1/profile/history' || url.pathname === `/v1/profile/${profileKey}/history`) {
     body = { rows:[{ cursor:'150', played_at:'2026-08-30T12:00:00Z', set_id:'woe', mode:'top3', score:88, grade:'A-', is_daily:false, outcome:null }], next_cursor:null };
   } else if (url.pathname === '/v1/profile' && route.request().method() === 'PATCH') {
+    assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
     updatePayload = route.request().postDataJSON();
     body = {
       ...fixture,

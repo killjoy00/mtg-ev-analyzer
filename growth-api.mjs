@@ -1,6 +1,5 @@
 const TOKEN_KEY = 'pack1-api-session-v1';
 const AUTH_TOKEN_KEY = 'pack1-auth-session-v1';
-const AUTH_USER_KEY = 'pack1-auth-user-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 const AUTH_BASE = 'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 let sessionPromise = null;
@@ -14,12 +13,11 @@ function saveAuth(data) {
   if (!data?.token) return data;
   try {
     localStorage.setItem(AUTH_TOKEN_KEY, data.token);
-    if (data.user) localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user));
   } catch {}
   globalThis.dispatchEvent?.(new Event('packone-account-changed'));
   return data;
 }
-function clearAuth() { try { localStorage.removeItem(AUTH_TOKEN_KEY); localStorage.removeItem(AUTH_USER_KEY); } catch {} globalThis.dispatchEvent?.(new Event('packone-account-changed')); }
+function clearAuth() { try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {} globalThis.dispatchEvent?.(new Event('packone-account-changed')); }
 export function savePackToken(token) { try { localStorage.setItem(TOKEN_KEY, token); } catch {} return token; }
 export function packApiConfigured() { return /^https:\/\//.test(baseUrl()); }
 
@@ -50,7 +48,7 @@ async function api(path, { method='GET', body, auth=true, authSession=null } = {
   if (authSession) headers.set('x-pack1-auth-session', authSession);
   const response = await fetch(`${baseUrl()}${path}`, { method, headers, body: body === undefined ? undefined : JSON.stringify(body),keepalive:path==='/v1/events' });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || `Pack 1 API failed (${response.status}).`);
+  if (!response.ok) throw Object.assign(new Error(data.error || `Pack 1 API failed (${response.status}).`), { status:response.status });
   return data;
 }
 
@@ -101,7 +99,9 @@ export async function updateProfile({ displayName, profilePublic, favoriteSetId,
   if (typeof profilePublic === 'boolean') body.profilePublic = profilePublic;
   if (favoriteSetId !== undefined) body.favoriteSetId = favoriteSetId;
   if (showcaseAchievement !== undefined) body.showcaseAchievement = showcaseAchievement;
-  const data = await api('/v1/profile', { method:'PATCH', body, auth:true });
+  const authSession=loadAuthToken();
+  if(!authSession) throw new Error('Sign in to change account settings.');
+  const data = await api('/v1/profile', { method:'PATCH', body, auth:true, authSession });
   if (data?.player?.display_name) {
     try { localStorage.setItem(NAME_KEY, data.player.display_name); } catch {}
   }
@@ -139,12 +139,11 @@ export async function getAuthSession() {
   if (!token || !packApiConfigured()) return null;
   try {
     const data = await api('/v1/account/session', { auth:false, authSession:token });
-    if (data?.user) {
-      try { localStorage.setItem(AUTH_USER_KEY, JSON.stringify(data.user)); } catch {}
-      return data;
-    }
-  } catch { clearAuth(); }
-  return null;
+    return data?.user ? data : null;
+  } catch (error) {
+    if (error?.status === 401 || error?.status === 403) { clearAuth(); return null; }
+    throw error;
+  }
 }
 export async function loadPatreonStatus() {
   const authSession=loadAuthToken();

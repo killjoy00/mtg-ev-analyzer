@@ -195,8 +195,10 @@ function failureMessage(error) {
 
 function renderLoadFailure(error,isBoard) {
   if(error.capability||error.status===401){
-    app().innerHTML=`<section class="message-card"><h1>${['custom_corpus','unlimited_cube_practice'].includes(error.capability)?'Elite practice':storedAccountToken()?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${error.capability==='custom_corpus'||error.capability==='unlimited_cube_practice'?'<p>Elite membership includes custom sets and unlimited Cube practice.</p><button class="button secondary" id="practice-membership">Manage membership</button>':''}${!storedAccountToken()?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<p><a class="button secondary" href="./">Back to Dailies</a></p></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs')).renderAccount();});
+    const premium=['custom_corpus','unlimited_cube_practice'].includes(error.capability);
+    const signedIn=Boolean(storedAccountToken());
+    app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p><button class="button primary" id="practice-membership">'+(signedIn?'Become Elite on Patreon':'Sign in to become Elite')+'</button>':''}${!premium&&!signedIn?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<p><a class="button secondary" href="./">Back to Dailies</a></p></section>`;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs')).beginEliteUpgrade({source:'practice_gate'});});
     document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs')).renderAccount();});return;
   }
   console.warn('Draft Run page failed to load',error?.message);
