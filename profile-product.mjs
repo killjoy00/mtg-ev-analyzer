@@ -397,7 +397,7 @@ function enhanceNav() {
   button.id = 'account-nav';
   button.type = 'button';
   button.textContent = 'Account';
-  button.addEventListener('click', () => { track('account_view'); void renderAccount(); });
+  button.addEventListener('click', () => { track('account_view'); void renderMyProfile(); });
   top.append(button);
 }
 
