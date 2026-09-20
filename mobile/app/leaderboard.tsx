@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -86,32 +86,29 @@ export default function LeaderboardScreen() {
   const [environment, setEnvironment] = useState<DailyEnvironment>('mixed');
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const requestId = useRef(0);
 
-  const load = useCallback(async () => {
-    const id = ++requestId.current;
-
-    try {
-      const data = await loadDraftRunLeaderboard(period, environment);
-      if (id !== requestId.current) return;
-      setState({ status: 'ready', data });
-    } catch (error: unknown) {
-      if (id !== requestId.current) return;
-      setState({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Leaderboard is unavailable.',
-      });
-    } finally {
-      if (id === requestId.current) setRefreshing(false);
-    }
-  }, [environment, period]);
-
   useEffect(() => {
-    void load();
+    const id = ++requestId.current;
+    void loadDraftRunLeaderboard(period, environment)
+      .then((data) => {
+        if (id === requestId.current) setState({ status: 'ready', data });
+      })
+      .catch((error: unknown) => {
+        if (id !== requestId.current) return;
+        setState({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Leaderboard is unavailable.',
+        });
+      })
+      .finally(() => {
+        if (id === requestId.current) setRefreshing(false);
+      });
     return () => {
       requestId.current += 1;
     };
-  }, [load]);
+  }, [environment, period, reloadKey]);
 
   const selectEnvironment = (next: DailyEnvironment) => {
     if (next === environment) return;
@@ -127,12 +124,12 @@ export default function LeaderboardScreen() {
 
   const retry = () => {
     setState({ status: 'loading' });
-    void load();
+    setReloadKey((value) => value + 1);
   };
 
   const refresh = () => {
     setRefreshing(true);
-    void load();
+    setReloadKey((value) => value + 1);
   };
 
   const showDays = period !== 'daily';
