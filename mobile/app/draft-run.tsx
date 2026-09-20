@@ -19,7 +19,7 @@ import {
   issueDraftRunClaim,
   rerollDraftRun,
   startDailyDraftRun,
-  startRegularPracticeDraftRun,
+  startPracticeDraftRun,
   submitDraftRunPick,
   type DailyEnvironment,
   type DraftRunCard,
@@ -92,12 +92,26 @@ function CardTile({
   );
 }
 
-async function loadDraftSurface(environment: DailyEnvironment, practice: boolean) {
+function practiceSetIds(value: string) {
+  return [...new Set(value
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => /^[a-z0-9_-]{2,24}$/.test(item)))];
+}
+
+async function loadDraftSurface(environment: DailyEnvironment, practice: boolean, setIdsParam = '') {
   const session = await ensureGuestSession();
   if (practice) {
     if (!session.accountToken) return { status: 'signin-required' as const };
-    const key = await practiceIdempotencyKey();
-    const run = await startRegularPracticeDraftRun(session, key);
+    const setIds = practiceSetIds(setIdsParam);
+    const practiceEnvironment = environment === 'powered-cube' ? 'powered-cube' : 'mixed';
+    const fingerprint = practiceEnvironment + ':' + [...setIds].sort().join(',');
+    const key = await practiceIdempotencyKey(fingerprint);
+    const run = await startPracticeDraftRun(session, {
+      environment: practiceEnvironment,
+      setIds,
+      idempotencyKey: key,
+    });
     if (run.complete) await clearPracticeIdempotencyKey();
     return { status: 'ready' as const, run, token: session.playerToken };
   }
@@ -106,18 +120,21 @@ async function loadDraftSurface(environment: DailyEnvironment, practice: boolean
 }
 
 export default function DraftRunScreen() {
-  const params = useLocalSearchParams<{ environment?: string; mode?: string }>();
+  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string }>();
   const practice = params.mode === 'practice';
+  const setIdsParam = typeof params.setIds === 'string' ? params.setIds : '';
+  const customPractice = practice && practiceSetIds(setIdsParam).length > 0;
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const environment: DailyEnvironment = practice
-    ? 'mixed'
+    ? requestedEnvironment === 'powered-cube' ? 'powered-cube' : 'mixed'
     : isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
   const surfaceMeta = practice
-    ? {
-        eyebrow: 'PRACTICE DRAFT RUN',
-        resultTitle: 'Practice complete.',
-      }
+    ? environment === 'powered-cube'
+      ? { eyebrow: 'POWERED CUBE PRACTICE', resultTitle: 'Powered Cube practice complete.' }
+      : customPractice
+        ? { eyebrow: 'CUSTOM PRACTICE', resultTitle: 'Custom practice complete.' }
+        : { eyebrow: 'PRACTICE DRAFT RUN', resultTitle: 'Practice complete.' }
     : dailyMeta;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [mode, setMode] = useState<ViewMode>('pick');
@@ -129,7 +146,7 @@ export default function DraftRunScreen() {
 
   useEffect(() => {
     let active = true;
-    void loadDraftSurface(environment, practice)
+    void loadDraftSurface(environment, practice, setIdsParam)
       .then((loaded) => {
         if (!active) return;
         if (loaded.status === 'signin-required') {
@@ -149,7 +166,7 @@ export default function DraftRunScreen() {
     return () => {
       active = false;
     };
-  }, [environment, practice]);
+  }, [environment, practice, setIdsParam]);
 
   const retry = async ({ freshPractice = false }: { freshPractice?: boolean } = {}) => {
     setState({ status: 'loading' });
@@ -158,7 +175,7 @@ export default function DraftRunScreen() {
     setActionError(null);
     if (practice && freshPractice) await clearPracticeIdempotencyKey();
     try {
-      const loaded = await loadDraftSurface(environment, practice);
+      const loaded = await loadDraftSurface(environment, practice, setIdsParam);
       if (loaded.status === 'signin-required') {
         setState({ status: 'signin-required' });
         return;
@@ -257,7 +274,7 @@ export default function DraftRunScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
-          <Text style={styles.loadingText}>Finding today&apos;s packs…</Text>
+          <Text style={styles.loadingText}>{practice ? 'Building your practice run…' : 'Finding today’s packs…'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -269,7 +286,7 @@ export default function DraftRunScreen() {
         <View style={styles.center}>
           <Text style={styles.eyebrow}>PRACTICE DRAFT RUN</Text>
           <Text style={styles.errorTitle}>Keep drafting with a free account.</Text>
-          <Text style={styles.errorBody}>A free account is required for regular practice.</Text>
+          <Text style={styles.errorBody}>A Pack One account is required for practice.</Text>
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push({ pathname: '/account', params: { returnTo: 'practice' } })}
@@ -323,7 +340,7 @@ export default function DraftRunScreen() {
           {practice ? (
             <View style={styles.guestNote}>
               <Text style={styles.guestNoteTitle}>Saved to your career</Text>
-              <Text style={styles.resultBody}>Regular practice uses your Pack One account and is not ranked on the Daily leaderboard.</Text>
+              <Text style={styles.resultBody}>This practice run is saved to your Pack One career and is not ranked on the Daily leaderboard.</Text>
               <Pressable
                 accessibilityRole="button"
                 disabled={busy}
