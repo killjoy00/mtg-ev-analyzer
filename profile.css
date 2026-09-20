@@ -17,11 +17,11 @@
 .profile-snapshot-heading small { display:block; margin-top:2px; color:var(--muted); font-size:11px; }
 .profile-career-snapshot > .profile-snapshot-stat { background:var(--surface); border:1px solid var(--line); }
 .profile-career-snapshot > .profile-snapshot-stat small { display:block; margin-top:4px; color:var(--muted); font-size:10px; line-height:1.35; }
-.profile-claim { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:0 0 24px; padding:20px; border:1px solid #d4c6a9; border-radius:var(--radius); background:#fbf7ed; }
+.profile-claim { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:0 0 24px; padding:20px; border:1px solid #d4c6a9; border-radius:0; background:#fbf7ed; }
 .profile-claim span { color:#6c501f; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
 .profile-claim strong { display:block; margin:4px 0; }
 .profile-claim p { margin:0; color:var(--muted); font-size:13px; }
-.profile-settings { margin:0 0 24px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); }
+.profile-settings { margin:0 0 24px; border:1px solid var(--line); border-radius:0; background:var(--surface); }
 .profile-settings summary { cursor:pointer; padding:16px 18px; font-weight:750; }
 .profile-settings form { padding:0 18px 18px; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; }
 .profile-settings label > span { display:block; margin-bottom:6px; color:var(--muted); font-size:11px; font-weight:750; }
@@ -35,7 +35,7 @@
 .profile-settings-actions { grid-column:1 / -1; display:flex; align-items:center; gap:12px; }
 .profile-settings-status { color:var(--muted); font-size:12px; }
 .profile-public-url { margin:-8px 0 22px; color:var(--muted); font-size:12px; }
-.profile-section { margin-top:18px; padding:22px; border:1px solid var(--line); border-radius:var(--radius); background:var(--surface); min-width:0; }
+.profile-section { margin-top:18px; padding:22px; border:1px solid var(--line); border-radius:0; background:var(--surface); min-width:0; }
 .profile-section h2 { font-size:clamp(21px,2.5vw,28px); }
 .profile-section-heading { display:flex; align-items:end; justify-content:space-between; gap:20px; }
 .profile-section-heading > strong { font-size:28px; line-height:1; }
