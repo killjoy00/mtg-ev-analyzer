@@ -67,6 +67,25 @@ export default ({ config }: ConfigContext): ExpoConfig => {
       ? 'Pack One Preview'
       : 'Pack One Dev';
 
+  const releaseIcon = './assets/images/icon.png';
+  const releaseSplash = './assets/images/splash-icon.png';
+  const adaptiveIcon = './assets/images/adaptive-icon.png';
+  const monochromeIcon = './assets/images/monochrome-icon.png';
+  const plugins = production
+    ? [
+        ...(config.plugins ?? []),
+        [
+          'expo-splash-screen',
+          {
+            backgroundColor: '#f7f8fa',
+            image: releaseSplash,
+            imageWidth: 200,
+            resizeMode: 'contain',
+          },
+        ] as [string, Record<string, unknown>],
+      ]
+    : config.plugins;
+
   const extra = {
     ...config.extra,
     buildProfile: profile,
@@ -84,6 +103,8 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ...config,
     name: displayName,
     backgroundColor: '#f7f8fa',
+    ...(production ? { icon: releaseIcon } : {}),
+    plugins,
     ios: {
       ...config.ios,
       bundleIdentifier,
@@ -91,6 +112,15 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     android: {
       ...config.android,
       package: androidPackage,
+      ...(production
+        ? {
+            adaptiveIcon: {
+              foregroundImage: adaptiveIcon,
+              monochromeImage: monochromeIcon,
+              backgroundColor: '#f7f8fa',
+            },
+          }
+        : {}),
     },
     extra,
   };
