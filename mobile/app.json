@@ -2,10 +2,12 @@
   "expo": {
     "name": "Pack One",
     "slug": "pack-one",
+    "description": "Practice real draft decisions, compare trophy picks, and track your Pack One career.",
     "version": "0.1.0",
     "orientation": "default",
     "scheme": "packone",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#f7f8fa",
     "newArchEnabled": true,
     "plugins": [
       "expo-router",
