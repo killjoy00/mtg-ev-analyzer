@@ -3,9 +3,12 @@ import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
+  AccessibilityInfo,
   ActivityIndicator,
+  Modal,
   Pressable,
   ScrollView,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -18,6 +21,7 @@ import {
   DAILY_ENVIRONMENT_META,
   isDailyEnvironment,
   issueDraftRunClaim,
+  loadDraftRun,
   rerollDraftRun,
   startDailyDraftRun,
   startPracticeDraftRun,
@@ -26,6 +30,7 @@ import {
   type DraftRunCard,
   type DraftRunState,
 } from '@/src/api/draftRun';
+import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import { colors, spacing } from '@/src/theme';
 
@@ -39,7 +44,18 @@ type ViewMode = 'pick' | 'feedback' | 'result';
 
 function Progress({ run }: { run: DraftRunState }) {
   return (
-    <View style={styles.progress} accessibilityLabel={`Round ${Math.min(run.answers.length + 1, run.run_length)} of ${run.run_length}`}>
+    <View
+      accessible
+      accessibilityRole="progressbar"
+      accessibilityLabel="Draft Run progress"
+      accessibilityValue={{
+        min: 0,
+        max: run.run_length,
+        now: run.answers.length,
+        text: `${run.answers.length} of ${run.run_length} picks completed`,
+      }}
+      style={styles.progress}
+    >
       {Array.from({ length: run.run_length }, (_, index) => (
         <View
           key={index}
@@ -59,18 +75,23 @@ function CardTile({
   selected,
   disabled,
   onPress,
+  onZoom,
 }: {
   card: DraftRunCard;
   selected: boolean;
   disabled: boolean;
   onPress: () => void;
+  onZoom: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Pick ${card.name}`}
+      accessibilityHint="Double tap to select. Long press to view a larger card."
       accessibilityState={{ selected, disabled }}
+      delayLongPress={350}
       disabled={disabled}
+      onLongPress={onZoom}
       onPress={onPress}
       style={[styles.card, selected && styles.cardSelected]}
     >
@@ -142,8 +163,34 @@ export default function DraftRunScreen() {
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [resultError, setResultError] = useState<string | null>(null);
+  const [shareError, setShareError] = useState<string | null>(null);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [zoomedCard, setZoomedCard] = useState<DraftRunCard | null>(null);
   const scroll = useRef<ScrollView>(null);
+
+  useAppResume(async () => {
+    if (state.status !== 'ready' || busy) return;
+    try {
+      const previousRun = state.run;
+      const run = practice
+        ? await loadDraftRun(previousRun.id, state.token)
+        : await startDailyDraftRun(state.token, environment);
+      setState({ status: 'ready', run, token: state.token });
+      setSelected(null);
+      setMode((currentMode) => {
+        if (
+          currentMode === 'feedback'
+          && run.id === previousRun.id
+          && run.answers.length === previousRun.answers.length
+        ) {
+          return 'feedback';
+        }
+        return run.complete ? 'result' : 'pick';
+      });
+    } catch {
+      // Keep the last server-authoritative state visible if foreground refresh fails.
+    }
+  });
 
   useEffect(() => {
     let active = true;
@@ -209,6 +256,14 @@ export default function DraftRunScreen() {
       setState({ status: 'ready', run, token: state.token });
       if (practice && run.complete) await clearPracticeIdempotencyKey();
       setMode('feedback');
+      const latestAnswer = run.answers.at(-1);
+      if (latestAnswer) {
+        AccessibilityInfo.announceForAccessibility(
+          `${latestAnswer.score} out of 100. ${latestAnswer.historicalMatch
+            ? 'You matched the trophy drafter.'
+            : `The trophy drafter took ${latestAnswer.historicalName ?? 'another card'}.`}`,
+        );
+      }
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       scroll.current?.scrollTo({ y: 0, animated: true });
     } catch (error: unknown) {
@@ -256,6 +311,26 @@ export default function DraftRunScreen() {
       setResultError(error instanceof Error ? error.message : 'Could not prepare this score for sign in.');
     } finally {
       setBusy(false);
+    }
+  };
+
+  const shareResult = async () => {
+    if (state.status !== 'ready' || !state.run.complete) return;
+    const matches = state.run.answers.filter((item) => item.historicalMatch).length;
+    const label = practice
+      ? setIdsKey
+        ? 'custom practice'
+        : environment === 'powered-cube'
+          ? 'Powered Cube practice'
+          : 'Draft Run practice'
+      : `${dailyMeta.title} Daily`;
+    setShareError(null);
+    try {
+      await Share.share({
+        message: `I scored ${state.run.score ?? 0}/100 on Pack One ${label} and matched ${matches} of ${state.run.run_length} trophy picks.\n\nhttps://packone.pro`,
+      });
+    } catch {
+      setShareError('Could not open sharing. Your result is still saved.');
     }
   };
 
@@ -338,6 +413,15 @@ export default function DraftRunScreen() {
               {run.standing.percentile ? ` · Top ${run.standing.percentile}%` : ''}
             </Text>
           ) : null}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Share Pack One result"
+            onPress={() => void shareResult()}
+            style={styles.secondaryButton}
+          >
+            <Text style={styles.secondaryButtonText}>Share result</Text>
+          </Pressable>
+          {shareError ? <Text accessibilityRole="alert" style={styles.resultError}>{shareError}</Text> : null}
           {practice ? (
             <View style={styles.guestNote}>
               <Text style={styles.guestNoteTitle}>Saved to your career</Text>
@@ -455,6 +539,7 @@ export default function DraftRunScreen() {
               ) : null}
 
               <Text style={styles.sectionTitle}>Choose a card</Text>
+              <Text style={styles.sectionBody}>Tap to choose. Press and hold a card to zoom.</Text>
               <View style={styles.grid}>
                 {puzzle.candidates.map((card) => (
                   <CardTile
@@ -463,6 +548,7 @@ export default function DraftRunScreen() {
                     selected={selected === card.id}
                     disabled={busy}
                     onPress={() => choose(card.id)}
+                    onZoom={() => setZoomedCard(card)}
                   />
                 ))}
               </View>
@@ -486,6 +572,39 @@ export default function DraftRunScreen() {
             </Pressable>
           )}
         </View>
+
+        <Modal
+          animationType="fade"
+          onRequestClose={() => setZoomedCard(null)}
+          transparent
+          visible={zoomedCard !== null}
+        >
+          <SafeAreaView style={styles.zoomSafe}>
+            <View accessibilityViewIsModal style={styles.zoomPanel}>
+              {zoomedCard?.image_url ? (
+                <Image
+                  accessibilityLabel={`${zoomedCard.name} enlarged card`}
+                  cachePolicy="memory-disk"
+                  contentFit="contain"
+                  source={zoomedCard.image_url}
+                  style={styles.zoomImage}
+                />
+              ) : (
+                <View style={styles.zoomFallback}>
+                  <Text style={styles.zoomName}>{zoomedCard?.name}</Text>
+                </View>
+              )}
+              <Text style={styles.zoomName}>{zoomedCard?.name}</Text>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => setZoomedCard(null)}
+                style={styles.zoomClose}
+              >
+                <Text style={styles.zoomCloseText}>Close</Text>
+              </Pressable>
+            </View>
+          </SafeAreaView>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -559,7 +678,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
   },
   primaryButtonDisabled: { opacity: 0.42 },
-  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '800' },
+  primaryButtonText: { color: '#fff', fontSize: 16, fontWeight: '800', textAlign: 'center' },
+  secondaryButton: {
+    minHeight: 50,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   feedback: {
     marginTop: spacing.sm,
     padding: spacing.lg,
@@ -585,4 +713,31 @@ const styles = StyleSheet.create({
   guestNote: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.xs },
   guestNoteTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
   resultError: { color: colors.danger, fontSize: 14, lineHeight: 20 },
+  zoomSafe: {
+    flex: 1,
+    backgroundColor: 'rgba(16, 24, 32, 0.96)',
+    padding: spacing.md,
+  },
+  zoomPanel: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  zoomImage: { width: '100%', flex: 1, maxWidth: 520 },
+  zoomFallback: {
+    width: '100%',
+    flex: 1,
+    maxWidth: 520,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    padding: spacing.lg,
+  },
+  zoomName: { color: '#fff', fontSize: 18, lineHeight: 24, fontWeight: '800', textAlign: 'center' },
+  zoomClose: {
+    minHeight: 50,
+    minWidth: 140,
+    borderWidth: 1,
+    borderColor: colors.surface,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.xl,
+  },
+  zoomCloseText: { color: '#fff', fontSize: 16, fontWeight: '800' },
 });
