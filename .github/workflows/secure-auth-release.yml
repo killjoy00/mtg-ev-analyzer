@@ -47,6 +47,15 @@ jobs:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
         run: node scripts/edge-production-control.mjs preflight
 
+      - name: Ensure PostgreSQL client is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
       - name: Build exact Neon function revision
         env:
           ESBUILD_BIN: ${{ runner.temp }}/edge-tools/node_modules/.bin/esbuild
