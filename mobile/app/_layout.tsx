@@ -1,6 +1,7 @@
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
+import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
 import { colors } from '@/src/theme';
 
 export default function RootLayout() {
@@ -8,6 +9,7 @@ export default function RootLayout() {
     <>
       <StatusBar style="dark" />
       <Stack
+        unstable_screenErrorBoundary={ScreenErrorBoundary}
         screenOptions={{
           headerStyle: { backgroundColor: colors.surface },
           headerShadowVisible: false,
