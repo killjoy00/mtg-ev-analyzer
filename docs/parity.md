@@ -11,7 +11,7 @@ Updated 2026-09-20. “Foundation” means scaffolding exists but the feature is
 | Draft Run / Dailies | ✓ | Mixed Daily + claim | Mixed Daily + claim | Required |
 | Powered Cube | ✓ | Daily + claim | Daily + claim | Required |
 | Latest Set | ✓ | Daily + claim | Daily + claim | Required |
-| Practice | ✓ | — | — | Required |
+| Practice | ✓ | Regular Draft Run + rerolls | Regular Draft Run + rerolls | Required |
 | Career/history | ✓ | Summary + paginated history | Summary + paginated history | Required |
 | Leaderboard | ✓ | Daily/week/month/all | Daily/week/month/all | Required |
 | Elite capability resolution | ✓ | — | — | Required |
