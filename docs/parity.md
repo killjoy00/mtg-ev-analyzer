@@ -13,7 +13,7 @@ Updated 2026-09-20. “Foundation” means scaffolding exists but the feature is
 | Latest Set | ✓ | Daily + claim | Daily + claim | Required |
 | Practice | ✓ | — | — | Required |
 | Career/history | ✓ | — | — | Required |
-| Leaderboard | ✓ | — | — | Required |
+| Leaderboard | ✓ | Daily/week/month/all | Daily/week/month/all | Required |
 | Elite capability resolution | ✓ | — | — | Required |
 | Custom-set practice | ✓ | — | — | Required |
 | Store subscription purchase | — | — | — | Required mobile |

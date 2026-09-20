@@ -1,0 +1,248 @@
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  FlatList,
+  Pressable,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
+} from 'react-native';
+
+import {
+  DAILY_ENVIRONMENT_META,
+  type DailyEnvironment,
+} from '@/src/api/draftRun';
+import {
+  loadDraftRunLeaderboard,
+  type DraftRunLeaderboard,
+  type LeaderboardPeriod,
+  type LeaderboardRow,
+} from '@/src/api/leaderboard';
+import { colors, spacing } from '@/src/theme';
+
+const periods: Array<{ id: LeaderboardPeriod; label: string }> = [
+  { id: 'daily', label: 'Today' },
+  { id: 'week', label: 'Week' },
+  { id: 'month', label: 'Month' },
+  { id: 'all', label: 'All time' },
+];
+
+const environments: DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
+
+type LoadState =
+  | { status: 'loading' }
+  | { status: 'ready'; data: DraftRunLeaderboard }
+  | { status: 'error'; message: string };
+
+function FilterButton({
+  active,
+  label,
+  onPress,
+}: {
+  active: boolean;
+  label: string;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected: active }}
+      onPress={onPress}
+      style={[styles.filterButton, active && styles.filterButtonActive]}
+    >
+      <Text style={[styles.filterText, active && styles.filterTextActive]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+function RankingRow({ item }: { item: LeaderboardRow }) {
+  return (
+    <View
+      accessible
+      accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, score ${item.score}, ${item.days} day${item.days === 1 ? '' : 's'}`}
+      style={[styles.rankingRow, item.rank <= 3 && styles.topRankingRow]}
+    >
+      <Text style={styles.rank}>{item.rank}</Text>
+      <Text style={styles.player} numberOfLines={1}>{item.display_name}</Text>
+      <Text style={styles.score}>{item.score}</Text>
+      <Text style={styles.days}>{item.days}</Text>
+    </View>
+  );
+}
+
+export default function LeaderboardScreen() {
+  const [period, setPeriod] = useState<LeaderboardPeriod>('daily');
+  const [environment, setEnvironment] = useState<DailyEnvironment>('mixed');
+  const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = async (refresh = false) => {
+    if (refresh) setRefreshing(true);
+    else setState({ status: 'loading' });
+    try {
+      const data = await loadDraftRunLeaderboard(period, environment);
+      setState({ status: 'ready', data });
+    } catch (error: unknown) {
+      setState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Leaderboard is unavailable.',
+      });
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    void load();
+  }, [period, environment]);
+
+  const header = (
+    <View style={styles.header}>
+      <Text style={styles.eyebrow}>LEADERBOARD</Text>
+      <Text style={styles.title}>See how the field drafted.</Text>
+      <Text style={styles.body}>Ranked scores come from signed-in Pack One Daily runs.</Text>
+
+      <View style={styles.filterGroup}>
+        <Text style={styles.filterLabel}>RUN</Text>
+        <View style={styles.filterRow}>
+          {environments.map((id) => (
+            <FilterButton
+              key={id}
+              active={environment === id}
+              label={DAILY_ENVIRONMENT_META[id].title}
+              onPress={() => setEnvironment(id)}
+            />
+          ))}
+        </View>
+      </View>
+
+      <View style={styles.filterGroup}>
+        <Text style={styles.filterLabel}>PERIOD</Text>
+        <View style={styles.filterRow}>
+          {periods.map((item) => (
+            <FilterButton
+              key={item.id}
+              active={period === item.id}
+              label={item.label}
+              onPress={() => setPeriod(item.id)}
+            />
+          ))}
+        </View>
+      </View>
+
+      {state.status === 'ready' ? (
+        <>
+          <Text style={styles.range}>
+            {state.data.start === state.data.today
+              ? state.data.today
+              : `${state.data.start} – ${state.data.today}`}
+          </Text>
+          <View style={styles.tableHeader}>
+            <Text style={styles.rankHeader}>#</Text>
+            <Text style={styles.playerHeader}>PLAYER</Text>
+            <Text style={styles.scoreHeader}>SCORE</Text>
+            <Text style={styles.daysHeader}>DAYS</Text>
+          </View>
+        </>
+      ) : null}
+    </View>
+  );
+
+  if (state.status === 'loading') {
+    return (
+      <SafeAreaView style={styles.safe}>
+        {header}
+        <View style={styles.center}>
+          <ActivityIndicator color={colors.accent} />
+          <Text style={styles.body}>Loading rankings…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (state.status === 'error') {
+    return (
+      <SafeAreaView style={styles.safe}>
+        {header}
+        <View style={styles.center}>
+          <Text style={styles.errorTitle}>Couldn&apos;t load the leaderboard</Text>
+          <Text style={styles.body}>{state.message}</Text>
+          <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.retryButton}>
+            <Text style={styles.retryText}>Try again</Text>
+          </Pressable>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <FlatList
+        data={state.data.rows}
+        keyExtractor={(item) => item.profile_key ?? `${item.rank}:${item.display_name}`}
+        renderItem={({ item }) => <RankingRow item={item} />}
+        ListHeaderComponent={header}
+        ListEmptyComponent={<Text style={styles.empty}>No ranked scores in this view yet.</Text>}
+        contentContainerStyle={styles.list}
+        refreshing={refreshing}
+        onRefresh={() => void load(true)}
+      />
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1, backgroundColor: colors.page },
+  list: { paddingBottom: spacing.xxl },
+  header: { padding: spacing.lg, gap: spacing.md },
+  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
+  title: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7 },
+  body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
+  filterGroup: { gap: spacing.xs },
+  filterLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.2 },
+  filterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  filterButton: {
+    minHeight: 40,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  filterButtonActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  filterText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
+  filterTextActive: { color: colors.accentDark },
+  range: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  tableHeader: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderColor: colors.lineStrong,
+    paddingBottom: spacing.sm,
+  },
+  rankHeader: { width: 42, color: colors.muted, fontSize: 10, fontWeight: '800' },
+  playerHeader: { flex: 1, color: colors.muted, fontSize: 10, fontWeight: '800' },
+  scoreHeader: { width: 64, textAlign: 'right', color: colors.muted, fontSize: 10, fontWeight: '800' },
+  daysHeader: { width: 52, textAlign: 'right', color: colors.muted, fontSize: 10, fontWeight: '800' },
+  rankingRow: {
+    minHeight: 54,
+    marginHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  topRankingRow: { borderLeftWidth: 3, borderLeftColor: colors.accent },
+  rank: { width: 39, color: colors.ink, fontSize: 16, fontWeight: '800' },
+  player: { flex: 1, color: colors.ink, fontSize: 15, fontWeight: '700' },
+  score: { width: 64, textAlign: 'right', color: colors.ink, fontSize: 16, fontWeight: '800' },
+  days: { width: 52, textAlign: 'right', color: colors.muted, fontSize: 14 },
+  center: { flex: 1, padding: spacing.xl, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
+  errorTitle: { color: colors.ink, fontSize: 22, fontWeight: '800', textAlign: 'center' },
+  retryButton: { minHeight: 48, backgroundColor: colors.accent, paddingHorizontal: spacing.xl, alignItems: 'center', justifyContent: 'center' },
+  retryText: { color: colors.surface, fontSize: 15, fontWeight: '800' },
+  empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
+});

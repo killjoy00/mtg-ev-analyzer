@@ -63,11 +63,21 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
+          onPress={() => router.push('/leaderboard')}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>RANKINGS</Text>
+          <Text style={styles.utilityTitle}>Leaderboard</Text>
+          <Text style={styles.cardBody}>Compare ranked Daily scores across Draft Run, Powered Cube, and Latest Set.</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push('/account')}
-          style={({ pressed }) => [styles.accountCard, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >
           <Text style={styles.cardKicker}>ACCOUNT</Text>
-          <Text style={styles.accountTitle}>Sign in or create an account</Text>
+          <Text style={styles.utilityTitle}>Sign in or create an account</Text>
           <Text style={styles.cardBody}>Use the same Pack One identity and career across web and mobile.</Text>
         </Pressable>
 
@@ -126,14 +136,14 @@ const styles = StyleSheet.create({
   dailyTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   cardBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   cardAction: { color: colors.accentDark, fontSize: 15, fontWeight: '800', marginTop: spacing.sm },
-  accountCard: {
+  utilityCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  accountTitle: { color: colors.ink, fontSize: 20, fontWeight: '800' },
+  utilityTitle: { color: colors.ink, fontSize: 20, fontWeight: '800' },
   note: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.xs },
   noteTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   noteBody: { color: colors.muted, fontSize: 14, lineHeight: 21 },
