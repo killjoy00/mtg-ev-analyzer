@@ -187,11 +187,13 @@ async function showBoard(period='daily') {
     loadDailyStatus().catch(()=>null),
   ]);
   document.body.classList.remove('is-game');
-  const elite=Boolean(access?.player?.claimed)&&(access?.capabilities||[]).includes('custom_corpus');
+  const claimed=Boolean(access?.player?.claimed),capabilities=access?.capabilities||[];
+  const customPractice=claimed&&capabilities.includes('custom_corpus');
+  const cubePractice=claimed&&capabilities.includes('unlimited_cube_practice');
   const practiceAction=environment==='latest'
-    ? (elite?'<a class="button secondary" href="?game=draft-run&custom=1">Choose sets for practice</a>':'<a class="button secondary" href="?game=draft-run">Practice a Draft Run</a>')
+    ? (customPractice?'<a class="button secondary" href="?game=draft-run&custom=1">Choose sets for practice</a>':'<a class="button secondary" href="?game=draft-run">Practice a Draft Run</a>')
     : cube()
-      ? (elite?`<a class="button secondary" href="${gameUrl()}">Practice a Powered Cube Run</a>`:'<a class="button secondary" href="?game=draft-run">Practice a Draft Run</a>')
+      ? (cubePractice?`<a class="button secondary" href="${gameUrl()}">Practice a Powered Cube Run</a>`:'<a class="button secondary" href="?game=draft-run">Practice a Draft Run</a>')
       : `<a class="button secondary" href="${gameUrl()}">Practice a Draft Run</a>`;
   app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s shared starting packs.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b>${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}<small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
   trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period});
