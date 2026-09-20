@@ -98,7 +98,7 @@ function validMobileAccount(value) {
 function mobileSessionRoute(service,path,method) {
   if(service==='growth') {
     if(method==='POST'&&['/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/delete','/v1/mobile/account/google/start','/v1/mobile/account/google/delete/start','/v1/mobile/account/google/finish'].includes(path))return true;
-    return method==='GET'&&path==='/v1/mobile/account/session';
+    return method==='GET'&&['/v1/mobile/account/session','/v1/profile/me','/v1/profile/history'].includes(path);
   }
   if(service!=='draft')return false;
   if(method==='POST'&&path==='/v1/runs')return true;
