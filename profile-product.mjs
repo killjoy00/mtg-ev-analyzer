@@ -16,6 +16,7 @@ import { loadReplayJson } from './replay-data.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs';
+import { PATREON_POLICY } from './patreon-policy.mjs';
 import { renderAccount } from './growth.mjs';
 import {
   bestPercentile,
@@ -131,6 +132,8 @@ function settingsMarkup(profile, progress, account, patreon) {
     return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="button secondary" id="profile-claim-account">Save my progress</button></aside>`;
   }
   const unlocked = unlockedAchievements(profile);
+  const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
+  const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
     <header><div><p class="eyebrow">Your account</p><h2 id="profile-account-title">Account & profile</h2><p>${account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     <form id="profile-settings-form">
@@ -142,14 +145,17 @@ function settingsMarkup(profile, progress, account, patreon) {
     </form>
     ${account?.user?`<section class="profile-membership" aria-labelledby="patreon-membership-title">
       <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
-        ${patreon?.connected
-          ? `<p><strong>${patreon.capabilities?.length?'Member access active':'Patreon connected'}</strong><br><span>${patreon.capabilities?.length?'Powered Cube practice and custom-set practice are unlocked.':'Premium tools require the Elite Member tier. Supporter membership helps keep Pack One running.'}</span></p>${patreon.ad_free?'<p>Ad-free browsing is included while your membership is connected.</p>':''}`
-          : `<p><strong>${patreon?.configured===true?'Connect your membership.':'Support Pack One.'}</strong><br><span>${patreon?.configured===true?'Supporter membership supports the site. Both paid tiers include ad-free browsing; Elite also unlocks member practice.':'Patreon account linking is coming soon. Regular practice stays free with a Pack One account.'}</span></p>`}
+        ${elite
+          ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked.</span></p>${patreon?.ad_free?'<p>Ad-free browsing is included while your membership is connected.</p>':''}`
+          : patreon?.connected
+            ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, refresh your access here.</span></p>${patreon?.ad_free?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
+            : `<p><strong>Unlock Elite practice.</strong><br><span>Join on Patreon, then connect your Patreon account here so Pack One can activate the benefits.</span></p>`}
       </div>
       ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',error:'Patreon could not be connected. Please try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
       <div class="profile-membership-actions">
-        <a class="button secondary" href="https://www.patreon.com/c/PackOne" target="_blank" rel="noopener noreferrer">Visit Patreon</a>
-        ${patreon?.connected?'<button type="button" class="button secondary" id="patreon-disconnect">Disconnect Patreon</button>':patreon?.configured===true?'<button type="button" class="button secondary" id="patreon-connect">Connect Patreon</button>':''}
+        <a class="button ${elite?'secondary':'primary'}" href="${supportUrl}" target="_blank" rel="noopener noreferrer">${elite?'Manage Patreon':patreon?.connected?'Upgrade to Elite on Patreon':'Become Elite on Patreon'}</a>
+        ${!elite&&patreon?.configured===true?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
+        ${patreon?.connected?'<button type="button" class="text-button" id="patreon-disconnect">Disconnect Patreon</button>':''}
         <span id="patreon-status" aria-live="polite"></span>
       </div>
     </section>`:''}
@@ -391,7 +397,7 @@ function enhanceNav() {
   button.id = 'account-nav';
   button.type = 'button';
   button.textContent = 'Account';
-  button.addEventListener('click', () => { track('account_view'); void renderMyProfile(); });
+  button.addEventListener('click', () => { track('account_view'); void renderAccount(); });
   top.append(button);
 }
 
