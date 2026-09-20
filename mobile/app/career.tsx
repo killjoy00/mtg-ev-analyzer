@@ -120,8 +120,9 @@ export default function CareerScreen() {
   };
 
   useEffect(() => {
-    void load({ showLoading: false });
+    const timer = setTimeout(() => void load({ showLoading: false }), 0);
     return () => {
+      clearTimeout(timer);
       requestId.current += 1;
     };
   }, []);
