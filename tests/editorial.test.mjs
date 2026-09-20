@@ -35,6 +35,17 @@ assert.match(howTo, /<h2>Method<\/h2>/);
 assert.match(howTo, /href="\/methodology\/">View method<\/a>/);
 assert.match(howTo, /<h2>Sets<\/h2>/);
 assert.match(howTo, /href="\/sets\/">View sets<\/a>/);
+const footerPages = ['about/index.html','contact/index.html','disclosure/index.html','privacy/index.html','terms/index.html'];
+for (const path of footerPages) {
+  const html = await readFile(path, 'utf8');
+  assert.match(html, /href="\/visual-c\.css\?v=2"/, `${path} needs the app header styles`);
+  assert.match(html, /class="topbar"/, `${path} needs the standard app topbar`);
+  assert.match(html, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/, `${path} needs Daily Run navigation`);
+  assert.match(html, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, `${path} needs Leaders navigation`);
+  assert.match(html, /href="\/how-it-works\/">How To Play\?<\/a>/, `${path} needs How To Play navigation`);
+  assert.match(html, /id="account-nav" href="\/\?account=1">Account<\/a>/, `${path} needs Account navigation`);
+  assert.doesNotMatch(html, /class="site-header"/, `${path} must not use the legacy editorial header`);
+}
 const bootstrap = await readFile('bootstrap.mjs','utf8');
 assert.match(bootstrap, /else if \(params\.has\('account'\)\)[\s\S]*?await profiles\.renderMyProfile\(\)/);
 const about = await readFile('about/index.html','utf8');
