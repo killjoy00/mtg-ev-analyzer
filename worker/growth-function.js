@@ -4,7 +4,7 @@ import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {handlePatreon} from './patreon.mjs';
-import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,withAccountCookies,withPlayerCookie} from './account-session.mjs';
+import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,digest,issueAccountSession,requireTrustedOrigin,revokeAccountSession,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 const ALLOWED_ORIGINS = new Set([
   'https://packone.pro',
   'https://killjoy00.github.io',
@@ -32,7 +32,7 @@ function cors(request) {
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS',
-    'access-control-allow-headers': 'authorization,content-type,x-pack1-auth-session,x-pack1-csrf',
+    'access-control-allow-headers': 'authorization,content-type,x-pack1-auth-session,x-pack1-csrf,x-pack1-mobile-account',
     'access-control-allow-credentials': 'true',
     'access-control-max-age': '86400',
     vary: 'Origin',
@@ -180,6 +180,13 @@ async function establishAccount(data,{replaceHash=null}={}) {
 function accountJson(auth,session,status=200) {
   const response=json({user:{id:auth.user_id,email:auth.email,name:auth.name},session:{expiresAt:session.expiresAt}},status);
   return withAccountCookies(response,session);
+}
+
+function mobileAccountJson(auth,session,status=200) {
+  return json({
+    user:{id:auth.user_id,email:auth.email,name:auth.name},
+    session:{token:session.token,expiresAt:session.expiresAt},
+  },status);
 }
 
 function props(value) {
@@ -614,6 +621,50 @@ async function handleAccountSignin(request) {
   return accountJson(established.auth,established.session);
 }
 
+async function handleMobileAccountSignup(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-account-auth',{limit:12,seconds:600});
+  const payload=await readJson(request);
+  const data=await neonAuth('/sign-up/email',{method:'POST',body:{
+    name:String(payload.name||'').trim().slice(0,80),
+    email:String(payload.email||'').trim(),
+    password:String(payload.password||''),
+  }});
+  const established=await establishAccount(data);
+  if(!established)return json({ok:true,verificationRequired:true,user:data?.user||null},202);
+  return mobileAccountJson(established.auth,established.session,201);
+}
+
+async function handleMobileAccountSignin(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-account-auth',{limit:12,seconds:600});
+  const payload=await readJson(request);
+  const data=await neonAuth('/sign-in/email',{method:'POST',body:{
+    email:String(payload.email||'').trim(),
+    password:String(payload.password||''),
+    rememberMe:true,
+  }});
+  const established=await establishAccount(data);
+  if(!established)throw Object.assign(Error('Sign in did not create an account session.'),{status:502});
+  return mobileAccountJson(established.auth,established.session);
+}
+
+async function handleMobileAccountSession(request) {
+  await player(request);
+  const auth=await authSession(request,{allowLegacy:false,csrf:false});
+  return json({
+    user:{id:auth.user_id,email:auth.email,name:auth.name},
+    session:{expiresAt:auth.expires_at},
+  });
+}
+
+async function handleMobileSignout(request) {
+  await player(request);
+  const auth=await authSession(request,{allowLegacy:false,csrf:false});
+  await revokeAccountSession(query,auth);
+  return json({ok:true});
+}
+
 async function handleAccountMigration(request) {
   requireTrustedOrigin(request);
   await player(request);
@@ -732,6 +783,64 @@ async function handleStats(request) {
   return json({ summary: summary.rows[0] || {}, bySet: bySet.rows, byMode: byMode.rows, recent: recent.rows });
 }
 
+async function mobileRunClaim(claimToken,guestPlayerId) {
+  const token=String(claimToken||'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(token))throw Object.assign(Error('Invalid run claim.'),{status:400});
+  const claim=await query(`SELECT run_id FROM mobile_run_claims
+    WHERE token_hash=$1 AND guest_player_id=$2::uuid AND consumed_at IS NULL AND expires_at>now()
+    LIMIT 1`,[digest(token),guestPlayerId]);
+  if(!claim.rows[0])throw Object.assign(Error('This run claim expired or was already used.'),{status:409});
+  return {tokenHash:digest(token),runId:claim.rows[0].run_id};
+}
+
+async function validateClaimedDailyRunScore(runId,playerId,authUserId,tokenHash,guestPlayerId) {
+  const result=await query(
+    `WITH claim AS (
+       UPDATE mobile_run_claims SET consumed_at=now()
+       WHERE token_hash=$5 AND run_id=$1::uuid AND guest_player_id=$6::uuid
+         AND consumed_at IS NULL AND expires_at>now()
+       RETURNING run_id
+     ), candidate AS MATERIALIZED (
+       SELECT s.*
+       FROM draft_run_sessions s
+       WHERE s.id=$1::uuid AND s.player_id=$2::uuid AND s.day=$4::date
+         AND s.score IS NOT NULL AND NOT s.leaderboard_eligible
+         AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
+         AND EXISTS(SELECT 1 FROM claim)
+         AND NOT EXISTS (
+           SELECT 1 FROM scores x
+           WHERE x.player_id=s.player_id AND x.challenge_date=s.day
+             AND x.set_id=s.environment AND x.mode='draft_run'
+         )
+       FOR UPDATE
+     ), ranked AS (
+       INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json,is_featured)
+       SELECT c.player_id,c.day,c.environment,'draft_run',c.score,
+              CASE WHEN c.score>=90 THEN 'A' WHEN c.score>=80 THEN 'B' WHEN c.score>=65 THEN 'C' WHEN c.score>=50 THEN 'D' ELSE 'F' END,
+              COALESCE((SELECT jsonb_agg(a.value->>'selectedId') FROM jsonb_array_elements(c.answers) a(value)),'[]'::jsonb),
+              jsonb_build_object('run',c.id,'corpus_version',c.corpus_version,'scoring_version',c.scoring_version,
+                'selection_version',c.selection_version,'validated_after_sign_in',true,'mobile_claim',true),
+              true
+       FROM candidate c
+       ON CONFLICT(player_id,challenge_date,set_id,mode) DO NOTHING
+       RETURNING player_id
+     ), promoted AS (
+       UPDATE draft_run_sessions s
+       SET leaderboard_eligible=true,daily_account_id=$3::uuid,updated_at=now()
+       FROM candidate c
+       WHERE s.id=c.id AND EXISTS(SELECT 1 FROM ranked)
+       RETURNING s.id
+     ), event AS (
+       INSERT INTO analytics_events(player_id,event_name,event_props)
+       SELECT $2::uuid,'daily_score_validated',jsonb_build_object('run_id',$1::text,'source','mobile_claim')
+       FROM promoted
+     )
+     SELECT count(*) n FROM promoted`,
+    [runId,playerId,authUserId,gameDateKey(),tokenHash,guestPlayerId],
+  );
+  return Number(result.rows[0]?.n||0)>0;
+}
+
 async function validateDailyRunScore(runId, playerId, authUserId) {
   const result = await query(
     `WITH candidate AS MATERIALIZED (
@@ -774,14 +883,17 @@ async function validateDailyRunScore(runId, playerId, authUserId) {
   return Number(result.rows[0]?.n || 0) > 0;
 }
 
-async function handleLink(request,{browser=false}={}) {
+async function handleLink(request,{browser=false,mobile=false}={}) {
   const payload = await readJson(request);
   const validateDailyRunId = payload.validateDailyRunId == null ? null : String(payload.validateDailyRunId);
   if (validateDailyRunId && !DAILY_RUN_ID_RE.test(validateDailyRunId)) {
     throw Object.assign(new Error('Invalid Daily run.'), { status: 400 });
   }
+  if(mobile&&validateDailyRunId)throw Object.assign(new Error('Mobile Daily validation requires a run claim token.'),{status:400});
+  if(!mobile&&payload.claimToken)throw Object.assign(new Error('Run claim tokens are for native account linking.'),{status:400});
   const current = await player(request);
-  const auth = await authSession(request);
+  const claim=mobile&&payload.claimToken?await mobileRunClaim(payload.claimToken,current):null;
+  const auth = await authSession(request,mobile?{allowLegacy:false,csrf:false}:{});
   const old = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
   let id = old.rows[0]?.player_id || current;
   let merged = false;
@@ -804,9 +916,11 @@ async function handleLink(request,{browser=false}={}) {
     }
   }
 
-  const validatedDailyScore = validateDailyRunId
-    ? await validateDailyRunScore(validateDailyRunId, id, auth.user_id)
-    : false;
+  const validatedDailyScore = claim
+    ? await validateClaimedDailyRunScore(claim.runId,id,auth.user_id,claim.tokenHash,current)
+    : validateDailyRunId
+      ? await validateDailyRunScore(validateDailyRunId,id,auth.user_id)
+      : false;
   const profile = await profileMetaByPlayer(id);
   const playerToken=await tokenFor(id);
   let response=json({
@@ -969,6 +1083,11 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/link') return handleLink(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/session') return handleAccount(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signout') return handleSignout(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signup') return handleMobileAccountSignup(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signin') return handleMobileAccountSignin(request);
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccountSession(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/link') return handleLink(request,{mobile:true});
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signout') return handleMobileSignout(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/daily-dates') return handleDates(request);
   if (request.method === 'GET' && url.pathname === '/v1/profile/me') return handleMyProfile(request);
   if (request.method === 'PATCH' && url.pathname === '/v1/profile') return handleProfileUpdate(request);

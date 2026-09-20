@@ -1,5 +1,6 @@
 import {SERVING_POLICY_VERSION,LEGACY_SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
 import {accountCapabilities,providerMembership,requireCapability,practiceCapability} from './capabilities.mjs';
+import {digest} from './account-session.mjs';
 import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity,linkedPlayerIdentity} from './account-identity.mjs';
@@ -190,6 +191,26 @@ async function change(request,id,action) {
   return json(await responseFor(decode(updated.rows[0])));
 }
 
+async function issueRunClaim(request,id) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-run-claim',{limit:8,seconds:900});
+  const s=await session(id,owner);
+  if(!s.day)fail('Only Daily runs can be claimed.',400);
+  if(s.day!==gameDateKey())fail('This Daily has closed.',410);
+  if(s.answers.length!==runLength(s)||s.score==null)fail('Finish the run before signing in.',409);
+  if(s.leaderboard_eligible)fail('This Daily is already validated.',409);
+  const bytes=new Uint8Array(32);crypto.getRandomValues(bytes);
+  const token=Buffer.from(bytes).toString('base64url');
+  const result=await query(`INSERT INTO mobile_run_claims(token_hash,run_id,guest_player_id,expires_at)
+    VALUES($1,$2::uuid,$3::uuid,now()+interval '15 minutes')
+    ON CONFLICT(run_id) DO UPDATE SET token_hash=EXCLUDED.token_hash,guest_player_id=EXCLUDED.guest_player_id,
+      expires_at=EXCLUDED.expires_at,created_at=now()
+    WHERE mobile_run_claims.consumed_at IS NULL
+    RETURNING expires_at`,[digest(token),s.id,owner]);
+  if(!result.rows[0])fail('This Daily has already been claimed.',409);
+  return json({claimToken:token,expiresAt:result.rows[0].expires_at});
+}
+
 async function createShare(request,id) {
   const owner=await player(request),s=await session(id,owner);
   if(s.answers.length!==runLength(s)) fail('Finish the run before sharing it.');
@@ -277,7 +298,7 @@ async function route(request) {
   if(request.method==='GET'&&path==='/v1/practice-sets') {const owner=await player(request),caps=await accountCapabilities(await accountIdentity(request,query,owner),query);requireCapability(caps,'custom_corpus');return json({sets:await loadCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION)});}
   if(request.method==='GET'&&path==='/v1/daily-status') return dailyStatus(request);
   if(request.method==='GET'&&path==='/v1/leaderboard') return leaderboard(request);
-  const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view))?$/);
+  const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view|claim))?$/);
   if(match) {
     if(request.method==='POST'&&match[2]==='view') {
       const owner=await player(request),body=await readJson(request),s=await session(match[1],owner);
@@ -286,6 +307,7 @@ async function route(request) {
     }
     if(request.method==='GET'&&!match[2]) return json(await responseFor(await session(match[1],await player(request))));
     if(request.method==='POST'&&match[2]==='share') return createShare(request,match[1]);
+    if(request.method==='POST'&&match[2]==='claim') return issueRunClaim(request,match[1]);
     if(request.method==='POST'&&['pick','reroll'].includes(match[2])) return change(request,match[1],match[2]);
   }
   const shared=path.match(/^\/v1\/(?:challenges|shared-runs)\/([a-f0-9]+)$/);

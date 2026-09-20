@@ -111,6 +111,25 @@ test('production gateway accepts a shaped mobile guest session only on Draft Run
     'cf-connecting-ip':'192.0.2.46','x-pack1-mobile-session':token,
   }});
   assert.equal((await gateway(account,prod,noFetch)).status,403);
+
+  const accountToken='a'.repeat(43);
+  const mobileLink=new Request('https://api.packone.pro/growth/v1/mobile/account/link',{
+    method:'POST',body:'{}',headers:{
+      'content-type':'application/json','cf-connecting-ip':'192.0.2.47',
+      'x-pack1-mobile-session':token,'x-pack1-mobile-account':accountToken,
+    },
+  });
+  const linked=await gateway(mobileLink,prod,async(url,options)=>{
+    assert.equal(url,'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/mobile/account/link');
+    assert.equal(options.headers.get('authorization'),'Bearer '+token);
+    assert.equal(options.headers.get('x-pack1-mobile-account'),accountToken);
+    return Response.json({ok:true});
+  });
+  assert.equal(linked.status,200);
+  const badAccount=new Request('https://api.packone.pro/draft/v1/runs',{method:'POST',body:'{}',headers:{
+    'content-type':'application/json','cf-connecting-ip':'192.0.2.48','x-pack1-mobile-session':token,'x-pack1-mobile-account':'bad',
+  }});
+  assert.equal((await gateway(badAccount,prod,noFetch)).status,401);
 });
 
 test('gateway rejects disallowed paths, origins, hosts, missing identity and partial config without forwarding',async()=>{
@@ -134,6 +153,7 @@ test('quota failure, oversized bodies and invalid preflights fail before upstrea
   assert.equal((await gateway(req('/growth/v1/session',{body:'x'.repeat(131073)}),env,noFetch)).status,413);
   for(const [headers,status] of [[{'origin':'https://packone.pro','access-control-request-method':'POST','access-control-request-headers':'content-type,x-pack1-preview-key'},204],
     [{'origin':'https://packone.pro','access-control-request-method':'POST','access-control-request-headers':'content-type,x-pack1-mobile-session,x-pack1-preview-key'},204],
+    [{'origin':'https://packone.pro','access-control-request-method':'POST','access-control-request-headers':'content-type,x-pack1-mobile-session,x-pack1-mobile-account,x-pack1-preview-key'},204],
     [{'origin':'https://packone.pro','access-control-request-method':'POST','access-control-request-headers':'x-pack1-ingress-secret'},403]])
     assert.equal((await gateway(req('/growth/v1/session',{method:'OPTIONS',body:undefined,headers}),env,noFetch)).status,status);
 });

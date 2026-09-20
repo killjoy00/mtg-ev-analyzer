@@ -42,6 +42,11 @@ export function csrfCookie(request) {
   return validOpaque(value)?value:null;
 }
 
+export function mobileAccountToken(request) {
+  const value=String(request.headers.get('x-pack1-mobile-account')||'');
+  return validOpaque(value)?value:null;
+}
+
 export function requireTrustedOrigin(request,allowed=new Set(['https://packone.pro'])) {
   const origin=request.headers.get('origin');
   if(!origin||!allowed.has(origin))throw Object.assign(Error('Origin not allowed.'),{status:403});
@@ -65,6 +70,20 @@ export async function accountSession(request,query,{required=true,allowLegacy=tr
     }
     return {...account,source:'cookie'};
   }
+  const mobile=mobileAccountToken(request);
+  if(mobile) {
+    const hash=digest(mobile);
+    const result=await query(`SELECT s.session_hash,s.expires_at,u.id user_id,u.email,u.name
+      FROM account_sessions s JOIN neon_auth."user" u ON u.id=s.auth_user_id
+      WHERE s.session_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()
+      LIMIT 1`,[hash]);
+    const account=result.rows[0];
+    if(!account)throw Object.assign(Error('Account session expired.'),{status:401});
+    return {...account,source:'mobile'};
+  }
+  if(request.headers.has('x-pack1-mobile-account'))
+    throw Object.assign(Error('Account session expired.'),{status:401});
+
   if(allowLegacy) {
     const token=String(request.headers.get('x-pack1-auth-session')||'').slice(0,512);
     if(token) {
@@ -96,7 +115,7 @@ export async function issueAccountSession(query,auth,{replaceHash=null}={}) {
 
 export async function revokeAccountSession(query,account) {
   if(!account)return;
-  if(account.source==='cookie'&&account.session_hash)
+  if(['cookie','mobile'].includes(account.source)&&account.session_hash)
     await query('UPDATE account_sessions SET revoked_at=COALESCE(revoked_at,now()) WHERE session_hash=$1',[account.session_hash]);
   if(account.source==='legacy'&&account.token)
     await query('DELETE FROM neon_auth.session WHERE token=$1',[account.token]);

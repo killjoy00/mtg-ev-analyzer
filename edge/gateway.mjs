@@ -37,10 +37,11 @@ function permitted(service,path,method,search,mode) {
       '/v1/session','/v1/player/session','/v1/player/migrate',
       '/v1/account/signup','/v1/account/signin','/v1/account/migrate',
       '/v1/account/link','/v1/account/link-browser','/v1/account/signout',
+      '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout',
       '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect',
     ].includes(path))return true;
     if(method==='GET'&&[
-      '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback',
+      '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback','/v1/mobile/account/session',
       '/v1/stats','/v1/profile/me','/v1/profile/history','/v1/patreon/status',
     ].includes(path))return true;
     if(method==='GET'&&/^\/v1\/profile\/[a-f0-9]{16}(?:\/history)?$/.test(path))return true;
@@ -48,7 +49,7 @@ function permitted(service,path,method,search,mode) {
   }
   if(service==='draft') {
     if(method==='POST'&&path==='/v1/runs')return true;
-    if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
+    if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view|claim)$/.test(path))return true;
     if(method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path))return true;
     if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
     if(method==='GET'&&/^\/v1\/(?:challenges|shared-runs)\/[a-f0-9]+$/.test(path))return true;
@@ -90,12 +91,29 @@ function publicCookie(line) {
 function validMobileSession(value) {
   return /^p1_[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/i.test(String(value||''));
 }
+function validMobileAccount(value) {
+  return /^[A-Za-z0-9_-]{43}$/.test(String(value||''));
+}
 function mobileSessionRoute(service,path,method) {
+  if(service==='growth') {
+    if(method==='POST'&&['/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout'].includes(path))return true;
+    return method==='GET'&&path==='/v1/mobile/account/session';
+  }
   if(service!=='draft')return false;
   if(method==='POST'&&path==='/v1/runs')return true;
-  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
+  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view|claim)$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
-  return method==='GET'&&['/v1/daily-status','/v1/capabilities'].includes(path);
+  return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets'].includes(path);
+}
+function mobileAccountRoute(service,path,method) {
+  if(service==='growth')return /^\/v1\/mobile\/account\/(?:session|link|signout)$/.test(path);
+  if(service!=='draft')return false;
+  if(method==='POST'&&path==='/v1/runs')return true;
+  if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view|claim)$/.test(path))return true;
+  return method==='GET'&&(
+    /^\/v1\/runs\/[a-f0-9-]+$/.test(path)||
+    ['/v1/daily-status','/v1/capabilities','/v1/practice-sets'].includes(path)
+  );
 }
 function safeRedirect(value) {
   try {const url=new URL(value);return url.origin==='https://packone.pro'&&url.protocol==='https:'?url.toString():null;} catch{return null;}
@@ -154,7 +172,7 @@ export async function gateway(request,env,fetcher=fetch) {
     if(!match||!permitted(match[1],match[2],method,url.search,mode))return finish(response(404,'Not found.'));
     if(request.method==='OPTIONS') {
       const requested=(request.headers.get('access-control-request-headers')||'').toLowerCase().split(',').map(x=>x.trim()).filter(Boolean);
-      const allowed=['authorization','content-type','x-pack1-auth-session','x-pack1-player-session','x-pack1-csrf','x-pack1-mobile-session','x-pack1-preview-key'];
+      const allowed=['authorization','content-type','x-pack1-auth-session','x-pack1-player-session','x-pack1-csrf','x-pack1-mobile-session','x-pack1-mobile-account','x-pack1-preview-key'];
       if(!origin||requested.some(x=>!allowed.includes(x)))return finish(response(403,'Preflight not allowed.'));
       return finish(new Response(null,{status:204,headers:{
         'access-control-allow-methods':'GET,POST,PATCH,OPTIONS',
@@ -166,6 +184,9 @@ export async function gateway(request,env,fetcher=fetch) {
     const mobileSession=request.headers.get('x-pack1-mobile-session');
     if(mobileSession&&(!validMobileSession(mobileSession)||!mobileSessionRoute(match[1],match[2],method)))
       return finish(response(validMobileSession(mobileSession)?403:401,validMobileSession(mobileSession)?'Mobile session not allowed on this route.':'Invalid mobile session.'));
+    const mobileAccount=request.headers.get('x-pack1-mobile-account');
+    if(mobileAccount&&(!validMobileAccount(mobileAccount)||!mobileAccountRoute(match[1],match[2],method)))
+      return finish(response(validMobileAccount(mobileAccount)?403:401,validMobileAccount(mobileAccount)?'Mobile account session not allowed on this route.':'Invalid mobile account session.'));
 
     const network=ipNetwork(request.headers.get('cf-connecting-ip')||'');
     const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
@@ -183,6 +204,7 @@ export async function gateway(request,env,fetcher=fetch) {
     if(playerToken)headers.set('authorization','Bearer '+playerToken);
     else if(mobileSession)headers.set('authorization','Bearer '+mobileSession);
     else if(preview&&request.headers.has('authorization'))headers.set('authorization',request.headers.get('authorization'));
+    if(mobileAccount)headers.set('x-pack1-mobile-account',mobileAccount);
     if(request.headers.has('x-pack1-csrf'))headers.set('x-pack1-csrf',request.headers.get('x-pack1-csrf'));
     if(match[1]==='growth'&&match[2]==='/v1/account/migrate'&&request.headers.has('x-pack1-auth-session'))
       headers.set('x-pack1-auth-session',request.headers.get('x-pack1-auth-session'));
