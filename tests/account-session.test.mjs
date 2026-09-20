@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {accountSession,applyCookies,clearAccountCookies,clearPlayerCookie,digest,setCookies,withAccountCookies,withPlayerCookie} from '../worker/account-session.mjs';
+import {COOKIE_SEPARATOR,accountSession,clearAccountCookies,clearPlayerCookie,digest,withAccountCookies,withPlayerCookie} from '../worker/account-session.mjs';
 
 const opaque=x=>x.repeat(43).slice(0,43);
 const LIVE=opaque('a'),STALE=opaque('b'),CSRF=opaque('c');
@@ -73,38 +73,30 @@ test('no credential at all stays 401 for required callers and null for optional 
   assert.equal(await accountSession(request(null),fakeQuery(),{required:false}),null);
 });
 
-// The deployed Neon runtime keeps only the LAST Set-Cookie entry when a Headers
-// object is copied; Node keeps all of them. That difference hid a live bug:
-// sign-out shipped only the player cookie and account linking shipped no player
-// cookie at all, while every test here passed. These tests copy responses the
-// way the deployed runtime does, so the loss is visible in CI.
-const lossyCopy=response=>{
-  const headers=new Headers();
-  for(const [key,value] of response.headers)if(key!=='set-cookie')headers.set(key,value);
-  const lines=response.headers.getSetCookie();
-  if(lines.length)headers.append('set-cookie',lines.at(-1));
-  return new Response(response.body,{status:response.status,headers});
-};
-const cookieNames=lines=>lines.map(line=>line.split('=')[0]);
-const shipped=response=>cookieNames(applyCookies(new Headers(lossyCopy(response).headers),setCookies(response)).getSetCookie());
+// Verified against the deployed Neon runtime with a throwaway probe function:
+// three appended Set-Cookie entries arrive at the client as one, and so does
+// the Response constructor's array form. Only a single joined header survives,
+// which the edge gateway splits apart again. These tests hold the worker to
+// that one shape - Node would happily ship several headers and hide the loss.
 const body=()=>new Response('{}',{headers:{'content-type':'application/json'}});
+const shipped=response=>{
+  const lines=response.headers.getSetCookie();
+  assert.equal(lines.length,1,'the runtime only ever ships one Set-Cookie header');
+  return lines[0].split(COOKIE_SEPARATOR).map(line=>line.split('=')[0]);
+};
 
-test('sign-out ships every clear-cookie through a runtime that loses copies',()=>{
-  const response=clearPlayerCookie(clearAccountCookies(body()));
-  assert.deepEqual(cookieNames(setCookies(response)),
-    ['__Host-pack1_account','__Secure-pack1_csrf','__Host-pack1_player']);
-  // Without the rewrite the runtime would ship only the last one.
-  assert.deepEqual(cookieNames(lossyCopy(response).headers.getSetCookie()),['__Host-pack1_player']);
-  assert.deepEqual(shipped(response),
+test('sign-out ships every clear-cookie in the one header the runtime emits',()=>{
+  // Stacked the other way round this shipped only the player clear, leaving the
+  // revoked HttpOnly account session on a browser that cannot drop it itself.
+  assert.deepEqual(shipped(clearPlayerCookie(clearAccountCookies(body()))),
     ['__Host-pack1_account','__Secure-pack1_csrf','__Host-pack1_player']);
 });
 
 test('account linking ships the player cookie alongside the rotated session',()=>{
-  // The player cookie is written first and the rotated account session second.
-  // Losing the first one left the browser on its pre-link player, so the
-  // account link no longer matched and every account surface 401'd.
-  const response=withAccountCookies(withPlayerCookie(body(),'p1_token'),{token:'rotated',csrf:'csrf'});
-  assert.deepEqual(shipped(response),
+  // The player cookie is written first and the rotated account session second,
+  // so this was the one lost: the browser stayed on its pre-link player,
+  // account_links stopped matching, and every account surface 401'd.
+  assert.deepEqual(shipped(withAccountCookies(withPlayerCookie(body(),'p1_token'),{token:'rotated',csrf:'csrf'})),
     ['__Host-pack1_player','__Host-pack1_account','__Secure-pack1_csrf']);
 });
 
@@ -113,11 +105,15 @@ test('a single wrapper still carries both account cookies',()=>{
     ['__Host-pack1_account','__Secure-pack1_csrf']);
 });
 
-test('the growth function re-applies cookies on its outgoing copy',()=>{
-  // withCors is the last Headers copy before the response leaves the function.
-  const source=readFileSync(new URL('../worker/growth-function.js',import.meta.url),'utf8');
-  const cors=source.slice(source.indexOf('function withCors'));
-  const end=cors.indexOf('\n}\n');
-  assert.match(cors.slice(0,end),/applyCookies\(headers, ?cookies\)/,
-    'withCors must rewrite Set-Cookie from setCookies(response)');
+test('account cookies never use Expires, whose comma is the gateway split boundary',()=>{
+  const all=[clearPlayerCookie(clearAccountCookies(body())),
+    withAccountCookies(withPlayerCookie(body(),'p1_token'),{token:'a',csrf:'b'})];
+  for(const response of all)
+    assert.doesNotMatch(response.headers.get('set-cookie'),/expires=/i);
+});
+
+test('a joined header survives the Headers copy every wrapper makes',()=>{
+  const response=clearPlayerCookie(clearAccountCookies(body()));
+  const copied=new Response(null,{headers:new Headers(response.headers)});
+  assert.equal(copied.headers.get('set-cookie'),response.headers.get('set-cookie'));
 });

@@ -120,6 +120,43 @@ test('strict session quota applies only to new player-session creation',async()=
   assert.deepEqual(kinds,['/request','/session','/request']);
 });
 
+test('the gateway splits the one joined Set-Cookie a Neon function can emit',async()=>{
+  // Neon functions serialize only the last Set-Cookie when several are set, so
+  // the worker joins them into one header. Splitting it back apart is the only
+  // thing that gets more than one cookie to the browser.
+  const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+  const account='__Host-pack1_account='+'a'.repeat(43)+'; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict';
+  const csrf='__Secure-pack1_csrf='+'b'.repeat(43)+'; Path=/; Domain=packone.pro; Max-Age=0; Secure; SameSite=Strict';
+  const player='__Host-pack1_player=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict';
+  const result=await gateway(
+    new Request('https://api.packone.pro/growth/v1/account/signout',{method:'POST',
+      headers:{'content-type':'application/json',origin:'https://packone.pro','cf-connecting-ip':'192.0.2.77'},body:'{}'}),
+    prod,
+    async()=>Response.json({ok:true},{headers:{'set-cookie':[account,csrf,player].join(', ')}}),
+  );
+  const set=result.headers.getSetCookie?.()||[result.headers.get('set-cookie')].filter(Boolean);
+  assert.deepEqual(set.map(row=>row.split('=')[0]),
+    ['__Host-pack1_account','__Secure-pack1_csrf','__Host-pack1_player']);
+  for(const row of set)assert.match(row,/Max-Age=0/,'each cookie keeps its own attributes');
+});
+
+test('splitting a lone upstream cookie is a no-op and still drops foreign ones',async()=>{
+  const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+  const one='__Host-pack1_player=p1_x; Path=/; Max-Age=60; Secure; HttpOnly; SameSite=Strict';
+  const result=await gateway(
+    new Request('https://api.packone.pro/growth/v1/player/session',{method:'POST',
+      headers:{'content-type':'application/json',origin:'https://packone.pro','cf-connecting-ip':'192.0.2.78'},body:'{}'}),
+    prod,
+    async()=>{const headers=new Headers({'content-type':'application/json'});
+      headers.append('set-cookie',one);headers.append('set-cookie','tracker=bad; Path=/');
+      return new Response('{}',{headers});},
+  );
+  const set=result.headers.getSetCookie?.()||[result.headers.get('set-cookie')].filter(Boolean);
+  assert.deepEqual(set,[one]);
+});
+
 test('IPv6 privacy addresses share a /64 quota without merging distinct networks',()=>{
   assert.equal(ipNetwork('2001:db8:1:2::1'),ipNetwork('2001:0db8:0001:0002:1234::9'));
   assert.notEqual(ipNetwork('2001:db8:1:2::1'),ipNetwork('2001:db8:1:3::1'));
