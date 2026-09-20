@@ -41,6 +41,29 @@ async function verifyMarkers({settle=false}={}) {
   }
 }
 await verifyMarkers({settle:true});
+async function waitForStableMarkers() {
+  if(!SETTLE_MS)return;
+  const deadline=Date.now()+SETTLE_MS,stableWindow=30*1000;
+  let stableSince=0,last={};
+  while(Date.now()<deadline) {
+    let all=true;
+    for(const slug of ['draftrunapi','pack1growth','pack1api']) {
+      const h=await call(slug,'/health?quick=1');
+      assert.equal(h.ok,true);
+      last[slug]=h.release_commit;
+      if(h.release_commit!==commit)all=false;
+    }
+    if(all) {
+      if(!stableSince)stableSince=Date.now();
+      if(Date.now()-stableSince>=stableWindow) {
+        console.log(`release markers held ${commit.slice(0,7)} continuously for ${stableWindow/1000}s`);
+        return;
+      }
+    } else stableSince=0;
+    await new Promise(resolve=>setTimeout(resolve,5000));
+  }
+  assert.deepEqual(last,{draftrunapi:commit,pack1growth:commit,pack1api:commit},'release markers did not stabilize');
+}
 const health=await call('draftrunapi','/health');
 assert.equal(health.ok,true);assert.equal(health.run_length,8);assert.equal(health.selection_version,'eight-pick-v4');
 assert.equal(health.unrated_puzzles,0);assert.deepEqual(health.missing_sets,[]);assert.equal(health.daily_featured_sets.length,4);
@@ -79,7 +102,10 @@ if(process.argv.includes('--daily')||process.argv.includes('--practice')) {
     console.log(environment+': guest practice denied, universal fixed Daily, no rerolls, completion retry, trophy scoring, unranked result, universal share and resume passed');
   }
 }
-// Catch a concurrent deployment during the acceptance pass, not just stale
-// code at the beginning. Image maintenance must never redeploy this backend.
+// Neon can briefly route an old instance even after the new revision has
+// already answered successfully. Require a sustained exact-revision window
+// first, then keep the closing check fail-fast so a concurrent deploy landing
+// underneath acceptance is still caught immediately.
+await waitForStableMarkers();
 await verifyMarkers();
 console.log(JSON.stringify({branch,commit,timings},null,2));
