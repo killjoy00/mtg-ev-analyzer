@@ -1,3 +1,5 @@
+import { ensurePackSession, firstPartyAuthEnabled } from './growth-api.mjs';
+
 const TOKEN_KEY = 'pack1-api-session-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 
@@ -15,8 +17,19 @@ async function request(path, options = {}, { auth = false } = {}) {
   if (!isLeaderboardConfigured()) throw new Error('Global leaderboard is not configured yet.');
   const headers = new Headers(options.headers || {});
   headers.set('content-type', 'application/json');
-  if (auth) headers.set('authorization', `Bearer ${await ensureSession()}`);
-  const response = await fetch(`${baseUrl()}${path}`, { ...options, headers });
+  // First-party browsers already carry the shared HttpOnly player cookie, which
+  // the gateway turns into the bearer this service expects. Minting a token
+  // here instead would fork the player identity away from the linked account.
+  const firstParty = firstPartyAuthEnabled();
+  if (auth) {
+    if (firstParty) await ensurePackSession();
+    else headers.set('authorization', `Bearer ${await ensureSession()}`);
+  }
+  const response = await fetch(`${baseUrl()}${path}`, {
+    ...options,
+    headers,
+    credentials: firstParty ? 'include' : 'omit',
+  });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new Error(data.error || `Pack 1 API failed (${response.status}).`);
   return data;
@@ -62,6 +75,7 @@ export async function submitLeaderboardScore({ setId, mode, score, grade, challe
 
 export async function loadLeaderboard({ period = 'daily', setId = null, mode = 'top3', limit = 50 } = {}) {
   const params = new URLSearchParams({ period, set: setId || 'all', mode, limit: String(limit) });
+  if (firstPartyAuthEnabled()) return request(`/v1/leaderboard?${params}`);
   const token = loadToken();
   const headers = token ? { authorization: `Bearer ${token}` } : {};
   return request(`/v1/leaderboard?${params}`, { headers });

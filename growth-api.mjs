@@ -62,11 +62,12 @@ async function migrateLegacyPlayer() {
     try { localStorage.removeItem(TOKEN_KEY); } catch {}
     return true;
   } catch(error) {
-    if(error?.status===401) {
-      try { localStorage.removeItem(TOKEN_KEY); } catch {}
-      return false;
-    }
-    throw error;
+    // Only a 401 proves the stored guest token is unusable, so only then is it
+    // safe to drop. Anything else is environmental and must not reject: this
+    // runs ahead of every authenticated call, and throwing here would fail the
+    // whole client instead of letting the player-session call report the fault.
+    if(error?.status===401) { try { localStorage.removeItem(TOKEN_KEY); } catch {} }
+    return false;
   }
 }
 
