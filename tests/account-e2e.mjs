@@ -28,6 +28,19 @@ await page.route('https://**-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**'
   await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 });
 
+await page.route('https://**-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
+  const path=new URL(route.request().url()).pathname;
+  if(path!=='/v1/daily-status')return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'Not found.'})});
+  const body={
+    day:'2026-09-19',
+    capabilities:signed?['account','unlimited_regular_practice']:[],
+    player:{claimed:signed},
+    membership:{connected:false},
+    daily_history:[],
+  };
+  await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
+});
+
 async function fillAuth(kind='signin'){
   const form=page.locator('#account-'+kind);
   await form.locator('[name="email"]').fill('qa@example.invalid');
@@ -69,9 +82,13 @@ try {
     assert.equal(await page.locator('#account-signup [name="name"]').inputValue(),'');
   }
 
-  // Guest upgrade intent asks for the Pack One account once, then continues to Patreon.
+  // Guests are not shown a paid ask on the landing page. The underlying guest
+  // handoff still works when an explicit premium action invokes it.
   await page.goto(base);
-  await page.locator('[data-home-elite]').first().click();
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForTimeout(50);
+  assert.equal(await page.locator('[data-home-elite]').count(),0);
+  await page.evaluate(async()=>{const growth=await import('./growth.mjs');await growth.beginEliteUpgrade({source:'e2e_explicit_premium'});});
   await page.locator('#account-signin').waitFor();
   assert.match(await page.locator('.account-page').textContent(),/Unlock Elite practice/);
   assert.match(await page.locator('.account-page').textContent(),/send you to Patreon/);
@@ -79,8 +96,9 @@ try {
   await page.waitForURL('https://www.patreon.com/c/PackOne');
   assert.equal(page.url(),'https://www.patreon.com/c/PackOne');
 
-  // A signed-in free member goes straight to Patreon instead of detouring through Account.
+  // A signed-in free member gets the Elite CTA and goes straight to Patreon.
   await page.goto(base);
+  await page.locator('[data-home-elite]').first().waitFor();
   await page.locator('[data-home-elite]').first().click();
   await page.waitForURL('https://www.patreon.com/c/PackOne');
   assert.equal(page.url(),'https://www.patreon.com/c/PackOne');
