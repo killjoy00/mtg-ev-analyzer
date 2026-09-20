@@ -3,7 +3,7 @@ const AUTH_TOKEN_KEY = 'pack1-auth-session-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 const CSRF_COOKIE = '__Secure-pack1_csrf';
 const AUTH_BASE = 'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
-const GOOGLE_CALLBACK = 'https://api.packone.pro/growth/v1/account/google/callback';
+const GOOGLE_RETURN = 'https://packone.pro/?auth=google';
 const ACCOUNT_RETURN = 'https://packone.pro/';
 let sessionPromise = null, migrationPromise = null;
 
@@ -292,8 +292,8 @@ export async function startGoogleSignIn() {
     credentials:'include',
     body:JSON.stringify({
       provider:'google',
-      callbackURL:GOOGLE_CALLBACK,
-      newUserCallbackURL:GOOGLE_CALLBACK,
+      callbackURL:GOOGLE_RETURN,
+      newUserCallbackURL:GOOGLE_RETURN,
       errorCallbackURL:ACCOUNT_RETURN+'?auth=google-error',
       disableRedirect:true,
     }),
@@ -304,6 +304,27 @@ export async function startGoogleSignIn() {
   try {target=new URL(String(data?.url||''));} catch {}
   if(!target||target.protocol!=='https:')throw new Error('Google sign in is temporarily unavailable.');
   location.assign(target.toString());
+}
+
+export async function completeGoogleSignIn() {
+  if(!firstPartyAuthEnabled())throw new Error('Google sign in is not available on this release yet.');
+  const verifier=new URL(location.href).searchParams.get('neon_auth_session_verifier');
+  if(!verifier)throw new Error('Google sign in did not return a session verifier.');
+  await ensurePackSession();
+  const sessionResponse=await fetch(`${AUTH_BASE}/get-session?neon_auth_session_verifier=${encodeURIComponent(verifier)}`,{
+    credentials:'include',
+    headers:{accept:'application/json'},
+  });
+  const data=await sessionResponse.json().catch(()=>({}));
+  if(!sessionResponse.ok||!data?.session?.token||!data?.user)
+    throw new Error(data.message||data.error||'Google sign in could not be finalized.');
+  await raw('/v1/account/migrate',{
+    method:'POST',
+    body:{},
+    headers:new Headers({'content-type':'application/json','x-pack1-auth-session':data.session.token}),
+  });
+  clearLegacyAuth();
+  return {user:data.user,session:data.session};
 }
 export async function signOutAccount() {
   if(firstPartyAuthEnabled()) {
