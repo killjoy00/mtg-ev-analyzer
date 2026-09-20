@@ -1,5 +1,11 @@
 import { installRenderLifecycle } from './render-lifecycle.mjs';
 
+// Authentication cookies are first-party to packone.pro. Treat the GitHub Pages
+// hostname as a publishing mirror, never as a second account origin.
+if (location.hostname === 'killjoy00.github.io') {
+  location.replace('https://packone.pro' + location.pathname + location.search + location.hash);
+} else {
+
 const params = new URLSearchParams(location.search);
 // Only previously published stored links load the historical game reader.
 const historicalShare = params.has('challenge') && params.get('game') !== 'draft-run';
@@ -66,4 +72,6 @@ if (historicalShare) {
     await identityReady;
     await game.installDraftRunPage();
   }
+}
+
 }
