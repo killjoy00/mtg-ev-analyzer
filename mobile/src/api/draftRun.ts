@@ -115,17 +115,55 @@ export function startDailyDraftRun(
   });
 }
 
-export function startRegularPracticeDraftRun(
+export type PracticeCapability =
+  | 'account'
+  | 'unlimited_regular_practice'
+  | 'unlimited_cube_practice'
+  | 'custom_corpus';
+
+export type PracticeSet = {
+  set_id: string;
+  set_name?: string | null;
+  release_date?: string | null;
+  regular_run?: boolean;
+};
+
+export function loadPracticeCapabilities(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in to load practice access.');
+  return requestJson<{ capabilities: PracticeCapability[] }>('/draft/v1/capabilities', {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
+}
+
+export function loadPracticeSets(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in to load custom practice sets.');
+  return requestJson<{ sets: PracticeSet[] }>('/draft/v1/practice-sets', {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
+}
+
+export function startPracticeDraftRun(
   session: MobileSession,
   idempotencyKey: string,
+  {
+    environment = 'mixed',
+    setIds = [],
+  }: {
+    environment?: 'mixed' | 'powered-cube';
+    setIds?: string[];
+  } = {},
 ) {
-  if (!session.accountToken) throw new Error('Sign in to start regular practice.');
+  if (!session.accountToken) throw new Error('Sign in to start practice.');
   return requestJson<DraftRunState>('/draft/v1/runs', {
     method: 'POST',
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
     idempotencyKey,
-    body: { daily: false, environment: 'mixed' },
+    body: { daily: false, environment, ...(setIds.length ? { setIds } : {}) },
     timeoutMs: 30_000,
   });
 }
