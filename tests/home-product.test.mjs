@@ -31,9 +31,12 @@ test('all three complete reveals account practice or account creation',()=>{
 });
 test('home runtime isolates historical code and lazily loads profiles',()=>{
  const source=fs.readFileSync('bootstrap.mjs','utf8');
+ const home=fs.readFileSync('daily-home.mjs','utf8');
  assert.doesNotMatch(source,/import\(['"]\.\/(app\.js|social\.mjs|home-today\.mjs|cube-home\.mjs|home-product\.mjs)/);
  assert.match(source,/historical-share\.mjs/);
  assert.match(source,/daily-home\.mjs/);
+ assert.match(source,/renderAccount\(\)/,'Account navigation uses account access instead of the guest profile');
+ assert.match(home,/beginEliteUpgrade\(\{source:'home'\}\)/,'Elite CTA uses the Patreon handoff flow');
 });
 
 test('Daily home differentiates free and Elite practice',()=>{
