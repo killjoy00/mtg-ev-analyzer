@@ -102,6 +102,7 @@ export default ({ config }: ConfigContext): ExpoConfig => {
   return {
     ...config,
     name: displayName,
+    slug: 'pack-one',
     backgroundColor: '#f7f8fa',
     ...(production ? { icon: releaseIcon } : {}),
     plugins,
