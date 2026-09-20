@@ -1,6 +1,6 @@
 # Pack One parity matrix
 
-Updated 2026-09-19. “Foundation” means scaffolding exists but the feature is not yet user-complete.
+Updated 2026-09-20. “Foundation” means scaffolding exists but the feature is not yet user-complete.
 
 | Feature | Web | iOS | Android | v1 intent |
 | --- | --- | --- | --- | --- |
@@ -8,9 +8,9 @@ Updated 2026-09-19. “Foundation” means scaffolding exists but the feature is
 | Email account | ✓ | Sign-in/create + claim | Sign-in/create + claim | Required |
 | Google login | ✓ | Native OAuth handoff | Native OAuth handoff | Required |
 | Apple login | — | — | — | Required on mobile |
-| Draft Run / Dailies | ✓ | Guest + score claim | Guest + score claim | Required |
-| Powered Cube | ✓ | — | — | Required |
-| Latest Set | ✓ | — | — | Required |
+| Draft Run / Dailies | ✓ | Mixed Daily + claim | Mixed Daily + claim | Required |
+| Powered Cube | ✓ | Daily + claim | Daily + claim | Required |
+| Latest Set | ✓ | Daily + claim | Daily + claim | Required |
 | Practice | ✓ | — | — | Required |
 | Career/history | ✓ | — | — | Required |
 | Leaderboard | ✓ | — | — | Required |

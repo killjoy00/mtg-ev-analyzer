@@ -1,7 +1,14 @@
 import { router } from 'expo-router';
 import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 
+import { DAILY_ENVIRONMENT_META, type DailyEnvironment } from '@/src/api/draftRun';
 import { colors, spacing } from '@/src/theme';
+
+const dailies: Array<{ environment: DailyEnvironment; action: string }> = [
+  { environment: 'mixed', action: 'Start Draft Run →' },
+  { environment: 'powered-cube', action: 'Play Powered Cube →' },
+  { environment: 'latest', action: 'Play Latest Set →' },
+];
 
 function Brand() {
   return (
@@ -30,18 +37,29 @@ export default function HomeScreen() {
           </Text>
         </View>
 
-        <Pressable
-          accessibilityRole="button"
-          onPress={() => router.push('/draft-run')}
-          style={({ pressed }) => [styles.primaryCard, pressed && styles.pressed]}
-        >
-          <Text style={styles.cardKicker}>PLAY TODAY</Text>
-          <Text style={styles.cardTitle}>Draft Run</Text>
-          <Text style={styles.cardBody}>
-            Play the full eight-pick Daily against Pack One&apos;s production scoring authority.
-          </Text>
-          <Text style={styles.cardAction}>Start Draft Run →</Text>
-        </Pressable>
+        <View style={styles.dailySection}>
+          <Text style={styles.sectionLabel}>PLAY TODAY</Text>
+          {dailies.map(({ environment, action }, index) => {
+            const meta = DAILY_ENVIRONMENT_META[environment];
+            return (
+              <Pressable
+                key={environment}
+                accessibilityRole="button"
+                accessibilityLabel={`Play ${meta.title} Daily`}
+                onPress={() => router.push({ pathname: '/draft-run', params: { environment } })}
+                style={({ pressed }) => [
+                  index === 0 ? styles.primaryCard : styles.dailyCard,
+                  pressed && styles.pressed,
+                ]}
+              >
+                <Text style={styles.cardKicker}>{meta.eyebrow}</Text>
+                <Text style={index === 0 ? styles.cardTitle : styles.dailyTitle}>{meta.title}</Text>
+                <Text style={styles.cardBody}>{meta.description}</Text>
+                <Text style={styles.cardAction}>{action}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
 
         <Pressable
           accessibilityRole="button"
@@ -84,6 +102,8 @@ const styles = StyleSheet.create({
   eyebrow: { color: colors.accent, fontSize: 11, fontWeight: '800', letterSpacing: 1.5 },
   title: { color: colors.ink, fontSize: 42, lineHeight: 44, fontWeight: '800', letterSpacing: -1.2 },
   lede: { color: colors.muted, fontSize: 17, lineHeight: 26, maxWidth: 560 },
+  dailySection: { gap: spacing.md },
+  sectionLabel: { color: colors.muted, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
   primaryCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
@@ -93,9 +113,17 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
+  dailyCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
   pressed: { opacity: 0.78 },
   cardKicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
   cardTitle: { color: colors.ink, fontSize: 28, fontWeight: '800' },
+  dailyTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   cardBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   cardAction: { color: colors.accentDark, fontSize: 15, fontWeight: '800', marginTop: spacing.sm },
   accountCard: {

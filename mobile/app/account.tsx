@@ -24,6 +24,7 @@ import {
   startGoogleDeletion,
   startGoogleSignIn,
 } from '@/src/api/account';
+import { isDailyEnvironment } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
 import { type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
@@ -31,8 +32,10 @@ import { colors, spacing } from '@/src/theme';
 type Mode = 'signin' | 'signup';
 
 export default function AccountScreen() {
-  const params = useLocalSearchParams<{ claimToken?: string }>();
+  const params = useLocalSearchParams<{ claimToken?: string; environment?: string }>();
   const claimToken = typeof params.claimToken === 'string' ? params.claimToken : undefined;
+  const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
+  const returnEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const [session, setSession] = useState<MobileSession | null>(null);
   const [mode, setMode] = useState<Mode>('signin');
   const [name, setName] = useState('');
@@ -85,7 +88,10 @@ export default function AccountScreen() {
       ? 'Score validated and added to today\'s leaderboard.'
       : 'Signed in to your Pack One account.');
     if (result.linked.validatedDailyScore) {
-      setTimeout(() => router.replace('/draft-run'), 600);
+      setTimeout(() => router.replace({
+        pathname: '/draft-run',
+        params: { environment: returnEnvironment },
+      }), 600);
     }
   };
 
