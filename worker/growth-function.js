@@ -4,7 +4,7 @@ import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {handlePatreon} from './patreon.mjs';
-import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,withAccountCookies,withPlayerCookie} from './account-session.mjs';
+import {accountSession,applyCookies,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,setCookies,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 const ALLOWED_ORIGINS = new Set([
   'https://packone.pro',
   'https://killjoy00.github.io',
@@ -42,6 +42,11 @@ function cors(request) {
 function withCors(response, request) {
   const headers = new Headers(response.headers);
   for (const [key, value] of Object.entries(cors(request))) headers.set(key, value);
+  // This copy is the last one before the response leaves the function, and the
+  // deployed runtime drops all but the last Set-Cookie across a copy. Rewrite
+  // them from the response's own record so every cookie survives.
+  const cookies = setCookies(response);
+  if (cookies.length) applyCookies(headers, cookies);
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,
