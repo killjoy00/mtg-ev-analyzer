@@ -1,6 +1,9 @@
 name: Live production browser verification
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows: ["pages build and deployment"]
+    types: [completed]
 permissions:
   contents: read
 concurrency:
@@ -8,16 +11,22 @@ concurrency:
   cancel-in-progress: false
 jobs:
   browser:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - run: test "$GITHUB_REF" = refs/heads/main
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      - name: Verify the released revision
+        run: |
+          expected="${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}"
+          test "$(git rev-parse HEAD)" = "$expected"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
       - run: npm install --no-save playwright@1.55.0
-      - name: Complete both unranked Dailies on the live site
+      - name: Complete all unranked Dailies on the live site
         run: node tests/production-browser-smoke.mjs
       - uses: actions/upload-artifact@v4
         if: always()
