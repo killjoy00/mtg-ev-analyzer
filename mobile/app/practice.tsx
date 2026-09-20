@@ -61,8 +61,11 @@ export default function PracticeScreen() {
       .then((loaded) => {
         if (!active) return;
         setState(loaded);
-        if (loaded.status === 'ready' && loaded.sets.length) {
-          setSelectedSets((current) => current.length ? current : [loaded.sets[0].set_id]);
+        if (loaded.status === 'ready') {
+          const firstSetId = loaded.sets.at(0)?.set_id;
+          if (firstSetId) {
+            setSelectedSets((current) => current.length ? current : [firstSetId]);
+          }
         }
       })
       .catch((error: unknown) => {
