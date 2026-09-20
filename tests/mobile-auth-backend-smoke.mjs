@@ -52,6 +52,15 @@ assert.equal(stored.leaderboard_eligible===true||stored.leaderboard_eligible==='
 assert.equal(stored.daily_account_id,userId);
 assert.equal((await query(`SELECT count(*) n FROM scores WHERE player_id=$1::uuid AND mode='draft_run' AND challenge_date=$2::date`,[guest.playerId,run.day])).rows[0].n,'1');
 
+const career=await call(growth,'/v1/mobile/profile/me',undefined,{playerToken:linked.token,accountToken});
+assert.equal(career.player.claimed,true);
+assert.ok(career.summary.games>=1);
+assert.ok(career.summary.daily_games>=1);
+const careerHistory=await call(growth,'/v1/mobile/profile/history?limit=5',undefined,{playerToken:linked.token,accountToken});
+assert.ok(careerHistory.rows.some(row=>row.mode==='draft_run'&&row.is_daily===true));
+const wrongCareerGuest=await call(growth,'/v1/session',{displayName:'QA wrong career guest'});
+await call(growth,'/v1/mobile/profile/me',undefined,{playerToken:wrongCareerGuest.token,accountToken,status:409});
+
 await call(growth,'/v1/mobile/account/link',{claimToken:claim.claimToken},{playerToken:linked.token,accountToken,status:409});
 const session=await call(growth,'/v1/mobile/account/session',undefined,{playerToken:linked.token,accountToken});
 assert.equal(session.user.id,userId);
@@ -107,4 +116,4 @@ for(const [sql,params,label] of [
   assert.equal((await query(sql,params)).rows[0].n,'0',label+' should be deleted');
 }
 
-console.log('Mobile auth passed: revocable native account session, guest-bound one-use run claim, Google OAuth sign-in + deletion handoffs, ranked promotion, signout, and full account-data deletion.');
+console.log('Mobile auth passed: revocable native account session, linked career/history reads, guest-bound one-use run claim, Google OAuth sign-in + deletion handoffs, ranked promotion, signout, and full account-data deletion.');

@@ -43,6 +43,7 @@ function permitted(service,path,method,search,mode) {
     ].includes(path))return true;
     if(method==='GET'&&[
       '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback','/v1/mobile/account/google/callback','/v1/mobile/account/session',
+      '/v1/mobile/profile/me','/v1/mobile/profile/history',
       '/v1/stats','/v1/profile/me','/v1/profile/history','/v1/patreon/status',
     ].includes(path))return true;
     if(method==='GET'&&/^\/v1\/profile\/[a-f0-9]{16}(?:\/history)?$/.test(path))return true;
@@ -98,7 +99,7 @@ function validMobileAccount(value) {
 function mobileSessionRoute(service,path,method) {
   if(service==='growth') {
     if(method==='POST'&&['/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/delete','/v1/mobile/account/google/start','/v1/mobile/account/google/delete/start','/v1/mobile/account/google/finish'].includes(path))return true;
-    return method==='GET'&&path==='/v1/mobile/account/session';
+    return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
   if(service!=='draft')return false;
   if(method==='POST'&&path==='/v1/runs')return true;
@@ -107,7 +108,8 @@ function mobileSessionRoute(service,path,method) {
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets'].includes(path);
 }
 function mobileAccountRoute(service,path,method) {
-  if(service==='growth')return /^\/v1\/mobile\/account\/(?:session|link|signout|delete|google\/delete\/start)$/.test(path);
+  if(service==='growth')return /^\/v1\/mobile\/account\/(?:session|link|signout|delete|google\/delete\/start)$/.test(path)||
+    (method==='GET'&&['/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path));
   if(service!=='draft')return false;
   if(method==='POST'&&path==='/v1/runs')return true;
   if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view|claim)$/.test(path))return true;

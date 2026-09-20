@@ -12,7 +12,7 @@ Updated 2026-09-20. “Foundation” means scaffolding exists but the feature is
 | Powered Cube | ✓ | Daily + claim | Daily + claim | Required |
 | Latest Set | ✓ | Daily + claim | Daily + claim | Required |
 | Practice | ✓ | — | — | Required |
-| Career/history | ✓ | — | — | Required |
+| Career/history | ✓ | Summary + paginated history | Summary + paginated history | Required |
 | Leaderboard | ✓ | Daily/week/month/all | Daily/week/month/all | Required |
 | Elite capability resolution | ✓ | — | — | Required |
 | Custom-set practice | ✓ | — | — | Required |

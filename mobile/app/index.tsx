@@ -74,6 +74,17 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Open career"
+          onPress={() => router.push('/career')}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>CAREER</Text>
+          <Text style={styles.utilityTitle}>Your career</Text>
+          <Text style={styles.cardBody}>Review your games, average score, streaks, and recent Pack One history.</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
           onPress={() => router.push('/account')}
           style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >

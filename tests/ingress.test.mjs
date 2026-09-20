@@ -126,6 +126,29 @@ test('production gateway accepts a shaped mobile guest session only on Draft Run
     return Response.json({ok:true});
   });
   assert.equal(linked.status,200);
+
+  const mobileCareer=new Request('https://api.packone.pro/growth/v1/mobile/profile/history?limit=5',{
+    headers:{
+      'cf-connecting-ip':'192.0.2.53',
+      'x-pack1-mobile-session':token,'x-pack1-mobile-account':accountToken,
+    },
+  });
+  const careerResult=await gateway(mobileCareer,prod,async(url,options)=>{
+    assert.equal(url,'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/mobile/profile/history?limit=5');
+    assert.equal(options.headers.get('authorization'),'Bearer '+token);
+    assert.equal(options.headers.get('x-pack1-mobile-account'),accountToken);
+    return Response.json({rows:[],next_cursor:null});
+  });
+  assert.equal(careerResult.status,200);
+
+  const browserProfileWithMobileCredentials=new Request('https://api.packone.pro/growth/v1/profile/history',{
+    headers:{
+      'cf-connecting-ip':'192.0.2.54',
+      'x-pack1-mobile-session':token,'x-pack1-mobile-account':accountToken,
+    },
+  });
+  assert.equal((await gateway(browserProfileWithMobileCredentials,prod,noFetch)).status,403);
+
   const mobileDelete=new Request('https://api.packone.pro/growth/v1/mobile/account/delete',{
     method:'POST',body:JSON.stringify({password:'not-forwarded-in-test-assertions'}),headers:{
       'content-type':'application/json','cf-connecting-ip':'192.0.2.49',

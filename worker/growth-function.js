@@ -791,6 +791,32 @@ async function handleMobileAccountSession(request) {
   });
 }
 
+async function mobileLinkedProfilePlayer(request) {
+  const id=await player(request);
+  const auth=await authSession(request,{allowLegacy:false,csrf:false});
+  const linked=await query(
+    'SELECT player_id::text player_id FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1',
+    [auth.user_id],
+  );
+  if(String(linked.rows[0]?.player_id||'').toLowerCase()!==String(id).toLowerCase()) {
+    throw Object.assign(Error('Account and player session are no longer linked. Sign in again.'),{status:409});
+  }
+  return id;
+}
+
+async function handleMobileMyProfile(request) {
+  const id=await mobileLinkedProfilePlayer(request);
+  const meta=await profileMetaByPlayer(id);
+  if(!meta)throw Object.assign(Error('Player profile not found.'),{status:404});
+  return json(await buildProfile(id,meta,{own:true}));
+}
+
+async function handleMobileMyHistory(request) {
+  const id=await mobileLinkedProfilePlayer(request);
+  const url=new URL(request.url);
+  return json(await historyPage(id,url.searchParams.get('cursor'),url.searchParams.get('limit')));
+}
+
 async function handleMobileSignout(request) {
   await player(request);
   const auth=await authSession(request,{allowLegacy:false,csrf:false});
@@ -1285,6 +1311,8 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/link') return handleLink(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signout') return handleMobileSignout(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete') return handleMobileAccountDelete(request);
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/me') return handleMobileMyProfile(request);
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/history') return handleMobileMyHistory(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/daily-dates') return handleDates(request);
   if (request.method === 'GET' && url.pathname === '/v1/profile/me') return handleMyProfile(request);
   if (request.method === 'PATCH' && url.pathname === '/v1/profile') return handleProfileUpdate(request);
