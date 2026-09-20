@@ -47,6 +47,10 @@ test('first-party migration removes browser bearer credentials and uses credenti
   const regular=calls.find(row=>row.path==='/growth/v1/account/session');
   assert.equal(regular.headers.has('x-pack1-auth-session'),false);
   assert.equal(regular.credentials,'include');
+  const playerSessionCount=calls.filter(row=>row.path==='/growth/v1/player/session').length;
+  await auth.ensurePackSession();
+  await auth.ensurePackSession();
+  assert.equal(calls.filter(row=>row.path==='/growth/v1/player/session').length,playerSessionCount,'first-party player session is reused for the page lifetime');
 });
 
 test('first-party writes use CSRF without exposing an account bearer',async()=>{
