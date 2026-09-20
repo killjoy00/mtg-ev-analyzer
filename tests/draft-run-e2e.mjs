@@ -102,6 +102,7 @@ try{
   await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0);assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),4);assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());await noOverflow();
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
   await page.locator('#run-share').click();await page.waitForFunction(()=>Boolean(window.__runShare));
+  assert.equal((await page.locator('#run-share-status').textContent())?.trim(),'');
   const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.text,new RegExp('🟩{'+(puzzles.length-1)+'}','u'));assert.equal(shared.files,undefined);assert.doesNotMatch(shared.url,/profile|token/);
   if(daily){
     assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.url,/daily=1/);assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
