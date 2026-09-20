@@ -85,8 +85,7 @@ try {
   // Guests are not shown a paid ask on the landing page. The underlying guest
   // handoff still works when an explicit premium action invokes it.
   await page.goto(base);
-  await page.waitForLoadState('domcontentloaded');
-  await page.waitForTimeout(50);
+  await page.locator('[data-daily-home]').waitFor();
   assert.equal(await page.locator('[data-home-elite]').count(),0);
   await page.evaluate(async()=>{const growth=await import('./growth.mjs');await growth.beginEliteUpgrade({source:'e2e_explicit_premium'});});
   await page.locator('#account-signin').waitFor();
