@@ -44,8 +44,8 @@ const googleResponse=await fetch(neonAuth+'/sign-in/social',{
   headers:{origin,'content-type':'application/json'},
   body:JSON.stringify({
     provider:'google',
-    callbackURL:'https://api.packone.pro/growth/v1/account/google/callback',
-    newUserCallbackURL:'https://api.packone.pro/growth/v1/account/google/callback',
+    callbackURL:'https://packone.pro/?auth=google',
+    newUserCallbackURL:'https://packone.pro/?auth=google',
     errorCallbackURL:'https://packone.pro/?auth=google-error',
     disableRedirect:true,
   }),

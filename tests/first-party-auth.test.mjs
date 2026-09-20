@@ -18,7 +18,7 @@ globalThis.window={PACK1_API:{
   draftRunUrl:'https://api.packone.pro/draft',
 }};
 let assigned=null;
-globalThis.location={assign:url=>{assigned=String(url);}};
+globalThis.location={href:'https://packone.pro/?auth=google&neon_auth_session_verifier=fixture-verifier',assign:url=>{assigned=String(url);}};
 globalThis.dispatchEvent=()=>{};
 const calls=[];
 globalThis.fetch=async(url,options={})=>{
@@ -30,6 +30,7 @@ globalThis.fetch=async(url,options={})=>{
   if(path==='/growth/v1/account/session')return Response.json({user:{id:'user',email:'qa@example.invalid',name:'QA'},session:{expiresAt:'2099-01-01T00:00:00Z'}});
   if(path==='/growth/v1/profile')return Response.json({player:{display_name:'QA Changed'}});
   if(path==='/pack1/auth/sign-in/social')return Response.json({url:'https://oauth.neon.tech/authorize?provider=google&state=fixture'});
+  if(path==='/pack1/auth/get-session')return Response.json({session:{token:'google-neon-session',expiresAt:'2099-01-01T00:00:00Z'},user:{id:'google-user',email:'google@example.invalid',name:'Google QA'}});
   throw Error('Unexpected '+path);
 };
 const auth=await import('../growth-api.mjs');
@@ -61,7 +62,7 @@ test('first-party writes use CSRF without exposing an account bearer',async()=>{
   assert.equal(auth.storedAccountToken(),'first-party');
 });
 
-test('Google starts on the Neon Auth browser origin so OAuth state cookies are preserved',async()=>{
+test('Google starts on Neon Auth and returns to Pack One with a verifier',async()=>{
   await auth.startGoogleSignIn();
   const call=calls.findLast(row=>row.path==='/pack1/auth/sign-in/social');
   assert.equal(call.host,'ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech');
@@ -69,8 +70,19 @@ test('Google starts on the Neon Auth browser origin so OAuth state cookies are p
   assert.equal(call.credentials,'include');
   const body=JSON.parse(call.body);
   assert.equal(body.provider,'google');
-  assert.equal(body.callbackURL,'https://api.packone.pro/growth/v1/account/google/callback');
+  assert.equal(body.callbackURL,'https://packone.pro/?auth=google');
   assert.equal(body.newUserCallbackURL,body.callbackURL);
   assert.equal(body.disableRedirect,true);
   assert.equal(assigned,'https://oauth.neon.tech/authorize?provider=google&state=fixture');
+});
+
+test('Google verifier is exchanged in the browser and immediately migrated to a first-party Pack One session',async()=>{
+  const result=await auth.completeGoogleSignIn();
+  assert.equal(result.user.id,'google-user');
+  const exchange=calls.findLast(row=>row.path==='/pack1/auth/get-session');
+  assert.equal(exchange.host,'ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech');
+  assert.equal(exchange.credentials,'include');
+  const migrate=calls.findLast(row=>row.path==='/growth/v1/account/migrate');
+  assert.equal(migrate.headers.get('x-pack1-auth-session'),'google-neon-session');
+  assert.equal(migrate.credentials,'include');
 });

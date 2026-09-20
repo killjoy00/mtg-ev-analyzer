@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import { firstPartyAuthEnabled, getAuthSession, linkAccount, signInAccount, signOutAccount, signUpAccount, startGoogleSignIn } from './growth-api.mjs';
+import { completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, signInAccount, signOutAccount, signUpAccount, startGoogleSignIn } from './growth-api.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { trackEvent as event } from './retention-events.mjs';
 
@@ -96,15 +96,34 @@ function shareCompletedAnalytics(eventObject) {
 
 export async function resumeAccountAuth(status) {
   const flow=takeAuthFlow()||{};
-  const clean=new URL(location.href);clean.searchParams.delete('auth');
+  if(status==='google') {
+    try {
+      await completeGoogleSignIn();
+      event('auth_google_completed',{source:flow.source||'unknown'});
+    } catch(error) {
+      event('auth_google_failed',{source:flow.source||'unknown'});
+      const clean=new URL(location.href);
+      clean.searchParams.delete('auth');
+      clean.searchParams.delete('neon_auth_session_verifier');
+      history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
+      await renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
+      const target=document.querySelector('#account-signin .form-error');
+      if(target)target.textContent=error?.message||'Google sign in did not finish. Please try again.';
+      return;
+    }
+  } else {
+    event('auth_google_failed',{source:flow.source||'unknown'});
+  }
+  const clean=new URL(location.href);
+  clean.searchParams.delete('auth');
+  clean.searchParams.delete('neon_auth_session_verifier');
   history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
   if(status!=='google') {
-    event('auth_google_failed',{source:flow.source||'unknown'});
     await renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
-    const error=document.querySelector('#account-signin .form-error');if(error)error.textContent='Google sign in did not finish. Please try again.';
+    const error=document.querySelector('#account-signin .form-error');
+    if(error)error.textContent='Google sign in did not finish. Please try again.';
     return;
   }
-  event('auth_google_completed',{source:flow.source||'unknown'});
   return renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
 }
 
