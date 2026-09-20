@@ -88,13 +88,8 @@ export default function LeaderboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const requestId = useRef(0);
 
-  const load = useCallback(async (refresh = false) => {
+  const load = useCallback(async () => {
     const id = ++requestId.current;
-    if (refresh) setRefreshing(true);
-    else {
-      setRefreshing(false);
-      setState({ status: 'loading' });
-    }
 
     try {
       const data = await loadDraftRunLeaderboard(period, environment);
@@ -118,6 +113,28 @@ export default function LeaderboardScreen() {
     };
   }, [load]);
 
+  const selectEnvironment = (next: DailyEnvironment) => {
+    if (next === environment) return;
+    setState({ status: 'loading' });
+    setEnvironment(next);
+  };
+
+  const selectPeriod = (next: LeaderboardPeriod) => {
+    if (next === period) return;
+    setState({ status: 'loading' });
+    setPeriod(next);
+  };
+
+  const retry = () => {
+    setState({ status: 'loading' });
+    void load();
+  };
+
+  const refresh = () => {
+    setRefreshing(true);
+    void load();
+  };
+
   const showDays = period !== 'daily';
 
   const header = (
@@ -134,7 +151,7 @@ export default function LeaderboardScreen() {
               key={id}
               active={environment === id}
               label={DAILY_ENVIRONMENT_META[id].title}
-              onPress={() => setEnvironment(id)}
+              onPress={() => selectEnvironment(id)}
             />
           ))}
         </View>
@@ -148,7 +165,7 @@ export default function LeaderboardScreen() {
               key={item.id}
               active={period === item.id}
               label={item.label}
-              onPress={() => setPeriod(item.id)}
+              onPress={() => selectPeriod(item.id)}
             />
           ))}
         </View>
@@ -191,7 +208,7 @@ export default function LeaderboardScreen() {
         <View style={styles.center}>
           <Text style={styles.errorTitle}>Couldn&apos;t load the leaderboard</Text>
           <Text style={styles.body}>{state.message}</Text>
-          <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.retryButton}>
+          <Pressable accessibilityRole="button" onPress={retry} style={styles.retryButton}>
             <Text style={styles.retryText}>Try again</Text>
           </Pressable>
         </View>
@@ -213,7 +230,7 @@ export default function LeaderboardScreen() {
         )}
         contentContainerStyle={styles.list}
         refreshing={refreshing}
-        onRefresh={() => void load(true)}
+        onRefresh={refresh}
       />
     </SafeAreaView>
   );
