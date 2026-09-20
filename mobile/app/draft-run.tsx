@@ -108,10 +108,6 @@ export default function DraftRunScreen() {
 
   useEffect(() => {
     let active = true;
-    setState({ status: 'loading' });
-    setSelected(null);
-    setMode('pick');
-    setResultError(null);
     void loadGuestDaily(environment)
       .then(({ run, token }) => {
         if (!active) return;

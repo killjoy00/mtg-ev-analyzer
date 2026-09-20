@@ -4,7 +4,7 @@ import { Pressable, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'rea
 import { DAILY_ENVIRONMENT_META, type DailyEnvironment } from '@/src/api/draftRun';
 import { colors, spacing } from '@/src/theme';
 
-const dailies: Array<{ environment: DailyEnvironment; action: string }> = [
+const dailies: { environment: DailyEnvironment; action: string }[] = [
   { environment: 'mixed', action: 'Start Draft Run →' },
   { environment: 'powered-cube', action: 'Play Powered Cube →' },
   { environment: 'latest', action: 'Play Latest Set →' },
@@ -63,6 +63,7 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Open leaderboard"
           onPress={() => router.push('/leaderboard')}
           style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >

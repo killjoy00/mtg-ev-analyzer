@@ -95,25 +95,117 @@ jobs:
 
           mapfile -t migration_changes < <(git diff --name-status "$BASE_SHA" "$HEAD_SHA" -- 'migrations/*.sql')
           for change in "${migration_changes[@]}"; do
-            status="${change%%$'\t'*}"
-            path="${change#*$'\t'}"
+            status="${change%%          else
+            for migration in "${pending[@]}"; do
+              echo "Applying $migration"
+              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+            done
+          fi
+
+      - name: Run SQL-backed integration suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATABASE_URL="$(cat "$PACK1_CI_CONNECTION")" node scripts/verify-neon-schema.mjs
+          # A corpus bump can be tested before production serves that version.
+          # This loader is additive and verifies existing payload equality.
+          node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
+          node tests/staged-manifest-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/source-eligibility-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-components-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/retirement-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-version-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/serving-statistics-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/selection-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/draft-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/cube-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/decision-measurements-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/fixed-daily-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-admin-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/account-session-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/mobile-auth-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/patreon-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/patreon-webhook-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/capabilities-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/eight-pick-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/request-integrity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+
+      - name: Delete isolated Neon branch
+        if: always() && steps.neon.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}
+\t'*}"
+            path="${change#*          else
+            for migration in "${pending[@]}"; do
+              echo "Applying $migration"
+              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+            done
+          fi
+
+      - name: Run SQL-backed integration suites
+        shell: bash
+        run: |
+          set -euo pipefail
+          DATABASE_URL="$(cat "$PACK1_CI_CONNECTION")" node scripts/verify-neon-schema.mjs
+          # A corpus bump can be tested before production serves that version.
+          # This loader is additive and verifies existing payload equality.
+          node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
+          node tests/staged-manifest-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/source-eligibility-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-components-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/retirement-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-version-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/serving-statistics-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/selection-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/draft-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/cube-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/decision-measurements-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/fixed-daily-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-admin-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/account-session-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/mobile-auth-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/patreon-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/patreon-webhook-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/capabilities-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/eight-pick-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/request-integrity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+
+      - name: Delete isolated Neon branch
+        if: always() && steps.neon.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}
+\t'}"
             if [[ "$status" != 'A' ]]; then
               echo "::error file=$path::Existing migration files are immutable in backend-gated PRs; add a new migration instead (status $status)."
               exit 1
             fi
           done
 
+          # A stacked PR can depend on additive migrations introduced by an
+          # unmerged base PR. The isolated Neon branch starts from production,
+          # not from the base PR's database state, so include migrations that
+          # exist in this head but not on main as well as migrations added by
+          # the immediate PR. Keep the base-to-head diff above for immutability.
+          mapfile -t stack_migration_changes < <(git diff --name-status origin/main "$HEAD_SHA" -- 'migrations/*.sql')
+
           # Production now has the reviewed rebuild through 0019. In particular,
           # 0016 was intentionally not applied: retirement retains history.
           # Replaying that obsolete deletion after 0019 violates retained-manifest
           # foreign keys and tests the wrong release path. Only additive backlog
-          # plus this PR's new migrations belongs on the disposable clone.
+          # plus this PR stack's new migrations belongs on the disposable clone.
           mapfile -t pending < <({
             printf '%s\n' migrations/0020_source_eligibility.sql migrations/0021_corpus_components.sql migrations/0022_corpus_admin_identity.sql migrations/0023_serving_policy_snapshots.sql migrations/0024_serving_quality_lookup.sql migrations/0025_traditional_phase2_components.sql migrations/0026_provider_accounts.sql
+            printf '%s\n' "${stack_migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
             printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
           } | sort -u)
           if (( ${#pending[@]} == 0 )); then
-            echo 'No pending migrations in this PR.'
+            echo 'No pending migrations in this PR stack.'
           else
             for migration in "${pending[@]}"; do
               echo "Applying $migration"

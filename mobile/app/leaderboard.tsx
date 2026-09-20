@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 
 import {
+  DAILY_ENVIRONMENTS,
   DAILY_ENVIRONMENT_META,
   type DailyEnvironment,
 } from '@/src/api/draftRun';
@@ -21,14 +22,12 @@ import {
 } from '@/src/api/leaderboard';
 import { colors, spacing } from '@/src/theme';
 
-const periods: Array<{ id: LeaderboardPeriod; label: string }> = [
-  { id: 'daily', label: 'Today' },
+const periods: { id: LeaderboardPeriod; label: string }[] = [
+  { id: 'daily', label: 'Daily' },
   { id: 'week', label: 'Week' },
   { id: 'month', label: 'Month' },
-  { id: 'all', label: 'All time' },
+  { id: 'all', label: 'All-time' },
 ];
-
-const environments: DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
 
 type LoadState =
   | { status: 'loading' }
@@ -47,6 +46,7 @@ function FilterButton({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityLabel={label}
       accessibilityState={{ selected: active }}
       onPress={onPress}
       style={[styles.filterButton, active && styles.filterButtonActive]}
@@ -56,17 +56,27 @@ function FilterButton({
   );
 }
 
-function RankingRow({ item }: { item: LeaderboardRow }) {
+function RankingRow({
+  item,
+  showDays,
+}: {
+  item: LeaderboardRow;
+  showDays: boolean;
+}) {
+  const daysLabel = showDays
+    ? `, ${item.days} day${item.days === 1 ? '' : 's'}`
+    : '';
+
   return (
     <View
       accessible
-      accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, score ${item.score}, ${item.days} day${item.days === 1 ? '' : 's'}`}
+      accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, score ${item.score}${daysLabel}`}
       style={[styles.rankingRow, item.rank <= 3 && styles.topRankingRow]}
     >
       <Text style={styles.rank}>{item.rank}</Text>
       <Text style={styles.player} numberOfLines={1}>{item.display_name}</Text>
       <Text style={styles.score}>{item.score}</Text>
-      <Text style={styles.days}>{item.days}</Text>
+      {showDays ? <Text style={styles.days}>{item.days}</Text> : null}
     </View>
   );
 }
@@ -76,26 +86,39 @@ export default function LeaderboardScreen() {
   const [environment, setEnvironment] = useState<DailyEnvironment>('mixed');
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
+  const requestId = useRef(0);
 
-  const load = async (refresh = false) => {
+  const load = useCallback(async (refresh = false) => {
+    const id = ++requestId.current;
     if (refresh) setRefreshing(true);
-    else setState({ status: 'loading' });
+    else {
+      setRefreshing(false);
+      setState({ status: 'loading' });
+    }
+
     try {
       const data = await loadDraftRunLeaderboard(period, environment);
+      if (id !== requestId.current) return;
       setState({ status: 'ready', data });
     } catch (error: unknown) {
+      if (id !== requestId.current) return;
       setState({
         status: 'error',
         message: error instanceof Error ? error.message : 'Leaderboard is unavailable.',
       });
     } finally {
-      setRefreshing(false);
+      if (id === requestId.current) setRefreshing(false);
     }
-  };
+  }, [environment, period]);
 
   useEffect(() => {
     void load();
-  }, [period, environment]);
+    return () => {
+      requestId.current += 1;
+    };
+  }, [load]);
+
+  const showDays = period !== 'daily';
 
   const header = (
     <View style={styles.header}>
@@ -106,7 +129,7 @@ export default function LeaderboardScreen() {
       <View style={styles.filterGroup}>
         <Text style={styles.filterLabel}>RUN</Text>
         <View style={styles.filterRow}>
-          {environments.map((id) => (
+          {DAILY_ENVIRONMENTS.map((id) => (
             <FilterButton
               key={id}
               active={environment === id}
@@ -142,7 +165,7 @@ export default function LeaderboardScreen() {
             <Text style={styles.rankHeader}>#</Text>
             <Text style={styles.playerHeader}>PLAYER</Text>
             <Text style={styles.scoreHeader}>SCORE</Text>
-            <Text style={styles.daysHeader}>DAYS</Text>
+            {showDays ? <Text style={styles.daysHeader}>DAYS</Text> : null}
           </View>
         </>
       ) : null}
@@ -154,7 +177,7 @@ export default function LeaderboardScreen() {
       <SafeAreaView style={styles.safe}>
         {header}
         <View style={styles.center}>
-          <ActivityIndicator color={colors.accent} />
+          <ActivityIndicator accessibilityLabel="Loading leaderboard" color={colors.accent} />
           <Text style={styles.body}>Loading rankings…</Text>
         </View>
       </SafeAreaView>
@@ -181,9 +204,13 @@ export default function LeaderboardScreen() {
       <FlatList
         data={state.data.rows}
         keyExtractor={(item) => item.profile_key ?? `${item.rank}:${item.display_name}`}
-        renderItem={({ item }) => <RankingRow item={item} />}
+        renderItem={({ item }) => <RankingRow item={item} showDays={showDays} />}
         ListHeaderComponent={header}
-        ListEmptyComponent={<Text style={styles.empty}>No ranked scores in this view yet.</Text>}
+        ListEmptyComponent={(
+          <Text style={styles.empty}>
+            No ranked {DAILY_ENVIRONMENT_META[environment].title} scores in this view yet.
+          </Text>
+        )}
         contentContainerStyle={styles.list}
         refreshing={refreshing}
         onRefresh={() => void load(true)}
