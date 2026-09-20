@@ -1,4 +1,5 @@
 import { requestJson } from '@/src/api/client';
+import type { MobileSession } from '@/src/storage/session';
 
 export type DailyEnvironment = 'mixed' | 'powered-cube' | 'latest';
 
@@ -105,6 +106,21 @@ export function startDailyDraftRun(
     method: 'POST',
     mobileSessionToken,
     body: { daily: true, environment },
+    timeoutMs: 30_000,
+  });
+}
+
+export function startRegularPracticeDraftRun(
+  session: MobileSession,
+  idempotencyKey: string,
+) {
+  if (!session.accountToken) throw new Error('Sign in to start regular practice.');
+  return requestJson<DraftRunState>('/draft/v1/runs', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    idempotencyKey,
+    body: { daily: false, environment: 'mixed' },
     timeoutMs: 30_000,
   });
 }
