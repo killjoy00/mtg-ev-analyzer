@@ -4,15 +4,6 @@ import { loadMyProfile } from './growth-api.mjs';
 let installed = false;
 let activePage = null;
 
-function ensureStyles() {
-  if (document.querySelector('link[data-profile-polish-css]')) return;
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = './profile-polish.css?v=2';
-  link.dataset.profilePolishCss = '1';
-  document.head.appendChild(link);
-}
-
 function hasLabel(strip, label) {
   return [...strip.querySelectorAll(':scope > div > span')].some((node) => node.textContent?.trim() === label);
 }
@@ -73,5 +64,5 @@ function scan() {
 
 export function installProfilePolish() {
   if(installed)return;installed=true;
-  ensureStyles();onAppRender(scan);
+  onAppRender(scan);
 }
