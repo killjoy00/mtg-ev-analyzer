@@ -135,7 +135,7 @@ function settingsMarkup(profile, progress, account, patreon) {
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
-    <header><div><p class="eyebrow">Your account</p><h2 id="profile-account-title">Account & profile</h2><p>${account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
+    <header><div><p class="eyebrow">Your account</p><h2 id="profile-account-title">Account & profile</h2><p>${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     <form id="profile-settings-form">
       <label><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required><small>Shown on all Daily leaderboards.</small></label>
       <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''}><span><strong>Public profile</strong><small>Allows leaderboard visitors and shared links to open your Pack One record.</small></span></label>
@@ -241,6 +241,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   const profileKey = publicKey || profile.player.profile_key || null;
 
   document.querySelector('#profile-home')?.addEventListener('click', () => { window.location.href = './'; });
+  document.querySelector('#account-status-retry')?.addEventListener('click',()=>void renderMyProfile());
   document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderAccount();});
   document.querySelector('#patreon-connect')?.addEventListener('click',async e=>{
     const button=e.currentTarget,status=document.querySelector('#patreon-status');button.disabled=true;if(status)status.textContent='Opening Patreon…';
@@ -351,7 +352,7 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
     ensureProfileStyles();
     const [catalog,account,patreon] = await Promise.all([
       loadCatalog(),
-      own?getAuthSession():null,
+      own?getAuthSession().catch(()=>({unavailable:true})):null,
       own?loadPatreonStatus().catch(()=>null):null,
     ]);
     const app = document.querySelector('#app');
