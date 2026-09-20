@@ -3,12 +3,13 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
-  SafeAreaView,
   ScrollView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { loadSetCatalog, type SetCatalog, type SetCatalogEntry } from '@/src/api/catalog';
 import { colors, spacing } from '@/src/theme';
