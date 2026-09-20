@@ -1,0 +1,24 @@
+{
+  "expo": {
+    "name": "Pack One",
+    "slug": "pack-one",
+    "version": "0.1.0",
+    "orientation": "default",
+    "scheme": "packone",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "edgeToEdgeEnabled": true
+    }
+  }
+}
