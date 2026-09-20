@@ -1,5 +1,5 @@
 import {SERVING_POLICY_VERSION,LEGACY_SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
-import {accountCapabilities,requireCapability,practiceCapability} from './capabilities.mjs';
+import {accountCapabilities,providerMembership,requireCapability,practiceCapability} from './capabilities.mjs';
 import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity,linkedPlayerIdentity} from './account-identity.mjs';
@@ -203,10 +203,16 @@ async function createShare(request,id) {
 
 async function dailyStatus(request) {
   const owner=await player(request),account=await accountIdentity(request,query,owner),day=gameDateKey();
-  const result=await query(`SELECT day::text date,environment set_id,'draft_run' mode,score,id run_id
-    FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date
-      AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)`,[owner,day]);
-  return json({day,capabilities:await accountCapabilities(account,query),player:{claimed:Boolean(account)},daily_history:result.rows.map(r=>({...r,score:Number(r.score)}))});
+  // This is the homepage's request, so the membership lookup rides alongside
+  // the other two rather than adding a round trip.
+  const [result,capabilities,membership]=await Promise.all([
+    query(`SELECT day::text date,environment set_id,'draft_run' mode,score,id run_id
+      FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date
+        AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)`,[owner,day]),
+    accountCapabilities(account,query),
+    providerMembership(account,query),
+  ]);
+  return json({day,capabilities,player:{claimed:Boolean(account)},membership,daily_history:result.rows.map(r=>({...r,score:Number(r.score)}))});
 }
 
 async function leaderboard(request) {

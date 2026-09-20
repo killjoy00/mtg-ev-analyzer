@@ -44,6 +44,16 @@ const authId=crypto.randomUUID(),auth=crypto.randomUUID()+crypto.randomUUID();
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[authId,'QA fixed account',`qa-fixed-${tag}@example.invalid`]);
 await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[auth,authId]);
 await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[authId,owner.playerId]);
+// A Supporter holds no paid capability, so the homepage cannot tell one from a
+// free account on capabilities alone and would offer to make them a member.
+assert.deepEqual((await call('/v1/daily-status',undefined,guest.token)).membership,{connected:false},'a guest is never connected');
+assert.deepEqual((await call('/v1/daily-status',undefined,owner.token,auth)).membership,{connected:false},'an account with no provider link is not connected');
+await query("INSERT INTO provider_accounts(auth_user_id,provider,provider_user_id) VALUES($1::uuid,'patreon',$2)",[authId,'qa-provider-'+tag]);
+const connectedStatus=await call('/v1/daily-status',undefined,owner.token,auth);
+assert.deepEqual(connectedStatus.membership,{connected:true},'a linked provider account reports connected');
+assert.deepEqual(connectedStatus.capabilities,['account','unlimited_regular_practice'],'linkage alone grants nothing');
+await query("DELETE FROM provider_accounts WHERE auth_user_id=$1::uuid",[authId]);
+assert.deepEqual((await call('/v1/daily-status',undefined,owner.token,auth)).membership,{connected:false},'disconnecting is reflected');
 let accountRun=await call('/v1/runs',{daily:true},owner.token);
 assert.equal(accountRun.ranked_name,'QA ranked '+tag);
 assert.equal(accountRun.current.puzzle_id,schedule[0]);assert.equal(accountRun.leaderboard_eligible,true);

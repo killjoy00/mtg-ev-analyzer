@@ -14,6 +14,15 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
   const status = todayStatus(profile, day);
   const dailyDate=new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));
   const capabilities=profile?.capabilities||[];
+  const claimed=Boolean(profile?.player?.claimed);
+  // Claimed is part of the test, not redundant: a capability list arriving
+  // without an account is not trusted to unlock Elite surfaces.
+  const elite=claimed&&capabilities.includes('custom_corpus');
+  // A connected member without Elite is already paying, so "Become" reads as
+  // if their support does not count. Covers a lapsed Elite too, where "Become"
+  // would be equally wrong.
+  const eliteLabel=profile?.membership?.connected?'Upgrade to Elite':'Become Elite';
+  const eliteCta=`<button class="button secondary" data-home-elite>${eliteLabel}</button>`;
   const ordered = [...games].sort((a, b) => Number(status[a.key].complete) - Number(status[b.key].complete));
   return `<section class="daily-home" data-daily-home data-completed="${status.completed}">
     <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Match a trophy drafter. See how your choices compare.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
@@ -24,14 +33,16 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
         <a class="button ${result.complete ? 'secondary' : 'primary'}" href="${game.href}">${result.complete ? 'View result' : 'Play now'}</a>
       </article>`;
     }).join('')}</div>
-    ${status.completed === 3 ? `<section class="daily-home-practice"><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2>${profile?.player?.claimed
-      ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${capabilities.includes('custom_corpus')
+    ${status.completed === 3 ? `<section class="daily-home-practice"><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2>${claimed
+      ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${elite
         ? (capabilities.includes('unlimited_cube_practice')?'<a class="button secondary" href="?game=draft-run&set=powered-cube">Powered Cube Practice</a>':'')
-        : '<button class="button secondary" data-home-elite>Become Elite</button><p>Elite adds unlimited Powered Cube and custom-set drafts.</p>'}`
+        : `${eliteCta}<p>Elite adds unlimited Powered Cube and custom-set drafts.</p>`}`
       : '<p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>'}</section>` : ''}
-    ${profile?.player?.claimed && capabilities.includes('custom_corpus')
+    ${elite
       ? '<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Build a random run from your favorite sets.</p></div><a class="button secondary" href="?game=draft-run&custom=1">Choose your sets</a></section>'
-      : '<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Draft beyond the Dailies. Unlock unlimited Powered Cube and custom-set drafts.</p></div><button class="button secondary" data-home-elite>Become Elite</button></section>'}
+      : claimed
+        ? `<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Draft beyond the Dailies. Unlock unlimited Powered Cube and custom-set drafts.</p></div>${eliteCta}</section>`
+        : ''}
     ${unavailable ? '<p role="status">Daily progress is unavailable. Play now still resumes your saved attempt.</p>' : ''}
   </section>`;
 }

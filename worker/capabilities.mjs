@@ -5,6 +5,18 @@ export async function accountCapabilities(account,query) {
     AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())`,[account.auth_user_id]);
   return ['account','unlimited_regular_practice',...result.rows.map(r=>r.capability).filter(c=>PAID_CAPABILITIES.has(c)).sort()];
 }
+// A Supporter holds no paid capability, so capabilities alone cannot tell a
+// paying member apart from a free account. Surfaces that offer an upgrade need
+// that difference to avoid telling a subscriber to "become" what they already
+// partly are. Linkage only - never an entitlement, which stays in the grants.
+export async function providerMembership(account,query) {
+  if(!account)return {connected:false};
+  const result=await query(
+    "SELECT 1 FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider='patreon' LIMIT 1",
+    [account.auth_user_id]);
+  return {connected:result.rows.length>0};
+}
+
 export function practiceCapability(environment,setIds=[]) {
   return setIds.length?'custom_corpus':environment==='powered-cube'?'unlimited_cube_practice':'unlimited_regular_practice';
 }
