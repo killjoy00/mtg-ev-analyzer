@@ -57,10 +57,7 @@ export async function accountSession(request,query,{required=true,allowLegacy=tr
       WHERE s.session_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()
       LIMIT 1`,[hash]);
     const account=result.rows[0];
-    if(!account) {
-      if(required)throw Object.assign(Error('Account session expired.'),{status:401});
-      return null;
-    }
+    if(!account)throw Object.assign(Error('Account session expired.'),{status:401});
     if(csrf&&!SAFE_METHODS.has(request.method)) {
       const supplied=String(request.headers.get('x-pack1-csrf')||'');
       if(!validOpaque(supplied)||!sameDigest(digest(supplied),account.csrf_hash))
@@ -75,8 +72,7 @@ export async function accountSession(request,query,{required=true,allowLegacy=tr
         FROM neon_auth.session s JOIN neon_auth."user" u ON u.id=s."userId"
         WHERE s.token=$1 AND s."expiresAt">now() LIMIT 1`,[token]);
       if(result.rows[0])return {...result.rows[0],source:'legacy'};
-      if(required)throw Object.assign(Error('Account session expired.'),{status:401});
-      return null;
+      throw Object.assign(Error('Account session expired.'),{status:401});
     }
   }
   if(required)throw Object.assign(Error('Account session required.'),{status:401});
