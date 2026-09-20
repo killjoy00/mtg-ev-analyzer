@@ -46,7 +46,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = './profile.css?v=2';
+  link.href = './profile.css?v=3';
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
