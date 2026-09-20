@@ -175,7 +175,7 @@ export async function signOutAccount() {
   }
   clearAuth();
   try {
-    for (const key of [TOKEN_KEY, 'pack1-game-history-v2', 'pack1-daily-history-v1']) localStorage.removeItem(key);
+    for (const key of [TOKEN_KEY, NAME_KEY, 'pack1-game-history-v2', 'pack1-daily-history-v1']) localStorage.removeItem(key);
   } catch {}
   return { ok:true };
 }
