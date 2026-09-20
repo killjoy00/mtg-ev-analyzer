@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -13,6 +14,7 @@ import {
 
 import { ensureGuestSession } from '@/src/api/guest';
 import {
+  issueDraftRunClaim,
   startDailyDraftRun,
   submitDraftRunPick,
   type DraftRunCard,
@@ -94,6 +96,7 @@ export default function DraftRunScreen() {
   const [mode, setMode] = useState<ViewMode>('pick');
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resultError, setResultError] = useState<string | null>(null);
   const scroll = useRef<ScrollView>(null);
 
   useEffect(() => {
@@ -161,6 +164,20 @@ export default function DraftRunScreen() {
     }
   };
 
+  const signInToClaim = async () => {
+    if (state.status !== 'ready' || !state.run.complete || busy) return;
+    setBusy(true);
+    setResultError(null);
+    try {
+      const claim = await issueDraftRunClaim(state.run.id, state.token);
+      router.push({ pathname: '/account', params: { claimToken: claim.claimToken } });
+    } catch (error: unknown) {
+      setResultError(error instanceof Error ? error.message : 'Could not prepare this score for sign in.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const next = () => {
     if (state.status !== 'ready') return;
     if (state.run.complete) {
@@ -221,12 +238,28 @@ export default function DraftRunScreen() {
               {run.standing.percentile ? ` · Top ${run.standing.percentile}%` : ''}
             </Text>
           ) : null}
-          <View style={styles.guestNote}>
-            <Text style={styles.guestNoteTitle}>Guest result</Text>
-            <Text style={styles.resultBody}>
-              This run is saved to this guest identity. Account sign-in and score claiming are the next mobile milestone.
-            </Text>
-          </View>
+          {run.leaderboard_eligible ? (
+            <View style={styles.guestNote}>
+              <Text style={styles.guestNoteTitle}>Ranked result</Text>
+              <Text style={styles.resultBody}>This score is attached to your Pack One identity.</Text>
+            </View>
+          ) : (
+            <View style={styles.guestNote}>
+              <Text style={styles.guestNoteTitle}>Save this score</Text>
+              <Text style={styles.resultBody}>
+                Sign in to validate and save your score and join the leaderboard.
+              </Text>
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy}
+                onPress={() => void signInToClaim()}
+                style={[styles.primaryButton, busy && styles.primaryButtonDisabled]}
+              >
+                {busy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Sign in and save score</Text>}
+              </Pressable>
+              {resultError ? <Text style={styles.resultError}>{resultError}</Text> : null}
+            </View>
+          )}
         </ScrollView>
       </SafeAreaView>
     );
@@ -399,4 +432,5 @@ const styles = StyleSheet.create({
   resultBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   guestNote: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.xs },
   guestNoteTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  resultError: { color: colors.danger, fontSize: 14, lineHeight: 20 },
 });

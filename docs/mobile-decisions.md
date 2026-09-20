@@ -54,3 +54,13 @@ Policy URLs:
 **Alternative:** forward arbitrary caller `Authorization` in production.  
 **Reason:** production intentionally strips caller authorization today. A shaped, route-scoped guest header preserves that boundary and cannot be used on account routes. Browser cookie identity still wins when present.  
 **Migration:** account auth will use a separately designed revocable native session; this guest bridge is not the final account-token contract.
+
+## 2026-09-19 — native account session and guest score claim
+
+**Decision:** keep two native credentials: the signed Pack One player token and a separate revocable opaque account-session token. Both live only in SecureStore.  
+**Alternative:** replace the player token with the account token, or reuse browser cookies.  
+**Reason:** gameplay ownership and authenticated account authority already have distinct server responsibilities. Keeping them separate makes account logout/revocation mechanical without changing Draft Run subject identity.
+
+**Decision:** completed unranked Daily runs mint a random 256-bit, 15-minute claim token. Only its SHA-256 hash is stored. The claim is bound to the guest player and run and is consumed by the account-link transaction path.  
+**Alternative:** submit a run ID after login.  
+**Reason:** a run ID is an identifier, not proof that the caller produced the run. The claim token satisfies the native handoff requirement for a server-issued, guest-bound, short-TTL, one-use proof.

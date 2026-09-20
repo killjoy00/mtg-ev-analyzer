@@ -35,12 +35,22 @@ export default function HomeScreen() {
           onPress={() => router.push('/draft-run')}
           style={({ pressed }) => [styles.primaryCard, pressed && styles.pressed]}
         >
-          <Text style={styles.cardKicker}>FIRST VERTICAL SLICE</Text>
+          <Text style={styles.cardKicker}>PLAY TODAY</Text>
           <Text style={styles.cardTitle}>Draft Run</Text>
           <Text style={styles.cardBody}>
-            The mobile shell is connected to the existing Draft Run service. The full guest pick loop is the next milestone.
+            Play the full eight-pick Daily against Pack One&apos;s production scoring authority.
           </Text>
-          <Text style={styles.cardAction}>Check service →</Text>
+          <Text style={styles.cardAction}>Start Draft Run →</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/account')}
+          style={({ pressed }) => [styles.accountCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>ACCOUNT</Text>
+          <Text style={styles.accountTitle}>Sign in or create an account</Text>
+          <Text style={styles.cardBody}>Use the same Pack One identity and career across web and mobile.</Text>
         </Pressable>
 
         <View style={styles.note}>
@@ -88,6 +98,14 @@ const styles = StyleSheet.create({
   cardTitle: { color: colors.ink, fontSize: 28, fontWeight: '800' },
   cardBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   cardAction: { color: colors.accentDark, fontSize: 15, fontWeight: '800', marginTop: spacing.sm },
+  accountCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  accountTitle: { color: colors.ink, fontSize: 20, fontWeight: '800' },
   note: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.xs },
   noteTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   noteBody: { color: colors.muted, fontSize: 14, lineHeight: 21 },

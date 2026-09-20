@@ -97,3 +97,17 @@ export function submitDraftRunPick(
     timeoutMs: 30_000,
   });
 }
+
+export type DraftRunClaim = {
+  claimToken: string;
+  expiresAt: string;
+};
+
+export function issueDraftRunClaim(runId: string, mobileSessionToken: string) {
+  return requestJson<DraftRunClaim>(`/draft/v1/runs/${encodeURIComponent(runId)}/claim`, {
+    method: 'POST',
+    mobileSessionToken,
+    body: {},
+    timeoutMs: 15_000,
+  });
+}
