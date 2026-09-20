@@ -1,4 +1,4 @@
-import {loadPatreonStatus,storedAccountToken} from './growth-api.mjs';
+import {hasAccountSession,loadPatreonStatus} from './growth-api.mjs';
 
 export async function advertisingAllowed({enabled,client,game=false,accountToken,checkMembership}) {
   if(!enabled||!client||game)return false;
@@ -7,7 +7,7 @@ export async function advertisingAllowed({enabled,client,game=false,accountToken
 }
 
 export async function initializeAds({doc=document,location=globalThis.location,
-  cfg=globalThis.PACKONE_ADSENSE||{},accountToken=storedAccountToken(),
+  cfg=globalThis.PACKONE_ADSENSE||{},accountToken=hasAccountSession()?'session':null,
   checkMembership=loadPatreonStatus}={}) {
   const slots=[...doc.querySelectorAll('[data-ad-slot]')];
   // Hide before asynchronous work. Preview queries cannot bypass the release gate.
@@ -16,7 +16,7 @@ export async function initializeAds({doc=document,location=globalThis.location,
   const game=doc.body.classList.contains('is-game')||params.has('game')||params.has('mode');
   if(!slots.length||!await advertisingAllowed({enabled:cfg.enabled,client:cfg.client,game,accountToken,checkMembership}))return;
   // Sign-in may have changed while the membership request was in flight.
-  if(accountToken!==storedAccountToken())return;
+  if(Boolean(accountToken)!==hasAccountSession())return;
   const usable=slots.map(slot=>({slot,id:cfg.slots?.[slot.dataset.adSlot]||cfg.slots?.articleTop})).filter(row=>row.id);
   if(!usable.length)return;
   const script=doc.createElement('script');
