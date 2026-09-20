@@ -10,7 +10,13 @@ const tag=crypto.randomUUID().slice(0,8);
 const authId=crypto.randomUUID(),legacyAuth=crypto.randomUUID()+crypto.randomUUID();
 const origin='https://packone.pro';
 const json=async(response,status=200)=>{const data=await response.json();assert.equal(response.status,status,JSON.stringify(data));return data;};
-const cookies=response=>response.headers.getSetCookie?.()||[response.headers.get('set-cookie')].filter(Boolean);
+// This calls the worker directly, so it sees the single joined Set-Cookie the
+// Neon runtime can actually emit. Split it exactly as edge/gateway.mjs does, so
+// these assertions describe what a browser receives rather than what the
+// function happened to write.
+const COOKIE_BOUNDARY=/,\s*(?=__(?:Host|Secure)-pack1_)/;
+const cookies=response=>(response.headers.getSetCookie?.()||[response.headers.get('set-cookie')].filter(Boolean))
+  .flatMap(line=>String(line).split(COOKIE_BOUNDARY));
 const value=(lines,name)=>{
   const line=lines.find(row=>row.startsWith(name+'='));
   assert.ok(line,'Missing '+name);
