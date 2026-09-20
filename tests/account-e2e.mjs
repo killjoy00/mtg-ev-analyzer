@@ -37,11 +37,15 @@ try {
     assert.equal(await page.locator('#patreon-connect').count(),1);
     assert.match(await page.locator('.profile-membership').textContent(),/Supporter membership supports the site/);
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-api-session-v1')),'claimed-fixture');
-    await page.locator('#account-signout').click();await page.locator('#profile-claim-account').waitFor();await page.locator('#profile-claim-account').click();await page.locator('#account-signin').waitFor();
+    await page.evaluate(()=>localStorage.setItem('pack1-player-name-v1','Test Player'));
+    await page.locator('#account-signout').click();await page.locator('#account-signin').waitFor();
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-auth-session-v1')),null);
+    assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-player-name-v1')),null);
     assert.notEqual(await page.evaluate(()=>localStorage.getItem('pack1-api-session-v1')),'claimed-fixture');
+    assert.equal(await page.locator('.player-profile-page').count(),0);
+    assert.equal(await page.locator('#account-signup [name="name"]').inputValue(),'');
   }
   assert.deepEqual(errors,[]);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
-  console.log('Account browser contract passed: guest access, sign in/up, linking, Patreon connection surface and sign-out credential separation.');
+  console.log('Account browser contract passed: guest access, sign in/up, linking, Patreon connection surface and sign-out identity separation.');
 }finally{await browser.close();}
