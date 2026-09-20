@@ -33,6 +33,7 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
         <a class="button ${result.complete ? 'secondary' : 'primary'}" href="${game.href}">${result.complete ? 'View result' : 'Play now'}</a>
       </article>`;
     }).join('')}</div>
+    ${claimed && !elite && status.completed < 3 ? '<section class="daily-home-regular"><div><p class="eyebrow">Free practice</p><p>Keep drafting with unlimited regular Draft Runs.</p></div><a class="button primary" href="?game=draft-run">Practice a Draft Run</a></section>' : ''}
     ${status.completed === 3 ? `<section class="daily-home-practice"><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2>${claimed
       ? `<a class="button primary" href="?game=draft-run">Start Another Draft Run</a>${elite
         ? (capabilities.includes('unlimited_cube_practice')?'<a class="button secondary" href="?game=draft-run&set=powered-cube">Powered Cube Practice</a>':'')
