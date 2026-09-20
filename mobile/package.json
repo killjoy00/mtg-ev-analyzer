@@ -10,6 +10,8 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "config:check": "node ./scripts/check-config.mjs",
+    "release:check": "node ./scripts/release-preflight.mjs --production",
+    "eas-build-pre-install": "node ./scripts/release-preflight.mjs",
     "test": "npm run lint && npm run typecheck && npm run config:check"
   },
   "dependencies": {
@@ -20,6 +22,7 @@
     "expo-linking": "~57.0.10",
     "expo-router": "~57.0.22",
     "expo-secure-store": "~57.0.4",
+    "expo-splash-screen": "~57.0.9",
     "expo-status-bar": "~57.0.1",
     "expo-web-browser": "~57.0.3",
     "react": "19.2.3",
