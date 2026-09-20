@@ -82,9 +82,9 @@ export default function CareerScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const requestId = useRef(0);
 
-  const load = async () => {
+  const load = async ({ showLoading = true }: { showLoading?: boolean } = {}) => {
     const id = ++requestId.current;
-    setState({ status: 'loading' });
+    if (showLoading) setState({ status: 'loading' });
     try {
       const session = await ensureGuestSession();
       if (id !== requestId.current) return;
@@ -120,7 +120,7 @@ export default function CareerScreen() {
   };
 
   useEffect(() => {
-    void load();
+    void load({ showLoading: false });
     return () => {
       requestId.current += 1;
     };
