@@ -33,10 +33,7 @@ if (historicalShare) {
   account.className = 'top-nav-button'; account.textContent = 'Account';
   account.onclick = async () => {
     await identityReady;
-    const profiles = await import('./profile-product.mjs');
-    profiles.installProfileProductLayer();
-    (await import('./profile-polish.mjs')).installProfilePolish();
-    await profiles.renderMyProfile();
+    await (await import('./growth.mjs')).renderAccount();
   };
   document.querySelector('.top-actions').append(account);
   if (params.has('patreon')) {
@@ -50,10 +47,7 @@ if (historicalShare) {
   } else if (home) home.installDailyHome(identityReady);
   else if (params.has('account')) {
     await identityReady;
-    const profiles=await import('./profile-product.mjs');
-    profiles.installProfileProductLayer();
-    (await import('./profile-polish.mjs')).installProfilePolish();
-    await profiles.renderMyProfile();
+    await (await import('./growth.mjs')).renderAccount();
   } else if (params.has('profile')) {
     await identityReady;
     (await import('./profile-product.mjs')).installProfileProductLayer();
