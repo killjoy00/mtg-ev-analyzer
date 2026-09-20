@@ -48,7 +48,13 @@ if (historicalShare) {
     const clean=new URL(location.href);clean.searchParams.delete('patreon');
     history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
   } else if (home) home.installDailyHome(identityReady);
-  else if (params.has('profile')) {
+  else if (params.has('account')) {
+    await identityReady;
+    const profiles=await import('./profile-product.mjs');
+    profiles.installProfileProductLayer();
+    (await import('./profile-polish.mjs')).installProfilePolish();
+    await profiles.renderMyProfile();
+  } else if (params.has('profile')) {
     await identityReady;
     (await import('./profile-product.mjs')).installProfileProductLayer();
   } else {
