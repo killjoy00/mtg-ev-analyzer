@@ -719,3 +719,9 @@ body .run-lock span{font-size:16px}
  body .run-lock span{font-size:14px}
  .app-footer{padding:24px 16px 30px}
 }
+
+@media(max-width:380px){
+ .top-actions{gap:0}
+ .top-nav-button{font-size:12px;padding-left:4px;padding-right:4px}
+ .top-actions #account-nav{padding-left:4px}
+}
