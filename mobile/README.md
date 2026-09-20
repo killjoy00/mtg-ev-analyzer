@@ -19,13 +19,14 @@ The native client now includes:
 - a live native Sets archive read from the serving corpus
 - `packone://` deep links for every Expo Router screen
 - native rewriting of Pack One web-style Daily, leaderboard, account, How to Play, Scoring, Method, and Sets links
+- navigator-level crash-safe screen recovery and a native stale-link/not-found screen
 - EAS development, preview, and production profiles
 
 All game selection, scoring, account linking, leaderboard state, career persistence, and entitlement checks remain server-authoritative. Do not add database credentials, Patreon credentials, store credentials, or privileged API secrets to this directory. Any value prefixed with `EXPO_PUBLIC_` must be treated as public.
 
 ## Remaining store-readiness work
 
-Sign in with Apple is blocked on Apple provider configuration. Store subscription purchase/restore and production crash diagnostics remain separate milestones. Custom-scheme deep links and Pack One web-URL rewriting are implemented; verified iOS Universal Links and Android App Links still require the final bundle/package identities plus Apple Team ID and Android signing certificate. Existing Pack One account entitlements can be recognized by the app, but this client does not currently sell or change memberships.
+Sign in with Apple is blocked on Apple provider configuration. Store subscription purchase/restore and production remote crash diagnostics remain separate milestones. Custom-scheme deep links and Pack One web-URL rewriting are implemented; verified iOS Universal Links and Android App Links still require the final bundle/package identities plus Apple Team ID and Android signing certificate. Existing Pack One account entitlements can be recognized by the app, but this client does not currently sell or change memberships.
 
 ## Environment
 
