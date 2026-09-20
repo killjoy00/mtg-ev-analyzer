@@ -145,15 +145,17 @@ function settingsMarkup(profile, progress, account, patreon) {
     </form>
     ${account?.user?`<section class="profile-membership" aria-labelledby="patreon-membership-title">
       <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
-        ${elite
-          ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked.</span></p>${patreon?.ad_free?'<p>Ad-free browsing is included while your membership is connected.</p>':''}`
-          : patreon?.connected
-            ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, refresh your access here.</span></p>${patreon?.ad_free?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
-            : `<p><strong>Unlock Elite practice.</strong><br><span>Join on Patreon, then connect your Patreon account here so Pack One can activate the benefits.</span></p>`}
+        ${patreon?.configured!==true
+          ? `<p><strong>Membership status unavailable.</strong><br><span>Pack One can’t verify Patreon linking right now. Your current access is unchanged.</span></p>`
+          : elite
+            ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked.</span></p>${patreon?.ad_free?'<p>Ad-free browsing is included while your membership is connected.</p>':''}`
+            : patreon?.connected
+              ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, refresh your access here.</span></p>${patreon?.ad_free?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
+              : `<p><strong>Unlock Elite practice.</strong><br><span>Join on Patreon, then connect your Patreon account here so Pack One can activate the benefits.</span></p>`}
       </div>
       ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',error:'Patreon could not be connected. Please try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
       <div class="profile-membership-actions">
-        <a class="button ${elite?'secondary':'primary'}" href="${supportUrl}" target="_blank" rel="noopener noreferrer">${elite?'Manage Patreon':patreon?.connected?'Upgrade to Elite on Patreon':'Become Elite on Patreon'}</a>
+        <a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${supportUrl}" rel="noopener noreferrer">${patreon?.configured!==true?'Open Patreon':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite on Patreon':'Become Elite on Patreon'}</a>
         ${!elite&&patreon?.configured===true?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
         ${patreon?.connected?'<button type="button" class="text-button" id="patreon-disconnect">Disconnect Patreon</button>':''}
         <span id="patreon-status" aria-live="polite"></span>
