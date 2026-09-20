@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -83,6 +83,12 @@ function CardTile({
   );
 }
 
+async function loadGuestDaily() {
+  const session = await ensureGuestSession();
+  const run = await startDailyDraftRun(session.token);
+  return { run, token: session.token };
+}
+
 export default function DraftRunScreen() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [mode, setMode] = useState<ViewMode>('pick');
@@ -90,23 +96,41 @@ export default function DraftRunScreen() {
   const [busy, setBusy] = useState(false);
   const scroll = useRef<ScrollView>(null);
 
-  const begin = useCallback(async () => {
+  useEffect(() => {
+    let active = true;
+    void loadGuestDaily()
+      .then(({ run, token }) => {
+        if (!active) return;
+        setMode(run.complete ? 'result' : 'pick');
+        setState({ status: 'ready', run, token });
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setState({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Draft Run is unavailable.',
+        });
+      });
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const retry = async () => {
+    setState({ status: 'loading' });
+    setSelected(null);
+    setMode('pick');
     try {
-      const session = await ensureGuestSession();
-      const run = await startDailyDraftRun(session.token);
+      const { run, token } = await loadGuestDaily();
       setMode(run.complete ? 'result' : 'pick');
-      setState({ status: 'ready', run, token: session.token });
+      setState({ status: 'ready', run, token });
     } catch (error: unknown) {
       setState({
         status: 'error',
         message: error instanceof Error ? error.message : 'Draft Run is unavailable.',
       });
     }
-  }, []);
-
-  useEffect(() => {
-    void begin();
-  }, [begin]);
+  };
 
   const choose = (id: string) => {
     if (busy || mode !== 'pick') return;
@@ -167,12 +191,7 @@ export default function DraftRunScreen() {
           <Text style={styles.errorBody}>{state.message}</Text>
           <Pressable
             accessibilityRole="button"
-            onPress={() => {
-              setState({ status: 'loading' });
-              setSelected(null);
-              setMode('pick');
-              void begin();
-            }}
+            onPress={() => void retry()}
             style={styles.primaryButton}
           >
             <Text style={styles.primaryButtonText}>Try again</Text>
