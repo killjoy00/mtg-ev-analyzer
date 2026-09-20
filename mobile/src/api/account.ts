@@ -7,6 +7,9 @@ type AccountSessionResponse = {
     token?: string;
     expiresAt?: string;
   };
+  deletion?: {
+    passwordSupported: boolean;
+  };
 };
 
 type LinkResponse = {
@@ -88,4 +91,17 @@ export async function signOutMobileAccount(session: MobileSession) {
     });
   }
   await clearSession();
+}
+
+export async function deleteMobileAccount(session: MobileSession, password: string) {
+  if (!session.accountToken) throw new Error('Sign in before deleting your account.');
+  const result = await requestJson<{ ok: boolean; deleted: boolean }>('/growth/v1/mobile/account/delete', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: { password },
+  });
+  if (!result.deleted) throw new Error('Pack One did not confirm account deletion.');
+  await clearSession();
+  return result;
 }

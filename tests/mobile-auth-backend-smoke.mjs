@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {digest} from '../worker/account-session.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Use an isolated branch.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
-const {query}=await import('../worker/growth-function.js');
+const {query,deleteMobileAccountData}=await import('../worker/growth-function.js');
 const growth=(await import('../worker/growth-function.js')).default;
 const draft=(await import('../worker/draft-run-function.mjs')).default;
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
@@ -38,7 +38,8 @@ assert.match(claim.claimToken,/^[A-Za-z0-9_-]{43}$/);
 const userId=crypto.randomUUID();
 const accountToken=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
 const csrf=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
-await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[userId,'QA mobile account',`qa-mobile-${userId}@example.invalid`]);
+const email=`qa-mobile-${userId}@example.invalid`;
+await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[userId,'QA mobile account',email]);
 await query(`INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at)
   VALUES($1,$2::uuid,$3,now()+interval '1 hour')`,[digest(accountToken),userId,digest(csrf)]);
 
@@ -54,7 +55,24 @@ assert.equal((await query(`SELECT count(*) n FROM scores WHERE player_id=$1::uui
 await call(growth,'/v1/mobile/account/link',{claimToken:claim.claimToken},{playerToken:linked.token,accountToken,status:409});
 const session=await call(growth,'/v1/mobile/account/session',undefined,{playerToken:linked.token,accountToken});
 assert.equal(session.user.id,userId);
+assert.equal(session.deletion.passwordSupported,false);
+await call(growth,'/v1/mobile/account/delete',{password:'irrelevant'},{playerToken:linked.token,accountToken,status:409});
 await call(growth,'/v1/mobile/account/signout',{},{playerToken:linked.token,accountToken});
 await call(growth,'/v1/mobile/account/session',undefined,{playerToken:linked.token,accountToken,status:401});
 
-console.log('Mobile auth passed: revocable native account session, guest-bound one-use run claim, ranked promotion, and signout.');
+await query(`INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference)
+  VALUES($1::uuid,'custom_corpus','test','mobile-delete')`,[userId]);
+assert.equal(await deleteMobileAccountData(userId,guest.playerId,email),true);
+for(const [sql,params,label] of [
+  ['SELECT count(*) n FROM neon_auth."user" WHERE id=$1::uuid',[userId],'auth user'],
+  ['SELECT count(*) n FROM players WHERE id=$1::uuid',[guest.playerId],'player'],
+  ['SELECT count(*) n FROM draft_run_sessions WHERE player_id=$1::uuid',[guest.playerId],'draft sessions'],
+  ['SELECT count(*) n FROM scores WHERE player_id=$1::uuid',[guest.playerId],'scores'],
+  ['SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid',[guest.playerId],'analytics'],
+  ['SELECT count(*) n FROM entitlement_grants WHERE auth_user_id=$1::uuid',[userId],'entitlements'],
+  ['SELECT count(*) n FROM account_sessions WHERE auth_user_id=$1::uuid',[userId],'Pack One account sessions'],
+]) {
+  assert.equal((await query(sql,params)).rows[0].n,'0',label+' should be deleted');
+}
+
+console.log('Mobile auth passed: revocable native account session, guest-bound one-use run claim, ranked promotion, signout, and full account-data deletion.');

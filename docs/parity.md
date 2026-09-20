@@ -19,7 +19,7 @@ Updated 2026-09-19. “Foundation” means scaffolding exists but the feature is
 | Store subscription purchase | — | — | — | Required mobile |
 | Restore purchases | — | — | — | Required mobile |
 | Patreon entitlement recognition | ✓ | — | — | Required |
-| Account deletion | — | — | — | Required |
+| Account deletion | — | Password-account path | Password-account path | Required |
 | How to Play | ✓ | — | — | Required |
 | Scoring | ✓ | — | — | Required |
 | Method | ✓ | — | — | Required |

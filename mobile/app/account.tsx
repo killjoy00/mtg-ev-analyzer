@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 
 import {
+  deleteMobileAccount,
   linkMobileAccount,
   loadMobileAccount,
   signInWithEmail,
@@ -35,6 +36,8 @@ export default function AccountScreen() {
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
   const [signedInLabel, setSignedInLabel] = useState<string | null>(null);
+  const [deletePassword, setDeletePassword] = useState('');
+  const [passwordDeletionSupported, setPasswordDeletionSupported] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -47,6 +50,7 @@ export default function AccountScreen() {
           const account = await loadMobileAccount(current);
           if (!active || !account) return;
           setSignedInLabel(account.user.email ?? account.user.name ?? 'Pack One account');
+          setPasswordDeletionSupported(account.deletion?.passwordSupported === true);
         } catch {
           // An expired account token leaves the player session intact; the form
           // below can establish a fresh account session.
@@ -67,6 +71,8 @@ export default function AccountScreen() {
     const result = await linkMobileAccount(current, account, claimToken);
     setSession(result.session);
     setSignedInLabel(result.session.accountUser?.email ?? result.session.accountUser?.name ?? 'Pack One account');
+    const current = await loadMobileAccount(result.session);
+    setPasswordDeletionSupported(current?.deletion?.passwordSupported === true);
     setMessage(result.linked.validatedDailyScore
       ? 'Score validated and added to today\'s leaderboard.'
       : 'Signed in to your Pack One account.');
@@ -94,6 +100,26 @@ export default function AccountScreen() {
       }
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Account request failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const deleteAccount = async () => {
+    if (!session || busy || !passwordDeletionSupported || !deletePassword) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await deleteMobileAccount(session, deletePassword);
+      const fresh = await ensureGuestSession();
+      setSession(fresh);
+      setSignedInLabel(null);
+      setDeletePassword('');
+      setPasswordDeletionSupported(false);
+      setMessage('Your Pack One account and career were permanently deleted.');
+      router.replace('/');
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Could not delete your account.');
     } finally {
       setBusy(false);
     }
@@ -136,6 +162,39 @@ export default function AccountScreen() {
             <Pressable accessibilityRole="button" onPress={() => void signOut()} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>Sign out</Text>
             </Pressable>
+            <View style={styles.dangerZone}>
+              <Text style={styles.dangerTitle}>Delete account</Text>
+              <Text style={styles.body}>
+                This permanently deletes your Pack One account, profile, career, scores, Draft Runs, challenges, provider links, and entitlements.
+              </Text>
+              {passwordDeletionSupported ? (
+                <>
+                  <TextInput
+                    accessibilityLabel="Current password for account deletion"
+                    autoCapitalize="none"
+                    autoComplete="current-password"
+                    onChangeText={setDeletePassword}
+                    placeholder="Current password"
+                    placeholderTextColor={colors.faint}
+                    secureTextEntry
+                    style={styles.input}
+                    value={deletePassword}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy || !deletePassword}
+                    onPress={() => void deleteAccount()}
+                    style={[styles.dangerButton, (busy || !deletePassword) && styles.disabled]}
+                  >
+                    <Text style={styles.dangerButtonText}>Permanently delete account</Text>
+                  </Pressable>
+                </>
+              ) : (
+                <Text style={styles.providerDeleteNote}>
+                  Provider reauthentication is required before this account can be deleted in-app. Google and Apple deletion support is the next auth step.
+                </Text>
+              )}
+            </View>
           </View>
         ) : (
           <View style={styles.panel}>
@@ -244,5 +303,10 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   disabled: { opacity: 0.42 },
   message: { color: colors.accentDark, fontSize: 14, lineHeight: 21, fontWeight: '700' },
+  dangerZone: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.md },
+  dangerTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
+  dangerButton: { minHeight: 50, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
+  dangerButtonText: { color: colors.danger, fontSize: 15, fontWeight: '800' },
+  providerDeleteNote: { color: colors.muted, fontSize: 13, lineHeight: 19 },
   providerNote: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.xs },
 });

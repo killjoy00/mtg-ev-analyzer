@@ -126,6 +126,19 @@ test('production gateway accepts a shaped mobile guest session only on Draft Run
     return Response.json({ok:true});
   });
   assert.equal(linked.status,200);
+  const mobileDelete=new Request('https://api.packone.pro/growth/v1/mobile/account/delete',{
+    method:'POST',body:JSON.stringify({password:'not-forwarded-in-test-assertions'}),headers:{
+      'content-type':'application/json','cf-connecting-ip':'192.0.2.49',
+      'x-pack1-mobile-session':token,'x-pack1-mobile-account':accountToken,
+    },
+  });
+  const deleted=await gateway(mobileDelete,prod,async(url,options)=>{
+    assert.equal(url,'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/mobile/account/delete');
+    assert.equal(options.headers.get('authorization'),'Bearer '+token);
+    assert.equal(options.headers.get('x-pack1-mobile-account'),accountToken);
+    return Response.json({ok:true,deleted:true});
+  });
+  assert.equal(deleted.status,200);
   const badAccount=new Request('https://api.packone.pro/draft/v1/runs',{method:'POST',body:'{}',headers:{
     'content-type':'application/json','cf-connecting-ip':'192.0.2.48','x-pack1-mobile-session':token,'x-pack1-mobile-account':'bad',
   }});

@@ -649,13 +649,51 @@ async function handleMobileAccountSignin(request) {
   return mobileAccountJson(established.auth,established.session);
 }
 
+async function mobilePasswordDeletionAvailable(authUserId) {
+  const result=await query(`SELECT EXISTS(
+    SELECT 1 FROM neon_auth.account
+    WHERE "userId"=$1::uuid AND "providerId"='credential' AND password IS NOT NULL
+  ) available`,[authUserId]);
+  return result.rows[0]?.available===true||result.rows[0]?.available==='t';
+}
+
 async function handleMobileAccountSession(request) {
   await player(request);
   const auth=await authSession(request,{allowLegacy:false,csrf:false});
   return json({
     user:{id:auth.user_id,email:auth.email,name:auth.name},
     session:{expiresAt:auth.expires_at},
+    deletion:{passwordSupported:await mobilePasswordDeletionAvailable(auth.user_id)},
   });
+}
+
+export async function deleteMobileAccountData(authUserId,playerId,email) {
+  const result=await query('SELECT delete_pack1_account($1::uuid,$2::uuid,$3) deleted',[authUserId,playerId,email||null]);
+  return result.rows[0]?.deleted===true||result.rows[0]?.deleted==='t';
+}
+
+async function handleMobileAccountDelete(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-account-delete',{limit:5,seconds:3600});
+  const auth=await authSession(request,{allowLegacy:false,csrf:false});
+  if(!await mobilePasswordDeletionAvailable(auth.user_id))
+    throw Object.assign(Error('This account requires provider reauthentication before deletion.'),{status:409});
+  const admin=await query('SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid LIMIT 1',[auth.user_id]);
+  if(admin.rows[0])throw Object.assign(Error('Remove Pack One admin access before deleting this account.'),{status:409});
+  const payload=await readJson(request);
+  const password=String(payload.password||'');
+  if(!password||password.length>256)throw Object.assign(Error('Enter your current password to delete your account.'),{status:400});
+  const verified=authIdentity(await neonAuth('/sign-in/email',{method:'POST',body:{
+    email:auth.email,
+    password,
+    rememberMe:false,
+  }}));
+  if(!verified||verified.user_id!==auth.user_id)
+    throw Object.assign(Error('Account reauthentication failed.'),{status:401});
+  await consumeNeonSession(query,verified.token);
+  if(!await deleteMobileAccountData(auth.user_id,owner,auth.email))
+    throw Object.assign(Error('Pack One account linkage changed. Sign in again before deleting.'),{status:409});
+  return json({ok:true,deleted:true});
 }
 
 async function handleMobileSignout(request) {
@@ -1088,6 +1126,7 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccountSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/link') return handleLink(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signout') return handleMobileSignout(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete') return handleMobileAccountDelete(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/daily-dates') return handleDates(request);
   if (request.method === 'GET' && url.pathname === '/v1/profile/me') return handleMyProfile(request);
   if (request.method === 'PATCH' && url.pathname === '/v1/profile') return handleProfileUpdate(request);

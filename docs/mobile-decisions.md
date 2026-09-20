@@ -64,3 +64,10 @@ Policy URLs:
 **Decision:** completed unranked Daily runs mint a random 256-bit, 15-minute claim token. Only its SHA-256 hash is stored. The claim is bound to the guest player and run and is consumed by the account-link transaction path.  
 **Alternative:** submit a run ID after login.  
 **Reason:** a run ID is an identifier, not proof that the caller produced the run. The claim token satisfies the native handoff requirement for a server-issued, guest-bound, short-TTL, one-use proof.
+
+## 2026-09-19 — account deletion data policy
+
+**Decision:** account deletion removes the Pack One auth user and the linked player-owned product record rather than retaining an anonymized leaderboard ghost. This includes profile/career data, scores, Draft Run sessions/shares, challenges, achievements, player analytics events, provider links, Pack One account sessions and entitlement grants. Corpus/model source data is unrelated to the user account and remains. Product corpus-audit history may retain the change itself but the deleted Pack One account identifier is cleared.  
+**Alternative:** preserve historical scores under an anonymous player.  
+**Reason:** the first mobile deletion contract should be unambiguous full account deletion; leaderboard continuity does not outweigh keeping deleted player-owned records.  
+**Authentication:** email/password deletion requires password reauthentication. Provider-only accounts remain blocked until Google/Apple provider reauthentication is implemented. Better Auth's documented built-in deletion is disabled by default; Pack One's managed Neon Auth stores users/accounts/sessions directly in Postgres with user-linked auth rows cascading from `neon_auth.user`. Sources checked 2026-09-19: Better Auth User & Accounts deletion documentation; Neon managed Better Auth architecture/schema.

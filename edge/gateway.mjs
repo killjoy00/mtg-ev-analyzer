@@ -37,7 +37,7 @@ function permitted(service,path,method,search,mode) {
       '/v1/session','/v1/player/session','/v1/player/migrate',
       '/v1/account/signup','/v1/account/signin','/v1/account/migrate',
       '/v1/account/link','/v1/account/link-browser','/v1/account/signout',
-      '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout',
+      '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/delete',
       '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect',
     ].includes(path))return true;
     if(method==='GET'&&[
@@ -96,7 +96,7 @@ function validMobileAccount(value) {
 }
 function mobileSessionRoute(service,path,method) {
   if(service==='growth') {
-    if(method==='POST'&&['/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout'].includes(path))return true;
+    if(method==='POST'&&['/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/link','/v1/mobile/account/signout','/v1/mobile/account/delete'].includes(path))return true;
     return method==='GET'&&path==='/v1/mobile/account/session';
   }
   if(service!=='draft')return false;
@@ -106,7 +106,7 @@ function mobileSessionRoute(service,path,method) {
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets'].includes(path);
 }
 function mobileAccountRoute(service,path,method) {
-  if(service==='growth')return /^\/v1\/mobile\/account\/(?:session|link|signout)$/.test(path);
+  if(service==='growth')return /^\/v1\/mobile\/account\/(?:session|link|signout|delete)$/.test(path);
   if(service!=='draft')return false;
   if(method==='POST'&&path==='/v1/runs')return true;
   if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view|claim)$/.test(path))return true;
