@@ -83,7 +83,7 @@ test('production gateway turns Pack One cookies into upstream identity and relay
 });
 
 
-test('production gateway accepts a shaped mobile guest session only on Draft Run player routes',async()=>{
+test('production gateway accepts a shaped mobile player session only on approved player routes',async()=>{
   const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'e'.repeat(64),
     NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
   const token='p1_00000000-0000-4000-8000-000000000000.'+'x'.repeat(43);
@@ -111,6 +111,19 @@ test('production gateway accepts a shaped mobile guest session only on Draft Run
     'cf-connecting-ip':'192.0.2.46','x-pack1-mobile-session':token,
   }});
   assert.equal((await gateway(account,prod,noFetch)).status,403);
+
+  for(const profilePath of ['/growth/v1/profile/me','/growth/v1/profile/history?limit=25']) {
+    const profileRequest=new Request('https://api.packone.pro'+profilePath,{headers:{
+      'cf-connecting-ip':'192.0.2.53','x-pack1-mobile-session':token,
+    }});
+    const profileResult=await gateway(profileRequest,prod,async(url,options)=>{
+      assert.equal(url,'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech'+profilePath.slice('/growth'.length));
+      assert.equal(options.headers.get('authorization'),'Bearer '+token);
+      assert.equal(options.headers.get('x-pack1-mobile-session'),null);
+      return Response.json(profilePath.includes('/history')?{rows:[],next_cursor:null}:{player:{display_name:'Pack Player'},summary:{}});
+    });
+    assert.equal(profileResult.status,200);
+  }
 
   const accountToken='a'.repeat(43);
   const mobileLink=new Request('https://api.packone.pro/growth/v1/mobile/account/link',{
