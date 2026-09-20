@@ -1,10 +1,9 @@
 name: rebuild-v4-draft-run-corpus
 
 # A model-version change cannot reuse the existing replay shards. This workflow
-# rebuilds every supported environment from its public source, verifies that no
-# environment or source snapshot drifted, creates a separately versioned v8
-# corpus, and publishes the result to a review branch. It never changes live
-# serving or either Neon database.
+# rebuilds every supported environment from its pinned public source. Expensive
+# regular-set work is split across sequential jobs and checkpointed to a rollout
+# branch so a runner timeout cannot erase completed environments.
 on:
   workflow_dispatch:
     inputs:
@@ -13,6 +12,15 @@ on:
         required: true
         default: elite-trophy-colour-stage-v8
         type: string
+  # The launch marker lets the reviewed workflow-fix PR start the first
+  # checkpointed rebuild without a separate manual API dispatch. Future edits to
+  # this workflow produce a skipped run unless their merge commit carries the
+  # explicit marker.
+  push:
+    branches:
+      - main
+    paths:
+      - .github/workflows/rebuild-v4-draft-run-corpus.yml
 
 permissions:
   contents: write
@@ -22,20 +30,27 @@ concurrency:
   group: set-data-import-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  EXPECTED_MODEL: strong-player-colour-stage-v4
+  EXPECTED_CORPUS: elite-trophy-colour-stage-v8
+
 jobs:
-  rebuild:
-    if: github.ref_name == 'main'
+  prepare:
+    if: >-
+      github.ref_name == 'main' &&
+      (
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'push' && contains(github.event.head_commit.message, '[launch-v4-rebuild]'))
+      )
     runs-on: ubuntu-latest
-    timeout-minutes: 360
-    env:
-      EXPECTED_MODEL: strong-player-colour-stage-v4
-      EXPECTED_CORPUS: elite-trophy-colour-stage-v8
-      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-      R2_BUCKET: ${{ secrets.R2_BUCKET }}
-      AWS_DEFAULT_REGION: auto
-      GH_TOKEN: ${{ github.token }}
+    timeout-minutes: 60
+    outputs:
+      rollout_branch: ${{ steps.plan.outputs.rollout_branch }}
+      chunk1: ${{ steps.plan.outputs.chunk1 }}
+      chunk2: ${{ steps.plan.outputs.chunk2 }}
+      chunk3: ${{ steps.plan.outputs.chunk3 }}
+      chunk4: ${{ steps.plan.outputs.chunk4 }}
+      chunk5: ${{ steps.plan.outputs.chunk5 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,15 +70,17 @@ jobs:
         with:
           node-version: 24
 
-      - name: Validate immutable rollout inputs
+      - name: Validate immutable rollout inputs and plan chunks
+        id: plan
         env:
-          REQUESTED_CORPUS: ${{ inputs.corpus_version }}
+          REQUESTED_CORPUS: ${{ github.event.inputs.corpus_version || 'elite-trophy-colour-stage-v8' }}
         shell: bash
         run: |
           set -euo pipefail
           test "$REQUESTED_CORPUS" = "$EXPECTED_CORPUS"
           python - <<'PY'
           import json
+          import os
           from pathlib import Path
           from scripts.build_replays import ISOLATED_MODEL_VERSION
 
@@ -76,30 +93,101 @@ jobs:
               raise SystemExit(f'Unexpected corrected builder: {ISOLATED_MODEL_VERSION}')
           if len(sets) != 32 or sum(row.get('category') == 'special_mode' for row in sets) != 1:
               raise SystemExit('Expected 31 regular environments plus Powered Cube.')
+
+          regular = [
+              row['id'].upper()
+              for row in sets
+              if row.get('category') != 'special_mode'
+              and row.get('cohort_selection') != 'earliest_game_arena_rank'
+          ]
+          if len(regular) != 29:
+              raise SystemExit(f'Expected 29 non-legacy regular environments, found {len(regular)}')
+          chunks = [regular[index:index + 6] for index in range(0, len(regular), 6)]
+          if len(chunks) != 5 or sorted(map(len, chunks)) != [5, 6, 6, 6, 6]:
+              raise SystemExit(f'Unexpected rebuild chunk plan: {[len(chunk) for chunk in chunks]}')
+
           Path('generated').mkdir(exist_ok=True)
           Path('generated/v4-original-catalog.json').write_text(
-              json.dumps(catalog, indent=2) + '\n')
+              json.dumps(catalog, indent=2) + '\n'
+          )
+
+          output = Path(os.environ['GITHUB_OUTPUT'])
+          with output.open('a', encoding='utf-8') as handle:
+              handle.write(f"rollout_branch=rollout/v4-v8-{os.environ['GITHUB_RUN_ID']}\n")
+              for index, chunk in enumerate(chunks, 1):
+                  handle.write(f"chunk{index}={','.join(chunk)}\n")
           print('Pinned', len(sets), 'v3 environments for exact-source reconciliation.')
+          for index, chunk in enumerate(chunks, 1):
+              print(f'Chunk {index}: {",".join(chunk)}')
           PY
 
       - name: Run pre-rebuild tests
         run: npm test
 
-      - name: Rebuild every regular environment with v4
+      - name: Create durable rollout branch
+        env:
+          BRANCH: ${{ steps.plan.outputs.rollout_branch }}
         shell: bash
         run: |
           set -euo pipefail
-          regular_sets="$(python - <<'PY'
-          import json
-          from pathlib import Path
-          rows=json.loads(Path('generated/v4-original-catalog.json').read_text())['sets']
-          print(','.join(row['id'].upper() for row in rows
-                         if row.get('category') != 'special_mode'
-                         and row.get('cohort_selection') != 'earliest_game_arena_rank'))
-          PY
-          )"
+          if git ls-remote --exit-code --heads origin "$BRANCH" >/dev/null 2>&1; then
+            echo "::error::Rollout branch already exists: $BRANCH"
+            exit 1
+          fi
+          git switch -c "$BRANCH"
+          git push origin "HEAD:$BRANCH"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v4-baseline-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: error
+          path: generated/v4-original-catalog.json
+
+  regular_chunks:
+    name: Rebuild regular chunk ${{ matrix.chunk }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: true
+      max-parallel: 1
+      matrix:
+        include:
+          - chunk: 1
+            sets: ${{ needs.prepare.outputs.chunk1 }}
+          - chunk: 2
+            sets: ${{ needs.prepare.outputs.chunk2 }}
+          - chunk: 3
+            sets: ${{ needs.prepare.outputs.chunk3 }}
+          - chunk: 4
+            sets: ${{ needs.prepare.outputs.chunk4 }}
+          - chunk: 5
+            sets: ${{ needs.prepare.outputs.chunk5 }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.rollout_branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: v4-baseline-${{ github.run_id }}
+          path: generated
+
+      - name: Rebuild regular environments
+        env:
+          SETS: ${{ matrix.sets }}
+          REPORT: generated/v4-regular-rebuild-chunk-${{ matrix.chunk }}.json
+        shell: bash
+        run: |
+          set -euo pipefail
           python -u scripts/import_sets.py \
-            --sets "$regular_sets" \
+            --sets "$SETS" \
             --format PremierDraft \
             --limit 100 \
             --max-training-drafts 5000 \
@@ -109,7 +197,82 @@ jobs:
             --folds 5 \
             --shard-size 2 \
             --max-path-bytes 4000000 \
-            --report generated/v4-regular-rebuild.json
+            --report "$REPORT"
+
+      - name: Verify pinned provenance for this chunk
+        env:
+          SETS: ${{ matrix.sets }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          before = {row['id']: row for row in json.loads(Path('generated/v4-original-catalog.json').read_text())['sets']}
+          after = {row['id']: row for row in json.loads(Path('data/catalog.json').read_text())['sets']}
+          errors = []
+          for sid in [value.lower() for value in os.environ['SETS'].split(',') if value]:
+              manifest = json.loads(Path('data', sid, 'manifest.json').read_text())
+              if manifest['model']['model_version'] != 'strong-player-colour-stage-v4':
+                  errors.append(f'{sid}: model={manifest["model"]["model_version"]}')
+              if after[sid]['model_version'] != 'strong-player-colour-stage-v4':
+                  errors.append(f'{sid}: catalog model={after[sid]["model_version"]}')
+              if manifest['source']['data_date'] != before[sid]['data_date']:
+                  errors.append(f'{sid}: source date {before[sid]["data_date"]} -> {manifest["source"]["data_date"]}')
+              if manifest['model'].get('holdout') != '5-fold by draft_id':
+                  errors.append(f'{sid}: holdout={manifest["model"].get("holdout")}')
+              if not list(Path('data', sid, 'shards').glob('*.json')):
+                  errors.append(f'{sid}: no replay shards')
+          if errors:
+              raise SystemExit('Chunk provenance check failed:\n' + '\n'.join(errors))
+          PY
+
+      - name: Checkpoint rebuilt environments
+        env:
+          BRANCH: ${{ needs.prepare.outputs.rollout_branch }}
+          CHUNK: ${{ matrix.chunk }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data
+          if git diff --cached --quiet; then
+            echo "::error::Chunk $CHUNK produced no data changes."
+            exit 1
+          fi
+          git commit -m "Rebuild v4 regular chunk $CHUNK [data-generated]"
+          git push origin "HEAD:$BRANCH"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v4-regular-chunk-${{ matrix.chunk }}-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: generated/v4-regular-rebuild-chunk-${{ matrix.chunk }}.json
+
+  legacy:
+    name: Rebuild MID and VOW
+    needs:
+      - prepare
+      - regular_chunks
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.rollout_branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: v4-baseline-${{ github.run_id }}
+          path: generated
 
       - name: Rebuild legacy Arena-rank environments with v4
         run: >-
@@ -125,6 +288,75 @@ jobs:
           --max-path-bytes 4000000
           --report generated/v4-legacy-rebuild.json
 
+      - name: Verify pinned legacy provenance
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          before = {row['id']: row for row in json.loads(Path('generated/v4-original-catalog.json').read_text())['sets']}
+          after = {row['id']: row for row in json.loads(Path('data/catalog.json').read_text())['sets']}
+          errors = []
+          for sid in ('mid', 'vow'):
+              manifest = json.loads(Path('data', sid, 'manifest.json').read_text())
+              if manifest['model']['model_version'] != 'strong-player-colour-stage-v4':
+                  errors.append(f'{sid}: model={manifest["model"]["model_version"]}')
+              if after[sid]['model_version'] != 'strong-player-colour-stage-v4':
+                  errors.append(f'{sid}: catalog model={after[sid]["model_version"]}')
+              if manifest['source']['data_date'] != before[sid]['data_date']:
+                  errors.append(f'{sid}: source date {before[sid]["data_date"]} -> {manifest["source"]["data_date"]}')
+              if manifest['model'].get('holdout') != '5-fold by draft_id':
+                  errors.append(f'{sid}: holdout={manifest["model"].get("holdout")}')
+          if errors:
+              raise SystemExit('Legacy provenance check failed:\n' + '\n'.join(errors))
+          PY
+
+      - name: Checkpoint legacy environments
+        env:
+          BRANCH: ${{ needs.prepare.outputs.rollout_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data
+          if git diff --cached --quiet; then
+            echo '::error::Legacy rebuild produced no data changes.'
+            exit 1
+          fi
+          git commit -m "Rebuild MID and VOW with v4 [data-generated]"
+          git push origin "HEAD:$BRANCH"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v4-legacy-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: generated/v4-legacy-rebuild.json
+
+  powered_cube:
+    name: Rebuild Powered Cube
+    needs:
+      - prepare
+      - legacy
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.rollout_branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: v4-baseline-${{ github.run_id }}
+          path: generated
+
       - name: Rebuild Powered Cube with v4
         run: >-
           python -u scripts/build_powered_cube_v3.py
@@ -136,6 +368,87 @@ jobs:
           --shard-size 2
           --max-path-bytes 8000000
 
+      - name: Verify pinned Powered Cube provenance
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          sid = 'powered-cube'
+          before = {row['id']: row for row in json.loads(Path('generated/v4-original-catalog.json').read_text())['sets']}
+          after = {row['id']: row for row in json.loads(Path('data/catalog.json').read_text())['sets']}
+          manifest = json.loads(Path('data', sid, 'manifest.json').read_text())
+          errors = []
+          if manifest['model']['model_version'] != 'strong-player-colour-stage-v4':
+              errors.append(f'{sid}: model={manifest["model"]["model_version"]}')
+          if after[sid]['model_version'] != 'strong-player-colour-stage-v4':
+              errors.append(f'{sid}: catalog model={after[sid]["model_version"]}')
+          if manifest['source']['data_date'] != before[sid]['data_date']:
+              errors.append(f'{sid}: source date {before[sid]["data_date"]} -> {manifest["source"]["data_date"]}')
+          if manifest['model'].get('holdout') != '5-fold by draft_id':
+              errors.append(f'{sid}: holdout={manifest["model"].get("holdout")}')
+          if errors:
+              raise SystemExit('Powered Cube provenance check failed:\n' + '\n'.join(errors))
+          PY
+
+      - name: Checkpoint Powered Cube
+        env:
+          BRANCH: ${{ needs.prepare.outputs.rollout_branch }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add data
+          if git diff --cached --quiet; then
+            echo '::error::Powered Cube rebuild produced no data changes.'
+            exit 1
+          fi
+          git commit -m "Rebuild Powered Cube with v4 [data-generated]"
+          git push origin "HEAD:$BRANCH"
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: v4-powered-cube-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: warn
+          path: |
+            generated/powered-cube-report.json
+            data/status.json
+
+  finalize:
+    name: Verify, publish, and open rollout PR
+    needs:
+      - prepare
+      - powered_cube
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.rollout_branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: v4-baseline-${{ github.run_id }}
+          path: generated
+
       - name: Verify complete v4 provenance
         shell: bash
         run: |
@@ -144,14 +457,15 @@ jobs:
           import json
           from pathlib import Path
 
-          before=json.loads(Path('generated/v4-original-catalog.json').read_text())['sets']
-          after=json.loads(Path('data/catalog.json').read_text())['sets']
-          old={row['id']:row for row in before}; new={row['id']:row for row in after}
+          before = json.loads(Path('generated/v4-original-catalog.json').read_text())['sets']
+          after = json.loads(Path('data/catalog.json').read_text())['sets']
+          old = {row['id']: row for row in before}
+          new = {row['id']: row for row in after}
           if set(old) != set(new):
               raise SystemExit(f'Environment drift: removed={sorted(set(old)-set(new))}, added={sorted(set(new)-set(old))}')
-          errors=[]
+          errors = []
           for sid in sorted(old):
-              manifest=json.loads(Path('data',sid,'manifest.json').read_text())
+              manifest = json.loads(Path('data', sid, 'manifest.json').read_text())
               if manifest['model']['model_version'] != 'strong-player-colour-stage-v4':
                   errors.append(f'{sid}: model={manifest["model"]["model_version"]}')
               if new[sid]['model_version'] != 'strong-player-colour-stage-v4':
@@ -160,26 +474,28 @@ jobs:
                   errors.append(f'{sid}: source date {old[sid]["data_date"]} -> {manifest["source"]["data_date"]}')
               if manifest['model'].get('holdout') != '5-fold by draft_id':
                   errors.append(f'{sid}: holdout={manifest["model"].get("holdout")}')
-              if not list(Path('data',sid,'shards').glob('*.json')):
+              if not list(Path('data', sid, 'shards').glob('*.json')):
                   errors.append(f'{sid}: no replay shards')
           if errors:
-              raise SystemExit('V4 rebuild refused:\n'+'\n'.join(errors))
+              raise SystemExit('V4 rebuild refused:\n' + '\n'.join(errors))
           print(f'All {len(new)} environments are exact-source, five-fold v4 rebuilds.')
           PY
           python scripts/audit_datasets.py --fail-on-error
 
       - name: Build the separately versioned v8 corpus
         env:
-          NEW_VERSION: ${{ inputs.corpus_version }}
+          NEW_VERSION: ${{ github.event.inputs.corpus_version || 'elite-trophy-colour-stage-v8' }}
         shell: bash
         run: |
           set -euo pipefail
+          test "$NEW_VERSION" = "$EXPECTED_CORPUS"
           python scripts/set_policy.py --set-corpus-version "$NEW_VERSION"
           python scripts/build_verified_trophy_corpus.py
           python - <<'PY'
           import json
           from pathlib import Path
-          catalog=json.loads(Path('corpus/draft-run/catalog.json').read_text())
+
+          catalog = json.loads(Path('corpus/draft-run/catalog.json').read_text())
           if catalog['corpus_version'] != 'elite-trophy-colour-stage-v8':
               raise SystemExit('The rebuilt corpus is not v8.')
           if catalog['model_version'] != 'strong-player-colour-stage-v4':
@@ -197,39 +513,56 @@ jobs:
           bash scripts/r2_replay_shards.sh upload
           bash scripts/r2_replay_shards.sh verify
 
-      - name: Commit the reviewed candidate to a rollout branch
+      - name: Commit final corpus candidate
         env:
-          NEW_VERSION: ${{ inputs.corpus_version }}
+          BRANCH: ${{ needs.prepare.outputs.rollout_branch }}
+          NEW_VERSION: ${{ github.event.inputs.corpus_version || 'elite-trophy-colour-stage-v8' }}
         shell: bash
         run: |
           set -euo pipefail
-          branch="rollout/v4-v8-${GITHUB_RUN_ID}"
-          git switch -c "$branch"
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add data corpus/draft-run draft-run.mjs
           if git diff --cached --quiet; then
-            echo '::error::The rebuild produced no candidate changes.'
+            echo '::error::The final corpus build produced no candidate changes.'
             exit 1
           fi
           git commit -m "Build $NEW_VERSION with strong-player-colour-stage-v4 [data-generated]"
-          git push origin "HEAD:$branch"
+          git push origin "HEAD:$BRANCH"
+
+      - name: Open rollout pull request
+        env:
+          BRANCH: ${{ needs.prepare.outputs.rollout_branch }}
+          NEW_VERSION: ${{ github.event.inputs.corpus_version || 'elite-trophy-colour-stage-v8' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(cat <<'EOF'
+          Automated full rebuild from the reviewed #164 correction.
+
+          - All 32 environments were rebuilt from their pinned public source dates.
+          - Regular environments were checkpointed in five sequential chunks so runner timeouts cannot erase completed work.
+          - MID/VOW and Powered Cube were rebuilt and checkpointed separately.
+          - Every environment was verified as model v4 with five-fold holdout isolation.
+          - The separately versioned v8 corpus passed the complete test suite.
+          - Versioned replay shards were uploaded to R2 and verified.
+
+          This PR does not switch Neon serving.
+          EOF
+          )"
           gh pr create \
             --base main \
-            --head "$branch" \
+            --head "$BRANCH" \
             --title "Release v4 model as $NEW_VERSION" \
-            --body "Automated full rebuild from the reviewed #164 correction. All 32 environments were rebuilt from their pinned public source dates, verified as model v4, regenerated as corpus v8, and passed the complete test suite. This PR does not switch Neon serving."
+            --body "$body"
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: v4-v8-rebuild-${{ github.run_id }}
+          name: v4-v8-final-${{ github.run_id }}
           retention-days: 90
           if-no-files-found: warn
           path: |
             generated/v4-original-catalog.json
-            generated/v4-regular-rebuild.json
-            generated/v4-legacy-rebuild.json
-            generated/powered-cube-report.json
             data/status.json
             corpus/draft-run/catalog.json
