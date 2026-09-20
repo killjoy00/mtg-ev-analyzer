@@ -330,6 +330,8 @@ a { color: inherit; }
   gap: 16px;
 }
 
+.article-links { margin-top: 18px; }
+
 .content-card {
   padding: 26px;
   border: 1px solid var(--line);
