@@ -64,12 +64,12 @@ export default function HomeScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Start regular practice"
-          onPress={() => router.push({ pathname: '/draft-run', params: { mode: 'practice' } })}
+          onPress={() => router.push('/practice')}
           style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >
           <Text style={styles.cardKicker}>PRACTICE</Text>
           <Text style={styles.utilityTitle}>Keep drafting</Text>
-          <Text style={styles.cardBody}>A free account unlocks unlimited regular Draft Run practice.</Text>
+          <Text style={styles.cardBody}>A free account unlocks regular Draft Run practice. Elite accounts also get Powered Cube and custom-set practice.</Text>
         </Pressable>
 
         <Pressable
