@@ -24,19 +24,27 @@ The native client now includes:
 - foreground revalidation for Dailies, practice access, career, and leaderboard state
 - accessible Draft Run progress/feedback, press-and-hold card zoom, and native result sharing
 - EAS development, preview, and production profiles
+- environment-aware app identity with non-store dev/preview IDs and fail-closed production identity
+- remote EAS build-number management with production auto-increment
 
 All game selection, scoring, account linking, leaderboard state, career persistence, and entitlement checks remain server-authoritative. Do not add database credentials, Patreon credentials, store credentials, or privileged API secrets to this directory. Any value prefixed with `EXPO_PUBLIC_` must be treated as public.
 
 ## Remaining store-readiness work
 
-Sign in with Apple is blocked on Apple provider configuration. Store subscription purchase/restore and production remote crash diagnostics remain separate milestones. Physical-device verification for VoiceOver/TalkBack, large text, rotation, keyboard behavior, and the smallest supported screens is still required before beta. Custom-scheme deep links and Pack One web-URL rewriting are implemented; verified iOS Universal Links and Android App Links still require the final bundle/package identities plus Apple Team ID and Android signing certificate. Existing Pack One account entitlements can be recognized by the app, but this client does not currently sell or change memberships.
+Sign in with Apple is blocked on Apple provider configuration. Store subscription purchase/restore and production remote crash diagnostics remain separate milestones. Final App Store/Play identifiers, Expo project linkage, and approved icon/splash artwork are explicit release inputs; see `../docs/mobile-release-config.md`. Physical-device verification for VoiceOver/TalkBack, large text, rotation, keyboard behavior, and the smallest supported screens is still required before beta. Custom-scheme deep links and Pack One web-URL rewriting are implemented; verified iOS Universal Links and Android App Links still require the final bundle/package identities plus Apple Team ID and Android signing certificate. Existing Pack One account entitlements can be recognized by the app, but this client does not currently sell or change memberships.
 
 ## Environment
 
-Optional public configuration:
+Public runtime configuration:
 
 - `EXPO_PUBLIC_PACKONE_ENV=development|preview|production`
 - `EXPO_PUBLIC_PACKONE_API_ORIGIN=https://api.packone.pro`
+
+Release/build configuration:
+
+- `PACKONE_BUILD_PROFILE` is set by `eas.json`.
+- Production EAS environment must provide `PACKONE_IOS_BUNDLE_IDENTIFIER`, `PACKONE_ANDROID_PACKAGE`, and `PACKONE_EXPO_PROJECT_ID`.
+- Development and preview use non-store identifiers so CI and internal builds never reserve or accidentally ship a guessed production identity.
 
 The default API origin is the existing first-party Pack One API. Preview/staging can override it in EAS without changing source.
 
