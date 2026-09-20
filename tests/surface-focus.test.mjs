@@ -20,3 +20,16 @@ test('the visible leaderboard offers only Draft Run and Cube boards', async () =
   assert.match(board, />Cube</);
   assert.doesNotMatch(board, /legacy-board|Full Pack/);
 });
+
+test('guest Daily results offer score validation instead of a career action', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const result = source.slice(source.indexOf('function renderResult()'), source.indexOf('async function shareResult'));
+  assert.match(result, /Sign in to add score/);
+  assert.match(result, /validateDailyRunId:run\.id/);
+  assert.match(source, /sign in after the run to add this score to the leaderboard/);
+});
+
+test('desktop reveal keeps Next pick in the top action row', async () => {
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /@media\(min-width:601px\)[\s\S]*\.run-feedback>#run-next\{grid-column:3;grid-row:1/);
+});
