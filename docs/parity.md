@@ -27,5 +27,6 @@ Updated 2026-09-20. “Foundation” means scaffolding exists but the feature is
 | Deep links | Web URLs | Scheme + web rewrite | Scheme + web rewrite | Universal/App Link verification pending signing |
 | Native crash diagnostics | n/a | Crash-safe boundary; remote diagnostics pending | Crash-safe boundary; remote diagnostics pending | Required before beta |
 | Beta UX resilience | n/a | Safe areas + resume + zoom/share | Safe areas + resume + zoom/share | Physical-device accessibility/layout QA pending |
+| Release identity/config | n/a | Guarded EAS config | Guarded EAS config | Final store IDs + artwork + signing pending |
 
 Intentional differences: Apple login and store billing are mobile additions. Mobile may use native navigation/interactions while preserving Pack One terminology, scoring, game state and server authority.
