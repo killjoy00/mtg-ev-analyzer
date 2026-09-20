@@ -69,19 +69,19 @@ test('Method has no secondary link directory',()=>{
  const html=fs.readFileSync('methodology/index.html','utf8');assert.equal((html.match(/class="method-directory"/g)||[]).length,0);
 });
 
-// A guest has not played a pick and cannot link Patreon without an account, so
-// the paid ask competes with the free-account rung the completed block offers.
-test('the Elite ask waits for an account',()=>{
+// Guests do get the Elite ask. PR #178 built the guest handoff - one sign-in,
+// then straight on to Patreon - and this button is its only entry point, so
+// pin it rather than let a later conversion tidy-up quietly remove the flow.
+test('the guest Elite handoff keeps its entry point',()=>{
  const complete=['mixed','powered-cube','latest'].map(row);
  for(const profile of [null,{player:{claimed:false},capabilities:[],daily_history:[]},
                        {player:{claimed:false},capabilities:[],daily_history:complete}]){
   const html=dailyHomeMarkup(profile,day);
-  assert.doesNotMatch(html,/Become Elite|Upgrade to Elite/,'a guest is not asked to pay');
-  assert.doesNotMatch(html,/daily-home-custom/,'the Elite panel is withheld too');
+  assert.match(html,/data-home-elite/);
+  assert.match(html,/Become Elite/,'a guest has no membership to upgrade');
  }
- // The free-account rung still appears once the Dailies are done.
- const guestDone=dailyHomeMarkup({player:{claimed:false},capabilities:[],daily_history:complete},day);
- assert.match(guestDone,/Create a free account/);
+ // The free-account rung still appears alongside it once the Dailies are done.
+ assert.match(dailyHomeMarkup({player:{claimed:false},capabilities:[],daily_history:complete},day),/Create a free account/);
 });
 
 // A Supporter holds no paid capability, so before membership was surfaced they

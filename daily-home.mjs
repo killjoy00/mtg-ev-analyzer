@@ -40,12 +40,12 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
       : '<p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>'}</section>` : ''}
     ${elite
       ? '<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Build a random run from your favorite sets.</p></div><a class="button secondary" href="?game=draft-run&custom=1">Choose your sets</a></section>'
-      // A guest has not played a pick yet, and their next rung is the free
-      // account the completed-Dailies block already offers. Asking an
-      // unconverted visitor to pay competes with that and wins less often.
-      : claimed
-        ? `<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Draft beyond the Dailies. Unlock unlimited Powered Cube and custom-set drafts.</p></div>${eliteCta}</section>`
-        : ''}
+      // Shown to guests on purpose: PR #178 built the guest handoff that takes
+      // one sign-in and then continues to Patreon, and this is its only entry
+      // point. Whether an unconverted visitor should be asked before playing
+      // is a live product question - see the note on #181 - but withdrawing
+      // the button is not the way to settle it.
+      : `<section class="daily-home-custom"><div><p class="eyebrow">Elite practice</p><p>Draft beyond the Dailies. Unlock unlimited Powered Cube and custom-set drafts.</p></div>${eliteCta}</section>`}
     ${unavailable ? '<p role="status">Daily progress is unavailable. Play now still resumes your saved attempt.</p>' : ''}
   </section>`;
 }
