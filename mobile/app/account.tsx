@@ -19,7 +19,7 @@ import {
   signUpWithEmail,
 } from '@/src/api/account';
 import { ensureGuestSession } from '@/src/api/guest';
-import { readSession, type MobileSession } from '@/src/storage/session';
+import { type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
 
 type Mode = 'signin' | 'signup';
