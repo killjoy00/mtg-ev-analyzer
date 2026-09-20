@@ -1,11 +1,12 @@
 import { router } from 'expo-router';
 import {
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { colors, spacing } from '@/src/theme';
 
