@@ -87,8 +87,8 @@ function CardTile({
 
 async function loadGuestDaily() {
   const session = await ensureGuestSession();
-  const run = await startDailyDraftRun(session.token);
-  return { run, token: session.token };
+  const run = await startDailyDraftRun(session.playerToken);
+  return { run, token: session.playerToken };
 }
 
 export default function DraftRunScreen() {
