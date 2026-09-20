@@ -154,19 +154,24 @@ export async function gateway(request,env,fetcher=fetch) {
     }
     if(preview&&request.headers.get('x-pack1-preview-key')!==env.PREVIEW_KEY)return finish(response(403,'Preview access required.'));
 
+    const cookies=selectedCookies(request);
+    const playerToken=cookieValue(cookies,'__Host-pack1_player');
+    const sessionCreation=request.method==='POST'&&(
+      (match[1]==='legacy'&&match[2]==='/v1/session')||
+      (match[1]==='growth'&&match[2]==='/v1/session')||
+      (match[1]==='growth'&&match[2]==='/v1/player/session'&&!playerToken)
+    );
     const network=ipNetwork(request.headers.get('cf-connecting-ip')||'');
     const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
     const digest=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,encode.encode(network)))).map(x=>x.toString(16).padStart(2,'0')).join('');
     const quota=env.NETWORK_QUOTA.get(env.NETWORK_QUOTA.idFromName(digest));
-    const limited=await quota.fetch(new Request(`https://quota/${match[2].endsWith('/session')? 'session':'request'}`,{method:'POST'}));
+    const limited=await quota.fetch(new Request(`https://quota/${sessionCreation?'session':'request'}`,{method:'POST'}));
     if(limited.status!==204)return finish(limited.status===429?limited:response(503,'Gateway unavailable.'));
 
-    const cookies=selectedCookies(request);
     const headers=new Headers({'accept':'application/json'});
     if(env.ORIGIN_SECRET)headers.set('x-pack1-ingress-secret',env.ORIGIN_SECRET);
     if(origin)headers.set('origin',origin);
     if(cookies)headers.set('cookie',cookies);
-    const playerToken=cookieValue(cookies,'__Host-pack1_player');
     if(playerToken)headers.set('authorization','Bearer '+playerToken);
     else if(preview&&request.headers.has('authorization'))headers.set('authorization',request.headers.get('authorization'));
     if(request.headers.has('x-pack1-csrf'))headers.set('x-pack1-csrf',request.headers.get('x-pack1-csrf'));

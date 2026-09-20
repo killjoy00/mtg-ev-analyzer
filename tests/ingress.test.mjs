@@ -107,6 +107,19 @@ test('quota failure, oversized bodies and invalid preflights fail before upstrea
     assert.equal((await gateway(req('/growth/v1/session',{method:'OPTIONS',body:undefined,headers}),env,noFetch)).status,status);
 });
 
+test('strict session quota applies only to new player-session creation',async()=>{
+  const kinds=[];
+  const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'e'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async request=>{kinds.push(new URL(request.url).pathname);return new Response(null,{status:204});}})}};
+  const upstream=async()=>Response.json({ok:true});
+  const headers={'cf-connecting-ip':'192.0.2.44','origin':'https://packone.pro'};
+  await gateway(new Request('https://api.packone.pro/growth/v1/account/session',{headers}),prod,upstream);
+  await gateway(new Request('https://api.packone.pro/growth/v1/player/session',{method:'POST',headers:{...headers,'content-type':'application/json'},body:'{}'}),prod,upstream);
+  const player='p1_00000000-0000-4000-8000-000000000000.'+'x'.repeat(43);
+  await gateway(new Request('https://api.packone.pro/growth/v1/player/session',{method:'POST',headers:{...headers,'content-type':'application/json',cookie:'__Host-pack1_player='+player},body:'{}'}),prod,upstream);
+  assert.deepEqual(kinds,['/request','/session','/request']);
+});
+
 test('IPv6 privacy addresses share a /64 quota without merging distinct networks',()=>{
   assert.equal(ipNetwork('2001:db8:1:2::1'),ipNetwork('2001:0db8:0001:0002:1234::9'));
   assert.notEqual(ipNetwork('2001:db8:1:2::1'),ipNetwork('2001:db8:1:3::1'));
