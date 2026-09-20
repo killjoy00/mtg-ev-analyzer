@@ -99,7 +99,9 @@ export async function updateProfile({ displayName, profilePublic, favoriteSetId,
   if (typeof profilePublic === 'boolean') body.profilePublic = profilePublic;
   if (favoriteSetId !== undefined) body.favoriteSetId = favoriteSetId;
   if (showcaseAchievement !== undefined) body.showcaseAchievement = showcaseAchievement;
-  const data = await api('/v1/profile', { method:'PATCH', body, auth:true });
+  const authSession=loadAuthToken();
+  if(!authSession) throw new Error('Sign in to change account settings.');
+  const data = await api('/v1/profile', { method:'PATCH', body, auth:true, authSession });
   if (data?.player?.display_name) {
     try { localStorage.setItem(NAME_KEY, data.player.display_name); } catch {}
   }
