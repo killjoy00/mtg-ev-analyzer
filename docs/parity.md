@@ -11,14 +11,14 @@ Updated 2026-09-20. “Foundation” means scaffolding exists but the feature is
 | Draft Run / Dailies | ✓ | Mixed Daily + claim | Mixed Daily + claim | Required |
 | Powered Cube | ✓ | Daily + claim | Daily + claim | Required |
 | Latest Set | ✓ | Daily + claim | Daily + claim | Required |
-| Practice | ✓ | Regular Draft Run + rerolls | Regular Draft Run + rerolls | Required |
+| Practice | ✓ | Regular + Elite modes + rerolls | Regular + Elite modes + rerolls | Required |
 | Career/history | ✓ | Summary + paginated history | Summary + paginated history | Required |
 | Leaderboard | ✓ | Daily/week/month/all | Daily/week/month/all | Required |
-| Elite capability resolution | ✓ | — | — | Required |
-| Custom-set practice | ✓ | — | — | Required |
+| Elite capability resolution | ✓ | Server-backed | Server-backed | Required |
+| Custom-set practice | ✓ | Native set picker | Native set picker | Required |
 | Store subscription purchase | — | — | — | Required mobile |
 | Restore purchases | — | — | — | Required mobile |
-| Patreon entitlement recognition | ✓ | — | — | Required |
+| Patreon entitlement recognition | ✓ | Existing account grants | Existing account grants | Required |
 | Account deletion | — | Password + Google reauth | Password + Google reauth | Required |
 | How to Play | ✓ | — | — | Required |
 | Scoring | ✓ | — | — | Required |
