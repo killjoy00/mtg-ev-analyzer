@@ -1,5 +1,4 @@
-Requested: 2026-09-16
-Purpose: Inspect packone.pro routing after the owner added the audit token.
-Change this file through a reviewed PR to request another read-only audit on main.
+Requested: 2026-09-19
+Purpose: Re-inspect packone.pro routing before the reviewed first-party account-session and Google OAuth gateway cutover.
 This file is only a trigger; its contents are not executed or sent to Cloudflare.
 Never put credentials here. The runner uses CLOUDFLARE_AUDIT_TOKEN from Actions secrets.
