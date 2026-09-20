@@ -119,27 +119,48 @@ function cookieLines(session) {
   ];
 }
 
+// The deployed Neon runtime keeps only the last Set-Cookie entry when a Headers
+// object is copied, so stacking two cookie wrappers silently dropped the first
+// one's cookies in production while Node kept all of them and every test
+// passed. Cookies therefore ride on the response as an authoritative list and
+// every wrapper rewrites that whole list instead of trusting the copy to carry
+// what is already there. Any wrapper that copies a response's headers after
+// this point must re-apply setCookies(response) the same way.
+const RESPONSE_COOKIES=new WeakMap();
+
+export function setCookies(response) {
+  return RESPONSE_COOKIES.get(response)||[];
+}
+
+export function applyCookies(headers,lines) {
+  headers.delete('set-cookie');
+  for(const line of lines)headers.append('set-cookie',line);
+  return headers;
+}
+
+export function withCookies(response,lines) {
+  const all=[...setCookies(response),...lines];
+  const headers=applyCookies(new Headers(response.headers),all);
+  const next=new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  RESPONSE_COOKIES.set(next,all);
+  return next;
+}
+
 export function withAccountCookies(response,session) {
-  const headers=new Headers(response.headers);
-  for(const line of cookieLines(session))headers.append('set-cookie',line);
-  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  return withCookies(response,cookieLines(session));
 }
 
 export function withPlayerCookie(response,token,maxAge=365*24*60*60) {
-  const headers=new Headers(response.headers);
-  headers.append('set-cookie',`${PLAYER_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; Secure; HttpOnly; SameSite=Strict`);
-  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  return withCookies(response,[`${PLAYER_COOKIE}=${encodeURIComponent(token)}; Path=/; Max-Age=${maxAge}; Secure; HttpOnly; SameSite=Strict`]);
 }
 
 export function clearPlayerCookie(response) {
-  const headers=new Headers(response.headers);
-  headers.append('set-cookie',`${PLAYER_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict`);
-  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  return withCookies(response,[`${PLAYER_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict`]);
 }
 
 export function clearAccountCookies(response) {
-  const headers=new Headers(response.headers);
-  headers.append('set-cookie',`${ACCOUNT_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict`);
-  headers.append('set-cookie',`${CSRF_COOKIE}=; Path=/; Domain=packone.pro; Max-Age=0; Secure; SameSite=Strict`);
-  return new Response(response.body,{status:response.status,statusText:response.statusText,headers});
+  return withCookies(response,[
+    `${ACCOUNT_COOKIE}=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict`,
+    `${CSRF_COOKIE}=; Path=/; Domain=packone.pro; Max-Age=0; Secure; SameSite=Strict`,
+  ]);
 }
