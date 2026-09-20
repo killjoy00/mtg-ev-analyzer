@@ -64,7 +64,7 @@ export default function HomeScreen() {
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Start regular practice"
-          onPress={() => router.push({ pathname: '/draft-run', params: { mode: 'practice' } })}
+          onPress={() => router.push('/practice')}
           style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >
           <Text style={styles.cardKicker}>PRACTICE</Text>
