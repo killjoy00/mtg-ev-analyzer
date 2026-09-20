@@ -15,7 +15,7 @@ for(const service of ['legacy','growth','draft']) {
 }
 const origin='https://packone.pro';
 const created=await call('/growth/v1/player/session',{
-  method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({displayName:'QA secure auth release'}),
+  method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({displayName:'QA secure auth release'}),expected:201,
 });
 assert.ok(created.data.playerId);
 assert.equal(created.data.token,undefined,'browser session never returns player bearer');

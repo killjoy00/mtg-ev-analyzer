@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"2026-09-19: Apply reviewed additive first-party session schema, deploy the same tested auth revision to development and production, attach the fixed api.packone.pro gateway, and verify Google OAuth start before frontend activation."}
+{"operation":"deploy-secure-auth","reason":"2026-09-19: Retry the reviewed secure-auth release after correcting the live smoke expectation for the 201 Created browser-player response; backend/schema/gateway deployment already succeeded and the gateway hostname now resolves."}
