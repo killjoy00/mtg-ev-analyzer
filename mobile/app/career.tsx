@@ -59,7 +59,7 @@ function HistoryRow({ item }: { item: CareerHistoryRow }) {
     environmentLabel(item.set_id),
     item.is_daily ? 'Daily' : null,
     item.grade || null,
-    item.outcome ? item.outcome[0].toUpperCase() + item.outcome.slice(1) : null,
+    item.outcome ? item.outcome.charAt(0).toUpperCase() + item.outcome.slice(1) : null,
   ].filter(Boolean).join(' · ');
 
   return (
