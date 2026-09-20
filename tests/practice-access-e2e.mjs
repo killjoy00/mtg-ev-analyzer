@@ -24,6 +24,12 @@ try{
  await page.getByRole('heading',{name:'Keep drafting with a free account'}).waitFor();
  assert.equal(await page.getByRole('button',{name:'Sign in or create an account'}).count(),1);
  assert.equal(await page.getByRole('link',{name:'Back to Dailies'}).count(),1);
+ assert.equal(await page.locator('.message-card .button-row').count(),1);
+ const signInBox=await page.getByRole('button',{name:'Sign in or create an account'}).boundingBox();
+ const backBox=await page.getByRole('link',{name:'Back to Dailies'}).boundingBox();
+ assert.ok(signInBox&&backBox);
+ const separated=backBox.x>=signInBox.x+signInBox.width-1||backBox.y>=signInBox.y+signInBox.height-1;
+ assert.ok(separated,'Practice gate actions must not overlap');
  await page.goto(base+'/?game=draft-run&custom=1');
  await page.getByRole('heading',{name:'Choose your sets'}).waitFor();
  assert.equal(await page.locator('input:checked').count(),1);
