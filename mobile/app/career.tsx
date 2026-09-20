@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import { loadMobileAccount } from '@/src/api/account';
 import {
   loadCareerHistory,
   loadCareerProfile,
@@ -89,6 +90,12 @@ export default function CareerScreen() {
       if (id !== requestId.current) return;
       if (!session.accountToken) {
         setState({ status: 'signed-out' });
+        return;
+      }
+      try {
+        await loadMobileAccount(session);
+      } catch {
+        if (id === requestId.current) setState({ status: 'signed-out' });
         return;
       }
       const [profile, history] = await Promise.all([
