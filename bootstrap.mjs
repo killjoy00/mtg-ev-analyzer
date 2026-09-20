@@ -24,7 +24,7 @@ if (historicalShare) {
   await installHistoricalShare();
 } else {
   // Paint play links before identity/profile requests. Profiles load on demand.
-  const home = params.get('game') !== 'draft-run' && !params.has('profile')
+  const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account')
     ? await import('./daily-home.mjs') : null;
   home?.renderDailyHome();
   const identityReady = import('./growth.mjs').then(m => m.installGrowthLayer());
