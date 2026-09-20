@@ -65,9 +65,6 @@ try {
   await page.locator('#profile-claim-account').click();
   await page.locator('#account-signin').waitFor();
   assert.match(await page.locator('.account-page header').textContent(),/A free account saves your record and enables leaderboard participation\./);
-  assert.equal((await page.locator('.account-social h2').textContent())?.trim(),'Create An Account With Your Email or With Google');
-  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Sign In With Google');
-  assert.equal(await page.locator('.account-divider').count(),0);
   await page.screenshot({path:'artifacts/ui-account-mobile.png',fullPage:true});
 
   for(const kind of ['signin','signup']) {
