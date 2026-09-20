@@ -115,4 +115,4 @@ jobs:
         run: node scripts/edge-production-control.mjs deploy
 
       - name: Verify live secure gateway and Google OAuth start
-        run: node tests/edge-production-live-smoke.mjs ignored "$GITHUB_SHA"
+        run: node tests/edge-production-live-smoke.mjs "$GITHUB_SHA"
