@@ -54,3 +54,23 @@ test('secondary gameplay controls keep mobile-sized targets', async () => {
   assert.match(css, /body \.run-zoom\{[^}]*min-height:44px/);
   assert.match(css, /\.run-lock \.run-tools \.button\{min-height:44px/);
 });
+
+
+test('profile CSS keeps one base rule for previously layered selectors', async () => {
+  const css = await readFile('profile.css', 'utf8');
+  const base = css.slice(0, css.indexOf('@media'));
+  for (const selector of [
+    '.profile-hero',
+    '.profile-hero-actions',
+    '.profile-claim',
+    '.profile-section',
+    '.profile-scoreboard > div',
+    '.environment-progress-card',
+    '.achievement-card',
+    '.profile-mode-grid',
+    '.profile-sparkline',
+  ]) {
+    assert.equal(base.split(selector + ' {').length - 1, 1, selector + ' should have one base rule');
+  }
+  assert.doesNotMatch(css, /linear-gradient/);
+});
