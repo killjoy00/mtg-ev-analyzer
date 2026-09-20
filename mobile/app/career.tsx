@@ -20,6 +20,7 @@ import {
 } from '@/src/api/career';
 import { DAILY_ENVIRONMENT_META, isDailyEnvironment } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
+import { useAppResume } from '@/src/hooks/useAppResume';
 import type { MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
 
@@ -81,7 +82,12 @@ function HistoryRow({ item }: { item: CareerHistoryRow }) {
 export default function CareerScreen() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [loadingMore, setLoadingMore] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const requestId = useRef(0);
+
+  useAppResume(() => {
+    setReloadKey((value) => value + 1);
+  });
 
   const load = async ({ showLoading = true }: { showLoading?: boolean } = {}) => {
     const id = ++requestId.current;
@@ -126,7 +132,7 @@ export default function CareerScreen() {
       clearTimeout(timer);
       requestId.current += 1;
     };
-  }, []);
+  }, [reloadKey]);
 
   const loadMore = async () => {
     if (state.status !== 'ready' || !state.nextCursor || loadingMore) return;
