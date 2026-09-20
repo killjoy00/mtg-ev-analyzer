@@ -2,10 +2,20 @@ import assert from 'node:assert/strict';
 const commit=process.argv[2];
 assert.match(commit||'',/^[a-f0-9]{40}$/);
 const base='https://api.packone.pro';
-async function call(path,options={}) {
-  const response=await fetch(base+path,{redirect:'manual',signal:AbortSignal.timeout(30000),...options});
+async function call(path,{expected=200,...options}={}) {
+  let response,lastError;
+  for(let attempt=0;attempt<20;attempt++) {
+    try {
+      response=await fetch(base+path,{redirect:'manual',signal:AbortSignal.timeout(30000),...options});
+      break;
+    } catch(error) {
+      lastError=error;
+      await new Promise(resolve=>setTimeout(resolve,1500));
+    }
+  }
+  if(!response)throw lastError;
   const data=await response.json().catch(()=>({}));
-  assert.equal(response.status,options.expected||200,path+': '+response.status+' '+JSON.stringify(data));
+  assert.equal(response.status,expected,path+': '+response.status+' '+JSON.stringify(data));
   assert.equal(response.headers.get('cache-control'),'no-store');
   return {response,data};
 }
@@ -15,7 +25,7 @@ for(const service of ['legacy','growth','draft']) {
 }
 const origin='https://packone.pro';
 const created=await call('/growth/v1/player/session',{
-  method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({displayName:'QA secure auth release'}),
+  expected:201,method:'POST',headers:{origin,'content-type':'application/json'},body:JSON.stringify({displayName:'QA secure auth release'}),
 });
 assert.ok(created.data.playerId);
 assert.equal(created.data.token,undefined,'browser session never returns player bearer');
