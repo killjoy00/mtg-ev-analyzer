@@ -18,9 +18,16 @@ for (const path of ['how-it-works/index.html','scoring/index.html','methodology/
 const home = await readFile('index.html','utf8');
 assert.doesNotMatch(home, /id="home-editorial"/);
 assert.doesNotMatch(home, /data-ad-slot="home"/);
-assert.match(home, /href="\/methodology\/"/);
+assert.match(home, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/);
+assert.doesNotMatch(home, /href="\/methodology\/"[^>]*>Method<\/a>/);
 assert.match(home, /Impact-Site-Verification: 3e227a68-dfc4-4be8-a619-b13df4f67e25/);
 assert.doesNotMatch(home, /impact-site-verification'\s+value=/i);
+const howTo = await readFile('how-it-works/index.html','utf8');
+assert.match(howTo, /<h1>How to Play Pack One<\/h1>/);
+assert.match(howTo, /<h2>Scoring Method<\/h2>/);
+assert.match(howTo, /href="\/scoring\/">View scoring method<\/a>/);
+assert.match(howTo, /<h2>Sets<\/h2>/);
+assert.match(howTo, /href="\/sets\/">View sets<\/a>/);
 const about = await readFile('about/index.html','utf8');
 assert.match(about, /Three Dailies, ready to play/);
 assert.match(about, /Daily Draft Run, Daily Powered Cube, and Daily Latest Set/);
