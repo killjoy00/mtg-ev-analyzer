@@ -14,6 +14,7 @@ import csv
 import gzip
 import json
 import time
+import urllib.error
 import urllib.parse
 import urllib.request
 from pathlib import Path
@@ -79,17 +80,34 @@ def aliases(card: dict) -> Iterable[str]:
                 yield name
 
 
-def request_json(url: str, retries: int = 4) -> dict:
+def request_json(url: str, retries: int = 7) -> dict:
     last_error = None
     for attempt in range(retries):
         try:
             request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT, "Accept": "application/json"})
             with urllib.request.urlopen(request, timeout=45) as response:
                 return json.load(response)
+        except urllib.error.HTTPError as exc:
+            last_error = exc
+            retryable = exc.code == 429 or 500 <= exc.code < 600
+            if not retryable or attempt + 1 >= retries:
+                break
+            retry_after = exc.headers.get("Retry-After") if exc.headers else None
+            try:
+                delay = float(retry_after) if retry_after is not None else 0.0
+            except ValueError:
+                delay = 0.0
+            time.sleep(max(delay, min(2.0 ** attempt, 30.0)))
+        except (urllib.error.URLError, TimeoutError) as exc:
+            last_error = exc
+            if attempt + 1 >= retries:
+                break
+            time.sleep(min(2.0 ** attempt, 30.0))
         except Exception as exc:
             last_error = exc
-            if attempt + 1 < retries:
-                time.sleep(1.5 * (attempt + 1))
+            if attempt + 1 >= retries:
+                break
+            time.sleep(min(2.0 ** attempt, 30.0))
     raise RuntimeError(f"Could not fetch Scryfall metadata: {last_error}")
 
 
@@ -105,7 +123,7 @@ def fetch_set(set_code: str) -> Dict[str, dict]:
                 records.setdefault(name, metadata)
         url = page.get("next_page") if page.get("has_more") else None
         if url:
-            time.sleep(0.12)
+            time.sleep(0.2)
     if not records:
         raise RuntimeError(f"Scryfall returned no cards for set {set_code}.")
     return records
@@ -164,7 +182,7 @@ def enrich_for_draft_names(records: Dict[str, dict], names: Iterable[str]) -> tu
             records.setdefault(name, metadata)
             for alias in aliases(card):
                 records.setdefault(alias, metadata)
-        time.sleep(0.12)
+        time.sleep(0.2)
     unresolved = sorted(wanted - records.keys())
     return records, unresolved
 
