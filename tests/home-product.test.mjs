@@ -68,3 +68,47 @@ test('Daily home differentiates free and Elite practice',()=>{
 test('Method has no secondary link directory',()=>{
  const html=fs.readFileSync('methodology/index.html','utf8');assert.equal((html.match(/class="method-directory"/g)||[]).length,0);
 });
+
+// A guest has not played a pick and cannot link Patreon without an account, so
+// the paid ask competes with the free-account rung the completed block offers.
+test('the Elite ask waits for an account',()=>{
+ const complete=['mixed','powered-cube','latest'].map(row);
+ for(const profile of [null,{player:{claimed:false},capabilities:[],daily_history:[]},
+                       {player:{claimed:false},capabilities:[],daily_history:complete}]){
+  const html=dailyHomeMarkup(profile,day);
+  assert.doesNotMatch(html,/Become Elite|Upgrade to Elite/,'a guest is not asked to pay');
+  assert.doesNotMatch(html,/daily-home-custom/,'the Elite panel is withheld too');
+ }
+ // The free-account rung still appears once the Dailies are done.
+ const guestDone=dailyHomeMarkup({player:{claimed:false},capabilities:[],daily_history:complete},day);
+ assert.match(guestDone,/Create a free account/);
+});
+
+// A Supporter holds no paid capability, so before membership was surfaced they
+// were indistinguishable from a free account and told to "become" a paying
+// member. Covers a lapsed Elite for the same reason.
+test('a connected member is asked to upgrade, not to become',()=>{
+ const base={player:{claimed:true},capabilities:['account','unlimited_regular_practice'],daily_history:[]};
+
+ const free=dailyHomeMarkup(base,day);
+ assert.match(free,/Become Elite/);assert.doesNotMatch(free,/Upgrade to Elite/);
+
+ const supporter=dailyHomeMarkup({...base,membership:{connected:true}},day);
+ assert.match(supporter,/Upgrade to Elite/);assert.doesNotMatch(supporter,/Become Elite/);
+ assert.match(supporter,/data-home-elite/,'the upgrade still uses the Patreon handoff');
+
+ // Explicitly unconnected must read the same as absent.
+ const unconnected=dailyHomeMarkup({...base,membership:{connected:false}},day);
+ assert.match(unconnected,/Become Elite/);assert.doesNotMatch(unconnected,/Upgrade to Elite/);
+
+ // Both slots agree once the Dailies are done.
+ const done={...base,membership:{connected:true},daily_history:['mixed','powered-cube','latest'].map(row)};
+ const doneHtml=dailyHomeMarkup(done,day);
+ assert.equal((doneHtml.match(/Upgrade to Elite/g)||[]).length,2);
+ assert.doesNotMatch(doneHtml,/Become Elite/);
+
+ // An Elite member is never asked for either.
+ const eliteHtml=dailyHomeMarkup({...base,capabilities:[...base.capabilities,'custom_corpus','unlimited_cube_practice'],membership:{connected:true}},day);
+ assert.match(eliteHtml,/Choose your sets/);
+ assert.doesNotMatch(eliteHtml,/Become Elite|Upgrade to Elite/);
+});
