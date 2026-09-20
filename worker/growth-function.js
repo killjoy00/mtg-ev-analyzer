@@ -4,12 +4,16 @@ import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {handlePatreon} from './patreon.mjs';
+import {accountSession,clearAccountCookies,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,withAccountCookies} from './account-session.mjs';
 const ALLOWED_ORIGINS = new Set([
   'https://packone.pro',
   'https://killjoy00.github.io',
   ...(process.env.PACK1_ALLOW_LOCALHOST==='1'?['http://127.0.0.1:4173','http://localhost:4173']:[]),
 ]);
 const TOKEN_PREFIX = 'p1_';
+const NEON_AUTH_BASE='https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const GOOGLE_CALLBACK='https://api.packone.pro/growth/v1/account/google/callback';
+const ACCOUNT_RETURN='https://packone.pro/';
 const STATIC_ORIGIN = 'https://packone.pro';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 const DAILY_RUN_ID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -29,7 +33,8 @@ function cors(request) {
   return {
     'access-control-allow-origin': origin,
     'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS',
-    'access-control-allow-headers': 'authorization,content-type,x-pack1-auth-session',
+    'access-control-allow-headers': 'authorization,content-type,x-pack1-auth-session,x-pack1-csrf',
+    'access-control-allow-credentials': 'true',
     'access-control-max-age': '86400',
     vary: 'Origin',
   };
@@ -141,19 +146,41 @@ async function upsertPlayer(id, name) {
   return displayName;
 }
 
-async function authSession(request) {
-  const token = String(request.headers.get('x-pack1-auth-session') || '').slice(0, 512);
-  if (!token) throw Object.assign(new Error('Account session required.'), { status: 401 });
-  const result = await query(
-    `SELECT s.token,s."expiresAt" expires_at,u.id user_id,u.email,u.name
-     FROM neon_auth.session s
-     JOIN neon_auth."user" u ON u.id=s."userId"
-     WHERE s.token=$1 AND s."expiresAt">now()
-     LIMIT 1`,
-    [token],
-  );
-  if (!result.rows[0]) throw Object.assign(new Error('Account session expired.'), { status: 401 });
-  return result.rows[0];
+async function authSession(request,options={}) {
+  return accountSession(request,query,options);
+}
+
+async function neonAuth(path,{method='GET',body}={}) {
+  const response=await fetch(NEON_AUTH_BASE+path,{
+    method,
+    headers:{origin:'https://packone.pro',...(body===undefined?{}:{'content-type':'application/json'})},
+    body:body===undefined?undefined:JSON.stringify(body),
+    redirect:'manual',
+    signal:AbortSignal.timeout(15000),
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Object.assign(Error(data.message||data.error||`Account request failed (${response.status}).`),{status:response.status});
+  return data;
+}
+
+function authIdentity(data) {
+  const token=data?.token||data?.session?.token;
+  const user=data?.user;
+  if(!token||!user?.id)return null;
+  return {token,user,user_id:user.id,email:user.email||null,name:user.name||null};
+}
+
+async function establishAccount(data,{replaceHash=null}={}) {
+  const auth=authIdentity(data);
+  if(!auth)return null;
+  const session=await issueAccountSession(query,auth,{replaceHash});
+  await consumeNeonSession(query,auth.token);
+  return {auth,session};
+}
+
+function accountJson(auth,session,status=200) {
+  const response=json({user:{id:auth.user_id,email:auth.email,name:auth.name},session:{expiresAt:session.expiresAt}},status);
+  return withAccountCookies(response,session);
 }
 
 function props(value) {
@@ -538,6 +565,77 @@ async function historyPage(playerId, cursor, limit = 25) {
   return { rows, next_cursor: rows.length === safeLimit ? rows.at(-1)?.cursor || null : null };
 }
 
+async function handleAccountSignup(request) {
+  requireTrustedOrigin(request);
+  const payload=await readJson(request);
+  const data=await neonAuth('/sign-up/email',{method:'POST',body:{
+    name:String(payload.name||'').trim().slice(0,80),
+    email:String(payload.email||'').trim(),
+    password:String(payload.password||''),
+  }});
+  const established=await establishAccount(data);
+  if(!established)return json({ok:true,verificationRequired:true,user:data?.user||null},202);
+  return accountJson(established.auth,established.session,201);
+}
+
+async function handleAccountSignin(request) {
+  requireTrustedOrigin(request);
+  const payload=await readJson(request);
+  const data=await neonAuth('/sign-in/email',{method:'POST',body:{
+    email:String(payload.email||'').trim(),
+    password:String(payload.password||''),
+    rememberMe:true,
+  }});
+  const established=await establishAccount(data);
+  if(!established)throw Object.assign(Error('Sign in did not create an account session.'),{status:502});
+  return accountJson(established.auth,established.session);
+}
+
+async function handleAccountMigration(request) {
+  requireTrustedOrigin(request);
+  await player(request);
+  const legacy=await authSession(request,{allowLegacy:true,csrf:false});
+  if(legacy.source!=='legacy') {
+    const current=legacy.source==='cookie'?legacy:await authSession(request);
+    return json({ok:true,user:{id:current.user_id,email:current.email,name:current.name},migrated:false});
+  }
+  const session=await issueAccountSession(query,legacy);
+  await consumeNeonSession(query,legacy.token);
+  return withAccountCookies(json({ok:true,user:{id:legacy.user_id,email:legacy.email,name:legacy.name},migrated:true}),session);
+}
+
+async function handleGoogleStart(request) {
+  requireTrustedOrigin(request);
+  await readJson(request);
+  const data=await neonAuth('/sign-in/social',{method:'POST',body:{
+    provider:'google',
+    callbackURL:GOOGLE_CALLBACK,
+    newUserCallbackURL:GOOGLE_CALLBACK,
+    errorCallbackURL:ACCOUNT_RETURN+'?auth=google-error',
+    disableRedirect:true,
+  }});
+  const target=new URL(String(data?.url||''));
+  if(target.protocol!=='https:'||target.hostname!=='accounts.google.com')
+    throw Object.assign(Error('Google sign in is temporarily unavailable.'),{status:502});
+  return json({url:target.toString()});
+}
+
+async function handleGoogleCallback(request) {
+  const url=new URL(request.url);
+  const verifier=String(url.searchParams.get('neon_auth_session_verifier')||'');
+  if(!/^[A-Za-z0-9._~-]{16,2048}$/.test(verifier))
+    return new Response(null,{status:302,headers:{location:ACCOUNT_RETURN+'?auth=google-error','cache-control':'no-store'}});
+  try {
+    const data=await neonAuth('/get-session?neon_auth_session_verifier='+encodeURIComponent(verifier));
+    const established=await establishAccount(data);
+    if(!established)throw Error('Google sign in did not create a session.');
+    return withAccountCookies(new Response(null,{status:302,headers:{location:ACCOUNT_RETURN+'?auth=google','cache-control':'no-store'}}),established.session);
+  } catch(error) {
+    console.error('Google OAuth callback failed',Number(error?.status||500));
+    return new Response(null,{status:302,headers:{location:ACCOUNT_RETURN+'?auth=google-error','cache-control':'no-store'}});
+  }
+}
+
 async function handleSession(request) {
   const payload = await readJson(request);
   const id = crypto.randomUUID();
@@ -703,7 +801,7 @@ async function handleLink(request) {
     ? await validateDailyRunScore(validateDailyRunId, id, auth.user_id)
     : false;
   const profile = await profileMetaByPlayer(id);
-  return json({
+  let response=json({
     ok: true,
     merged,
     validatedDailyScore,
@@ -713,20 +811,25 @@ async function handleLink(request) {
     profileKey: profile?.profile_key || null,
     email: auth.email,
   });
+  if(auth.source==='cookie') {
+    const rotated=await issueAccountSession(query,auth,{replaceHash:auth.session_hash});
+    response=withAccountCookies(response,rotated);
+  }
+  return response;
 }
 
 async function handleAccount(request) {
   const auth = await authSession(request);
   return json({
     user: { id: auth.user_id, email: auth.email, name: auth.name },
-    session: { token: auth.token, expiresAt: auth.expires_at },
+    session: { expiresAt: auth.expires_at },
   });
 }
 
 async function handleSignout(request) {
   const auth = await authSession(request);
-  await query('DELETE FROM neon_auth.session WHERE token=$1', [auth.token]);
-  return json({ ok: true });
+  await revokeAccountSession(query,auth);
+  return clearAccountCookies(json({ ok: true }));
 }
 
 async function handleDates(request) {
@@ -842,7 +945,12 @@ async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true });
+  if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
+  if (request.method === 'POST' && url.pathname === '/v1/account/signup') return handleAccountSignup(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/signin') return handleAccountSignin(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/google/start') return handleGoogleStart(request);
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/events') return handleEvents(request);
   if (request.method === 'POST' && url.pathname === '/v1/results') return handleResult(request);
