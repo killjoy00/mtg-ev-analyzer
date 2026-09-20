@@ -330,7 +330,8 @@ a { color: inherit; }
   gap: 16px;
 }
 
-.article-links { margin-top: 18px; }
+.article-links { margin-top: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.topbar .brand { color: inherit; text-decoration: none; }
 
 .content-card {
   padding: 26px;
