@@ -67,3 +67,13 @@ test('QA recovery acceptance runner exposes no recovery secrets',()=>{
   assert.match(source,/unexpected output/);
   assert.doesNotMatch(source,/console\.log\([^\n]*(token|password|signature|cookie)/i);
 });
+
+
+test('secure Auth release deploys the production recovery Worker from the exact reviewed revision',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/secure-auth-release.yml',import.meta.url),'utf8');
+  assert.match(workflow,/PACK1_AUTH_RESEND_API_KEY: \$\{\{ secrets\.PACK1_AUTH_RESEND_API_KEY \}\}/);
+  assert.match(workflow,/PACK1_AUTH_RESEND_API_KEY is missing or malformed/);
+  assert.match(workflow,/name: Deploy dedicated production recovery webhook Worker/);
+  assert.match(workflow,/RELEASE_COMMIT: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow,/auth-webhook-control\.mjs deploy-production/);
+});
