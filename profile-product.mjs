@@ -162,7 +162,7 @@ function settingsMarkup(profile, progress, account, patreon) {
     ${account?.user?`<section class="profile-credentials profile-danger" aria-labelledby="delete-account-title">
       <div><p class="eyebrow">Danger zone</p><h3 id="delete-account-title">Delete account</h3>
         <p>Permanently deletes your Pack One account, public profile, leaderboard participation, individual gameplay/career history, and linked Patreon/account associations. You will be signed out on all devices. This cannot be undone.</p>
-        <p><small>Short-lived non-identifying security/OAuth verification records may remain until they expire; expired technical verification records are automatically swept afterward. Aggregate, non-attributable statistics may remain.</small></p>
+        <p><small>Deletion usually completes immediately. If identity-provider completion is temporarily unavailable after deletion commits, you will be signed out and server-side recovery finishes the irreversible operation; no further action is required and it cannot be canceled. Short-lived non-identifying security/OAuth verification records may remain until they expire; expired technical verification records are automatically swept afterward. Aggregate, non-attributable statistics may remain.</small></p>
         ${account?.deletion?.googleOnly
           ? `<p><strong>Deletion is temporarily unavailable for Google-only accounts.</strong><br><span>Pack One cannot yet safely perform the required fresh same-account Google verification. This control remains visible and disabled rather than weakening verification.</span></p>
              <button class="button secondary" type="button" disabled>Delete account</button>`
