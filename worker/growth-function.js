@@ -907,19 +907,44 @@ async function handleLink(request,{browser=false}={}) {
   let merged = false;
 
   if (!old.rows.length) {
-    await query(
-      `WITH claimed AS (INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)
-        ON CONFLICT(auth_user_id) DO NOTHING RETURNING player_id)
-       INSERT INTO analytics_events(player_id,event_name) SELECT player_id,'account_claimed' FROM claimed`,
+    const claimed=await query(
+      `WITH lock AS MATERIALIZED (
+          SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
+        ), allowed AS MATERIALIZED (
+          SELECT 1 FROM lock WHERE NOT EXISTS (
+            SELECT 1 FROM account_deletion_operations
+            WHERE auth_user_id=$1::uuid AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
+          )
+        ), claimed AS (
+          INSERT INTO account_links(auth_user_id,player_id)
+          SELECT $1::uuid,$2::uuid FROM allowed
+          ON CONFLICT(auth_user_id) DO NOTHING RETURNING player_id
+        ), event AS (
+          INSERT INTO analytics_events(player_id,event_name) SELECT player_id,'account_claimed' FROM claimed
+        )
+        SELECT player_id FROM claimed`,
       [auth.user_id, current],
     );
+    if(!claimed.rows.length) {
+      const pending=await query('SELECT 1 FROM account_deletion_operations WHERE auth_user_id=$1::uuid LIMIT 1',[auth.user_id]);
+      if(pending.rows.length)throw Object.assign(Error('This account is being deleted.'),{status:409,code:'ACCOUNT_DELETING'});
+    }
     const resolved = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
     id = resolved.rows[0]?.player_id || current;
   }
   if (id !== current) {
     const currentLink = await query('SELECT auth_user_id FROM account_links WHERE player_id=$1::uuid LIMIT 1', [current]);
     if (!currentLink.rows.length) {
-      await query('SELECT merge_pack1_player($1::uuid,$2::uuid)', [current, id]);
+      const mergedResult=await query(`WITH lock AS MATERIALIZED (
+          SELECT pg_advisory_xact_lock(hashtextextended($3::text,0))
+        ), allowed AS MATERIALIZED (
+          SELECT 1 FROM lock WHERE NOT EXISTS (
+            SELECT 1 FROM account_deletion_operations
+            WHERE auth_user_id=$3::uuid AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
+          )
+        )
+        SELECT merge_pack1_player($1::uuid,$2::uuid) FROM allowed`,[current,id,auth.user_id]);
+      if(!mergedResult.rows.length)throw Object.assign(Error('This account is being deleted.'),{status:409,code:'ACCOUNT_DELETING'});
       merged = true;
     }
   }
@@ -1149,6 +1174,13 @@ async function handleAccountDelete(request) {
   let providerSession='';
   try {
     providerSession=await providerPasswordSession(auth,currentPassword);
+    try {
+      await neonAuthSession('/verify-password',{cookie:providerSession,body:{password:currentPassword}});
+    } catch(error) {
+      const status=Number(error?.status||500);
+      if(status>=500)throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'PROVIDER_FAILURE'});
+      throw Object.assign(Error('Current password was not accepted.'),{status:400,code:'CURRENT_PASSWORD'});
+    }
     await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'account_delete_verify'});
   } finally {
     await closeProviderSession(providerSession);
