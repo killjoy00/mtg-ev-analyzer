@@ -4,6 +4,7 @@ import {chromium,webkit} from 'playwright';
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 
 for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
+  console.log(`Password recovery browser: ${name}`);
   const browser=await type.launch({headless:true});
   const page=await browser.newPage({viewport:{width:390,height:844}});
   const errors=[];let resetMode='success',requestBodies=[];
@@ -26,10 +27,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
   });
 
   await page.goto(base);
-  await page.locator('#account-nav').click();
-  await page.locator('.player-profile-page').waitFor();
-  await page.locator('#profile-claim-account').click();
-  await page.locator('#account-signin').waitFor();
+  await page.evaluate(async()=>{const growth=await import('./growth.mjs');await growth.renderAccount();});
   await page.locator('#account-forgot').waitFor();
   assert.equal((await page.locator('#account-forgot').textContent())?.trim(),'Forgot password?');
   await page.locator('#account-forgot').click();
