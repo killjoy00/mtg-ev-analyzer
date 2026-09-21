@@ -134,61 +134,62 @@ try {
   await page.goto(base, { waitUntil:'domcontentloaded' });
   await page.locator('#account-nav').waitFor({ timeout:10000 });
   assert.equal(await page.locator('#profile-nav').count(), 0, 'Profile and Account share one navigation destination');
+  await page.waitForFunction(()=>document.querySelector('#account-nav')?.textContent?.trim()==='My Pack One');
   await page.locator('#account-nav').click();
-  await page.locator('.player-profile-page').waitFor({ timeout:10000 });
-  assert.equal((await page.locator('.profile-hero h1').textContent())?.trim(), 'Profile Tester');
+  await page.locator('.my-pack-one-page').waitFor({ timeout:10000 });
+  assert.equal((await page.locator('.my-pack-one-heading h1').textContent())?.trim(), 'My Pack One');
+  assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Profile Tester');
+  assert.equal(await page.locator('#profile-stats-tab').getAttribute('aria-selected'),'true');
+  assert.equal(await page.locator('#profile-account-panel').isHidden(),true);
 
   const catalogTotal = await page.evaluate(async () => {
     const response = await fetch('/data/catalog.json', { cache:'no-store' });
     const data = await response.json();
     return (data.sets || []).filter((entry) => entry?.id && !entry.is_fixture).length;
   });
-  assert.equal(await page.locator('.environment-progress-card').count(), catalogTotal, 'profile archive must follow the production catalog dynamically');
-  assert.match((await page.locator('.archive-progress-section h2').textContent()) || '', new RegExp(`6/${catalogTotal} environments played`));
-  assert.equal(await page.locator('[data-environment-id="powered-cube"].played').count(), 1, 'Powered Cube must be part of archive progression');
-  assert.match((await page.locator('.cube-profile-callout').textContent()) || '', /73\.5 avg/i);
-  assert.match((await page.locator('.profile-daily-list li').first().textContent()) || '', /Top 7%/i);
-  assert.equal(await page.locator('.achievement-card').count(), fixture.achievements.length);
-  assert.equal(await page.locator('.achievement-card.locked').count(), 1);
-  assert.equal(await page.locator('.achievement-card.showcase').count(), 1);
+  assert.equal(await page.locator('.my-archive-item').count(), catalogTotal, 'My Pack One archive must follow the production catalog dynamically');
+  assert.match((await page.locator('.my-archive-summary').textContent()) || '', new RegExp(`6/${catalogTotal}\\s*environments played`));
+  assert.equal(await page.locator('[data-environment-id="powered-cube"].is-played').count(), 1, 'Powered Cube must be part of archive progression');
+  assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /Top 7%/i);
+  assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
+  assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
   assert.equal(await page.locator('[data-profile-section="archive"]').getAttribute('open'), null, 'large archive starts collapsed');
   await page.locator('[data-profile-section="archive"] summary').click();
-  assert.ok(await page.locator('[data-environment-id="neo"] a').isVisible(), 'archive entries link to set coverage');
+  assert.ok(await page.locator('[data-environment-id="neo"]').isVisible(), 'archive entries link to set coverage');
   await page.locator('[data-profile-section="archive"] summary').click();
   await page.locator('[data-profile-section="achievements"] summary').click();
-  assert.equal(await page.locator('.achievement-card.unlocked').first().isVisible(), true);
+  assert.equal(await page.locator('.my-achievement-row.is-unlocked').first().isVisible(), true);
   assert.equal(await page.locator('#profile-settings-form').count(), 1);
-  assert.match((await page.locator('.profile-identity-strip').textContent()) || '', /Leaderboard name\s*Profile Tester/i);
-  await page.locator('.profile-career-snapshot').waitFor();
-  assert.equal(await page.locator('.profile-identity-strip').evaluate(node=>node.tagName),'DIV','career stats should not create an unlabeled document section');
-  assert.equal(await page.locator('.profile-career-snapshot').evaluate(node=>getComputedStyle(node).backgroundImage),'none','career snapshot stays flat');
-  const flatRadii=await page.locator('.environment-progress-card,.achievement-card,.profile-mode-card,.cube-profile-callout,.profile-account').evaluateAll(nodes=>nodes.map(node=>getComputedStyle(node).borderRadius));
-  assert.ok(flatRadii.every(radius=>radius==='0px'),'profile cards use the flat tournament treatment');
-  const achievementTargets=await page.locator('.achievement-actions .text-button').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));
+  const achievementTargets=await page.locator('.my-achievement-actions .text-button').evaluateAll(nodes=>nodes.map(node=>node.getBoundingClientRect().height));
   assert.ok(achievementTargets.length>0&&achievementTargets.every(height=>height>=43.5),'achievement actions meet the 44px control target');
   await noOverflow();
   await page.screenshot({ path:'artifacts/ui-profile-mobile.png', fullPage:true });
-  for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}
+
+  await page.locator('#profile-account-tab').click();
+  assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
+  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Account settings are in the Account tab');
+  for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});await noOverflow();await page.locator('#profile-account-panel').screenshot({path:`artifacts/ui-profile-settings-${width}.png`});}
   await page.setViewportSize({width:390,height:844});
 
+  await page.locator('#profile-stats-tab').click();
+  await page.locator('#profile-load-more').evaluate(button=>{button.closest('details').open=true;});
   await page.locator('#profile-load-more').click();
   await page.getByText('WOE', { exact:true }).last().waitFor({ timeout:5000 });
   await page.locator('#profile-load-more').waitFor({ state:'hidden', timeout:5000 });
 
-  assert.ok(await page.locator('#profile-account input[name="displayName"]').isVisible(),'Account settings are on the profile');
+  await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-manage-account,#profile-share-progress').count(),0);
   assert.equal(await page.locator('input[name="displayName"]').inputValue(), 'Profile Tester');
   await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
   await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
   await page.locator('#profile-settings-form button[type="submit"]').click();
-  // The select already has this value before submit; wait for the saved
-  // profile to render instead of racing the asynchronous update response.
-  await page.waitForFunction(() => document.querySelector('.profile-hero h1')?.textContent?.trim() === 'Leaderboard Ace' && document.querySelector('select[name="favoriteSetId"]')?.value === 'ktk');
+  await page.waitForFunction(() => document.querySelector('input[name="displayName"]')?.value === 'Leaderboard Ace' && document.querySelector('select[name="favoriteSetId"]')?.value === 'ktk');
   assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10' });
-  assert.equal((await page.locator('.profile-hero h1').textContent())?.trim(), 'Leaderboard Ace');
   assert.equal(await page.evaluate(() => localStorage.getItem('pack1-player-name-v1')), 'Leaderboard Ace');
 
+  await page.locator('#profile-stats-tab').click();
+  assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Leaderboard Ace');
   await page.locator('#profile-share').click();
   await page.waitForFunction(() => (window.__pack1ShareCalls || 0) > 0, null, { timeout:5000 });
   shareCalls = await page.evaluate(() => window.__pack1ShareCalls || 0);

@@ -79,7 +79,7 @@ for (const path of ['about/index.html','contact/index.html','privacy/index.html'
   assert.match(html, /class="article-return"[^>]*>[\s\S]*Back to Pack One/, `${path} needs a quiet return to the product`);
 }
 const bootstrap = await readFile('bootstrap.mjs','utf8');
-assert.match(bootstrap, /else if \(params\.has\('account'\)\)[\s\S]*?await profiles\.renderMyProfile\(\)/);
+assert.match(bootstrap, /else if \(params\.has\('account'\)\)[\s\S]*?renderAccount\(\{source:'route'\}\)/);
 const about = await readFile('about/index.html','utf8');
 assert.match(about, /Three Dailies, ready to play/);
 assert.match(about, /Daily Draft Run, Daily Powered Cube, and Daily Latest Set/);
