@@ -42,7 +42,11 @@ await page.route('https://**-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**'
 });
 
 async function fillAuth(kind='signin'){
+  if(await page.locator('#account-'+kind).count()===0){
+    await page.locator('#account-mode-toggle').click();
+  }
   const form=page.locator('#account-'+kind);
+  await form.waitFor();
   await form.locator('[name="email"]').fill('qa@example.invalid');
   await form.locator('[name="password"]').fill('fixture-password-123');
   if(kind==='signup')await form.locator('[name="name"]').fill('Test Player');
@@ -68,6 +72,7 @@ try {
   await page.waitForFunction(()=>document.querySelector('#account-nav')?.textContent?.trim()==='Sign in');
   await page.locator('#account-nav').click();
   await page.locator('#account-signin').waitFor();
+  assert.equal(await page.locator('#account-signup').count(),0);
   assert.equal(await page.locator('.player-profile-page').count(),0);
   assert.match(await page.locator('.account-page header').textContent(),/A free account saves your record and enables leaderboard participation\./);
   await page.screenshot({path:'artifacts/ui-account-mobile.png',fullPage:true});
@@ -96,7 +101,7 @@ try {
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-auth-user-v1')),null);
     assert.notEqual(await page.evaluate(()=>localStorage.getItem('pack1-api-session-v1')),'claimed-fixture');
     assert.equal(await page.locator('.player-profile-page').count(),0);
-    assert.equal(await page.locator('#account-signup [name="name"]').inputValue(),'');
+    assert.equal(await page.locator('#account-signup').count(),0);
   }
 
   // Guests are not shown a paid ask on the landing page. The underlying guest
@@ -105,7 +110,8 @@ try {
   await page.locator('[data-daily-home]').waitFor();
   assert.equal(await page.locator('[data-home-elite]').count(),0);
   await page.evaluate(async()=>{const growth=await import('./growth.mjs');await growth.beginEliteUpgrade({source:'e2e_explicit_premium'});});
-  await page.locator('#account-signin').waitFor();
+  await page.locator('#account-signup').waitFor();
+  assert.equal(await page.locator('#account-signin').count(),0);
   assert.match(await page.locator('.account-page').textContent(),/Unlock Elite practice/);
   assert.match(await page.locator('.account-page').textContent(),/send you to Patreon/);
   await fillAuth('signin');

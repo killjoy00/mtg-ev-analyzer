@@ -26,6 +26,7 @@ test('guest Daily results offer score validation instead of a career action', as
   const result = source.slice(source.indexOf('function renderResult()'), source.indexOf('async function shareResult'));
   assert.match(result, /Sign in to add score/);
   assert.match(result, /validateDailyRunId:run\.id/);
+  assert.match(result, /source:'daily_result'/);
   assert.match(source, /sign in after the run to add this score to the leaderboard/);
 });
 
