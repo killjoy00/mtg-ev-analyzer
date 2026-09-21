@@ -188,6 +188,7 @@ try {
   await page.locator('#profile-settings-form button[type="submit"]').click();
   await page.waitForFunction(() => document.querySelector('input[name="displayName"]')?.value === 'Leaderboard Ace' && document.querySelector('select[name="favoriteSetId"]')?.value === 'ktk');
   assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10' });
+  await page.waitForFunction(() => localStorage.getItem('pack1-player-name-v1') === 'Leaderboard Ace');
   assert.equal(await page.evaluate(() => localStorage.getItem('pack1-player-name-v1')), 'Leaderboard Ace');
 
   await page.locator('#profile-stats-tab').click();
