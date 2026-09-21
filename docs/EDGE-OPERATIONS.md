@@ -64,6 +64,7 @@ Change `.github/edge-preview-request.json` through a reviewed PR. `operation` mu
 
 | Operation | Effect |
 |---|---|
+| `idle` | No infrastructure action. Use this as the resting state after an operation is complete. |
 | `check-access` | Read scoped Cloudflare configuration and check hostname/Worker ownership. No provisioning. |
 | `deploy-preview` | Create an expiring Neon branch, deploy guarded origins and the private gateway, then run live acceptance. |
 | `disable-preview` | Remove only this Worker's verified preview custom-domain attachment. Keep backend guards enabled. |
