@@ -60,6 +60,24 @@ test('production Auth webhook verifies the exact raw request bytes and rejects c
   assert.equal(await verifyNeonWebhook(changed,fixture.headers,'https://auth.raw.example',fetcher,fixture.timestamp),false);
 });
 
+test('production Auth webhook rejects protected-header algorithm or kid mismatches',async()=>{
+  const fixture=await signedFixture({kid:'protected-kid'});
+  const fetcher=async()=>Response.json({keys:[fixture.jwk]});
+
+  const [protectedB64,,signatureB64]=fixture.headers.get('x-neon-signature').split('.');
+  const wrongAlg=b64url(encoder.encode(JSON.stringify({alg:'HS256',kid:'protected-kid'})));
+  const algHeaders=new Headers(fixture.headers);
+  algHeaders.set('x-neon-signature',wrongAlg+'..'+signatureB64);
+  assert.equal(await verifyNeonWebhook(fixture.raw,algHeaders,'https://auth.protected.example',fetcher,fixture.timestamp),false);
+
+  const wrongKid=b64url(encoder.encode(JSON.stringify({alg:'EdDSA',kid:'other-kid'})));
+  const kidHeaders=new Headers(fixture.headers);
+  kidHeaders.set('x-neon-signature',wrongKid+'..'+signatureB64);
+  assert.equal(await verifyNeonWebhook(fixture.raw,kidHeaders,'https://auth.protected.example',fetcher,fixture.timestamp),false);
+
+  assert.ok(protectedB64);
+});
+
 test('production Auth webhook rejects stale timestamps, malformed detached JWS and wrong key ids',async()=>{
   const now=Date.now();
   const stale=await signedFixture({timestamp:now-6*60*1000,kid:'stale-kid'});
