@@ -1,1 +1,1 @@
-{"operation":"cleanup-auth-webhook-probe","reason":"2026-09-21: QA Auth webhook has been disabled after successful Phase 0; remove the temporary Cloudflare probe receiver."}
+{"operation":"cleanup-auth-webhook-probe","reason":"2026-09-21: Retry temporary QA Auth probe cleanup using Cloudflare inventory verification after the Wrangler-only delete path failed."}
