@@ -30,6 +30,57 @@ CREATE INDEX IF NOT EXISTS account_deletion_nonterminal_idx
   ON account_deletion_operations(updated_at, operation_id)
   WHERE state <> 'complete';
 
+-- Identity attachment/deletion serialization must take a fresh visibility
+-- snapshot after waiting on the per-Auth-user advisory lock. Keeping the lock
+-- and tombstone check inside one caller statement can retain a pre-wait
+-- READ COMMITTED snapshot and miss a deletion that committed while blocked.
+CREATE OR REPLACE FUNCTION pack1_identity_attachment_allowed(p_auth_user_id uuid)
+RETURNS boolean
+LANGUAGE plpgsql
+VOLATILE
+AS $
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_auth_user_id::text,0));
+  RETURN NOT EXISTS (
+    SELECT 1
+    FROM account_deletion_operations
+    WHERE auth_user_id=p_auth_user_id
+      AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
+  );
+END;
+$;
+
+CREATE OR REPLACE FUNCTION pack1_begin_account_deletion(p_auth_user_id uuid,p_player_id uuid DEFAULT NULL)
+RETURNS SETOF account_deletion_operations
+LANGUAGE plpgsql
+VOLATILE
+AS $
+DECLARE
+  resolved_player uuid;
+  op account_deletion_operations%ROWTYPE;
+BEGIN
+  PERFORM pg_advisory_xact_lock(hashtextextended(p_auth_user_id::text,0));
+
+  SELECT a.player_id INTO resolved_player
+  FROM account_links a
+  WHERE a.auth_user_id=p_auth_user_id
+  LIMIT 1;
+
+  INSERT INTO account_deletion_operations(auth_user_id,player_id,state)
+  VALUES(p_auth_user_id,COALESCE(p_player_id,resolved_player),'pending')
+  ON CONFLICT(auth_user_id) DO UPDATE SET
+    updated_at=account_deletion_operations.updated_at
+  RETURNING account_deletion_operations.* INTO op;
+
+  UPDATE account_sessions
+  SET revoked_at=COALESCE(revoked_at,now())
+  WHERE auth_user_id=p_auth_user_id AND revoked_at IS NULL;
+
+  RETURN NEXT op;
+END;
+$;
+
+
 -- Reuse the signed-in credential limiter storage for destructive verification
 -- and deletion initiation. The account UUID and authenticated gateway network
 -- HMAC are the only identity dimensions; raw network data is never stored.
