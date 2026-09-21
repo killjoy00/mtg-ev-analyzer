@@ -1,0 +1,90 @@
+name: Issue 179A isolated recovery QA
+
+on:
+  push:
+    branches:
+      - ops/179a-recovery-qa
+
+permissions:
+  contents: read
+
+jobs:
+  recovery-qa:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      REPO_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
+      PROJECT_ID: late-fire-55708539
+      TARGET_BRANCH: br-super-snow-b5ufhq30
+      FEATURE_COMMIT: c63f27d2bdcb47c1e81db495d7f8abb8af9b5451
+      QA_AUTH_BASE: https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth
+      QA_FUNCTION_BASE: https://br-super-snow-b5ufhq30-pack1growth.compute.c-7.us-east-2.aws.neon.tech
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Prepare isolated QA credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY is missing.'; exit 1; }
+          if [ ${#REPO_RATE_LIMIT_SECRET} -ge 32 ]; then
+            echo "production_rate_limit_secret_ready=true"
+          else
+            echo "production_rate_limit_secret_ready=false"
+          fi
+          QA_RATE_LIMIT_SECRET="$(openssl rand -hex 32)"
+          echo "::add-mask::$QA_RATE_LIMIT_SECRET"
+          echo "QA_RATE_LIMIT_SECRET=$QA_RATE_LIMIT_SECRET" >> "$GITHUB_ENV"
+
+      - name: Install pinned Neon release tools
+        run: npm install -g neon@4.17.4 esbuild@0.28.2
+
+      - name: Resolve isolated QA database
+        shell: bash
+        run: |
+          set -euo pipefail
+          QA_DATABASE_URL="$(neon connection-string "$TARGET_BRANCH" --project-id "$PROJECT_ID" --database-name neondb)"
+          echo "::add-mask::$QA_DATABASE_URL"
+          echo "QA_DATABASE_URL=$QA_DATABASE_URL" >> "$GITHUB_ENV"
+
+      - name: Build reviewed recovery bundle
+        run: node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$FEATURE_COMMIT"
+
+      - name: Deploy only Pack One growth to isolated QA
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon functions deploy pack1growth \
+            --src "$RUNNER_TEMP/pack1-bundles/pack1growth" \
+            --no-bundle \
+            --project-id "$PROJECT_ID" \
+            --branch "$TARGET_BRANCH" \
+            --runtime nodejs24 \
+            --wait \
+            --env "PACK1_AUTH_ENV=qa" \
+            --env "PACK1_ALLOW_LOCALHOST=1" \
+            --env "PACK1_RATE_LIMIT_SECRET=$QA_RATE_LIMIT_SECRET"
+
+      - name: Wait for exact reviewed revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 36); do
+            body="$(curl -fsS --max-time 20 "$QA_FUNCTION_BASE/health?quick=1" || true)"
+            if BODY="$body" node -e 'const d=JSON.parse(process.env.BODY||"{}");process.exit(d.ok===true&&d.release_commit===process.env.FEATURE_COMMIT?0:1)' 2>/dev/null; then
+              echo "qa_release_marker_ready=true"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo '::error::QA function never served the reviewed recovery revision.'
+          exit 1
+
+      - name: Run real isolated recovery capability checks
+        run: node .github/ops/issue-179a-recovery-qa.mjs
