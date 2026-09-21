@@ -89,15 +89,27 @@ export async function issueAccountSession(query,auth,{replaceHash=null}={}) {
   if(!auth?.user_id)throw Error('Cannot issue account session without a user.');
   const token=randomBytes(32).toString('base64url');
   const csrf=randomBytes(32).toString('base64url');
-  const result=await query(`WITH revoked AS (
+  const result=await query(`WITH lock AS MATERIALIZED (
+      SELECT pg_advisory_xact_lock(hashtextextended($2::text,0))
+    ), allowed AS MATERIALIZED (
+      SELECT 1 FROM lock
+      WHERE NOT EXISTS (
+        SELECT 1 FROM account_deletion_operations
+        WHERE auth_user_id=$2::uuid
+          AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
+      )
+    ), revoked AS (
       UPDATE account_sessions SET revoked_at=COALESCE(revoked_at,now())
       WHERE $4::text IS NOT NULL AND session_hash=$4 AND revoked_at IS NULL
+        AND EXISTS(SELECT 1 FROM allowed)
     ), inserted AS (
       INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at)
-      VALUES($1,$2::uuid,$3,now()+interval '7 days')
+      SELECT $1,$2::uuid,$3,now()+interval '7 days' FROM allowed
       RETURNING expires_at
     ) SELECT expires_at FROM inserted`,[digest(token),auth.user_id,digest(csrf),replaceHash]);
-  return {token,csrf,expiresAt:result.rows[0]?.expires_at};
+  if(!result.rows[0]?.expires_at)
+    throw Object.assign(Error('This account is being deleted.'),{status:409,code:'ACCOUNT_DELETING'});
+  return {token,csrf,expiresAt:result.rows[0].expires_at};
 }
 
 export async function revokeAllAccountSessions(query,authUserId) {
