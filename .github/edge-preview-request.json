@@ -1,1 +1,1 @@
-{"operation":"run-auth-webhook-probe","reason":"2026-09-21: Execute one controlled password-recovery reset against the separate Pack One Auth QA project after the QA webhook was manually enabled."}
+{"operation":"run-auth-webhook-probe","reason":"2026-09-21: Execute the third controlled QA password-recovery webhook probe after the JWKS fetch fix; clear stale evidence first."}

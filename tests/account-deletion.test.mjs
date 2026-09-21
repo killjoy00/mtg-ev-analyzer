@@ -256,3 +256,28 @@ test('manual controls redeploy the current release without migrations',()=>{
   assert.match(flow,/PACK1_ACCOUNT_DELETION_ENABLED/);
   assert.match(flow,/PACK1_VERIFICATION_SWEEP_ENABLED/);
 });
+
+
+test('secure-auth release smoke is deletion-specific and corpus-independent',()=>{
+  const flow=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
+  const smoke=fs.readFileSync('tests/secure-auth-release-smoke.mjs','utf8');
+  assert.equal((flow.match(/secure-auth-release-smoke\.mjs/g)||[]).length,2);
+  assert.doesNotMatch(flow,/release-functions-smoke\.mjs/);
+  assert.match(smoke,/\/health\?quick=1/);
+  assert.match(smoke,/account_deletion_enabled/);
+  assert.match(smoke,/verification_sweep_enabled/);
+  assert.match(smoke,/\/v1\/account\/delete/);
+  assert.match(smoke,/status:401/);
+  assert.doesNotMatch(smoke,/daily_featured_sets|\/v1\/runs|corpus_version/);
+});
+
+test('secure-auth release smoke waits through stale Neon instances until the revision is stable',()=>{
+  const smoke=fs.readFileSync('tests/secure-auth-release-smoke.mjs','utf8');
+  assert.match(smoke,/const stableWindow=30\*1000/);
+  assert.match(smoke,/stableSince=0/);
+  assert.match(smoke,/if\(await marker\(slug\)!==commit\)all=false/);
+  assert.match(smoke,/else \{\s*stableSince=0;/);
+  assert.match(smoke,/release markers did not stabilize on the reviewed revision/);
+  assert.doesNotMatch(smoke,/stableUntil=Date\.now\(\)\+30\*1000/);
+});
+
