@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import { completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, signInAccount, signOutAccount, signUpAccount, startGoogleSignIn } from './growth-api.mjs';
+import { completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, signInAccount, signOutAccount, signUpAccount, startGoogleSignIn } from './growth-api.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { trackEvent as event } from './retention-events.mjs';
 
@@ -16,7 +16,7 @@ function takeAuthFlow() {
 function authCompleted(data) {return firstPartyAuthEnabled()?Boolean(data?.user):Boolean(data?.token);}
 
 function formMarkup(kind) {
-  return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="email"></label>${kind==='signup'?'<label>Display name<input required name="name" minlength="2" maxlength="24" autocomplete="nickname"></label>':''}<label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button><p class="form-error" aria-live="polite"></p></form>`;
+  return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="email"></label>${kind==='signup'?'<label>Display name<input required name="name" minlength="2" maxlength="24" autocomplete="nickname"></label>':''}<label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p class="form-error" aria-live="polite"></p></form>`;
 }
 
 function handoffToPatreon(source='account') {
@@ -40,6 +40,25 @@ async function claimCurrentSession() {
 export async function beginEliteUpgrade({ source='unknown' } = {}) {
   event('elite_upgrade_clicked',{source});
   return renderAccount({intent:'elite',source});
+}
+
+export async function renderForgotPassword() {
+  document.body.classList.remove('is-game');
+  const app=document.querySelector('#app');if(!app)return;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account recovery</p><h1>Reset your password.</h1><p>Enter your account email. We’ll send a reset link if a password account exists.</p></header><div class="account-columns"><div><form class="account-form" id="account-recovery-request"><label>Email<input required type="email" name="email" autocomplete="email"></label><button class="button primary" type="submit">Send reset link</button><p class="form-error" aria-live="polite"></p></form></div></div><div class="account-actions"><button class="button secondary" id="account-recovery-back" type="button">Back to sign in</button></div></section>`;
+  document.querySelector('#account-recovery-back')?.addEventListener('click',()=>void renderAccount());
+  document.querySelector('#account-recovery-request')?.addEventListener('submit',async e=>{
+    e.preventDefault();const form=e.currentTarget,button=form.querySelector('button[type="submit"]'),status=form.querySelector('.form-error');
+    status.textContent='';button.disabled=true;
+    try {
+      const {email}=Object.fromEntries(new FormData(form));
+      const result=await requestPasswordReset(email);
+      form.innerHTML=`<p class="form-success" role="status">${esc(result?.message||"If an account exists for that email, we've sent a password reset link.")}</p>`;
+    } catch(error) {
+      status.textContent=error?.message||'Password recovery is temporarily unavailable.';
+      button.disabled=false;
+    }
+  });
 }
 
 export async function renderAccount({ validateDailyRunId = null, intent = null, source = 'account' } = {}) {
@@ -83,6 +102,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     try {saveAuthFlow(intent,source);event('auth_google_started',{source});await startGoogleSignIn();}
     catch(error){button.disabled=false;const target=document.querySelector('#account-signin .form-error');if(target)target.textContent=error.message;}
   });
+  document.querySelector('#account-forgot')?.addEventListener('click',()=>void renderForgotPassword());
   document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;await (await import('./profile-product.mjs')).renderMyProfile();});
   document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;document.querySelector('#brand-home')?.click();});
   document.querySelector('#account-signup')?.addEventListener('submit',async(e)=>{e.preventDefault();const form=e.currentTarget,err=form.querySelector('.form-error');err.textContent='';try{const data=Object.fromEntries(new FormData(form));const auth=await signUpAccount(data);event('auth_sign_up');if(!authCompleted(auth)){err.textContent='Account created. Check your email to finish verification, then sign in.';return;}await claimCurrentSession();if(upgradingElite){handoffToPatreon(source);return;}await renderAccount();}catch(error){err.textContent=error.message;}});

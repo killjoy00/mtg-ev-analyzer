@@ -42,7 +42,8 @@ export function csrfCookie(request) {
   return validOpaque(value)?value:null;
 }
 
-export function requireTrustedOrigin(request,allowed=new Set(['https://packone.pro'])) {
+export function requireTrustedOrigin(request,allowed) {
+  if(!(allowed instanceof Set)||allowed.size===0)throw Object.assign(Error('Trusted origin policy unavailable.'),{status:503});
   const origin=request.headers.get('origin');
   if(!origin||!allowed.has(origin))throw Object.assign(Error('Origin not allowed.'),{status:403});
   return origin;
@@ -97,6 +98,17 @@ export async function issueAccountSession(query,auth,{replaceHash=null}={}) {
       RETURNING expires_at
     ) SELECT expires_at FROM inserted`,[digest(token),auth.user_id,digest(csrf),replaceHash]);
   return {token,csrf,expiresAt:result.rows[0]?.expires_at};
+}
+
+export async function revokeAllAccountSessions(query,authUserId) {
+  const id=String(authUserId||'');
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
+    throw Object.assign(Error('Unambiguous Auth user identity required.'),{status:500});
+  const result=await query(
+    'UPDATE account_sessions SET revoked_at=COALESCE(revoked_at,now()) WHERE auth_user_id=$1::uuid AND revoked_at IS NULL',
+    [id],
+  );
+  return {authUserId:id,revoked:Number(result?.rowCount||0)};
 }
 
 export async function revokeAccountSession(query,account) {

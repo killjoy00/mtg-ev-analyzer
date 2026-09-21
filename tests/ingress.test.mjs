@@ -107,6 +107,26 @@ test('quota failure, oversized bodies and invalid preflights fail before upstrea
     assert.equal((await gateway(req('/growth/v1/session',{method:'OPTIONS',body:undefined,headers}),env,noFetch)).status,status);
 });
 
+test('gateway and worker recovery origin/route policy stay aligned',async()=>{
+  const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+  for(const origin of ['https://packone.pro','https://api.packone.pro','https://magic.planitnow.us']) {
+    for(const path of ['/growth/v1/account/request-password-reset','/growth/v1/account/reset-password']) {
+      let forwarded=false;
+      const result=await gateway(new Request('https://api.packone.pro'+path,{
+        method:'POST',body:'{}',headers:{'content-type':'application/json','cf-connecting-ip':'192.0.2.41',origin},
+      }),prod,async()=>{forwarded=true;return Response.json({ok:true});});
+      assert.equal(result.status,200);assert.equal(forwarded,true);
+      assert.equal(result.headers.get('access-control-allow-origin'),origin);
+    }
+  }
+  let forwarded=false;
+  const denied=await gateway(new Request('https://api.packone.pro/growth/v1/account/request-password-reset',{
+    method:'POST',body:'{}',headers:{'content-type':'application/json','cf-connecting-ip':'192.0.2.42',origin:'http://localhost:4173'},
+  }),prod,async()=>{forwarded=true;return Response.json({ok:true});});
+  assert.equal(denied.status,403);assert.equal(forwarded,false);
+});
+
 test('strict session quota applies only to new player-session creation',async()=>{
   const kinds=[];
   const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'e'.repeat(64),

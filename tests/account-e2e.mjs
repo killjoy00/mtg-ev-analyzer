@@ -11,8 +11,8 @@ await page.route('https://www.patreon.com/**',route=>route.fulfill({
   body:'<!doctype html><title>Patreon fixture</title><p>Patreon</p>',
 }));
 
-await page.route('https://**.neonauth.c-5.us-east-2.aws.neon.tech/**',async route=>{
-  const path=new URL(route.request().url()).pathname;assert.match(path,/sign-(in|up)\/email$/);
+await page.route('https://**.neonauth.c-7.us-east-2.aws.neon.tech/**',async route=>{
+  const target=new URL(route.request().url()),path=target.pathname;assert.equal(target.host,'ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech');assert.match(path,/sign-(in|up)\/email$/);
   const body=route.request().postDataJSON();assert.equal(body.email,'qa@example.invalid');signed=true;
   await route.fulfill({contentType:'application/json',body:JSON.stringify({token:'auth-fixture',user:{email:body.email,name:'Test Player'}})});
 });

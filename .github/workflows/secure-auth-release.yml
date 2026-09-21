@@ -26,6 +26,7 @@ jobs:
       PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
       PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
       PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
+      PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,6 +57,12 @@ jobs:
             sudo apt-get install -y postgresql-client
           fi
 
+      - name: Verify password-recovery deployment secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ${#PACK1_RATE_LIMIT_SECRET} -ge 32 || { echo '::error::PACK1_RATE_LIMIT_SECRET is missing or too short.'; exit 1; }
+
       - name: Build exact Neon function revision
         env:
           ESBUILD_BIN: ${{ runner.temp }}/edge-tools/node_modules/.bin/esbuild
@@ -72,6 +79,7 @@ jobs:
           connection=$("$neon" connection-string "$DEV_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
           echo "::add-mask::$connection"
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0028_account_sessions.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0029_account_recovery.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
 
       - name: Deploy exact revision to development
@@ -80,7 +88,9 @@ jobs:
           set -euo pipefail
           neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
           while IFS=: read -r slug entry; do
-            "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait
+            extra=()
+            if [[ "$slug" == pack1growth ]]; then extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET"); fi
+            "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
           node tests/release-functions-smoke.mjs "$DEV_BRANCH" "$GITHUB_SHA" --daily --settle
 
@@ -111,8 +121,11 @@ jobs:
           neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
           while IFS=: read -r slug entry; do
             extra=()
-            if [[ "$slug" == pack1growth && "$PATREON_RUNTIME_ENABLED" == true ]]; then
-              extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
+            if [[ "$slug" == pack1growth ]]; then
+              extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET")
+              if [[ "$PATREON_RUNTIME_ENABLED" == true ]]; then
+                extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
+              fi
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$PROD_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt

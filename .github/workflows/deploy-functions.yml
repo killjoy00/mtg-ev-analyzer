@@ -34,6 +34,7 @@ jobs:
       PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
       PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
       PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
+      PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -48,6 +49,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY is missing.'; exit 1; }
+          test ${#PACK1_RATE_LIMIT_SECRET} -ge 32 || { echo '::error::PACK1_RATE_LIMIT_SECRET is missing or too short.'; exit 1; }
           [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::Use a full commit SHA.'; exit 1; }
           git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
           git checkout --detach "$RELEASE_COMMIT"
@@ -100,8 +102,11 @@ jobs:
           set -euo pipefail
           while IFS=: read -r slug entry; do
             extra=()
-            if [[ "$slug" == pack1growth && "$RELEASE_TARGET" == production && "$PATREON_RUNTIME_ENABLED" == true ]]; then
-              extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
+            if [[ "$slug" == pack1growth ]]; then
+              extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET")
+              if [[ "$RELEASE_TARGET" == production && "$PATREON_RUNTIME_ENABLED" == true ]]; then
+                extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
+              fi
             fi
             neon functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle \
               --project-id "$PROJECT_ID" --branch "$TARGET_BRANCH" --runtime nodejs24 --wait "${extra[@]}"

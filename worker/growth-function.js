@@ -1,17 +1,16 @@
+import {createHmac} from 'node:crypto';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {handlePatreon} from './patreon.mjs';
-import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,withAccountCookies,withPlayerCookie} from './account-session.mjs';
-const ALLOWED_ORIGINS = new Set([
-  'https://packone.pro',
-  'https://killjoy00.github.io',
-  ...(process.env.PACK1_ALLOW_LOCALHOST==='1'?['http://127.0.0.1:4173','http://localhost:4173']:[]),
-]);
+import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
+import {accountRuntimeConfig} from './account-config.mjs';
+const ACCOUNT_CONFIG=accountRuntimeConfig();
+const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
 const TOKEN_PREFIX = 'p1_';
-const NEON_AUTH_BASE='https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const NEON_AUTH_BASE=ACCOUNT_CONFIG.authBase;
 const ACCOUNT_RETURN='https://packone.pro/';
 const STATIC_ORIGIN = 'https://packone.pro';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
@@ -152,7 +151,7 @@ async function authSession(request,options={}) {
 async function neonAuth(path,{method='GET',body}={}) {
   const response=await fetch(NEON_AUTH_BASE+path,{
     method,
-    headers:{origin:'https://packone.pro',...(body===undefined?{}:{'content-type':'application/json'})},
+    headers:{origin:ACCOUNT_CONFIG.providerOrigin,...(body===undefined?{}:{'content-type':'application/json'})},
     body:body===undefined?undefined:JSON.stringify(body),
     redirect:'manual',
     signal:AbortSignal.timeout(15000),
@@ -565,7 +564,7 @@ async function historyPage(playerId, cursor, limit = 25) {
 }
 
 async function handleBrowserPlayerSession(request) {
-  requireTrustedOrigin(request);
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const current=await player(request,false);
   if(current) {
     const meta=await profileMetaByPlayer(current);
@@ -579,7 +578,7 @@ async function handleBrowserPlayerSession(request) {
 }
 
 async function handlePlayerMigration(request) {
-  requireTrustedOrigin(request);
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const legacy=String(request.headers.get('x-pack1-player-session')||'');
   const id=await verifyToken(legacy);
   if(!id)throw Object.assign(Error('Guest session could not be migrated.'),{status:401});
@@ -597,7 +596,7 @@ async function handlePlayerMigration(request) {
 }
 
 async function handleAccountSignup(request) {
-  requireTrustedOrigin(request);
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const payload=await readJson(request);
   const data=await neonAuth('/sign-up/email',{method:'POST',body:{
     name:String(payload.name||'').trim().slice(0,80),
@@ -610,7 +609,7 @@ async function handleAccountSignup(request) {
 }
 
 async function handleAccountSignin(request) {
-  requireTrustedOrigin(request);
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const payload=await readJson(request);
   const data=await neonAuth('/sign-in/email',{method:'POST',body:{
     email:String(payload.email||'').trim(),
@@ -622,8 +621,91 @@ async function handleAccountSignin(request) {
   return accountJson(established.auth,established.session);
 }
 
+const RESET_REQUEST_MESSAGE="If an account exists for that email, we've sent a password reset link.";
+const RESET_LIMIT_MAX=5;
+
+function normalizedRecoveryEmail(value) {
+  const email=String(value||'').trim().toLowerCase();
+  if(email.length<3||email.length>254||!email.includes('@'))throw Object.assign(Error('Enter a valid email address.'),{status:400});
+  return email;
+}
+
+function recoveryRateKey(email) {
+  const secret=String(process.env.PACK1_RATE_LIMIT_SECRET||'');
+  if(secret.length<32)throw Object.assign(Error('Password recovery is temporarily unavailable.'),{status:503,code:'RATE_LIMIT_CONFIG'});
+  return createHmac('sha256',secret).update(email).digest('hex');
+}
+
+async function consumeRecoveryLimit(email) {
+  const key=recoveryRateKey(email);
+  await query('DELETE FROM account_recovery_rate_limits WHERE expires_at<=now()');
+  const result=await query(`INSERT INTO account_recovery_rate_limits(limit_key,attempts,expires_at)
+    VALUES($1,1,now()+interval '15 minutes')
+    ON CONFLICT(limit_key) DO UPDATE SET
+      attempts=CASE WHEN account_recovery_rate_limits.expires_at<=now() THEN 1 ELSE account_recovery_rate_limits.attempts+1 END,
+      expires_at=CASE WHEN account_recovery_rate_limits.expires_at<=now() THEN now()+interval '15 minutes' ELSE account_recovery_rate_limits.expires_at END
+    RETURNING attempts,expires_at`,[key]);
+  return {limited:Number(result.rows[0]?.attempts||0)>RESET_LIMIT_MAX,expiresAt:result.rows[0]?.expires_at,key};
+}
+
+async function handlePasswordResetRequest(request) {
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const payload=await readJson(request);
+  const email=normalizedRecoveryEmail(payload.email);
+  const limit=await consumeRecoveryLimit(email);
+  if(limit.limited)return json({error:'Too many password reset requests. Please try again later.'},429);
+  try {
+    await neonAuth('/request-password-reset',{method:'POST',body:{
+      email,
+      redirectTo:ACCOUNT_CONFIG.resetDestination,
+    }});
+  } catch(error) {
+    if(Number(error?.status||500)>=500)throw Object.assign(Error('Password recovery is temporarily unavailable.'),{status:503});
+    // Better Auth account/provider-specific 4xx responses are intentionally
+    // collapsed to the same public response as a successful request.
+  }
+  return json({ok:true,message:RESET_REQUEST_MESSAGE});
+}
+
+function recoveryToken(value) {
+  const token=String(value||'');
+  if(!/^[A-Za-z0-9._~-]{16,2048}$/.test(token))throw Object.assign(Error('This password reset link is invalid or expired.'),{status:400,code:'INVALID_RESET'});
+  return token;
+}
+
+async function recoveryUserForToken(token) {
+  const result=await query(`SELECT value auth_user_id,"expiresAt" expires_at FROM neon_auth.verification
+    WHERE identifier=$1 LIMIT 1`,['reset-password:'+token]);
+  const row=result.rows[0],id=String(row?.auth_user_id||'');
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
+    throw Object.assign(Error('This password reset link is invalid or has already been used.'),{status:400,code:'INVALID_RESET'});
+  if(new Date(row.expires_at).getTime()<=Date.now())
+    throw Object.assign(Error('This password reset link has expired.'),{status:400,code:'EXPIRED_RESET'});
+  return id;
+}
+
+async function handlePasswordReset(request) {
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const payload=await readJson(request);
+  const token=recoveryToken(payload.token);
+  const password=String(payload.newPassword||'');
+  if(password.length<8||password.length>128)throw Object.assign(Error('Password must be 8-128 characters.'),{status:400,code:'PASSWORD_POLICY'});
+  // Resolve only a tentative identity before provider consumption. No Pack One
+  // session is touched unless Better Auth subsequently confirms the reset.
+  const authUserId=await recoveryUserForToken(token);
+  try {
+    await neonAuth('/reset-password',{method:'POST',body:{newPassword:password,token}});
+  } catch(error) {
+    const status=Number(error?.status||500);
+    if(status>=500)throw Object.assign(Error('Password recovery is temporarily unavailable.'),{status:503,code:'PROVIDER_FAILURE'});
+    throw Object.assign(Error(status===400?'This password reset link is invalid, expired, or already used.':'The new password was not accepted.'),{status:400,code:status===400?'INVALID_RESET':'PASSWORD_POLICY'});
+  }
+  await revokeAllAccountSessions(query,authUserId);
+  return clearAccountCookies(json({ok:true}));
+}
+
 async function handleAccountMigration(request) {
-  requireTrustedOrigin(request);
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
   await player(request);
   const legacy=await authSession(request,{allowLegacy:true,csrf:false});
   if(legacy.source!=='legacy') {
@@ -971,6 +1053,8 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signup') return handleAccountSignup(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signin') return handleAccountSignin(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/request-password-reset') return handlePasswordResetRequest(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/reset-password') return handlePasswordReset(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/link-browser') return handleLink(request,{browser:true});
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
@@ -1001,11 +1085,11 @@ export default {
     } catch (error) {
       console.error(error);
       const status=Number(error?.status||500);
-      const response=json({ error: status===500?'Request failed. Please try again.':error.message },status);
+      const response=json({ error: status===500?'Request failed. Please try again.':error.message,...(error?.code?{code:String(error.code)}:{}) },status);
       if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));
       return withCors(response, request);
     }
   },
 };
 
-export { query, player, readJson, json, withCors, gameDateKey };
+export { query, player, readJson, json, withCors, gameDateKey, normalizedRecoveryEmail, recoveryRateKey, consumeRecoveryLimit };

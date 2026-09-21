@@ -1,10 +1,11 @@
 import {isIP} from 'node:net';
 import {readJson} from '../worker/request-json.mjs';
+import {PROD_ORIGINS} from '../worker/account-config.mjs';
 
 const SERVICES={legacy:'pack1api',growth:'pack1growth',draft:'draftrunapi'};
 const PROD_BRANCH='br-orange-feather-ayps8kep';
 const DEV_BRANCH='br-twilight-hill-ayffyd2b';
-const ORIGINS=new Set(['https://packone.pro']);
+const ORIGINS=new Set(PROD_ORIGINS);
 const COOKIE_NAMES=new Set(['__Host-pack1_account','__Secure-pack1_csrf','__Host-pack1_player']);
 const response=(status,error,headers={})=>Response.json({error},{status,headers:{'cache-control':'no-store',...headers}});
 const secret=value=>/^[a-f0-9]{64}$/.test(value||'');
@@ -35,7 +36,7 @@ function permitted(service,path,method,search,mode) {
   if(service==='growth') {
     if(method==='POST'&&[
       '/v1/session','/v1/player/session','/v1/player/migrate',
-      '/v1/account/signup','/v1/account/signin','/v1/account/migrate',
+      '/v1/account/signup','/v1/account/signin','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/migrate',
       '/v1/account/link','/v1/account/link-browser','/v1/account/signout',
       '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect',
     ].includes(path))return true;

@@ -1,6 +1,6 @@
 # Request and identity integrity
 
-Reviewed 2026-09-14. Backend changes require deployment after migration 0013; merging code does not deploy Neon Functions.
+Reviewed 2026-09-20. Backend changes require deployment after migration 0013; merging code does not deploy Neon Functions.
 
 ## Implemented protections
 
@@ -11,6 +11,15 @@ Reviewed 2026-09-14. Backend changes require deployment after migration 0013; me
 - Growth JSON responses use `Cache-Control: no-store`; unexpected legacy database errors return a generic error. Fresh legacy signing-key initialization uses cryptographic random bytes, preserving any existing key.
 - One `game-date.mjs` implementation owns Eastern dates for frontend, Today, both backend modules and legacy aliases. Misnamed UTC callers are removed; DST and midnight regression cases cover every entry point.
 - Today refreshes on a completed result, return to the page and a date change. Old asynchronous results cannot overwrite newer state. Today and Profile subscribe to the common rendering lifecycle, now included in the architecture gate.
+
+## Password recovery integrity
+
+- Password-reset requests are signed-out by design but still require the authoritative Pack One origin policy. Production recognizes `https://packone.pro`, `https://api.packone.pro`, and `https://magic.planitnow.us`; localhost is added only with explicit `PACK1_ALLOW_LOCALHOST=1`. `requireTrustedOrigin()` has no implicit fallback.
+- The recovery callback is server-owned configuration. Production always supplies `https://packone.pro/reset-password/`; isolated Auth QA supplies `http://localhost:4173/reset-password/`. Request bodies, query strings, `Origin`, `Referer`, host/forwarded-host headers, cookies, fragments, localStorage, and sessionStorage cannot choose it.
+- Anonymous reset requests are throttled by a deterministic HMAC-SHA-256 of the normalized email using the dedicated server-only `PACK1_RATE_LIMIT_SECRET`. Raw email and plain SHA-256 email digests are not persisted as limiter identity. The limiter expires rows and fails closed before provider invocation when the secret is missing.
+- Public request-reset responses do not disclose whether an email exists or whether it has a password credential. Provider-specific 4xx account lookup behavior is collapsed to the same generic public response; provider outages remain generic temporary failures.
+- Recovery credentials are accepted only by the reset-completion endpoint, are not logged or persisted by Pack One, and are removed from the browser-visible URL/history as soon as the reset page loads. A successful provider reset revokes every Pack One first-party session for the resolved Auth user; malformed, expired, reused, policy-rejected, or provider-failed resets revoke none.
+- Auth provider selection is deployment/runtime configuration. Production defaults to production Auth; the static local development configuration selects the isolated QA Auth provider. Browser query/hash/cookie/storage input is not an environment selector.
 
 ## Remaining ingress and account work
 
