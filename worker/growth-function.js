@@ -902,6 +902,7 @@ async function handleLink(request,{browser=false}={}) {
   const old = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
   let id = old.rows[0]?.player_id || current;
   let merged = false;
+  let linkChanged = !old.rows.length;
 
   if (!old.rows.length) {
     await query(
@@ -914,6 +915,10 @@ async function handleLink(request,{browser=false}={}) {
     id = resolved.rows[0]?.player_id || current;
   }
   if (id !== current) {
+    // Even when the current player cannot be merged because it is already
+    // linked elsewhere, switching this browser back to the account's player is
+    // a real association change and remains a session-rotation boundary.
+    linkChanged = true;
     const currentLink = await query('SELECT auth_user_id FROM account_links WHERE player_id=$1::uuid LIMIT 1', [current]);
     if (!currentLink.rows.length) {
       await query('SELECT merge_pack1_player($1::uuid,$2::uuid)', [current, id]);
@@ -936,8 +941,11 @@ async function handleLink(request,{browser=false}={}) {
     profileKey: profile?.profile_key || null,
     email: auth.email,
   });
-  if(browser)response=withPlayerCookie(response,playerToken);
-  if(auth.source==='cookie') {
+  // A no-op link must not rewrite identity cookies. Reissuing the account
+  // session here revoked the valid session and rotated CSRF on every ordinary
+  // page load. Genuine claims/merges/browser-player reassociations still rotate.
+  if(browser&&linkChanged)response=withPlayerCookie(response,playerToken);
+  if(auth.source==='cookie'&&linkChanged) {
     const rotated=await issueAccountSession(query,auth,{replaceHash:auth.session_hash});
     response=withAccountCookies(response,rotated);
   }
