@@ -72,7 +72,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
           readyState:document.readyState,
           appText:document.querySelector('#app')?.textContent?.replace(/\\s+/g,' ').trim().slice(0,1200)||'',
         }));
-        console.error('Accepted deletion confirmation missing:',JSON.stringify(state));
+        console.error('Accepted deletion confirmation missing:',JSON.stringify({...state,pageErrors:errors}));
         throw error;
       }
       await page.getByText(/No further action is required/).waitFor();
