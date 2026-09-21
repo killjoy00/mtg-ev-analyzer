@@ -187,6 +187,65 @@ test('maintenance workflow has schedule, dispatch, concurrency and OIDC',()=>{
   assert.match(flow,/GITHUB_STEP_SUMMARY/);
 });
 
+test('all Auth identity attachment surfaces share deletion serialization',()=>{
+  for(const path of [
+    'worker/account-session.mjs',
+    'worker/account-credential-limits.mjs',
+    'worker/patreon.mjs',
+    'worker/capabilities.mjs',
+    'worker/measurement-admin.mjs',
+    'worker/corpus-admin.mjs',
+    'worker/draft-run-function.mjs',
+    'worker/growth-function.js',
+  ]) {
+    const source=fs.readFileSync(path,'utf8');
+    assert.match(source,/pg_advisory_xact_lock/,path+' must participate in the account identity lock');
+    assert.match(source,/account_deletion_operations/,path+' must reject or guard deletion tombstones');
+  }
+});
+
+test('deletion endpoint keeps the committed 200\/202 response and clears both browser identities',()=>{
+  const source=fs.readFileSync('worker/growth-function.js','utf8');
+  const start=source.indexOf('async function handleAccountDelete');
+  const end=source.indexOf('function bearer',start);
+  const block=source.slice(start,end);
+  assert.match(block,/complete\?200:202/);
+  assert.match(block,/clearPlayerCookie\(clearAccountCookies\(response\)\)/);
+  assert.match(block,/providerPasswordSession/);
+  assert.match(block,/\/verify-password/);
+});
+
+test('managed Auth direct deletion remains verification-only',()=>{
+  const source=fs.readFileSync('worker/account-deletion.mjs','utf8');
+  const direct=[...source.matchAll(/DELETE FROM neon_auth\.("?\w+"?)/g)].map(match=>match[1].replaceAll('"',''));
+  assert.deepEqual(direct,['verification']);
+  assert.doesNotMatch(source,/DELETE FROM neon_auth\.(?:"?user"?|account|session)\b/);
+});
+
+test('maintenance OIDC trust is exact repo owner main workflow audience and scheduled/manual events',()=>{
+  const source=fs.readFileSync('worker/account-deletion-auth.mjs','utf8');
+  assert.match(source,/killjoy00\/mtg-ev-analyzer/);
+  assert.match(source,/REPOSITORY_ID='1201587098'/);
+  assert.match(source,/OWNER_ID='211694413'/);
+  assert.match(source,/refs\/heads\/main/);
+  assert.match(source,/account-deletion-maintenance\.yml@refs\/heads\/main/);
+  assert.match(source,/pack-one-account-deletion-maintenance/);
+  assert.match(source,/\['schedule','workflow_dispatch'\]/);
+  assert.doesNotMatch(source,/pull_request/);
+});
+
+test('same-repository PRs fail before merge when deletion release secrets are absent',()=>{
+  const testFlow=fs.readFileSync('.github/workflows/test.yml','utf8');
+  assert.match(testFlow,/Verify account-deletion release secrets are provisioned/);
+  assert.match(testFlow,/secrets\.PACK1_DELETION_ADMIN_EMAIL != ''/);
+  assert.match(testFlow,/secrets\.PACK1_DELETION_ADMIN_PASSWORD != ''/);
+  assert.match(testFlow,/secrets\.PACK1_RATE_LIMIT_SECRET != ''/);
+  assert.match(testFlow,/pull_request\.head\.repo\.full_name == github\.repository/);
+  const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
+  assert.match(release,/PACK1_DELETION_ADMIN_EMAIL is missing or malformed/);
+  assert.match(release,/PACK1_DELETION_ADMIN_PASSWORD is missing or too short/);
+});
+
 test('manual controls redeploy the current release without migrations',()=>{
   const flow=fs.readFileSync('.github/workflows/account-deletion-controls.yml','utf8');
   assert.match(flow,/release_commit/);
