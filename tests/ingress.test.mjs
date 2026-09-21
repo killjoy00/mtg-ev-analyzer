@@ -222,7 +222,7 @@ test('IPv6 privacy addresses share a /64 quota without merging distinct networks
 });
 
 test('operations reject arbitrary commands and existing branch targets',()=>{
-  for(const operation of ['check-access','deploy-preview','disable-preview','probe-auth-webhook','stage-auth-webhook-probe','run-auth-webhook-probe','cleanup-auth-webhook-probe'])assert.equal(parseRequest({operation,reason:'reviewed test'}),operation);
+  for(const operation of ['check-access','deploy-preview','disable-preview','probe-auth-webhook','stage-auth-webhook-probe','run-auth-webhook-probe','cleanup-auth-webhook-probe','deploy-authhook-qa','remove-authhook-qa'])assert.equal(parseRequest({operation,reason:'reviewed test'}),operation);
   for(const value of [{operation:'deploy-production',reason:'x'},{operation:'deploy-preview',reason:'x',command:'anything'},{operation:'deploy-preview',reason:''},null])assert.throws(()=>parseRequest(value));
   for(const branch of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b','main','../../production'])assert.throws(()=>checkBranch(branch));
   checkBranch('br-new-isolated-preview');
