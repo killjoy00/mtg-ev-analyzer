@@ -29,7 +29,9 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install browser test dependency
-        run: npm install --no-save playwright@1.55.0
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install webkit
       - name: Hydrate replay shards from R2 for local browser tests
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: bash scripts/r2_replay_shards.sh hydrate
@@ -62,6 +64,8 @@ jobs:
         run: PACK1_TEST_SELECTION_VERSION=first-pack-v2 node tests/draft-run-e2e.mjs
       - name: Run account browser contract
         run: node tests/account-e2e.mjs
+      - name: Run password recovery Chromium/WebKit mobile contract
+        run: node tests/password-recovery-e2e.mjs
       - name: Verify display-ad membership suppression with intercepted requests
         run: node tests/ads-e2e.mjs
       - name: Run admin reporting browser contract
