@@ -25,7 +25,14 @@ document.querySelector('#brand-home').onclick = () => location.href = './';
 document.querySelector('#daily-nav').onclick = () => location.href = '?game=draft-run&daily=1';
 document.querySelector('#leaderboard-nav').onclick = () => location.href = '?game=draft-run&board=daily';
 
-if (historicalShare) {
+const deletionState=params.get('account');
+if (deletionState==='deleted'||deletionState==='deleting') {
+  const app=document.querySelector('#app');
+  if(app) {
+    const complete=deletionState==='deleted';
+    app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account deletion</p><h1>${complete?'Your Pack One account has been deleted.':'Your deletion request has been accepted.'}</h1><p>${complete?'This action cannot be undone.':'You have been signed out. Deletion is still being completed and cannot be cancelled. No further action is required.'}</p></header><div class="account-actions"><a class="button primary" href="./">Return to Pack One</a></div></section>`;
+  }
+} else if (historicalShare) {
   const { installHistoricalShare } = await import('./historical-share.mjs');
   await installHistoricalShare();
 } else {
