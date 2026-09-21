@@ -10,7 +10,9 @@ page.on('pageerror',error=>errors.push(error.message));
 
 let signed=false;
 let verificationRequired=false;
+let delaySignup=false;
 let delaySignin=false;
+let delayGoogle=false;
 let googleStartFails=false;
 let linkBodies=[];
 
@@ -51,6 +53,7 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
     body=signed?{user:accountUser,session:{expiresAt:'2099-01-01T00:00:00Z'}}:{error:'Account session required.'};
   } else if(path==='/v1/account/signup') {
     const input=route.request().postDataJSON();
+    if(delaySignup)await new Promise(resolve=>setTimeout(resolve,300));
     if(verificationRequired)body={ok:true,verificationRequired:true,email:input.email};
     else {signed=true;body={ok:true,user:{...accountUser,email:input.email,name:input.name}};}
   } else if(path==='/v1/account/signin') {
@@ -88,6 +91,7 @@ await page.route('https://api.packone.pro/draft/**',async route=>{
 await page.route('https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/**',async route=>{
   const url=new URL(route.request().url());
   if(url.pathname.endsWith('/sign-in/social')) {
+    if(delayGoogle)await new Promise(resolve=>setTimeout(resolve,300));
     if(googleStartFails)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Google unavailable fixture'})});
     return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({url:'https://accounts.google.test/fixture'})});
   }
@@ -98,7 +102,7 @@ await page.route('https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.ne
 });
 
 async function fresh({source='nav',validateDailyRunId=null,intent=null,width=390}={}) {
-  signed=false;verificationRequired=false;delaySignin=false;googleStartFails=false;linkBodies=[];
+  signed=false;verificationRequired=false;delaySignup=false;delaySignin=false;delayGoogle=false;googleStartFails=false;linkBodies=[];
   await page.setViewportSize({width,height:width<700?844:900});
   await page.goto(base+'/tests/auth-context-harness.html');
   await page.waitForFunction(()=>Boolean(window.__renderAccount));
@@ -133,13 +137,28 @@ try {
   await fresh({source:'practice_gate',intent:'elite'});
   await page.locator('#account-signup').waitFor();
 
-  // Google errors stay in the Google area and the control recovers.
+  // Google disables while pending; errors stay in its own area and the control recovers.
   await fresh({source:'nav'});
-  googleStartFails=true;
+  delayGoogle=true;googleStartFails=true;
   await page.locator('#account-google').click();
+  await page.waitForFunction(()=>document.querySelector('#account-google')?.disabled===true);
+  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Connecting…');
   await page.getByText('Google unavailable fixture').waitFor();
   assert.equal((await page.locator('#account-signin .form-error').textContent())?.trim(),'');
   assert.equal(await page.locator('#account-google').isEnabled(),true);
+
+  // Create-account submit also disables while its request is pending.
+  await fresh({source:'nav'});
+  await page.locator('#account-mode-toggle').click();
+  delaySignup=true;
+  const pendingSignup=page.locator('#account-signup');
+  await pendingSignup.locator('[name="name"]').fill('QA Player');
+  await pendingSignup.locator('[name="email"]').fill('qa@example.invalid');
+  await pendingSignup.locator('[name="password"]').fill('fixture-password-123');
+  await pendingSignup.getByRole('button',{name:'Create account',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#account-signup button[type="submit"]')?.disabled===true);
+  assert.equal((await page.locator('#account-signup button[type="submit"]').textContent())?.trim(),'Creating account…');
+  await page.locator('.my-pack-one-page').waitFor();
 
   // Verification-required signup is a success state with an explicit sign-in route.
   await fresh({source:'nav'});
