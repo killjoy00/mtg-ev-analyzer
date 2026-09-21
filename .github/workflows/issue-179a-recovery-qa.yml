@@ -1,4 +1,4 @@
-name: Issue 179A isolated recovery QA
+name: Issue 179A recovery browser QA
 
 on:
   push:
@@ -9,25 +9,31 @@ permissions:
   contents: read
 
 jobs:
-  recovery-qa:
+  recovery-browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     steps:
-      - name: Run one-shot isolated recovery capability suite
-        shell: bash
-        env:
-          QA_URL: https://br-super-snow-b5ufhq30-qa179arecovery.compute.c-7.us-east-2.aws.neon.tech/
+      - uses: actions/checkout@v4
+        with:
+          ref: 95ca905cf54eaf99f09f6d62c871ff32fda784d3
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install recovery browsers
         run: |
-          set -euo pipefail
-          status="$(curl -sS --max-time 300 -o /tmp/qa.json -w '%{http_code}' "$QA_URL")"
-          if [ "$status" != 200 ]; then
-            echo "qa_http_status=$status"
-            cat /tmp/qa.json
-            exit 1
-          fi
-          QA_FILE=/tmp/qa.json node - <<'NODE'
-          const fs=require('fs');
-          const data=JSON.parse(fs.readFileSync(process.env.QA_FILE,'utf8'));
-          if(data.ok!==true) throw new Error('QA suite did not report success');
-          console.log(JSON.stringify({ok:true,checks:data.checks},null,2));
-          NODE
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Start static site
+        run: |
+          nohup python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
+          echo $! > /tmp/pack1-http.pid
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ -o /dev/null
+      - name: Run recovery contract only
+        run: node tests/password-recovery-e2e.mjs
+      - name: Stop static site
+        if: always()
+        run: |
+          if [ -f /tmp/pack1-http.pid ]; then kill "$(cat /tmp/pack1-http.pid)" || true; fi
