@@ -41,6 +41,9 @@ async function main() {
   const health=await fetch(workerUrl+'/health',{redirect:'error',signal:AbortSignal.timeout(15000)});
   if(!health.ok)throw Error('Temporary Auth probe Worker is not staged.');
 
+  const cleared=await fetch(workerUrl+'/evidence',{method:'DELETE',redirect:'error',signal:AbortSignal.timeout(10000)});
+  if(cleared.status!==204)throw Error('Temporary Auth probe evidence could not be cleared.');
+
   const password='P1-'+randomBytes(24).toString('base64url')+'!';
   console.log('::add-mask::'+password);
   const runId=String(process.env.GITHUB_RUN_ID||Date.now());
@@ -68,7 +71,7 @@ async function main() {
   }
   if(!evidence)throw Error('No signed Auth webhook evidence was captured.');
   console.log('AUTH_PROBE_EVIDENCE '+JSON.stringify(evidence));
-  if(!evidence.signature_verified)throw Error('Managed Neon webhook signature did not verify against the documented reconstruction.');
+  if(!evidence?.verification?.verified)throw Error('Managed Neon webhook signature did not verify against the documented reconstruction.');
   if(!evidence.token_present)throw Error('Managed Neon recovery webhook did not expose a raw token.');
 }
 main().catch(error=>{

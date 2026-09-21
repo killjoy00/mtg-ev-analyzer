@@ -44,7 +44,8 @@ async function main() {
     redirect:'error',
     signal:AbortSignal.timeout(15000),
   });
-  if(existing.status!==404)throw Error('Temporary Auth probe Worker already exists; refusing to overwrite it.');
+  if(existing.status!==200&&existing.status!==404)throw Error('Temporary Auth probe Worker inventory could not be verified.');
+  console.log('AUTH_PROBE_RECEIVER_MODE '+(existing.status===200?'update':'create'));
 
   const wrangler=path.join(process.env.EDGE_TOOLS_DIR,'node_modules/.bin/wrangler');
   const configPath=path.join(process.env.RUNNER_TEMP,'auth-probe-wrangler.json');

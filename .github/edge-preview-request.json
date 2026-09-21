@@ -1,1 +1,1 @@
-{"operation":"run-auth-webhook-probe","reason":"2026-09-21: Execute one controlled password-recovery reset against the separate Pack One Auth QA project after the QA webhook was manually enabled."}
+{"operation":"stage-auth-webhook-probe","reason":"2026-09-21: Redeploy the temporary QA webhook receiver with the Neon-documented Node Ed25519 verifier and sanitized diagnostics."}

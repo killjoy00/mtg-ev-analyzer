@@ -1,17 +1,11 @@
+import {Buffer} from 'node:buffer';
+import {createPublicKey,verify as verifySignature} from 'node:crypto';
+
 const MAX_BODY_BYTES=64*1024;
 const textEncoder=new TextEncoder();
 
 function base64url(bytes) {
-  const view=bytes instanceof Uint8Array?bytes:new Uint8Array(bytes);
-  let binary='';
-  for(let i=0;i<view.length;i+=0x8000)binary+=String.fromCharCode(...view.subarray(i,i+0x8000));
-  return btoa(binary).replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
-}
-function fromBase64url(value) {
-  const normalized=String(value||'').replace(/-/g,'+').replace(/_/g,'/');
-  const padded=normalized+'='.repeat((4-normalized.length%4)%4);
-  const binary=atob(padded);
-  return Uint8Array.from(binary,ch=>ch.charCodeAt(0));
+  return Buffer.from(bytes instanceof Uint8Array?bytes:new Uint8Array(bytes)).toString('base64url');
 }
 async function sha256Hex(value) {
   const bytes=typeof value==='string'?textEncoder.encode(value):(value instanceof Uint8Array?value:new Uint8Array(value));
@@ -25,27 +19,75 @@ function payloadShape(value,depth=0) {
   if(typeof value!=='object')return typeof value;
   return Object.fromEntries(Object.entries(value).slice(0,40).map(([key,item])=>[key,payloadShape(item,depth+1)]));
 }
+function responseJson(value,status=200) {
+  return Response.json(value,{status,headers:{'cache-control':'no-store'}});
+}
 
-export async function verifyNeonWebhook(rawBytes,headers,authBase,fetcher=fetch,now=Date.now()) {
+export async function verifyNeonWebhookDetailed(rawBytes,headers,authBase,fetcher=fetch,now=Date.now()) {
   const signature=headers.get('x-neon-signature')||'';
   const kid=headers.get('x-neon-signature-kid')||'';
   const timestamp=headers.get('x-neon-timestamp')||'';
   const [protectedB64,emptyPayload,signatureB64]=signature.split('.');
-  if(!protectedB64||emptyPayload!==''||!signatureB64||!kid||!/^\d{10,16}$/.test(timestamp))return false;
+  const details={
+    verified:false,
+    envelope_valid:false,
+    timestamp_fresh:false,
+    jwks_fetch_ok:false,
+    jwks_key_found:false,
+    public_key_imported:false,
+    signature_valid:false,
+  };
+
+  if(!protectedB64||emptyPayload!==''||!signatureB64||!kid||!/^\d{10,16}$/.test(timestamp))return details;
+  details.envelope_valid=true;
+
   const timestampMs=Number(timestamp);
-  if(!Number.isFinite(timestampMs)||Math.abs(now-timestampMs)>5*60*1000)return false;
+  if(!Number.isFinite(timestampMs)||Math.abs(now-timestampMs)>5*60*1000)return details;
+  details.timestamp_fresh=true;
 
-  const jwksResponse=await fetcher(authBase+'/.well-known/jwks.json',{redirect:'error',signal:AbortSignal.timeout(5000)});
-  if(!jwksResponse.ok)return false;
-  const jwks=await jwksResponse.json();
+  let jwksResponse;
+  try {
+    jwksResponse=await fetcher(authBase+'/.well-known/jwks.json',{redirect:'error',signal:AbortSignal.timeout(5000)});
+  } catch {
+    return details;
+  }
+  if(!jwksResponse.ok)return details;
+  details.jwks_fetch_ok=true;
+
+  let jwks;
+  try {jwks=await jwksResponse.json();} catch {return details;}
   const jwk=jwks?.keys?.find(key=>key.kid===kid);
-  if(!jwk)return false;
+  if(!jwk)return details;
+  details.jwks_key_found=true;
 
-  const publicKey=await crypto.subtle.importKey('jwk',jwk,{name:'Ed25519'},false,['verify']);
-  const payloadB64=base64url(rawBytes);
-  const signedPayloadB64=base64url(textEncoder.encode(timestamp+'.'+payloadB64));
-  const signingInput=textEncoder.encode(protectedB64+'.'+signedPayloadB64);
-  return crypto.subtle.verify({name:'Ed25519'},publicKey,fromBase64url(signatureB64),signingInput);
+  let publicKey;
+  try {
+    publicKey=createPublicKey({key:jwk,format:'jwk'});
+    details.public_key_imported=true;
+  } catch {
+    return details;
+  }
+
+  try {
+    const payloadB64=base64url(rawBytes);
+    const signaturePayloadB64=Buffer.from(timestamp+'.'+payloadB64,'utf8').toString('base64url');
+    const signingInput=Buffer.from(protectedB64+'.'+signaturePayloadB64,'utf8');
+    details.signature_valid=verifySignature(
+      null,
+      signingInput,
+      publicKey,
+      Buffer.from(signatureB64,'base64url'),
+    );
+    details.verified=details.signature_valid;
+  } catch {
+    details.signature_valid=false;
+    details.verified=false;
+  }
+  return details;
+}
+
+export async function verifyNeonWebhook(rawBytes,headers,authBase,fetcher=fetch,now=Date.now()) {
+  return (await verifyNeonWebhookDetailed(rawBytes,headers,authBase,fetcher,now)).verified;
 }
 
 export class ProbeStore {
@@ -53,13 +95,17 @@ export class ProbeStore {
   async fetch(request) {
     if(request.method==='PUT') {
       await this.storage.put('evidence',await request.json());
-      return new Response(null,{status:204});
+      return new Response(null,{status:204,headers:{'cache-control':'no-store'}});
     }
     if(request.method==='GET') {
       const evidence=await this.storage.get('evidence');
-      return evidence?Response.json(evidence):Response.json({ready:false},{status:404});
+      return evidence?responseJson(evidence):responseJson({ready:false},404);
     }
-    return new Response(null,{status:405});
+    if(request.method==='DELETE') {
+      await this.storage.delete('evidence');
+      return new Response(null,{status:204,headers:{'cache-control':'no-store'}});
+    }
+    return new Response(null,{status:405,headers:{'cache-control':'no-store'}});
   }
 }
 
@@ -68,62 +114,23 @@ async function evidenceStore(env) {
 }
 async function writeEvidence(env,evidence) {
   const store=await evidenceStore(env);
-  await store.fetch('https://probe-store/evidence',{method:'PUT',headers:{'content-type':'application/json'},body:JSON.stringify(evidence)});
+  await store.fetch('https://probe-store/evidence',{
+    method:'PUT',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify(evidence),
+  });
 }
-
-export async function authProbe(request,env) {
-  const url=new URL(request.url);
-  if(request.method==='GET'&&url.pathname==='/health')return Response.json({ok:true,probe:'pack1-auth-webhook'});
-  if(request.method==='GET'&&url.pathname==='/evidence') {
-    const store=await evidenceStore(env);
-    return store.fetch('https://probe-store/evidence');
-  }
-  if(request.method!=='POST'||url.pathname!=='/webhook')return new Response(null,{status:404});
-
-  const rawBytes=new Uint8Array(await request.arrayBuffer());
-  if(rawBytes.byteLength>MAX_BODY_BYTES)return new Response(null,{status:413});
-  const neonHeaderNames=[...request.headers.keys()].filter(name=>name.startsWith('x-neon-')).sort();
-  const signature=request.headers.get('x-neon-signature')||'';
-  const invalidEvidence={
-    ready:true,
-    signature_verified:false,
-    raw_body_bytes:rawBytes.byteLength,
-    raw_body_sha256:await sha256Hex(rawBytes),
-    neon_header_names:neonHeaderNames,
-    signature_parts:signature?signature.split('.').map(part=>part.length):[],
-  };
-
-  let verified=false;
-  try {verified=await verifyNeonWebhook(rawBytes,request.headers,env.AUTH_BASE);}
-  catch {verified=false;}
-  if(!verified) {
-    await writeEvidence(env,invalidEvidence);
-    return new Response(null,{status:400});
-  }
-
+async function sanitizedPayload(rawBytes) {
   let payload;
   try {payload=JSON.parse(new TextDecoder().decode(rawBytes));}
-  catch {
-    await writeEvidence(env,{...invalidEvidence,signature_verified:true,json_valid:false});
-    return new Response(null,{status:400});
-  }
+  catch {return {json_valid:false};}
 
   const token=typeof payload?.event_data?.token==='string'?payload.event_data.token:'';
   const linkUrl=typeof payload?.event_data?.link_url==='string'?payload.event_data.link_url:'';
   let linkHost=null;
   try {linkHost=linkUrl?new URL(linkUrl).hostname:null;} catch {}
-  const evidence={
-    ready:true,
-    signature_verified:true,
+  return {
     json_valid:true,
-    raw_body_bytes:rawBytes.byteLength,
-    raw_body_sha256:await sha256Hex(rawBytes),
-    neon_header_names:neonHeaderNames,
-    event_type_header:request.headers.get('x-neon-event-type')||null,
-    event_id:request.headers.get('x-neon-event-id')||null,
-    delivery_attempt:request.headers.get('x-neon-delivery-attempt')||null,
-    signature_kid_present:Boolean(request.headers.get('x-neon-signature-kid')),
-    signature_parts:signature.split('.').map(part=>part.length),
     event_type_payload:payload?.event_type||null,
     payload_shape:payloadShape(payload),
     user_email_present:typeof payload?.user?.email==='string',
@@ -133,8 +140,56 @@ export async function authProbe(request,env) {
     token_length:token.length,
     token_sha256:token?await sha256Hex(token):null,
   };
+}
+
+export async function authProbe(request,env) {
+  const url=new URL(request.url);
+  if(request.method==='GET'&&url.pathname==='/health')return responseJson({ok:true,probe:'pack1-auth-webhook'});
+  if((request.method==='GET'||request.method==='DELETE')&&url.pathname==='/evidence') {
+    const store=await evidenceStore(env);
+    return store.fetch('https://probe-store/evidence',{method:request.method});
+  }
+  if(request.method!=='POST'||url.pathname!=='/webhook')return new Response(null,{status:404});
+
+  const rawBytes=new Uint8Array(await request.arrayBuffer());
+  if(rawBytes.byteLength>MAX_BODY_BYTES)return new Response(null,{status:413,headers:{'cache-control':'no-store'}});
+
+  const signature=request.headers.get('x-neon-signature')||'';
+  const timestamp=request.headers.get('x-neon-timestamp')||'';
+  const baseEvidence={
+    ready:true,
+    raw_body_bytes:rawBytes.byteLength,
+    raw_body_sha256:await sha256Hex(rawBytes),
+    neon_header_names:[...request.headers.keys()].filter(name=>name.startsWith('x-neon-')).sort(),
+    event_type_header:request.headers.get('x-neon-event-type')||null,
+    event_id_present:Boolean(request.headers.get('x-neon-event-id')),
+    delivery_attempt:request.headers.get('x-neon-delivery-attempt')||null,
+    timestamp_digits:timestamp.length,
+    timestamp_age_ms:/^\d{10,16}$/.test(timestamp)?Date.now()-Number(timestamp):null,
+    signature_kid_present:Boolean(request.headers.get('x-neon-signature-kid')),
+    signature_parts:signature?signature.split('.').map(part=>part.length):[],
+    ...(await sanitizedPayload(rawBytes)),
+  };
+
+  let verification;
+  try {
+    verification=await verifyNeonWebhookDetailed(rawBytes,request.headers,env.AUTH_BASE);
+  } catch {
+    verification={
+      verified:false,
+      envelope_valid:false,
+      timestamp_fresh:false,
+      jwks_fetch_ok:false,
+      jwks_key_found:false,
+      public_key_imported:false,
+      signature_valid:false,
+    };
+  }
+
+  const evidence={...baseEvidence,verification};
   await writeEvidence(env,evidence);
-  return new Response(null,{status:204});
+  if(!verification.verified)return new Response(null,{status:400,headers:{'cache-control':'no-store'}});
+  return new Response(null,{status:204,headers:{'cache-control':'no-store'}});
 }
 
 export default {fetch:authProbe};
