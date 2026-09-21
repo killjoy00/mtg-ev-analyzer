@@ -44,15 +44,13 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   const identityReady = growthReady.then(m => m.installGrowthLayer());
   const account = document.createElement('button');
   account.id = 'account-nav'; account.type = 'button';
-  account.className = 'top-nav-button'; account.textContent = 'Account';
+  account.className = 'top-nav-button'; account.textContent = 'Sign in';
   account.onclick = async () => {
     await identityReady;
-    const profiles = await import('./profile-product.mjs');
-    profiles.installProfileProductLayer();
-    (await import('./profile-polish.mjs')).installProfilePolish();
-    await profiles.renderMyProfile();
+    await (await growthReady).renderAccount({source:'nav'});
   };
   document.querySelector('.top-actions').append(account);
+  identityReady.then(async()=>{account.textContent=(await growthReady).accountSignedIn()?'My Pack One':'Sign in';});
   if (params.has('auth')) {
     await identityReady;
     await (await growthReady).resumeAccountAuth(params.get('auth'));
@@ -68,10 +66,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   else if (params.has('account')) {
     await identityReady;
     if (!['deleted','deleting'].includes(params.get('account'))) {
-      const profiles=await import('./profile-product.mjs');
-      profiles.installProfileProductLayer();
-      (await import('./profile-polish.mjs')).installProfilePolish();
-      await profiles.renderMyProfile();
+      await (await growthReady).renderAccount({source:'route'});
     }
   } else if (params.has('profile')) {
     await identityReady;
