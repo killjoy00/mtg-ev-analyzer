@@ -1,1 +1,1 @@
-{"operation":"probe-auth-webhook","reason":"2026-09-21: Retry the isolated QA password-recovery webhook capability probe using the supported Neon CLI config path; restore QA config and remove the temporary Worker afterward."}\n
+{"operation":"probe-auth-webhook","reason":"2026-09-21: Retry the isolated QA password-recovery webhook capability probe using the supported Neon CLI config path; restore QA config and remove the temporary Worker afterward."}
