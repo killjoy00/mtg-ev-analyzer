@@ -368,6 +368,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       status.textContent = 'Saved';
       track('profile_settings_saved', { public: updated.player?.profile_public || false });
       await renderProfile(updated, { own: true });
+      if(updated.player?.display_name){try{localStorage.setItem('pack1-player-name-v1',updated.player.display_name);}catch{}}
     } catch (error) {
       status.textContent = error.message;
     }
