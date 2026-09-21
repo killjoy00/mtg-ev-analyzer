@@ -1,1 +1,1 @@
-{"operation":"stage-auth-webhook-probe","reason":"2026-09-21: Redeploy the temporary QA webhook receiver with normal JWKS redirect handling and sanitized fetch diagnostics."}
+{"operation":"run-auth-webhook-probe","reason":"2026-09-21: Execute the third controlled QA password-recovery webhook probe after the JWKS fetch fix; clear stale evidence first."}
