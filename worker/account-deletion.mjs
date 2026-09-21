@@ -33,29 +33,8 @@ export async function deletedPlayerTombstone(query,playerId) {
 export async function beginDeletion(query,{authUserId,playerId=null}) {
   const auth=uuid(authUserId);
   const player=playerId==null?null:uuid(playerId);
-  const result=await query(`
-    WITH lock AS MATERIALIZED (
-      SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
-    ), linked AS MATERIALIZED (
-      SELECT a.player_id
-      FROM lock
-      JOIN account_links a ON a.auth_user_id=$1::uuid
-    ), inserted AS (
-      INSERT INTO account_deletion_operations(auth_user_id,player_id,state)
-      SELECT $1::uuid,COALESCE($2::uuid,(SELECT player_id FROM linked)),'pending'
-      FROM lock
-      ON CONFLICT(auth_user_id) DO UPDATE SET
-        updated_at=account_deletion_operations.updated_at
-      RETURNING *
-    ), revoked AS (
-      UPDATE account_sessions s
-      SET revoked_at=COALESCE(s.revoked_at,now())
-      FROM inserted i
-      WHERE s.auth_user_id=i.auth_user_id AND s.revoked_at IS NULL
-      RETURNING s.session_hash
-    )
-    SELECT operation_id,auth_user_id,player_id,state,attempts,last_error_code,created_at,updated_at
-    FROM inserted`,[auth,player]);
+  const result=await query(`SELECT operation_id,auth_user_id,player_id,state,attempts,last_error_code,created_at,updated_at
+    FROM pack1_begin_account_deletion($1::uuid,$2::uuid)`,[auth,player]);
   return result.rows[0]||null;
 }
 
