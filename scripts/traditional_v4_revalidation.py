@@ -52,6 +52,8 @@ from import_all_trophies import (
 )
 from traditional_puzzles import THRESHOLDS, compare, record
 from set_policy import corpus_version
+import import_all_trophies as trophy_import
+from run_import_all_trophies import resilient_request
 
 EVENTS = ("PremierDraft", "TradDraft")
 CUBE = "powered-cube"
@@ -476,6 +478,12 @@ def measure(sid: str, directory: Path, frozen: Path):
         for example in examples
         for card in (*example.candidates, *example.pool)
     }
+    pinned_images_path = frozen / sid / "images.json"
+    if not pinned_images_path.exists():
+        raise ValueError(f"{sid}: pinned v8 image metadata is missing")
+    pinned_images = json.loads(pinned_images_path.read_text())
+    known.update({name: value for name, value in pinned_images.items() if value})
+    trophy_import.request = resilient_request
     known = resolve_images(names, known, directory / "images.json")
 
     records = []
@@ -763,6 +771,10 @@ def prepare_pins(source: Path, output: Path, sample_size: int = 256):
         if manifest.get("corpus_version") != PARENT or manifest.get("model_version") != MODEL:
             raise ValueError(f"{sid}: production artifact is not v8/v4")
         (dest / "manifest.json").write_bytes((src_dir / "manifest.json").read_bytes())
+        image_source = src_dir / "images.json"
+        if not image_source.exists():
+            raise ValueError(f"{sid}: pinned production artifact lacks images.json")
+        (dest / "images.json").write_bytes(image_source.read_bytes())
         candidates = []
         first, last = serving_window(sid)
         with gzip.open(src_dir / "puzzles.jsonl.gz", "rt") as handle:
@@ -782,6 +794,7 @@ def prepare_pins(source: Path, output: Path, sample_size: int = 256):
             "production_puzzle_sha256": manifest["puzzle_file_sha256"],
             "reference_decisions": len(sample),
             "reference_sha256": digest(dest / "reference.jsonl.gz"),
+            "images_sha256": digest(dest / "images.json"),
         })
     print(json.dumps({
         "prepared": True,
