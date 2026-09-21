@@ -1,17 +1,15 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import {createHash} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
 const AUTH_BASE='https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth';
 const WORKER='pack1-auth-webhook-probe-temp';
 
-function run(binary,args,input) {
+function run(binary,args) {
   try {
     return execFileSync(binary,args,{
-      input,
       encoding:'utf8',
-      stdio:['pipe','pipe','pipe'],
+      stdio:['ignore','pipe','pipe'],
       env:{...process.env,CLOUDFLARE_API_TOKEN:process.env.CLOUDFLARE_EDGE_TOKEN},
     });
   } catch(error) {
@@ -65,10 +63,7 @@ async function main() {
   };
   fs.writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
 
-  const probeSecret=createHash('sha256').update('pack1-auth-probe:'+process.env.CLOUDFLARE_EDGE_TOKEN).digest('hex');
-  console.log('::add-mask::'+probeSecret);
   run(wrangler,['deploy','--config',configPath]);
-  run(wrangler,['secret','bulk','--config',configPath],JSON.stringify({PROBE_SECRET:probeSecret}));
 
   const workerUrl=`https://${WORKER}.${accountSubdomain}.workers.dev`;
   const health=await fetch(workerUrl+'/health',{redirect:'error',signal:AbortSignal.timeout(15000)});
