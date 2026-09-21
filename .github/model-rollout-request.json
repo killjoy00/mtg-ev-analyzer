@@ -1,7 +1,5 @@
 {
-  "operation": "import",
-  "request_id": "v8-production-import-20260921",
-  "reason": "Stage and verify elite-trophy-colour-stage-v8 strong-player-colour-stage-v4 in production after successful complete development staging. Production draftrunapi already carries v8-compatible code from the concurrent secure-account release, so complete the guarded corpus publication now.",
-  "sets": "all",
-  "target": "production"
+  "operation": "production-browser",
+  "request_id": "v8-production-browser-20260921",
+  "reason": "Run final end-to-end production browser acceptance after successful elite-trophy-colour-stage-v8 production staging and green production corpus health."
 }
