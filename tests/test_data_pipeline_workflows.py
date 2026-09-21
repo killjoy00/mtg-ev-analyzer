@@ -43,6 +43,22 @@ class DataPipelineWorkflowTests(unittest.TestCase):
         self.assertGreaterEqual(text.count("REPLAY_MODEL_VERSION:"), 3)
         self.assertGreaterEqual(text.count("REPLAY_SETS:"), 3)
 
+        regular = text.split("  regular_chunks:", 1)[1].split("  legacy:", 1)[0]
+        legacy = text.split("  legacy:", 1)[1].split("  powered_cube:", 1)[0]
+        cube = text.split("  powered_cube:", 1)[1].split("  finalize:", 1)[0]
+        self.assertLess(
+            regular.index("Checkpoint regular replay shards to versioned R2"),
+            regular.index("Checkpoint rebuilt environments"),
+        )
+        self.assertLess(
+            legacy.index("Checkpoint legacy replay shards to versioned R2"),
+            legacy.index("Checkpoint legacy environments"),
+        )
+        self.assertLess(
+            cube.index("Checkpoint Powered Cube replay shards to versioned R2"),
+            cube.index("Checkpoint Powered Cube\n"),
+        )
+
         finalize = text.split("  finalize:", 1)[1]
         hydrate = finalize.index("Hydrate checkpointed v4 replay shards from R2")
         verify = finalize.index("Verify complete v4 provenance")
