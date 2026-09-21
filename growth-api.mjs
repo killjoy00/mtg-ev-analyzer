@@ -2,13 +2,13 @@ const TOKEN_KEY = 'pack1-api-session-v1';
 const AUTH_TOKEN_KEY = 'pack1-auth-session-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 const CSRF_COOKIE = '__Secure-pack1_csrf';
-const AUTH_BASE = 'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const GOOGLE_RETURN = 'https://packone.pro/?auth=google';
 const ACCOUNT_RETURN = 'https://packone.pro/';
 let sessionPromise = null, migrationPromise = null;
 
 function baseUrl() { return String(window.PACK1_API?.growthUrl || window.PACK1_API?.url || '').replace(/\/$/, ''); }
 function draftUrl() { return String(window.PACK1_API?.draftRunUrl || '').replace(/\/$/, ''); }
+function authBase() { return String(window.PACK1_API?.authBase || '').replace(/\/$/, ''); }
 export function firstPartyAuthEnabled() { return window.PACK1_API?.firstParty === true; }
 function loadPackToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
 function loadAuthToken() { try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch { return null; } }
@@ -223,7 +223,8 @@ export async function authRequest(path,{method='GET',body}={}) {
     if(!mapped)throw new Error('Unsupported account request.');
     return api(mapped,{method,body,auth:false});
   }
-  const response=await fetch(`${AUTH_BASE}${path}`,{
+  const base=authBase();if(!/^https:\/\//.test(base))throw new Error('Account provider is not configured.');
+  const response=await fetch(`${base}${path}`,{
     method,headers:body===undefined?{}:{'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),
   });
   const data=await response.json().catch(()=>({}));
@@ -284,10 +285,19 @@ export async function signInAccount({email,password}) {
   if(data?.token){try{localStorage.setItem(AUTH_TOKEN_KEY,data.token);}catch{}globalThis.dispatchEvent?.(new Event('packone-account-changed'));}
   return data;
 }
+
+export async function requestPasswordReset(email) {
+  return api('/v1/account/request-password-reset',{method:'POST',body:{email:String(email||'')},auth:false});
+}
+
+export async function resetPassword({token,newPassword}) {
+  return api('/v1/account/reset-password',{method:'POST',body:{token:String(token||''),newPassword:String(newPassword||'')},auth:false});
+}
 export async function startGoogleSignIn() {
   if(!firstPartyAuthEnabled())throw new Error('Google sign in is not available on this release yet.');
   await ensurePackSession();
-  const response=await fetch(`${AUTH_BASE}/sign-in/social`,{
+  const provider=authBase();if(!/^https:\/\//.test(provider))throw new Error('Google sign in is temporarily unavailable.');
+  const response=await fetch(`${provider}/sign-in/social`,{
     method:'POST',
     headers:{'content-type':'application/json'},
     credentials:'include',
@@ -312,7 +322,8 @@ export async function completeGoogleSignIn() {
   const verifier=new URL(location.href).searchParams.get('neon_auth_session_verifier');
   if(!verifier)throw new Error('Google sign in did not return a session verifier.');
   await ensurePackSession();
-  const sessionResponse=await fetch(`${AUTH_BASE}/get-session?neon_auth_session_verifier=${encodeURIComponent(verifier)}`,{
+  const provider=authBase();if(!/^https:\/\//.test(provider))throw new Error('Google sign in is temporarily unavailable.');
+  const sessionResponse=await fetch(`${provider}/get-session?neon_auth_session_verifier=${encodeURIComponent(verifier)}`,{
     credentials:'include',
     headers:{accept:'application/json'},
   });
