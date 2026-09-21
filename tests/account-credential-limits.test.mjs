@@ -103,6 +103,6 @@ test('request-integrity docs distinguish signed-in credentials from signed-out r
   const docs=readFileSync('docs/REQUEST-INTEGRITY.md','utf8');
   assert.match(docs,/first-party account session/);
   assert.match(docs,/allowLegacy:false/);
-  assert.match(docs,/current-password failure budget/);
+  assert.match(docs,/account-global failure budget/);
   assert.doesNotMatch(docs,/Provider capability gate/);
 });
