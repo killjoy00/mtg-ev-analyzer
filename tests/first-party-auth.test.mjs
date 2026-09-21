@@ -14,6 +14,7 @@ globalThis.localStorage={
 globalThis.document={cookie:'__Secure-pack1_csrf='+'c'.repeat(43)};
 globalThis.window={PACK1_API:{
   firstParty:true,
+  authBase:'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth',
   growthUrl:'https://api.packone.pro/growth',
   draftRunUrl:'https://api.packone.pro/draft',
 }};
@@ -29,6 +30,8 @@ globalThis.fetch=async(url,options={})=>{
   if(path==='/growth/v1/account/migrate')return Response.json({ok:true,migrated:true,user:{id:'user',email:'qa@example.invalid',name:'QA'}});
   if(path==='/growth/v1/account/session')return Response.json({user:{id:'user',email:'qa@example.invalid',name:'QA'},session:{expiresAt:'2099-01-01T00:00:00Z'}});
   if(path==='/growth/v1/profile')return Response.json({player:{display_name:'QA Changed'}});
+  if(path==='/growth/v1/account/request-password-reset')return Response.json({ok:true,message:'generic'});
+  if(path==='/growth/v1/account/reset-password')return Response.json({ok:true});
   if(path==='/pack1/auth/sign-in/social')return Response.json({url:'https://oauth.neon.tech/authorize?provider=google&state=fixture'});
   if(path==='/pack1/auth/get-session')return Response.json({session:{token:'google-neon-session',expiresAt:'2099-01-01T00:00:00Z'},user:{id:'google-user',email:'google@example.invalid',name:'Google QA'}});
   throw Error('Unexpected '+path);
@@ -85,4 +88,16 @@ test('Google verifier is exchanged in the browser and immediately migrated to a 
   const migrate=calls.findLast(row=>row.path==='/growth/v1/account/migrate');
   assert.equal(migrate.headers.get('x-pack1-auth-session'),'google-neon-session');
   assert.equal(migrate.credentials,'include');
+});
+
+
+test('password recovery stays behind the Pack One first-party API and never accepts a browser redirect destination',async()=>{
+  await auth.requestPasswordReset('qa@example.invalid');
+  const request=calls.findLast(row=>row.path==='/growth/v1/account/request-password-reset');
+  assert.equal(request.host,'api.packone.pro');
+  assert.deepEqual(JSON.parse(request.body),{email:'qa@example.invalid'});
+  await auth.resetPassword({token:'fixture-token-123456',newPassword:'new-password-123'});
+  const reset=calls.findLast(row=>row.path==='/growth/v1/account/reset-password');
+  assert.equal(reset.host,'api.packone.pro');
+  assert.deepEqual(JSON.parse(reset.body),{token:'fixture-token-123456',newPassword:'new-password-123'});
 });
