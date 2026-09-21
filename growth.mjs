@@ -148,6 +148,18 @@ export async function resumeAccountAuth(status) {
 }
 
 export async function installGrowthLayer() {
+  const deletionState=new URLSearchParams(location.search).get('account');
+  if(deletionState==='deleted'||deletionState==='deleting') {
+    currentAccount=null;
+    document.body.classList.remove('is-game');
+    const app=document.querySelector('#app');
+    if(app) {
+      const complete=deletionState==='deleted';
+      app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account deletion</p><h1>${complete?'Your Pack One account has been deleted.':'Your deletion request has been accepted.'}</h1><p>${complete?'This action cannot be undone.':'You have been signed out. Deletion is still being completed and cannot be cancelled. No further action is required.'}</p></header><div class="account-actions"><a class="button primary" href="./">Return to Pack One</a></div></section>`;
+    }
+    event('page_view',{account:false});
+    return;
+  }
   currentAccount = await getAuthSession().catch(()=>null);
   if (currentAccount?.user) await linkAccount().catch(() => null);
   event('page_view', { account:Boolean(currentAccount?.user) });
