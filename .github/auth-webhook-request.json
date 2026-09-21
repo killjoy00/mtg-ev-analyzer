@@ -1,1 +1,1 @@
-{"operation":"check-secret","reason":"2026-09-21: Verify the dedicated Pack One recovery-email Resend credential is provisioned before QA deployment."}
+{"operation":"deploy-qa","reason":"2026-09-21: Deploy the reviewed Pack One QA recovery-email Worker after dedicated credential preflight passed.","commit":"64a11997012060085f60d9607666161d59efb365"}
