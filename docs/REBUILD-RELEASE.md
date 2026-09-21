@@ -11,3 +11,20 @@ This is a staged backend release, separate from the automatically published brow
 Do not apply destructive migration 0016 to production. Do not restore the development branch over production. The `--stage-only` loader flag is required while the previous backend still reads single-version manifests. An existing file/ledger with missing losses remains unknown; artifact reuse does not constitute a complete source-outcome audit.
 
 If staging fails, keep the previous functions serving their untouched corpus, diagnose the exact artifact/schema failure, and resume additive staging. After v4 sessions exist, rollback must retain v4 and historical compatibility; use a compatible reviewed revision or fix forward.
+
+## Replay-shard persistence invariant
+
+Replay shards under `data/*/shards/` are intentionally gitignored and must never be treated as ordinary working-tree output. A Git commit that contains rebuilt manifests, catalog entries, ledgers or path models is **not** a complete rebuild checkpoint by itself.
+
+For any multi-job model/corpus rebuild:
+
+1. Rebuild and validate the environment locally on the current runner.
+2. Upload that environment's replay shards to the model-versioned R2 namespace using `scripts/r2_replay_shards.sh` with an explicit `REPLAY_MODEL_VERSION` and `REPLAY_SETS` scope while the checkout is still mixed-model.
+3. Verify the scoped remote shard count exactly matches the local shard count before the runner is allowed to exit.
+4. Commit and push the git-tracked outputs to the rollout branch.
+5. On the final fresh runner, hydrate the complete model-versioned shard namespace from R2 **before** full provenance/audit checks, corpus construction, publication or rollout-PR creation.
+
+GitHub-hosted runners are ephemeral. If a job ends before both the R2 shard checkpoint and the git-tracked checkpoint succeed, that stage is not durable and must be considered incomplete.
+
+The rebuild workflow is intentionally covered by `tests/test_data_pipeline_workflows.py`. Changes that remove scoped R2 checkpointing, exact shard verification, or final hydration must fail CI rather than silently returning to runner-local shard storage.
+
