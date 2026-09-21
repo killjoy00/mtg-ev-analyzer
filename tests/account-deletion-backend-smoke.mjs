@@ -5,7 +5,8 @@ if(!process.argv.includes('--dev-fixtures'))throw Error('Requires an isolated fi
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 
 const {query}=await import('../worker/growth-function.js');
-const {beginDeletion,cleanupPackOne}=await import('../worker/account-deletion.mjs');
+const {beginDeletion,cleanupPackOne,sweepExpiredVerification}=await import('../worker/account-deletion.mjs');
+const {issueAccountSession}=await import('../worker/account-session.mjs');
 
 const auth=crypto.randomUUID();
 const player=crypto.randomUUID();
@@ -14,6 +15,43 @@ const challenge='qa-delete-'+crypto.randomUUID().replaceAll('-','').slice(0,20);
 const recovery='b'.repeat(64);
 
 try {
+  // Exercise the shared advisory lock with two independent runtime queries.
+  // The account is an existing Auth identity from this disposable Neon branch;
+  // this test never mutates managed Auth user/account/session tables.
+  const raceAuth=(await query(`SELECT u.id
+    FROM neon_auth."user" u
+    WHERE NOT EXISTS (
+      SELECT 1 FROM account_deletion_operations d WHERE d.auth_user_id=u.id
+    )
+    ORDER BY u."createdAt",u.id
+    LIMIT 1`)).rows[0]?.id;
+  assert.ok(raceAuth,'isolated branch must contain an Auth identity for the deletion/session race');
+  const [deleteRace,sessionRace]=await Promise.allSettled([
+    beginDeletion(query,{authUserId:raceAuth}),
+    issueAccountSession(query,{user_id:raceAuth}),
+  ]);
+  assert.equal(deleteRace.status,'fulfilled','deletion must commit its tombstone in the race');
+  if(sessionRace.status==='rejected') {
+    assert.equal(sessionRace.reason?.code,'ACCOUNT_DELETING');
+  }
+  const raceLive=Number((await query(`SELECT count(*)::int n FROM account_sessions
+    WHERE auth_user_id=$1::uuid AND revoked_at IS NULL AND expires_at>now()`,[raceAuth])).rows[0].n);
+  assert.equal(raceLive,0,'a concurrent account session must never remain live after deletion commits');
+  assert.equal(Number((await query('SELECT count(*)::int n FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[raceAuth])).rows[0].n),1);
+
+  // The maintenance sweep must delete only expired verification rows. The
+  // unexpired fixture is intentionally left for disposal with the CI branch.
+  const expiredVerification=crypto.randomUUID();
+  const freshVerification=crypto.randomUUID();
+  const marker='qa-delete-verification-'+crypto.randomUUID();
+  await query(`INSERT INTO neon_auth.verification(id,identifier,value,"expiresAt")
+    VALUES($1::uuid,$3,$3,now()-interval '1 minute'),
+          ($2::uuid,$3,$3,now()+interval '1 hour')`,[expiredVerification,freshVerification,marker]);
+  const swept=await sweepExpiredVerification(query,{limit:500});
+  assert.ok(swept>=1);
+  assert.equal(Number((await query('SELECT count(*)::int n FROM neon_auth.verification WHERE id=$1::uuid',[expiredVerification])).rows[0].n),0);
+  assert.equal(Number((await query('SELECT count(*)::int n FROM neon_auth.verification WHERE id=$1::uuid',[freshVerification])).rows[0].n),1);
+
   await query('INSERT INTO players(id,display_name) VALUES($1::uuid,$2),($3::uuid,$4)',[
     player,'QA Deleted Player',other,'QA Retained Player',
   ]);
