@@ -55,7 +55,7 @@ jobs:
           suspend_timeout: 300
           expires_at: ${{ steps.expiry.outputs.expires_at }}
       - name: Install pinned deployment tools
-        if: steps.request.outputs.operation == 'deploy-preview' || steps.request.outputs.operation == 'probe-auth-webhook' || steps.request.outputs.operation == 'stage-auth-webhook-probe' || steps.request.outputs.operation == 'cleanup-auth-webhook-probe'
+        if: steps.request.outputs.operation == 'deploy-preview' || steps.request.outputs.operation == 'probe-auth-webhook' || steps.request.outputs.operation == 'stage-auth-webhook-probe' || steps.request.outputs.operation == 'cleanup-auth-webhook-probe' || steps.request.outputs.operation == 'deploy-authhook-qa' || steps.request.outputs.operation == 'remove-authhook-qa'
         run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@4.17.4 esbuild@0.28.2 wrangler@4.132.0
       - name: Run isolated Auth webhook capability probe
         if: steps.request.outputs.operation == 'probe-auth-webhook'
@@ -81,6 +81,18 @@ jobs:
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
         run: node scripts/auth-webhook-probe-cleanup.mjs
+      - name: Deploy permanent QA Auth webhook ingress
+        if: steps.request.outputs.operation == 'deploy-authhook-qa'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-webhook-ingress-control.mjs deploy-qa
+      - name: Remove permanent QA Auth webhook ingress
+        if: steps.request.outputs.operation == 'remove-authhook-qa'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-webhook-ingress-control.mjs remove-qa
       - name: Apply reviewed retirement policy to the disposable preview
         if: steps.request.outputs.operation == 'deploy-preview'
         env:
