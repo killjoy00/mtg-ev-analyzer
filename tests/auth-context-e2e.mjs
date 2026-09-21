@@ -198,6 +198,7 @@ try {
   await page.getByText("Score added to today's leaderboard",{exact:true}).waitFor();
   assert.equal(await page.locator('.my-pack-one-page').count(),0);
   assert.equal(await page.locator('.run-result-page').count(),1);
+  assert.equal((await page.locator('#account-nav').textContent())?.trim(),'My Pack One');
   assert.equal(await page.getByRole('link',{name:'View leaderboard',exact:true}).count(),1);
   assert.equal(await page.locator('[data-daily-validation-confirmation] span').count(),0,'standing must be omitted because linkAccount did not expose it');
   assert.deepEqual(linkBodies.at(-1),{validateDailyRunId:runId});
@@ -214,6 +215,7 @@ try {
   await page.getByText("Score added to today's leaderboard",{exact:true}).waitFor();
   assert.equal(await page.locator('.my-pack-one-page').count(),0);
   assert.equal(await page.locator('.run-result-page').count(),1);
+  assert.equal((await page.locator('#account-nav').textContent())?.trim(),'My Pack One');
   assert.equal(await page.locator('[data-daily-validation-confirmation] span').count(),0);
   assert.deepEqual(linkBodies.at(-1),{validateDailyRunId:runId});
 
