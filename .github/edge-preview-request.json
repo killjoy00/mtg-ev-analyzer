@@ -1,1 +1,1 @@
-{"operation":"stage-auth-webhook-probe","reason":"2026-09-21: Redeploy the temporary QA webhook receiver with the Neon-documented Node Ed25519 verifier and sanitized diagnostics."}
+{"operation":"run-auth-webhook-probe","reason":"2026-09-21: Execute the second controlled QA password-recovery webhook probe using the corrected Neon-documented Ed25519 verifier; clear stale evidence first."}
