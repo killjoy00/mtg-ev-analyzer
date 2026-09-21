@@ -101,6 +101,10 @@ export class ProbeStore {
       const evidence=await this.storage.get('evidence');
       return evidence?responseJson(evidence):responseJson({ready:false},404);
     }
+    if(request.method==='DELETE') {
+      await this.storage.delete('evidence');
+      return new Response(null,{status:204,headers:{'cache-control':'no-store'}});
+    }
     return new Response(null,{status:405,headers:{'cache-control':'no-store'}});
   }
 }
@@ -141,9 +145,9 @@ async function sanitizedPayload(rawBytes) {
 export async function authProbe(request,env) {
   const url=new URL(request.url);
   if(request.method==='GET'&&url.pathname==='/health')return responseJson({ok:true,probe:'pack1-auth-webhook'});
-  if(request.method==='GET'&&url.pathname==='/evidence') {
+  if((request.method==='GET'||request.method==='DELETE')&&url.pathname==='/evidence') {
     const store=await evidenceStore(env);
-    return store.fetch('https://probe-store/evidence');
+    return store.fetch('https://probe-store/evidence',{method:request.method});
   }
   if(request.method!=='POST'||url.pathname!=='/webhook')return new Response(null,{status:404});
 
