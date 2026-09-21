@@ -159,7 +159,17 @@ export class RecoveryEventDedupe {
   }
 }
 
+function logTiming(env,deliveryAttempt,details) {
+  console.log(JSON.stringify({
+    type:'pack1_authhook_timing',
+    environment:env.PACK1_AUTH_ENV||'unknown',
+    delivery_attempt:deliveryAttempt||null,
+    ...details,
+  }));
+}
+
 export async function authWebhook(request,env) {
+  const started=Date.now();
   const url=new URL(request.url);
   if(url.pathname==='/health') {
     if(request.method!=='GET')return new Response(null,{status:405});
@@ -174,7 +184,12 @@ export async function authWebhook(request,env) {
   const rawBytes=new Uint8Array(await request.arrayBuffer());
   if(rawBytes.byteLength===0||rawBytes.byteLength>MAX_BODY_BYTES)return new Response(null,{status:413});
 
-  if(!env.AUTH_BASE||!(await verifyNeonWebhook(rawBytes,request.headers,env.AUTH_BASE)))return new Response(null,{status:401});
+  const verifyStarted=Date.now();
+  if(!env.AUTH_BASE||!(await verifyNeonWebhook(rawBytes,request.headers,env.AUTH_BASE))) {
+    logTiming(env,request.headers.get('x-neon-delivery-attempt'),{status:'invalid_signature',verify_ms:Date.now()-verifyStarted,total_ms:Date.now()-started});
+    return new Response(null,{status:401});
+  }
+  const verifyMs=Date.now()-verifyStarted;
 
   let payload;
   try {payload=JSON.parse(new TextDecoder().decode(rawBytes));}
@@ -183,6 +198,12 @@ export async function authWebhook(request,env) {
   const event=validateRecoveryEvent(payload,request.headers);
   if(!event)return new Response(null,{status:400});
 
+  if(env.PACK1_FORCE_DELIVERY_FAILURE==='1') {
+    logTiming(env,request.headers.get('x-neon-delivery-attempt'),{status:'forced_failure',verify_ms:verifyMs,total_ms:Date.now()-started});
+    return new Response(null,{status:503});
+  }
+
+  const deliveryStarted=Date.now();
   const id=env.RECOVERY_DEDUPE.idFromName(event.eventId);
   const stub=env.RECOVERY_DEDUPE.get(id);
   const result=await stub.fetch('https://pack1.internal/send',{
@@ -190,7 +211,12 @@ export async function authWebhook(request,env) {
     headers:{'content-type':'application/json'},
     body:JSON.stringify(event),
   });
-  if(!result.ok)return new Response(null,{status:502});
+  const deliveryMs=Date.now()-deliveryStarted;
+  if(!result.ok) {
+    logTiming(env,request.headers.get('x-neon-delivery-attempt'),{status:'delivery_failure',verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started});
+    return new Response(null,{status:502});
+  }
+  logTiming(env,request.headers.get('x-neon-delivery-attempt'),{status:'sent_or_duplicate',verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started});
   return new Response(null,{status:204});
 }
 
