@@ -3,9 +3,9 @@ import path from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 
-const PROJECT='late-fire-55708539';
-const BRANCH='br-super-snow-b5ufhq30';
-const AUTH_BASE='https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth';
+const PROJECT='patient-shadow-91417882';
+const BRANCH='br-shy-resonance-ayf5djjc';
+const AUTH_BASE='https://ep-still-math-ayzm00u3.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const WEBHOOK_API=`https://console.neon.tech/api/v2/projects/${PROJECT}/branches/${BRANCH}/auth/webhooks`;
 const WORKER='pack1-auth-webhook-probe-temp';
 
