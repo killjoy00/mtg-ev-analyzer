@@ -149,7 +149,9 @@ export async function resumeAccountAuth(status) {
 
 export async function installGrowthLayer() {
   currentAccount = await getAuthSession().catch(()=>null);
-  if (currentAccount?.user) await linkAccount().catch(() => null);
+  // Authentication/account-establishment flows link explicitly. Ordinary page
+  // bootstrap must only observe the existing account session: calling
+  // link-browser here used to rotate a valid account + CSRF pair on every load.
   event('page_view', { account:Boolean(currentAccount?.user) });
   document.addEventListener('pack1:share-completed', shareCompletedAnalytics);
   document.addEventListener('click', e => {
