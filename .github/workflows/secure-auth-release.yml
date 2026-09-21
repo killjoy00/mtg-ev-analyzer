@@ -104,7 +104,7 @@ jobs:
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
-          node tests/release-functions-smoke.mjs "$DEV_BRANCH" "$GITHUB_SHA" --daily --settle
+          node tests/secure-auth-release-smoke.mjs "$DEV_BRANCH" "$GITHUB_SHA" --settle
 
       - name: Verify activated Patreon secrets before production
         shell: bash
@@ -148,7 +148,7 @@ jobs:
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$PROD_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
-          node tests/release-functions-smoke.mjs "$PROD_BRANCH" "$GITHUB_SHA" --daily --settle
+          node tests/secure-auth-release-smoke.mjs "$PROD_BRANCH" "$GITHUB_SHA" --settle
 
       - name: Deploy fixed first-party production gateway
         env:
