@@ -1,1 +1,1 @@
-{"operation":"deploy-qa","reason":"2026-09-21: Deploy the reviewed Pack One QA recovery-email Worker after dedicated credential preflight passed.","commit":"64a11997012060085f60d9607666161d59efb365"}
+{"operation":"deploy-qa","reason":"2026-09-21: Redeploy the reviewed Pack One QA recovery-email Worker with bounded exact-marker health verification.","commit":"658c43180cc9481549f5727a9b9a9374c451fbeb"}
