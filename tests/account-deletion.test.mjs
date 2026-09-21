@@ -36,25 +36,21 @@ test('recovery limiter key remains HMAC-only',()=>{
   assert.equal(deletionRecoveryKey('person@example.com',{}),null);
 });
 
-test('pending transition uses shared advisory lock and revokes sessions atomically',async()=>{
+test('pending transition uses the database serialization primitive',async()=>{
   let seen='';
   const row={operation_id:OP,auth_user_id:AUTH,player_id:PLAYER,state:'pending',attempts:'0'};
   const query=async(sql,params)=>{seen=sql;assert.deepEqual(params,[AUTH,null]);return {rows:[row],rowCount:1};};
   assert.deepEqual(await beginDeletion(query,{authUserId:AUTH}),row);
-  assert.match(seen,/pg_advisory_xact_lock\(hashtextextended\(\$1::text,0\)\)/);
-  assert.match(seen,/FROM lock\s+JOIN account_links/);
-  assert.match(seen,/INSERT INTO account_deletion_operations/);
-  assert.match(seen,/UPDATE account_sessions/);
+  assert.match(seen,/pack1_begin_account_deletion\(\$1::uuid,\$2::uuid\)/);
 });
 
-test('session issuance uses the same lock and denies tombstoned identities',async()=>{
+test('session issuance uses the fresh-snapshot deletion guard',async()=>{
   let seen='';
   await assert.rejects(
     issueAccountSession(async(sql)=>{seen=sql;return {rows:[],rowCount:0};},{user_id:AUTH}),
     error=>error?.code==='ACCOUNT_DELETING',
   );
-  assert.match(seen,/pg_advisory_xact_lock\(hashtextextended\(\$2::text,0\)\)/);
-  assert.match(seen,/account_deletion_operations/);
+  assert.match(seen,/pack1_identity_attachment_allowed\(\$2::uuid\)/);
 });
 
 test('stale player tombstone lookup rejects deleted career ids',async()=>{
@@ -161,8 +157,13 @@ test('schema and release bookkeeping include migration 0031 in both stages',()=>
   const migration=fs.readFileSync('migrations/0031_account_deletion.sql','utf8');
   assert.match(migration,/account_deletion_operations/);
   assert.match(migration,/account_delete_init/);
+  assert.match(migration,/CREATE OR REPLACE FUNCTION pack1_identity_attachment_allowed/);
+  assert.match(migration,/CREATE OR REPLACE FUNCTION pack1_begin_account_deletion/);
+  assert.match(migration,/pg_advisory_xact_lock/);
   const schema=fs.readFileSync('worker/schema.sql','utf8');
   assert.match(schema,/account_deletion_operations/);
+  assert.match(schema,/CREATE OR REPLACE FUNCTION pack1_identity_attachment_allowed/);
+  assert.match(schema,/CREATE OR REPLACE FUNCTION pack1_begin_account_deletion/);
   assert.match(schema,/account_delete_verify/);
   assert.match(schema,/account_delete_network/);
   assert.match(schema,/account_delete_init/);
@@ -201,8 +202,7 @@ test('all Auth identity attachment surfaces share deletion serialization',()=>{
     'worker/growth-function.js',
   ]) {
     const source=fs.readFileSync(path,'utf8');
-    assert.match(source,/pg_advisory_xact_lock/,path+' must participate in the account identity lock');
-    assert.match(source,/account_deletion_operations/,path+' must reject or guard deletion tombstones');
+    assert.match(source,/pack1_identity_attachment_allowed/,path+' must use the fresh-snapshot account identity guard');
   }
 });
 
