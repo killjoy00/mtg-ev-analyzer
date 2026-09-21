@@ -1,0 +1,10 @@
+{
+  "name": "pack1-authhook-qa",
+  "main": "auth-webhook-ingress.mjs",
+  "compatibility_date": "2026-09-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {"enabled": false},
+  "vars": {"MODE": "qa", "NEON_BRANCH_ID": "br-twilight-hill-ayffyd2b", "RELEASE_COMMIT": "0000000000000000000000000000000000000000"}
+}
