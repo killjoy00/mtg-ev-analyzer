@@ -192,10 +192,19 @@ export async function gateway(request,env,fetcher=fetch) {
     if(limited.status!==204)return finish(limited.status===429?limited:response(503,'Gateway unavailable.'));
 
     const headers=new Headers({'accept':'application/json'});
-    // Only the gateway can author this value: it is the HMAC-SHA-256 network
-    // digest already used for the durable quota. Raw client IP is never sent
-    // upstream, and the function requires authenticated ingress before trusting it.
-    headers.set('x-pack1-network-id',digest);
+    // The persisted network dimension is already HMAC-SHA-256 under the
+    // gateway-only QUOTA_KEY. Authenticate that digest for the worker as well:
+    // direct-origin callers can invent a digest header but cannot forge this
+    // proof without the server-only credential key.
+    const credentialProofSecret=String(env.CREDENTIAL_PROOF_KEY||'');
+    if(credentialProofSecret.length>=32) {
+      const proofKey=await crypto.subtle.importKey('raw',encode.encode(credentialProofSecret),{name:'HMAC',hash:'SHA-256'},false,['sign']);
+      const proof=Array.from(new Uint8Array(await crypto.subtle.sign(
+        'HMAC',proofKey,encode.encode('pack1-credential-network:'+digest),
+      ))).map(x=>x.toString(16).padStart(2,'0')).join('');
+      headers.set('x-pack1-network-id',digest);
+      headers.set('x-pack1-network-proof',proof);
+    }
     if(env.ORIGIN_SECRET)headers.set('x-pack1-ingress-secret',env.ORIGIN_SECRET);
     if(origin)headers.set('origin',origin);
     if(cookies)headers.set('cookie',cookies);
