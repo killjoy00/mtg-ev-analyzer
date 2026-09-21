@@ -731,6 +731,40 @@ async function handlePasswordReset(request) {
   return clearAccountCookies(json({ok:true}));
 }
 
+async function handleEmailChange(request) {
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const auth=await authSession(request,{required:true,allowLegacy:false,csrf:true});
+  const payload=await readJson(request);
+  const newEmail=normalizedRecoveryEmail(payload.newEmail);
+  if(newEmail===String(auth.email||'').trim().toLowerCase())
+    throw Object.assign(Error('Enter a different email address.'),{status:400,code:'EMAIL_UNCHANGED'});
+
+  // Keep the anti-flood posture active even while the provider capability is
+  // gated. Target email is deliberately absent from both limiter identities.
+  const accountLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'email_change_account',
+    limit:EMAIL_ACCOUNT_LIMIT,seconds:EMAIL_LIMIT_SECONDS,
+  });
+  if(accountLimit.limited)
+    return credentialThrottle('Too many email-change requests. Please try again later.',accountLimit);
+  const network=trustedCredentialNetwork(request);
+  const networkLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'email_change_network',networkHash:network,
+    limit:EMAIL_NETWORK_LIMIT,seconds:EMAIL_LIMIT_SECONDS,
+  });
+  if(networkLimit.limited)
+    return credentialThrottle('Too many email-change requests. Please try again later.',networkLimit);
+
+  // Better Auth requires user.changeEmail.enabled=true, but Neon Managed Auth
+  // currently returns "Change email is disabled" and exposes no supported
+  // configuration switch. Never mutate neon_auth.user.email directly and never
+  // claim that a verification email was sent when no provider mutation began.
+  return json({
+    error:'Email changes are temporarily unavailable.',
+    code:'EMAIL_CHANGE_UNAVAILABLE',
+  },503);
+}
+
 async function handleAccountMigration(request) {
   requireTrustedOrigin(request,ALLOWED_ORIGINS);
   await player(request);
@@ -952,6 +986,9 @@ async function credentialState(authUserId) {
   return {
     password:bool(result.rows[0]?.has_password),
     google:bool(result.rows[0]?.has_google),
+    // Neon Managed Auth currently disables Better Auth changeEmail and exposes
+    // no supported configuration switch for this project. Keep the UI honest.
+    emailChange:false,
   };
 }
 
@@ -967,6 +1004,9 @@ async function handleAccount(request) {
 const PASSWORD_FAILURE_LIMIT=8;
 const PASSWORD_NETWORK_LIMIT=5;
 const PASSWORD_LIMIT_SECONDS=15*60;
+const EMAIL_ACCOUNT_LIMIT=6;
+const EMAIL_NETWORK_LIMIT=4;
+const EMAIL_LIMIT_SECONDS=60*60;
 
 function credentialThrottle(message,limit) {
   return new Response(JSON.stringify({error:message,code:'RATE_LIMITED'}),{
@@ -1195,6 +1235,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/request-password-reset') return handlePasswordResetRequest(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/reset-password') return handlePasswordReset(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/password-change') return handlePasswordChange(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/email-change') return handleEmailChange(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/link-browser') return handleLink(request,{browser:true});
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
