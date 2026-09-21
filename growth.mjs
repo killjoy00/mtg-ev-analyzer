@@ -161,7 +161,9 @@ export async function installGrowthLayer() {
     return;
   }
   currentAccount = await getAuthSession().catch(()=>null);
-  if (currentAccount?.user) await linkAccount().catch(() => null);
+  // Authentication/account-establishment flows link explicitly. Ordinary page
+  // bootstrap must only observe the existing account session: calling
+  // link-browser here rotates identity cookies and defeats session stability.
   event('page_view', { account:Boolean(currentAccount?.user) });
   document.addEventListener('pack1:share-completed', shareCompletedAnalytics);
   document.addEventListener('click', e => {
