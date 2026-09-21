@@ -1,0 +1,22 @@
+name: Issue 179A device email trigger
+
+on:
+  push:
+    branches:
+      - ops/179a-device-email-trigger
+
+permissions:
+  contents: read
+
+jobs:
+  trigger:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Trigger repaired Safari QA reset request
+        shell: bash
+        run: |
+          set -euo pipefail
+          body="$(curl --fail --silent --show-error --max-time 30 -X POST https://br-super-snow-b5ufhq30-device179a.compute.c-7.us-east-2.aws.neon.tech/prepare)"
+          BODY="$body" node -e 'const d=JSON.parse(process.env.BODY||"{}"); if(d.ok!==true) process.exit(1);'
+          echo 'device_qa_reset_requested=true'
