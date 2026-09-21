@@ -34,7 +34,7 @@ jobs:
       - name: Validate frozen protocol and provenance guards
         run: |
           python -m unittest discover -s tests -p test_traditional_puzzles.py
-          python -m unittest discover -s tests -p test_holdout_isolation.py
+          PYTHONPATH=scripts:. python -m unittest discover -s tests -p test_holdout_isolation.py
           python -m unittest discover -s tests -p test_traditional_v4_revalidation.py
       - name: Download pinned complete production v8 evidence
         uses: actions/download-artifact@v4
@@ -102,7 +102,7 @@ jobs:
           path: generated/frozen-v8
       - name: Recheck v4-only research invariants
         run: |
-          python -m unittest discover -s tests -p test_holdout_isolation.py
+          PYTHONPATH=scripts:. python -m unittest discover -s tests -p test_holdout_isolation.py
           python -m unittest discover -s tests -p test_traditional_v4_revalidation.py
       - name: Reconstruct exact production v4 grader and evaluate Traditional source
         run: python -u scripts/traditional_v4_revalidation.py --set "${{ matrix.set }}"
