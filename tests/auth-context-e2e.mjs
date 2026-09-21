@@ -102,6 +102,7 @@ async function fresh({source='nav',validateDailyRunId=null,intent=null,width=390
   await page.setViewportSize({width,height:width<700?844:900});
   await page.goto(base+'/tests/auth-context-harness.html');
   await page.waitForFunction(()=>Boolean(window.__renderAccount));
+  await page.locator('.account-page').waitFor();
   await page.evaluate(async args=>window.__renderAccount(args),{source,validateDailyRunId,intent});
 }
 
