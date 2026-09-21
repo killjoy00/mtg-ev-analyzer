@@ -33,6 +33,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
+import {bindMyPackOneTabs,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs';
 
 let catalogPromise = null;
 let profileRendering = false;
@@ -48,7 +49,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=3', import.meta.url).href;
+  link.href = new URL('./profile.css?v=4', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -137,7 +138,7 @@ function settingsMarkup(profile, progress, account, patreon) {
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
-    <header><div><p class="eyebrow">Your account</p><h2 id="profile-account-title">Account & profile</h2><p>${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
+    <header><div><p class="eyebrow">Profile</p><h2 id="profile-account-title">Profile settings</h2><p>${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     ${account?.user?`<form id="profile-settings-form">
       <label><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required><small>Shown on all Daily leaderboards.</small></label>
       <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''}><span><strong>Public profile</strong><small>Allows leaderboard visitors and shared links to open your Pack One record.</small></span></label>
@@ -197,6 +198,7 @@ function settingsMarkup(profile, progress, account, patreon) {
   </section>`;
 }
 function profileMarkup(profile, catalog, { own = false, publicKey = null, account = null, patreon = null } = {}) {
+  if (own && profile.player.claimed) return myPackOneMarkup(profile,catalog,{account,patreon,settingsMarkup});
   const names = catalogNames(catalog);
   const progress = environmentProgress(catalog, profile.by_set || []);
   const summary = profile.summary || {};
@@ -432,6 +434,7 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
     app.innerHTML = profileMarkup(profile, catalog, { own, publicKey, account, patreon });
     window.PACK1_LAST_PROFILE = profile;
     await bindProfile(profile, catalog, { own, publicKey });
+    if (own && profile.player.claimed) bindMyPackOneTabs();
     track('profile_view', { own, public: profile.player?.profile_public || false });
     window.scrollTo?.({ top: 0, behavior: 'smooth' });
   } finally {
@@ -440,6 +443,7 @@ async function renderProfile(profile, { own = false, publicKey = null } = {}) {
 }
 
 export async function renderMyProfile() {
+  resetMyPackOneTab();
   ensureProfileStyles();
   const app = document.querySelector('#app');
   if (app) app.innerHTML = '<section class="message-card"><p class="eyebrow">Account</p><h1>Loading your record…</h1></section>';
@@ -471,9 +475,10 @@ function enhanceNav() {
   button.className = 'top-nav-button';
   button.id = 'account-nav';
   button.type = 'button';
-  button.textContent = 'Account';
-  button.addEventListener('click', () => { track('account_view'); void renderMyProfile(); });
+  button.textContent = 'Sign in';
+  button.addEventListener('click', () => { track('account_view'); void renderAccount(); });
   top.append(button);
+  getAuthSession().then(session=>{if(document.body.contains(button))button.textContent=session?.user?'My Pack One':'Sign in';}).catch(()=>{});
 }
 
 async function enhanceLeaderboardProfiles() {
