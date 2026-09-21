@@ -905,6 +905,7 @@ async function handleLink(request,{browser=false}={}) {
   const old = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
   let id = old.rows[0]?.player_id || current;
   let merged = false;
+  let linkChanged = !old.rows.length;
 
   if (!old.rows.length) {
     const claimed=await query(
@@ -933,6 +934,9 @@ async function handleLink(request,{browser=false}={}) {
     id = resolved.rows[0]?.player_id || current;
   }
   if (id !== current) {
+    // Switching this browser back to the account's player is an association
+    // change even when the current player is already linked elsewhere.
+    linkChanged = true;
     const currentLink = await query('SELECT auth_user_id FROM account_links WHERE player_id=$1::uuid LIMIT 1', [current]);
     if (!currentLink.rows.length) {
       const mergedResult=await query(`WITH lock AS MATERIALIZED (
@@ -964,8 +968,10 @@ async function handleLink(request,{browser=false}={}) {
     profileKey: profile?.profile_key || null,
     email: auth.email,
   });
-  if(browser)response=withPlayerCookie(response,playerToken);
-  if(auth.source==='cookie') {
+  // No-op links must not rotate player/account cookies. Genuine claims,
+  // merges, and browser-player reassociations remain rotation boundaries.
+  if(browser&&linkChanged)response=withPlayerCookie(response,playerToken);
+  if(auth.source==='cookie'&&linkChanged) {
     const rotated=await issueAccountSession(query,auth,{replaceHash:auth.session_hash});
     response=withAccountCookies(response,rotated);
   }
