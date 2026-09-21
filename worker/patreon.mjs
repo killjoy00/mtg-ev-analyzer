@@ -55,10 +55,20 @@ export async function applyPatreonMembership(query,authUserId,providerUserId,mem
     currently_entitled_amount_cents=$6::int,is_free_trial=$7::boolean,is_gifted=$8::boolean,
     tier_ids=$9::jsonb,last_charge_status=$10,last_synced_at=$11::timestamptz,
     sync_requested_at=NULL,sync_revision=provider_accounts.sync_revision+1,updated_at=now()`;
+  const identityGuard=link?`identity_lock AS MATERIALIZED (
+    SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
+  ), identity_allowed AS MATERIALIZED (
+    SELECT 1 FROM identity_lock WHERE NOT EXISTS (
+      SELECT 1 FROM account_deletion_operations
+      WHERE auth_user_id=$1::uuid
+        AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
+    )
+  ), `:'';
   const save=link?`INSERT INTO provider_accounts(auth_user_id,provider,provider_user_id,
       provider_member_id,provider_campaign_id,membership_status,currently_entitled_amount_cents,
       is_free_trial,is_gifted,tier_ids,last_charge_status,last_synced_at)
     SELECT $1::uuid,'patreon',$2,$3,$4,$5,$6::int,$7::boolean,$8::boolean,$9::jsonb,$10,$11::timestamptz
+    FROM identity_allowed
     WHERE $12::bigint IS NULL AND EXISTS(SELECT 1 FROM provider_oauth_states
       WHERE state_hash=$14 AND auth_user_id=$1::uuid AND provider='patreon' AND consumed_at IS NOT NULL AND expires_at>now())
     ON CONFLICT(auth_user_id,provider) DO UPDATE SET provider_user_id=$2,${assignments}
@@ -67,7 +77,7 @@ export async function applyPatreonMembership(query,authUserId,providerUserId,mem
     `UPDATE provider_accounts SET ${assignments}
      WHERE auth_user_id=$1::uuid AND provider='patreon' AND provider_user_id=$2
        AND $14::text IS NULL AND sync_revision=$12::bigint AND last_synced_at <= $11::timestamptz RETURNING auth_user_id`;
-  const result=await query(`WITH saved AS (${save}), revoked AS (
+  const result=await query(`WITH ${identityGuard}saved AS (${save}), revoked AS (
     UPDATE entitlement_grants SET revoked_at=COALESCE(revoked_at,now())
     WHERE auth_user_id IN(SELECT auth_user_id FROM saved) AND provider='patreon'
       AND provider_reference<>$2 AND revoked_at IS NULL
@@ -237,8 +247,20 @@ export async function handlePatreon(request,{query,authSession,json}) {
     if(!configured()||!patreonAccountAllowed(authUserId))return json({error:'Patreon membership is not fully configured yet.'},503);
     const state=randomBytes(32).toString('hex'),hash=createHash('sha256').update(state).digest('hex');
     await query('DELETE FROM provider_oauth_states WHERE expires_at<=now()');
-    await query(`INSERT INTO provider_oauth_states(state_hash,auth_user_id,provider,expires_at)
-      VALUES($1,$2::uuid,$3,now()+interval '10 minutes')`,[hash,authUserId,PROVIDER]);
+    const inserted=await query(`WITH identity_lock AS MATERIALIZED (
+        SELECT pg_advisory_xact_lock(hashtextextended($2::text,0))
+      ), identity_allowed AS MATERIALIZED (
+        SELECT 1 FROM identity_lock WHERE NOT EXISTS (
+          SELECT 1 FROM account_deletion_operations
+          WHERE auth_user_id=$2::uuid
+            AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
+        )
+      )
+      INSERT INTO provider_oauth_states(state_hash,auth_user_id,provider,expires_at)
+      SELECT $1,$2::uuid,$3,now()+interval '10 minutes' FROM identity_allowed
+      RETURNING state_hash`,[hash,authUserId,PROVIDER]);
+    if(!inserted.rows[0])
+      throw Object.assign(Error('This account is being deleted.'),{status:409,code:'ACCOUNT_DELETING'});
     const target=new URL(`${PATREON_ORIGIN}/oauth2/authorize`);
     target.searchParams.set('response_type','code');
     target.searchParams.set('client_id',process.env.PATREON_CLIENT_ID);
