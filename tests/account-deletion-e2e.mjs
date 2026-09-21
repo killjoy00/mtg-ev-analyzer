@@ -64,7 +64,17 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       assert.match(await page.locator('.profile-danger').textContent(),/server-side recovery finishes the irreversible operation/i);
       await submitDeletion(page);
       await page.waitForURL('**/?account=deleting');
-      await page.getByText('Your deletion request has been accepted.').waitFor();
+      try {
+        await page.getByText('Your deletion request has been accepted.').waitFor({timeout:5000});
+      } catch (error) {
+        const state=await page.evaluate(()=>({
+          href:location.href,
+          readyState:document.readyState,
+          appText:document.querySelector('#app')?.textContent?.replace(/\\s+/g,' ').trim().slice(0,1200)||'',
+        }));
+        console.error('Accepted deletion confirmation missing:',JSON.stringify(state));
+        throw error;
+      }
       await page.getByText(/No further action is required/).waitFor();
       assert.deepEqual(deleteBody(),{currentPassword:'fixture-current-value',confirm:true});
       assert.deepEqual(errors,[],name+' accepted deletion emitted page errors');
