@@ -31,8 +31,17 @@ export function requireCapability(capabilities,capability) {
 export async function applyProviderEvent(adapter,event,query) {
   const grant=await adapter.verifyAndResolve(event);
   if(!grant||!/^[-a-z0-9]{2,40}$/.test(adapter.id)||!PAID_CAPABILITIES.has(grant.capability)||!/^[a-f0-9-]{36}$/.test(grant.accountId)||!grant.reference)throw Error('Invalid verified entitlement grant.');
-  await query(`INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference,expires_at,revoked_at)
-    VALUES($1::uuid,$2,$3,$4,$5::timestamptz,CASE WHEN $6::boolean THEN now() END)
+  await query(`WITH identity_lock AS MATERIALIZED (
+      SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
+    ), identity_allowed AS MATERIALIZED (
+      SELECT 1 FROM identity_lock WHERE NOT EXISTS (
+        SELECT 1 FROM account_deletion_operations
+        WHERE auth_user_id=$1::uuid
+          AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
+      )
+    )
+    INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference,expires_at,revoked_at)
+    SELECT $1::uuid,$2,$3,$4,$5::timestamptz,CASE WHEN $6::boolean THEN now() END FROM identity_allowed
     ON CONFLICT(auth_user_id,capability,provider,provider_reference) DO UPDATE SET expires_at=EXCLUDED.expires_at,revoked_at=EXCLUDED.revoked_at`,
     [grant.accountId,grant.capability,adapter.id,grant.reference,grant.expiresAt||null,grant.revoked===true]);
 }
