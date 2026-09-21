@@ -1,1 +1,1 @@
-{"operation":"deploy-preview","reason":"2026-09-17: Apply the reviewed retirement migration only to the new preview branch and verify exact corpus health before deploying; development still has one retired environment."}
+{"operation":"probe-auth-webhook","reason":"2026-09-21: Run the isolated QA Managed Neon password-recovery webhook capability probe; restore QA config and remove the temporary Worker afterward."}\n
