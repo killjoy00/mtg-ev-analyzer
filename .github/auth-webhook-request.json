@@ -1,1 +1,1 @@
-{"operation":"qa-acceptance","reason":"2026-09-21: Complete the real QA password reset, sign in with the new password, and record first/warm webhook timing."}
+{"operation":"deploy-qa","reason":"2026-09-21: Redeploy QA recovery Worker from reviewed revision that includes QA telemetry required by acceptance tests.","commit":"a1e04e610ad75d52be6f18774b165b8622c497c6"}
