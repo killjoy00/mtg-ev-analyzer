@@ -50,14 +50,8 @@ export async function consumeCredentialLimit(query,{
   if(!Number.isInteger(max)||max<1||!Number.isInteger(windowSeconds)||windowSeconds<1)
     throw Object.assign(Error('Credential limiter policy is invalid.'),{status:500});
   await query('DELETE FROM account_credential_rate_limits WHERE expires_at<=now()');
-  const result=await query(`WITH identity_lock AS MATERIALIZED (
-      SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
-    ), identity_allowed AS MATERIALIZED (
-      SELECT 1 FROM identity_lock WHERE NOT EXISTS (
-        SELECT 1 FROM account_deletion_operations
-        WHERE auth_user_id=$1::uuid
-          AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-      )
+  const result=await query(`WITH identity_allowed AS MATERIALIZED (
+      SELECT 1 WHERE pack1_identity_attachment_allowed($1::uuid)
     ), limited AS (
       INSERT INTO account_credential_rate_limits(auth_user_id,purpose,network_hash,attempts,expires_at)
       SELECT $1::uuid,$2,$3,1,now()+($4::int*interval '1 second') FROM identity_allowed
