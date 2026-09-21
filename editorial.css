@@ -31,6 +31,14 @@ body {
 h1, h2, h3 { font-family: var(--display); font-weight: 600; letter-spacing: 0; }
 a { color: inherit; }
 
+/* Keep navigation available while reading long content pages without changing
+   the gameplay/home header behavior. */
+body[data-page="editorial"] > .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+}
+
 .site-header {
   min-height: 72px;
   padding: 8px max(20px, calc((100vw - var(--content)) / 2));

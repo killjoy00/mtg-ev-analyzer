@@ -28,6 +28,9 @@ assert.match(home, /<main id="app" class="app"><\/main>/, 'the app shell should 
 assert.match(home, /Impact-Site-Verification: 3e227a68-dfc4-4be8-a619-b13df4f67e25/);
 assert.doesNotMatch(home, /impact-site-verification'\s+value=/i);
 assert.doesNotMatch(home, /Draft data from|No 17Lands endorsement/i, 'home footer should stay visually minimal');
+const editorialCss = await readFile('editorial.css','utf8');
+assert.match(editorialCss, /body\[data-page="editorial"\]\s*>\s*\.topbar\s*\{[\s\S]*?position:\s*sticky;[\s\S]*?top:\s*0;[\s\S]*?z-index:\s*20;/, 'editorial pages should keep the shared header visible while scrolling');
+assert.doesNotMatch(home, /<body[^>]*data-page="editorial"/i, 'the gameplay/home shell must not opt into the sticky editorial header');
 const howTo = await readFile('how-it-works/index.html','utf8');
 assert.match(howTo, /<h1>How to Play Pack One<\/h1>/);
 assert.match(howTo, /class="topbar"/);
