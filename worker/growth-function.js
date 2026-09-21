@@ -1092,4 +1092,4 @@ export default {
   },
 };
 
-export { query, player, readJson, json, withCors, gameDateKey };
+export { query, player, readJson, json, withCors, gameDateKey, normalizedRecoveryEmail, recoveryRateKey, consumeRecoveryLimit };
