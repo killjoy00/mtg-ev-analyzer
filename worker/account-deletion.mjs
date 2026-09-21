@@ -90,7 +90,7 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}) {
   }
 
   await query('UPDATE pack1_admin_invites SET redeemed_by=NULL WHERE redeemed_by=$1::uuid',[auth]);
-  await query('UPDATE corpus_status_events SET auth_user_id=NULL WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM corpus_status_events WHERE auth_user_id=$1::uuid',[auth]);
 
   // Shares have NO ACTION to sessions and must be removed first.
   await query(`DELETE FROM draft_run_shares
@@ -152,7 +152,7 @@ async function providerCall(authBase,path,{body,cookie}={}) {
   return {response,data,cookie:session};
 }
 
-export async function removeProviderUser({authBase,authUserId,env=process.env}) {
+export async function removeProviderUser({authBase,authUserId,env=process.env,validateServicePrincipal}) {
   const email=String(env.PACK1_DELETION_ADMIN_EMAIL||'').trim();
   const password=String(env.PACK1_DELETION_ADMIN_PASSWORD||'');
   if(!email||password.length<16)return {kind:'operator_review',code:'PROVIDER_ADMIN_CONFIG'};
@@ -164,6 +164,16 @@ export async function removeProviderUser({authBase,authUserId,env=process.env}) 
     const serviceId=String(signed.data?.user?.id||'');
     if(!UUID.test(serviceId)||serviceId===String(authUserId))
       return {kind:'operator_review',code:'PROVIDER_ADMIN_IDENTITY'};
+    if(typeof validateServicePrincipal!=='function')
+      return {kind:'operator_review',code:'PROVIDER_ADMIN_LINK_POLICY'};
+    let servicePrincipalAllowed=false;
+    try {
+      servicePrincipalAllowed=await validateServicePrincipal(serviceId);
+    } catch {
+      return {kind:'transient',code:'PROVIDER_ADMIN_LINK_CHECK'};
+    }
+    if(!servicePrincipalAllowed)
+      return {kind:'operator_review',code:'PROVIDER_ADMIN_LINKED'};
     let removed=await providerCall(authBase,'/admin/remove-user',{cookie:session,body:{userId:authUserId}});
     if(removed.response.status===401) {
       signed=await providerCall(authBase,'/sign-in/email',{body:{email,password,rememberMe:false}});
