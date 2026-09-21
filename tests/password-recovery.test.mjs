@@ -183,6 +183,7 @@ test('reset page is non-indexable, token-safe, and absent from the sitemap',asyn
   const sitemap=fs.readFileSync(new URL('../sitemap.xml',import.meta.url),'utf8');
   assert.match(html,/name="robots" content="noindex,nofollow"/);
   assert.match(html,/name="referrer" content="no-referrer"/);
+  assert.match(script,/fragmentParams\.get\('token'\)\|\|params\.get\('token'\)/);
   assert.match(script,/history\.replaceState\(\{\},'',location\.pathname\)/);
   for(const forbidden of ['localStorage','sessionStorage','console.','trackEvent','analytics'])assert.ok(!script.includes(forbidden));
   assert.ok(!sitemap.includes('/reset-password/'));
