@@ -192,6 +192,10 @@ export async function gateway(request,env,fetcher=fetch) {
     if(limited.status!==204)return finish(limited.status===429?limited:response(503,'Gateway unavailable.'));
 
     const headers=new Headers({'accept':'application/json'});
+    // Only the gateway can author this value: it is the HMAC-SHA-256 network
+    // digest already used for the durable quota. Raw client IP is never sent
+    // upstream, and the function requires authenticated ingress before trusting it.
+    headers.set('x-pack1-network-id',digest);
     if(env.ORIGIN_SECRET)headers.set('x-pack1-ingress-secret',env.ORIGIN_SECRET);
     if(origin)headers.set('origin',origin);
     if(cookies)headers.set('cookie',cookies);
