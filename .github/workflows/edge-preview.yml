@@ -55,7 +55,7 @@ jobs:
           suspend_timeout: 300
           expires_at: ${{ steps.expiry.outputs.expires_at }}
       - name: Install pinned deployment tools
-        if: steps.request.outputs.operation == 'deploy-preview' || steps.request.outputs.operation == 'probe-auth-webhook'
+        if: steps.request.outputs.operation == 'deploy-preview' || steps.request.outputs.operation == 'probe-auth-webhook' || steps.request.outputs.operation == 'stage-auth-webhook-probe' || steps.request.outputs.operation == 'cleanup-auth-webhook-probe'
         run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@4.17.4 esbuild@0.28.2 wrangler@4.132.0
       - name: Run isolated Auth webhook capability probe
         if: steps.request.outputs.operation == 'probe-auth-webhook'
@@ -64,6 +64,23 @@ jobs:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
         run: node scripts/auth-webhook-probe-control-v2.mjs
+      - name: Stage standalone Auth webhook receiver
+        if: steps.request.outputs.operation == 'stage-auth-webhook-probe'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-webhook-probe-stage.mjs
+      - name: Run QA Auth webhook probe after manual enablement
+        if: steps.request.outputs.operation == 'run-auth-webhook-probe'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/auth-webhook-probe-execute.mjs
+      - name: Remove standalone Auth webhook receiver
+        if: steps.request.outputs.operation == 'cleanup-auth-webhook-probe'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-webhook-probe-cleanup.mjs
       - name: Apply reviewed retirement policy to the disposable preview
         if: steps.request.outputs.operation == 'deploy-preview'
         env:
