@@ -33,6 +33,9 @@ export async function verifyNeonWebhookDetailed(rawBytes,headers,authBase,fetche
     envelope_valid:false,
     timestamp_fresh:false,
     jwks_fetch_ok:false,
+    jwks_http_status:null,
+    jwks_redirected:false,
+    jwks_fetch_error_name:null,
     jwks_key_found:false,
     public_key_imported:false,
     signature_valid:false,
@@ -47,10 +50,13 @@ export async function verifyNeonWebhookDetailed(rawBytes,headers,authBase,fetche
 
   let jwksResponse;
   try {
-    jwksResponse=await fetcher(authBase+'/.well-known/jwks.json',{redirect:'error',signal:AbortSignal.timeout(5000)});
-  } catch {
+    jwksResponse=await fetcher(authBase+'/.well-known/jwks.json',{signal:AbortSignal.timeout(5000)});
+  } catch (error) {
+    details.jwks_fetch_error_name=String(error?.name||'Error');
     return details;
   }
+  details.jwks_http_status=Number(jwksResponse.status)||null;
+  details.jwks_redirected=Boolean(jwksResponse.redirected);
   if(!jwksResponse.ok)return details;
   details.jwks_fetch_ok=true;
 
@@ -180,6 +186,9 @@ export async function authProbe(request,env) {
       envelope_valid:false,
       timestamp_fresh:false,
       jwks_fetch_ok:false,
+      jwks_http_status:null,
+      jwks_redirected:false,
+      jwks_fetch_error_name:null,
       jwks_key_found:false,
       public_key_imported:false,
       signature_valid:false,
