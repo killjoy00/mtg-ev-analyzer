@@ -85,9 +85,28 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}) {
   // is deliberately ordered and idempotent so a crash can resume from the same
   // operation without reattaching the old identity or rolling deletion back.
   if(player) {
+    // A retained result may reference either the classic challenge artifact or
+    // a Draft Run share. Remove only the deleted opponent's identifying
+    // snapshot/reference; the retained player's score and outcome remain.
     await query(`UPDATE game_results SET challenge_id=NULL,opponent_name=NULL
       WHERE player_id<>$1::uuid AND challenge_id IN (
         SELECT id FROM share_challenges WHERE player_id=$1::uuid
+        UNION
+        SELECT sh.id
+        FROM draft_run_shares sh
+        JOIN draft_run_sessions owner ON owner.id=sh.session_id
+        WHERE owner.player_id=$1::uuid
+      )`,[player]);
+
+    // Other players can also have an unfinished Draft Run challenge pointing
+    // at the deleted player's share. Clear that dangling reference before the
+    // share is hard-deleted so their own run remains usable and non-identifying.
+    await query(`UPDATE draft_run_sessions SET challenge_id=NULL,updated_at=now()
+      WHERE player_id<>$1::uuid AND challenge_id IN (
+        SELECT sh.id
+        FROM draft_run_shares sh
+        JOIN draft_run_sessions owner ON owner.id=sh.session_id
+        WHERE owner.player_id=$1::uuid
       )`,[player]);
   }
 
