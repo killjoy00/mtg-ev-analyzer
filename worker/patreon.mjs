@@ -55,15 +55,9 @@ export async function applyPatreonMembership(query,authUserId,providerUserId,mem
     currently_entitled_amount_cents=$6::int,is_free_trial=$7::boolean,is_gifted=$8::boolean,
     tier_ids=$9::jsonb,last_charge_status=$10,last_synced_at=$11::timestamptz,
     sync_requested_at=NULL,sync_revision=provider_accounts.sync_revision+1,updated_at=now()`;
-  const identityGuard=link?`identity_lock AS MATERIALIZED (
-    SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
-  ), identity_allowed AS MATERIALIZED (
-    SELECT 1 FROM identity_lock WHERE NOT EXISTS (
-      SELECT 1 FROM account_deletion_operations
-      WHERE auth_user_id=$1::uuid
-        AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-    )
-  ), `:'';
+  const identityGuard=link?`identity_allowed AS MATERIALIZED (
+      SELECT 1 WHERE pack1_identity_attachment_allowed($1::uuid)
+    ), `:'';
   const save=link?`INSERT INTO provider_accounts(auth_user_id,provider,provider_user_id,
       provider_member_id,provider_campaign_id,membership_status,currently_entitled_amount_cents,
       is_free_trial,is_gifted,tier_ids,last_charge_status,last_synced_at)
@@ -247,15 +241,9 @@ export async function handlePatreon(request,{query,authSession,json}) {
     if(!configured()||!patreonAccountAllowed(authUserId))return json({error:'Patreon membership is not fully configured yet.'},503);
     const state=randomBytes(32).toString('hex'),hash=createHash('sha256').update(state).digest('hex');
     await query('DELETE FROM provider_oauth_states WHERE expires_at<=now()');
-    const inserted=await query(`WITH identity_lock AS MATERIALIZED (
-        SELECT pg_advisory_xact_lock(hashtextextended($2::text,0))
-      ), identity_allowed AS MATERIALIZED (
-        SELECT 1 FROM identity_lock WHERE NOT EXISTS (
-          SELECT 1 FROM account_deletion_operations
-          WHERE auth_user_id=$2::uuid
-            AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-        )
-      )
+    const inserted=await query(`WITH identity_allowed AS MATERIALIZED (
+      SELECT 1 WHERE pack1_identity_attachment_allowed($2::uuid)
+    )
       INSERT INTO provider_oauth_states(state_hash,auth_user_id,provider,expires_at)
       SELECT $1,$2::uuid,$3,now()+interval '10 minutes' FROM identity_allowed
       RETURNING state_hash`,[hash,authUserId,PROVIDER]);
