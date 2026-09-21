@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const pages = ['index.html','how-it-works/index.html','scoring/index.html','methodology/index.html','learn/index.html','learn/first-pick-discipline/index.html','learn/reading-consensus/index.html','learn/staying-open/index.html','sets/index.html','sets/msh/index.html','sets/sos/index.html','sets/tmt/index.html','sets/ecl/index.html','about/index.html','contact/index.html','privacy/index.html','terms/index.html','disclosure/index.html'];
+const pages = ['index.html','how-it-works/index.html','scoring/index.html','methodology/index.html','learn/index.html','learn/first-pick-discipline/index.html','learn/reading-consensus/index.html','learn/staying-open/index.html','sets/index.html','sets/msh/index.html','sets/sos/index.html','sets/tmt/index.html','sets/ecl/index.html','about/index.html','contact/index.html','privacy/index.html','terms/index.html'];
 for (const path of pages) {
   const html = await readFile(path, 'utf8');
   assert.match(html, /<meta name="description"/i, `${path} needs a description`);
@@ -9,6 +9,7 @@ for (const path of pages) {
   assert.doesNotMatch(html, /lorem ipsum/i, `${path} must not contain filler`);
   assert.doesNotMatch(html, /site-nav-menu|top-nav-menu/i, `${path} must not hide Method behind a dropdown`);
   assert.match(html, /class="brand-mark"[^>]*><span>P<\/span><sup>1<\/sup>/i, `${path} needs the shared P1 mark`);
+  assert.doesNotMatch(html, /href="\/disclosure\/">Disclosure<\/a>/i, `${path} must not expose a standalone Disclosure footer link`);
 }
 for (const path of ['how-it-works/index.html','scoring/index.html','methodology/index.html','learn/first-pick-discipline/index.html','learn/reading-consensus/index.html','learn/staying-open/index.html','sets/msh/index.html']) {
   const html = await readFile(path, 'utf8');
@@ -54,7 +55,6 @@ const staticTopbarPages = [
   'sets/ecl/index.html',
   'about/index.html',
   'contact/index.html',
-  'disclosure/index.html',
   'privacy/index.html',
   'terms/index.html',
   'admin/index.html'
@@ -69,7 +69,7 @@ for (const path of staticTopbarPages) {
   assert.match(html, /id="account-nav" href="\/\?account=1">Account<\/a>/, `${path} needs Account navigation`);
   assert.doesNotMatch(html, /class="site-header"|class="admin-brand"/, `${path} must not use a legacy top-level header`);
 }
-for (const path of ['about/index.html','contact/index.html','disclosure/index.html','privacy/index.html','terms/index.html']) {
+for (const path of ['about/index.html','contact/index.html','privacy/index.html','terms/index.html']) {
   const html = await readFile(path, 'utf8');
   assert.doesNotMatch(html, /Make the decision before you read the answer\./, `${path} should not use the coaching CTA`);
   assert.match(html, /class="article-return"[^>]*>[\s\S]*Back to Pack One/, `${path} needs a quiet return to the product`);
@@ -107,11 +107,16 @@ assert.match(tcg, /tcgplayer_click/);
 const tcgConfig = await readFile('tcgplayer-config.js','utf8');
 assert.match(tcgConfig, /partner\.tcgplayer\.com\/c\/7742974\/1780961\/21018\?u=\{url\}/);
 assert.doesNotMatch(tcgConfig, /impactDeepLinkTemplate:\\s*''/);
-const disclosure = await readFile('disclosure/index.html','utf8');
-assert.match(disclosure, /participates in TCGplayer's affiliate program through Impact/i);
-assert.match(disclosure, /commission/i);
-assert.doesNotMatch(disclosure, /preparing to participate|When affiliate routing is active/i);
-assert.doesNotMatch(disclosure, /How links are labeled/i);
+const terms = await readFile('terms/index.html','utf8');
+assert.match(terms, /id="advertising-and-affiliates"/i);
+assert.match(terms, /participates in TCGplayer's affiliate program through Impact/i);
+assert.match(terms, /commission/i);
+assert.match(terms, /Commerce relationships do not influence consensus support/i);
+assert.match(terms, /Display advertising, if enabled/i);
+const disclosureRedirect = await readFile('disclosure/index.html','utf8');
+assert.match(disclosureRedirect, /http-equiv="refresh" content="0; url=\/terms\/#advertising-and-affiliates"/i);
+assert.match(disclosureRedirect, /rel="canonical" href="https:\/\/packone\.pro\/terms\/#advertising-and-affiliates"/i);
+assert.match(disclosureRedirect, /location\.replace\('\/terms\/#advertising-and-affiliates'\)/i);
 const privacy = await readFile('privacy/index.html','utf8');
 assert.match(privacy, /TCGplayer links on Pack One are affiliate links routed through Pack One's approved Impact referral URL/i);
 assert.match(privacy, /may earn a commission from eligible purchases at no added cost to the buyer/i);
@@ -119,4 +124,5 @@ assert.doesNotMatch(privacy, /may be affiliate links|whether affiliate routing w
 const sitemap = await readFile('sitemap.xml','utf8');
 assert.match(sitemap, /\/sets\/msh\//);
 assert.match(sitemap, /\/learn\/first-pick-discipline\//);
+assert.doesNotMatch(sitemap, /\/disclosure\//);
 console.log('Editorial and monetization shell guardrails passed.');
