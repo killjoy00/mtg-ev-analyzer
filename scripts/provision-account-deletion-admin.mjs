@@ -52,5 +52,17 @@ const userId=String(result.data?.user?.id||'');
 if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId))
   fail('Managed Auth did not return an unambiguous service-principal identity.');
 
+const setCookie=String(result.response.headers.get('set-cookie')||'');
+const sessionCookie=setCookie.split(/,(?=\\s*[^;,]+=)/)[0]?.split(';')[0]?.trim()||'';
+if(!sessionCookie)fail('Managed Auth did not return the short-lived provisioning session.');
+const signedOut=await fetch(base+'/sign-out',{
+  method:'POST',
+  headers:{origin:'https://packone.pro',accept:'application/json','content-type':'application/json',cookie:sessionCookie},
+  body:'{}',
+  redirect:'manual',
+  signal:AbortSignal.timeout(15000),
+});
+if(!signedOut.ok)fail(`Could not revoke the provisioning session (HTTP ${signedOut.status}).`);
+
 fs.writeFileSync(idFile,userId,{encoding:'utf8',mode:0o600});
-console.log('Managed Auth service-principal credential is valid.');
+console.log('Managed Auth service-principal credential is valid and the provisioning session was revoked.');
