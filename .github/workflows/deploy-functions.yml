@@ -37,6 +37,7 @@ jobs:
       PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
       PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
       PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
+      PACK1_RESEND_API_KEY: ${{ secrets.PACK1_RESEND_API_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -54,6 +55,7 @@ jobs:
           test ${#PACK1_RATE_LIMIT_SECRET} -ge 32 || { echo '::error::PACK1_RATE_LIMIT_SECRET is missing or too short.'; exit 1; }
           [[ "$PACK1_DELETION_ADMIN_EMAIL" == *@* ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is missing or malformed.'; exit 1; }
           test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16 || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is missing or too short.'; exit 1; }
+          test ${#PACK1_RESEND_API_KEY} -ge 20 || { echo '::error::PACK1_RESEND_API_KEY is missing or too short.'; exit 1; }
           [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::Use a full commit SHA.'; exit 1; }
           git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
           git checkout --detach "$RELEASE_COMMIT"
@@ -115,6 +117,13 @@ jobs:
               if [[ "$RELEASE_TARGET" == production && "$PATREON_RUNTIME_ENABLED" == true ]]; then
                 extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
               fi
+            elif [[ "$slug" == pack1authhook ]]; then
+              extra+=(--env "PACK1_RESEND_API_KEY=$PACK1_RESEND_API_KEY")
+              if [[ "$RELEASE_TARGET" == development ]]; then
+                extra+=(--env "PACK1_AUTH_ENV=qa" --env "PACK1_ALLOW_LOCALHOST=1")
+              else
+                extra+=(--env "PACK1_AUTH_ENV=production")
+              fi
             fi
             neon functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle \
               --project-id "$PROJECT_ID" --branch "$TARGET_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
@@ -123,5 +132,5 @@ jobs:
       # --settle: this runs seconds after the deploy call returned, and a
       # "completed" deployment is not yet guaranteed to be what every instance
       # answers with. The closing marker check inside the smoke stays strict.
-      - name: Verify revision, coverage and complete all three unranked Daily flows
+      - name: Verify all four function revisions, coverage and unranked Daily flows
         run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$RELEASE_COMMIT" --daily --settle
