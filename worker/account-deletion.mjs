@@ -37,7 +37,9 @@ export async function beginDeletion(query,{authUserId,playerId=null}) {
     WITH lock AS MATERIALIZED (
       SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
     ), linked AS MATERIALIZED (
-      SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid
+      SELECT a.player_id
+      FROM lock
+      JOIN account_links a ON a.auth_user_id=$1::uuid
     ), inserted AS (
       INSERT INTO account_deletion_operations(auth_user_id,player_id,state)
       SELECT $1::uuid,COALESCE($2::uuid,(SELECT player_id FROM linked)),'pending'
