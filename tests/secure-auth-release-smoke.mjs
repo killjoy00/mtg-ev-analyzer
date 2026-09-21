@@ -72,11 +72,21 @@ const maintenance=await fetch(`https://${branch}-pack1growth.compute.c-5.us-east
 assert.ok([401,403].includes(maintenance.status),`maintenance forged bearer unexpectedly returned ${maintenance.status}`);
 
 if(settle) {
-  const stableUntil=Date.now()+30*1000;
-  while(Date.now()<stableUntil) {
-    for(const slug of ['draftrunapi','pack1growth','pack1api'])assert.equal(await marker(slug),commit,`${slug} stable revision`);
+  const deadline=Date.now()+settleMs,stableWindow=30*1000;
+  let stableSince=0,last={};
+  while(Date.now()<deadline) {
+    let all=true;
+    for(const slug of ['draftrunapi','pack1growth','pack1api']) {
+      last[slug]=await marker(slug);
+      if(last[slug]!==commit)all=false;
+    }
+    if(all) {
+      if(!stableSince)stableSince=Date.now();
+      if(Date.now()-stableSince>=stableWindow)break;
+    } else stableSince=0;
     await new Promise(resolve=>setTimeout(resolve,5000));
   }
+  assert.deepEqual(last,{draftrunapi:commit,pack1growth:commit,pack1api:commit},'secure-auth release markers did not stabilize');
 }
 for(const slug of ['draftrunapi','pack1growth','pack1api'])assert.equal(await marker(slug),commit,`${slug} closing revision`);
 
