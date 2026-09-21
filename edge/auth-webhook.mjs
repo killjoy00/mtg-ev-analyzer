@@ -59,6 +59,9 @@ export async function verifyNeonWebhook(rawBytes,headers,authBase,fetcher=fetch,
   const [protectedB64,emptyPayload,signatureB64]=signature.split('.');
 
   if(!protectedB64||emptyPayload!==''||!signatureB64||!kid||!/^\d{13}$/.test(timestamp))return false;
+  let protectedHeader;
+  try {protectedHeader=JSON.parse(Buffer.from(protectedB64,'base64url').toString('utf8'));} catch {return false;}
+  if(protectedHeader?.alg!=='EdDSA'||protectedHeader?.kid!==kid)return false;
   const timestampMs=Number(timestamp);
   if(!Number.isFinite(timestampMs)||Math.abs(now-timestampMs)>MAX_CLOCK_SKEW_MS)return false;
 
