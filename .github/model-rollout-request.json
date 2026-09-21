@@ -1,5 +1,7 @@
 {
-  "operation": "rebuild-v4",
-  "request_id": "issue-164-v4-rebuild-20260919",
-  "reason": "Issue #164 holdout-isolation correction is merged and fully green. Rebuild every replay shard with strong-player-colour-stage-v4 and generate the separately versioned v8 baseline for review without changing live serving."
+  "operation": "import",
+  "request_id": "v8-development-import-20260921",
+  "reason": "Stage and verify the complete elite-trophy-colour-stage-v8 strong-player-colour-stage-v4 trophy corpus on development before production promotion.",
+  "sets": "all",
+  "target": "development"
 }
