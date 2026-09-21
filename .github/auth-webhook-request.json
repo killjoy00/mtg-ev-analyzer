@@ -1,1 +1,1 @@
-{"operation":"deploy-qa-retry","reason":"2026-09-21: Force a post-send 503 in QA to prove Managed Neon retries the same event while Pack One suppresses duplicate email delivery.","commit":"a1e04e610ad75d52be6f18774b165b8622c497c6"}
+{"operation":"qa-retry-check","reason":"2026-09-21: Prove post-send Neon retries are deduplicated by the permanent QA recovery Worker."}
