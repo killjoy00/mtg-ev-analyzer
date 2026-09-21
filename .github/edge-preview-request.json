@@ -1,1 +1,1 @@
-{"operation":"cleanup-auth-webhook-probe","reason":"2026-09-21: Retry removal of the disabled QA Auth probe receiver using the scoped Cloudflare API delete path."}\n
+{"operation":"cleanup-auth-webhook-probe","reason":"2026-09-21: Retry removal of the disabled QA Auth probe receiver using the scoped Cloudflare API delete path."}
