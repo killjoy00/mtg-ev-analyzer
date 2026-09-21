@@ -44,9 +44,18 @@ async function waitForRevision() {
 
 await waitForRevision();
 
-const growth=await request('pack1growth','/health');
-assert.equal(growth.ok,true);
-assert.equal(growth.release_commit,commit);
+async function waitForGrowthHealth() {
+  const deadline=Date.now()+settleMs;
+  for(;;) {
+    const growth=await request('pack1growth','/health');
+    assert.equal(growth.ok,true);
+    if(growth.release_commit===commit)return growth;
+    if(!settle||Date.now()>=deadline)assert.equal(growth.release_commit,commit,'pack1growth full health revision');
+    await new Promise(resolve=>setTimeout(resolve,pollMs));
+  }
+}
+
+const growth=await waitForGrowthHealth();
 assert.equal(growth.account_deletion_enabled,true,'account deletion kill switch must be enabled');
 assert.equal(growth.verification_sweep_enabled,true,'verification sweep kill switch must be enabled');
 
