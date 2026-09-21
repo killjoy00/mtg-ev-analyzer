@@ -5,6 +5,7 @@ from collections import Counter
 import gzip
 import hashlib
 import json
+import math
 from pathlib import Path
 from set_policy import corpus_version
 import re
@@ -19,6 +20,117 @@ def slug(name):
 
 def read_gzip(path):
     return json.loads(gzip.decompress(path.read_bytes()))
+
+
+CUBE_REROLL_MAX_RATING_DELTA = 10
+CUBE_REROLL_MAX_DISTANCE = 0.16
+CUBE_CURRENT_FIRST_PICK = 2
+CUBE_CURRENT_LAST_PICK = 9
+
+
+def js_round_nonnegative(value):
+    return int(math.floor(float(value) + 0.5))
+
+
+def puzzle_metrics(puzzle):
+    values = sorted((max(0.0, float(c.get('model_probability') or 0)) for c in puzzle['candidates']), reverse=True)
+    if len(values) < 2 or not values[0] > 0:
+        return None
+    top, second = values[0], values[1]
+    total = sum(values)
+    entropy = 1.0 if total <= 1e-9 else -sum(
+        (v / total) * math.log(v / total) for v in values if v > 1e-9
+    ) / math.log(len(values))
+    historical = next((c for c in puzzle['candidates'] if c['id'] == puzzle['historical_pick_id']), None)
+    target_ratio = None if historical is None else float(historical.get('model_probability') or 0) / top
+    rating = js_round_nonnegative(100 * second / top)
+    band = 'easy' if rating < 50 else 'medium' if rating < 80 else 'hard'
+    return {
+        'rating': rating,
+        'band': band,
+        'candidate_count': len(values),
+        'top_gap': top - second,
+        'entropy': max(0.0, min(1.0, entropy)),
+        'prior_pool_size': len(puzzle.get('prior_picks') or []),
+        'interesting': len(values) >= 4 and top <= .75 and second / top >= .2,
+        'serving': target_ratio is not None and 0 <= target_ratio <= 1 and
+                   js_round_nonnegative(95 * target_ratio) >= 20,
+    }
+
+
+def reroll_distance(a, b):
+    return (
+        abs(a['pick_number'] - b['pick_number']) / 3 * .35
+        + abs(a['candidate_count'] - b['candidate_count']) / max(1, a['candidate_count'], b['candidate_count']) * .15
+        + abs(a['top_gap'] - b['top_gap']) * .25
+        + abs(a['entropy'] - b['entropy']) * .15
+        + abs(a['prior_pool_size'] - b['prior_pool_size']) / max(1, a['prior_pool_size'], b['prior_pool_size']) * .10
+    )
+
+
+def cube_reroll_candidates(pool, source, metrics, anchor, excluded=()):
+    source_metric = metrics[source['puzzle_id']]
+    excluded = set(excluded) | {source['source_draft_hash']}
+    candidates = []
+    for puzzle in pool:
+        metric = metrics[puzzle['puzzle_id']]
+        if puzzle['source_draft_hash'] in excluded or puzzle['pick_number'] != source['pick_number']:
+            continue
+        if metric['band'] != source_metric['band'] or metric['band'] != anchor['band']:
+            continue
+        if abs(metric['rating'] - source_metric['rating']) > CUBE_REROLL_MAX_RATING_DELTA:
+            continue
+        if abs(metric['rating'] - anchor['rating']) > CUBE_REROLL_MAX_RATING_DELTA:
+            continue
+        distance = reroll_distance(
+            {'pick_number': source['pick_number'], **source_metric},
+            {'pick_number': puzzle['pick_number'], **metric},
+        )
+        if math.isfinite(distance) and distance <= CUBE_REROLL_MAX_DISTANCE:
+            candidates.append((distance, puzzle['puzzle_id'], puzzle))
+    candidates.sort(key=lambda item: (item[0], item[1]))
+    return [item[2] for item in candidates[:20]]
+
+
+def cube_supports_two_pack_rerolls(pool, source, metrics):
+    anchor = metrics[source['puzzle_id']]
+    first = cube_reroll_candidates(pool, source, metrics, anchor)
+    if not first:
+        return False
+    # The first reroll is seed-selected from the closest 20. Every possible
+    # first replacement must leave a second valid replacement, otherwise the
+    # advertised two-reroll Cube contract can fail for some session seeds.
+    for replacement in first:
+        if not cube_reroll_candidates(
+            pool, replacement, metrics, anchor,
+            excluded=(source['source_draft_hash'], replacement['source_draft_hash']),
+        ):
+            return False
+    return True
+
+
+def prune_cube_reroll_dead_ends(rows):
+    metrics = {p['puzzle_id']: puzzle_metrics(p) for p in rows}
+    def selectable(p):
+        m = metrics[p['puzzle_id']]
+        if not m or not m['interesting'] or not m['serving']:
+            return False
+        pick = int(p['pick_number'])
+        if not CUBE_CURRENT_FIRST_PICK <= pick <= CUBE_CURRENT_LAST_PICK:
+            return False
+        # eight-pick-v4 places its only easy slot in rounds 1-5 (P1P2-P1P6).
+        return pick <= 6 or m['band'] != 'easy'
+
+    kept = list(rows)
+    removed = set()
+    while True:
+        pool = [p for p in kept if selectable(p)]
+        bad = {p['puzzle_id'] for p in pool if not cube_supports_two_pack_rerolls(pool, p, metrics)}
+        if not bad:
+            break
+        removed |= bad
+        kept = [p for p in kept if p['puzzle_id'] not in bad]
+    return kept, len(removed)
 
 
 def build(root=ROOT, selected=None):
@@ -128,21 +240,26 @@ def build(root=ROOT, selected=None):
             if staged:
                 used.add(replay['draft_id'])
                 rows.extend(staged)
+        if sid == 'powered-cube':
+            rows, removed = prune_cube_reroll_dead_ends(rows)
+            if removed:
+                exclusions['reroll_dead_end_decisions'] += removed
         for p in rows:
             for c in p['candidates'] + p['prior_picks']:
                 if not c.get('image_url', '').startswith('https://'):
                     missing_images[c['id']] = c['name']
-        if len(used) < 12:
-            raise ValueError(f'{sid}: only {len(used)} eligible trophy drafts; exclusions={dict(exclusions)}')
+        published_sources = len({p['source_draft_hash'] for p in rows})
+        if published_sources < 12:
+            raise ValueError(f'{sid}: only {published_sources} published trophy drafts; exclusions={dict(exclusions)}')
         output = root / 'corpus/draft-run' / f'{sid}.json.gz'
         output.write_bytes(gzip.compress(json.dumps(rows, separators=(',', ':')).encode(), mtime=0))
-        info = {'id': sid, 'name': entry['name'], 'puzzles': len(rows), 'trophy_drafts': len(used),
+        info = {'id': sid, 'name': entry['name'], 'puzzles': len(rows), 'trophy_drafts': published_sources,
                 'first_pick': min(p['pick_number'] for p in rows), 'last_pick': max(p['pick_number'] for p in rows), 'category': 'special_mode' if sid == 'powered-cube' else 'expansion',
                 'source_date': manifest['source']['data_date'], 'source_archive': evidence['source'],
                 'evidence_sha256': hashlib.sha256(evidence_path.read_bytes()).hexdigest(),
                 'exclusions': dict(exclusions), 'unresolved_image_names': sorted(unresolved_names), 'sha256': hashlib.sha256(output.read_bytes()).hexdigest()}
         catalog['sets'].append(info)
-        print(f'{sid}: {len(used)} trophy drafts, {len(rows)} decisions, excluded {dict(exclusions)}', flush=True)
+        print(f'{sid}: {published_sources} trophy drafts, {len(rows)} decisions, excluded {dict(exclusions)}', flush=True)
     if missing_images:
         target = root / 'generated/review/all-set-missing-images.json'
         target.parent.mkdir(parents=True, exist_ok=True)

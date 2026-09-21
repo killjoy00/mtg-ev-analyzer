@@ -92,7 +92,7 @@ test('Cube has eight independent trophy decisions and two sequential pack replac
       assert.equal(current.set_id,environment);assert.ok(eligiblePickForRound(round,current.pick_number,environment));
       for(let reroll=0;reroll<2;reroll++){
         const replacement=selectDraftRunReroll(pool,current,{type:'pack',round,seed,environment,excludedSources:seen});
-        assert.ok(replacement);assert.equal(replacement.set_id,environment);assert.ok(!seen.includes(replacement.source_draft_hash));
+        assert.ok(replacement,`missing Cube replacement seed=${seed} round=${round} reroll=${reroll} source=${current.puzzle_id}`);assert.equal(replacement.set_id,environment);assert.ok(!seen.includes(replacement.source_draft_hash));
         seen.push(replacement.source_draft_hash);current=replacement;
       }
     }

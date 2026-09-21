@@ -132,8 +132,8 @@ case "$mode" in
           --bucket "$R2_BUCKET" \
           --prefix "${replay_prefix}/${sid}/shards/" \
           --endpoint-url "$R2_ENDPOINT" \
-          --query 'length(Contents[?ends_with(Key, `.json`)])' \
-          --output text)"
+          --query 'Contents[?ends_with(Key, `.json`)].Key' \
+          --output text | awk '{ count += NF } END { print count + 0 }')"
         echo "$sid replay shards: local=$local_count remote=$remote_count"
         test "$local_count" -gt 0
         test "$remote_count" = "$local_count"
@@ -144,8 +144,8 @@ case "$mode" in
         --bucket "$R2_BUCKET" \
         --prefix "${replay_prefix}/" \
         --endpoint-url "$R2_ENDPOINT" \
-        --query 'length(Contents[?contains(Key, `/shards/`) && ends_with(Key, `.json`)])' \
-        --output text)"
+        --query 'Contents[?contains(Key, `/shards/`) && ends_with(Key, `.json`)].Key' \
+        --output text | awk '{ count += NF } END { print count + 0 }')"
       echo "Local replay shards: $local_count"
       echo "Remote replay shards: $remote_count"
       test "$local_count" -gt 0

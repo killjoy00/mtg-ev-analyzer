@@ -19,7 +19,7 @@
     "training_picks": 128166
   },
   "model": {
-    "model_version": "strong-player-colour-stage-v3",
+    "model_version": "strong-player-colour-stage-v4",
     "holdout": "5-fold by draft_id",
     "probabilities_are_calibrated": false,
     "description": "Hierarchical strong-player pick tendency, adjusted by a stage-matched card/pool co-pick lift and a stage-matched colour-commitment shift; normalized within each pack.",
