@@ -674,11 +674,13 @@ function recoveryToken(value) {
 }
 
 async function recoveryUserForToken(token) {
-  const result=await query(`SELECT value auth_user_id FROM neon_auth.verification
-    WHERE identifier=$1 AND "expiresAt">now() LIMIT 1`,['reset-password:'+token]);
-  const id=String(result.rows[0]?.auth_user_id||'');
+  const result=await query(`SELECT value auth_user_id,"expiresAt" expires_at FROM neon_auth.verification
+    WHERE identifier=$1 LIMIT 1`,['reset-password:'+token]);
+  const row=result.rows[0],id=String(row?.auth_user_id||'');
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id))
-    throw Object.assign(Error('This password reset link is invalid or expired.'),{status:400,code:'INVALID_RESET'});
+    throw Object.assign(Error('This password reset link is invalid or has already been used.'),{status:400,code:'INVALID_RESET'});
+  if(new Date(row.expires_at).getTime()<=Date.now())
+    throw Object.assign(Error('This password reset link has expired.'),{status:400,code:'EXPIRED_RESET'});
   return id;
 }
 
@@ -1083,7 +1085,7 @@ export default {
     } catch (error) {
       console.error(error);
       const status=Number(error?.status||500);
-      const response=json({ error: status===500?'Request failed. Please try again.':error.message },status);
+      const response=json({ error: status===500?'Request failed. Please try again.':error.message,...(error?.code?{code:String(error.code)}:{}) },status);
       if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));
       return withCors(response, request);
     }
