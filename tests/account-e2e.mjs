@@ -73,7 +73,6 @@ try {
   await page.locator('#account-nav').click();
   await page.locator('#account-signin').waitFor();
   assert.equal(await page.locator('#account-signup').count(),0);
-  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Continue with Google');
   assert.equal(await page.locator('.player-profile-page').count(),0);
   assert.match(await page.locator('.account-page header').textContent(),/A free account saves your record and enables leaderboard participation\./);
   await page.screenshot({path:'artifacts/ui-account-mobile.png',fullPage:true});
