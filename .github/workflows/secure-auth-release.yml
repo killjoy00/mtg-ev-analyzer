@@ -29,6 +29,7 @@ jobs:
       PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
       PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
       PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
+      PACK1_AUTH_RESEND_API_KEY: ${{ secrets.PACK1_AUTH_RESEND_API_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -66,6 +67,7 @@ jobs:
           test ${#PACK1_RATE_LIMIT_SECRET} -ge 32 || { echo '::error::PACK1_RATE_LIMIT_SECRET is missing or too short.'; exit 1; }
           [[ "$PACK1_DELETION_ADMIN_EMAIL" == *@* ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is missing or malformed.'; exit 1; }
           test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16 || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is missing or too short.'; exit 1; }
+          [[ "$PACK1_AUTH_RESEND_API_KEY" == re_* ]] || { echo '::error::PACK1_AUTH_RESEND_API_KEY is missing or malformed.'; exit 1; }
 
       - name: Build exact Neon function revision
         env:
@@ -149,6 +151,12 @@ jobs:
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$PROD_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
           node tests/secure-auth-release-smoke.mjs "$PROD_BRANCH" "$GITHUB_SHA" --settle
+
+      - name: Deploy dedicated production recovery webhook Worker
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: node scripts/auth-webhook-control.mjs deploy-production
 
       - name: Deploy fixed first-party production gateway
         env:
