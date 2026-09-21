@@ -22,7 +22,7 @@ async function call(slug,path,body,token,status=200) {
 const SETTLE_MS=process.argv.includes('--settle')?10*60*1000:0, POLL_MS=10*1000;
 async function verifyMarkers({settle=false}={}) {
   const deadline=Date.now()+SETTLE_MS;
-  for(const slug of ['draftrunapi','pack1growth','pack1api']) {
+  for(const slug of ['draftrunapi','pack1growth','pack1api','pack1authhook']) {
     const started=Date.now();
     for(;;) {
       const h=await call(slug,'/health?quick=1');
@@ -47,7 +47,7 @@ async function waitForStableMarkers() {
   let stableSince=0,last={};
   while(Date.now()<deadline) {
     let all=true;
-    for(const slug of ['draftrunapi','pack1growth','pack1api']) {
+    for(const slug of ['draftrunapi','pack1growth','pack1api','pack1authhook']) {
       const h=await call(slug,'/health?quick=1');
       assert.equal(h.ok,true);
       last[slug]=h.release_commit;
@@ -62,7 +62,7 @@ async function waitForStableMarkers() {
     } else stableSince=0;
     await new Promise(resolve=>setTimeout(resolve,5000));
   }
-  assert.deepEqual(last,{draftrunapi:commit,pack1growth:commit,pack1api:commit},'release markers did not stabilize');
+  assert.deepEqual(last,{draftrunapi:commit,pack1growth:commit,pack1api:commit,pack1authhook:commit},'release markers did not stabilize');
 }
 const health=await call('draftrunapi','/health');
 assert.equal(health.ok,true);assert.equal(health.run_length,8);assert.equal(health.selection_version,'eight-pick-v4');
