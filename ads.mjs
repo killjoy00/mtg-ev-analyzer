@@ -1,9 +1,11 @@
 import {hasAccountSession,loadPatreonStatus} from './growth-api.mjs';
 
-export function syncAccountNavigation({doc=document,signedIn=hasAccountSession()}={}) {
+export function syncAccountNavigation({doc=document,signedIn=null}={}) {
   const nav=doc?.querySelector?.('#account-nav');
   if(!nav)return;
-  nav.textContent=signedIn?'My Pack One':'Sign in';
+  const firstPartyHint=/(?:^|;\s*)__Secure-pack1_csrf=/.test(String(doc.cookie||''));
+  const active=signedIn==null?(hasAccountSession()||firstPartyHint):Boolean(signedIn);
+  nav.textContent=active?'My Pack One':'Sign in';
   if(nav.tagName==='A')nav.setAttribute('href','/?account=1');
 }
 
