@@ -1,5 +1,5 @@
 import {Buffer} from 'node:buffer';
-import {createPublicKey,verify as verifySignature} from 'node:crypto';
+import {createHash,createPublicKey,verify as verifySignature} from 'node:crypto';
 
 const MAX_BODY_BYTES=64*1024;
 const MAX_CLOCK_SKEW_MS=5*60*1000;
@@ -145,6 +145,17 @@ export class RecoveryEventDedupe {
     this.env=env;
   }
   async fetch(request) {
+    const url=new URL(request.url);
+    if(url.pathname==='/telemetry') {
+      if(request.method==='GET')return responseJson({entries:await this.storage.get('qa_telemetry')||[]});
+      if(request.method!=='POST')return new Response(null,{status:405});
+      let entry;
+      try {entry=await request.json();} catch {return responseJson({ok:false},400);}
+      const entries=await this.storage.get('qa_telemetry')||[];
+      entries.push(entry);
+      await this.storage.put('qa_telemetry',entries.slice(-30));
+      return responseJson({ok:true});
+    }
     if(request.method!=='POST')return new Response(null,{status:405});
     if(await this.storage.get('sent'))return responseJson({ok:true,duplicate:true});
 
@@ -170,6 +181,25 @@ function logTiming(env,deliveryAttempt,details) {
     ...details,
   }));
 }
+function eventTelemetryKey(eventId) {
+  return createHash('sha256').update(String(eventId||'')).digest('hex').slice(0,16);
+}
+async function recordQaTelemetry(env,eventId,deliveryAttempt,details) {
+  if(env.PACK1_AUTH_ENV!=='qa'||!env.RECOVERY_DEDUPE)return;
+  try {
+    const id=env.RECOVERY_DEDUPE.idFromName('__qa_telemetry__');
+    await env.RECOVERY_DEDUPE.get(id).fetch('https://pack1.internal/telemetry',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        event_key:eventTelemetryKey(eventId),
+        delivery_attempt:String(deliveryAttempt||''),
+        at:new Date().toISOString(),
+        ...details,
+      }),
+    });
+  } catch {}
+}
 
 export async function authWebhook(request,env) {
   const started=Date.now();
@@ -178,6 +208,12 @@ export async function authWebhook(request,env) {
     if(request.method!=='GET')return new Response(null,{status:405});
     if(url.searchParams.get('quick')!=='1')return new Response(null,{status:404});
     return responseJson({ok:true,service:'pack1authhook',environment:env.PACK1_AUTH_ENV||'unknown',release_commit:env.PACK1_RELEASE_COMMIT||null});
+  }
+  if(url.pathname==='/qa/telemetry') {
+    if(env.PACK1_AUTH_ENV!=='qa')return new Response(null,{status:404});
+    if(request.method!=='GET')return new Response(null,{status:405});
+    const id=env.RECOVERY_DEDUPE.idFromName('__qa_telemetry__');
+    return env.RECOVERY_DEDUPE.get(id).fetch('https://pack1.internal/telemetry');
   }
   if(url.pathname!=='/webhook')return new Response(null,{status:404});
   if(request.method!=='POST')return new Response(null,{status:405});
@@ -201,8 +237,11 @@ export async function authWebhook(request,env) {
   const event=validateRecoveryEvent(payload,request.headers);
   if(!event)return new Response(null,{status:400});
 
+  const deliveryAttempt=request.headers.get('x-neon-delivery-attempt');
   if(env.PACK1_FORCE_DELIVERY_FAILURE==='1') {
-    logTiming(env,request.headers.get('x-neon-delivery-attempt'),{status:'forced_failure',verify_ms:verifyMs,total_ms:Date.now()-started});
+    const details={status:'forced_failure',verify_ms:verifyMs,total_ms:Date.now()-started};
+    logTiming(env,deliveryAttempt,details);
+    await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
     return new Response(null,{status:503});
   }
 
@@ -216,10 +255,17 @@ export async function authWebhook(request,env) {
   });
   const deliveryMs=Date.now()-deliveryStarted;
   if(!result.ok) {
-    logTiming(env,request.headers.get('x-neon-delivery-attempt'),{status:'delivery_failure',verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started});
+    const details={status:'delivery_failure',verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
+    logTiming(env,deliveryAttempt,details);
+    await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
     return new Response(null,{status:502});
   }
-  logTiming(env,request.headers.get('x-neon-delivery-attempt'),{status:'sent_or_duplicate',verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started});
+  let deliveryResult={};
+  try {deliveryResult=await result.json();} catch {}
+  const details={status:'sent_or_duplicate',duplicate:Boolean(deliveryResult?.duplicate),verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
+  logTiming(env,deliveryAttempt,details);
+  await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
+  if(env.PACK1_FORCE_RETRY_AFTER_SEND==='1')return new Response(null,{status:503});
   return new Response(null,{status:204});
 }
 
