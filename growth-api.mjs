@@ -305,6 +305,22 @@ export async function changeAccountPassword({currentPassword,newPassword}) {
   clearLegacyAuth();
   return data;
 }
+export async function deleteAccount({currentPassword}={}) {
+  if(!firstPartyAuthEnabled())throw new Error('Account deletion requires the secure account session.');
+  await ensureMigrations();
+  const data=await api('/v1/account/delete',{
+    method:'POST',
+    body:{currentPassword:String(currentPassword||''),confirm:true},
+    auth:false,
+  });
+  clearLegacyAuth();
+  try {
+    for(const key of [TOKEN_KEY,NAME_KEY,'pack1-game-history-v2','pack1-daily-history-v1'])localStorage.removeItem(key);
+  } catch {}
+  sessionPromise=null;
+  return data;
+}
+
 export async function startGoogleSignIn() {
   if(!firstPartyAuthEnabled())throw new Error('Google sign in is not available on this release yet.');
   await ensurePackSession();
