@@ -23,7 +23,7 @@ jobs:
         id: request
         run: node scripts/edge-control.mjs request
       - name: Verify Cloudflare access before provisioning
-        if: steps.request.outputs.operation != 'disable-preview'
+        if: steps.request.outputs.operation == 'deploy-preview' || steps.request.outputs.operation == 'check-access'
         env:
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
         run: node scripts/edge-control.mjs preflight
