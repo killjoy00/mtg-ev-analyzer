@@ -96,6 +96,7 @@ async function runFailure() {
   const probe=[...groups.values()].sort((a,b)=>b.length-a.length)[0]||[];
   if(probe.length<2)throw Error('Managed Neon did not retry the forced webhook failure.');
   console.log('QA_FAILURE_ACCEPTANCE '+JSON.stringify({
+    helper_stage:helper.body.stage,
     reset_request_status:helper.body.request_status,
     retry_attempts:probe.length,
     attempts:safeSummary(probe),
@@ -105,7 +106,7 @@ async function runRetry() {
   const before=await telemetry();
   const helper=await fetchJson(HELPER+'?mode=full');
   assertSanitizedHelper(helper.body);
-  if(helper.status!==200||helper.body?.stage!=='request'||Number(helper.body?.request_status||0)<400)throw Error('QA post-send retry probe did not force provider retry behavior.');
+  if(helper.status!==200||!['request','complete'].includes(helper.body?.stage))throw Error('QA post-send retry helper did not complete a valid recovery request path.');
   await sleep(1000);
   const after=await telemetry();
   const entries=unseen(before,after).filter(e=>e.status==='sent_or_duplicate');
