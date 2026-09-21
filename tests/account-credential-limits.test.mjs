@@ -86,3 +86,23 @@ test('migration 0030 is applied in both secure-auth release schema stages and ve
   assert.match(schema,/CREATE TABLE IF NOT EXISTS account_credential_rate_limits/);
   assert.match(verify,/account_credential_rate_limits/);
 });
+
+
+test('gateway allowlist and production control preserve authenticated credential network identity',()=>{
+  const gateway=readFileSync('edge/gateway.mjs','utf8');
+  const control=readFileSync('scripts/edge-production-control.mjs','utf8');
+  for(const route of ['/v1/account/password-change','/v1/account/email-change'])assert.match(gateway,new RegExp(route.replaceAll('/','\\/')));
+  assert.match(gateway,/CF-Connecting-IP|cf-connecting-ip/i);
+  assert.match(gateway,/CREDENTIAL_PROOF_KEY/);
+  assert.match(gateway,/x-pack1-network-proof/);
+  assert.match(control,/CREDENTIAL_PROOF_KEY:credentialProof/);
+  assert.match(control,/PACK1_RATE_LIMIT_SECRET/);
+});
+
+test('request-integrity docs distinguish signed-in credentials from signed-out recovery',()=>{
+  const docs=readFileSync('docs/REQUEST-INTEGRITY.md','utf8');
+  assert.match(docs,/first-party account session/);
+  assert.match(docs,/allowLegacy:false/);
+  assert.match(docs,/shared by every credential route/);
+  assert.match(docs,/Provider capability gate/);
+});
