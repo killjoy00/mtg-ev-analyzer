@@ -1,1 +1,1 @@
-{"operation":"qa-failure-check","reason":"2026-09-21: Prove Managed Neon retries a pre-send QA webhook failure and that no email is delivered."}
+{"operation":"qa-failure-check","reason":"2026-09-21: Rerun the pre-send forced-failure proof using live Managed Neon async-retry behavior as the contract."}
