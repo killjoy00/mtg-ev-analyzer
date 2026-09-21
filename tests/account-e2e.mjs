@@ -58,6 +58,8 @@ try {
   ]) {
     await page.goto(base+'/?account='+state);
     await page.getByText(heading).waitFor();
+    await page.waitForTimeout(150);
+    assert.equal(await page.getByText(heading).isVisible(),true,state+' deletion receipt did not remain visible');
     assert.equal(await page.locator('.player-profile-page').count(),0,state+' deletion receipt was replaced by profile rendering');
   }
 
