@@ -35,6 +35,8 @@ jobs:
       PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
       PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
       PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
+      PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
+      PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -50,6 +52,8 @@ jobs:
           set -euo pipefail
           test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY is missing.'; exit 1; }
           test ${#PACK1_RATE_LIMIT_SECRET} -ge 32 || { echo '::error::PACK1_RATE_LIMIT_SECRET is missing or too short.'; exit 1; }
+          [[ "$PACK1_DELETION_ADMIN_EMAIL" == *@* ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is missing or malformed.'; exit 1; }
+          test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16 || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is missing or too short.'; exit 1; }
           [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::Use a full commit SHA.'; exit 1; }
           git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
           git checkout --detach "$RELEASE_COMMIT"
@@ -103,7 +107,11 @@ jobs:
           while IFS=: read -r slug entry; do
             extra=()
             if [[ "$slug" == pack1growth ]]; then
-              extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET")
+              extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET"
+                --env "PACK1_DELETION_ADMIN_EMAIL=$PACK1_DELETION_ADMIN_EMAIL"
+                --env "PACK1_DELETION_ADMIN_PASSWORD=$PACK1_DELETION_ADMIN_PASSWORD"
+                --env "PACK1_ACCOUNT_DELETION_ENABLED=1"
+                --env "PACK1_VERIFICATION_SWEEP_ENABLED=1")
               if [[ "$RELEASE_TARGET" == production && "$PATREON_RUNTIME_ENABLED" == true ]]; then
                 extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
               fi
