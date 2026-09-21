@@ -144,7 +144,7 @@ function settingsMarkup(profile, progress, account, patreon) {
       <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
       <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status" aria-live="polite"></span></div>
     </form>`:`<p class="profile-empty">${account?.unavailable?'Profile settings are temporarily unavailable.':'Sign in to edit your profile settings.'}</p>`}
-    ${account?.user?`<section class="profile-membership profile-credentials" aria-labelledby="credential-settings-title">
+    ${account?.user?`<section class="profile-credentials" aria-labelledby="credential-settings-title">
       <div><p class="eyebrow">Security</p><h3 id="credential-settings-title">Sign-in credentials</h3>
         ${account?.credentials?.password
           ? `<p><strong>Change password</strong><br><span>Changing your password signs out every Pack One session, including this device.</span></p>
