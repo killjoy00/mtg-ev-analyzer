@@ -1011,6 +1011,24 @@ def summarize(paths, previous_path: Path, previous_cube_path: Path | None, out: 
         "persistent_category_patterns": residuals["persistent_category_patterns"],
         "powered_cube_restricted": cube_restricted,
         "format_training_audit": audit,
+        "issue_164_review": {
+            "issue": 164,
+            "historical_v3_defect": (
+                "Held-fold direct counts were subtracted only after pair/stage expectations "
+                "had been derived from full-cohort base rates, leaving an indirect held-fold dependency."
+            ),
+            "traditional_implication": (
+                "Traditional drafts were disjoint evaluation sources, but their selected Premier fold "
+                "model still inherited the v3 held-Premier-fold dependency. Disjoint source format alone "
+                "does not validate historical Traditional scores."
+            ),
+            "corrected_construction": (
+                "Every v4 fold used by this study is rebuilt from its Premier fold complement with "
+                "collect_isolated and build_colour_tables_by_fold."
+            ),
+            "held_label_invariance_regression_required": True,
+            "historical_components_are_comparison_only": True,
+        },
         "production_changed": False,
         "publication_authorized": False,
         "decision": (
@@ -1044,6 +1062,10 @@ def render_markdown(report: dict) -> str:
         f"Parent: `{PARENT}` · grader: `{MODEL}` · historical comparison: `{PREVIOUS_PARENT}` / `{PREVIOUS_MODEL}`.",
         "",
         "This is research evidence only. No production component was published by this run.",
+        "",
+        "## Issue #164 validity boundary",
+        "",
+        "The historical v3 Traditional components are comparison evidence under the known fold-construction defect: their source drafts were disjoint, but the Premier fold model used to score them still had an indirect held-fold dependency through the stage reference. This v4 study therefore requires strict fold-complement reconstruction plus the unchanged held-label invariance regression before any result is accepted.",
         "",
         "## Environment comparison",
         "",
