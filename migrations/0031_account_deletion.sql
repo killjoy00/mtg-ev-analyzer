@@ -38,7 +38,7 @@ CREATE OR REPLACE FUNCTION pack1_identity_attachment_allowed(p_auth_user_id uuid
 RETURNS boolean
 LANGUAGE plpgsql
 VOLATILE
-AS $
+AS $pack1$
 BEGIN
   PERFORM pg_advisory_xact_lock(hashtextextended(p_auth_user_id::text,0));
   RETURN NOT EXISTS (
@@ -48,13 +48,13 @@ BEGIN
       AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
   );
 END;
-$;
+$pack1$;
 
 CREATE OR REPLACE FUNCTION pack1_begin_account_deletion(p_auth_user_id uuid,p_player_id uuid DEFAULT NULL)
 RETURNS SETOF account_deletion_operations
 LANGUAGE plpgsql
 VOLATILE
-AS $
+AS $pack1$
 DECLARE
   resolved_player uuid;
   op account_deletion_operations%ROWTYPE;
@@ -78,7 +78,7 @@ BEGIN
 
   RETURN NEXT op;
 END;
-$;
+$pack1$;
 
 
 -- Reuse the signed-in credential limiter storage for destructive verification
