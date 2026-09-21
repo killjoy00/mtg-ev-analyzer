@@ -26,8 +26,8 @@ async function call(path,{body,cookie}={}) {
 }
 
 test('179C0 verification cleanup proof on isolated QA',{skip:!enabled,timeout:240000},async()=>{
-  const adminEmail='qa-179c0-admin-20260921@example.com';
-  const victimEmail='qa-179c0-victim-20260921@example.com';
+  const adminEmail='qa-179c0-admin-b-20260921@example.com';
+  const victimEmail='qa-179c0-victim-b-20260921@example.com';
   const adminPassword='Qa1!'+randomBytes(20).toString('base64url');
   const victimPassword='Qa1!'+randomBytes(20).toString('base64url');
 
