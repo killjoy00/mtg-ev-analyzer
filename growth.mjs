@@ -42,6 +42,7 @@ async function claimCurrentSession() {
   const linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
   pendingDailyRunValidation=null;
   currentAccount=session;
+  syncAccountNav(true);
   return {linked,validationRunId};
 }
 
