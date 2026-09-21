@@ -195,3 +195,24 @@ test('manual controls redeploy the current release without migrations',()=>{
   assert.match(flow,/PACK1_ACCOUNT_DELETION_ENABLED/);
   assert.match(flow,/PACK1_VERIFICATION_SWEEP_ENABLED/);
 });
+
+
+test('CI wiring keeps deletion browser coverage and release-secret gate mandatory',()=>{
+  const e2e=fs.readFileSync('.github/workflows/e2e.yml','utf8');
+  assert.match(e2e,/node tests\/account-deletion-e2e\.mjs/);
+  const backend=fs.readFileSync('.github/workflows/backend-gate.yml','utf8');
+  assert.match(backend,/node tests\/account-deletion-backend-smoke\.mjs/);
+  const ci=fs.readFileSync('.github/workflows/test.yml','utf8');
+  assert.match(ci,/PACK1_RATE_LIMIT_SECRET/);
+  assert.match(ci,/PACK1_DELETION_ADMIN_EMAIL/);
+  assert.match(ci,/PACK1_DELETION_ADMIN_PASSWORD/);
+});
+
+test('maintenance OIDC policy pins repository owner branch workflow and audience',()=>{
+  const auth=fs.readFileSync('worker/account-deletion-auth.mjs','utf8');
+  assert.match(auth,/pack-one-account-deletion-maintenance/);
+  assert.match(auth,/repository_owner_id/);
+  assert.match(auth,/refs\/heads\/main/);
+  assert.match(auth,/account-deletion-maintenance\.yml@refs\/heads\/main/);
+  assert.match(auth,/\['schedule','workflow_dispatch'\]/);
+});
