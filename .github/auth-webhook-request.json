@@ -1,1 +1,1 @@
-{"operation":"qa-retry-check","reason":"2026-09-21: Prove post-send Neon retries are deduplicated by the permanent QA recovery Worker."}
+{"operation":"qa-retry-check","reason":"2026-09-21: Rerun the post-send retry and duplicate-suppression proof using live webhook telemetry as the authority."}
