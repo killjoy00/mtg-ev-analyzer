@@ -27,7 +27,12 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
   });
 
   await page.goto(base);
-  await page.evaluate(async()=>{const growth=await import('./growth.mjs');await growth.renderAccount();});
+  await page.evaluate(()=>{
+    const script=document.createElement('script');
+    script.type='module';
+    script.textContent="import {renderAccount} from './growth.mjs'; await renderAccount();";
+    document.body.append(script);
+  });
   await page.locator('#account-forgot').waitFor();
   assert.equal((await page.locator('#account-forgot').textContent())?.trim(),'Forgot password?');
   await page.locator('#account-forgot').click();
