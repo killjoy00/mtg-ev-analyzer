@@ -117,7 +117,7 @@ async function main() {
   console.log('::add-mask::'+password);
   const runId=String(process.env.GITHUB_RUN_ID||Date.now());
   const attempt=String(process.env.GITHUB_RUN_ATTEMPT||'1');
-  const email=`pack1-auth-probe-${runId}-${attempt}@example.com`;
+  const email=`pack1-auth-probe-${runId}-${attempt}@planitnow.us`;
   const workerUrl=`https://${WORKER}.${accountSubdomain}.workers.dev`;
 
   let webhookChanged=false;
@@ -134,7 +134,6 @@ async function main() {
     if(signup.status<200||signup.status>=300)throw Error(`QA Auth probe signup failed with HTTP ${signup.status}.`);
     authUserId=signup.json?.user?.id||signup.json?.id||null;
     console.log('AUTH_PROBE_SIGNUP_STATUS '+signup.status);
-    console.log('AUTH_PROBE_EMAIL '+email);
 
     await neonControl(WEBHOOK_API,{method:'PUT',body:{
       enabled:true,
