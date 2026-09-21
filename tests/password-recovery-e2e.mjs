@@ -40,17 +40,27 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
 
   const token='fixture-token-1234567890abcdef';
   resetMode='success';
-  await page.goto(base+'/reset-password/?token='+token);
+  await page.goto(base+'/reset-password/#token='+token);
   await page.locator('#reset-password-form').waitFor();
-  assert.equal(page.url(),base+'/reset-password/','recovery token is removed from visible URL/history');
+  assert.equal(page.url(),base+'/reset-password/','fragment recovery token is removed from visible URL/history');
   await page.locator('[name="password"]').fill('New-password-123!');
   await page.locator('[name="confirm"]').fill('New-password-123!');
   await page.getByRole('button',{name:'Reset password'}).click();
   await page.getByText('Your password has been changed.').waitFor();
   assert.deepEqual(requestBodies.at(-1),{token,newPassword:'New-password-123!'});
 
-  resetMode='policy';
+  resetMode='success';
   await page.goto(base+'/reset-password/?token='+token);
+  await page.locator('#reset-password-form').waitFor();
+  assert.equal(page.url(),base+'/reset-password/','managed query recovery token remains supported and is scrubbed');
+  await page.locator('[name="password"]').fill('Second-password-123!');
+  await page.locator('[name="confirm"]').fill('Second-password-123!');
+  await page.getByRole('button',{name:'Reset password'}).click();
+  await page.getByText('Your password has been changed.').waitFor();
+  assert.deepEqual(requestBodies.at(-1),{token,newPassword:'Second-password-123!'});
+
+  resetMode='policy';
+  await page.goto(base+'/reset-password/#token='+token);
   await page.locator('[name="password"]').fill('short123');
   await page.locator('[name="confirm"]').fill('short123');
   await page.getByRole('button',{name:'Reset password'}).click();
