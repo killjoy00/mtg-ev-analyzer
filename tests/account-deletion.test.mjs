@@ -42,6 +42,7 @@ test('pending transition uses shared advisory lock and revokes sessions atomical
   const query=async(sql,params)=>{seen=sql;assert.deepEqual(params,[AUTH,null]);return {rows:[row],rowCount:1};};
   assert.deepEqual(await beginDeletion(query,{authUserId:AUTH}),row);
   assert.match(seen,/pg_advisory_xact_lock\(hashtextextended\(\$1::text,0\)\)/);
+  assert.match(seen,/FROM lock\s+JOIN account_links/);
   assert.match(seen,/INSERT INTO account_deletion_operations/);
   assert.match(seen,/UPDATE account_sessions/);
 });
