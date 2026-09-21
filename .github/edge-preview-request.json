@@ -1,1 +1,1 @@
-{"operation":"idle","reason":"2026-09-21: Auth webhook QA probes are complete; no edge-preview infrastructure action is requested."}
+{"operation":"cleanup-auth-webhook-probe","reason":"2026-09-21: QA Auth webhook has been disabled after successful Phase 0; remove the temporary Cloudflare probe receiver."}
