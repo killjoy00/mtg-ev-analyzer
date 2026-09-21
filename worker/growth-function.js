@@ -854,10 +854,19 @@ async function handleStats(request) {
 
 async function validateDailyRunScore(runId, playerId, authUserId) {
   const result = await query(
-    `WITH candidate AS MATERIALIZED (
+    `WITH identity_lock AS MATERIALIZED (
+       SELECT pg_advisory_xact_lock(hashtextextended($3::text,0))
+     ), identity_allowed AS MATERIALIZED (
+       SELECT 1 FROM identity_lock WHERE NOT EXISTS (
+         SELECT 1 FROM account_deletion_operations
+         WHERE auth_user_id=$3::uuid
+           AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
+       )
+     ), candidate AS MATERIALIZED (
        SELECT s.*
        FROM draft_run_sessions s
        WHERE s.id=$1::uuid AND s.player_id=$2::uuid AND s.day=$4::date
+         AND EXISTS(SELECT 1 FROM identity_allowed)
          AND s.score IS NOT NULL AND NOT s.leaderboard_eligible
          AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
          AND NOT EXISTS (
