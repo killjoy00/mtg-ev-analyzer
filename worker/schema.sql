@@ -57,3 +57,11 @@ CREATE INDEX IF NOT EXISTS share_challenges_created_idx ON share_challenges(crea
 INSERT INTO settings(key, value)
 VALUES ('player_secret', md5(random()::text || clock_timestamp()::text) || md5(random()::text || clock_timestamp()::text))
 ON CONFLICT (key) DO NOTHING;
+
+
+CREATE TABLE IF NOT EXISTS account_recovery_rate_limits (
+  limit_key text PRIMARY KEY CHECK (limit_key ~ '^[a-f0-9]{64}$'),
+  attempts integer NOT NULL CHECK (attempts > 0),
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS account_recovery_rate_limits_expiry_idx ON account_recovery_rate_limits(expires_at);
