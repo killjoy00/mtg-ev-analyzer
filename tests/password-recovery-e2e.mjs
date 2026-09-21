@@ -27,6 +27,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
 
   await page.goto(base);
   await page.locator('#account-nav').click();
+  await page.locator('.player-profile-page').waitFor();
+  await page.locator('#profile-claim-account').click();
   await page.locator('#account-signin').waitFor();
   await page.locator('#account-forgot').waitFor();
   assert.equal((await page.locator('#account-forgot').textContent())?.trim(),'Forgot password?');
