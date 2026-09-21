@@ -19,7 +19,7 @@ import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
-import { renderAccount } from './growth.mjs';
+import { renderAccount, renderDeletionState } from './growth.mjs';
 import {
   bestPercentile,
   environmentProgress,
@@ -305,9 +305,9 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
     button.disabled=true;status.textContent='Deleting account…';
     try {
       const result=await deleteAccount({currentPassword:data.currentPassword});
-      track('account_deletion_committed');
       const next=result?.deletion==='complete'?'deleted':'deleting';
-      location.assign(`/?account=${next}`);
+      history.replaceState({},'',`/?account=${next}`);
+      renderDeletionState(next);
     } catch(error) {
       status.textContent=error?.message||'Account could not be deleted.';
       button.disabled=false;
