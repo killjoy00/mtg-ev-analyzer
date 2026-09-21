@@ -43,3 +43,17 @@ jobs:
       - name: Audit production datasets
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: python scripts/audit_datasets.py --fail-on-error
+
+
+  c179-runtime-privilege-probe:
+    if: github.event_name == 'pull_request' && github.head_ref == 'ops/179c1-runtime-delete-privilege-probe-20260921'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Prove deployed worker runtime DELETE privilege
+        shell: bash
+        run: |
+          set -euo pipefail
+          body=$(curl -fsS --max-time 30 https://br-twilight-hill-ayffyd2b-c179probe.compute.c-5.us-east-2.aws.neon.tech/179c1-runtime-delete-privilege-probe-8d3d5174)
+          printf '%s\n' "$body"
+          node -e 'const x=JSON.parse(process.argv[1]);if(x.ok!==true||x.delete_row_count!==0||x.before_count!==x.after_count||x.same_role!==true)process.exit(1)' "$body"
