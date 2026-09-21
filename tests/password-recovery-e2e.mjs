@@ -60,7 +60,9 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
   assert.deepEqual(requestBodies.at(-1),{token,newPassword:'Second-password-123!'});
 
   resetMode='policy';
+  await page.goto(base+'/');
   await page.goto(base+'/reset-password/#token='+token);
+  await page.locator('#reset-password-form').waitFor();
   await page.locator('[name="password"]').fill('short123');
   await page.locator('[name="confirm"]').fill('short123');
   await page.getByRole('button',{name:'Reset password'}).click();
