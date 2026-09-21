@@ -71,6 +71,14 @@ Bootstrap remains deterministic, 500 draws, by whole source draft.
 
 Residual blocking remains the original rule: a directionally consistent >=3 percentage-point category residual whose interval excludes zero in at least three compatible environments blocks automatic expansion pending investigation.
 
+## Issue #164 is directly in scope
+
+The reason this study exists is not merely that the parent corpus version changed. The v3 production construction first computed second-pass pair/stage expectations from base rates fitted on the full training cohort and only then subtracted held-fold direct/expected contributions. Therefore the held Premier fold could still alter the grader assigned to that fold through the stage reference. Issue #164's deterministic reproduction proved that changing only held-fold answers changed the held-fold model.
+
+That defect also matters when reviewing the historical Traditional corpus. Traditional source drafts were never Premier training rows, but each Traditional draft was scored by one of the five Premier fold models. Under v3, that selected fold model still contained the indirect held-Premier-fold dependency. Therefore source-format disjointness alone does not validate the old Traditional scores.
+
+The v4 revalidation must pass the repository's held-label invariance regression unchanged and must construct every fold's direct counts, base tendencies, pair expectations, priors/fallbacks, colour evidence and stage references only from that fold's complement. A failure of that regression invalidates the run before any Traditional gate result is considered.
+
 ## Exact v4 construction
 
 For each environment:
