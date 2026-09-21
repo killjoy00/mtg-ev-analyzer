@@ -3,10 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import { gunzipSync } from 'node:zlib';
 import { createHash } from 'node:crypto';
-import {validateDraftRunPuzzle,interestingDraftRunPuzzle,gradeDraftRunPick,selectDraftRun,selectDraftRunReroll,eligiblePickForRound,publicDraftRunPuzzle,summarizeDraftRun,poolForEnvironment,draftRunRerollDistance} from '../draft-run.mjs';
-import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
-import {meetsServingQuality} from '../serving-quality.mjs';
-import {eligibleRunPuzzle} from '../draft-run-policy.mjs';
+import {validateDraftRunPuzzle,interestingDraftRunPuzzle,gradeDraftRunPick,selectDraftRun,selectDraftRunReroll,eligiblePickForRound,publicDraftRunPuzzle,summarizeDraftRun,poolForEnvironment} from '../draft-run.mjs';
 
 const catalog=JSON.parse(fs.readFileSync(new URL('../corpus/draft-run/catalog.json',import.meta.url)));
 const all=catalog.sets.flatMap(s=>{
@@ -95,17 +92,7 @@ test('Cube has eight independent trophy decisions and two sequential pack replac
       assert.equal(current.set_id,environment);assert.ok(eligiblePickForRound(round,current.pick_number,environment));
       for(let reroll=0;reroll<2;reroll++){
         const replacement=selectDraftRunReroll(pool,current,{type:'pack',round,seed,environment,excludedSources:seen});
-        if(!replacement){
-          const sourceRating=rateDraftRunPuzzle(current);
-          const candidates=poolForEnvironment(pool,environment)
-            .filter(meetsServingQuality)
-            .filter(eligibleRunPuzzle)
-            .filter(p=>p.set_id===environment&&!seen.includes(p.source_draft_hash)&&eligiblePickForRound(round,p.pick_number,environment))
-            .map(p=>({id:p.puzzle_id,pick:p.pick_number,rating:rateDraftRunPuzzle(p).rating,band:rateDraftRunPuzzle(p).band,distance:draftRunRerollDistance(current,p)}))
-            .sort((a,b)=>a.distance-b.distance||a.id.localeCompare(b.id))
-            .slice(0,8);
-          assert.fail(`missing Cube replacement seed=${seed} round=${round} reroll=${reroll} source=${current.puzzle_id} pick=${current.pick_number} seen=${seen.length} sourceRating=${sourceRating.rating}/${sourceRating.band} nearest=${JSON.stringify(candidates)}`);
-        }assert.equal(replacement.set_id,environment);assert.ok(!seen.includes(replacement.source_draft_hash));
+        assert.ok(replacement,`missing Cube replacement seed=${seed} round=${round} reroll=${reroll} source=${current.puzzle_id}`);assert.equal(replacement.set_id,environment);assert.ok(!seen.includes(replacement.source_draft_hash));
         seen.push(replacement.source_draft_hash);current=replacement;
       }
     }
