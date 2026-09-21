@@ -91,8 +91,7 @@ test('credential limiter writes fail closed once account deletion is tombstoned'
     }),
     error=>error?.code==='ACCOUNT_DELETING'&&error?.status===409,
   );
-  assert.match(seen,/pg_advisory_xact_lock/);
-  assert.match(seen,/account_deletion_operations/);
+  assert.match(seen,/pack1_identity_attachment_allowed\(\$1::uuid\)/);
 });
 
 test('only successful callers explicitly clear a selected limiter bucket',async()=>{
