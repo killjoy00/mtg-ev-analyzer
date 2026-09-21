@@ -113,15 +113,9 @@ async function start(request) {
   if(day) {
     const old=await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3 ORDER BY daily_account_id NULLS LAST,created_at LIMIT 1',[owner,day,environment,account?.auth_user_id||null]);
     if(old.rows[0]) {
-      if(account&&!old.rows[0].daily_account_id)await query(`WITH identity_lock AS MATERIALIZED (
-        SELECT pg_advisory_xact_lock(hashtextextended($2::text,0))
-      ), identity_allowed AS MATERIALIZED (
-        SELECT 1 FROM identity_lock WHERE NOT EXISTS (
-          SELECT 1 FROM account_deletion_operations
-          WHERE auth_user_id=$2::uuid
-            AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-        )
-      )
+      if(account&&!old.rows[0].daily_account_id)await query(`WITH identity_allowed AS MATERIALIZED (
+      SELECT 1 WHERE pack1_identity_attachment_allowed($2::uuid)
+    )
       UPDATE draft_run_sessions SET daily_account_id=$2::uuid
       WHERE id=$1::uuid AND daily_account_id IS NULL AND EXISTS(SELECT 1 FROM identity_allowed)`,[old.rows[0].id,account.auth_user_id]);
       return json(await responseFor(decode(old.rows[0])));
@@ -153,15 +147,9 @@ async function start(request) {
   if(choices.some(p=>!p || (environment==='powered-cube')!==(p.set_id==='powered-cube'))) fail('This run uses an unavailable corpus.',409);
   const sources=choices.map(p=>p.source_draft_hash),anchors=choices.map(publicDifficulty);
   const rerolls=day||source?{set:0,pack:0}:environment==='powered-cube'||setIds.length?{set:0,pack:2}:{set:1,pack:1};
-  const inserted=await query(`WITH identity_lock AS MATERIALIZED (
-      SELECT CASE WHEN $16::uuid IS NULL THEN NULL ELSE pg_advisory_xact_lock(hashtextextended($16::text,0)) END
-    ), identity_allowed AS MATERIALIZED (
-      SELECT 1 FROM identity_lock WHERE $16::uuid IS NULL OR NOT EXISTS (
-        SELECT 1 FROM account_deletion_operations
-        WHERE auth_user_id=$16::uuid
-          AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-      )
-    )
+  const inserted=await query(`WITH identity_allowed AS MATERIALIZED (
+   SELECT 1 WHERE $16::uuid IS NULL OR pack1_identity_attachment_allowed($16::uuid)
+  )
     INSERT INTO draft_run_sessions(player_id,day,seed,corpus_version,scoring_version,puzzle_ids,seen_sources,challenge_id,environment,rerolls,difficulty_version,difficulty_anchors,selection_version,measurement_qa,daily_featured_sets,daily_account_id,leaderboard_eligible,custom_set_ids,serving_policy_version)
     SELECT $1::uuid,$2::date,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12::jsonb,$13,
       $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb,$16::uuid,$17::boolean,$18::jsonb,$19
