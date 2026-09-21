@@ -89,15 +89,8 @@ export async function issueAccountSession(query,auth,{replaceHash=null}={}) {
   if(!auth?.user_id)throw Error('Cannot issue account session without a user.');
   const token=randomBytes(32).toString('base64url');
   const csrf=randomBytes(32).toString('base64url');
-  const result=await query(`WITH lock AS MATERIALIZED (
-      SELECT pg_advisory_xact_lock(hashtextextended($2::text,0))
-    ), allowed AS MATERIALIZED (
-      SELECT 1 FROM lock
-      WHERE NOT EXISTS (
-        SELECT 1 FROM account_deletion_operations
-        WHERE auth_user_id=$2::uuid
-          AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-      )
+  const result=await query(`WITH allowed AS MATERIALIZED (
+      SELECT 1 WHERE pack1_identity_attachment_allowed($2::uuid)
     ), revoked AS (
       UPDATE account_sessions SET revoked_at=COALESCE(revoked_at,now())
       WHERE $4::text IS NOT NULL AND session_hash=$4 AND revoked_at IS NULL
