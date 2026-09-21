@@ -26,7 +26,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
   });
 
   await page.goto(base);
-  await page.evaluate(()=>import('/growth.mjs').then(module=>module.renderAccount()));
+  await page.locator('#account-nav').click();
+  await page.locator('#account-signin').waitFor();
   await page.locator('#account-forgot').waitFor();
   assert.equal((await page.locator('#account-forgot').textContent())?.trim(),'Forgot password?');
   await page.locator('#account-forgot').click();
