@@ -273,6 +273,8 @@ test('secure-auth release smoke is deletion-specific and corpus-independent',()=
 
 test('secure-auth release smoke waits through stale Neon instances until the revision is stable',()=>{
   const smoke=fs.readFileSync('tests/secure-auth-release-smoke.mjs','utf8');
+  assert.match(smoke,/async function waitForGrowthHealth/);
+  assert.match(smoke,/pack1growth full health revision/);
   assert.match(smoke,/const stableWindow=30\*1000/);
   assert.match(smoke,/stableSince=0/);
   assert.match(smoke,/if\(await marker\(slug\)!==commit\)all=false/);
