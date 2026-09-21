@@ -7,6 +7,7 @@ import {gameDateKey} from '../game-date.mjs';
 import {handlePatreon} from './patreon.mjs';
 import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 import {accountRuntimeConfig} from './account-config.mjs';
+import {clearCredentialLimit,consumeCredentialLimit,trustedCredentialNetwork} from './account-credential-limits.mjs';
 const ACCOUNT_CONFIG=accountRuntimeConfig();
 const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
 const TOKEN_PREFIX = 'p1_';
@@ -157,8 +158,34 @@ async function neonAuth(path,{method='GET',body}={}) {
     signal:AbortSignal.timeout(15000),
   });
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(Error(data.message||data.error||`Account request failed (${response.status}).`),{status:response.status});
+  if(!response.ok)throw Object.assign(Error(data.message||data.error||`Account request failed (${response.status}).`),{status:response.status,providerCode:data.code||null});
   return data;
+}
+
+function providerCookie(response,fallback='') {
+  const raw=String(response.headers.get('set-cookie')||'');
+  const first=raw.split(/,(?=\s*[^;,]+=)/)[0]?.split(';')[0]?.trim();
+  return first||fallback;
+}
+
+async function neonAuthSession(path,{method='POST',body,cookie=''}={}) {
+  const response=await fetch(NEON_AUTH_BASE+path,{
+    method,
+    headers:{
+      origin:ACCOUNT_CONFIG.providerOrigin,
+      accept:'application/json',
+      ...(body===undefined?{}:{'content-type':'application/json'}),
+      ...(cookie?{cookie}:{}),
+    },
+    body:body===undefined?undefined:JSON.stringify(body),
+    redirect:'manual',
+    signal:AbortSignal.timeout(15000),
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Object.assign(Error(data.message||data.error||`Account request failed (${response.status}).`),{
+    status:response.status,providerCode:data.code||null,providerCookie:providerCookie(response,cookie),
+  });
+  return {data,cookie:providerCookie(response,cookie)};
 }
 
 function authIdentity(data) {
@@ -917,12 +944,125 @@ async function handleLink(request,{browser=false}={}) {
   return response;
 }
 
+async function credentialState(authUserId) {
+  const result=await query(`SELECT
+    bool_or("providerId"='credential' AND password IS NOT NULL) has_password,
+    bool_or("providerId"='google') has_google
+    FROM neon_auth.account WHERE "userId"=$1::uuid`,[authUserId]);
+  return {
+    password:bool(result.rows[0]?.has_password),
+    google:bool(result.rows[0]?.has_google),
+  };
+}
+
 async function handleAccount(request) {
   const auth = await authSession(request);
   return json({
     user: { id: auth.user_id, email: auth.email, name: auth.name },
     session: { expiresAt: auth.expires_at },
+    credentials:await credentialState(auth.user_id),
   });
+}
+
+const PASSWORD_FAILURE_LIMIT=8;
+const PASSWORD_NETWORK_LIMIT=5;
+const PASSWORD_LIMIT_SECONDS=15*60;
+
+function credentialThrottle(message,limit) {
+  return new Response(JSON.stringify({error:message,code:'RATE_LIMITED'}),{
+    status:429,
+    headers:{
+      'content-type':'application/json; charset=utf-8',
+      'cache-control':'no-store',
+      'retry-after':String(Math.max(1,limit.retryAfter||1)),
+    },
+  });
+}
+
+async function providerPasswordSession(auth,currentPassword) {
+  try {
+    const signed=await neonAuthSession('/sign-in/email',{body:{
+      email:String(auth.email||''),
+      password:currentPassword,
+      rememberMe:false,
+    }});
+    if(String(signed.data?.user?.id||'')!==String(auth.user_id))
+      throw Object.assign(Error('Current password was not accepted.'),{status:400,code:'CURRENT_PASSWORD'});
+    return signed.cookie;
+  } catch(error) {
+    if(Number(error?.status||500)>=500)
+      throw Object.assign(Error('Password change is temporarily unavailable.'),{status:503,code:'PROVIDER_FAILURE'});
+    throw Object.assign(Error('Current password was not accepted.'),{status:400,code:'CURRENT_PASSWORD'});
+  }
+}
+
+async function closeProviderSession(cookie) {
+  if(!cookie)return;
+  try {await neonAuthSession('/sign-out',{body:{},cookie});} catch {}
+}
+
+async function handlePasswordChange(request) {
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const auth=await authSession(request,{required:true,allowLegacy:false,csrf:true});
+  const payload=await readJson(request);
+  const currentPassword=String(payload.currentPassword||'');
+  const newPassword=String(payload.newPassword||'');
+  if(currentPassword.length<1||currentPassword.length>256)
+    throw Object.assign(Error('Enter your current password.'),{status:400,code:'CURRENT_PASSWORD'});
+  if(newPassword.length<8||newPassword.length>128)
+    throw Object.assign(Error('Password must be 8-128 characters.'),{status:400,code:'PASSWORD_POLICY'});
+  if(newPassword===currentPassword)
+    throw Object.assign(Error('Choose a new password that is different from your current password.'),{status:400,code:'PASSWORD_POLICY'});
+
+  const state=await credentialState(auth.user_id);
+  if(!state.password)
+    throw Object.assign(Error('This account does not have a password to change.'),{status:409,code:'NO_PASSWORD_CREDENTIAL'});
+
+  // The account-global oracle budget is independent of network configuration.
+  // The trusted network dimension is resolved separately and fails closed before
+  // any provider call if its authenticated gateway proof is unavailable.
+  const accountLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'current_password',
+    limit:PASSWORD_FAILURE_LIMIT,seconds:PASSWORD_LIMIT_SECONDS,
+  });
+  if(accountLimit.limited)
+    return credentialThrottle('Too many password attempts. Please try again later.',accountLimit);
+  const network=trustedCredentialNetwork(request);
+  const networkLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'password_change_network',networkHash:network,
+    limit:PASSWORD_NETWORK_LIMIT,seconds:PASSWORD_LIMIT_SECONDS,
+  });
+  if(networkLimit.limited)
+    return credentialThrottle('Too many password attempts. Please try again later.',networkLimit);
+
+  let providerSession='';
+  try {
+    providerSession=await providerPasswordSession(auth,currentPassword);
+    // The provider sign-in above is the current-password verification boundary.
+    // Clear the shared failure budget as soon as that verification succeeds so
+    // valid users are not penalized for a later new-password policy rejection.
+    // The account-plus-network submission bucket still ages out naturally.
+    await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'current_password'});
+    let changed;
+    try {
+      changed=await neonAuthSession('/change-password',{cookie:providerSession,body:{
+        currentPassword,
+        newPassword,
+        revokeOtherSessions:true,
+      }});
+    } catch(error) {
+      providerSession=error?.providerCookie||providerSession;
+      const status=Number(error?.status||500);
+      if(status>=500)
+        throw Object.assign(Error('Password change is temporarily unavailable.'),{status:503,code:'PROVIDER_FAILURE'});
+      throw Object.assign(Error('The new password was not accepted.'),{status:400,code:'PASSWORD_POLICY'});
+    }
+    providerSession=changed.cookie||providerSession;
+    await revokeAllAccountSessions(query,auth.user_id);
+    return clearAccountCookies(json({ok:true,signedOut:true}));
+  } finally {
+    await closeProviderSession(providerSession);
+  }
 }
 
 async function handleSignout(request) {
@@ -1055,6 +1195,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/signin') return handleAccountSignin(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/request-password-reset') return handlePasswordResetRequest(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/reset-password') return handlePasswordReset(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/password-change') return handlePasswordChange(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/link-browser') return handleLink(request,{browser:true});
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
