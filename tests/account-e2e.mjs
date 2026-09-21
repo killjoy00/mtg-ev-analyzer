@@ -50,6 +50,17 @@ async function fillAuth(kind='signin'){
 }
 
 try {
+  // Deletion return states are terminal. They must not fall through to the
+  // generic account route and be replaced by the player profile.
+  for(const [state,heading] of [
+    ['deleted','Your Pack One account has been deleted.'],
+    ['deleting','Your deletion request has been accepted.'],
+  ]) {
+    await page.goto(base+'/?account='+state);
+    await page.getByText(heading).waitFor();
+    assert.equal(await page.locator('.player-profile-page').count(),0,state+' deletion receipt was replaced by profile rendering');
+  }
+
   // Account remains the combined career/account surface for guests and members.
   await page.goto(base);
   await page.locator('#account-nav').click();
