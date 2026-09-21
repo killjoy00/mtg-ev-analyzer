@@ -9,7 +9,7 @@ import {deployPreviewFunction} from './edge-neon-deploy.mjs';
 const HOST='api-preview.packone.pro',WORKER='pack1-gateway-preview';
 export function parseRequest(value) {
   if(!value||Array.isArray(value)||Object.keys(value).some(k=>!['operation','reason'].includes(k))||
-    !['idle','check-access','deploy-preview','disable-preview','probe-auth-webhook','stage-auth-webhook-probe','run-auth-webhook-probe','cleanup-auth-webhook-probe','deploy-authhook-qa','remove-authhook-qa'].includes(value.operation)||typeof value.reason!=='string'||!value.reason.trim())throw Error('Invalid preview request.');
+    !['idle','check-access','deploy-preview','disable-preview','probe-auth-webhook','stage-auth-webhook-probe','run-auth-webhook-probe','cleanup-auth-webhook-probe'].includes(value.operation)||typeof value.reason!=='string'||!value.reason.trim())throw Error('Invalid preview request.');
   return value.operation;
 }
 export function checkBranch(branch) {
