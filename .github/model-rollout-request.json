@@ -1,7 +1,7 @@
 {
   "operation": "import",
-  "reason": "Refresh and verify the complete elite-trophy-colour-stage-v8 development corpus required by the 179C1 secure-auth release smoke; development currently has zero v8 serving puzzle rows while production remains untouched.",
-  "request_id": "v8-development-refresh-179c1-20260921",
+  "request_id": "v8-production-import-20260921",
+  "reason": "Stage and verify elite-trophy-colour-stage-v8 strong-player-colour-stage-v4 in production after successful complete development staging. Production draftrunapi already carries v8-compatible code from the concurrent secure-account release, so complete the guarded corpus publication now.",
   "sets": "all",
-  "target": "development"
+  "target": "production"
 }
