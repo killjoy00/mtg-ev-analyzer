@@ -83,6 +83,18 @@ test('account deletion limiter purposes are accepted and remain UUID/network sco
   assert.deepEqual(insert.params,[USER,'account_delete_network',NETWORK,900]);
 });
 
+test('credential limiter writes fail closed once account deletion is tombstoned',async()=>{
+  let seen='';
+  await assert.rejects(
+    consumeCredentialLimit(async(sql)=>{seen=sql;return {rows:[],rowCount:0};},{
+      authUserId:USER,purpose:'account_delete_init',limit:3,seconds:900,
+    }),
+    error=>error?.code==='ACCOUNT_DELETING'&&error?.status===409,
+  );
+  assert.match(seen,/pg_advisory_xact_lock/);
+  assert.match(seen,/account_deletion_operations/);
+});
+
 test('only successful callers explicitly clear a selected limiter bucket',async()=>{
   const {query,calls}=fakeQuery();
   await clearCredentialLimit(query,{authUserId:USER,purpose:'current_password'});
