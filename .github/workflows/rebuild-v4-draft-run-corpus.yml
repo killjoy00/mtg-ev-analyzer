@@ -149,6 +149,12 @@ jobs:
     needs: prepare
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
     strategy:
       fail-fast: true
       max-parallel: 1
@@ -227,6 +233,14 @@ jobs:
               raise SystemExit('Chunk provenance check failed:\n' + '\n'.join(errors))
           PY
 
+      - name: Checkpoint regular replay shards to versioned R2
+        env:
+          REPLAY_MODEL_VERSION: ${{ env.EXPECTED_MODEL }}
+          REPLAY_SETS: ${{ matrix.sets }}
+        run: |
+          bash scripts/r2_replay_shards.sh upload
+          bash scripts/r2_replay_shards.sh verify
+
       - name: Checkpoint rebuilt environments
         env:
           BRANCH: ${{ needs.prepare.outputs.rollout_branch }}
@@ -259,6 +273,12 @@ jobs:
       - regular_chunks
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
     steps:
       - uses: actions/checkout@v4
         with:
@@ -311,6 +331,14 @@ jobs:
               raise SystemExit('Legacy provenance check failed:\n' + '\n'.join(errors))
           PY
 
+      - name: Checkpoint legacy replay shards to versioned R2
+        env:
+          REPLAY_MODEL_VERSION: ${{ env.EXPECTED_MODEL }}
+          REPLAY_SETS: MID,VOW
+        run: |
+          bash scripts/r2_replay_shards.sh upload
+          bash scripts/r2_replay_shards.sh verify
+
       - name: Checkpoint legacy environments
         env:
           BRANCH: ${{ needs.prepare.outputs.rollout_branch }}
@@ -342,6 +370,12 @@ jobs:
       - legacy
     runs-on: ubuntu-latest
     timeout-minutes: 300
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
     steps:
       - uses: actions/checkout@v4
         with:
@@ -390,6 +424,14 @@ jobs:
           if errors:
               raise SystemExit('Powered Cube provenance check failed:\n' + '\n'.join(errors))
           PY
+
+      - name: Checkpoint Powered Cube replay shards to versioned R2
+        env:
+          REPLAY_MODEL_VERSION: ${{ env.EXPECTED_MODEL }}
+          REPLAY_SETS: powered-cube
+        run: |
+          bash scripts/r2_replay_shards.sh upload
+          bash scripts/r2_replay_shards.sh verify
 
       - name: Checkpoint Powered Cube
         env:
@@ -448,6 +490,9 @@ jobs:
         with:
           name: v4-baseline-${{ github.run_id }}
           path: generated
+
+      - name: Hydrate checkpointed v4 replay shards from R2
+        run: bash scripts/r2_replay_shards.sh hydrate
 
       - name: Verify complete v4 provenance
         shell: bash

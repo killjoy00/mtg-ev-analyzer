@@ -32,13 +32,42 @@ class DataPipelineWorkflowTests(unittest.TestCase):
         self.assertIn("v4-original-catalog.json", text)
         self.assertGreaterEqual(text.count('git push origin "HEAD:$BRANCH"'), 4)
 
+        # Replay shards are intentionally gitignored, so every expensive rebuild
+        # stage must durably checkpoint its shard subset before the next runner.
+        for checkpoint in (
+            "Checkpoint regular replay shards to versioned R2",
+            "Checkpoint legacy replay shards to versioned R2",
+            "Checkpoint Powered Cube replay shards to versioned R2",
+        ):
+            self.assertIn(checkpoint, text)
+        self.assertGreaterEqual(text.count("REPLAY_MODEL_VERSION:"), 3)
+        self.assertGreaterEqual(text.count("REPLAY_SETS:"), 3)
+
+        regular = text.split("  regular_chunks:", 1)[1].split("  legacy:", 1)[0]
+        legacy = text.split("  legacy:", 1)[1].split("  powered_cube:", 1)[0]
+        cube = text.split("  powered_cube:", 1)[1].split("  finalize:", 1)[0]
+        self.assertLess(
+            regular.index("Checkpoint regular replay shards to versioned R2"),
+            regular.index("Checkpoint rebuilt environments"),
+        )
+        self.assertLess(
+            legacy.index("Checkpoint legacy replay shards to versioned R2"),
+            legacy.index("Checkpoint legacy environments"),
+        )
+        self.assertLess(
+            cube.index("Checkpoint Powered Cube replay shards to versioned R2"),
+            cube.index("Checkpoint Powered Cube\n"),
+        )
+
         finalize = text.split("  finalize:", 1)[1]
+        hydrate = finalize.index("Hydrate checkpointed v4 replay shards from R2")
         verify = finalize.index("Verify complete v4 provenance")
         corpus = finalize.index("Build the separately versioned v8 corpus")
         tests = finalize.index("Validate the complete candidate")
         upload = finalize.index("Publish versioned v4 replay shards")
         commit = finalize.index("Commit final corpus candidate")
         release_pr = finalize.index("Open rollout pull request")
+        self.assertLess(hydrate, verify)
         self.assertLess(verify, corpus)
         self.assertLess(corpus, tests)
         self.assertLess(tests, upload)
@@ -58,6 +87,10 @@ class DataPipelineWorkflowTests(unittest.TestCase):
         self.assertIn('strong-player-colour-stage-v3', text)
         self.assertIn('replay-models/$model_version/data', text)
         self.assertIn('s3://${R2_BUCKET}/${replay_prefix}', text)
+        self.assertIn('REPLAY_MODEL_VERSION', text)
+        self.assertIn('REPLAY_SETS', text)
+        self.assertIn('--delete', text)
+        self.assertIn('Scoped replay set $sid has model', text)
 
     def test_backlog_routes_before_shared_lock(self):
         text = BACKLOG.read_text()
