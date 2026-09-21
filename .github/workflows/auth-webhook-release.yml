@@ -31,7 +31,7 @@ jobs:
         id: request
         run: node scripts/auth-webhook-request.mjs
       - name: Resolve exact implementation revision
-        if: steps.request.outputs.operation == 'deploy-qa' || steps.request.outputs.operation == 'deploy-qa-fail'
+        if: steps.request.outputs.operation == 'deploy-qa' || steps.request.outputs.operation == 'deploy-qa-fail' || steps.request.outputs.operation == 'deploy-qa-retry'
         shell: bash
         run: |
           set -euo pipefail
@@ -58,6 +58,11 @@ jobs:
         env:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-webhook-tools
         run: node scripts/auth-webhook-control.mjs deploy-qa-fail
+      - name: Deploy QA post-send retry recovery-email Worker
+        if: steps.request.outputs.operation == 'deploy-qa-retry'
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-webhook-tools
+        run: node scripts/auth-webhook-control.mjs deploy-qa-retry
       - name: Remove QA recovery-email Worker
         if: steps.request.outputs.operation == 'delete-qa'
         env:

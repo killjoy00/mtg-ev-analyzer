@@ -10,6 +10,7 @@ test('QA Auth webhook release request accepts only fixed reviewed operations',()
   assert.deepEqual(parseAuthWebhookRequest({operation:'check-secret',reason:'preflight'}),{operation:'check-secret',commit:''});
   assert.deepEqual(parseAuthWebhookRequest({operation:'deploy-qa',reason:'qa',commit}),{operation:'deploy-qa',commit});
   assert.deepEqual(parseAuthWebhookRequest({operation:'deploy-qa-fail',reason:'retry probe',commit}),{operation:'deploy-qa-fail',commit});
+  assert.deepEqual(parseAuthWebhookRequest({operation:'deploy-qa-retry',reason:'dedupe probe',commit}),{operation:'deploy-qa-retry',commit});
   assert.deepEqual(parseAuthWebhookRequest({operation:'delete-qa',reason:'cleanup'}),{operation:'delete-qa',commit:''});
 
   for(const value of [
@@ -29,6 +30,7 @@ test('QA Auth webhook workflow uses dedicated secrets and exposes no production 
   assert.match(workflow,/CLOUDFLARE_EDGE_TOKEN: \$\{\{ secrets\.CLOUDFLARE_EDGE_TOKEN \}\}/);
   assert.match(workflow,/auth-webhook-control\.mjs deploy-qa/);
   assert.match(workflow,/auth-webhook-control\.mjs deploy-qa-fail/);
+  assert.match(workflow,/auth-webhook-control\.mjs deploy-qa-retry/);
   assert.match(workflow,/auth-webhook-control\.mjs delete-qa/);
   assert.doesNotMatch(workflow,/auth-webhook-control\.mjs deploy-production/);
 });
@@ -43,5 +45,9 @@ test('Auth webhook deployment controller pins service identity, Auth bases, send
   assert.match(source,/Pack One <accounts@packone\.pro>/);
   assert.match(source,/resetOrigin:'http:\/\/localhost:4173'/);
   assert.match(source,/resetOrigin:'https:\/\/packone\.pro'/);
+  assert.match(source,/PACK1_FORCE_RETRY_AFTER_SEND/);
   assert.match(source,/wrangler.*secret.*bulk/s);
+  assert.match(source,/async function waitForHealth/);
+  assert.match(source,/attempt<=20/);
+  assert.match(source,/release marker mismatch/);
 });
