@@ -23,6 +23,19 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Verify account-deletion release secrets are provisioned
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        env:
+          RATE_LIMIT_SECRET_PRESENT: ${{ secrets.PACK1_RATE_LIMIT_SECRET != '' }}
+          DELETION_ADMIN_EMAIL_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL != '' }}
+          DELETION_ADMIN_PASSWORD_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD != '' }}
+        run: |
+          set -euo pipefail
+          [[ "$RATE_LIMIT_SECRET_PRESENT" == true ]] || { echo '::error::PACK1_RATE_LIMIT_SECRET is not provisioned.'; exit 1; }
+          [[ "$DELETION_ADMIN_EMAIL_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is not provisioned.'; exit 1; }
+          [[ "$DELETION_ADMIN_PASSWORD_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is not provisioned.'; exit 1; }
+
       - name: Verify deployment bundles and embedded revisions
         shell: bash
         run: |
