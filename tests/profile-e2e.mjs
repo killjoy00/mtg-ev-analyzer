@@ -173,9 +173,11 @@ try {
 
   await page.locator('#profile-stats-tab').click();
   await page.locator('#profile-load-more').evaluate(button=>{button.closest('details').open=true;});
+  const historyBefore=await page.locator('#profile-history-list > li').count();
   await page.locator('#profile-load-more').click();
-  await page.getByText('WOE', { exact:true }).last().waitFor({ timeout:5000 });
   await page.locator('#profile-load-more').waitFor({ state:'hidden', timeout:5000 });
+  assert.equal(await page.locator('#profile-history-list > li').count(),historyBefore+1,'load more appends the next history row');
+  assert.match((await page.locator('#profile-history-list > li').last().textContent())||'',/88/,'loaded history preserves the returned score');
 
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-manage-account,#profile-share-progress').count(),0);
