@@ -27,6 +27,15 @@ const request=(cookie,{method='GET',headers={}}={})=>
   new Request('https://packone.pro/v1/account/session',{method,headers:{...(cookie?{cookie}:{}),...headers}});
 const accountCookie=value=>'__Host-pack1_account='+value;
 
+test('ordinary growth bootstrap observes account state without relinking',()=>{
+  const source=readFileSync(new URL('../growth.mjs',import.meta.url),'utf8');
+  const start=source.indexOf('export async function installGrowthLayer()');
+  const end=source.indexOf('\n}',start);
+  assert.ok(start>=0&&end>start,'installGrowthLayer exists');
+  const body=source.slice(start,end+2);
+  assert.doesNotMatch(body,/\blinkAccount\s*\(/,'ordinary page bootstrap must not call link-browser');
+});
+
 test('a live first-party cookie resolves to its account',async()=>{
   const session=await accountSession(request(accountCookie(LIVE)),fakeQuery());
   assert.equal(session.source,'cookie');
