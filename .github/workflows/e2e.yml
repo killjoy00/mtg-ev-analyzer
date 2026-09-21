@@ -64,6 +64,8 @@ jobs:
         run: PACK1_TEST_SELECTION_VERSION=first-pack-v2 node tests/draft-run-e2e.mjs
       - name: Run account browser contract
         run: node tests/account-e2e.mjs
+      - name: Run auth simplification and Daily return contract
+        run: node tests/auth-context-e2e.mjs
       - name: Run password recovery Chromium/WebKit mobile contract
         run: node tests/password-recovery-e2e.mjs
       - name: Run credential management Chromium/WebKit mobile contract
