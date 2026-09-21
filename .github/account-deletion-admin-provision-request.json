@@ -1,1 +1,0 @@
-{"operation":"provision-account-deletion-admin","target":"production","email":"account-deletion@packone.pro","reason":"Issue #179C1 release prerequisite: distinct non-human Better Auth admin service principal for provider-last account deletion."}\n
