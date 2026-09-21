@@ -51,6 +51,7 @@ from import_all_trophies import (
     write_gzip_jsonl,
 )
 from traditional_puzzles import THRESHOLDS, compare, record
+from set_policy import corpus_version
 
 EVENTS = ("PremierDraft", "TradDraft")
 CUBE = "powered-cube"
@@ -67,10 +68,11 @@ EXCLUSIONS = {
     "vow": "No public TradDraft draft archive in the original Phase 1 source study.",
     "stx": "Traditional archive lacked the current skill-bucket evidence required by the frozen study and the environment is retired.",
 }
-PARENT = "elite-trophy-colour-stage-v8"
-MODEL = "strong-player-colour-stage-v4"
-PREVIOUS_PARENT = "elite-trophy-colour-stage-v7"
-PREVIOUS_MODEL = "strong-player-colour-stage-v3"
+PARENT = corpus_version()
+MODEL = ISOLATED_MODEL_VERSION
+_HISTORY_PIN = json.loads((ROOT / "research/traditional-puzzle-v3-inputs.json").read_text())
+PREVIOUS_PARENT = _HISTORY_PIN["blb"]["corpus_version"]
+PREVIOUS_MODEL = _HISTORY_PIN["blb"]["model_version"]
 COMPONENT = "traditional-premier-v4-phase2-v1"
 CUBE_COMPONENT = "traditional-cube-p2p7-v4-v1"
 PINNED_V8_RUN = 35646313155
