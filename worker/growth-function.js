@@ -854,15 +854,9 @@ async function handleStats(request) {
 
 async function validateDailyRunScore(runId, playerId, authUserId) {
   const result = await query(
-    `WITH identity_lock AS MATERIALIZED (
-       SELECT pg_advisory_xact_lock(hashtextextended($3::text,0))
-     ), identity_allowed AS MATERIALIZED (
-       SELECT 1 FROM identity_lock WHERE NOT EXISTS (
-         SELECT 1 FROM account_deletion_operations
-         WHERE auth_user_id=$3::uuid
-           AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-       )
-     ), candidate AS MATERIALIZED (
+    `WITH identity_allowed AS MATERIALIZED (
+      SELECT 1 WHERE pack1_identity_attachment_allowed($3::uuid)
+    ), candidate AS MATERIALIZED (
        SELECT s.*
        FROM draft_run_sessions s
        WHERE s.id=$1::uuid AND s.player_id=$2::uuid AND s.day=$4::date
@@ -918,13 +912,8 @@ async function handleLink(request,{browser=false}={}) {
 
   if (!old.rows.length) {
     const claimed=await query(
-      `WITH lock AS MATERIALIZED (
-          SELECT pg_advisory_xact_lock(hashtextextended($1::text,0))
-        ), allowed AS MATERIALIZED (
-          SELECT 1 FROM lock WHERE NOT EXISTS (
-            SELECT 1 FROM account_deletion_operations
-            WHERE auth_user_id=$1::uuid AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-          )
+      `WITH allowed AS MATERIALIZED (
+          SELECT 1 WHERE pack1_identity_attachment_allowed($1::uuid)
         ), claimed AS (
           INSERT INTO account_links(auth_user_id,player_id)
           SELECT $1::uuid,$2::uuid FROM allowed
@@ -948,13 +937,8 @@ async function handleLink(request,{browser=false}={}) {
     linkChanged = true;
     const currentLink = await query('SELECT auth_user_id FROM account_links WHERE player_id=$1::uuid LIMIT 1', [current]);
     if (!currentLink.rows.length) {
-      const mergedResult=await query(`WITH lock AS MATERIALIZED (
-          SELECT pg_advisory_xact_lock(hashtextextended($3::text,0))
-        ), allowed AS MATERIALIZED (
-          SELECT 1 FROM lock WHERE NOT EXISTS (
-            SELECT 1 FROM account_deletion_operations
-            WHERE auth_user_id=$3::uuid AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-          )
+      const mergedResult=await query(`WITH allowed AS MATERIALIZED (
+          SELECT 1 WHERE pack1_identity_attachment_allowed($3::uuid)
         )
         SELECT merge_pack1_player($1::uuid,$2::uuid) FROM allowed`,[current,id,auth.user_id]);
       if(!mergedResult.rows.length)throw Object.assign(Error('This account is being deleted.'),{status:409,code:'ACCOUNT_DELETING'});
