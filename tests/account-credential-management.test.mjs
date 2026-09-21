@@ -21,8 +21,8 @@ function dbResponse(fields=[],rows=[],rowCount=0) {
 }
 
 function installFetch({
-  currentAttempts=1,networkAttempts=1,hasPassword=true,hasGoogle=false,
-  signInStatus=200,changeStatus=200,
+  currentAttempts=1,networkAttempts=1,emailAccountAttempts=1,emailNetworkAttempts=1,
+  hasPassword=true,hasGoogle=false,signInStatus=200,changeStatus=200,
 }={}) {
   const calls=[];
   globalThis.fetch=async(url,options={})=>{
@@ -40,7 +40,12 @@ function installFetch({
       if(sql.startsWith('DELETE FROM account_credential_rate_limits WHERE expires_at'))
         return dbResponse([],[],1);
       if(sql.includes('INSERT INTO account_credential_rate_limits')) {
-        const attempts=params[1]==='current_password'?currentAttempts:networkAttempts;
+        const attempts={
+          current_password:currentAttempts,
+          password_change_network:networkAttempts,
+          email_change_account:emailAccountAttempts,
+          email_change_network:emailNetworkAttempts,
+        }[params[1]]??1;
         return dbResponse(['attempts','expires_at','retry_after'],[[String(attempts),'2099-01-01T00:00:00Z','900']],1);
       }
       if(sql.startsWith('DELETE FROM account_credential_rate_limits WHERE auth_user_id='))
@@ -88,6 +93,21 @@ function request(body={},headers={}) {
       newPassword:'New-password-456!',
       ...body,
     }),
+  });
+}
+
+function emailRequest(newEmail='new-owner@example.com',headers={}) {
+  return new Request('https://packone.pro/v1/account/email-change',{
+    method:'POST',
+    headers:{
+      origin:ORIGIN,'content-type':'application/json',
+      cookie:`__Host-pack1_account=${ACCOUNT}; __Secure-pack1_csrf=${CSRF}`,
+      'x-pack1-csrf':CSRF,
+      'x-pack1-network-id':NETWORK,
+      'x-pack1-network-proof':proof(),
+      ...headers,
+    },
+    body:JSON.stringify({newEmail}),
   });
 }
 
@@ -197,4 +217,51 @@ test('Google-only account is provider-aware and never enters password verificati
   assert.equal(body.code,'NO_PASSWORD_CREDENTIAL');
   assert.equal(calls.some(x=>x.kind==='provider'),false);
   assert.equal(calls.some(x=>x.kind==='db'&&x.sql.includes('INSERT INTO account_credential_rate_limits')),false);
+});
+
+
+test('email-change boundary is first-party only, target-independent, rate limited, and never claims verification was sent',async()=>{
+  const calls=installFetch();
+  const response=await growth.fetch(emailRequest('first-target@example.com'));
+  const body=await response.json();
+  assert.equal(response.status,503);
+  assert.equal(body.code,'EMAIL_CHANGE_UNAVAILABLE');
+  assert.equal(body.error,'Email changes are temporarily unavailable.');
+  assert.equal(calls.some(x=>x.kind==='provider'),false);
+  const writes=calls.filter(x=>x.kind==='db'&&x.sql.includes('INSERT INTO account_credential_rate_limits'));
+  assert.equal(writes.length,2);
+  assert.deepEqual(writes[0].params.slice(0,3),[USER,'email_change_account','']);
+  assert.deepEqual(writes[1].params.slice(0,3),[USER,'email_change_network',NETWORK]);
+  assert.equal(JSON.stringify(writes).includes('first-target@example.com'),false);
+  assert.equal(calls.some(x=>x.kind==='db'&&x.sql.startsWith('DELETE FROM account_credential_rate_limits WHERE auth_user_id=')),false);
+});
+
+test('changing target email cannot evade account email-submission threshold',async()=>{
+  for(const target of ['one@example.com','two@example.net']) {
+    const calls=installFetch({emailAccountAttempts:7});
+    const response=await growth.fetch(emailRequest(target));
+    assert.equal(response.status,429);
+    assert.equal(calls.some(x=>x.kind==='provider'),false);
+    const writes=calls.filter(x=>x.kind==='db'&&x.sql.includes('INSERT INTO account_credential_rate_limits'));
+    assert.equal(writes.length,1);
+    assert.deepEqual(writes[0].params.slice(0,3),[USER,'email_change_account','']);
+    assert.equal(JSON.stringify(writes).includes(target),false);
+  }
+});
+
+test('email-change network threshold blocks locally and malicious Origin or CSRF never reaches limiter/provider',async()=>{
+  let calls=installFetch({emailAccountAttempts:1,emailNetworkAttempts:5});
+  let response=await growth.fetch(emailRequest());
+  assert.equal(response.status,429);
+  assert.equal(calls.some(x=>x.kind==='provider'),false);
+
+  calls=installFetch();
+  response=await growth.fetch(emailRequest('other@example.com',{origin:'https://evil.test'}));
+  assert.equal(response.status,403);
+  assert.equal(calls.length,0);
+
+  calls=installFetch();
+  response=await growth.fetch(emailRequest('other@example.com',{'x-pack1-csrf':''}));
+  assert.equal(response.status,403);
+  assert.equal(calls.some(x=>x.kind==='provider'),false);
 });
