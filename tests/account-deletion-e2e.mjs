@@ -6,6 +6,21 @@ const user={id:'11111111-1111-4111-8111-111111111111',email:'qa@example.invalid'
 
 async function installApi(page,{password=true,google=false,result='accepted'}={}) {
   let signed=true,deleteBody=null;
+  // A delete commits on the first-party production gateway and then performs a
+  // full navigation to /?account=deleted|deleting. Keep that navigation on the
+  // same first-party architecture in localhost E2E instead of letting the
+  // local-development config switch to direct Neon function origins.
+  await page.route('**/leaderboard-config.js',route=>route.fulfill({
+    status:200,
+    contentType:'application/javascript',
+    body:`window.PACK1_API={
+      firstParty:true,
+      authBase:'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
+      url:'https://api.packone.pro/legacy',
+      growthUrl:'https://api.packone.pro/growth',
+      draftRunUrl:'https://api.packone.pro/draft'
+    };`,
+  }));
   await page.route('https://api.packone.pro/growth/**',async route=>{
     const path=new URL(route.request().url()).pathname.replace(/^\/growth/,'');
     let body={ok:true},status=200;
