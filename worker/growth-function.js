@@ -1078,6 +1078,11 @@ async function handlePasswordChange(request) {
   let providerSession='';
   try {
     providerSession=await providerPasswordSession(auth,currentPassword);
+    // The provider sign-in above is the current-password verification boundary.
+    // Clear the shared failure budget as soon as that verification succeeds so
+    // valid users are not penalized for a later new-password policy rejection.
+    // The account-plus-network submission bucket still ages out naturally.
+    await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'current_password'});
     let changed;
     try {
       changed=await neonAuthSession('/change-password',{cookie:providerSession,body:{
@@ -1093,10 +1098,6 @@ async function handlePasswordChange(request) {
       throw Object.assign(Error('The new password was not accepted.'),{status:400,code:'PASSWORD_POLICY'});
     }
     providerSession=changed.cookie||providerSession;
-    // Clear only the shared current-password failure budget, and only after the
-    // provider has committed the password change. The defense-in-depth network
-    // bucket ages out naturally.
-    await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'current_password'});
     await revokeAllAccountSessions(query,auth.user_id);
     return clearAccountCookies(json({ok:true,signedOut:true}));
   } finally {
