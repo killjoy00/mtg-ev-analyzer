@@ -1127,7 +1127,14 @@ async function resumeDeletionOperation(operation,{knownEmail=null}={}) {
     current=await cleanupPackOne(query,current,{recoveryKey});
   }
   if(current.state==='provider_delete_pending') {
-    const result=await removeProviderUser({authBase:NEON_AUTH_BASE,authUserId:current.auth_user_id});
+    const result=await removeProviderUser({
+      authBase:NEON_AUTH_BASE,
+      authUserId:current.auth_user_id,
+      validateServicePrincipal:async serviceId=>{
+        const linked=await query('SELECT 1 FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1',[serviceId]);
+        return linked.rows.length===0;
+      },
+    });
     current=await finishProviderPhase(query,current,result);
     if(current.state==='operator_review') {
       const age=Math.max(0,Math.floor((Date.now()-new Date(current.created_at).getTime())/1000));
