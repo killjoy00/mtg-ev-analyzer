@@ -50,7 +50,7 @@ async function raw(path,{method='GET',body,headers=new Headers(),credentials=fir
     keepalive,
   });
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(new Error(data.error||data.message||`Pack 1 API failed (${response.status}).`),{status:response.status});
+  if(!response.ok)throw Object.assign(new Error(data.error||data.message||`Pack 1 API failed (${response.status}).`),{status:response.status,code:data.code||null});
   return data;
 }
 
