@@ -1,5 +1,5 @@
 {
   "operation": "production-browser",
-  "request_id": "v8-production-browser-20260921",
-  "reason": "Run final end-to-end production browser acceptance after successful elite-trophy-colour-stage-v8 production staging and green production corpus health."
+  "request_id": "v8-production-browser-20260921-r2",
+  "reason": "Retry final end-to-end production browser acceptance after repairing the test-only Draft Run gateway-prefix response matcher. Production v8 corpus staging and health are already green."
 }
