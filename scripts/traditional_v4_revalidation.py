@@ -54,7 +54,6 @@ from import_all_trophies import (
 )
 from traditional_puzzles import THRESHOLDS, compare, record
 from set_policy import corpus_version
-import import_all_trophies as trophy_import
 from run_import_all_trophies import resilient_request
 from fetch_card_metadata import compact_card, aliases
 
