@@ -1,0 +1,129 @@
+name: account deletion safety controls
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Runtime to update'
+        type: choice
+        options: [development, production]
+        required: true
+      account_deletion:
+        description: 'Account deletion switch'
+        type: choice
+        options: [unchanged, enabled, disabled]
+        default: unchanged
+        required: true
+      verification_sweep:
+        description: 'Verification sweep switch'
+        type: choice
+        options: [unchanged, enabled, disabled]
+        default: unchanged
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack1-account-deletion-safety-control
+  cancel-in-progress: false
+
+jobs:
+  toggle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      PROJECT_ID: patient-shadow-91417882
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
+      PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
+      PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
+      PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
+      PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
+      PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Resolve currently deployed reviewed revision and switch state
+        shell: bash
+        env:
+          TARGET: ${{ inputs.target }}
+          DELETE_INPUT: ${{ inputs.account_deletion }}
+          SWEEP_INPUT: ${{ inputs.verification_sweep }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY"
+          test ${#PACK1_RATE_LIMIT_SECRET} -ge 32
+          [[ "$PACK1_DELETION_ADMIN_EMAIL" == *@* ]]
+          test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16
+          case "$TARGET" in
+            development)
+              branch=br-twilight-hill-ayffyd2b
+              health=https://br-twilight-hill-ayffyd2b-pack1growth.compute.c-5.us-east-2.aws.neon.tech/health
+              ;;
+            production)
+              branch=br-orange-feather-ayps8kep
+              health=https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/health
+              ;;
+            *) exit 1 ;;
+          esac
+          body=$(curl -fsS --max-time 30 "$health")
+          commit=$(node -e 'const x=JSON.parse(process.argv[1]);process.stdout.write(String(x.release_commit||""))' "$body")
+          [[ "$commit" =~ ^[a-f0-9]{40}$ ]]
+          git merge-base --is-ancestor "$commit" origin/main
+          current_delete=$(node -e 'const x=JSON.parse(process.argv[1]);process.stdout.write(x.account_deletion_enabled?"1":"0")' "$body")
+          current_sweep=$(node -e 'const x=JSON.parse(process.argv[1]);process.stdout.write(x.verification_sweep_enabled?"1":"0")' "$body")
+          case "$DELETE_INPUT" in enabled) delete=1;; disabled) delete=0;; unchanged) delete=$current_delete;; esac
+          case "$SWEEP_INPUT" in enabled) sweep=1;; disabled) sweep=0;; unchanged) sweep=$current_sweep;; esac
+          echo "TARGET_BRANCH=$branch" >> "$GITHUB_ENV"
+          echo "RELEASE_COMMIT=$commit" >> "$GITHUB_ENV"
+          echo "DELETE_VALUE=$delete" >> "$GITHUB_ENV"
+          echo "SWEEP_VALUE=$sweep" >> "$GITHUB_ENV"
+          git checkout --detach "$commit"
+
+      - name: Build exact currently deployed function revision
+        run: |
+          npm install -g neon@4.17.4 esbuild@0.28.2
+          node scripts/build-neon-functions.mjs "$RUNNER_TEMP/bundles" "$RELEASE_COMMIT"
+
+      - name: Redeploy exact pack1growth revision with requested switch state
+        shell: bash
+        run: |
+          set -euo pipefail
+          extra=(
+            --env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET"
+            --env "PACK1_DELETION_ADMIN_EMAIL=$PACK1_DELETION_ADMIN_EMAIL"
+            --env "PACK1_DELETION_ADMIN_PASSWORD=$PACK1_DELETION_ADMIN_PASSWORD"
+            --env "PACK1_ACCOUNT_DELETION_ENABLED=$DELETE_VALUE"
+            --env "PACK1_VERIFICATION_SWEEP_ENABLED=$SWEEP_VALUE"
+          )
+          if [[ -n "$PATREON_CLIENT_ID" && -n "$PATREON_CLIENT_SECRET" && -n "$PATREON_WEBHOOK_SECRET" ]]; then
+            extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
+          fi
+          neon functions deploy pack1growth --src "$RUNNER_TEMP/bundles/pack1growth" --no-bundle             --project-id "$PROJECT_ID" --branch "$TARGET_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
+
+      - name: Verify revision did not change and switches took effect
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$TARGET_BRANCH" == br-orange-feather-ayps8kep ]]; then
+            health=https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/health
+          else
+            health=https://br-twilight-hill-ayffyd2b-pack1growth.compute.c-5.us-east-2.aws.neon.tech/health
+          fi
+          for i in {1..12}; do
+            body=$(curl -fsS --max-time 30 "$health") || { sleep 3; continue; }
+            if BODY="$body" node -e 'const x=JSON.parse(process.env.BODY);if(x.release_commit!==process.env.RELEASE_COMMIT||Number(x.account_deletion_enabled)!==Number(process.env.DELETE_VALUE)||Number(x.verification_sweep_enabled)!==Number(process.env.SWEEP_VALUE))process.exit(1)' 2>/dev/null; then
+              echo "Account deletion enabled: $DELETE_VALUE"
+              echo "Verification sweep enabled: $SWEEP_VALUE"
+              echo "Reviewed revision preserved: $RELEASE_COMMIT"
+              exit 0
+            fi
+            sleep 3
+          done
+          echo "::error::Runtime safety-control verification failed."
+          exit 1

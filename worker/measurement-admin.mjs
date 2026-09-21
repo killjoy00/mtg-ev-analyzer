@@ -48,10 +48,18 @@ export async function handleAdmin(request,query,readJson) {
     const body=await readJson(request);
     if(!/^[a-f0-9]{64}$/.test(body.invite||''))fail('Invalid invitation.',403);
     const hash=createHash('sha256').update(body.invite).digest('hex');
-    const {rows}=await query(`WITH already AS (SELECT i.redeemed_by FROM pack1_admin_invites i JOIN pack1_admins a ON a.auth_user_id=i.redeemed_by WHERE i.token_hash=$1 AND i.redeemed_by=$2::uuid),
-      claimed AS (UPDATE pack1_admin_invites SET redeemed_by=$2::uuid,redeemed_at=now()
-      WHERE token_hash=$1 AND expires_at>now() AND redeemed_at IS NULL RETURNING redeemed_by),
-      granted AS (INSERT INTO pack1_admins(auth_user_id) SELECT redeemed_by FROM claimed ON CONFLICT DO NOTHING)
+    const {rows}=await query(`WITH identity_allowed AS MATERIALIZED (
+      SELECT 1 WHERE pack1_identity_attachment_allowed($2::uuid)
+    ), already AS (
+        SELECT i.redeemed_by FROM pack1_admin_invites i JOIN pack1_admins a ON a.auth_user_id=i.redeemed_by
+        WHERE i.token_hash=$1 AND i.redeemed_by=$2::uuid AND EXISTS(SELECT 1 FROM identity_allowed)
+      ), claimed AS (
+        UPDATE pack1_admin_invites SET redeemed_by=$2::uuid,redeemed_at=now()
+        WHERE token_hash=$1 AND expires_at>now() AND redeemed_at IS NULL
+          AND EXISTS(SELECT 1 FROM identity_allowed) RETURNING redeemed_by
+      ), granted AS (
+        INSERT INTO pack1_admins(auth_user_id) SELECT redeemed_by FROM claimed ON CONFLICT DO NOTHING
+      )
       SELECT redeemed_by FROM claimed UNION SELECT redeemed_by FROM already`,[hash,id]);
     if(!rows.length)fail('This invitation expired or has already been used.',403);
     return {ok:true};

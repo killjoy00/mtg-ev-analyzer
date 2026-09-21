@@ -43,3 +43,20 @@ jobs:
       - name: Audit production datasets
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: python scripts/audit_datasets.py --fail-on-error
+
+      # Keep this last so implementation regressions are visible even while a
+      # release-critical secret is intentionally not yet provisioned. A
+      # same-repository PR still cannot go green or merge without all three.
+      - name: Verify account-deletion release secrets are provisioned
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        shell: bash
+        env:
+          RATE_LIMIT_SECRET_PRESENT: ${{ secrets.PACK1_RATE_LIMIT_SECRET != '' }}
+          DELETION_ADMIN_EMAIL_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL != '' }}
+          DELETION_ADMIN_PASSWORD_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD != '' }}
+        run: |
+          set -euo pipefail
+          [[ "$RATE_LIMIT_SECRET_PRESENT" == true ]] || { echo '::error::PACK1_RATE_LIMIT_SECRET is not provisioned.'; exit 1; }
+          [[ "$DELETION_ADMIN_EMAIL_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is not provisioned.'; exit 1; }
+          [[ "$DELETION_ADMIN_PASSWORD_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is not provisioned.'; exit 1; }
+

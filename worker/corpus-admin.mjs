@@ -47,9 +47,12 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
   if(!CORPUS_TRANSITIONS[old]?.includes(next))fail('Invalid lifecycle transition.');
   if(b.corpusVersion!==DRAFT_RUN_CORPUS_VERSION)fail('The parent corpus changed. Refresh.',409);
   if(b.reason!=null&&(typeof b.reason!=='string'||b.reason.length>1000))fail('Reason must be at most 1,000 characters.');
-  const result=await query(`WITH changed AS (
+  const result=await query(`WITH identity_allowed AS MATERIALIZED (
+   SELECT 1 WHERE $6::uuid IS NULL OR pack1_identity_attachment_allowed($6::uuid)
+  ), changed AS (
    UPDATE corpus_components c SET status=$4,status_changed_at=now()
    WHERE c.set_id=$1 AND c.component_version=$2 AND c.parent_version=$5 AND c.status=$3
+     AND EXISTS(SELECT 1 FROM identity_allowed)
      AND ($4<>'Live' OR EXISTS(SELECT 1 FROM corpus_set_versions v JOIN LATERAL(
        SELECT * FROM corpus_health_checks h WHERE h.set_id=v.set_id AND h.corpus_version=v.corpus_version ORDER BY checked_at DESC,id DESC LIMIT 1
      ) h ON true JOIN draft_run_environment_policy p ON p.set_id=v.set_id
@@ -70,9 +73,12 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
   if(b.reason!=null&&(typeof b.reason!=='string'||b.reason.length>1000))fail('Reason must be at most 1,000 characters.');
   // One statement makes the state change and its audit event atomic. Promotion
   // requires fresh health for this exact manifest, not a different staged version.
-  const result=await query(`WITH changed AS (
+  const result=await query(`WITH identity_allowed AS MATERIALIZED (
+   SELECT 1 WHERE $5::uuid IS NULL OR pack1_identity_attachment_allowed($5::uuid)
+  ), changed AS (
    UPDATE draft_run_environment_policy p SET status=$3,status_changed_at=now()
-   WHERE p.set_id=$1 AND p.status=$2 AND ($3<>'Live' OR EXISTS (
+   WHERE p.set_id=$1 AND p.status=$2 AND EXISTS(SELECT 1 FROM identity_allowed)
+     AND ($3<>'Live' OR EXISTS (
     SELECT 1 FROM corpus_set_versions v JOIN LATERAL (
      SELECT * FROM corpus_health_checks c WHERE c.set_id=v.set_id AND c.corpus_version=v.corpus_version ORDER BY checked_at DESC,id DESC LIMIT 1
     ) h ON true WHERE v.set_id=p.set_id AND v.corpus_version=$4 AND h.ready AND h.gate_version=$7

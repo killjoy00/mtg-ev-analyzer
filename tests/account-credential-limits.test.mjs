@@ -69,6 +69,31 @@ test('spoofable client network headers and forged internal digests cannot select
   assert.throws(()=>trustedCredentialNetwork(forged,{PACK1_RATE_LIMIT_SECRET:secret}),error=>error.status===503);
 });
 
+test('account deletion limiter purposes are accepted and remain UUID/network scoped',async()=>{
+  for (const purpose of ['account_delete_verify','account_delete_init']) {
+    const {query,calls}=fakeQuery(1);
+    const result=await consumeCredentialLimit(query,{authUserId:USER,purpose,limit:8,seconds:900});
+    assert.equal(result.limited,false);
+    const insert=calls.find(row=>row.sql.includes('INSERT INTO account_credential_rate_limits'));
+    assert.deepEqual(insert.params,[USER,purpose,'',900]);
+  }
+  const {query,calls}=fakeQuery(1);
+  await consumeCredentialLimit(query,{authUserId:USER,purpose:'account_delete_network',networkHash:NETWORK,limit:5,seconds:900});
+  const insert=calls.find(row=>row.sql.includes('INSERT INTO account_credential_rate_limits'));
+  assert.deepEqual(insert.params,[USER,'account_delete_network',NETWORK,900]);
+});
+
+test('credential limiter writes fail closed once account deletion is tombstoned',async()=>{
+  let seen='';
+  await assert.rejects(
+    consumeCredentialLimit(async(sql)=>{seen=sql;return {rows:[],rowCount:0};},{
+      authUserId:USER,purpose:'account_delete_init',limit:3,seconds:900,
+    }),
+    error=>error?.code==='ACCOUNT_DELETING'&&error?.status===409,
+  );
+  assert.match(seen,/pack1_identity_attachment_allowed\(\$1::uuid\)/);
+});
+
 test('only successful callers explicitly clear a selected limiter bucket',async()=>{
   const {query,calls}=fakeQuery();
   await clearCredentialLimit(query,{authUserId:USER,purpose:'current_password'});

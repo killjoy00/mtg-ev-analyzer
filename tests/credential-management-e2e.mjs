@@ -48,7 +48,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     await page.goto(base+'/tests/credential-management-harness.html');
     await page.locator('#account-password-change').waitFor();
     assert.equal(await page.locator('body').getAttribute('data-harness-error'),null,name+' harness failed');
-    assert.match(await page.locator('.profile-credentials').textContent(),/Change password/);
+    assert.match(await page.getByRole('region',{name:'Sign-in credentials'}).textContent(),/Change password/);
 
     const form=page.locator('#account-password-change');
     await form.locator('[name="currentPassword"]').fill('Current-password-123!');
@@ -69,9 +69,14 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     await page.goto(base+'/tests/credential-management-harness.html');
     await page.getByText('This account signs in with Google and does not have a Pack One password to change.').waitFor();
     assert.equal(await page.locator('#account-password-change').count(),0);
+    // The profile stylesheet is injected dynamically by the product layer.
+    // Wait for it before measuring layout so this assertion checks the rendered
+    // UI rather than a transient unstyled frame on a fast harness navigation.
+    await page.waitForFunction(()=>Boolean(document.querySelector('link[data-pack1-profile-css]')?.sheet));
 
     assert.deepEqual(errors,[],name+' emitted page errors');
-    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),name+' mobile layout overflowed');
+    const layout=await page.evaluate(()=>({client:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth}));
+    assert.ok(layout.scroll<=layout.client+1,name+` mobile layout overflowed: ${layout.scroll} > ${layout.client}`);
   } finally {
     await browser.close();
   }

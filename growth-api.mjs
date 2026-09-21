@@ -4,7 +4,7 @@ const NAME_KEY = 'pack1-player-name-v1';
 const CSRF_COOKIE = '__Secure-pack1_csrf';
 const GOOGLE_RETURN = 'https://packone.pro/?auth=google';
 const ACCOUNT_RETURN = 'https://packone.pro/';
-let sessionPromise = null, migrationPromise = null;
+let sessionPromise = null, migrationPromise = null, identityRetired = false;
 
 function baseUrl() { return String(window.PACK1_API?.growthUrl || window.PACK1_API?.url || '').replace(/\/$/, ''); }
 function draftUrl() { return String(window.PACK1_API?.draftRunUrl || '').replace(/\/$/, ''); }
@@ -77,6 +77,7 @@ async function ensureBrowserPlayerSession() {
 }
 
 export async function ensurePackSession() {
+  if(identityRetired)throw Object.assign(new Error('This browser identity was retired by account deletion.'),{status:410,code:'ACCOUNT_DELETED'});
   if(firstPartyAuthEnabled()) {
     if(sessionPromise)return sessionPromise;
     sessionPromise=ensureBrowserPlayerSession().catch(error=>{sessionPromise=null;throw error;});
@@ -305,6 +306,28 @@ export async function changeAccountPassword({currentPassword,newPassword}) {
   clearLegacyAuth();
   return data;
 }
+export async function deleteAccount({currentPassword}={}) {
+  if(!firstPartyAuthEnabled())throw new Error('Account deletion requires the secure account session.');
+  await ensureMigrations();
+  const data=await api('/v1/account/delete',{
+    method:'POST',
+    body:{currentPassword:String(currentPassword||''),confirm:true},
+    auth:false,
+  });
+  // The deletion tombstone is committed before this response. From this point
+  // onward this document must never recreate a player/account identity (for
+  // example from analytics flushes during navigation).
+  identityRetired=true;
+  sessionPromise=null;
+  migrationPromise=null;
+  clearLegacyAuth();
+  try {
+    for(const key of [TOKEN_KEY,NAME_KEY,'pack1-game-history-v2','pack1-daily-history-v1'])localStorage.removeItem(key);
+  } catch {}
+  sessionPromise=null;
+  return data;
+}
+
 export async function startGoogleSignIn() {
   if(!firstPartyAuthEnabled())throw new Error('Google sign in is not available on this release yet.');
   await ensurePackSession();

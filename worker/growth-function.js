@@ -8,6 +8,8 @@ import {handlePatreon} from './patreon.mjs';
 import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 import {accountRuntimeConfig} from './account-config.mjs';
 import {clearCredentialLimit,consumeCredentialLimit,trustedCredentialNetwork} from './account-credential-limits.mjs';
+import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,deletionRecoveryKey,finishProviderPhase,loadDeletionOperation,maintenanceBatch,removeProviderUser,stuckDeletion,sweepExpiredVerification,verificationSweepEnabled} from './account-deletion.mjs';
+import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 const ACCOUNT_CONFIG=accountRuntimeConfig();
 const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
 const TOKEN_PREFIX = 'p1_';
@@ -131,7 +133,8 @@ async function verifyToken(value) {
 
 async function player(request, required = true) {
   const header = request.headers.get('authorization') || '';
-  const id = await verifyToken(header.startsWith('Bearer ') ? header.slice(7) : '');
+  let id = await verifyToken(header.startsWith('Bearer ') ? header.slice(7) : '');
+  if(id&&await deletedPlayerTombstone(query,id))id=null;
   if (required && !id) throw Object.assign(new Error('Player session required.'), { status: 401 });
   return id;
 }
@@ -851,10 +854,13 @@ async function handleStats(request) {
 
 async function validateDailyRunScore(runId, playerId, authUserId) {
   const result = await query(
-    `WITH candidate AS MATERIALIZED (
+    `WITH identity_allowed AS MATERIALIZED (
+      SELECT 1 WHERE pack1_identity_attachment_allowed($3::uuid)
+    ), candidate AS MATERIALIZED (
        SELECT s.*
        FROM draft_run_sessions s
        WHERE s.id=$1::uuid AND s.player_id=$2::uuid AND s.day=$4::date
+         AND EXISTS(SELECT 1 FROM identity_allowed)
          AND s.score IS NOT NULL AND NOT s.leaderboard_eligible
          AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
          AND NOT EXISTS (
@@ -905,23 +911,37 @@ async function handleLink(request,{browser=false}={}) {
   let linkChanged = !old.rows.length;
 
   if (!old.rows.length) {
-    await query(
-      `WITH claimed AS (INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)
-        ON CONFLICT(auth_user_id) DO NOTHING RETURNING player_id)
-       INSERT INTO analytics_events(player_id,event_name) SELECT player_id,'account_claimed' FROM claimed`,
+    const claimed=await query(
+      `WITH allowed AS MATERIALIZED (
+          SELECT 1 WHERE pack1_identity_attachment_allowed($1::uuid)
+        ), claimed AS (
+          INSERT INTO account_links(auth_user_id,player_id)
+          SELECT $1::uuid,$2::uuid FROM allowed
+          ON CONFLICT(auth_user_id) DO NOTHING RETURNING player_id
+        ), event AS (
+          INSERT INTO analytics_events(player_id,event_name) SELECT player_id,'account_claimed' FROM claimed
+        )
+        SELECT player_id FROM claimed`,
       [auth.user_id, current],
     );
+    if(!claimed.rows.length) {
+      const pending=await query('SELECT 1 FROM account_deletion_operations WHERE auth_user_id=$1::uuid LIMIT 1',[auth.user_id]);
+      if(pending.rows.length)throw Object.assign(Error('This account is being deleted.'),{status:409,code:'ACCOUNT_DELETING'});
+    }
     const resolved = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
     id = resolved.rows[0]?.player_id || current;
   }
   if (id !== current) {
-    // Even when the current player cannot be merged because it is already
-    // linked elsewhere, switching this browser back to the account's player is
-    // a real association change and remains a session-rotation boundary.
+    // Switching this browser back to the account's player is an association
+    // change even when the current player is already linked elsewhere.
     linkChanged = true;
     const currentLink = await query('SELECT auth_user_id FROM account_links WHERE player_id=$1::uuid LIMIT 1', [current]);
     if (!currentLink.rows.length) {
-      await query('SELECT merge_pack1_player($1::uuid,$2::uuid)', [current, id]);
+      const mergedResult=await query(`WITH allowed AS MATERIALIZED (
+          SELECT 1 WHERE pack1_identity_attachment_allowed($3::uuid)
+        )
+        SELECT merge_pack1_player($1::uuid,$2::uuid) FROM allowed`,[current,id,auth.user_id]);
+      if(!mergedResult.rows.length)throw Object.assign(Error('This account is being deleted.'),{status:409,code:'ACCOUNT_DELETING'});
       merged = true;
     }
   }
@@ -941,9 +961,8 @@ async function handleLink(request,{browser=false}={}) {
     profileKey: profile?.profile_key || null,
     email: auth.email,
   });
-  // A no-op link must not rewrite identity cookies. Reissuing the account
-  // session here revoked the valid session and rotated CSRF on every ordinary
-  // page load. Genuine claims/merges/browser-player reassociations still rotate.
+  // No-op links must not rotate player/account cookies. Genuine claims,
+  // merges, and browser-player reassociations remain rotation boundaries.
   if(browser&&linkChanged)response=withPlayerCookie(response,playerToken);
   if(auth.source==='cookie'&&linkChanged) {
     const rotated=await issueAccountSession(query,auth,{replaceHash:auth.session_hash});
@@ -965,10 +984,16 @@ async function credentialState(authUserId) {
 
 async function handleAccount(request) {
   const auth = await authSession(request);
+  const credentials=await credentialState(auth.user_id);
   return json({
     user: { id: auth.user_id, email: auth.email, name: auth.name },
     session: { expiresAt: auth.expires_at },
-    credentials:await credentialState(auth.user_id),
+    credentials,
+    deletion:{
+      enabled:deletionEnabled(),
+      available:deletionEnabled()&&credentials.password,
+      googleOnly:credentials.google&&!credentials.password,
+    },
   });
 }
 
@@ -1071,6 +1096,162 @@ async function handlePasswordChange(request) {
   } finally {
     await closeProviderSession(providerSession);
   }
+}
+
+
+const DELETE_INIT_LIMIT=3;
+const DELETE_VERIFY_LIMIT=8;
+const DELETE_NETWORK_LIMIT=5;
+const DELETE_LIMIT_SECONDS=15*60;
+
+async function recoveryKeyForDeletion(operation,knownEmail=null) {
+  let email=knownEmail;
+  if(!email) {
+    const row=await query('SELECT email FROM neon_auth."user" WHERE id=$1::uuid LIMIT 1',[operation.auth_user_id]);
+    email=row.rows[0]?.email||null;
+  }
+  return deletionRecoveryKey(email);
+}
+
+async function resumeDeletionOperation(operation,{knownEmail=null}={}) {
+  let current=operation;
+  if(['pending','app_cleanup_complete'].includes(current.state)) {
+    const recoveryKey=await recoveryKeyForDeletion(current,knownEmail);
+    current=await cleanupPackOne(query,current,{recoveryKey});
+  }
+  if(current.state==='provider_delete_pending') {
+    const result=await removeProviderUser({
+      authBase:NEON_AUTH_BASE,
+      authUserId:current.auth_user_id,
+      validateServicePrincipal:async serviceId=>{
+        const linked=await query('SELECT 1 FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1',[serviceId]);
+        return linked.rows.length===0;
+      },
+    });
+    current=await finishProviderPhase(query,current,result);
+    if(current.state==='operator_review') {
+      const age=Math.max(0,Math.floor((Date.now()-new Date(current.created_at).getTime())/1000));
+      console.error(JSON.stringify({
+        event:'account_deletion_operator_review',
+        operation_id:current.operation_id,
+        phase:current.state,
+        age_seconds:age,
+        attempts:Number(current.attempts||0),
+        error_code:current.last_error_code||'PROVIDER_FAILURE',
+        release_commit:releaseMetadata().release_commit,
+      }));
+    }
+  }
+  return current;
+}
+
+async function handleAccountDelete(request) {
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const auth=await authSession(request,{required:true,allowLegacy:false,csrf:true});
+  if(!deletionEnabled())
+    throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'DELETION_DISABLED'});
+  const payload=await readJson(request);
+  if(payload.confirm!==true)
+    throw Object.assign(Error('Confirm permanent account deletion.'),{status:400,code:'DELETE_CONFIRMATION'});
+  const state=await credentialState(auth.user_id);
+  if(!state.password)
+    throw Object.assign(Error('Account deletion is temporarily unavailable for this sign-in method.'),{status:409,code:'GOOGLE_DELETE_UNAVAILABLE'});
+  const currentPassword=String(payload.currentPassword||'');
+  if(currentPassword.length<1||currentPassword.length>256)
+    throw Object.assign(Error('Enter your current password.'),{status:400,code:'CURRENT_PASSWORD'});
+
+  const initLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_init',
+    limit:DELETE_INIT_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(initLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',initLimit);
+  const verifyLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_verify',
+    limit:DELETE_VERIFY_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(verifyLimit.limited)return credentialThrottle('Too many verification attempts. Please try again later.',verifyLimit);
+  const network=trustedCredentialNetwork(request);
+  const networkLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_network',networkHash:network,
+    limit:DELETE_NETWORK_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(networkLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',networkLimit);
+
+  let providerSession='';
+  try {
+    providerSession=await providerPasswordSession(auth,currentPassword);
+    try {
+      await neonAuthSession('/verify-password',{cookie:providerSession,body:{password:currentPassword}});
+    } catch(error) {
+      const status=Number(error?.status||500);
+      if(status>=500)throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'PROVIDER_FAILURE'});
+      throw Object.assign(Error('Current password was not accepted.'),{status:400,code:'CURRENT_PASSWORD'});
+    }
+    await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'account_delete_verify'});
+  } finally {
+    await closeProviderSession(providerSession);
+  }
+
+  const operation=await beginDeletion(query,{authUserId:auth.user_id});
+  if(!operation)throw Object.assign(Error('Account deletion could not be started.'),{status:500,code:'DELETE_START'});
+  const final=await resumeDeletionOperation(operation,{knownEmail:auth.email});
+  const complete=final?.state==='complete';
+  let response=json({
+    ok:true,
+    deletion:complete?'complete':'accepted',
+    operationId:final?.operation_id,
+  },complete?200:202);
+  response=clearPlayerCookie(clearAccountCookies(response));
+  return response;
+}
+
+function bearer(request) {
+  const value=String(request.headers.get('authorization')||'');
+  return value.startsWith('Bearer ')?value.slice(7):'';
+}
+
+async function handleDeletionMaintenance(request) {
+  if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
+  await verifyDeletionMaintenanceToken(bearer(request));
+  const advanced=[];
+  if(deletionEnabled()) {
+    for(const operation of await maintenanceBatch(query,{limit:20})) {
+      if(operation.state==='operator_review')continue;
+      try {
+        const next=await resumeDeletionOperation(operation);
+        advanced.push({operation_id:next.operation_id,state:next.state});
+      } catch(error) {
+        await query(`UPDATE account_deletion_operations SET attempts=attempts+1,last_error_code='MAINTENANCE_FAILURE',updated_at=now()
+          WHERE operation_id=$1::uuid AND state<>'complete'`,[operation.operation_id]);
+        console.error(JSON.stringify({
+          event:'account_deletion_maintenance_failure',
+          operation_id:operation.operation_id,
+          phase:operation.state,
+          age_seconds:Math.max(0,Math.floor((Date.now()-new Date(operation.created_at).getTime())/1000)),
+          attempts:Number(operation.attempts||0)+1,
+          error_code:'MAINTENANCE_FAILURE',
+          release_commit:releaseMetadata().release_commit,
+        }));
+      }
+    }
+  }
+  const swept=verificationSweepEnabled()?await sweepExpiredVerification(query,{limit:200}):null;
+  const remaining=await maintenanceBatch(query,{limit:50});
+  const attention=remaining.filter(row=>stuckDeletion(row)).map(row=>({
+    operation_id:row.operation_id,
+    state:row.state,
+    age_seconds:Math.max(0,Math.floor((Date.now()-new Date(row.created_at).getTime())/1000)),
+    attempts:Number(row.attempts||0),
+    error_code:row.last_error_code||null,
+  }));
+  return json({
+    ok:attention.length===0,
+    deletion_enabled:deletionEnabled(),
+    sweep_enabled:verificationSweepEnabled(),
+    advanced,
+    swept_expired_verifications:swept,
+    attention,
+  },attention.length?503:200);
 }
 
 async function handleSignout(request) {
@@ -1194,7 +1375,8 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled() });
+  if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
@@ -1204,6 +1386,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/request-password-reset') return handlePasswordResetRequest(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/reset-password') return handlePasswordReset(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/password-change') return handlePasswordChange(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/delete') return handleAccountDelete(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/link-browser') return handleLink(request,{browser:true});
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
@@ -1228,7 +1411,8 @@ async function route(request) {
 
 export default {
   async fetch(request) {
-    const denied=guardIngress(request);if(denied)return denied;
+    const maintenance=new URL(request.url).pathname==='/internal/account-deletion-maintenance';
+    if(!maintenance){const denied=guardIngress(request);if(denied)return denied;}
     try {
       return withCors(await route(request), request);
     } catch (error) {

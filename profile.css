@@ -66,6 +66,12 @@
 .profile-credentials p { margin:0; }
 .profile-membership p span,
 .profile-credentials p span { color:var(--muted); font-size:13px; }
+.profile-credentials > div { min-width:0; width:100%; }
+.profile-credentials .account-form { min-width:0; width:100%; }
+.profile-credentials .button { max-width:100%; white-space:normal; }
+.profile-credentials p,
+.profile-credentials small,
+.profile-credentials span { overflow-wrap:anywhere; }
 .profile-membership-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
 .profile-membership-actions .text-button { min-height:44px; }
 .profile-membership-actions #patreon-status { color:var(--muted); font-size:12px; }

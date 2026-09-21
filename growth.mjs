@@ -147,11 +147,25 @@ export async function resumeAccountAuth(status) {
   return renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
 }
 
+export function renderDeletionState(deletionState) {
+  if(deletionState!=='deleted'&&deletionState!=='deleting')return false;
+  currentAccount=null;
+  document.body.classList.remove('is-game');
+  const app=document.querySelector('#app');
+  if(app) {
+    const complete=deletionState==='deleted';
+    app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account deletion</p><h1>${complete?'Your Pack One account has been deleted.':'Your deletion request has been accepted.'}</h1><p>${complete?'This action cannot be undone.':'You have been signed out. Deletion is still being completed and cannot be cancelled. No further action is required.'}</p></header><div class="account-actions"><a class="button primary" href="./">Return to Pack One</a></div></section>`;
+  }
+  return true;
+}
+
 export async function installGrowthLayer() {
+  const deletionState=new URLSearchParams(location.search).get('account');
+  if(renderDeletionState(deletionState))return;
   currentAccount = await getAuthSession().catch(()=>null);
   // Authentication/account-establishment flows link explicitly. Ordinary page
   // bootstrap must only observe the existing account session: calling
-  // link-browser here used to rotate a valid account + CSRF pair on every load.
+  // link-browser here rotates identity cookies and defeats session stability.
   event('page_view', { account:Boolean(currentAccount?.user) });
   document.addEventListener('pack1:share-completed', shareCompletedAnalytics);
   document.addEventListener('click', e => {

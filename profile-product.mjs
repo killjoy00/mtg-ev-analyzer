@@ -5,6 +5,7 @@ import {
   loadPatreonStatus,
   connectPatreon,
   changeAccountPassword,
+  deleteAccount,
   disconnectPatreon,
   signOutAccount,
   loadProfileHistory,
@@ -18,7 +19,7 @@ import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
 import { nextMilestones } from './progression.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
-import { renderAccount } from './growth.mjs';
+import { renderAccount, renderDeletionState } from './growth.mjs';
 import {
   bestPercentile,
   environmentProgress,
@@ -47,7 +48,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = './profile.css?v=3';
+  link.href = new URL('./profile.css?v=3', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -156,6 +157,23 @@ function settingsMarkup(profile, progress, account, patreon) {
                <span class="profile-settings-status" aria-live="polite"></span>
              </form>`
           : `<p><strong>Password</strong><br><span>${account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password credential to change.'}</span></p>`}
+      </div>
+    </section>`:''}
+    ${account?.user?`<section class="profile-credentials profile-danger" aria-labelledby="delete-account-title">
+      <div><p class="eyebrow">Danger zone</p><h3 id="delete-account-title">Delete account</h3>
+        <p>Permanently deletes your Pack One account, public profile, leaderboard participation, individual gameplay/career history, and linked Patreon/account associations. You will be signed out on all devices. This cannot be undone.</p>
+        <p><small>Deletion usually completes immediately. If identity-provider completion is temporarily unavailable after deletion commits, you will be signed out and server-side recovery finishes the irreversible operation; no further action is required and it cannot be canceled. Short-lived non-identifying security/OAuth verification records may remain until they expire; expired technical verification records are automatically swept afterward. Aggregate, non-attributable statistics may remain.</small></p>
+        ${account?.deletion?.googleOnly
+          ? `<p><strong>Deletion is temporarily unavailable for Google-only accounts.</strong><br><span>Pack One cannot yet safely perform the required fresh same-account Google verification. This control remains visible and disabled rather than weakening verification.</span></p>
+             <button class="button secondary" type="button" disabled>Delete account</button>`
+          : account?.deletion?.enabled===false
+            ? `<p><strong>Account deletion is temporarily unavailable.</strong></p><button class="button secondary" type="button" disabled>Delete account</button>`
+            : `<form class="account-form" id="account-delete">
+                 <label>Current password<input required type="password" name="currentPassword" maxlength="256" autocomplete="current-password"></label>
+                 <label class="profile-toggle"><input required type="checkbox" name="confirm"><span><strong>I understand this permanently deletes my account and cannot be undone.</strong></span></label>
+                 <button class="button secondary" type="submit">Permanently delete account</button>
+                 <span class="profile-settings-status" aria-live="polite"></span>
+               </form>`}
       </div>
     </section>`:''}
     ${account?.user?`<section class="profile-membership" aria-labelledby="patreon-membership-title">
@@ -274,6 +292,24 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       await renderAccount({notice:'Password changed. You have been signed out everywhere.'});
     } catch(error) {
       status.textContent=error?.message||'Password could not be changed.';
+      button.disabled=false;
+    } finally {
+      form.reset();
+    }
+  });
+  document.querySelector('#account-delete')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const form=e.currentTarget,button=form.querySelector('button[type="submit"]'),status=form.querySelector('.profile-settings-status');
+    const data=Object.fromEntries(new FormData(form));
+    if(data.confirm!=='on'){status.textContent='Confirm that you understand deletion is permanent.';return;}
+    button.disabled=true;status.textContent='Deleting account…';
+    try {
+      const result=await deleteAccount({currentPassword:data.currentPassword});
+      const next=result?.deletion==='complete'?'deleted':'deleting';
+      history.replaceState({},'',`/?account=${next}`);
+      renderDeletionState(next);
+    } catch(error) {
+      status.textContent=error?.message||'Account could not be deleted.';
       button.disabled=false;
     } finally {
       form.reset();
