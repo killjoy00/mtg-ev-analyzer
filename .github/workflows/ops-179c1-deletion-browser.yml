@@ -1,0 +1,53 @@
+name: 179C1 targeted deletion browser
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack1-179c1-targeted-deletion-browser
+  cancel-in-progress: true
+
+jobs:
+  deletion-browser:
+    if: >-
+      github.repository == 'killjoy00/mtg-ev-analyzer' &&
+      github.event.pull_request.number == 249 &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.head_ref == 'feat/179c1-secure-account-deletion-main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deletion browser dependencies
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Start static site
+        run: |
+          nohup python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
+          echo $! > /tmp/pack1-http.pid
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ -o /dev/null
+      - name: Run deletion Chromium/WebKit contract only
+        run: node tests/account-deletion-e2e.mjs
+      - name: Upload deletion screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 179c1-targeted-deletion-browser
+          path: artifacts/ui-account-deletion-*.png
+          if-no-files-found: ignore
+      - name: Stop static site
+        if: always()
+        run: |
+          if [ -f /tmp/pack1-http.pid ]; then kill "$(cat /tmp/pack1-http.pid)" || true; fi
