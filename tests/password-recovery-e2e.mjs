@@ -23,29 +23,12 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       if(resetMode==='reused')return route.fulfill({status:400,contentType:'application/json',body:JSON.stringify({error:'This password reset link is invalid or has already been used.',code:'INVALID_RESET'})});
       return route.fulfill({contentType:'application/json',body:JSON.stringify({ok:true})});
     }
-    if(path==='/v1/session')return route.fulfill({contentType:'application/json',body:JSON.stringify({token:'guest-fixture'})});
-    if(path==='/v1/account/session')return route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:'Signed out'})});
-    if(path==='/v1/patreon/status')return route.fulfill({contentType:'application/json',body:JSON.stringify({configured:true,webhook_configured:false,connected:false,membership:null,capabilities:[],support_url:'https://www.patreon.com/c/PackOne'})});
-    if(path==='/v1/profile/me')return route.fulfill({contentType:'application/json',body:JSON.stringify({player:{claimed:false,profile_public:false,display_name:'Guest Player'},summary:{games:0},achievements:[]})});
     return route.fulfill({contentType:'application/json',body:'{"ok":true}'});
   });
 
-  await page.route('https://**-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
-    const path=new URL(route.request().url()).pathname;
-    if(path!=='/v1/daily-status')return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'Not found.'})});
-    return route.fulfill({contentType:'application/json',body:JSON.stringify({
-      day:'2026-09-20',
-      capabilities:[],
-      player:{claimed:false},
-      membership:{connected:false},
-      daily_history:[],
-    })});
-  });
-
-  await page.goto(base+'/?account=1');
-  await page.locator('.player-profile-page').waitFor();
-  await page.locator('#profile-claim-account').click();
+  await page.goto(base+'/tests/password-recovery-harness.html');
   await page.locator('#account-signin').waitFor();
+  assert.equal(await page.locator('body').getAttribute('data-harness-error'),null,name+' harness failed to render account UI');
   await page.locator('#account-forgot').waitFor();
   assert.equal((await page.locator('#account-forgot').textContent())?.trim(),'Forgot password?');
   await page.locator('#account-forgot').click();
