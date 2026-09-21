@@ -1,0 +1,24 @@
+name: cancel unintended v8 development import
+on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/ops-cancel-179c1-v8-import.yml']
+permissions:
+  actions: write
+  contents: read
+jobs:
+  cancel:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Cancel queued v8 development import
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            -H "Accept: application/vnd.github+json" \
+            -H "X-GitHub-Api-Version: 2026-03-10" \
+            https://api.github.com/repos/killjoy00/mtg-ev-analyzer/actions/runs/35644436030/cancel
