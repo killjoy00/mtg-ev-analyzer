@@ -156,7 +156,6 @@ function settingsMarkup(profile, progress, account, patreon) {
                <span class="profile-settings-status" aria-live="polite"></span>
              </form>`
           : `<p><strong>Password</strong><br><span>${account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password credential to change.'}</span></p>`}
-        <p><strong>Change email</strong><br><span id="account-email-change-state">Email changes are temporarily unavailable while the account provider has this feature disabled.</span></p>
       </div>
     </section>`:''}
     ${account?.user?`<section class="profile-membership" aria-labelledby="patreon-membership-title">
