@@ -181,7 +181,7 @@ test('wrong current password is generic, retains failure budget, and never revok
   assert.equal(calls.some(x=>x.kind==='db'&&x.sql.startsWith('DELETE FROM account_credential_rate_limits WHERE auth_user_id=')),false);
 });
 
-test('provider password-policy failure does not revoke sessions or clear the shared failure budget',async()=>{
+test('valid current password clears the failure budget even when the new password is rejected',async()=>{
   const calls=installFetch({changeStatus:422});
   const response=await growth.fetch(request());
   const body=await response.json();
@@ -189,18 +189,22 @@ test('provider password-policy failure does not revoke sessions or clear the sha
   assert.equal(body.code,'PASSWORD_POLICY');
   assert.equal(body.error,'The new password was not accepted.');
   assert.equal(calls.some(x=>x.kind==='db'&&x.sql.includes('UPDATE account_sessions SET revoked_at')),false);
-  assert.equal(calls.some(x=>x.kind==='db'&&x.sql.startsWith('DELETE FROM account_credential_rate_limits WHERE auth_user_id=')),false);
+  const cleared=calls.findIndex(x=>x.kind==='db'&&x.sql.startsWith('DELETE FROM account_credential_rate_limits WHERE auth_user_id='));
+  const verified=calls.findIndex(x=>x.kind==='provider'&&x.path.endsWith('/sign-in/email'));
+  const changed=calls.findIndex(x=>x.kind==='provider'&&x.path.endsWith('/change-password'));
+  assert.ok(verified>=0&&cleared>verified&&changed>cleared);
   assert.ok(calls.some(x=>x.kind==='provider'&&x.path.endsWith('/sign-out')),'temporary provider session is closed');
 });
 
-test('successful password change clears shared failure counter then revokes all Pack One sessions and clears cookies',async()=>{
+test('successful password change verifies and clears failure budget before mutation, then revokes all Pack One sessions',async()=>{
   const calls=installFetch();
   const response=await growth.fetch(request());
   assert.equal(response.status,200);
-  const changed=calls.findIndex(x=>x.kind==='provider'&&x.path.endsWith('/change-password'));
+  const verified=calls.findIndex(x=>x.kind==='provider'&&x.path.endsWith('/sign-in/email'));
   const cleared=calls.findIndex(x=>x.kind==='db'&&x.sql.startsWith('DELETE FROM account_credential_rate_limits WHERE auth_user_id='));
+  const changed=calls.findIndex(x=>x.kind==='provider'&&x.path.endsWith('/change-password'));
   const revoked=calls.findIndex(x=>x.kind==='db'&&x.sql.includes('UPDATE account_sessions SET revoked_at'));
-  assert.ok(changed>=0&&cleared>changed&&revoked>cleared);
+  assert.ok(verified>=0&&cleared>verified&&changed>cleared&&revoked>changed);
   const clearCall=calls[cleared];
   assert.deepEqual(clearCall.params,[USER,'current_password','']);
   assert.ok(calls.some(x=>x.kind==='provider'&&x.path.endsWith('/sign-out')));
