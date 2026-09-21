@@ -42,8 +42,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     })});
   });
 
-  await page.goto(base);
-  await page.locator('#account-nav').click();
+  await page.goto(base+'/?account=1');
   await page.locator('.player-profile-page').waitFor();
   await page.locator('#profile-claim-account').click();
   await page.locator('#account-signin').waitFor();
