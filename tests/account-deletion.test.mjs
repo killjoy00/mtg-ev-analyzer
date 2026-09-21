@@ -165,7 +165,8 @@ test('schema and release bookkeeping include migration 0031 in both stages',()=>
   assert.match(schema,/account_delete_verify/);
   assert.match(schema,/account_delete_network/);
   assert.match(schema,/account_delete_init/);
-  assert.match(schema,/network_hash ~ '\\^\\[a-f0-9\\]\\{64\\}\\\\\  const verify=fs.readFileSync('scripts/verify-neon-schema.mjs','utf8');
+  assert.ok(schema.includes("network_hash = '' OR network_hash ~ '^[a-f0-9]{64}$'"));
+  const verify=fs.readFileSync('scripts/verify-neon-schema.mjs','utf8');
   assert.match(verify,/account_deletion_operations/);
   const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   assert.equal((release.match(/migrations\/0031_account_deletion\.sql/g)||[]).length,2);
