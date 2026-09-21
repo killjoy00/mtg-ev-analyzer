@@ -88,3 +88,20 @@ body:has(.run-result-page) #home-editorial{display:none}
 .practice-picker{max-width:820px;margin:24px auto}.practice-picker fieldset{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px;padding:20px}.practice-picker label{display:flex;align-items:center;gap:10px;min-height:44px}.run-shared-scores{list-style:none;padding:0}.run-shared-scores li{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid var(--line)}
 
 .run-ranking-state{font-size:14px;color:var(--muted);border-left:3px solid var(--line-strong);padding:8px 12px;margin:12px 0 20px}.run-board-games{flex-wrap:wrap}
+
+
+.run-validation-success {
+  display:flex;
+  flex-wrap:wrap;
+  align-items:center;
+  gap:8px 14px;
+  margin:14px 0;
+  padding:12px 14px;
+  border:1px solid #b9d8c5;
+  border-radius:9px;
+  background:#eef8f1;
+  color:var(--green-dark);
+}
+.run-validation-success strong { font-size:13px; }
+.run-validation-success span { font-size:12px; }
+.run-validation-success .text-button { margin-left:auto; }
