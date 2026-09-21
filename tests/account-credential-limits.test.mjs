@@ -69,6 +69,20 @@ test('spoofable client network headers and forged internal digests cannot select
   assert.throws(()=>trustedCredentialNetwork(forged,{PACK1_RATE_LIMIT_SECRET:secret}),error=>error.status===503);
 });
 
+test('account deletion limiter purposes are accepted and remain UUID/network scoped',async()=>{
+  for (const purpose of ['account_delete_verify','account_delete_init']) {
+    const {query,calls}=fakeQuery(1);
+    const result=await consumeCredentialLimit(query,{authUserId:USER,purpose,limit:8,seconds:900});
+    assert.equal(result.limited,false);
+    const insert=calls.find(row=>row.sql.includes('INSERT INTO account_credential_rate_limits'));
+    assert.deepEqual(insert.params,[USER,purpose,'',900]);
+  }
+  const {query,calls}=fakeQuery(1);
+  await consumeCredentialLimit(query,{authUserId:USER,purpose:'account_delete_network',networkHash:NETWORK,limit:5,seconds:900});
+  const insert=calls.find(row=>row.sql.includes('INSERT INTO account_credential_rate_limits'));
+  assert.deepEqual(insert.params,[USER,'account_delete_network',NETWORK,900]);
+});
+
 test('only successful callers explicitly clear a selected limiter bucket',async()=>{
   const {query,calls}=fakeQuery();
   await clearCredentialLimit(query,{authUserId:USER,purpose:'current_password'});
