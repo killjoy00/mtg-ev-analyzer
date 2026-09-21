@@ -270,3 +270,12 @@ test('secure-auth release smoke is deletion-specific and corpus-independent',()=
   assert.match(smoke,/status:401/);
   assert.doesNotMatch(smoke,/daily_featured_sets|\/v1\/runs|corpus_version/);
 });
+
+
+test('secure-auth release tolerates transient old Neon instances only within settle budget',()=>{
+  const smoke=fs.readFileSync('tests/secure-auth-release-smoke.mjs','utf8');
+  assert.match(smoke,/const deadline=Date\.now\(\)\+settleMs,stableWindow=30\*1000/);
+  assert.match(smoke,/else stableSince=0/);
+  assert.match(smoke,/secure-auth release markers did not stabilize/);
+  assert.match(smoke,/closing revision/);
+});
