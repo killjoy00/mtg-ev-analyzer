@@ -18,7 +18,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       body=signed?{
         user:{id:'11111111-1111-4111-8111-111111111111',email:'qa@example.invalid',name:'Test Player'},
         session:{expiresAt:'2099-01-01T00:00:00Z'},
-        credentials:{password:passwordCredential,google:googleCredential,emailChange:false},
+        credentials:{password:passwordCredential,google:googleCredential},
       }:{error:'Account session required.'};
     } else if(path==='/v1/player/session') {
       body={ok:true};
@@ -49,7 +49,6 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     await page.locator('#account-password-change').waitFor();
     assert.equal(await page.locator('body').getAttribute('data-harness-error'),null,name+' harness failed');
     assert.match(await page.locator('.profile-credentials').textContent(),/Change password/);
-    assert.match(await page.locator('.profile-credentials').textContent(),/Email changes are temporarily unavailable/);
 
     const form=page.locator('#account-password-change');
     await form.locator('[name="currentPassword"]').fill('Current-password-123!');
@@ -70,7 +69,6 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     await page.goto(base+'/tests/credential-management-harness.html');
     await page.getByText('This account signs in with Google and does not have a Pack One password to change.').waitFor();
     assert.equal(await page.locator('#account-password-change').count(),0);
-    assert.match(await page.locator('.profile-credentials').textContent(),/Email changes are temporarily unavailable/);
 
     assert.deepEqual(errors,[],name+' emitted page errors');
     assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),name+' mobile layout overflowed');
