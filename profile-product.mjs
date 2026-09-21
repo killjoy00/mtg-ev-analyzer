@@ -272,7 +272,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       await changeAccountPassword({currentPassword:data.currentPassword,newPassword:data.newPassword});
       status.textContent='Password changed. You have been signed out.';
       track('account_password_changed');
-      await renderAccount();
+      await renderAccount({notice:'Password changed. You have been signed out everywhere.'});
     } catch(error) {
       status.textContent=error?.message||'Password could not be changed.';
       button.disabled=false;
