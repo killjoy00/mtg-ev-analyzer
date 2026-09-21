@@ -1,1 +1,1 @@
-{"operation":"stage-auth-webhook-probe","reason":"2026-09-21: Stage the temporary non-Neon QA Auth webhook receiver only; do not change Neon Auth configuration."}
+{"operation":"run-auth-webhook-probe","reason":"2026-09-21: Execute one controlled password-recovery reset against the separate Pack One Auth QA project after the QA webhook was manually enabled."}
