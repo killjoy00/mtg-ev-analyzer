@@ -48,7 +48,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
     await page.goto(base+'/tests/credential-management-harness.html');
     await page.locator('#account-password-change').waitFor();
     assert.equal(await page.locator('body').getAttribute('data-harness-error'),null,name+' harness failed');
-    assert.match(await page.locator('.profile-credentials').textContent(),/Change password/);
+    assert.match(await page.getByRole('region',{name:'Sign-in credentials'}).textContent(),/Change password/);
 
     const form=page.locator('#account-password-change');
     await form.locator('[name="currentPassword"]').fill('Current-password-123!');

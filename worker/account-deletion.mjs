@@ -73,7 +73,7 @@ export async function loadDeletionForAuth(query,authUserId) {
   return result.rows[0]||null;
 }
 
-export async function cleanupPackOne(query,operation,{recoveryKey=null}) {
+export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
   if(!operation)throw Error('Deletion operation required.');
   const operationId=uuid(operation.operation_id);
   let current=await loadDeletionOperation(query,operationId);
