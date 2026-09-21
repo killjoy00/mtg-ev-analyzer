@@ -960,10 +960,16 @@ async function credentialState(authUserId) {
 
 async function handleAccount(request) {
   const auth = await authSession(request);
+  const credentials=await credentialState(auth.user_id);
   return json({
     user: { id: auth.user_id, email: auth.email, name: auth.name },
     session: { expiresAt: auth.expires_at },
-    credentials:await credentialState(auth.user_id),
+    credentials,
+    deletion:{
+      enabled:deletionEnabled(),
+      available:deletionEnabled()&&credentials.password,
+      googleOnly:credentials.google&&!credentials.password,
+    },
   });
 }
 
