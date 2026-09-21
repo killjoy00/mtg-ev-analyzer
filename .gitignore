@@ -7,4 +7,8 @@ raw-data/
 generated/
 node_modules/
 artifacts/
+
+# Replay shards are intentionally not committed to git. They are durable data,
+# not disposable runner output: rebuild workflows must checkpoint them to the
+# model-versioned R2 namespace and verify them before a runner exits.
 data/*/shards/

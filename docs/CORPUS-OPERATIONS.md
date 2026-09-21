@@ -18,7 +18,7 @@ The reviewed-main **Corpus Operations** workflow runs daily and can be dispatche
 
 Existing versions are frozen: discovery records source freshness, but an updated archive does not automatically retrain a model or replace decisions in an existing corpus version. Such changes need a reviewed versioned regeneration. New-set models use the current frozen model implementation and qualified-player standard. Traditional data remains outside production pending the separate research decision.
 
-Completed build artifacts/checkpoints survive retries in Actions cache and artifacts. Source archives are disposable downloads; manifests, ledgers, hashes, puzzles and historical database records are retained. The importer no longer invokes historical data-purge commands.
+Completed rebuild checkpoints are split by storage contract: git retains manifests, ledgers, hashes, path models and other tracked outputs, while gitignored replay shards are checkpointed to the model-versioned R2 namespace and verified before each ephemeral Actions runner exits. Final validation hydrates those shards from R2 on a fresh runner before publication. Source archives remain disposable downloads; historical database records are retained. The importer no longer invokes historical data-purge commands.
 
 Regular chronology comes from set release metadata and Live eligibility. Powered Cube has a separate policy. Every new regular run uses P1P1–P1P8; Cube uses P1P2–P1P9, its first eight complete archived decisions. Old selection versions retain their old windows. Older source decisions remain stored for historical/model uses.
 
