@@ -5,7 +5,7 @@ const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const user={id:'11111111-1111-4111-8111-111111111111',email:'qa@example.invalid',name:'Test Player'};
 
 async function installApi(page,{password=true,google=false,result='accepted'}={}) {
-  let signed=true,deleteBody=null;
+  let signed=true,deleteBody=null,postDeletePlayerSessions=0;
   // A delete commits on the first-party production gateway and then performs a
   // full navigation to /?account=deleted|deleting. Keep that navigation on the
   // same first-party architecture in localhost E2E instead of letting the
@@ -33,6 +33,7 @@ async function installApi(page,{password=true,google=false,result='accepted'}={}
         deletion:{enabled:true,available:password,googleOnly:google&&!password},
       }:{error:'Account session required.'};
     } else if(path==='/v1/player/session') {
+      if(!signed)postDeletePlayerSessions+=1;
       body={ok:true};
     } else if(path==='/v1/account/link-browser') {
       body={ok:true,merged:false};
@@ -55,7 +56,7 @@ async function installApi(page,{password=true,google=false,result='accepted'}={}
   await page.route('https://api.packone.pro/draft/**',route=>route.fulfill({
     status:404,contentType:'application/json',body:JSON.stringify({error:'Not found.'}),
   }));
-  return ()=>deleteBody;
+  return ()=>({deleteBody,postDeletePlayerSessions});
 }
 
 async function submitDeletion(page) {
@@ -91,7 +92,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
         throw error;
       }
       await page.getByText(/No further action is required/).waitFor();
-      assert.deepEqual(deleteBody(),{currentPassword:'fixture-current-value',confirm:true});
+      assert.deepEqual(deleteBody().deleteBody,{currentPassword:'fixture-current-value',confirm:true});
+      assert.equal(deleteBody().postDeletePlayerSessions,0,name+' must not recreate a player session after deletion commits');
       assert.deepEqual(errors,[],name+' accepted deletion emitted page errors');
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),name+' accepted deletion overflowed');
       await page.screenshot({path:`artifacts/ui-account-deletion-accepted-${name}-mobile.png`,fullPage:true});
@@ -106,7 +108,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       await page.waitForURL('**/?account=deleted');
       await page.getByText('Your Pack One account has been deleted.').waitFor();
       await page.getByText('This action cannot be undone.').waitFor();
-      assert.deepEqual(deleteBody(),{currentPassword:'fixture-current-value',confirm:true});
+      assert.deepEqual(deleteBody().deleteBody,{currentPassword:'fixture-current-value',confirm:true});
+      assert.equal(deleteBody().postDeletePlayerSessions,0,name+' must not recreate a player session after deletion commits');
       await page.close();
     }
 
