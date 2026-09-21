@@ -1,1 +1,1 @@
-{"operation":"deploy-qa","reason":"2026-09-21: Redeploy the reviewed Pack One QA recovery-email Worker with bounded exact-marker health verification.","commit":"658c43180cc9481549f5727a9b9a9374c451fbeb"}
+{"operation":"deploy-qa","reason":"2026-09-21: Deploy QA retry telemetry in normal delivery mode for final acceptance measurements.","commit":"fa226d314b55a86a7daeb957798c12be6effa143"}
