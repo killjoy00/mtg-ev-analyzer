@@ -1,12 +1,15 @@
 import {resetPassword} from '../growth-api.mjs';
 
 const root=document.querySelector('#recovery-state');
-const params=new URL(location.href).searchParams;
-let token=params.get('token')||'';
+const url=new URL(location.href);
+const fragmentParams=new URLSearchParams(url.hash.startsWith('#')?url.hash.slice(1):url.hash);
+const params=url.searchParams;
+let token=fragmentParams.get('token')||params.get('token')||'';
 const providerError=params.get('error')||'';
 
 // Recovery credentials must not remain visible in the address bar or browser
-// history. Keep the token only in this page's memory for the current attempt.
+// history. Prefer Pack One's fragment token, preserve the managed-email query
+// fallback, and keep the token only in this page's memory for this attempt.
 history.replaceState({},'',location.pathname);
 
 function state(title,body,action='') {
