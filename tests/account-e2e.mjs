@@ -63,25 +63,22 @@ try {
     assert.equal(await page.locator('.player-profile-page').count(),0,state+' deletion receipt was replaced by profile rendering');
   }
 
-  // Account remains the combined career/account surface for guests and members.
+  // Guests go directly to account access; signed-in members land on My Pack One.
   await page.goto(base);
+  await page.waitForFunction(()=>document.querySelector('#account-nav')?.textContent?.trim()==='Sign in');
   await page.locator('#account-nav').click();
-  await page.locator('.player-profile-page').waitFor();
-  assert.match(await page.locator('.profile-claim').textContent(),/Guest record/);
-  assert.equal(await page.locator('#profile-nav').count(),0);
-  assert.equal((await page.locator('.profile-hero-actions #profile-claim-account').textContent())?.trim(),'Sign In');
-  assert.match(await page.locator('.profile-hero-actions #profile-claim-account').getAttribute('class'),/primary/);
-  assert.equal((await page.locator('.profile-hero-actions #profile-share').textContent())?.trim(),'Share my record');
-  assert.match(await page.locator('.profile-hero-actions #profile-share').getAttribute('class'),/secondary/);
-  assert.equal(await page.locator('.profile-claim #profile-claim-account').count(),0);
-  assert.doesNotMatch(await page.locator('.profile-claim').textContent(),/Save my progress/);
-  await page.locator('#profile-claim-account').click();
   await page.locator('#account-signin').waitFor();
+  assert.equal(await page.locator('.player-profile-page').count(),0);
   assert.match(await page.locator('.account-page header').textContent(),/A free account saves your record and enables leaderboard participation\./);
   await page.screenshot({path:'artifacts/ui-account-mobile.png',fullPage:true});
 
   for(const kind of ['signin','signup']) {
     await fillAuth(kind);
+    await page.locator('.my-pack-one-page').waitFor();
+    await page.waitForFunction(()=>document.querySelector('#account-nav')?.textContent?.trim()==='My Pack One');
+    assert.equal((await page.locator('.my-pack-one-heading h1').textContent())?.trim(),'My Pack One');
+    assert.equal(await page.locator('#profile-stats-tab').getAttribute('aria-selected'),'true');
+    await page.locator('#profile-account-tab').click();
     await page.locator('#profile-account #account-signout').waitFor();assert.ok(claims>0);
     assert.equal(await page.locator('#profile-account #profile-settings-form').count(),1);
     assert.match(await page.locator('#profile-account').textContent(),/qa@example.invalid/);
@@ -122,15 +119,18 @@ try {
   await page.waitForURL('https://www.patreon.com/c/PackOne');
   assert.equal(page.url(),'https://www.patreon.com/c/PackOne');
 
-  // Account still returns to the combined career/settings surface after that flow.
+  // Signed-in navigation returns to My Pack One; Account remains a dedicated tab.
   await page.goto(base);
+  await page.waitForFunction(()=>document.querySelector('#account-nav')?.textContent?.trim()==='My Pack One');
   await page.locator('#account-nav').click();
-  await page.locator('#account-signout').waitFor();
+  await page.locator('.my-pack-one-page').waitFor();
   assert.equal(await page.locator('.player-profile-page').count(),1);
+  await page.locator('#profile-account-tab').click();
+  await page.locator('#account-signout').waitFor();
   await page.locator('#account-signout').click();
   await page.locator('#account-signin').waitFor();
 
   assert.deepEqual(errors,[]);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
-  console.log('Account browser contract passed: combined career/account surface, sign in/up, linking, Patreon Elite handoff, membership connection and sign-out identity separation.');
+  console.log('Account browser contract passed: guest sign-in, signed-in My Pack One tabs, linking, Patreon Elite handoff, membership connection and sign-out identity separation.');
 }finally{await browser.close();}

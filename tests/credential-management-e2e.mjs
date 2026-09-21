@@ -46,6 +46,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
 
   try {
     await page.goto(base+'/tests/credential-management-harness.html');
+    await page.locator('.my-pack-one-page').waitFor();
+    await page.locator('#profile-account-tab').click();
     await page.locator('#account-password-change').waitFor();
     assert.equal(await page.locator('body').getAttribute('data-harness-error'),null,name+' harness failed');
     assert.match(await page.getByRole('region',{name:'Sign-in credentials'}).textContent(),/Change password/);
@@ -67,6 +69,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
 
     signed=true;passwordCredential=false;googleCredential=true;passwordBody=null;
     await page.goto(base+'/tests/credential-management-harness.html');
+    await page.locator('.my-pack-one-page').waitFor();
+    await page.locator('#profile-account-tab').click();
     await page.getByText('This account signs in with Google and does not have a Pack One password to change.').waitFor();
     assert.equal(await page.locator('#account-password-change').count(),0);
     // The profile stylesheet is injected dynamically by the product layer.

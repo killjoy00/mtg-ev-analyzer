@@ -1,5 +1,15 @@
 import {hasAccountSession,loadPatreonStatus} from './growth-api.mjs';
 
+export function syncAccountNavigation({doc=document,signedIn=null}={}) {
+  const nav=doc?.querySelector?.('#account-nav');
+  if(!nav)return;
+  const firstPartyHint=/(?:^|;\s*)__Secure-pack1_csrf=/.test(String(doc.cookie||''));
+  const active=signedIn==null?(hasAccountSession()||firstPartyHint):Boolean(signedIn);
+  nav.textContent=active?'My Pack One':'Sign in';
+  if(nav.tagName==='A')nav.setAttribute('href','/?account=1');
+}
+
+
 export async function advertisingAllowed({enabled,client,game=false,accountToken,checkMembership}) {
   if(!enabled||!client||game)return false;
   if(!accountToken)return true;
@@ -32,6 +42,12 @@ export async function initializeAds({doc=document,location=globalThis.location,
     slot.appendChild(ad);slot.hidden=false;
     (globalThis.adsbygoogle=globalThis.adsbygoogle||[]).push({});
   }
+}
+
+if(typeof document!=='undefined') {
+  syncAccountNavigation();
+  globalThis.addEventListener?.('packone-account-changed',()=>syncAccountNavigation());
+  globalThis.addEventListener?.('storage',event=>{if(event.key==='pack1-auth-session-v1'||event.key===null)syncAccountNavigation();});
 }
 
 export const adsReady=typeof document==='undefined'?Promise.resolve():(async()=>{

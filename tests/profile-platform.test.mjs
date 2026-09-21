@@ -2,13 +2,14 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 
-const [migration, worker, bootstrap, api, product, growth] = await Promise.all([
+const [migration, worker, bootstrap, api, product, growth, myPack] = await Promise.all([
   readFile(new URL('../migrations/0003_player_profiles.sql', import.meta.url), 'utf8'),
   readFile(new URL('../worker/growth-function.js', import.meta.url), 'utf8'),
   readFile(new URL('../bootstrap.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../growth-api.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../profile-product.mjs', import.meta.url), 'utf8'),
   readFile(new URL('../growth.mjs', import.meta.url), 'utf8'),
+  readFile(new URL('../my-pack-one.mjs', import.meta.url), 'utf8'),
 ]);
 
 test('identity merge preserves authoritative Daily attempt and moves guest history', () => {
@@ -36,16 +37,19 @@ test('public profile is opt-in and profile API supports history and lookup', () 
   assert.match(product, /Leaderboard name/);
 });
 
-test('progression UI keeps stats inside Account and preserves the career surface', () => {
-  assert.match(bootstrap, /profile-product\.mjs/);
-  assert.match(bootstrap, /installProfileProductLayer/);
+test('signed-in progression uses My Pack One stats and Account tabs', () => {
+  assert.match(bootstrap, /renderAccount\(\{source:'nav'\}\)/);
+  assert.match(product, /myPackOneMarkup/);
   assert.match(product, /id = 'account-nav'/);
   assert.doesNotMatch(product, /id = 'profile-nav'/);
-  assert.doesNotMatch(product, /stats-nav.*remove/);
   assert.doesNotMatch(growth, /id='stats-nav'/);
+  assert.match(myPack, /My Pack One/);
+  assert.match(myPack, /profile-stats-tab/);
+  assert.match(myPack, /profile-account-tab/);
+  assert.match(myPack, /my-pack-one-grid/);
+  assert.match(myPack, /data-profile-panel="account"/);
+  assert.match(myPack, /environmentProgress/);
+  assert.match(myPack, /data-share-achievement/);
+  assert.match(myPack, /data-share-daily/);
   assert.match(product, /profile-account/);
-  assert.match(growth, /Back to my career/);
-  assert.match(product, /environmentProgress/);
-  assert.match(product, /data-share-achievement/);
-  assert.match(product, /data-share-daily/);
 });

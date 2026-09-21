@@ -35,7 +35,7 @@ test('home runtime isolates historical code and lazily loads profiles',()=>{
  assert.doesNotMatch(source,/import\(['"]\.\/(app\.js|social\.mjs|home-today\.mjs|cube-home\.mjs|home-product\.mjs)/);
  assert.match(source,/historical-share\.mjs/);
  assert.match(source,/daily-home\.mjs/);
- assert.match(source,/renderMyProfile\(\)/,'Account navigation keeps the combined career/account surface');
+ assert.match(source,/renderAccount\(\{source:'nav'\}\)/,'Account navigation routes guests to sign in and members to My Pack One');
  assert.match(home,/beginEliteUpgrade\(\{source:'home'\}\)/,'Elite CTA uses the Patreon handoff flow');
 });
 
