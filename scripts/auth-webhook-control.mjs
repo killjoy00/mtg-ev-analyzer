@@ -36,10 +36,11 @@ function run(binary,args,input) {
     throw Error('Cloudflare '+stage+' failed; exit '+status+'.');
   }
 }
-async function cf(route) {
+async function cf(route,{method='GET',allow404=false}={}) {
   let response;
   try {
     response=await fetch('https://api.cloudflare.com/client/v4'+route,{
+      method,
       headers:{authorization:'Bearer '+process.env.CLOUDFLARE_EDGE_TOKEN},
       redirect:'error',
       signal:AbortSignal.timeout(15000),
@@ -47,6 +48,7 @@ async function cf(route) {
   } catch {
     throw Error('Cloudflare control request failed.');
   }
+  if(allow404&&response.status===404)return null;
   if(!response.ok)throw Error('Cloudflare control HTTP '+response.status+'.');
   const body=await response.json();
   if(!body.success)throw Error('Cloudflare rejected the control request.');
@@ -117,8 +119,12 @@ async function deploy(target,{forceFailure=false}={}) {
 }
 async function removeQa() {
   requireSecret(process.env.CLOUDFLARE_EDGE_TOKEN,'CLOUDFLARE_EDGE_TOKEN');
-  const wrangler=tool('wrangler');
-  run(wrangler,['delete','--name',CONFIGS.qa.worker,'--force']);
+  const {accountId}=await cloudflareContext();
+  const route='/accounts/'+accountId+'/workers/scripts/'+CONFIGS.qa.worker;
+  const existing=await cf(route+'/settings',{allow404:true});
+  if(!existing){console.log('QA Auth webhook Worker already absent.');return;}
+  await cf(route,{method:'DELETE'});
+  if(await cf(route+'/settings',{allow404:true}))throw Error('QA Auth webhook Worker still exists after delete.');
   console.log('QA Auth webhook Worker removed.');
 }
 async function verify(target) {
