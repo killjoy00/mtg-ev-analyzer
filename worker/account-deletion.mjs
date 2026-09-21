@@ -74,88 +74,63 @@ export async function loadDeletionForAuth(query,authUserId) {
 export async function cleanupPackOne(query,operation,{recoveryKey=null}) {
   if(!operation)throw Error('Deletion operation required.');
   const operationId=uuid(operation.operation_id);
-  const result=await query(`
-    WITH op AS MATERIALIZED (
-      SELECT * FROM account_deletion_operations
-      WHERE operation_id=$1::uuid
-      FOR UPDATE
-    ), eligible AS MATERIALIZED (
-      SELECT * FROM op WHERE state IN ('pending','app_cleanup_complete','provider_delete_pending')
-    ), owned_challenges AS MATERIALIZED (
-      SELECT c.id FROM share_challenges c JOIN eligible e ON c.player_id=e.player_id
-    ), redact_other_results AS (
-      UPDATE game_results g SET challenge_id=NULL,opponent_name=NULL
-      WHERE EXISTS(SELECT 1 FROM eligible)
-        AND g.player_id IS DISTINCT FROM (SELECT player_id FROM eligible)
-        AND g.challenge_id IN (SELECT id FROM owned_challenges)
-      RETURNING g.id
-    ), null_admin_invites AS (
-      UPDATE pack1_admin_invites i SET redeemed_by=NULL
-      WHERE i.redeemed_by=(SELECT auth_user_id FROM eligible)
-      RETURNING i.token_hash
-    ), null_corpus AS (
-      UPDATE corpus_status_events c SET auth_user_id=NULL
-      WHERE c.auth_user_id=(SELECT auth_user_id FROM eligible)
-      RETURNING c.id
-    ), delete_shares AS (
-      DELETE FROM draft_run_shares d
-      USING draft_run_sessions s,eligible e
-      WHERE d.session_id=s.id AND (s.player_id=e.player_id OR s.daily_account_id=e.auth_user_id)
-      RETURNING d.id
-    ), delete_runs AS (
-      DELETE FROM draft_run_sessions s USING eligible e
-      WHERE s.player_id=e.player_id OR s.daily_account_id=e.auth_user_id
-      RETURNING s.id
-    ), delete_achievements AS (
-      DELETE FROM player_achievements p USING eligible e WHERE p.player_id=e.player_id RETURNING p.player_id
-    ), delete_analytics AS (
-      DELETE FROM analytics_events a USING eligible e WHERE a.player_id=e.player_id RETURNING a.id
-    ), delete_scores AS (
-      DELETE FROM scores s USING eligible e WHERE s.player_id=e.player_id RETURNING s.id
-    ), delete_results AS (
-      DELETE FROM game_results g USING eligible e WHERE g.player_id=e.player_id RETURNING g.id
-    ), delete_limits AS (
-      DELETE FROM player_request_limits l USING eligible e WHERE l.player_id=e.player_id RETURNING l.scope
-    ), delete_challenges AS (
-      DELETE FROM share_challenges c USING eligible e WHERE c.player_id=e.player_id RETURNING c.id
-    ), delete_merges AS (
-      DELETE FROM player_identity_merges m USING eligible e
-      WHERE m.source_player_id=e.player_id OR m.target_player_id=e.player_id
-      RETURNING m.id
-    ), delete_provider_states AS (
-      DELETE FROM provider_oauth_states p USING eligible e WHERE p.auth_user_id=e.auth_user_id RETURNING p.state_hash
-    ), delete_provider_accounts AS (
-      DELETE FROM provider_accounts p USING eligible e WHERE p.auth_user_id=e.auth_user_id RETURNING p.provider
-    ), delete_entitlements AS (
-      DELETE FROM entitlement_grants g USING eligible e WHERE g.auth_user_id=e.auth_user_id RETURNING g.capability
-    ), delete_admin AS (
-      DELETE FROM pack1_admins a USING eligible e WHERE a.auth_user_id=e.auth_user_id RETURNING a.auth_user_id
-    ), delete_credential_limits AS (
-      DELETE FROM account_credential_rate_limits l USING eligible e WHERE l.auth_user_id=e.auth_user_id RETURNING l.purpose
-    ), delete_recovery_limit AS (
-      DELETE FROM account_recovery_rate_limits r
-      WHERE $2::text IS NOT NULL AND r.limit_key=$2
-      RETURNING r.limit_key
-    ), delete_links AS (
-      DELETE FROM account_links a USING eligible e WHERE a.auth_user_id=e.auth_user_id RETURNING a.player_id
-    ), delete_sessions AS (
-      DELETE FROM account_sessions a USING eligible e WHERE a.auth_user_id=e.auth_user_id RETURNING a.session_hash
-    ), delete_player AS (
-      DELETE FROM players p USING eligible e WHERE p.id=e.player_id RETURNING p.id
-    ), advanced AS (
-      UPDATE account_deletion_operations d
-      SET state='provider_delete_pending',
-          app_cleanup_completed_at=COALESCE(app_cleanup_completed_at,now()),
-          updated_at=now(),
-          last_error_code=NULL
-      WHERE d.operation_id=$1::uuid
-        AND d.state IN ('pending','app_cleanup_complete','provider_delete_pending')
-      RETURNING d.*
-    )
-    SELECT operation_id,auth_user_id,player_id,state,attempts,last_error_code,
-           created_at,updated_at,app_cleanup_completed_at,provider_deleted_at,completed_at
-    FROM advanced`,[operationId,recoveryKey]);
-  return result.rows[0]||await loadDeletionOperation(query,operationId);
+  let current=await loadDeletionOperation(query,operationId);
+  if(!current||!['pending','app_cleanup_complete','provider_delete_pending'].includes(current.state))return current;
+  const auth=uuid(current.auth_user_id);
+  const player=current.player_id==null?null:uuid(current.player_id);
+
+  // The tombstone was committed before this function is called. Every step below
+  // is deliberately ordered and idempotent so a crash can resume from the same
+  // operation without reattaching the old identity or rolling deletion back.
+  if(player) {
+    await query(`UPDATE game_results SET challenge_id=NULL,opponent_name=NULL
+      WHERE player_id<>$1::uuid AND challenge_id IN (
+        SELECT id FROM share_challenges WHERE player_id=$1::uuid
+      )`,[player]);
+  }
+
+  await query('UPDATE pack1_admin_invites SET redeemed_by=NULL WHERE redeemed_by=$1::uuid',[auth]);
+  await query('UPDATE corpus_status_events SET auth_user_id=NULL WHERE auth_user_id=$1::uuid',[auth]);
+
+  // Shares have NO ACTION to sessions and must be removed first.
+  await query(`DELETE FROM draft_run_shares
+    WHERE session_id IN (
+      SELECT id FROM draft_run_sessions
+      WHERE ($1::uuid IS NOT NULL AND player_id=$1::uuid) OR daily_account_id=$2::uuid
+    )`,[player,auth]);
+  await query(`DELETE FROM draft_run_sessions
+    WHERE ($1::uuid IS NOT NULL AND player_id=$1::uuid) OR daily_account_id=$2::uuid`,[player,auth]);
+
+  if(player) {
+    await query('DELETE FROM player_achievements WHERE player_id=$1::uuid',[player]);
+    await query('DELETE FROM analytics_events WHERE player_id=$1::uuid',[player]);
+    await query('DELETE FROM scores WHERE player_id=$1::uuid',[player]);
+    await query('DELETE FROM game_results WHERE player_id=$1::uuid',[player]);
+    await query('DELETE FROM player_request_limits WHERE player_id=$1::uuid',[player]);
+    await query('DELETE FROM share_challenges WHERE player_id=$1::uuid',[player]);
+    await query('DELETE FROM player_identity_merges WHERE source_player_id=$1::uuid OR target_player_id=$1::uuid',[player]);
+  }
+
+  await query('DELETE FROM provider_oauth_states WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM provider_accounts WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM entitlement_grants WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM account_credential_rate_limits WHERE auth_user_id=$1::uuid',[auth]);
+  if(recoveryKey)await query('DELETE FROM account_recovery_rate_limits WHERE limit_key=$1',[recoveryKey]);
+  await query('DELETE FROM account_links WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM account_sessions WHERE auth_user_id=$1::uuid',[auth]);
+  if(player)await query('DELETE FROM players WHERE id=$1::uuid',[player]);
+
+  const advanced=await query(`UPDATE account_deletion_operations
+    SET state='provider_delete_pending',
+        app_cleanup_completed_at=COALESCE(app_cleanup_completed_at,now()),
+        updated_at=now(),
+        last_error_code=NULL
+    WHERE operation_id=$1::uuid
+      AND state IN ('pending','app_cleanup_complete','provider_delete_pending')
+    RETURNING operation_id,auth_user_id,player_id,state,attempts,last_error_code,
+      created_at,updated_at,app_cleanup_completed_at,provider_deleted_at,completed_at`,[operationId]);
+  return advanced.rows[0]||loadDeletionOperation(query,operationId);
 }
 
 async function providerCall(authBase,path,{body,cookie}={}) {
