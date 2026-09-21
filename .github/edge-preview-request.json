@@ -1,1 +1,1 @@
-{"operation":"run-auth-webhook-probe","reason":"2026-09-21: Execute the third controlled QA password-recovery webhook probe after the JWKS fetch fix; clear stale evidence first."}
+{"operation":"idle","reason":"2026-09-21: Auth webhook QA probes are complete; no edge-preview infrastructure action is requested."}
