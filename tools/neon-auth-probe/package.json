@@ -1,0 +1,8 @@
+{
+  "name": "pack1-neon-auth-probe",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "raw-body": "3.0.0"
+  }
+}
