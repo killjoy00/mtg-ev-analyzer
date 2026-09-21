@@ -256,3 +256,17 @@ test('manual controls redeploy the current release without migrations',()=>{
   assert.match(flow,/PACK1_ACCOUNT_DELETION_ENABLED/);
   assert.match(flow,/PACK1_VERIFICATION_SWEEP_ENABLED/);
 });
+
+
+test('secure-auth release smoke is deletion-specific and corpus-independent',()=>{
+  const flow=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
+  const smoke=fs.readFileSync('tests/secure-auth-release-smoke.mjs','utf8');
+  assert.equal((flow.match(/secure-auth-release-smoke\.mjs/g)||[]).length,2);
+  assert.doesNotMatch(flow,/release-functions-smoke\.mjs/);
+  assert.match(smoke,/\/health\?quick=1/);
+  assert.match(smoke,/account_deletion_enabled/);
+  assert.match(smoke,/verification_sweep_enabled/);
+  assert.match(smoke,/\/v1\/account\/delete/);
+  assert.match(smoke,/status:401/);
+  assert.doesNotMatch(smoke,/daily_featured_sets|\/v1\/runs|corpus_version/);
+});
