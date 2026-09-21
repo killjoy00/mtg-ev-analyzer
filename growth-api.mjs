@@ -293,6 +293,18 @@ export async function requestPasswordReset(email) {
 export async function resetPassword({token,newPassword}) {
   return api('/v1/account/reset-password',{method:'POST',body:{token:String(token||''),newPassword:String(newPassword||'')},auth:false});
 }
+
+export async function changeAccountPassword({currentPassword,newPassword}) {
+  if(!firstPartyAuthEnabled())throw new Error('Password management requires the secure account session.');
+  await ensureMigrations();
+  const data=await api('/v1/account/password-change',{
+    method:'POST',
+    body:{currentPassword:String(currentPassword||''),newPassword:String(newPassword||'')},
+    auth:false,
+  });
+  clearLegacyAuth();
+  return data;
+}
 export async function startGoogleSignIn() {
   if(!firstPartyAuthEnabled())throw new Error('Google sign in is not available on this release yet.');
   await ensurePackSession();
