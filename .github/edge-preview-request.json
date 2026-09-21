@@ -1,1 +1,1 @@
-{"operation":"probe-auth-webhook","reason":"2026-09-21: Run the isolated QA Managed Neon password-recovery webhook capability probe; restore QA config and remove the temporary Worker afterward."}
+{"operation":"probe-auth-webhook","reason":"2026-09-21: Retry Phase 0 on a disposable child of Pack One development Auth so the existing repo credential can operate the isolated probe."}
