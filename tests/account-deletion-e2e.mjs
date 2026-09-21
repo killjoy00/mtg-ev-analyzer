@@ -91,6 +91,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
         throw error;
       }
       await page.getByText(/No further action is required/).waitFor();
+      assert.equal(await page.locator('.player-profile-page').count(),0,name+' accepted deletion receipt must remain terminal');
       assert.deepEqual(deleteBody(),{currentPassword:'fixture-current-value',confirm:true});
       assert.deepEqual(errors,[],name+' accepted deletion emitted page errors');
       assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1),name+' accepted deletion overflowed');
@@ -106,6 +107,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       await page.waitForURL('**/?account=deleted');
       await page.getByText('Your Pack One account has been deleted.').waitFor();
       await page.getByText('This action cannot be undone.').waitFor();
+      assert.equal(await page.locator('.player-profile-page').count(),0,name+' completed deletion receipt must remain terminal');
       assert.deepEqual(deleteBody(),{currentPassword:'fixture-current-value',confirm:true});
       await page.close();
     }
