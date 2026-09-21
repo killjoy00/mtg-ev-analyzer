@@ -1,0 +1,62 @@
+name: 179C1 runtime verification DELETE privilege probe
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: github.head_ref == 'ops/179c1-runtime-delete-privilege-probe-20260921'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
+      PROJECT_ID: patient-shadow-91417882
+      TARGET_BRANCH: br-twilight-hill-ayffyd2b
+      PROBE_URL: https://br-twilight-hill-ayffyd2b-c179probe.compute.c-5.us-east-2.aws.neon.tech/179c1-runtime-delete-privilege-probe
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate release credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY is missing.'; exit 1; }
+          test ${#PACK1_RATE_LIMIT_SECRET} -ge 32 || { echo '::error::PACK1_RATE_LIMIT_SECRET is missing or too short.'; exit 1; }
+      - name: Install pinned deploy tools
+        run: npm install -g neon@4.17.4 esbuild@0.28.2
+      - name: Build fixed-operation probe using Pack One's runtime SQL path
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/c179probe"
+          banner="import{createRequire as ___cr}from'module';import{fileURLToPath as ___f}from'url';import{dirname as ___d}from'path';const require=___cr(import.meta.url);const __filename=___f(import.meta.url);const __dirname=___d(__filename);"
+          esbuild worker/qa-179c-runtime-delete-probe.mjs --bundle --platform=node --target=node24 --format=esm \
+            --banner:js="$banner" --outfile="$RUNNER_TEMP/c179probe/index.mjs"
+      - name: Deploy isolated development runtime probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon functions deploy c179probe --src "$RUNNER_TEMP/c179probe" --no-bundle \
+            --project-id "$PROJECT_ID" --branch "$TARGET_BRANCH" --runtime nodejs24 --wait \
+            --env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET" --env "PACK1_179C_PRIVILEGE_PROBE=1"
+      - name: Execute non-mutating DELETE privilege probe
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          import {createHmac} from 'node:crypto';
+          const proof=createHmac('sha256',process.env.PACK1_RATE_LIMIT_SECRET)
+            .update('179c1-runtime-delete-privilege-probe-v1').digest('hex');
+          const response=await fetch(process.env.PROBE_URL,{method:'POST',headers:{'x-pack1-probe-proof':proof},signal:AbortSignal.timeout(30000)});
+          const data=await response.json();
+          console.log(JSON.stringify({status:response.status,ok:data.ok===true,delete_row_count:data.delete_row_count,before_count:data.before_count,after_count:data.after_count,code:data.code||null}));
+          if(!response.ok||data.ok!==true||data.delete_row_count!==0||data.before_count!==data.after_count)
+            process.exit(1);
+          NODE
