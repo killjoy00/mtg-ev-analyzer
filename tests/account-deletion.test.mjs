@@ -162,6 +162,9 @@ test('schema and release bookkeeping include migration 0031 in both stages',()=>
   assert.match(migration,/account_delete_init/);
   const schema=fs.readFileSync('worker/schema.sql','utf8');
   assert.match(schema,/account_deletion_operations/);
+  assert.match(schema,/account_delete_verify/);
+  assert.match(schema,/account_delete_network/);
+  assert.match(schema,/account_delete_init/);
   const verify=fs.readFileSync('scripts/verify-neon-schema.mjs','utf8');
   assert.match(verify,/account_deletion_operations/);
   const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
