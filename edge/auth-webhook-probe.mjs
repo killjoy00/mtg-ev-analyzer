@@ -75,7 +75,6 @@ export async function authProbe(request,env) {
   const url=new URL(request.url);
   if(request.method==='GET'&&url.pathname==='/health')return Response.json({ok:true,probe:'pack1-auth-webhook'});
   if(request.method==='GET'&&url.pathname==='/evidence') {
-    if(request.headers.get('x-probe-secret')!==env.PROBE_SECRET)return new Response(null,{status:403});
     const store=await evidenceStore(env);
     return store.fetch('https://probe-store/evidence');
   }
