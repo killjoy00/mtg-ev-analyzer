@@ -27,6 +27,7 @@ assert.match(home, /id="leaderboard-nav"[^>]*>Leaders<\/button>/);
 assert.match(home, /<main id="app" class="app"><\/main>/, 'the app shell should not announce every full-page rerender as a live region');
 assert.match(home, /Impact-Site-Verification: 3e227a68-dfc4-4be8-a619-b13df4f67e25/);
 assert.doesNotMatch(home, /impact-site-verification'\s+value=/i);
+assert.doesNotMatch(home, /Draft data from|No 17Lands endorsement/i, 'home footer should stay visually minimal');
 const howTo = await readFile('how-it-works/index.html','utf8');
 assert.match(howTo, /<h1>How to Play Pack One<\/h1>/);
 assert.match(howTo, /class="topbar"/);
