@@ -1,0 +1,20 @@
+name: 179C0 isolated QA verification cleanup probe
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  probe:
+    if: github.head_ref == 'ops/179c-c0-verification-cleanup-20260921'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Run isolated QA probe only
+        run: node --test tests/qa-179c-delete-capability-probe.test.mjs
