@@ -4,6 +4,7 @@ import {
   authWebhook,
   renderRecoveryEmail,
   sendRecoveryEmail,
+  RecoveryEventDedupe,
   validateRecoveryEvent,
   verifyNeonWebhook,
 } from '../edge/auth-webhook.mjs';
@@ -187,3 +188,26 @@ test('health endpoint exposes only environment and exact release marker',async()
 function responseJson(value,status=200) {
   return Response.json(value,{status});
 }
+
+test('Durable Object dedupe returns success without a second Resend call after an event is marked sent',async()=>{
+  let writes=0;
+  const dedupe=new RecoveryEventDedupe({
+    storage:{
+      get:async key=>key==='sent'?{messageId:'email_already_sent'}:null,
+      put:async()=>{writes++;},
+    },
+  },{});
+  const response=await dedupe.fetch(new Request('https://pack1.internal/send',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({
+      eventId:'evt_test_12345678',
+      email:'person@example.com',
+      token:'fixture-token-1234567890',
+      expiresAt:'2026-09-21T21:00:00.000Z',
+    }),
+  }));
+  assert.equal(response.status,200);
+  assert.deepEqual(await response.json(),{ok:true,duplicate:true});
+  assert.equal(writes,0);
+});
