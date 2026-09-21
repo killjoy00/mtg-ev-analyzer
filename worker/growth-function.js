@@ -8,6 +8,8 @@ import {handlePatreon} from './patreon.mjs';
 import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 import {accountRuntimeConfig} from './account-config.mjs';
 import {clearCredentialLimit,consumeCredentialLimit,trustedCredentialNetwork} from './account-credential-limits.mjs';
+import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,deletionRecoveryKey,finishProviderPhase,loadDeletionOperation,maintenanceBatch,removeProviderUser,stuckDeletion,sweepExpiredVerification,verificationSweepEnabled} from './account-deletion.mjs';
+import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 const ACCOUNT_CONFIG=accountRuntimeConfig();
 const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
 const TOKEN_PREFIX = 'p1_';
@@ -131,7 +133,8 @@ async function verifyToken(value) {
 
 async function player(request, required = true) {
   const header = request.headers.get('authorization') || '';
-  const id = await verifyToken(header.startsWith('Bearer ') ? header.slice(7) : '');
+  let id = await verifyToken(header.startsWith('Bearer ') ? header.slice(7) : '');
+  if(id&&await deletedPlayerTombstone(query,id))id=null;
   if (required && !id) throw Object.assign(new Error('Player session required.'), { status: 401 });
   return id;
 }
@@ -1065,6 +1068,148 @@ async function handlePasswordChange(request) {
   }
 }
 
+
+const DELETE_INIT_LIMIT=3;
+const DELETE_VERIFY_LIMIT=8;
+const DELETE_NETWORK_LIMIT=5;
+const DELETE_LIMIT_SECONDS=15*60;
+
+async function recoveryKeyForDeletion(operation,knownEmail=null) {
+  let email=knownEmail;
+  if(!email) {
+    const row=await query('SELECT email FROM neon_auth."user" WHERE id=$1::uuid LIMIT 1',[operation.auth_user_id]);
+    email=row.rows[0]?.email||null;
+  }
+  return deletionRecoveryKey(email);
+}
+
+async function resumeDeletionOperation(operation,{knownEmail=null}={}) {
+  let current=operation;
+  if(['pending','app_cleanup_complete'].includes(current.state)) {
+    const recoveryKey=await recoveryKeyForDeletion(current,knownEmail);
+    current=await cleanupPackOne(query,current,{recoveryKey});
+  }
+  if(current.state==='provider_delete_pending') {
+    const result=await removeProviderUser({authBase:NEON_AUTH_BASE,authUserId:current.auth_user_id});
+    current=await finishProviderPhase(query,current,result);
+    if(current.state==='operator_review') {
+      const age=Math.max(0,Math.floor((Date.now()-new Date(current.created_at).getTime())/1000));
+      console.error(JSON.stringify({
+        event:'account_deletion_operator_review',
+        operation_id:current.operation_id,
+        phase:current.state,
+        age_seconds:age,
+        attempts:Number(current.attempts||0),
+        error_code:current.last_error_code||'PROVIDER_FAILURE',
+        release_commit:releaseMetadata().release_commit,
+      }));
+    }
+  }
+  return current;
+}
+
+async function handleAccountDelete(request) {
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const auth=await authSession(request,{required:true,allowLegacy:false,csrf:true});
+  if(!deletionEnabled())
+    throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'DELETION_DISABLED'});
+  const payload=await readJson(request);
+  if(payload.confirm!==true)
+    throw Object.assign(Error('Confirm permanent account deletion.'),{status:400,code:'DELETE_CONFIRMATION'});
+  const state=await credentialState(auth.user_id);
+  if(!state.password)
+    throw Object.assign(Error('Account deletion is temporarily unavailable for this sign-in method.'),{status:409,code:'GOOGLE_DELETE_UNAVAILABLE'});
+  const currentPassword=String(payload.currentPassword||'');
+  if(currentPassword.length<1||currentPassword.length>256)
+    throw Object.assign(Error('Enter your current password.'),{status:400,code:'CURRENT_PASSWORD'});
+
+  const initLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_init',
+    limit:DELETE_INIT_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(initLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',initLimit);
+  const verifyLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_verify',
+    limit:DELETE_VERIFY_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(verifyLimit.limited)return credentialThrottle('Too many verification attempts. Please try again later.',verifyLimit);
+  const network=trustedCredentialNetwork(request);
+  const networkLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_network',networkHash:network,
+    limit:DELETE_NETWORK_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(networkLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',networkLimit);
+
+  let providerSession='';
+  try {
+    providerSession=await providerPasswordSession(auth,currentPassword);
+    await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'account_delete_verify'});
+  } finally {
+    await closeProviderSession(providerSession);
+  }
+
+  const operation=await beginDeletion(query,{authUserId:auth.user_id});
+  if(!operation)throw Object.assign(Error('Account deletion could not be started.'),{status:500,code:'DELETE_START'});
+  const final=await resumeDeletionOperation(operation,{knownEmail:auth.email});
+  const complete=final?.state==='complete';
+  let response=json({
+    ok:true,
+    deletion:complete?'complete':'accepted',
+    operationId:final?.operation_id,
+  },complete?200:202);
+  response=clearPlayerCookie(clearAccountCookies(response));
+  return response;
+}
+
+function bearer(request) {
+  const value=String(request.headers.get('authorization')||'');
+  return value.startsWith('Bearer ')?value.slice(7):'';
+}
+
+async function handleDeletionMaintenance(request) {
+  if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
+  await verifyDeletionMaintenanceToken(bearer(request));
+  const advanced=[];
+  if(deletionEnabled()) {
+    for(const operation of await maintenanceBatch(query,{limit:20})) {
+      if(operation.state==='operator_review')continue;
+      try {
+        const next=await resumeDeletionOperation(operation);
+        advanced.push({operation_id:next.operation_id,state:next.state});
+      } catch(error) {
+        await query(`UPDATE account_deletion_operations SET attempts=attempts+1,last_error_code='MAINTENANCE_FAILURE',updated_at=now()
+          WHERE operation_id=$1::uuid AND state<>'complete'`,[operation.operation_id]);
+        console.error(JSON.stringify({
+          event:'account_deletion_maintenance_failure',
+          operation_id:operation.operation_id,
+          phase:operation.state,
+          age_seconds:Math.max(0,Math.floor((Date.now()-new Date(operation.created_at).getTime())/1000)),
+          attempts:Number(operation.attempts||0)+1,
+          error_code:'MAINTENANCE_FAILURE',
+          release_commit:releaseMetadata().release_commit,
+        }));
+      }
+    }
+  }
+  const swept=verificationSweepEnabled()?await sweepExpiredVerification(query,{limit:200}):null;
+  const remaining=await maintenanceBatch(query,{limit:50});
+  const attention=remaining.filter(row=>stuckDeletion(row)).map(row=>({
+    operation_id:row.operation_id,
+    state:row.state,
+    age_seconds:Math.max(0,Math.floor((Date.now()-new Date(row.created_at).getTime())/1000)),
+    attempts:Number(row.attempts||0),
+    error_code:row.last_error_code||null,
+  }));
+  return json({
+    ok:attention.length===0,
+    deletion_enabled:deletionEnabled(),
+    sweep_enabled:verificationSweepEnabled(),
+    advanced,
+    swept_expired_verifications:swept,
+    attention,
+  },attention.length?503:200);
+}
+
 async function handleSignout(request) {
   // Sign-out must always be able to clear the cookies it set, including when
   // the session behind them is already expired or revoked. A live session is
@@ -1187,6 +1332,7 @@ async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true });
+  if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
@@ -1196,6 +1342,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/request-password-reset') return handlePasswordResetRequest(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/reset-password') return handlePasswordReset(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/password-change') return handlePasswordChange(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/delete') return handleAccountDelete(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/link-browser') return handleLink(request,{browser:true});
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
@@ -1220,7 +1367,8 @@ async function route(request) {
 
 export default {
   async fetch(request) {
-    const denied=guardIngress(request);if(denied)return denied;
+    const maintenance=new URL(request.url).pathname==='/internal/account-deletion-maintenance';
+    if(!maintenance){const denied=guardIngress(request);if(denied)return denied;}
     try {
       return withCors(await route(request), request);
     } catch (error) {
