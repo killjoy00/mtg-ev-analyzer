@@ -1,3 +1,5 @@
+import {createHmac,timingSafeEqual} from 'node:crypto';
+
 const PURPOSES=new Set([
   'current_password',
   'password_change_network',
@@ -17,14 +19,24 @@ function identity(authUserId,purpose,networkHash='') {
   return {id,kind,network};
 }
 
+function proofFor(network,secret) {
+  return createHmac('sha256',secret).update('pack1-credential-network:'+network).digest('hex');
+}
+
 export function trustedCredentialNetwork(request,env=process.env) {
-  // The edge gateway authenticates to the function and authors this HMAC
-  // digest from Cloudflare's CF-Connecting-IP. Direct-origin deployments must
-  // never accept a caller-selected digest.
-  if(env.PACK1_REQUIRE_INGRESS!=='1'||!/^[a-f0-9]{64}$/.test(String(env.PACK1_INGRESS_SECRET||'')))
+  // The edge gateway derives network from Cloudflare's CF-Connecting-IP, HMACs
+  // that network before forwarding it, then authenticates the digest again
+  // with the server-only rate-limit secret. Direct-origin callers can invent
+  // headers, but cannot produce the matching proof.
+  const secret=String(env.PACK1_RATE_LIMIT_SECRET||'');
+  if(secret.length<32)
     throw Object.assign(Error('Credential management is temporarily unavailable.'),{status:503,code:'RATE_LIMIT_CONFIG'});
   const network=String(request.headers.get('x-pack1-network-id')||'');
-  if(!DIGEST.test(network))
+  const supplied=String(request.headers.get('x-pack1-network-proof')||'');
+  if(!DIGEST.test(network)||!DIGEST.test(supplied))
+    throw Object.assign(Error('Credential management is temporarily unavailable.'),{status:503,code:'RATE_LIMIT_CONFIG'});
+  const expected=proofFor(network,secret);
+  if(!timingSafeEqual(Buffer.from(expected),Buffer.from(supplied)))
     throw Object.assign(Error('Credential management is temporarily unavailable.'),{status:503,code:'RATE_LIMIT_CONFIG'});
   return network;
 }
@@ -65,3 +77,4 @@ export async function clearCredentialLimit(query,{authUserId,purpose,networkHash
 }
 
 export const CREDENTIAL_LIMIT_PURPOSES=Object.freeze([...PURPOSES]);
+export const credentialNetworkProof=proofFor;
