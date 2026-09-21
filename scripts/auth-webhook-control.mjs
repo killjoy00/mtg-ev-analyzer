@@ -92,7 +92,7 @@ async function waitForHealth(base,{commit,environment}) {
   }
   throw Error('Auth webhook health verification failed after deployment; last result '+lastResult+'.');
 }
-async function deploy(target,{forceFailure=false}={}) {
+async function deploy(target,{forceFailure=false,forceRetryAfterSend=false}={}) {
   const cfg=CONFIGS[target];
   if(!cfg)throw Error('Unknown Auth webhook deployment target.');
   validateEnvironment();
@@ -120,6 +120,7 @@ async function deploy(target,{forceFailure=false}={}) {
       SUBJECT:cfg.subject,
       PACK1_RELEASE_COMMIT:commit,
       PACK1_FORCE_DELIVERY_FAILURE:forceFailure?'1':'0',
+      PACK1_FORCE_RETRY_AFTER_SEND:forceRetryAfterSend?'1':'0',
     },
   };
   fs.writeFileSync(configPath,JSON.stringify(wranglerConfig),{mode:0o600});
@@ -169,6 +170,7 @@ async function main(action) {
   }
   if(action==='deploy-qa')return deploy('qa');
   if(action==='deploy-qa-fail')return deploy('qa',{forceFailure:true});
+  if(action==='deploy-qa-retry')return deploy('qa',{forceRetryAfterSend:true});
   if(action==='deploy-production')return deploy('production');
   if(action==='verify-qa')return verify('qa');
   if(action==='verify-production')return verify('production');
