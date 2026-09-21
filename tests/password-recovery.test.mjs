@@ -197,3 +197,11 @@ test('deployment workflows fail closed on and inject the dedicated recovery limi
     assert.match(source,/--env "PACK1_RATE_LIMIT_SECRET=\$PACK1_RATE_LIMIT_SECRET"/);
   }
 });
+
+
+test('secure auth release applies account recovery schema in both development and production',async()=>{
+  const fs=await import('node:fs');
+  const source=fs.readFileSync(new URL('../.github/workflows/secure-auth-release.yml',import.meta.url),'utf8');
+  const matches=[...source.matchAll(/migrations\/0029_account_recovery\.sql/g)];
+  assert.equal(matches.length,2);
+});

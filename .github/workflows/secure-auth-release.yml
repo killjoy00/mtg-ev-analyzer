@@ -104,7 +104,7 @@ jobs:
             test -n "$PATREON_CLIENT_ID" && test -n "$PATREON_CLIENT_SECRET" && test -n "$PATREON_WEBHOOK_SECRET"
           fi
 
-      - name: Apply additive secure-session schema to production
+      - name: Apply additive secure-account schema to production
         shell: bash
         run: |
           set -euo pipefail
@@ -112,6 +112,7 @@ jobs:
           connection=$("$neon" connection-string "$PROD_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
           echo "::add-mask::$connection"
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0028_account_sessions.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0029_account_recovery.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
 
       - name: Deploy the development-tested revision to production
