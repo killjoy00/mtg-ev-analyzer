@@ -68,6 +68,8 @@ Change `.github/edge-preview-request.json` through a reviewed PR. `operation` mu
 | `check-access` | Read scoped Cloudflare configuration and check hostname/Worker ownership. No provisioning. |
 | `deploy-preview` | Create an expiring Neon branch, deploy guarded origins and the private gateway, then run live acceptance. |
 | `disable-preview` | Remove only this Worker's verified preview custom-domain attachment. Keep backend guards enabled. |
+| `deploy-authhook-qa` | Deploy the dedicated QA password-recovery webhook ingress Worker. It forwards only exact raw webhook bytes and the fixed Neon header allowlist to `pack1authhook`; it does not use the player API gateway. |
+| `remove-authhook-qa` | Remove only the dedicated QA password-recovery webhook ingress Worker after QA webhook testing is complete. |
 
 Also change the human-readable `reason` for a new request. Merging that exact file into `main` triggers **operate private gateway preview**. Ordinary merges do not deploy. Manual dispatch remains optional. The workflow has read-only GitHub permissions and no PR-secret execution path. The controller accepts no arbitrary command, URL, branch or production target from the request. Keep the workflow/controller at a reviewed revision.
 
