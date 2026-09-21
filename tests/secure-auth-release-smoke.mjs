@@ -1,5 +1,5 @@
 // Secure-account release acceptance intentionally avoids Draft Run corpus/gameplay.
-// It proves the exact reviewed revision is live on all three shared runtimes,
+// It proves the exact reviewed revision is live on all four shared runtimes,
 // then exercises only non-destructive account-deletion controls.
 import assert from 'node:assert/strict';
 
@@ -31,7 +31,7 @@ async function marker(slug) {
 }
 
 async function waitForRevision() {
-  for(const slug of ['draftrunapi','pack1growth','pack1api']) {
+  for(const slug of ['draftrunapi','pack1growth','pack1api','pack1authhook']) {
     const deadline=Date.now()+settleMs;
     for(;;) {
       const seen=await marker(slug);
@@ -77,7 +77,7 @@ if(settle) {
   let stableSince=0;
   while(Date.now()<deadline) {
     let all=true;
-    for(const slug of ['draftrunapi','pack1growth','pack1api']) {
+    for(const slug of ['draftrunapi','pack1growth','pack1api','pack1authhook']) {
       if(await marker(slug)!==commit)all=false;
     }
     if(all) {
@@ -90,6 +90,6 @@ if(settle) {
   }
   assert.ok(stableSince&&Date.now()-stableSince>=stableWindow,'release markers did not stabilize on the reviewed revision');
 }
-for(const slug of ['draftrunapi','pack1growth','pack1api'])assert.equal(await marker(slug),commit,`${slug} closing revision`);
+for(const slug of ['draftrunapi','pack1growth','pack1api','pack1authhook'])assert.equal(await marker(slug),commit,`${slug} closing revision`);
 
 console.log(JSON.stringify({branch,commit,account_deletion_enabled:true,verification_sweep_enabled:true,unauthenticated_delete_rejected:true,maintenance_forged_bearer_rejected:true}));
