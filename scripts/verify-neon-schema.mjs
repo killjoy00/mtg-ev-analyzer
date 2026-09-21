@@ -21,6 +21,8 @@ const result=await query(`SELECT
   to_regclass('account_recovery_rate_limits') IS NOT NULL account_recovery_rate_limits,
   to_regclass('account_credential_rate_limits') IS NOT NULL account_credential_rate_limits,
   to_regclass('account_deletion_operations') IS NOT NULL account_deletion_operations,
+  to_regprocedure('pack1_identity_attachment_allowed(uuid)') IS NOT NULL account_deletion_identity_guard,
+  to_regprocedure('pack1_begin_account_deletion(uuid,uuid)') IS NOT NULL account_deletion_begin_function,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='account_deletion_player_tombstone_uq') account_deletion_player_tombstone,
   EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='account_deletion_operations'::regclass AND pg_get_constraintdef(oid) LIKE '%operator_review%') account_deletion_states,
   EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='account_credential_rate_limits'::regclass AND pg_get_constraintdef(oid) LIKE '%account_delete_init%') account_deletion_limits,
