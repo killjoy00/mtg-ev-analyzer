@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {randomBytes} from 'node:crypto';
 
-const enabled=process.env.GITHUB_HEAD_REF==='ops/179c-delete-capability-probe';
+const enabled=process.env.GITHUB_HEAD_REF==='ops/179c-c0-verification-cleanup-20260921';
 const base='https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth';
 const origin='http://localhost:4173';
 
