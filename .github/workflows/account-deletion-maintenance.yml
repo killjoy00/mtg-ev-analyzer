@@ -2,7 +2,8 @@ name: account deletion maintenance
 
 on:
   schedule:
-    - cron: '*/10 * * * *'
+    # Keep the 10-minute recovery cadence, but avoid crowded round-minute GitHub scheduler slots.
+    - cron: '9,19,29,39,49,59 * * * *'
   workflow_dispatch:
 
 permissions:
