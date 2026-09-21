@@ -63,6 +63,15 @@ jobs:
         env:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-webhook-tools
         run: node scripts/auth-webhook-control.mjs deploy-qa-retry
+      - name: Run QA happy-path recovery acceptance
+        if: steps.request.outputs.operation == 'qa-acceptance'
+        run: node scripts/auth-webhook-qa-acceptance.mjs happy
+      - name: Run QA forced-failure retry acceptance
+        if: steps.request.outputs.operation == 'qa-failure-check'
+        run: node scripts/auth-webhook-qa-acceptance.mjs failure
+      - name: Run QA post-send retry and duplicate acceptance
+        if: steps.request.outputs.operation == 'qa-retry-check'
+        run: node scripts/auth-webhook-qa-acceptance.mjs retry
       - name: Remove QA recovery-email Worker
         if: steps.request.outputs.operation == 'delete-qa'
         env:
