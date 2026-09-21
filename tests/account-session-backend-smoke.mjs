@@ -79,6 +79,30 @@ assert.notEqual(rotated,account,'account session rotates on account linking');
 assert.match(player,/^p1_/);
 assert.equal((await growth.fetch(new Request('https://packone.pro/v1/account/session',{headers:{origin,cookie:cookieHeader(account,csrf,player)}}))).status,401,'rotated account session is revoked');
 
+// Once the account and browser player are already associated, link-browser is a
+// no-op. It must reuse the same account + CSRF pair and must not append another
+// historical account_sessions row merely because a page rendered.
+const beforeNoop=Number((await query('SELECT count(*) n FROM account_sessions WHERE auth_user_id=$1::uuid',[authId])).rows[0].n);
+const noopResponse=await growth.fetch(new Request('https://packone.pro/v1/account/link-browser',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
+  body:'{}',
+}));
+const noop=await json(noopResponse);
+assert.equal(noop.merged,false);
+assert.equal(cookies(noopResponse).length,0,'no-op link rewrites no identity cookies');
+assert.equal(Number((await query('SELECT count(*) n FROM account_sessions WHERE auth_user_id=$1::uuid',[authId])).rows[0].n),beforeNoop,'no-op link creates no session row');
+assert.equal(Number((await query('SELECT count(*) n FROM account_sessions WHERE auth_user_id=$1::uuid AND revoked_at IS NULL',[authId])).rows[0].n),1,'the existing account session stays active');
+
+// This is the multi-tab correctness contract: another page performing the
+// ordinary no-op link cannot invalidate the pair a first page will use for its
+// next authenticated write.
+await json(await growth.fetch(new Request('https://packone.pro/v1/profile',{
+  method:'PATCH',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
+  body:JSON.stringify({displayName:'QA Secure Same Session'}),
+})));
+
 const profileDenied=await growth.fetch(new Request('https://packone.pro/v1/profile',{
   method:'PATCH',
   headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,cookie:cookieHeader(rotated,rotatedCsrf,player)},
@@ -139,4 +163,4 @@ assert.equal(seeded.migrated,true);
 assert.equal(seeded.playerId,strayPlayer.playerId);
 
 await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[authId]);
-console.log('First-party account session migration, CSRF, rotation, no-token JSON, repeat sign-out and player-cookie preservation passed.');
+console.log('First-party account session migration, boundary rotation, no-op reuse, multi-page CSRF, no-token JSON, repeat sign-out and player-cookie preservation passed.');
