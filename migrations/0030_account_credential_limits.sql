@@ -6,9 +6,7 @@ CREATE TABLE IF NOT EXISTS account_credential_rate_limits (
   auth_user_id uuid NOT NULL,
   purpose text NOT NULL CHECK (purpose IN (
     'current_password',
-    'password_change_network',
-    'email_change_account',
-    'email_change_network'
+    'password_change_network'
   )),
   network_hash text NOT NULL DEFAULT '' CHECK (
     network_hash = '' OR network_hash ~ '^[a-f0-9]{64}$'
