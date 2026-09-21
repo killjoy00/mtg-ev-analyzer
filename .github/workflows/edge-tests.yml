@@ -31,12 +31,15 @@ jobs:
           assert.ok(deletion.includes('delete <slug>'),'Missing Neon function delete command');
           JS
       - name: Test request and origin boundaries
-        run: node --test tests/ingress.test.mjs
+        run: node --test tests/ingress.test.mjs tests/auth-webhook-ingress.test.mjs
       - name: Build and test the Workers runtime
         env:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
         run: |
           "$EDGE_TOOLS_DIR/node_modules/.bin/esbuild" edge/gateway.mjs --bundle --format=esm --platform=browser --external:node:net --outfile="$RUNNER_TEMP/gateway.mjs"
+          "$EDGE_TOOLS_DIR/node_modules/.bin/esbuild" edge/auth-webhook-ingress.mjs --bundle --format=esm --platform=browser --outfile="$RUNNER_TEMP/auth-webhook-ingress.mjs"
           node tests/edge-runtime.mjs "$RUNNER_TEMP/gateway.mjs"
       - name: Validate Cloudflare deployment configuration
-        run: "$RUNNER_TEMP/edge-tools/node_modules/.bin/wrangler deploy --config edge/wrangler.json --dry-run --outdir $RUNNER_TEMP/edge-dry-run"
+        run: |
+          "$RUNNER_TEMP/edge-tools/node_modules/.bin/wrangler" deploy --config edge/wrangler.json --dry-run --outdir "$RUNNER_TEMP/edge-dry-run"
+          "$RUNNER_TEMP/edge-tools/node_modules/.bin/wrangler" deploy --config edge/auth-webhook-wrangler.json --dry-run --outdir "$RUNNER_TEMP/auth-webhook-dry-run"
