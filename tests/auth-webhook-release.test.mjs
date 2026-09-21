@@ -44,4 +44,7 @@ test('Auth webhook deployment controller pins service identity, Auth bases, send
   assert.match(source,/resetOrigin:'http:\/\/localhost:4173'/);
   assert.match(source,/resetOrigin:'https:\/\/packone\.pro'/);
   assert.match(source,/wrangler.*secret.*bulk/s);
+  assert.match(source,/async function waitForHealth/);
+  assert.match(source,/attempt<=20/);
+  assert.match(source,/release marker mismatch/);
 });
