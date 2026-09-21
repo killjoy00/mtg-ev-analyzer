@@ -175,3 +175,25 @@ test('failed, expired, invalid or policy-rejected resets never revoke valid sess
     assert.equal(calls.some(x=>x.kind==='db'&&x.sql.includes('UPDATE account_sessions SET revoked_at')),false);
   }
 });
+
+test('reset page is non-indexable, token-safe, and absent from the sitemap',async()=>{
+  const fs=await import('node:fs');
+  const html=fs.readFileSync(new URL('../reset-password/index.html',import.meta.url),'utf8');
+  const script=fs.readFileSync(new URL('../reset-password/reset-password.mjs',import.meta.url),'utf8');
+  const sitemap=fs.readFileSync(new URL('../sitemap.xml',import.meta.url),'utf8');
+  assert.match(html,/name="robots" content="noindex,nofollow"/);
+  assert.match(html,/name="referrer" content="no-referrer"/);
+  assert.match(script,/history\.replaceState\(\{\},'',location\.pathname\)/);
+  for(const forbidden of ['localStorage','sessionStorage','console.','trackEvent','analytics'])assert.ok(!script.includes(forbidden));
+  assert.ok(!sitemap.includes('/reset-password/'));
+});
+
+test('deployment workflows fail closed on and inject the dedicated recovery limiter secret',async()=>{
+  const fs=await import('node:fs');
+  for(const file of ['../.github/workflows/deploy-functions.yml','../.github/workflows/secure-auth-release.yml']) {
+    const source=fs.readFileSync(new URL(file,import.meta.url),'utf8');
+    assert.match(source,/PACK1_RATE_LIMIT_SECRET: \$\{\{ secrets\.PACK1_RATE_LIMIT_SECRET \}\}/);
+    assert.match(source,/PACK1_RATE_LIMIT_SECRET is missing or too short/);
+    assert.match(source,/--env "PACK1_RATE_LIMIT_SECRET=\$PACK1_RATE_LIMIT_SECRET"/);
+  }
+});
