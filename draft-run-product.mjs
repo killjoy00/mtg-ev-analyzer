@@ -9,7 +9,7 @@ import { consensusFeedback } from './draft-run-feedback.mjs';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
-let run=null,selection=null,review=null,busy=false;
+let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null;
 const clock=decisionClock();let viewPromise=Promise.resolve(),viewKey=null;
 document.addEventListener('visibilitychange',()=>{if(document.hidden)clock.pause();else if(run?.current&&review==null&&!busy)recordView(true);});
 function recordView(touch=false) {
@@ -157,6 +157,7 @@ function renderResult() {
   app().innerHTML=`<section class="run-result-page"><p class="eyebrow">${run.day?'Daily ':''}${title()} complete</p><h1>Your ${cube()?'Cube Run':'Draft Run'}.</h1><div class="run-final-score"><strong>${run.score}</strong><span>/100<br>${matches} trophy picks matched</span></div>
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Eastern.'}</p>`:''}
+    ${dailyValidationConfirmation?`<div class="run-validation-success" role="status" data-daily-validation-confirmation><strong>Score added to today's leaderboard</strong>${dailyValidationConfirmation.standing?`<span>#${dailyValidationConfirmation.standing.rank} of ${dailyValidationConfirmation.standing.total}${dailyValidationConfirmation.standing.percentile?` · Top ${dailyValidationConfirmation.standing.percentile}%`:''}</span>`:''}<a class="text-button" href="${gameUrl('board=daily')}">View leaderboard</a></div>`:''}
     ${run.day?`<p class="run-ranking-state" role="status">${run.leaderboard_eligible?`Ranked as ${esc(run.ranked_name||'your account')}`:'Playing as guest — sign in after the run to add this score to the leaderboard.'}</p>`:''}
     ${run.comparison?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
     <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?'Sign in to add score':'View your career'}</button></div>
@@ -164,9 +165,23 @@ function renderResult() {
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; alternatives earn up to 95 from held-out strong-player support.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs')).renderAccount({validateDailyRunId:run.id});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
+export async function returnToValidatedDaily(runId,{standing=null}={}) {
+  styles();
+  await loadSetNames();
+  if(!run||run.id!==runId||!run.complete)run=await api(`/v1/runs/${runId}`);
+  if(!run?.day||!run?.complete)throw new Error('Completed Daily result is unavailable.');
+  environment=run.environment||environment;
+  selection=null;review=null;
+  run.leaderboard_eligible=true;
+  run.standing=standing||null;
+  dailyValidationConfirmation={standing:standing||null};
+  renderResult();
+  window.scrollTo({top:0,behavior:'instant'});
+}
+
 async function shareResult() {
   const button=document.querySelector('#run-share');button.disabled=true;
   try {
