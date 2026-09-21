@@ -61,7 +61,7 @@ export async function renderForgotPassword() {
   });
 }
 
-export async function renderAccount({ validateDailyRunId = null, intent = null, source = 'account' } = {}) {
+export async function renderAccount({ validateDailyRunId = null, intent = null, source = 'account', notice = '' } = {}) {
   if(validateDailyRunId) pendingDailyRunValidation=validateDailyRunId;
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
@@ -96,7 +96,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       ? 'Create or sign in to your free Pack One account first. Then we’ll send you to Patreon to choose Elite.'
       : 'A free account saves your record and enables leaderboard participation.';
   const google=firstPartyAuthEnabled()?'<div class="account-social"><h2>Create An Account With Your Email or With Google</h2><button class="button primary" id="account-google" type="button">Sign In With Google</button></div>':'';
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>${heading}</h1><p>${intro}</p></header>${google}<div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite?'Not now — keep playing':'Keep playing as guest'}</button></div></section>`;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>${heading}</h1><p>${intro}</p>${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header>${google}<div class="account-columns"><div><h2>Create account</h2>${formMarkup('signup')}</div><div><h2>Sign in</h2>${formMarkup('signin')}</div></div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite?'Not now — keep playing':'Keep playing as guest'}</button></div></section>`;
   document.querySelector('#account-google')?.addEventListener('click',async e=>{
     const button=e.currentTarget;button.disabled=true;
     try {saveAuthFlow(intent,source);event('auth_google_started',{source});await startGoogleSignIn();}
@@ -149,7 +149,9 @@ export async function resumeAccountAuth(status) {
 
 export async function installGrowthLayer() {
   currentAccount = await getAuthSession().catch(()=>null);
-  if (currentAccount?.user) await linkAccount().catch(() => null);
+  // Authentication/account-establishment flows link explicitly. Ordinary page
+  // bootstrap must only observe the existing account session: calling
+  // link-browser here used to rotate a valid account + CSRF pair on every load.
   event('page_view', { account:Boolean(currentAccount?.user) });
   document.addEventListener('pack1:share-completed', shareCompletedAnalytics);
   document.addEventListener('click', e => {

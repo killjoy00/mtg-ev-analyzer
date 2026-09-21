@@ -4,6 +4,7 @@ import {
   getAuthSession,
   loadPatreonStatus,
   connectPatreon,
+  changeAccountPassword,
   disconnectPatreon,
   signOutAccount,
   loadProfileHistory,
@@ -143,6 +144,20 @@ function settingsMarkup(profile, progress, account, patreon) {
       <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
       <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status" aria-live="polite"></span></div>
     </form>`:`<p class="profile-empty">${account?.unavailable?'Profile settings are temporarily unavailable.':'Sign in to edit your profile settings.'}</p>`}
+    ${account?.user?`<section class="profile-credentials" aria-labelledby="credential-settings-title">
+      <div><p class="eyebrow">Security</p><h3 id="credential-settings-title">Sign-in credentials</h3>
+        ${account?.credentials?.password
+          ? `<p><strong>Change password</strong><br><span>Changing your password signs out every Pack One session, including this device.</span></p>
+             <form class="account-form" id="account-password-change">
+               <label>Current password<input required type="password" name="currentPassword" maxlength="256" autocomplete="current-password"></label>
+               <label>New password<input required type="password" name="newPassword" minlength="8" maxlength="128" autocomplete="new-password"></label>
+               <label>Confirm new password<input required type="password" name="confirmPassword" minlength="8" maxlength="128" autocomplete="new-password"></label>
+               <button class="button secondary" type="submit">Change password</button>
+               <span class="profile-settings-status" aria-live="polite"></span>
+             </form>`
+          : `<p><strong>Password</strong><br><span>${account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password credential to change.'}</span></p>`}
+      </div>
+    </section>`:''}
     ${account?.user?`<section class="profile-membership" aria-labelledby="patreon-membership-title">
       <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
         ${patreon?.configured!==true
@@ -245,6 +260,25 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   document.querySelector('#profile-home')?.addEventListener('click', () => { window.location.href = './'; });
   document.querySelector('#account-status-retry')?.addEventListener('click',()=>void renderMyProfile());
   document.querySelector('#account-signout')?.addEventListener('click',async e=>{e.currentTarget.disabled=true;await signOutAccount();track('auth_sign_out');await renderAccount();});
+  document.querySelector('#account-password-change')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const form=e.currentTarget,button=form.querySelector('button[type="submit"]'),status=form.querySelector('.profile-settings-status');
+    const data=Object.fromEntries(new FormData(form));
+    status.textContent='';
+    if(data.newPassword!==data.confirmPassword){status.textContent='New passwords do not match.';return;}
+    button.disabled=true;
+    try {
+      await changeAccountPassword({currentPassword:data.currentPassword,newPassword:data.newPassword});
+      status.textContent='Password changed. You have been signed out.';
+      track('account_password_changed');
+      await renderAccount({notice:'Password changed. You have been signed out everywhere.'});
+    } catch(error) {
+      status.textContent=error?.message||'Password could not be changed.';
+      button.disabled=false;
+    } finally {
+      form.reset();
+    }
+  });
   document.querySelector('#patreon-connect')?.addEventListener('click',async e=>{
     const button=e.currentTarget,status=document.querySelector('#patreon-status');button.disabled=true;if(status)status.textContent='Opening Patreon…';
     try{const result=await connectPatreon();if(!result?.url)throw Error('Patreon did not return a connection URL.');track('patreon_connect_started');location.href=result.url;}

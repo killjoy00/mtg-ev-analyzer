@@ -58,10 +58,14 @@
 .profile-account small { color:var(--muted); line-height:1.5; }
 .profile-account .profile-settings-actions { margin-top:6px; }
 
-.profile-membership { display:flex; align-items:center; justify-content:space-between; gap:18px; margin:0 18px 18px; padding:18px; border-top:1px solid var(--line); }
-.profile-membership h3 { margin:2px 0 8px; }
-.profile-membership p { margin:0; }
-.profile-membership p span { color:var(--muted); font-size:13px; }
+.profile-membership,
+.profile-credentials { display:flex; align-items:center; justify-content:space-between; gap:18px; margin:0 18px 18px; padding:18px; border-top:1px solid var(--line); }
+.profile-membership h3,
+.profile-credentials h3 { margin:2px 0 8px; }
+.profile-membership p,
+.profile-credentials p { margin:0; }
+.profile-membership p span,
+.profile-credentials p span { color:var(--muted); font-size:13px; }
 .profile-membership-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
 .profile-membership-actions .text-button { min-height:44px; }
 .profile-membership-actions #patreon-status { color:var(--muted); font-size:12px; }
@@ -191,7 +195,8 @@
 }
 
 @media (max-width:680px) {
-  .profile-membership { align-items:flex-start; flex-direction:column; }
+  .profile-membership,
+  .profile-credentials { align-items:flex-start; flex-direction:column; }
   .profile-membership-actions { justify-content:flex-start; }
 }
 

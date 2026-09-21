@@ -19,6 +19,7 @@ const result=await query(`SELECT
   to_regclass('entitlement_grants') IS NOT NULL capabilities,
   to_regclass('account_sessions') IS NOT NULL account_sessions,
   to_regclass('account_recovery_rate_limits') IS NOT NULL account_recovery_rate_limits,
+  to_regclass('account_credential_rate_limits') IS NOT NULL account_credential_rate_limits,
   EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='account_sessions' AND column_name='csrf_hash') account_session_csrf,
   to_regclass('provider_accounts') IS NOT NULL provider_accounts,
   to_regclass('provider_oauth_states') IS NOT NULL provider_oauth_states,

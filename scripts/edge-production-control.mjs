@@ -97,7 +97,12 @@ async function main(action) {
   const configPath=path.join(process.env.RUNNER_TEMP,'edge-production-wrangler.json');
   fs.writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
   run('wrangler',['deploy','--config',configPath]);
-  run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({QUOTA_KEY:quota}));
+  const credentialProof=String(process.env.PACK1_RATE_LIMIT_SECRET||'');
+  if(credentialProof.length<32)throw Error('Require the credential rate-limit secret for the production gateway.');
+  run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({
+    QUOTA_KEY:quota,
+    CREDENTIAL_PROOF_KEY:credentialProof,
+  }));
   await cf('/accounts/'+zone.account.id+'/workers/domains',{method:'PUT',body:{hostname:HOST,service:WORKER,zone_id:zone.id}});
   const after=await context();
   if(!after.domain||after.domain.service!==WORKER)throw Error('Production gateway domain verification failed.');

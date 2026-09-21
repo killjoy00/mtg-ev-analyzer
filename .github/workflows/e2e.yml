@@ -66,6 +66,8 @@ jobs:
         run: node tests/account-e2e.mjs
       - name: Run password recovery Chromium/WebKit mobile contract
         run: node tests/password-recovery-e2e.mjs
+      - name: Run credential management Chromium/WebKit mobile contract
+        run: node tests/credential-management-e2e.mjs
       - name: Verify display-ad membership suppression with intercepted requests
         run: node tests/ads-e2e.mjs
       - name: Run admin reporting browser contract

@@ -8,6 +8,9 @@ ROOT = Path(__file__).resolve().parents[1]
 BACKLOG = ROOT / ".github" / "workflows" / "build-more-sets.yml"
 CUBE = ROOT / ".github" / "workflows" / "build-powered-cube.yml"
 V4_REBUILD = ROOT / ".github" / "workflows" / "rebuild-v4-draft-run-corpus.yml"
+GITIGNORE = ROOT / ".gitignore"
+R2_SHARDS = ROOT / "scripts" / "r2_replay_shards.sh"
+REBUILD_RELEASE = ROOT / "docs" / "REBUILD-RELEASE.md"
 
 
 class DataPipelineWorkflowTests(unittest.TestCase):
@@ -83,7 +86,7 @@ class DataPipelineWorkflowTests(unittest.TestCase):
         self.assertIn("contains(github.event.head_commit.message, '[launch-v4-rebuild]')", text)
 
     def test_replay_storage_keeps_v3_and_v4_separate(self):
-        text = (ROOT / "scripts" / "r2_replay_shards.sh").read_text()
+        text = R2_SHARDS.read_text()
         self.assertIn('strong-player-colour-stage-v3', text)
         self.assertIn('replay-models/$model_version/data', text)
         self.assertIn('s3://${R2_BUCKET}/${replay_prefix}', text)
@@ -91,6 +94,55 @@ class DataPipelineWorkflowTests(unittest.TestCase):
         self.assertIn('REPLAY_SETS', text)
         self.assertIn('--delete', text)
         self.assertIn('Scoped replay set $sid has model', text)
+
+    def test_gitignored_replay_shards_have_a_durable_checkpoint_contract(self):
+        ignore = GITIGNORE.read_text()
+        workflow = V4_REBUILD.read_text()
+        helper = R2_SHARDS.read_text()
+        runbook = REBUILD_RELEASE.read_text()
+
+        # Git is deliberately not the durable store for replay shards.
+        self.assertIn("data/*/shards/", ignore)
+        self.assertIn("intentionally not committed to git", ignore)
+        self.assertIn("Git commit", runbook)
+        self.assertIn("not** a complete rebuild checkpoint", runbook)
+        self.assertIn("ephemeral", runbook)
+
+        # Every expensive stage must persist and verify its shard subset before
+        # it records the tracked-data checkpoint that lets the workflow advance.
+        stages = (
+            (
+                workflow.split("  regular_chunks:", 1)[1].split("  legacy:", 1)[0],
+                "Checkpoint regular replay shards to versioned R2",
+                "Checkpoint rebuilt environments",
+            ),
+            (
+                workflow.split("  legacy:", 1)[1].split("  powered_cube:", 1)[0],
+                "Checkpoint legacy replay shards to versioned R2",
+                "Checkpoint legacy environments",
+            ),
+            (
+                workflow.split("  powered_cube:", 1)[1].split("  finalize:", 1)[0],
+                "Checkpoint Powered Cube replay shards to versioned R2",
+                "Checkpoint Powered Cube\n",
+            ),
+        )
+        for stage, shard_checkpoint, tracked_checkpoint in stages:
+            self.assertIn("AWS_ACCESS_KEY_ID:", stage)
+            self.assertIn("R2_ENDPOINT:", stage)
+            self.assertIn("bash scripts/r2_replay_shards.sh upload", stage)
+            self.assertIn("bash scripts/r2_replay_shards.sh verify", stage)
+            self.assertLess(stage.index(shard_checkpoint), stage.index(tracked_checkpoint))
+
+        # Scoped uploads target only the rebuilt environment and require exact
+        # remote/local equality; the final fresh runner must hydrate before audit.
+        self.assertIn('s3://${R2_BUCKET}/${replay_prefix}/${sid}/shards/', helper)
+        self.assertIn('test "$remote_count" = "$local_count"', helper)
+        finalize = workflow.split("  finalize:", 1)[1]
+        self.assertLess(
+            finalize.index("Hydrate checkpointed v4 replay shards from R2"),
+            finalize.index("Verify complete v4 provenance"),
+        )
 
     def test_backlog_routes_before_shared_lock(self):
         text = BACKLOG.read_text()
