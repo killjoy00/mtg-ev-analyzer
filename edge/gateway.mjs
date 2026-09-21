@@ -1,10 +1,11 @@
 import {isIP} from 'node:net';
 import {readJson} from '../worker/request-json.mjs';
+import {PROD_ORIGINS} from '../worker/account-config.mjs';
 
 const SERVICES={legacy:'pack1api',growth:'pack1growth',draft:'draftrunapi'};
 const PROD_BRANCH='br-orange-feather-ayps8kep';
 const DEV_BRANCH='br-twilight-hill-ayffyd2b';
-const ORIGINS=new Set(['https://packone.pro','https://api.packone.pro','https://magic.planitnow.us']);
+const ORIGINS=new Set(PROD_ORIGINS);
 const COOKIE_NAMES=new Set(['__Host-pack1_account','__Secure-pack1_csrf','__Host-pack1_player']);
 const response=(status,error,headers={})=>Response.json({error},{status,headers:{'cache-control':'no-store',...headers}});
 const secret=value=>/^[a-f0-9]{64}$/.test(value||'');

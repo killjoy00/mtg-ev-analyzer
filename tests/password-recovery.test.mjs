@@ -24,7 +24,7 @@ function installFetch({providerStatus=200,attempts=1,recovery='valid'}={}) {
   const calls=[];
   globalThis.fetch=async(url,options={})=>{
     const target=String(url),body=options.body?JSON.parse(options.body):null;
-    if(target.startsWith('https://api-fixture.example/sql')) {
+    if(target.startsWith('https://api.example/sql')) {
       const sql=body.query;
       calls.push({kind:'db',sql,params:body.params});
       if(sql.includes('DELETE FROM account_recovery_rate_limits'))return dbResponse([],[],1);
