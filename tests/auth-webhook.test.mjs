@@ -229,3 +229,68 @@ test('Durable Object dedupe returns success without a second Resend call after a
   assert.deepEqual(await response.json(),{ok:true,duplicate:true});
   assert.equal(writes,0);
 });
+
+
+test('QA telemetry stores only sanitized retry fields and is hidden outside QA',async()=>{
+  let stored=[];
+  const storage={
+    get:async key=>key==='qa_telemetry'?stored:null,
+    put:async(key,value)=>{if(key==='qa_telemetry')stored=value;},
+  };
+  const telemetry=new RecoveryEventDedupe({storage},{});
+  const post=await telemetry.fetch(new Request('https://pack1.internal/telemetry',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({event_key:'abc123',delivery_attempt:'2',status:'forced_failure',total_ms:17}),
+  }));
+  assert.equal(post.status,200);
+  const get=await telemetry.fetch(new Request('https://pack1.internal/telemetry'));
+  assert.deepEqual(await get.json(),{entries:[{event_key:'abc123',delivery_attempt:'2',status:'forced_failure',total_ms:17}]});
+
+  const prod=await authWebhook(new Request('https://hook.example/qa/telemetry'),{PACK1_AUTH_ENV:'production'});
+  assert.equal(prod.status,404);
+});
+
+test('QA retry-after-send mode returns retryable failure after one successful deduped send boundary',async()=>{
+  const fixture=await signedFixture({kid:'qa-retry-kid'});
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async url=>{
+    if(String(url)==='https://auth.qa-retry.example/.well-known/jwks.json')return Response.json({keys:[fixture.jwk]});
+    throw Error('unexpected network call');
+  };
+  const telemetryEntries=[];
+  let sendCalls=0;
+  const env={
+    PACK1_AUTH_ENV:'qa',
+    PACK1_FORCE_RETRY_AFTER_SEND:'1',
+    AUTH_BASE:'https://auth.qa-retry.example',
+    RECOVERY_DEDUPE:{
+      idFromName:value=>value,
+      get:id=>({
+        fetch:async(_url,init)=>{
+          if(id==='__qa_telemetry__'){
+            telemetryEntries.push(JSON.parse(init.body));
+            return Response.json({ok:true});
+          }
+          sendCalls++;
+          return Response.json({ok:true,duplicate:sendCalls>1});
+        },
+      }),
+    },
+  };
+  try {
+    const first=await authWebhook(new Request('https://hook.example/webhook',{method:'POST',headers:fixture.headers,body:fixture.raw}),env);
+    assert.equal(first.status,503);
+    const retryHeaders=new Headers(fixture.headers);retryHeaders.set('x-neon-delivery-attempt','2');
+    const second=await authWebhook(new Request('https://hook.example/webhook',{method:'POST',headers:retryHeaders,body:fixture.raw}),env);
+    assert.equal(second.status,503);
+    assert.equal(sendCalls,2);
+    assert.equal(telemetryEntries[0].duplicate,false);
+    assert.equal(telemetryEntries[1].duplicate,true);
+    assert.equal(telemetryEntries[1].delivery_attempt,'2');
+    assert.equal('token' in telemetryEntries[0],false);
+    assert.equal('email' in telemetryEntries[0],false);
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
