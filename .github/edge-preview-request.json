@@ -1,1 +1,1 @@
-{"operation":"probe-auth-webhook","reason":"2026-09-21: Retry the isolated QA password-recovery webhook capability probe using the supported Neon CLI config path; restore QA config and remove the temporary Worker afterward."}
+{"operation":"stage-auth-webhook-probe","reason":"2026-09-21: Stage the temporary non-Neon QA Auth webhook receiver only; do not change Neon Auth configuration."}
