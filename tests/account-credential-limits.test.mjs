@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {consumeCredentialLimit,clearCredentialLimit,trustedCredentialNetwork} from '../worker/account-credential-limits.mjs';
+import {consumeCredentialLimit,clearCredentialLimit,credentialNetworkProof,trustedCredentialNetwork} from '../worker/account-credential-limits.mjs';
 
 const USER='11111111-1111-4111-8111-111111111111';
 const NETWORK='a'.repeat(64);
@@ -41,18 +41,32 @@ test('network limiter persists only a 64-hex trusted digest',async()=>{
 test('account limiter works without network configuration while sensitive network identity fails closed',async()=>{
   const {query}=fakeQuery(1);
   assert.equal((await consumeCredentialLimit(query,{authUserId:USER,purpose:'email_change_account',limit:5,seconds:3600})).limited,false);
+  const secret='b'.repeat(64);
   const request=new Request('https://origin.test/v1/account/email-change',{headers:{'x-pack1-network-id':NETWORK}});
   assert.throws(()=>trustedCredentialNetwork(request,{}),error=>error.status===503);
-  assert.equal(trustedCredentialNetwork(request,{PACK1_REQUIRE_INGRESS:'1',PACK1_INGRESS_SECRET:'b'.repeat(64)}),NETWORK);
+  assert.throws(()=>trustedCredentialNetwork(request,{PACK1_RATE_LIMIT_SECRET:secret}),error=>error.status===503);
+  const proved=new Request('https://origin.test/v1/account/email-change',{headers:{
+    'x-pack1-network-id':NETWORK,
+    'x-pack1-network-proof':credentialNetworkProof(NETWORK,secret),
+  }});
+  assert.equal(trustedCredentialNetwork(proved,{PACK1_RATE_LIMIT_SECRET:secret}),NETWORK);
 });
 
-test('spoofable network headers cannot select the persisted credential network identity',()=>{
+test('spoofable client network headers and forged internal digests cannot select credential identity',()=>{
+  const secret='c'.repeat(64);
+  const proof=credentialNetworkProof(NETWORK,secret);
   const request=new Request('https://origin.test/v1/account/password-change',{headers:{
     'x-pack1-network-id':NETWORK,
+    'x-pack1-network-proof':proof,
     'x-forwarded-for':'203.0.113.99',
     'cf-connecting-ip':'203.0.113.100',
   }});
-  assert.equal(trustedCredentialNetwork(request,{PACK1_REQUIRE_INGRESS:'1',PACK1_INGRESS_SECRET:'c'.repeat(64)}),NETWORK);
+  assert.equal(trustedCredentialNetwork(request,{PACK1_RATE_LIMIT_SECRET:secret}),NETWORK);
+  const forged=new Request('https://origin.test/v1/account/password-change',{headers:{
+    'x-pack1-network-id':'d'.repeat(64),
+    'x-pack1-network-proof':proof,
+  }});
+  assert.throws(()=>trustedCredentialNetwork(forged,{PACK1_RATE_LIMIT_SECRET:secret}),error=>error.status===503);
 });
 
 test('only successful callers explicitly clear a selected limiter bucket',async()=>{
