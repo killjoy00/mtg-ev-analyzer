@@ -25,32 +25,30 @@ async function call(path,{body,cookie}={}) {
   return {response,data,cookie:cookies(response)};
 }
 
-test('179C Gate 1 capability probe: application-facing delete-user on isolated QA',{skip:!enabled,timeout:30000},async()=>{
-  const stamp=Date.now();
-  const email=`qa-179c-delete-${stamp}@example.com`;
-  const password='Qa1!'+randomBytes(20).toString('base64url');
+test('179C0 verification cleanup proof on isolated QA',{skip:!enabled,timeout:240000},async()=>{
+  const adminEmail='qa-179c0-admin-20260921@example.com';
+  const victimEmail='qa-179c0-victim-20260921@example.com';
+  const adminPassword='Qa1!'+randomBytes(20).toString('base64url');
+  const victimPassword='Qa1!'+randomBytes(20).toString('base64url');
 
-  const signup=await call('/sign-up/email',{body:{name:'QA 179C Delete Probe',email,password}});
-  assert.equal(signup.response.status,200);
-  const userId=String(signup.data?.user?.id||'');
-  assert.match(userId,/^[0-9a-f-]{36}$/i);
+  const admin=await call('/sign-up/email',{body:{name:'QA 179C0 Admin',email:adminEmail,password:adminPassword}});
+  assert.equal(admin.response.status,200);
+  const victim=await call('/sign-up/email',{body:{name:'QA 179C0 Victim',email:victimEmail,password:victimPassword}});
+  assert.equal(victim.response.status,200);
+  const adminId=String(admin.data?.user?.id||'');
+  const victimId=String(victim.data?.user?.id||'');
+  assert.match(adminId,/^[0-9a-f-]{36}$/i);
+  assert.match(victimId,/^[0-9a-f-]{36}$/i);
 
-  const deleted=await call('/delete-user',{cookie:signup.cookie,body:{password}});
-  console.log(JSON.stringify({
-    label:'qa-179c-delete-capability',
-    userId,
-    deleteStatus:deleted.response.status,
-    deleteOk:deleted.response.ok,
-    code:deleted.data?.code||null,
-    message:typeof deleted.data?.message==='string'?deleted.data.message.slice(0,160):null,
-    error:typeof deleted.data?.error==='string'?deleted.data.error.slice(0,160):null,
-  }));
+  const reset=await call('/request-password-reset',{body:{email:victimEmail,redirectTo:'http://localhost:4173/reset-password/'}});
+  assert.equal(reset.response.status,200);
+  console.log(JSON.stringify({label:'qa-179c0-ready-for-role-promotion',adminId,victimId,adminEmail,victimEmail,resetStatus:reset.response.status}));
 
-  if(deleted.response.ok) {
-    const signin=await call('/sign-in/email',{body:{email,password,rememberMe:true}});
-    console.log(JSON.stringify({
-      label:'qa-179c-delete-postcheck',
-      signinAfterDeleteStatus:signin.response.status,
-    }));
-  }
+  await new Promise(resolve=>setTimeout(resolve,120000));
+
+  const signin=await call('/sign-in/email',{body:{email:adminEmail,password:adminPassword,rememberMe:true}});
+  assert.equal(signin.response.status,200);
+  const removed=await call('/admin/remove-user',{cookie:signin.cookie,body:{userId:victimId}});
+  console.log(JSON.stringify({label:'qa-179c0-remove-user',victimId,status:removed.response.status,ok:removed.response.ok,code:removed.data?.code||null,message:removed.data?.message||removed.data?.error||null}));
+  assert.equal(removed.response.status,200);
 });
