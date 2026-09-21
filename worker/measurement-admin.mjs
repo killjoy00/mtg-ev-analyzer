@@ -48,15 +48,9 @@ export async function handleAdmin(request,query,readJson) {
     const body=await readJson(request);
     if(!/^[a-f0-9]{64}$/.test(body.invite||''))fail('Invalid invitation.',403);
     const hash=createHash('sha256').update(body.invite).digest('hex');
-    const {rows}=await query(`WITH identity_lock AS MATERIALIZED (
-        SELECT pg_advisory_xact_lock(hashtextextended($2::text,0))
-      ), identity_allowed AS MATERIALIZED (
-        SELECT 1 FROM identity_lock WHERE NOT EXISTS (
-          SELECT 1 FROM account_deletion_operations
-          WHERE auth_user_id=$2::uuid
-            AND state IN ('pending','app_cleanup_complete','provider_delete_pending','provider_deleted','complete','operator_review')
-        )
-      ), already AS (
+    const {rows}=await query(`WITH identity_allowed AS MATERIALIZED (
+      SELECT 1 WHERE pack1_identity_attachment_allowed($2::uuid)
+    ), already AS (
         SELECT i.redeemed_by FROM pack1_admin_invites i JOIN pack1_admins a ON a.auth_user_id=i.redeemed_by
         WHERE i.token_hash=$1 AND i.redeemed_by=$2::uuid AND EXISTS(SELECT 1 FROM identity_allowed)
       ), claimed AS (
