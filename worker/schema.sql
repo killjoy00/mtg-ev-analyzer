@@ -70,7 +70,10 @@ CREATE TABLE IF NOT EXISTS account_credential_rate_limits (
   auth_user_id uuid NOT NULL,
   purpose text NOT NULL CHECK (purpose IN (
     'current_password',
-    'password_change_network'
+    'password_change_network',
+    'account_delete_verify',
+    'account_delete_network',
+    'account_delete_init'
   )),
   network_hash text NOT NULL DEFAULT '' CHECK (
     network_hash = '' OR network_hash ~ '^[a-f0-9]{64}
