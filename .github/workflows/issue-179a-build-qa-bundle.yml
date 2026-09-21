@@ -1,0 +1,37 @@
+name: Issue 179A build QA bundle
+
+on:
+  push:
+    branches:
+      - ops/179a-recovery-bundle
+
+permissions:
+  contents: read
+
+jobs:
+  build-bundle:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      FEATURE_COMMIT: 13a66cd1d97db8e1a571b0bcd4d6a03581b38fe1
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install pinned bundler
+        run: npm install -g esbuild@0.28.2
+
+      - name: Build reviewed Neon function bundles
+        run: node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$FEATURE_COMMIT"
+
+      - name: Emit Pack One growth bundle for connected QA deploy
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'PACK1GROWTH_B64_BEGIN'
+          base64 -w0 "$RUNNER_TEMP/pack1-bundles/pack1growth.zip" | fold -w 4096
+          echo
+          echo 'PACK1GROWTH_B64_END'
