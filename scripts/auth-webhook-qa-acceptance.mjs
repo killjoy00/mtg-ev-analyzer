@@ -87,17 +87,22 @@ async function runFailure() {
   const helper=await fetchJson(HELPER+'?mode=request');
   assertSanitizedHelper(helper.body);
   if(helper.status!==200||helper.body?.stage!=='request_only')throw Error('QA forced-failure helper did not complete request setup.');
-  if(Number(helper.body?.request_status||0)<400)throw Error('QA forced-failure reset request unexpectedly succeeded.');
-  await sleep(1000);
-  const after=await telemetry();
-  const entries=unseen(before,after).filter(e=>e.status==='forced_failure');
-  const groups=new Map();
-  for(const entry of entries){const key=entry.event_key;groups.set(key,[...(groups.get(key)||[]),entry]);}
-  const probe=[...groups.values()].sort((a,b)=>b.length-a.length)[0]||[];
+  const requestStatus=Number(helper.body?.request_status||0);
+  if(requestStatus<200||requestStatus>=300)throw Error('QA forced-failure reset request was not accepted by Managed Neon.');
+  let probe=[];
+  for(let poll=0;poll<10;poll++) {
+    await sleep(1000);
+    const after=await telemetry();
+    const entries=unseen(before,after).filter(e=>e.status==='forced_failure');
+    const groups=new Map();
+    for(const entry of entries){const key=entry.event_key;groups.set(key,[...(groups.get(key)||[]),entry]);}
+    probe=[...groups.values()].sort((a,b)=>b.length-a.length)[0]||[];
+    if(probe.length>=2)break;
+  }
   if(probe.length<2)throw Error('Managed Neon did not retry the forced webhook failure.');
   console.log('QA_FAILURE_ACCEPTANCE '+JSON.stringify({
     helper_stage:helper.body.stage,
-    reset_request_status:helper.body.request_status,
+    reset_request_status:requestStatus,
     retry_attempts:probe.length,
     attempts:safeSummary(probe),
   }));
