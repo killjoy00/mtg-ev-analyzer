@@ -3,8 +3,6 @@ import {createHmac,timingSafeEqual} from 'node:crypto';
 const PURPOSES=new Set([
   'current_password',
   'password_change_network',
-  'email_change_account',
-  'email_change_network',
 ]);
 const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DIGEST=/^[a-f0-9]{64}$/;
