@@ -4,10 +4,12 @@ import fs from 'node:fs';
 
 import {
   beginDeletion,
+  cleanupPackOne,
   deletedPlayerTombstone,
   deletionEnabled,
   deletionRecoveryKey,
   finishProviderPhase,
+  removeProviderUser,
   stuckDeletion,
   sweepExpiredVerification,
   verificationSweepEnabled,
@@ -72,6 +74,65 @@ test('verification sweep is expired-only, bounded and idempotent-shaped',async()
   assert.match(seen,/ORDER BY "expiresAt",id/);
   assert.match(seen,/LIMIT \$1::int/);
   assert.doesNotMatch(seen,/neon_auth\."user"|neon_auth\.account|neon_auth\.session/);
+});
+
+test('Pack One cleanup hard-deletes attributable corpus events and preserves retained opponent score/outcome',async()=>{
+  const calls=[];
+  const current={operation_id:OP,auth_user_id:AUTH,player_id:PLAYER,state:'pending',attempts:0};
+  const query=async(sql,params=[])=>{
+    calls.push({sql,params});
+    if(sql.includes('FROM account_deletion_operations WHERE operation_id='))return {rows:[current],rowCount:1};
+    if(sql.startsWith('UPDATE account_deletion_operations'))return {rows:[{...current,state:'provider_delete_pending'}],rowCount:1};
+    return {rows:[],rowCount:1};
+  };
+  const result=await cleanupPackOne(query,current);
+  assert.equal(result.state,'provider_delete_pending');
+  const text=calls.map(row=>row.sql).join('\n');
+  assert.match(text,/DELETE FROM corpus_status_events WHERE auth_user_id=/);
+  assert.doesNotMatch(text,/UPDATE corpus_status_events SET auth_user_id=NULL/);
+  const retained=calls.find(row=>row.sql.includes('UPDATE game_results SET challenge_id=NULL,opponent_name=NULL'))?.sql||'';
+  assert.ok(retained,'retained cross-player result is scrubbed');
+  assert.doesNotMatch(retained,/opponent_score\s*=|outcome\s*=/);
+});
+
+test('provider deletion refuses a Pack One-linked service principal before remove-user',async()=>{
+  const originalFetch=globalThis.fetch;
+  const service='44444444-4444-4444-8444-444444444444';
+  const paths=[];
+  globalThis.fetch=async url=>{
+    const path=new URL(url).pathname; paths.push(path);
+    if(path.endsWith('/sign-in/email'))return new Response(JSON.stringify({user:{id:service}}),{status:200,headers:{'content-type':'application/json','set-cookie':'better-auth.session_token=secret; Path=/; HttpOnly'}});
+    if(path.endsWith('/sign-out'))return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
+    if(path.endsWith('/admin/remove-user'))return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
+    throw Error('unexpected provider path');
+  };
+  try {
+    const result=await removeProviderUser({
+      authBase:'https://auth.example.test',
+      authUserId:AUTH,
+      env:{PACK1_DELETION_ADMIN_EMAIL:'delete-admin@example.test',PACK1_DELETION_ADMIN_PASSWORD:'x'.repeat(32)},
+      validateServicePrincipal:async id=>{assert.equal(id,service);return false;},
+    });
+    assert.deepEqual(result,{kind:'operator_review',code:'PROVIDER_ADMIN_LINKED'});
+    assert.equal(paths.includes('/admin/remove-user'),false,'linked service principal must never reach provider deletion');
+  } finally {globalThis.fetch=originalFetch;}
+});
+
+test('provider deletion fails closed when service-principal Pack One isolation cannot be checked',async()=>{
+  const originalFetch=globalThis.fetch;
+  const service='44444444-4444-4444-8444-444444444444';
+  globalThis.fetch=async url=>{
+    const path=new URL(url).pathname;
+    if(path.endsWith('/sign-in/email'))return new Response(JSON.stringify({user:{id:service}}),{status:200,headers:{'content-type':'application/json','set-cookie':'better-auth.session_token=secret; Path=/; HttpOnly'}});
+    return new Response('{}',{status:200,headers:{'content-type':'application/json'}});
+  };
+  try {
+    const result=await removeProviderUser({
+      authBase:'https://auth.example.test',authUserId:AUTH,
+      env:{PACK1_DELETION_ADMIN_EMAIL:'delete-admin@example.test',PACK1_DELETION_ADMIN_PASSWORD:'x'.repeat(32)},
+    });
+    assert.deepEqual(result,{kind:'operator_review',code:'PROVIDER_ADMIN_LINK_POLICY'});
+  } finally {globalThis.fetch=originalFetch;}
 });
 
 test('provider not-found is success only from provider-delete-pending',async()=>{
