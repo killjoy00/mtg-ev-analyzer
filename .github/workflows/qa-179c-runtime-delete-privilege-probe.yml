@@ -54,9 +54,17 @@ jobs:
           import {createHmac} from 'node:crypto';
           const proof=createHmac('sha256',process.env.PACK1_RATE_LIMIT_SECRET)
             .update('179c1-runtime-delete-privilege-probe-v1').digest('hex');
-          const response=await fetch(process.env.PROBE_URL,{method:'POST',headers:{'x-pack1-probe-proof':proof},signal:AbortSignal.timeout(30000)});
-          const data=await response.json();
-          console.log(JSON.stringify({status:response.status,ok:data.ok===true,delete_row_count:data.delete_row_count,before_count:data.before_count,after_count:data.after_count,code:data.code||null}));
-          if(!response.ok||data.ok!==true||data.delete_row_count!==0||data.before_count!==data.after_count)
+          let last=null;
+          for(let attempt=1;attempt<=12;attempt++) {
+            const response=await fetch(process.env.PROBE_URL,{method:'POST',headers:{'x-pack1-probe-proof':proof},signal:AbortSignal.timeout(30000)});
+            const data=await response.json().catch(()=>({}));
+            last={status:response.status,data};
+            if(response.ok&&data.ok===true)break;
+            if(data.code==='INSUFFICIENT_PRIVILEGE')break;
+            await new Promise(resolve=>setTimeout(resolve,3000));
+          }
+          const {status,data}=last;
+          console.log(JSON.stringify({status,ok:data.ok===true,delete_row_count:data.delete_row_count,before_count:data.before_count,after_count:data.after_count,code:data.code||null}));
+          if(status!==200||data.ok!==true||data.delete_row_count!==0||data.before_count!==data.after_count)
             process.exit(1);
           NODE
