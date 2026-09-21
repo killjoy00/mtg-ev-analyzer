@@ -7,11 +7,10 @@ from build_verified_trophy_corpus import prune_cube_reroll_dead_ends
 
 
 def puzzle(pid, source, rating, pick=4):
-    top = 0.5
+    top = 0.6
     second = top * rating / 100
-    remaining = max(0.0, 1 - top - second)
-    third = remaining * 0.6
-    fourth = remaining - third
+    third = min(0.05, second * 0.5)
+    fourth = min(0.04, second * 0.4)
     cards = [
         {'id': f'{pid}-a', 'name': 'A', 'model_probability': top},
         {'id': f'{pid}-b', 'name': 'B', 'model_probability': second},
