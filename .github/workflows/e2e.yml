@@ -22,6 +22,13 @@ jobs:
       AWS_DEFAULT_REGION: auto
     steps:
       - uses: actions/checkout@v4
+      - name: Phase 3 done-check greps
+        run: |
+          git grep -n "Sign In With Google" -- '*.mjs' '*.html' tests/ || true
+          git grep -n "account-columns" -- growth.mjs || true
+          git grep -n "renderMyProfile" -- growth.mjs || true
+          git grep -n "account-signin .form-error" -- growth.mjs || true
+          git grep -n "source" -- draft-run-product.mjs | grep run-career || true
       - uses: actions/setup-node@v4
         with:
           node-version: 24
