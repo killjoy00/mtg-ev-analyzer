@@ -183,7 +183,7 @@ test('public gateway allows deletion but not maintenance endpoint',()=>{
 
 test('maintenance workflow has schedule, dispatch, concurrency and OIDC',()=>{
   const flow=fs.readFileSync('.github/workflows/account-deletion-maintenance.yml','utf8');
-  assert.match(flow,/cron: '\*\/10 \* \* \* \*'/);
+  assert.match(flow,/cron: '9,19,29,39,49,59 \* \* \* \*'/);
   assert.match(flow,/workflow_dispatch/);
   assert.match(flow,/id-token: write/);
   assert.match(flow,/group: pack1-account-deletion-maintenance/);
