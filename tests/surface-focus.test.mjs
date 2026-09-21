@@ -72,5 +72,6 @@ test('profile CSS keeps one base rule for previously layered selectors', async (
   ]) {
     assert.equal(base.split(selector + ' {').length - 1, 1, selector + ' should have one base rule');
   }
-  assert.doesNotMatch(css, /linear-gradient/);
+  assert.doesNotMatch(base, /linear-gradient/);
+  assert.match(css, /\.my-membership-card\s*\{[^}]*linear-gradient/,'My Pack One may use the approved membership-card gradient without reintroducing gradients to legacy profile surfaces');
 });

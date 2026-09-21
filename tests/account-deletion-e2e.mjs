@@ -59,6 +59,12 @@ async function installApi(page,{password=true,google=false,result='accepted'}={}
   return ()=>({deleteBody,postDeletePlayerSessions});
 }
 
+async function openAccountTab(page) {
+  await page.locator('.my-pack-one-page').waitFor();
+  await page.locator('#profile-account-tab').click();
+  await page.locator('#profile-account-panel').waitFor();
+}
+
 async function submitDeletion(page) {
   const form=page.locator('#account-delete');
   await form.waitFor();
@@ -76,6 +82,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       const errors=[];page.on('pageerror',error=>errors.push(error.message));
       const deleteBody=await installApi(page,{result:'accepted'});
       await page.goto(base+'/tests/credential-management-harness.html');
+      await openAccountTab(page);
       await page.locator('#account-delete').waitFor();
       assert.match(await page.locator('.profile-danger').textContent(),/server-side recovery finishes the irreversible operation/i);
       await submitDeletion(page);
@@ -104,6 +111,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       const page=await browser.newPage({viewport:{width:390,height:844}});
       const deleteBody=await installApi(page,{result:'complete'});
       await page.goto(base+'/tests/credential-management-harness.html');
+      await openAccountTab(page);
       await submitDeletion(page);
       await page.waitForURL('**/?account=deleted');
       await page.getByText('Your Pack One account has been deleted.').waitFor();
@@ -117,6 +125,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       const page=await browser.newPage({viewport:{width:390,height:844}});
       await installApi(page,{password:false,google:true});
       await page.goto(base+'/tests/credential-management-harness.html');
+      await openAccountTab(page);
       await page.getByText('Deletion is temporarily unavailable for Google-only accounts.').waitFor();
       assert.equal(await page.locator('#account-delete').count(),0);
       assert.equal(await page.getByRole('button',{name:'Delete account'}).isDisabled(),true);
