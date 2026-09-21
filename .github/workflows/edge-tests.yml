@@ -40,3 +40,5 @@ jobs:
           node tests/edge-runtime.mjs "$RUNNER_TEMP/gateway.mjs"
       - name: Validate Cloudflare deployment configuration
         run: "$RUNNER_TEMP/edge-tools/node_modules/.bin/wrangler deploy --config edge/wrangler.json --dry-run --outdir $RUNNER_TEMP/edge-dry-run"
+      - name: Validate recovery webhook Worker deployment configuration
+        run: "$RUNNER_TEMP/edge-tools/node_modules/.bin/wrangler deploy --config edge/auth-webhook-wrangler.json --dry-run --outdir $RUNNER_TEMP/auth-webhook-dry-run"
