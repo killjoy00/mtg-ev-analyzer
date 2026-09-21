@@ -37,7 +37,7 @@ assert.match(howTo, /class="topbar"/);
 assert.match(howTo, />Daily Run<\/a>/);
 assert.match(howTo, />Leaders<\/a>/);
 assert.match(howTo, />How To Play\?<\/a>/);
-assert.match(howTo, /id="account-nav" href="\/\?account=1">Account<\/a>/);
+assert.match(howTo, /id="account-nav" href="\/\?account=1">Sign in<\/a>/);
 assert.match(howTo, /<h2>Scoring<\/h2>/);
 assert.match(howTo, /href="\/scoring\/">View scoring<\/a>/);
 assert.match(howTo, /<h2>Method<\/h2>/);
@@ -70,7 +70,7 @@ for (const path of staticTopbarPages) {
   assert.match(html, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/, `${path} needs Daily Run navigation`);
   assert.match(html, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, `${path} needs Leaders navigation`);
   assert.match(html, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/, `${path} needs How To Play navigation`);
-  assert.match(html, /id="account-nav" href="\/\?account=1">Account<\/a>/, `${path} needs Account navigation`);
+  assert.match(html, /id="account-nav" href="\/\?account=1">Sign in<\/a>/, `${path} needs Sign in navigation`);
   assert.doesNotMatch(html, /class="site-header"|class="admin-brand"/, `${path} must not use a legacy top-level header`);
 }
 for (const path of ['about/index.html','contact/index.html','privacy/index.html','terms/index.html']) {
