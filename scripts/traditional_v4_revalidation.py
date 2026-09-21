@@ -131,8 +131,12 @@ def frozen_manifest(frozen: Path, sid: str) -> dict:
     if MODEL != ISOLATED_MODEL_VERSION:
         raise AssertionError("Research model identity differs from production isolated model constant")
     puzzle_path = frozen / sid / "puzzles.jsonl.gz"
-    if digest(puzzle_path) != manifest.get("puzzle_file_sha256"):
-        raise ValueError(f"{sid}: pinned v8 puzzle checksum mismatch")
+    reference_path = frozen / sid / "reference.jsonl.gz"
+    if puzzle_path.exists():
+        if digest(puzzle_path) != manifest.get("puzzle_file_sha256"):
+            raise ValueError(f"{sid}: pinned v8 puzzle checksum mismatch")
+    elif not reference_path.exists():
+        raise ValueError(f"{sid}: pinned v8 evidence has neither full puzzles nor reference sample")
     manifest["_manifest_sha256"] = digest(manifest_path)
     return manifest
 
@@ -371,7 +375,9 @@ def parity_with_v8(sid: str, frozen: Path, built: dict):
     first, last = serving_window(sid)
     parity = 0
     known = metadata(ROOT)
-    puzzle_path = frozen / sid / "puzzles.jsonl.gz"
+    puzzle_path = frozen / sid / "reference.jsonl.gz"
+    if not puzzle_path.exists():
+        puzzle_path = frozen / sid / "puzzles.jsonl.gz"
     with gzip.open(puzzle_path, "rt") as handle:
         for line in handle:
             old = json.loads(line)
@@ -730,6 +736,60 @@ def measure(sid: str, directory: Path, frozen: Path):
     }), flush=True)
 
 
+def prepare_pins(source: Path, output: Path, sample_size: int = 256):
+    """Extract immutable per-set v8 provenance and parity samples from the pinned artifact."""
+    source_catalog = json.loads((source / "catalog.json").read_text())
+    if (
+        source_catalog.get("complete") is not True
+        or source_catalog.get("errors")
+        or source_catalog.get("corpus_version") != PARENT
+    ):
+        raise ValueError("Source artifact is not the complete pinned v8 import")
+    output.mkdir(parents=True, exist_ok=True)
+    pin_catalog = {
+        **source_catalog,
+        "production_run_id": PINNED_V8_RUN,
+        "production_artifact_id": PINNED_V8_ARTIFACT,
+        "reference_sample_size": sample_size,
+    }
+    atomic_json(output / "catalog.json", pin_catalog)
+    for sid in SETS:
+        src_dir = source / sid
+        dest = output / sid
+        dest.mkdir(parents=True, exist_ok=True)
+        manifest = json.loads((src_dir / "manifest.json").read_text())
+        if manifest.get("corpus_version") != PARENT or manifest.get("model_version") != MODEL:
+            raise ValueError(f"{sid}: production artifact is not v8/v4")
+        (dest / "manifest.json").write_bytes((src_dir / "manifest.json").read_bytes())
+        candidates = []
+        first, last = serving_window(sid)
+        with gzip.open(src_dir / "puzzles.jsonl.gz", "rt") as handle:
+            for line in handle:
+                row = json.loads(line)
+                if first <= int(row["pick_number"]) <= last:
+                    candidates.append(row)
+        if len(candidates) < sample_size:
+            raise ValueError(f"{sid}: only {len(candidates)} v8 serving decisions available for parity")
+        candidates.sort(key=lambda row: row["puzzle_id"])
+        sample = candidates[:sample_size]
+        write_gzip_jsonl(dest / "reference.jsonl.gz", sample)
+        atomic_json(dest / "reference.json", {
+            "set": sid,
+            "production_run_id": PINNED_V8_RUN,
+            "production_artifact_id": PINNED_V8_ARTIFACT,
+            "production_puzzle_sha256": manifest["puzzle_file_sha256"],
+            "reference_decisions": len(sample),
+            "reference_sha256": digest(dest / "reference.jsonl.gz"),
+        })
+    print(json.dumps({
+        "prepared": True,
+        "sets": len(SETS),
+        "model": MODEL,
+        "parent": PARENT,
+        "sample_per_set": sample_size,
+    }), flush=True)
+
+
 def format_training_audit():
     source_path = ROOT / "scripts" / "format_research.py"
     eval_path = ROOT / "scripts" / "eval_model.py"
@@ -995,6 +1055,8 @@ def main():
         "--frozen", type=Path, default=ROOT / "generated/frozen-v8"
     )
     parser.add_argument("--summarize", type=Path, nargs="+")
+    parser.add_argument("--prepare-pins", type=Path)
+    parser.add_argument("--pins-out", type=Path)
     parser.add_argument("--previous", type=Path)
     parser.add_argument("--previous-cube", type=Path)
     parser.add_argument(
@@ -1006,7 +1068,11 @@ def main():
         default=ROOT / "generated/traditional-v4-revalidation/REPORT.md",
     )
     args = parser.parse_args()
-    if args.summarize:
+    if args.prepare_pins:
+        if not args.pins_out:
+            parser.error("--pins-out is required with --prepare-pins")
+        prepare_pins(args.prepare_pins, args.pins_out)
+    elif args.summarize:
         if not args.previous:
             parser.error("--previous is required with --summarize")
         summarize(
