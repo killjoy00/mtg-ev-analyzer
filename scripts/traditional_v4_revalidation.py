@@ -13,6 +13,8 @@ import gzip
 import hashlib
 import json
 import time
+import urllib.error
+import urllib.parse
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 
@@ -45,7 +47,6 @@ from import_all_trophies import (
     eligible_trophies,
     encoded,
     metadata,
-    resolve_images,
     rows,
     scan_metadata,
     trajectory,
@@ -55,6 +56,7 @@ from traditional_puzzles import THRESHOLDS, compare, record
 from set_policy import corpus_version
 import import_all_trophies as trophy_import
 from run_import_all_trophies import resilient_request
+from fetch_card_metadata import compact_card, aliases
 
 EVENTS = ("PremierDraft", "TradDraft")
 CUBE = "powered-cube"
@@ -346,6 +348,50 @@ def grader_for(event: str, did: str, built: dict):
     return built["models"][fold_number]
 
 
+def resolve_research_images(names, known, cache_path: Path):
+    """Resolve only image absence, matching the frozen Phase 2 usability gate.
+
+    The production resolver also refreshes rows missing type_line. Type lines are
+    optional display metadata and were never part of this experiment's source
+    usability gate, so requesting them here adds rate-limit risk without changing
+    the predeclared decision rule.
+    """
+    cache = (
+        {key: value for key, value in json.loads(cache_path.read_text()).items() if value}
+        if cache_path.exists() else {}
+    )
+    known = {**known, **cache}
+
+    def research_request(url, method="GET"):
+        # Combined with one research job's own pacing and a bounded workflow
+        # matrix, this stays below the public API request rate. Transient 429/5xx
+        # responses still receive the importer's bounded retry behavior.
+        time.sleep(.30)
+        return resilient_request(url, method)
+
+    for name in sorted(
+        name for name in names
+        if not known.get(name, {}).get("image_url", "").startswith("https://")
+    ):
+        time.sleep(.15)
+        try:
+            url = "https://api.scryfall.com/cards/named?exact=" + urllib.parse.quote(name)
+            with research_request(url) as response:
+                card = json.load(response)
+            value = compact_card(card) if name in set(aliases(card)) else None
+            if value and value.get("image_url", "").startswith("https://"):
+                known[name] = value
+                cache[name] = value
+            else:
+                cache[name] = None
+        except urllib.error.HTTPError as exc:
+            if exc.code != 404:
+                raise
+            cache[name] = None
+        atomic_json(cache_path, cache)
+    return known
+
+
 def interesting(records):
     kept = []
     for row in records:
@@ -479,14 +525,7 @@ def measure(sid: str, directory: Path, frozen: Path):
         for example in examples
         for card in (*example.candidates, *example.pool)
     }
-    def research_request(url, method="GET"):
-        # resolve_images already sleeps 150 ms. This additional shared throttle
-        # keeps concurrent research jobs below Scryfall's public request rate,
-        # while resilient_request handles transient 429/5xx responses.
-        time.sleep(.30)
-        return resilient_request(url, method)
-    trophy_import.request = research_request
-    known = resolve_images(names, known, directory / "images.json")
+    known = resolve_research_images(names, known, directory / "images.json")
 
     records = []
     puzzles = []
