@@ -15,6 +15,12 @@ function takeAuthFlow() {
 }
 function authCompleted(data) {return firstPartyAuthEnabled()?Boolean(data?.user):Boolean(data?.token);}
 
+function syncAccountNav(signedIn=Boolean(currentAccount?.user)) {
+  const nav=document.querySelector('#account-nav');
+  if(nav)nav.textContent=signedIn?'My Pack One':'Sign in';
+}
+export function accountSignedIn() {return Boolean(currentAccount?.user);}
+
 function formMarkup(kind) {
   return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="email"></label>${kind==='signup'?'<label>Display name<input required name="name" minlength="2" maxlength="24" autocomplete="nickname"></label>':''}<label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p class="form-error" aria-live="polite"></p></form>`;
 }
@@ -67,6 +73,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   const app=document.querySelector('#app'); if(!app) return;
   try {
     currentAccount=await getAuthSession();
+    syncAccountNav(Boolean(currentAccount?.user));
   } catch(error) {
     renderAccountError(app,error,()=>renderAccount({intent,source}));
     return;
@@ -163,6 +170,7 @@ export async function installGrowthLayer() {
   const deletionState=new URLSearchParams(location.search).get('account');
   if(renderDeletionState(deletionState))return;
   currentAccount = await getAuthSession().catch(()=>null);
+  syncAccountNav(Boolean(currentAccount?.user));
   // Authentication/account-establishment flows link explicitly. Ordinary page
   // bootstrap must only observe the existing account session: calling
   // link-browser here rotates identity cookies and defeats session stability.
