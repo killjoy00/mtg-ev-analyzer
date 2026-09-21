@@ -23,7 +23,7 @@ try {
  await page.goto('https://packone.pro',{waitUntil:'domcontentloaded'});await page.locator('.daily-home-game a').first().waitFor();
  await page.screenshot({path:'artifacts/production/home-mobile.png',fullPage:true});
  for(const [index,environment] of ['mixed','powered-cube','latest'].entries()) {
-  t=Date.now();const startResponse=page.waitForResponse(r=>new URL(r.url()).pathname==='/v1/runs'&&r.request().method()==='POST');
+  t=Date.now();const startResponse=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/v1/runs')&&r.request().method()==='POST');
   await page.locator(`[data-environment="${environment}"] a`).click();
   let state=await (await startResponse).json();await page.locator('.run-cards').waitFor();
   metrics.push({action:environment+'_first_pack',ms:Date.now()-t});
