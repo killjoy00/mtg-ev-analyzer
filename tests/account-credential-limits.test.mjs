@@ -40,12 +40,12 @@ test('network limiter persists only a 64-hex trusted digest',async()=>{
 
 test('account limiter works without network configuration while sensitive network identity fails closed',async()=>{
   const {query}=fakeQuery(1);
-  assert.equal((await consumeCredentialLimit(query,{authUserId:USER,purpose:'email_change_account',limit:5,seconds:3600})).limited,false);
+  assert.equal((await consumeCredentialLimit(query,{authUserId:USER,purpose:'current_password',limit:5,seconds:900})).limited,false);
   const secret='b'.repeat(64);
-  const request=new Request('https://origin.test/v1/account/email-change',{headers:{'x-pack1-network-id':NETWORK}});
+  const request=new Request('https://origin.test/v1/account/password-change',{headers:{'x-pack1-network-id':NETWORK}});
   assert.throws(()=>trustedCredentialNetwork(request,{}),error=>error.status===503);
   assert.throws(()=>trustedCredentialNetwork(request,{PACK1_RATE_LIMIT_SECRET:secret}),error=>error.status===503);
-  const proved=new Request('https://origin.test/v1/account/email-change',{headers:{
+  const proved=new Request('https://origin.test/v1/account/password-change',{headers:{
     'x-pack1-network-id':NETWORK,
     'x-pack1-network-proof':credentialNetworkProof(NETWORK,secret),
   }});
@@ -91,7 +91,7 @@ test('migration 0030 is applied in both secure-auth release schema stages and ve
 test('gateway allowlist and production control preserve authenticated credential network identity',()=>{
   const gateway=readFileSync('edge/gateway.mjs','utf8');
   const control=readFileSync('scripts/edge-production-control.mjs','utf8');
-  for(const route of ['/v1/account/password-change','/v1/account/email-change'])assert.match(gateway,new RegExp(route.replaceAll('/','\\/')));
+  assert.match(gateway,/\/v1\/account\/password-change/);
   assert.match(gateway,/CF-Connecting-IP|cf-connecting-ip/i);
   assert.match(gateway,/CREDENTIAL_PROOF_KEY/);
   assert.match(gateway,/x-pack1-network-proof/);
@@ -103,6 +103,6 @@ test('request-integrity docs distinguish signed-in credentials from signed-out r
   const docs=readFileSync('docs/REQUEST-INTEGRITY.md','utf8');
   assert.match(docs,/first-party account session/);
   assert.match(docs,/allowLegacy:false/);
-  assert.match(docs,/shared by every credential route/);
-  assert.match(docs,/Provider capability gate/);
+  assert.match(docs,/current-password failure budget/);
+  assert.doesNotMatch(docs,/Provider capability gate/);
 });
