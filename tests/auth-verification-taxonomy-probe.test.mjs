@@ -30,6 +30,12 @@ test('verification taxonomy probe is pinned to one disposable non-serving Pack O
   assert.match(source,/delivered@resend\.dev/);
   assert.doesNotMatch(source,/await probeMode\('otp'/);
   assert.match(source,/await probeMode\('link'/);
+  assert.doesNotMatch(source,/refusing to overwrite an active configuration/);
+  assert.match(source,/originalWebhook\.enabled/);
+  assert.match(source,/originalWebhook\.enabled_events\.includes\('send\.magic_link'\)/);
+  assert.match(source,/pack1-authhook\.killjoy00\.workers\.dev\/webhook/);
+  assert.match(source,/webhookChanged=true;[\s\S]{0,80}webhookUpdate\(neon/);
+  assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
 });
 
 test('verification state fallback is read-only and never emits credential contents',()=>{
