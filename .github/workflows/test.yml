@@ -60,3 +60,14 @@ jobs:
           [[ "$DELETION_ADMIN_EMAIL_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is not provisioned.'; exit 1; }
           [[ "$DELETION_ADMIN_PASSWORD_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is not provisioned.'; exit 1; }
 
+      - name: Execute reviewed production localhost hardening
+        if: github.event_name == 'push' && contains(github.event.head_commit.modified, '.github/auth-localhost-hardening-request.json')
+        shell: bash
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          NEON_BIN: ${{ runner.temp }}/neon-auth-tools/node_modules/.bin/neon
+        run: |
+          set -euo pipefail
+          npm install --prefix "$RUNNER_TEMP/neon-auth-tools" --no-audit --no-fund neon@4.17.4
+          node scripts/auth-localhost-hardening.mjs production
+
