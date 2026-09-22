@@ -1,5 +1,7 @@
 {
-  "operation": "production-browser",
-  "request_id": "v8-production-browser-20260921-r2",
-  "reason": "Retry final end-to-end production browser acceptance after repairing the test-only Draft Run gateway-prefix response matcher. Production v8 corpus staging and health are already green."
+  "operation": "deploy",
+  "request_id": "username-identity-dev-20260921",
+  "reason": "Deploy the reviewed owned-username public-identity fix to development after PR 336 passed unit, browser, and isolated Neon backend gates.",
+  "commit": "6738441200831e0772374da765e54174c1419ea3",
+  "target": "development"
 }
