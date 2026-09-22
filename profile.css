@@ -43,7 +43,8 @@
 .profile-toggle span { margin:0!important; color:var(--ink)!important; }
 .profile-toggle strong,
 .profile-toggle small { display:block; }
-.profile-toggle small { margin-top:3px; color:var(--muted); font-weight:500; line-height:1.45; }
+.profile-toggle strong { font-size:16px; line-height:1.35; }
+.profile-toggle small { margin-top:5px; color:var(--muted); font-size:13px; font-weight:500; line-height:1.5; }
 .profile-settings-actions { grid-column:1/-1; display:flex; align-items:center; gap:12px; }
 .profile-settings-status { color:var(--muted); font-size:12px; }
 .profile-public-url { margin:-8px 0 22px; color:var(--muted); font-size:12px; }
@@ -55,6 +56,8 @@
 .profile-account .eyebrow { margin:0; }
 .profile-account form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:22px; padding:0; }
 .profile-account label { display:grid; gap:8px; }
+.profile-account .profile-leaderboard-name { grid-column:1/-1; }
+.profile-account .profile-settings-membership { grid-column:1/-1; margin:0; border:1px solid var(--line); border-radius:8px; }
 .profile-account small { color:var(--muted); line-height:1.5; }
 .profile-account .profile-settings-actions { margin-top:6px; }
 
@@ -75,6 +78,7 @@
 .profile-membership-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
 .profile-membership-actions .text-button { min-height:44px; }
 .profile-membership-actions #patreon-status { color:var(--muted); font-size:12px; }
+.profile-delete-title { margin:0 0 8px; color:var(--blue); font-size:16px; }
 
 .profile-section { min-width:0; margin-top:18px; padding:22px 0; border:1px solid var(--line); border-width:1px 0 0; border-radius:0; background:transparent; }
 .profile-section h2 { font-size:clamp(21px,2.5vw,28px); }
@@ -263,7 +267,7 @@
 .my-performance-bar:nth-child(even) i { opacity:.55; }
 .my-performance-bar small { overflow:hidden; color:var(--muted); font-size:9px; white-space:nowrap; }
 
-.my-two-up { display:grid; grid-template-columns:1fr 1.08fr; gap:16px; min-width:0; }
+.my-two-up { display:grid; grid-template-columns:1.2fr .88fr; gap:16px; min-width:0; }
 .my-best-list,
 .my-game-preview,
 .my-daily-preview,
@@ -283,16 +287,16 @@
 .my-achievement-badge.is-locked { background:var(--surface-soft); color:var(--muted); }
 .my-achievement-badge.is-unlocked > span { color:var(--green-dark); }
 
-.my-game-preview li,
-.my-daily-preview li { display:grid; grid-template-columns:86px minmax(0,1fr) 48px 110px; gap:10px; align-items:center; min-height:42px; border-top:1px solid var(--line); }
+.my-game-preview li { display:grid; grid-template-columns:86px minmax(0,1fr) 48px 110px; gap:10px; align-items:center; min-height:42px; border-top:1px solid var(--line); }
+.my-daily-preview li { display:grid; grid-template-columns:68px minmax(130px,1fr) 40px 88px; gap:8px; align-items:center; min-height:48px; border-top:1px solid var(--line); }
 .my-game-preview li:first-child,
 .my-daily-preview li:first-child { border-top:0; }
 .my-game-preview span,
 .my-daily-preview span,
 .my-game-preview small,
 .my-daily-preview small { color:var(--muted); font-size:11px; }
-.my-game-preview strong,
-.my-daily-preview strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.my-game-preview strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.my-daily-preview strong { overflow:visible; line-height:1.25; white-space:normal; }
 .my-game-preview b,
 .my-daily-preview b { text-align:center; }
 
@@ -348,8 +352,7 @@
 .my-pack-one-account-panel .profile-account > header { order:1; }
 .my-pack-one-account-panel .profile-account > form { order:2; }
 .my-pack-one-account-panel .profile-account > .profile-credentials:not(.profile-danger) { order:3; }
-.my-pack-one-account-panel .profile-account > .profile-membership { order:4; }
-.my-pack-one-account-panel .profile-account > .profile-danger { order:5; }
+.my-pack-one-account-panel .profile-account > .profile-danger { order:4; }
 .my-pack-one-account-panel .profile-credentials,
 .my-pack-one-account-panel .profile-membership { border-radius:10px; }
 
