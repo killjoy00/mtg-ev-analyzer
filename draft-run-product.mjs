@@ -76,6 +76,15 @@ function cardGrid(p,answer=null) {
   const candidates=sortPackByRarity(p.candidates);
   return `<div class="run-cards">${candidates.map(c=>`<article class="run-card ${selection===c.id?'selected':''} ${answer?.historicalId===c.id?'trophy-pick':''}"><button class="run-card-select" type="button" data-pick="${esc(c.id)}" aria-label="Pick ${esc(c.name)}" aria-pressed="${selection===c.id}" ${answer?'disabled':''}>${image(c)}<span>${esc(c.name)}</span></button><button class="run-zoom" type="button" data-zoom="${esc(c.id)}" aria-label="Enlarge ${esc(c.name)}">Enlarge</button>${answer&&(answer.historicalId===c.id||answer.selectedId===c.id)?`<span class="run-card-outcome">${answer.historicalId===c.id?'Trophy pick':'Your pick'}</span>`:''}</article>`).join('')}</div>`;
 }
+function rankingStateMarkup(value=run) {
+  if(!value?.day)return '';
+  if(value.leaderboard_eligible)return `<p class="run-ranking-state" role="status">Ranked as ${esc(value.ranked_name||'your account')}</p>`;
+  if(['username_taken','username_required'].includes(value.ranking_identity?.reason))
+    return value.complete
+      ? '<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> Choose a unique username to add this score to the leaderboard.</p>'
+      : '<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> Your account needs a unique username. Choose one in My Pack One; you can add the completed score afterward.</p>';
+  return '<p class="run-ranking-state" role="status">Playing as guest — sign in after the run to add this score to the leaderboard.</p>';
+}
 function render() {
   const answer=review==null?null:run.answers[review];
   if(answer||run.complete){clock.clear();viewKey=null;}
@@ -83,7 +92,7 @@ function render() {
   const p=answer?.puzzle||run.current;
   document.body.classList.add('is-game');
   app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
-    ${run.day?`<p class="run-ranking-state" role="status">${run.leaderboard_eligible?`Ranked as ${esc(run.ranked_name||'your account')}`:'Playing as guest — sign in after the run to add this score to the leaderboard.'}</p>`:''}
+    ${rankingStateMarkup(run)}
     ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed — this result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
     ${answer?`<section class="run-feedback" aria-live="polite"><strong>${answer.score}<small>/100</small></strong><div class="run-feedback-copy"><h2>${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2><p>${answer.historicalMatch?'Full points.':`You chose ${esc(answer.selectedName)}. ${answer.score>=85?'A strongly supported alternative.':answer.score>=60?'A plausible alternative.':'The model found less support for this choice.'}`}</p>${answer.modelTargetDisagreement?'<p>The trophy drafter made an unusual choice relative to the model. Strong alternatives still receive their normal credit.</p>':''}</div>${revealComparison(p,answer)}${consensusFeedback(answer)}<div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>`:
@@ -158,14 +167,14 @@ function renderResult() {
     <aside id="post-game-progress" class="post-game-progress" data-result-id="draft-run:${run.id}"></aside>
     ${run.standing?`<p class="run-standing">#${run.standing.rank} of ${run.standing.total} today${run.standing.percentile?` · Top ${run.standing.percentile}%`:''}. ${run.standing.final?'Final result.':'The board closes at midnight Eastern.'}</p>`:''}
     ${dailyValidationConfirmation?`<div class="run-validation-success" role="status" data-daily-validation-confirmation><strong>Score added to today's leaderboard</strong>${dailyValidationConfirmation.standing?`<span>#${dailyValidationConfirmation.standing.rank} of ${dailyValidationConfirmation.standing.total}${dailyValidationConfirmation.standing.percentile?` · Top ${dailyValidationConfirmation.standing.percentile}%`:''}</span>`:''}<a class="text-button" href="${gameUrl('board=daily')}">View leaderboard</a></div>`:''}
-    ${run.day?`<p class="run-ranking-state" role="status">${run.leaderboard_eligible?`Ranked as ${esc(run.ranked_name||'your account')}`:'Playing as guest — sign in after the run to add this score to the leaderboard.'}</p>`:''}
+    ${rankingStateMarkup(run)}
     ${run.comparison?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
-    <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?'Sign in to add score':'View your career'}</button></div>
+    <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required'].includes(run.ranking_identity?.reason)?'Choose username to add score':'Sign in to add score'):'View your career'}</button></div>
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; alternatives earn up to 95 from held-out strong-player support.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=5')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=6')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
 export async function returnToValidatedDaily(runId,{standing=null}={}) {
@@ -235,8 +244,8 @@ function renderLoadFailure(error,isBoard) {
     const premium=['custom_corpus','unlimited_cube_practice'].includes(error.capability);
     const signedIn=hasAccountSession();
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite on Patreon':'Sign in to become Elite')+'</button>':''}${!premium&&!signedIn?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=5')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=5')).renderAccount();});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=6')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=6')).renderAccount();});return;
   }
   console.warn('Draft Run page failed to load',error?.message);
   const retry=`<button class="button primary" type="button" data-run-retry="1">Try again</button>`;

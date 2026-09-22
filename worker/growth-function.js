@@ -410,7 +410,7 @@ async function dailyHistoryFor(playerId) {
 
 async function profileMetaByPlayer(playerId) {
   const result = await query(
-    `SELECT p.display_name,p.profile_key,p.profile_public,p.favorite_set_id,p.showcase_achievement,
+    `SELECT p.display_name,p.profile_key,p.profile_public,p.favorite_set_id,p.showcase_achievement,p.username_owned,
             EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=p.id) claimed
      FROM players p
      WHERE p.id=$1::uuid
@@ -555,7 +555,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
       profile_public: bool(meta.profile_public),
       favorite_set_id: meta.favorite_set_id || null,
       showcase_achievement: meta.showcase_achievement || null,
-      ...(own ? { claimed: bool(meta.claimed) } : {}),
+      ...(own ? { claimed: bool(meta.claimed), username_owned: bool(meta.username_owned) } : {}),
     },
     summary: normalizedSummary,
     environment_total: reportedEnvironmentTotal,
@@ -786,7 +786,7 @@ async function handleSession(request) {
   return json({ token, playerId: id, displayName, profileKey: meta?.profile_key || null });
 }
 
-const SERVER_EVENTS=new Set(['account_claimed','public_profile_enabled','leaderboard_name_changed','achievement_unlocked','archive_milestone_reached','streak_milestone_reached','game_started','daily_started','game_completed']);
+const SERVER_EVENTS=new Set(['account_claimed','username_ownership_conflict','public_profile_enabled','leaderboard_name_changed','achievement_unlocked','archive_milestone_reached','streak_milestone_reached','game_started','daily_started','game_completed']);
 async function handleEvents(request) {
   const id = await player(request);
   const payload = await readJson(request);
@@ -963,10 +963,19 @@ async function handleLink(request,{browser=false}={}) {
 
   await reserveUsername(id);
 
+  const profile = await profileMetaByPlayer(id);
+  const usernameOwned=bool(profile?.username_owned);
+  const rankingReason=usernameOwned?null:(isPlaceholderUsername(profile?.display_name)?'username_required':'username_taken');
+  if(linkChanged&&!usernameOwned) {
+    await query(
+      `INSERT INTO analytics_events(player_id,event_name,event_props)
+       VALUES($1::uuid,'username_ownership_conflict',jsonb_build_object('reason',$2::text))`,
+      [id,rankingReason],
+    );
+  }
   const validatedDailyScore = validateDailyRunId
     ? await validateDailyRunScore(validateDailyRunId, id, auth.user_id)
     : false;
-  const profile = await profileMetaByPlayer(id);
   const playerToken=await tokenFor(id);
   let response=json({
     ok: true,
@@ -977,6 +986,7 @@ async function handleLink(request,{browser=false}={}) {
     displayName: profile?.display_name || auth.name || 'Pack Player',
     profileKey: profile?.profile_key || null,
     email: auth.email,
+    rankingIdentity:{eligible:usernameOwned,reason:rankingReason},
   });
   // No-op links must not rotate player/account cookies. Genuine claims,
   // merges, and browser-player reassociations remain rotation boundaries.

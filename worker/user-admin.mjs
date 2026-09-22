@@ -27,6 +27,7 @@ function normalizeUser(row) {
     email_verified:bool(row.email_verified),
     banned:bool(row.banned),
     linked:Boolean(row.claimed_at),
+    username_owned:bool(row.username_owned),
     is_admin:bool(row.is_admin),
     patreon_connected:bool(row.patreon_connected),
     active_entitlements:num(row.active_entitlements),
@@ -47,7 +48,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
     const [account,stats,entitlements,providers,runs,events,authActivity]=await Promise.all([
       query(`SELECT u.id,u.name,u.email,u."emailVerified" email_verified,u."createdAt" created_at,u."updatedAt" updated_at,
           u.banned,u."banReason" ban_reason,u."banExpires" ban_expires,
-          a.claimed_at,p.display_name profile_name,p.profile_public,
+          a.claimed_at,p.display_name profile_name,p.profile_public,p.username_owned,
           EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id) is_admin
         FROM neon_auth."user" u
         LEFT JOIN account_links a ON a.auth_user_id=u.id
@@ -131,11 +132,15 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
         count(*) FILTER(WHERE activity.last_active>=now()-interval '30 days')::int active_30d,
         count(*) FILTER(WHERE EXISTS(SELECT 1 FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())))::int paid,
         count(*) FILTER(WHERE EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon'))::int patreon,
-        count(*) FILTER(WHERE EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id))::int admins
+        count(*) FILTER(WHERE EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id))::int admins,
+        count(*) FILTER(WHERE EXISTS(
+          SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
+          WHERE a.auth_user_id=u.id AND NOT p.username_owned
+        ))::int username_attention
       FROM neon_auth."user" u JOIN activity ON activity.id=u.id`),
     query(`SELECT count(*)::int total FROM neon_auth."user" u ${where}`,params),
     query(`SELECT u.id,u.name,u.email,u."emailVerified" email_verified,u."createdAt" created_at,u.banned,
-        a.claimed_at,p.display_name profile_name,
+        a.claimed_at,p.display_name profile_name,p.username_owned,
         EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id) is_admin,
         EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon') patreon_connected,
         (SELECT count(*)::int FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())) active_entitlements,

@@ -2,7 +2,7 @@ import {SERVING_POLICY_VERSION,LEGACY_SERVING_POLICY_VERSION,SERVING_QUALITY_SQL
 import {accountCapabilities,providerMembership,requireCapability,practiceCapability} from './capabilities.mjs';
 import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
-import {accountIdentity,linkedPlayerIdentity} from './account-identity.mjs';
+import {accountIdentity,linkedPlayerIdentity,rankingIdentityStatus} from './account-identity.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
@@ -89,7 +89,8 @@ async function responseFor(s) {
   const current=complete ? null : publicDraftRunPuzzle(await puzzle(s.puzzle_ids[s.answers.length],s.corpus_version));
   const other=s.challenge_id ? await share(s.challenge_id) : null;
   const comparison=other ? {name:other.display_name,score:other.score,exact:JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids)} : null;
-  const rankedIdentity=s.day&&s.leaderboard_eligible?await linkedPlayerIdentity(query,s.player_id):null;
+  const identityStatus=s.day?await rankingIdentityStatus(query,s.player_id):null;
+  const rankedIdentity=s.day&&s.leaderboard_eligible&&identityStatus?.eligible?identityStatus:null;
   let standing=null;
   if(complete && s.day && s.leaderboard_eligible && rankedIdentity) {
     const r=await query(`SELECT count(*) total,1+count(*) FILTER(WHERE score>$2::int) rank,count(*) FILTER(WHERE score>=$2::int) through_ties
@@ -103,7 +104,7 @@ async function responseFor(s) {
     standing={rank:Number(row.rank),total,percentile:total>=10?Math.max(1,Math.ceil(Number(row.through_ties)/total*100)):null,final:s.day<gameDateKey()};
   }
   const rankedName=rankedIdentity?.display_name||null;
-  return {ranked_name:rankedName,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:Boolean(s.leaderboard_eligible&&rankedIdentity),environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
+  return {ranked_name:rankedName,ranking_identity:identityStatus?{eligible:identityStatus.eligible,reason:identityStatus.reason}:null,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:Boolean(s.leaderboard_eligible&&rankedIdentity),environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
 }
 
 async function start(request) {
@@ -225,14 +226,15 @@ async function dailyStatus(request) {
   const owner=await player(request),account=await accountIdentity(request,query,owner),day=gameDateKey();
   // This is the homepage's request, so the membership lookup rides alongside
   // the other two rather than adding a round trip.
-  const [result,capabilities,membership]=await Promise.all([
+  const [result,capabilities,membership,rankingIdentity]=await Promise.all([
     query(`SELECT day::text date,environment set_id,'draft_run' mode,score,id run_id
       FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date
         AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)`,[owner,day]),
     accountCapabilities(account,query),
     providerMembership(account,query),
+    rankingIdentityStatus(query,owner),
   ]);
-  return json({day,capabilities,player:{claimed:Boolean(account)},membership,daily_history:result.rows.map(r=>({...r,score:Number(r.score)}))});
+  return json({day,capabilities,player:{claimed:Boolean(account)},membership,ranking_identity:{eligible:rankingIdentity.eligible,reason:rankingIdentity.reason},daily_history:result.rows.map(r=>({...r,score:Number(r.score)}))});
 }
 
 async function leaderboard(request) {

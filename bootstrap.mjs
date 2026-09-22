@@ -38,9 +38,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
 } else {
   // Paint play links before identity/profile requests. Profiles load on demand.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account')
-    ? await import('./daily-home.mjs?v=5') : null;
+    ? await import('./daily-home.mjs?v=6') : null;
   home?.renderDailyHome();
-  const growthReady = import('./growth.mjs?v=5');
+  const growthReady = import('./growth.mjs?v=6');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
   const account = document.createElement('button');
   account.id = 'account-nav'; account.type = 'button';
@@ -56,9 +56,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await (await growthReady).resumeAccountAuth(params.get('auth'));
   } else if (params.has('patreon')) {
     await identityReady;
-    const profiles=await import('./profile-product.mjs?v=5');
+    const profiles=await import('./profile-product.mjs?v=6');
     profiles.installProfileProductLayer();
-    (await import('./profile-polish.mjs?v=5')).installProfilePolish();
+    (await import('./profile-polish.mjs?v=6')).installProfilePolish();
     await profiles.renderMyProfile();
     const clean=new URL(location.href);clean.searchParams.delete('patreon');
     history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
@@ -70,9 +70,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     }
   } else if (params.has('profile')) {
     await identityReady;
-    (await import('./profile-product.mjs?v=5')).installProfileProductLayer();
+    (await import('./profile-product.mjs?v=6')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=5');
+    const game = await import('./draft-run-product.mjs?v=6');
     await identityReady;
     await game.installDraftRunPage();
   }

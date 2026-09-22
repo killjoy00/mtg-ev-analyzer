@@ -17,9 +17,9 @@ import {
 import { loadReplayJson } from './replay-data.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=5';
+import { nextMilestones } from './progression.mjs?v=6';
 import { PATREON_POLICY } from './patreon-policy.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=5';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=6';
 import {
   bestPercentile,
   environmentProgress,
@@ -49,7 +49,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=5', import.meta.url).href;
+  link.href = new URL('./profile.css?v=6', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -140,7 +140,7 @@ function settingsMarkup(profile, progress, account, patreon) {
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
     <header><div><p class="eyebrow">Profile</p><h2 id="profile-account-title">Profile settings</h2><p>${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     ${account?.user?`<form id="profile-settings-form">
-      <label class="profile-leaderboard-name"><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required><small>Shown on all Daily leaderboards.</small></label>
+      <label class="profile-leaderboard-name"><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required><small>${profile.player.username_owned===false?'Choose a unique name to appear on Daily leaderboards.':'Shown on all Daily leaderboards.'}</small></label>
     ${account?.user?`<section class="profile-membership profile-settings-membership" aria-labelledby="patreon-membership-title">
       <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
         ${patreon?.configured!==true
@@ -367,6 +367,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       status.textContent = 'Saved';
       track('profile_settings_saved', { public: updated.player?.profile_public || false });
       await renderProfile(updated, { own: true });
+      document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:updated.player?.username_owned===true}}));
       if(updated.player?.display_name){try{localStorage.setItem('pack1-player-name-v1',updated.player.display_name);}catch{}}
     } catch (error) {
       status.textContent = error.message;

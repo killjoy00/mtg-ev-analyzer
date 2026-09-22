@@ -6,6 +6,10 @@
 .daily-home-heading>p:not(.eyebrow){font-size:18px;color:var(--muted);margin:0 0 32px}
 .daily-home-heading time{display:block;padding:13px 0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line);font-size:14px;font-weight:600;letter-spacing:.025em}
 .daily-home-games{display:grid;gap:0;background:var(--surface)}
+.daily-home-identity-warning{display:flex;align-items:center;justify-content:space-between;gap:20px;margin:18px 0 0;padding:18px 20px;border:1px solid var(--line-strong);background:var(--surface)}
+.daily-home-identity-warning strong{display:block;margin-bottom:4px}
+.daily-home-identity-warning p{margin:0;color:var(--muted);line-height:1.45}
+.daily-home-identity-warning .button{flex:0 0 auto;white-space:nowrap}
 .daily-home-game{display:grid;grid-template-columns:64px 1fr auto;align-items:center;gap:24px;padding:30px 28px;border-bottom:1px solid var(--line);border-left:3px solid var(--green)}
 .daily-home-game[data-environment="powered-cube"]{border-left-color:#976822}
 .daily-home-number{align-self:start;font-family:var(--display);font-size:50px;font-weight:600;line-height:1;color:#a4b2c0;font-variant-numeric:tabular-nums}
@@ -29,6 +33,7 @@
  .daily-home-heading>p:not(.eyebrow){font-size:16px;margin-bottom:24px;max-width:30ch}
  .daily-home-heading h1{font-size:48px;max-width:11ch}
  .daily-home-heading time{font-size:14px}
+ .daily-home-identity-warning{align-items:flex-start;flex-direction:column;padding:16px}.daily-home-identity-warning .button{width:100%;justify-content:center}
  .daily-home-game{grid-template-columns:36px minmax(0,1fr);gap:12px;padding:22px 16px}
  .daily-home-number{font-size:34px}.daily-home-game h2{font-size:30px}.daily-home-game p{font-size:16px}
  .daily-home-game .button{grid-column:2;width:100%;margin-top:5px}

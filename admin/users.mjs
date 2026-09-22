@@ -22,6 +22,7 @@ export async function renderUsers(root,request) {
   function access(user) {
     if(user.banned)return badge('Banned','blocked');
     const items=[];
+    if(user.linked&&!user.username_owned)items.push(badge('Username attention','blocked'));
     if(user.patreon_connected)items.push(badge('Patreon','candidate'));
     if(user.active_entitlements>0)items.push(badge('Paid','live'),...(user.capabilities||[]).map(value=>badge(capabilityLabel(value))));
     if(!items.length)items.push(badge('Free account'));
@@ -32,7 +33,7 @@ export async function renderUsers(root,request) {
     root.innerHTML=`<section class="users-page">
       <div class="users-heading"><div><h1>Users</h1><p class="muted">Authenticated Pack One accounts only. Anonymous and guest gameplay identities are intentionally not listed here.</p></div><button type="button" class="secondary" id="users-signout">Sign out</button></div>
       <div class="cards user-cards">
-        ${[['Accounts',s.total],['New · 30d',s.new_30d],['Active · 30d',s.active_30d],['Patreon',s.patreon],['Paid',s.paid],['Admins',s.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
+        ${[['Accounts',s.total],['New · 30d',s.new_30d],['Active · 30d',s.active_30d],['Username attention',s.username_attention],['Patreon',s.patreon],['Paid',s.paid],['Admins',s.admins]].map(([label,value])=>`<div class="card"><span>${esc(label)}</span><strong>${fmt(value)}</strong></div>`).join('')}
       </div>
       <form id="user-filters" class="filters user-filters">
         <label>Find a user<input type="search" name="search" value="${esc(filters.search)}" placeholder="Name or email"></label>
@@ -68,7 +69,7 @@ export async function renderUsers(root,request) {
           <dt>Created</dt><dd>${esc(dateTime(u.created_at))}</dd>
           <dt>Last active</dt><dd>${esc(dateTime(u.last_active))}</dd>
           <dt>Gameplay history</dt><dd>${u.linked?'Linked to this account':'Not linked yet'}</dd>
-          <dt>Profile</dt><dd>${esc(u.profile_name||'—')}${u.profile_public?' · public':''}</dd>
+          <dt>Profile</dt><dd>${esc(u.profile_name||'—')}${u.profile_public?' · public':''}${u.linked&&!u.username_owned?' · username needs attention':''}</dd>
           <dt>Admin access</dt><dd>${u.is_admin?'Yes':'No'}</dd>
           ${u.banned?`<dt>Account status</dt><dd>${badge('Banned','blocked')} ${esc(u.ban_reason||'')}</dd>`:''}
         </dl>

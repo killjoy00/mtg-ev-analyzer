@@ -26,6 +26,7 @@ const fixture = {
     favorite_set_id:'neo',
     showcase_achievement:'explorer5',
     claimed:true,
+    username_owned:true,
   },
   summary: {
     games:42,
