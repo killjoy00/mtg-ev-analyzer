@@ -66,7 +66,7 @@ export async function applyPatreonMembership(query,authUserId,providerUserId,mem
     WHERE $12::bigint IS NULL AND EXISTS(SELECT 1 FROM provider_oauth_states
       WHERE state_hash=$14 AND auth_user_id=$1::uuid AND provider='patreon' AND consumed_at IS NOT NULL AND expires_at>now())
     ON CONFLICT(auth_user_id,provider) DO UPDATE SET provider_user_id=$2,${assignments}
-      WHERE provider_accounts.last_synced_at <= $11::timestamptz
+      WHERE provider_accounts.provider_user_id=$2 AND provider_accounts.last_synced_at <= $11::timestamptz
     RETURNING auth_user_id`:
     `UPDATE provider_accounts SET ${assignments}
      WHERE auth_user_id=$1::uuid AND provider='patreon' AND provider_user_id=$2
@@ -249,7 +249,11 @@ export async function handlePatreon(request,{query,authSession,json}) {
       }
       const applied=await applyPatreonMembership(query,authUserId,resolved.userId,resolved.member,{link:true,observedAt,oauthStateHash:hash});
       await query('DELETE FROM provider_oauth_states WHERE state_hash=$1',[hash]);
-      if(!applied)return redirect('expired');
+      if(!applied) {
+        const current=await query('SELECT provider_user_id FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider=$2',[authUserId,PROVIDER]);
+        if(current.rows[0]&&String(current.rows[0].provider_user_id)!==resolved.userId)return redirect('identity-mismatch');
+        return redirect('expired');
+      }
       return redirect('connected');
     } catch(error) {
       if(error?.code==='23505') {
