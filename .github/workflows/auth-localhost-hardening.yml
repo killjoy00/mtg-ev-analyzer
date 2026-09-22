@@ -37,7 +37,7 @@ jobs:
         with:
           node-version: 24
       - name: Install pinned Neon CLI
-        run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@4.17.4
+        run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@5.0.0
       - name: Prove localhost capability in QA and restore QA
         env:
           NEON_BIN: ${{ runner.temp }}/neon-tools/node_modules/.bin/neon
@@ -55,7 +55,7 @@ jobs:
         with:
           node-version: 24
       - name: Install pinned Neon CLI
-        run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@4.17.4
+        run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@5.0.0
       - name: Disable production localhost allowance and verify auth flows
         env:
           NEON_BIN: ${{ runner.temp }}/neon-tools/node_modules/.bin/neon
