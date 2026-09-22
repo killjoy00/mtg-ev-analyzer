@@ -75,7 +75,8 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(source,/delivered@resend\.dev/);
   assert.match(source,/removeProviderUser/);
   assert.match(source,/SELECT count\(\*\) FROM account_links WHERE auth_user_id=/);
-  assert.doesNotMatch(source,/\bpsql\b|DATABASE_URL|DELETE\s+FROM|UPDATE\s+neon_auth|INSERT\s+INTO\s+neon_auth/i);
+  assert.doesNotMatch(source,/DATABASE_URL|DELETE\s+FROM|UPDATE\s+neon_auth|INSERT\s+INTO\s+neon_auth/i);
+  assert.match(source,/\['psql',branch[\s\S]*SELECT count\(\*\) FROM account_links WHERE auth_user_id=/);
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/branches:\s*\[main\]/);
   assert.match(workflow,/github\.event_name == 'pull_request'/);
