@@ -1,0 +1,99 @@
+name: One-shot Traditional v4 complete promotion
+
+on:
+  push:
+    branches:
+      - ops/traditional-v4-complete-promotion-20260921
+    paths:
+      - .github/workflows/complete-traditional-v4-promotion.yml
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  promote:
+    if: github.event.head_commit.message == 'Complete Traditional v4 promotion'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Complete reviewed release sequence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          workflow=publish-puzzle-components.yml
+          mkdir -p ops /tmp/traditional-v4-complete
+          result_file=ops/traditional-v4-complete-promotion-results.json
+          baseline_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          printf '[]' > /tmp/traditional-v4-complete/results.json
+
+          append_result() {
+            local file="$1"
+            jq --slurpfile row "$file" '. + $row' /tmp/traditional-v4-complete/results.json > /tmp/traditional-v4-complete/results.next
+            mv /tmp/traditional-v4-complete/results.next /tmp/traditional-v4-complete/results.json
+          }
+
+          run_release() {
+            local target="$1"
+            local source="$2"
+            local action=publish
+            local label="$target-$source"
+            local current_sha before after new_ids id rc
+
+            current_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+            if [[ "$current_sha" != "$baseline_sha" ]]; then
+              jq -n --arg target "$target" --arg source "$source" --arg expected "$baseline_sha" --arg actual "$current_sha"                 '{target:$target,source:$source,action:"publish",run_id:null,status:"blocked_main_changed",conclusion:null,expected_main_sha:$expected,actual_main_sha:$actual}'                 > "/tmp/traditional-v4-complete/$label.json"
+              append_result "/tmp/traditional-v4-complete/$label.json"
+              return 3
+            fi
+
+            before="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --event workflow_dispatch --branch main --limit 100 --json databaseId --jq '.[].databaseId' | sort -n)"
+            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main               -f target="$target"               -f action=publish               -f source="$source"
+
+            id=""
+            for attempt in $(seq 1 60); do
+              after="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --event workflow_dispatch --branch main --limit 100 --json databaseId --jq '.[].databaseId' | sort -n)"
+              new_ids="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | sed '/^$/d')"
+              if [[ "$(printf '%s\n' "$new_ids" | sed '/^$/d' | wc -l)" -eq 1 ]]; then id="$new_ids"; break; fi
+              if [[ "$(printf '%s\n' "$new_ids" | sed '/^$/d' | wc -l)" -gt 1 ]]; then
+                jq -n --arg target "$target" --arg source "$source" --arg ids "$new_ids"                   '{target:$target,source:$source,action:"publish",run_id:null,status:"ambiguous_new_runs",conclusion:null,new_run_ids:$ids}'                   > "/tmp/traditional-v4-complete/$label.json"
+                append_result "/tmp/traditional-v4-complete/$label.json"
+                return 4
+              fi
+              sleep 2
+            done
+
+            if [[ -z "$id" ]]; then
+              jq -n --arg target "$target" --arg source "$source"                 '{target:$target,source:$source,action:"publish",run_id:null,status:"dispatch_not_observed",conclusion:null}'                 > "/tmp/traditional-v4-complete/$label.json"
+              append_result "/tmp/traditional-v4-complete/$label.json"
+              return 2
+            fi
+
+            set +e
+            gh run watch "$id" --repo "$GITHUB_REPOSITORY" --exit-status
+            rc=$?
+            set -e
+            gh run view "$id" --repo "$GITHUB_REPOSITORY"               --json databaseId,status,conclusion,url,headSha,createdAt,updatedAt               --jq --arg target "$target" --arg source "$source" '. + {target:$target,source:$source,action:"publish",run_id:.databaseId} | del(.databaseId)'               > "/tmp/traditional-v4-complete/$label.json"
+            append_result "/tmp/traditional-v4-complete/$label.json"
+            return "$rc"
+          }
+
+          overall=0
+          run_release development v4-regular-phase2 || overall=$?
+          if [[ "$overall" -eq 0 ]]; then run_release development v4-powered-cube || overall=$?; fi
+          if [[ "$overall" -eq 0 ]]; then run_release production v4-regular-phase2 || overall=$?; fi
+          if [[ "$overall" -eq 0 ]]; then run_release production v4-powered-cube || overall=$?; fi
+
+          jq -n --arg baseline_main_sha "$baseline_sha" --slurpfile runs /tmp/traditional-v4-complete/results.json             '{baseline_main_sha:$baseline_main_sha,runs:$runs[0]}' > "$result_file"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$result_file"
+          git commit -m "Record Traditional v4 complete promotion run IDs [skip ci]"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+          exit "$overall"
