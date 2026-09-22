@@ -36,7 +36,8 @@ export function safeEmailConfig(value){
 }
 function emailConfig(){return safeEmailConfig(readJson(['neon-auth','config','email-password','get',...authArgs()]));}
 function emailProvider(){
-  const source=readJson(['neon-auth','config','email-provider','get',...authArgs()])||{};
+  const raw=readJson(['neon-auth','config','email-provider','get',...authArgs()])||{};
+  const source=raw?.email_provider||raw?.config||raw;
   return {
     type:String(source.type||''),
     host:String(source.host||''),
