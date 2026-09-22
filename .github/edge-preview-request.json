@@ -1,1 +1,1 @@
-{"operation":"probe-email-verification","reason":"Issue #246: measure OTP/link verification state directly when Managed Neon sends no subscribed webhook event; keep the disposable branch and restore all Auth settings."}
+{"operation":"probe-email-verification","reason":"Issue #246: measure link-only verification on disposable production child br-square-water-ay71uef3 with inherited custom Resend SMTP; restore all Auth settings afterward."}

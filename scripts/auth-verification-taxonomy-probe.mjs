@@ -4,8 +4,8 @@ import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const PROJECT='patient-shadow-91417882';
-export const BRANCH='br-wandering-brook-ayf9dopn';
-export const AUTH_BASE='https://ep-bold-king-ay0y1jwz.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+export const BRANCH='br-square-water-ay71uef3';
+export const AUTH_BASE='https://ep-weathered-surf-ay5urlmr.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const WORKER='pack1-auth-webhook-probe-temp';
 const EMAIL_CONFIG_PATH='/projects/'+PROJECT+'/branches/'+BRANCH+'/auth/email_and_password';
 
@@ -66,8 +66,21 @@ async function getEmailConfig(){
   return safeEmailConfig(await neonApi('GET'));
 }
 
-async function updateEmailConfig(config){
-  return safeEmailConfig(await neonApi('PATCH',safeEmailConfig(config)));
+async function updateEmailConfig(neon,config){
+  const value=safeEmailConfig(config);
+  run(neon,[
+    'neon-auth','config','email-password','update',
+    '--project-id',PROJECT,
+    '--branch',BRANCH,
+    '--enabled='+String(value.enabled),
+    '--email-verification-method',value.email_verification_method,
+    '--require-email-verification='+String(value.require_email_verification),
+    '--auto-sign-in-after-verification='+String(value.auto_sign_in_after_verification),
+    '--send-verification-email-on-sign-up='+String(value.send_verification_email_on_sign_up),
+    '--send-verification-email-on-sign-in='+String(value.send_verification_email_on_sign_in),
+    '--disable-sign-up='+String(value.disable_sign_up),
+  ]);
+  return getEmailConfig();
 }
 
 function run(binary,args){
@@ -143,7 +156,7 @@ async function authPost(pathname,body){
   const response=await fetch(AUTH_BASE+pathname,{
     method:'POST',
     redirect:'manual',
-    headers:{origin:'http://localhost:4173','content-type':'application/json'},
+    headers:{origin:'https://packone.pro','content-type':'application/json'},
     body:JSON.stringify(body),
     signal:AbortSignal.timeout(20000),
   });
@@ -205,7 +218,7 @@ function evidenceSummary(evidence){
 
 async function probeMode(mode,originalEmail,workerUrl,neon){
   const target=verificationConfigForMode(originalEmail,mode);
-  const applied=await updateEmailConfig(target);
+  const applied=await updateEmailConfig(neon,target);
   assert(configEqual(applied,target),'QA email verification configuration did not reach the requested probe state.');
   console.log('AUTH_VERIFICATION_MODE_CONFIG '+JSON.stringify({mode,config:applied}));
 
@@ -214,7 +227,7 @@ async function probeMode(mode,originalEmail,workerUrl,neon){
   console.log('::add-mask::'+password);
   const runId=String(process.env.GITHUB_RUN_ID||Date.now());
   const attempt=String(process.env.GITHUB_RUN_ATTEMPT||'1');
-  const email='pack1-verification-probe-'+runId+'-'+attempt+'-'+mode+'@example.com';
+  const email=mode==='link'?'delivered@resend.dev':'pack1-verification-probe-'+runId+'-'+attempt+'-'+mode+'@example.com';
 
   const signup=await authPost('/sign-up/email',{name:'Pack One Verification Probe',email,password});
   assert(signup.status>=200&&signup.status<300,'QA verification probe signup failed with HTTP '+signup.status+'.');
@@ -275,7 +288,6 @@ export async function main(){
     console.log('AUTH_VERIFICATION_ENABLED_WEBHOOK '+JSON.stringify(enabledWebhook));
 
     emailChanged=true;
-    await probeMode('otp',originalEmail,workerUrl,neon);
     await probeMode('link',originalEmail,workerUrl,neon);
   }catch(error){
     primaryError=error;
@@ -283,7 +295,7 @@ export async function main(){
     const rollbackErrors=[];
     if(emailChanged){
       try{
-        const restored=await updateEmailConfig(originalEmail);
+        const restored=await updateEmailConfig(neon,originalEmail);
         if(!configEqual(restored,originalEmail))throw Error('email config mismatch');
         console.log('AUTH_VERIFICATION_FINAL_EMAIL_CONFIG '+JSON.stringify(restored));
       }catch{rollbackErrors.push('email/password config');}
