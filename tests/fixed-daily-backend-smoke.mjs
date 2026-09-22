@@ -43,7 +43,9 @@ const owner=await call('/v1/session',{displayName:'QA ranked '+tag});
 const authId=crypto.randomUUID(),auth=crypto.randomUUID()+crypto.randomUUID();
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[authId,'QA fixed account',`qa-fixed-${tag}@example.invalid`]);
 await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[auth,authId]);
-await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[authId,owner.playerId]);
+// Use the real link path so this ranked fixture also reserves its username.
+// Directly inserting account_links no longer creates a public identity.
+await callGrowth('/v1/account/link',{},owner.token,auth);
 // A Supporter holds no paid capability, so the homepage cannot tell one from a
 // free account on capabilities alone and would offer to make them a member.
 assert.deepEqual((await call('/v1/daily-status',undefined,guest.token)).membership,{connected:false},'a guest is never connected');
