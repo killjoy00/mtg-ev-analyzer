@@ -91,3 +91,15 @@ test('production recovery smoke is main-only, fixed-target and secret-free',()=>
   assert.match(source,/delivered@resend\.dev/);
   assert.doesNotMatch(source,/console\.log\([^\n]*(password|token|signature|cookie)/i);
 });
+
+
+test('production Auth webhook config workflow is fixed to recovery-only subscription',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/production-auth-webhook-config.yml',import.meta.url),'utf8');
+  assert.match(workflow,/patient-shadow-91417882/);
+  assert.match(workflow,/br-orange-feather-ayps8kep/);
+  assert.match(workflow,/pack1-authhook\.killjoy00\.workers\.dev\/webhook/);
+  assert.match(workflow,/enabled_events:\['send\.magic_link'\]/);
+  assert.match(workflow,/timeout_seconds:5/);
+  assert.match(workflow,/secrets\.NEON_API_KEY/);
+  assert.doesNotMatch(workflow,/send\.otp/);
+});
