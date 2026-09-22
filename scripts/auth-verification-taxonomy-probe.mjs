@@ -3,9 +3,9 @@ import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
-export const PROJECT='late-fire-55708539';
-export const BRANCH='br-super-snow-b5ufhq30';
-export const AUTH_BASE='https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth';
+export const PROJECT='patient-shadow-91417882';
+export const BRANCH='br-wandering-brook-ayf9dopn';
+export const AUTH_BASE='https://ep-bold-king-ay0y1jwz.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const WORKER='pack1-auth-webhook-probe-temp';
 const EMAIL_CONFIG_PATH='/projects/'+PROJECT+'/branches/'+BRANCH+'/auth/email_and_password';
 
