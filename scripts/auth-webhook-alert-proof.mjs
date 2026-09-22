@@ -1,13 +1,10 @@
-import path from 'node:path';
-import {execFileSync} from 'node:child_process';
 const CF_ZONE='packone.pro';
 const PROD_SERVICE='pack1-authhook';
 const PROD_HEALTH='https://pack1-authhook.killjoy00.workers.dev/health?quick=1';
 const QA_PROJECT='late-fire-55708539';
-const QA_BRANCH='br-dry-sun-b5oe9snz';
-const QA_AUTH_BASE='https://ep-holy-hall-b5uw4nql.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth';
+const QA_BRANCH='br-super-snow-b5ufhq30';
 const QA_WORKER='https://pack1-authhook-qa.killjoy00.workers.dev';
-const QA_ORIGIN='http://localhost:4173';
+const QA_HELPER='https://br-super-snow-b5ufhq30-pack1qareset.compute.c-7.us-east-2.aws.neon.tech/';
 
 async function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 function requireSecret(value,name){
@@ -72,83 +69,55 @@ async function proveProductionService(){
   const started=Date.now();
   const health=await fetch(PROD_HEALTH,{redirect:'error',signal:AbortSignal.timeout(15000)});
   if(!health.ok)throw Error('Production authhook health probe failed with HTTP '+health.status+'.');
-
   for(let attempt=0;attempt<24;attempt++){
     if(attempt)await sleep(5000);
-    const now=Date.now();
-    const rows=await serviceEvents(accountId,null,started-60000,now);
+    const rows=await serviceEvents(accountId,null,started-60000,Date.now());
     const recent=rows.filter(row=>Number.isFinite(Number(row?.timestamp))&&Number(row.timestamp)>=started-5000);
-    if(recent.length){
-      const services=[...new Set(recent.map(row=>row?.$metadata?.service).filter(value=>typeof value==='string'&&value.length<=128))].sort();
-      const shapes=[];
-      for(const row of recent.slice(-20))shapes.push(safeEventShape(row));
-      console.log('PRODUCTION_SERVICE_DIAGNOSTIC '+JSON.stringify({
-        health_status:health.status,
-        recent_events:recent.length,
-        services,
-        shapes,
-      }));
-      const hits=recent.filter(row=>row?.$metadata?.service===PROD_SERVICE);
-      if(hits.length){
-        console.log('PRODUCTION_SERVICE_PROOF '+JSON.stringify({
-          health_status:health.status,
-          service:PROD_SERVICE,
-          matching_events:hits.length,
-        }));
-        return;
-      }
-      throw Error('Retained production traffic exists, but none uses the expected pack1-authhook service value.');
-    }
+    if(!recent.length)continue;
+    const services=[...new Set(recent.map(row=>row?.$metadata?.service).filter(value=>typeof value==='string'&&value.length<=128))].sort();
+    const shapes=recent.slice(-20).map(safeEventShape);
+    console.log('PRODUCTION_SERVICE_DIAGNOSTIC '+JSON.stringify({
+      health_status:health.status,
+      recent_events:recent.length,
+      services,
+      shapes,
+    }));
+    const hits=recent.filter(row=>row?.$metadata?.service===PROD_SERVICE);
+    if(!hits.length)throw Error('Retained production traffic exists, but none uses the expected pack1-authhook service value.');
+    console.log('PRODUCTION_SERVICE_PROOF '+JSON.stringify({
+      health_status:health.status,
+      service:PROD_SERVICE,
+      matching_events:hits.length,
+    }));
+    return;
   }
   throw Error('No retained cloudflare-workers events appeared after the known production health request.');
 }
 
-function neonBin(){
-  if(!process.env.EDGE_TOOLS_DIR)throw Error('EDGE_TOOLS_DIR is required.');
-  return path.join(process.env.EDGE_TOOLS_DIR,'node_modules/.bin/neon');
-}
-function runNeon(args){
+async function qaWebhookConfig(method='GET',value=null){
   requireSecret(process.env.NEON_API_KEY,'NEON_API_KEY');
-  try{
-    return execFileSync(neonBin(),args,{encoding:'utf8',stdio:['ignore','pipe','pipe'],env:process.env});
-  }catch(error){
-    throw Error('QA Auth control failed; exit '+(Number.isInteger(error?.status)?error.status:'unknown')+'.');
-  }
-}
-function runNeonJson(args){
-  const text=runNeon([...args,'--output','json']).trim();
-  return text?JSON.parse(text):null;
+  const endpoint='https://console.neon.tech/api/v2/projects/'+QA_PROJECT+'/branches/'+QA_BRANCH+'/auth/webhooks';
+  const response=await fetch(endpoint,{
+    method,
+    headers:{
+      accept:'application/json',
+      authorization:'Bearer '+process.env.NEON_API_KEY,
+      ...(value?{'content-type':'application/json'}:{}),
+    },
+    ...(value?{body:JSON.stringify(value)}:{}),
+    redirect:'error',
+    signal:AbortSignal.timeout(15000),
+  });
+  if(!response.ok)throw Error('QA Auth webhook API failed with HTTP '+response.status+'.');
+  return response.json();
 }
 function safeWebhookConfig(value){
-  const source=value?.webhook||value?.config||value||{};
   return {
-    enabled:Boolean(source.enabled),
-    webhook_url:source.webhook_url||source.url||'',
-    enabled_events:Array.isArray(source.enabled_events)?source.enabled_events:[],
-    timeout_seconds:Number(source.timeout_seconds??source.timeout??0),
+    enabled:Boolean(value?.enabled),
+    webhook_url:typeof value?.webhook_url==='string'?value.webhook_url:'',
+    enabled_events:Array.isArray(value?.enabled_events)?value.enabled_events:[],
+    timeout_seconds:Number(value?.timeout_seconds||0),
   };
-}
-function getWebhookConfig(){
-  const text=runNeon([
-    'neon-auth','config','webhook','get',
-    '--project-id',QA_PROJECT,
-    '--branch',QA_BRANCH,
-    '--output','json',
-  ]).trim();
-  return safeWebhookConfig(text?JSON.parse(text):null);
-}
-function updateWebhookConfig(value){
-  const args=[
-    'neon-auth','config','webhook','update',
-    '--project-id',QA_PROJECT,
-    '--branch',QA_BRANCH,
-    '--enabled='+String(Boolean(value?.enabled)),
-  ];
-  if(value?.webhook_url)args.push('--url',String(value.webhook_url));
-  for(const event of Array.isArray(value?.enabled_events)?value.enabled_events:[])args.push('--enabled-events',String(event));
-  if(Number.isFinite(Number(value?.timeout_seconds))&&Number(value.timeout_seconds)>0)args.push('--timeout',String(Number(value.timeout_seconds)));
-  runNeon(args);
-  return getWebhookConfig();
 }
 function exactQaWebhook(config){
   return config.enabled===true
@@ -175,7 +144,7 @@ async function qaTelemetry(){
   return body.entries;
 }
 async function triggerGenuineQaFault(){
-  const original=getWebhookConfig();
+  const original=safeWebhookConfig(await qaWebhookConfig());
   console.log('QA_ALERT_PROOF_ORIGINAL_CONFIG '+JSON.stringify(original));
   const desired={
     enabled:true,
@@ -190,7 +159,7 @@ async function triggerGenuineQaFault(){
   let changed=false;
   try{
     if(!exactQaWebhook(original)){
-      const enabled=updateWebhookConfig(desired);
+      const enabled=safeWebhookConfig(await qaWebhookConfig('PUT',desired));
       if(!exactQaWebhook(enabled))throw Error('QA Auth webhook did not match the exact proof configuration.');
       changed=true;
       console.log('QA_ALERT_PROOF_ENABLED_CONFIG '+JSON.stringify(enabled));
@@ -220,9 +189,9 @@ async function triggerGenuineQaFault(){
       link_type:match.link_type,
       delivery_attempt:String(match.delivery_attempt||''),
     }));
-  }finally{
+  } finally {
     if(changed){
-      const restored=updateWebhookConfig(original);
+      const restored=safeWebhookConfig(await qaWebhookConfig('PUT',original));
       console.log('QA_ALERT_PROOF_FINAL_CONFIG '+JSON.stringify(restored));
     }
   }
