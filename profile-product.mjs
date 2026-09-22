@@ -17,9 +17,9 @@ import {
 import { loadReplayJson } from './replay-data.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs';
+import { nextMilestones } from './progression.mjs?v=5';
 import { PATREON_POLICY } from './patreon-policy.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=5';
 import {
   bestPercentile,
   environmentProgress,
