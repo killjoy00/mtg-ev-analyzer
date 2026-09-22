@@ -28,8 +28,8 @@ test('email verification QA acceptance is pinned to a fresh disposable productio
   assert.doesNotMatch(source,/attempt<30/);
   assert.match(source,/link_type==='email-verification'/);
   assert.match(source,/link_type==='forget-password'/);
-  assert.match(source,/link_type==='email-verification'/);
-  assert.doesNotMatch(source,/console\.log\([^\n]*(deliveredLink|qaEvidenceKey)/);
+  assert.match(source,/console\.log\('::add-mask::'\+qaEvidenceKey\)/);
+  assert.doesNotMatch(source,/AUTH_VERIFY_QA[^\n]*(deliveredLink|qaEvidenceKey)/);
   assert.match(source,/emailUpdate\(neon,originalEmail\)/);
   assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
   assert.match(source,/AUTH_VERIFY_QA_WORKER_CLEANED true/);
