@@ -11,7 +11,10 @@ test('account access renders one contextual email mode with explicit Google sign
   assert.match(growth,/Sign in with Google/);
   const render=growth.slice(growth.indexOf('export async function renderAccount'),growth.indexOf('function shareCompletedAnalytics'));
   assert.doesNotMatch(render,/account-columns/,'auth screen must not render both email columns');
-  assert.match(render,/validatingDaily\|\|upgradingElite\?'signup':'signin'/);
+  assert.match(render,/validatingDaily\|\|upgradingElite\|\|activatingPatreon\?'signup':'signin'/);
+  assert.match(render,/intent==='patreon-activate'/);
+  assert.match(render,/hasPatreonActivationIntent\(\)/);
+  assert.match(render,/rememberPatreonActivation\(source\)/);
   assert.match(render,/New to Pack One\? .*Create account/);
   assert.match(render,/Already have an account\? .*Sign in/);
 });
