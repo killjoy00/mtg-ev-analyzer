@@ -236,6 +236,16 @@ export class RecoveryEventDedupe {
       await this.storage.put('qa_telemetry',entries.slice(-30));
       return responseJson({ok:true});
     }
+    if(url.pathname==='/pending-verification') {
+      if(request.method==='GET')return responseJson({linkUrl:await this.storage.get('qa_pending_verification')||null});
+      if(request.method!=='POST')return new Response(null,{status:405});
+      let value;
+      try {value=await request.json();} catch {return responseJson({ok:false},400);}
+      const linkUrl=safeString(value?.linkUrl,2048);
+      if(!linkUrl)return responseJson({ok:false},400);
+      await this.storage.put('qa_pending_verification',linkUrl);
+      return responseJson({ok:true});
+    }
     if(request.method!=='POST')return new Response(null,{status:405});
     if(await this.storage.get('sent'))return responseJson({ok:true,duplicate:true});
 
@@ -253,15 +263,7 @@ export class RecoveryEventDedupe {
         : fetch;
       const result=await sendAuthEmail(this.env,event,providerFetch);
       await this.storage.put('sent',{messageId:result.id,sentAt:new Date().toISOString()});
-      let qaAutoVerified=false;
-      if(this.env.PACK1_AUTH_ENV==='qa'
-        && this.env.PACK1_QA_AUTO_VERIFY_AFTER_SEND==='1'
-        && event.linkType==='email-verification') {
-        const verified=await fetch(event.linkUrl,{redirect:'follow',signal:AbortSignal.timeout(15000)});
-        if(!verified.ok)throw Error('QA verification link redemption failed');
-        qaAutoVerified=true;
-      }
-      return responseJson({ok:true,duplicate:false,qaAutoVerified});
+      return responseJson({ok:true,duplicate:false});
     } catch {
       return responseJson({ok:false},502);
     }
@@ -295,6 +297,24 @@ async function recordQaTelemetry(env,eventId,deliveryAttempt,details) {
     });
   } catch {}
 }
+async function recordQaVerificationLink(env,event) {
+  if(env.PACK1_AUTH_ENV!=='qa'||event?.linkType!=='email-verification'||!env.RECOVERY_DEDUPE)return;
+  try {
+    const linkUrl=validatedAuthLink(env.AUTH_BASE,event.linkUrl);
+    if(!linkUrl)return;
+    const id=env.RECOVERY_DEDUPE.idFromName('__qa_verification_evidence__');
+    await env.RECOVERY_DEDUPE.get(id).fetch('https://pack1.internal/pending-verification',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({linkUrl}),
+    });
+  } catch {}
+}
+function qaEvidenceAuthorized(request,env) {
+  const key=safeString(env.PACK1_QA_EVIDENCE_KEY,256);
+  if(!key||key.length<32)return false;
+  return request.headers.get('authorization')==='Bearer '+key;
+}
 
 export async function authWebhook(request,env) {
   const started=Date.now();
@@ -309,6 +329,13 @@ export async function authWebhook(request,env) {
     if(request.method!=='GET')return new Response(null,{status:405});
     const id=env.RECOVERY_DEDUPE.idFromName('__qa_telemetry__');
     return env.RECOVERY_DEDUPE.get(id).fetch('https://pack1.internal/telemetry');
+  }
+  if(url.pathname==='/qa/pending-verification') {
+    if(env.PACK1_AUTH_ENV!=='qa')return new Response(null,{status:404});
+    if(request.method!=='GET')return new Response(null,{status:405});
+    if(!qaEvidenceAuthorized(request,env))return new Response(null,{status:401});
+    const id=env.RECOVERY_DEDUPE.idFromName('__qa_verification_evidence__');
+    return env.RECOVERY_DEDUPE.get(id).fetch('https://pack1.internal/pending-verification');
   }
   if(url.pathname!=='/webhook')return new Response(null,{status:404});
   if(request.method!=='POST')return new Response(null,{status:405});
@@ -361,7 +388,8 @@ export async function authWebhook(request,env) {
   }
   let deliveryResult={};
   try {deliveryResult=await result.json();} catch {}
-  const details={status:'sent_or_duplicate',event_type:event.eventType,link_type:event.linkType,duplicate:Boolean(deliveryResult?.duplicate),qa_auto_verified:env.PACK1_AUTH_ENV==='qa'?Boolean(deliveryResult?.qaAutoVerified):undefined,verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
+  await recordQaVerificationLink(env,event);
+  const details={status:'sent_or_duplicate',event_type:event.eventType,link_type:event.linkType,duplicate:Boolean(deliveryResult?.duplicate),verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
   logTiming(env,deliveryAttempt,details);
   await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
   if(env.PACK1_AUTH_ENV==='qa'&&env.PACK1_FORCE_RETRY_AFTER_SEND==='1')return new Response(null,{status:503});
