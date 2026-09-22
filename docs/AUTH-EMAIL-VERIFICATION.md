@@ -106,6 +106,15 @@ The verification delivery boundary receives the validated `link_url` but not the
 
 Other signed event/link types remain rejected and observable without logging credentials.
 
+## Acceptance evidence boundaries
+
+Pack One intentionally separates two kinds of verification evidence:
+
+- **Delivered-email evidence:** a real delivered Pack One verification email has already been inspected through Resend, including branding and the delivered Neon `/verify-email` link shape. This is the evidence that the email content itself contains the expected verification link.
+- **Automated CI evidence:** the disposable-branch acceptance should prove the signed Neon webhook is accepted, the already validated verification URL can be redeemed only after signup completes, `neon_auth.user.emailVerified` becomes true, and password sign-in succeeds afterward.
+
+Automated CI must not be described as proof of mailbox contents unless it actually reads the delivered message. Resend API keys currently expose only `sending_access` or `full_access`; there is no read-only key scope. Pack One will not broaden the production send credential or add a full-access QA credential solely to make CI read messages. The safer acceptance design is a QA-only one-shot redemption seam that never returns or logs the stored verification URL/token.
+
 ## Production gate
 
 Before enabling production verification, QA must prove end-to-end:
