@@ -305,6 +305,7 @@ test('QA verification acceptance may redeem the exact delivered link only after 
   const originalFetch=globalThis.fetch;
   globalThis.fetch=async(url,init={})=>{
     calls.push({url:String(url),init});
+    if(String(url)==='https://api.resend.com/emails')return Response.json({id:'email_qa_verify_fixture'},{status:200});
     if(String(url)===linkUrl)return new Response(null,{status:302,headers:{location:'https://packone.pro/'}});
     throw Error('unexpected network call');
   };
