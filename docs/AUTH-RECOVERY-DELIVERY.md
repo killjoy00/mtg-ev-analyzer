@@ -126,6 +126,22 @@ The corrected production smoke passed:
 
 The disposable production user and recovery row were removed after the smoke.
 
+## Real email-client acceptance
+
+A real production reset was requested for an existing production account and completed through Gmail on 2026-09-22.
+
+Measured acceptance evidence:
+
+- client: Gmail;
+- observed delivered link shape: `https://packone.pro/reset-password/#token=<redacted>`;
+- Gmail preserved the fragment through the actual email-client click/redirect chain;
+- the Pack One reset page received the credential and the password reset completed successfully;
+- no reset token contents were recorded in repository evidence.
+
+Outlook was not tested because the owner does not use Outlook. This is recorded as unavailable coverage, not as a failed acceptance result.
+
+The managed-Neon `?token=` fallback remains permanently supported regardless of this successful Gmail fragment proof.
+
 ## Reset-page rollback compatibility
 
 The reset page permanently supports both:
