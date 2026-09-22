@@ -88,6 +88,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0029_account_recovery.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0030_account_credential_limits.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0031_account_deletion.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0032_traditional_v4_components.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
 
       - name: Deploy exact revision to development
@@ -129,6 +130,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0029_account_recovery.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0030_account_credential_limits.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0031_account_deletion.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0032_traditional_v4_components.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
 
       - name: Deploy the development-tested revision to production

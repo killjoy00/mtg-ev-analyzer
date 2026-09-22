@@ -107,3 +107,12 @@ test('production Auth webhook config workflow is fixed to recovery-only subscrip
   assert.match(workflow,/steps\.request\.outputs\.operation == 'ensure-enabled'/);
   assert.doesNotMatch(workflow,/send\.otp/);
 });
+
+
+test('secure Auth release applies migration 0032 before schema verification in both environments',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/secure-auth-release.yml',import.meta.url),'utf8');
+  const migration='migrations/0032_traditional_v4_components.sql';
+  assert.equal(workflow.split(migration).length-1,2,'0032 must be applied once in development and once in production');
+  for(const block of workflow.split('DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs').slice(0,-1))
+    assert.ok(block.lastIndexOf(migration)>block.lastIndexOf('migrations/0031_account_deletion.sql'),'0032 must run after 0031 before verification');
+});
