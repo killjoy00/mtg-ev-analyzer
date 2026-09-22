@@ -10,7 +10,7 @@ Pack One remains the eight-decision game in [CHARTER](CHARTER.md): three univers
 | --- | --- |
 | Browser | GitHub Pages serves main. PR156 released the light tournament design: self-hosted Barlow Condensed and Source Sans 3, numbered Daily scorecards, larger controls, and matching editorial typography. PR160 adds the third Daily, visible ranked/guest state and Elite set picker. PR162 publicly activates Patreon; PR163 adds both-tier ad suppression with Google delivery still disabled. Current application release: `4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5`. |
 | Production functions | `draftrunapi` deployment 26, `pack1growth` 17, and `pack1api` 20 all answer with release `4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5`. Development run 35463356101 and production run 35463480967 passed all three complete Daily flows. Independent health-marker reads passed afterward. |
-| Schema | Reviewed additive migrations through 0027 are applied to development and production. Historical migration 0016 was not replayed. |
+| Schema | Reviewed additive migrations through 0032 are applied to development and production, including the v4 Traditional component guards. Historical destructive migration 0016 was not replayed. |
 | Corpus / selection | `elite-trophy-colour-stage-v8` / `eight-pick-v4`. The v8 parent remains immutable while separately versioned supplemental source components extend current inventory. |
 | Model / scoring | Current v8 evidence uses leakage-corrected `strong-player-colour-stage-v4`, trained on Premier evidence. Traditional source rows do not train or calibrate the model. Historical v3 remains readable; the scoring curve is unchanged. |
 | New-run eligibility | `trophy-implied-score-20-v1`; the indexed threshold is equivalent to the rounded implied-score floor. Historical games retain their recorded policy. |
@@ -31,7 +31,7 @@ The first staging attempt caught an older automatic image-refresh job changing d
 
 The index/selection change had zero eligibility mismatches across 2,034,020 stored ratings and selected the same eight puzzle IDs for the recorded seed on an isolated production clone. Local serial HTTP timings are not production page latency. [Performance evidence](../results/release-2026-09-19/serving-performance.json).
 
-Production source verification passed 40 new Daily selections (320 decisions) and 25 single-set custom paths. It confirmed independent trajectories, serving floor, pick windows, retained historical reads, 13,673 unchanged Premier Cube payloads and 19 unchanged existing Daily schedules. Production has 21 Live regular Phase 2 components and SIR Candidate, with all nine exclusions retained.
+The v4 release verification passed 40 new Daily selections (320 decisions) and 25 single-set custom paths. It confirmed independent trajectories, the serving floor, reviewed pick windows, retained historical reads and preserved existing payloads/Dailies. Production has 21 Live regular v4 components plus Live Powered Cube v4; SIR v4 remains Candidate under its Candidate parent. HBG/HOB/KTK/PIO remain blocked.
 
 Live browser run 35458218471 passed both complete unranked Dailies, loaded card images, responsive widths 320/390/768/1440, pool/card proportions, completion states and zero browser errors. In that single run, homepage play links appeared at 808 ms, mixed first pack at 688 ms, and Cube first pack at 213 ms. These are observations, not latency guarantees. [Full production evidence](../results/release-2026-09-19/production-verification.json).
 
