@@ -132,7 +132,7 @@ function dailyRow(row, names, index) {
 
 function settingsMarkup(profile, progress, account, patreon) {
   if (!profile.player.claimed) {
-    return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div></aside>`;
+    return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="text-button" id="profile-claim-account">Sign in</button></aside>`;
   }
   const unlocked = unlockedAchievements(profile);
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
@@ -140,7 +140,25 @@ function settingsMarkup(profile, progress, account, patreon) {
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
     <header><div><p class="eyebrow">Profile</p><h2 id="profile-account-title">Profile settings</h2><p>${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     ${account?.user?`<form id="profile-settings-form">
-      <label><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required><small>Shown on all Daily leaderboards.</small></label>
+      <label class="profile-leaderboard-name"><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required><small>Shown on all Daily leaderboards.</small></label>
+    ${account?.user?`<section class="profile-membership profile-settings-membership" aria-labelledby="patreon-membership-title">
+      <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
+        ${patreon?.configured!==true
+          ? `<p><strong>Membership status unavailable.</strong><br><span>Pack One can’t verify Patreon linking right now. Your current access is unchanged.</span></p>`
+          : elite
+            ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked.</span></p>${patreon?.ad_free?'<p>Ad-free browsing is included while your membership is connected.</p>':''}`
+            : patreon?.connected
+              ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, refresh your access here.</span></p>${patreon?.ad_free?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
+              : `<p><strong>Unlock Elite practice.</strong><br><span>Join on Patreon, then connect your Patreon account here so Pack One can activate the benefits.</span></p>`}
+      </div>
+      ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',error:'Patreon could not be connected. Please try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
+      <div class="profile-membership-actions">
+        <a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${supportUrl}" rel="noopener noreferrer">${patreon?.configured!==true?'Open Patreon':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite on Patreon':'Become Elite on Patreon'}</a>
+        ${!elite&&patreon?.configured===true?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
+        ${patreon?.connected?'<button type="button" class="text-button" id="patreon-disconnect">Disconnect Patreon</button>':''}
+        <span id="patreon-status" aria-live="polite"></span>
+      </div>
+    </section>`:''}
       <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''}><span><strong>Public profile</strong><small>Allows leaderboard visitors and shared links to open your Pack One record.</small></span></label>
       <label><span>Favorite environment</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>
       <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
@@ -172,27 +190,9 @@ function settingsMarkup(profile, progress, account, patreon) {
             : `<form class="account-form" id="account-delete">
                  <label>Current password<input required type="password" name="currentPassword" maxlength="256" autocomplete="current-password"></label>
                  <label class="profile-toggle"><input required type="checkbox" name="confirm"><span><strong>I understand this permanently deletes my account and cannot be undone.</strong></span></label>
-                 <button class="button secondary" type="submit">Permanently delete account</button>
+                 <button class="button secondary" type="submit">Delete Account</button>
                  <span class="profile-settings-status" aria-live="polite"></span>
                </form>`}
-      </div>
-    </section>`:''}
-    ${account?.user?`<section class="profile-membership" aria-labelledby="patreon-membership-title">
-      <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
-        ${patreon?.configured!==true
-          ? `<p><strong>Membership status unavailable.</strong><br><span>Pack One can’t verify Patreon linking right now. Your current access is unchanged.</span></p>`
-          : elite
-            ? `<p><strong>Elite active</strong><br><span>Powered Cube practice and custom-set practice are unlocked.</span></p>${patreon?.ad_free?'<p>Ad-free browsing is included while your membership is connected.</p>':''}`
-            : patreon?.connected
-              ? `<p><strong>Patreon connected</strong><br><span>Elite unlocks Powered Cube practice and custom-set practice. If you just upgraded on Patreon, refresh your access here.</span></p>${patreon?.ad_free?'<p>Your current paid membership includes ad-free browsing.</p>':''}`
-              : `<p><strong>Unlock Elite practice.</strong><br><span>Join on Patreon, then connect your Patreon account here so Pack One can activate the benefits.</span></p>`}
-      </div>
-      ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',error:'Patreon could not be connected. Please try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
-      <div class="profile-membership-actions">
-        <a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${supportUrl}" rel="noopener noreferrer">${patreon?.configured!==true?'Open Patreon':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite on Patreon':'Become Elite on Patreon'}</a>
-        ${!elite&&patreon?.configured===true?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
-        ${patreon?.connected?'<button type="button" class="text-button" id="patreon-disconnect">Disconnect Patreon</button>':''}
-        <span id="patreon-status" aria-live="polite"></span>
       </div>
     </section>`:''}
   </section>`;
@@ -213,7 +213,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
   const recent = (profile.recent || []).slice(0, 20);
   const publicUrl = profile.player.profile_public && profile.player.profile_key ? `${location.origin}${location.pathname}?profile=${encodeURIComponent(profile.player.profile_key)}` : '';
   const heroActions = own && !profile.player.claimed
-    ? '<button type="button" class="button primary" id="profile-claim-account">Sign In</button><button type="button" class="button secondary" id="profile-share">Share my record</button><button type="button" class="button secondary" id="profile-home">Back to game</button>'
+    ? '<button type="button" class="button primary" id="profile-claim-account">Sign In</button><button type="button" class="button secondary" id="profile-home">Back to game</button>'
     : `<button type="button" class="button primary" id="profile-share">${profile.player.profile_public ? 'Share profile' : 'Share my record'}</button>${own ? '<a class="button secondary" href="#profile-account">Account settings</a><button type="button" class="button secondary" id="profile-home">Back to game</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}`;
 
   return `<section class="player-profile-page growth-page" data-profile-key="${esc(publicKey || profile.player.profile_key || '')}">
