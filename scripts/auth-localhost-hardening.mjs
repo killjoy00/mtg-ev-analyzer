@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
+import {removeProviderUser} from '../worker/account-deletion.mjs';
 
 export const PROJECT_ID='patient-shadow-91417882';
 export const QA_BRANCH='br-twilight-hill-ayffyd2b';
@@ -88,9 +89,23 @@ export function readConfigSnapshot(branch){
   });
 }
 
-export function deleteAuthUser(branch,userId){
+function servicePrincipalUnlinked(branch,serviceId){
+  if(!/^[0-9a-f-]{36}$/i.test(String(serviceId||'')))return false;
+  const sql="SELECT count(*) FROM account_links WHERE auth_user_id='"+serviceId+"'::uuid";
+  const output=runNeon(['psql',branch,'--project-id',PROJECT_ID,'--database-name','pack1','--','-XAtc',sql]).trim();
+  return output==='0';
+}
+
+export async function deleteAuthUser(branch,userId){
   if(!safeString(userId,128))return;
-  runNeon(['neon-auth','user','delete',userId,...authArgs(branch)]);
+  const authBase=branch===PROD_BRANCH?PROD_AUTH_BASE:QA_AUTH_BASE;
+  const result=await removeProviderUser({
+    authBase,
+    authUserId:userId,
+    validateServicePrincipal:async serviceId=>servicePrincipalUnlinked(branch,serviceId),
+  });
+  if(!['success','not_found'].includes(result.kind))
+    throw Error('Provider Auth user cleanup failed: '+String(result.code||result.kind)+'.');
 }
 
 function responseCode(body){
@@ -218,12 +233,6 @@ export async function runQa({fetcher=fetch}={}){
 
 export async function runProduction({fetcher=fetch}={}){
   validateRequestFile(JSON.parse(fs.readFileSync(REQUEST_FILE,'utf8')));
-  // One-time cleanup of disposable smoke users left by the two pre-CLI-5.0 verification runs.
-  for(const userId of [
-    '3a238e01-6e6c-4d96-b719-e321e39ff00c',
-    '252acfa7-57fa-4774-9048-6de5dcc4f160',
-    '4fb31297-251d-48b5-b2ee-cd698d5ac8a1',
-  ]) deleteAuthUser(PROD_BRANCH,userId);
   const beforeSnapshot=readConfigSnapshot(PROD_BRANCH);
   const before=getAllowLocalhost(PROD_BRANCH);
   let changed=false;
@@ -278,7 +287,7 @@ export async function runProduction({fetcher=fetch}={}){
   const cleanupErrors=[];
   for(const [label,userId] of [['sign-in smoke',signInUserId],['recovery smoke',recoveryUserId]]){
     if(!userId)continue;
-    try{deleteAuthUser(PROD_BRANCH,userId);}
+    try{await deleteAuthUser(PROD_BRANCH,userId);}
     catch(error){cleanupErrors.push(label+': '+String(error?.message||'cleanup failed'));}
   }
 
