@@ -73,6 +73,8 @@ jobs:
         run: node tests/account-e2e.mjs
       - name: Run auth simplification and Daily return contract
         run: node tests/auth-context-e2e.mjs
+      - name: Run email verification Chromium/WebKit mobile contract
+        run: node tests/email-verification-e2e.mjs
       - name: Run Patreon activation mobile contract
         run: node tests/patreon-activation-e2e.mjs
       - name: Run password recovery Chromium/WebKit mobile contract
