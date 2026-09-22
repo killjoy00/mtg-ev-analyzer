@@ -33,6 +33,30 @@ The API uses Patreon's v2 `currently_entitled_tiers` relationship as recommended
 in the [official API reference](https://docs.patreon.com/). Neon Auth remains the
 account identity; Patreon is a linked provider, not a login replacement.
 
+## Elite Welcome Note activation
+
+Phase 0 on September 22, 2026 verified with the same already-linked owner Patreon
+identity that the existing `identity` OAuth scope returns the Pack One campaign
+membership and exact Elite tier. The OAuth callback immediately reapplied the
+authoritative Elite snapshot and premium capabilities without waiting for scheduled
+reconciliation, so no broader Patreon membership scope is requested.
+
+After this activation release is deployed, replace the Elite tier's existing
+five-step Welcome Note instructions with:
+
+**Activate your Pack One Elite benefits**
+
+Go to:
+
+`https://packone.pro/?patreon=activate`
+
+Sign in to Pack One if needed, then authorize Patreon. Pack One will verify your
+membership and unlock Elite benefits.
+
+This reuses the existing Patreon client, campaign, tiers, webhook, callback and
+Pack One account infrastructure. Do not create a second Patreon client or another
+post-purchase communication path.
+
 ## Synchronization and failure behavior
 
 OAuth requests only `identity`, reads the linked user's membership in the creator

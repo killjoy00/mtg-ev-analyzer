@@ -14,6 +14,12 @@ export function validPatreonPolicy(policy = PATREON_POLICY) {
     policy.premiumTierIds.length > 0 && policy.premiumTierIds.every(id => /^\d+$/.test(id));
 }
 
+export function currentPatreonMembership(member, policy = PATREON_POLICY) {
+  if (!validPatreonPolicy(policy) || !member || member.campaignId !== policy.campaignId) return false;
+  if (member.status === 'declined_patron' || /declined|refunded|fraud|deleted/i.test(member.lastChargeStatus || '')) return false;
+  return member.status === 'active_patron' || member.status === 'former_patron' || member.isFreeTrial || member.isGifted;
+}
+
 export function premiumPatreonMembership(member, policy = PATREON_POLICY) {
   return qualifyingMembership(member, policy.premiumTierIds, policy);
 }
@@ -23,10 +29,9 @@ export function adFreePatreonMembership(member, policy = PATREON_POLICY) {
 }
 
 function qualifyingMembership(member, tierIds, policy) {
-  if (!validPatreonPolicy(policy) || !member || member.campaignId !== policy.campaignId) return false;
+  if (!currentPatreonMembership(member, policy)) return false;
   if (!member.tierIds?.some(id => tierIds.includes(id))) return false;
-  if (member.status === 'declined_patron' || /declined|refunded|fraud|deleted/i.test(member.lastChargeStatus || '')) return false;
   // Current tier entitlement, including a still-entitled cancelled subscription,
   // is authoritative. Monetary totals and lifetime support cannot unlock tools.
-  return member.status === 'active_patron' || member.status === 'former_patron' || member.isFreeTrial || member.isGifted;
+  return true;
 }

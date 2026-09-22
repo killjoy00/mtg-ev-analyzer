@@ -37,7 +37,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   await installHistoricalShare();
 } else {
   // Paint play links before identity/profile requests. Profiles load on demand.
-  const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account')
+  const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
     ? await import('./daily-home.mjs?v=6') : null;
   home?.renderDailyHome();
   const growthReady = import('./growth.mjs?v=6');
@@ -56,10 +56,16 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await (await growthReady).resumeAccountAuth(params.get('auth'));
   } else if (params.has('patreon')) {
     await identityReady;
-    const profiles=await import('./profile-product.mjs?v=6');
-    profiles.installProfileProductLayer();
-    (await import('./profile-polish.mjs?v=6')).installProfilePolish();
-    await profiles.renderMyProfile();
+    const patreonResult=params.get('patreon');
+    const growth=await growthReady;
+    if(patreonResult==='activate'||growth.hasPatreonActivationIntent()) {
+      await growth.renderPatreonActivation({result:patreonResult==='activate'?null:patreonResult,source:patreonResult==='activate'?'welcome_note':'oauth_return'});
+    } else {
+      const profiles=await import('./profile-product.mjs?v=6');
+      profiles.installProfileProductLayer();
+      (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+      await profiles.renderMyProfile();
+    }
     const clean=new URL(location.href);clean.searchParams.delete('patreon');
     history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
   } else if (home) home.installDailyHome(identityReady);
@@ -67,6 +73,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     if (!['deleted','deleting'].includes(params.get('account'))) {
       await (await growthReady).renderAccount({source:'route'});
+      if(params.get('account')==='patreon')document.querySelector('#profile-account-tab')?.click();
     }
   } else if (params.has('profile')) {
     await identityReady;
