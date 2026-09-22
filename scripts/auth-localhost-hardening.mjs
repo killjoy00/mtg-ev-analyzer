@@ -233,12 +233,6 @@ export async function runQa({fetcher=fetch}={}){
 
 export async function runProduction({fetcher=fetch}={}){
   validateRequestFile(JSON.parse(fs.readFileSync(REQUEST_FILE,'utf8')));
-  // One-time cleanup of disposable smoke users left by the two pre-CLI-5.0 verification runs.
-  for(const userId of [
-    '3a238e01-6e6c-4d96-b719-e321e39ff00c',
-    '252acfa7-57fa-4774-9048-6de5dcc4f160',
-    '4fb31297-251d-48b5-b2ee-cd698d5ac8a1',
-  ]) await deleteAuthUser(PROD_BRANCH,userId);
   const beforeSnapshot=readConfigSnapshot(PROD_BRANCH);
   const before=getAllowLocalhost(PROD_BRANCH);
   let changed=false;
