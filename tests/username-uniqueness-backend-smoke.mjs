@@ -9,8 +9,10 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 if(!process.argv.includes('--dev-fixtures'))throw new Error('Use an isolated development database and --dev-fixtures.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
-const {default:growth,query}=await import('../worker/growth-function.js');
+const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
 const {default:legacy}=await import('../worker/index.js');
+const {default:draftRun}=await import('../worker/draft-run-function.mjs');
+const {linkedPlayerIdentity}=await import('../worker/account-identity.mjs');
 const {USERNAME_TAKEN_MESSAGE}=await import('../worker/username.mjs');
 
 const tag=crypto.randomUUID().slice(0,8);
@@ -160,11 +162,73 @@ assert.equal((await stored(adopter.playerId)).display_name,freeNickname);
 const contender=await claim('contender',username);
 assert.equal((await stored(contender.playerId)).display_name,username,'linking never fails over a taken nickname');
 assert.equal(await owned(contender.playerId),false,'a taken nickname is not reserved');
+assert.equal(await linkedPlayerIdentity(query,contender.playerId),null,
+  'an unowned collision is linked but is not a public ranked identity');
+
+// Recreate the original bug directly: both linked players have the same stored
+// nickname, but only the legitimate owner may surface on public leaderboards.
+const today=gameDateKey();
+for(const [playerId,score] of [[first.playerId,91],[contender.playerId,89]]) {
+  await query(
+    `INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json,is_featured)
+     VALUES($1::uuid,$2::date,'mixed','draft_run',$3::int,'A','[]'::jsonb,'{}'::jsonb,true)
+     ON CONFLICT(player_id,challenge_date,set_id,mode) DO NOTHING`,
+    [playerId,today,score],
+  );
+}
+const draftBoard=await call(draftRun,'/v1/leaderboard?period=all&environment=mixed',undefined,null,200);
+assert.equal(draftBoard.rows.filter(row=>row.display_name===username).length,1,
+  'Draft Run exposes the owned username exactly once');
+
+const legacySet=`q${tag}`;
+for(const [playerId,score] of [[first.playerId,91],[contender.playerId,89]]) {
+  await query(
+    `INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json,is_featured)
+     VALUES($1::uuid,$2::date,$3,'top3',$4::int,'A','[]'::jsonb,'{}'::jsonb,true)
+     ON CONFLICT(player_id,challenge_date,set_id,mode) DO NOTHING`,
+    [playerId,today,legacySet,score],
+  );
+}
+const legacyBoard=await call(legacy,`/v1/leaderboard?period=all&set=${legacySet}&mode=top3`,undefined,null,200);
+assert.equal(legacyBoard.filter(row=>row.display_name===username).length,1,
+  'the legacy board also exposes the owned username exactly once');
+
+// Public challenge attribution follows the same boundary. A guest/local
+// nickname may still be duplicated, but it is presented generically to others.
+const challengePayload={
+  setId:legacySet,setName:'QA',
+  pack:[
+    {id:`a-${tag}`,name:'A',model_probability:0.6,image_url:''},
+    {id:`b-${tag}`,name:'B',model_probability:0.3,image_url:''},
+    {id:`c-${tag}`,name:'C',model_probability:0.1,image_url:''},
+  ],
+  historicalId:`a-${tag}`,
+  selectedIds:[`a-${tag}`,`b-${tag}`,`c-${tag}`],
+  displayName:username,
+};
+const genericShare=await call(legacy,'/v1/challenges',challengePayload,contender.token,200);
+assert.equal(genericShare.displayName,'A friend','an unowned nickname is not public share attribution');
+const loadedGenericShare=await call(legacy,`/v1/challenges/${genericShare.id}`,undefined,null,200);
+assert.equal(loadedGenericShare.creator.displayName,'A friend');
+
 assert.equal((await rename(contender,username,409)).error,USERNAME_TAKEN_MESSAGE,
-  'and it cannot be taken later either');
-assert.equal((await rename(contender,`Erin ${tag}`)).player.display_name,`Erin ${tag}`,'renaming resolves the collision');
+  'and the duplicate cannot be taken later either');
+const resolvedName=`Erin ${tag}`;
+assert.equal((await rename(contender,resolvedName)).player.display_name,resolvedName,'renaming resolves the collision');
 assert.equal(await owned(contender.playerId),true);
-console.log('Account claim reserves only a free username',tag);
+assert.equal((await linkedPlayerIdentity(query,contender.playerId)).display_name,resolvedName,
+  'the renamed account becomes a public ranked identity');
+
+const renamedDraftBoard=await call(draftRun,'/v1/leaderboard?period=all&environment=mixed',undefined,null,200);
+assert.ok(renamedDraftBoard.rows.some(row=>row.display_name===resolvedName),
+  'the existing Draft Run score becomes visible under the newly owned username');
+const renamedLegacyBoard=await call(legacy,`/v1/leaderboard?period=all&set=${legacySet}&mode=top3`,undefined,null,200);
+assert.ok(renamedLegacyBoard.some(row=>row.display_name===resolvedName),
+  'the existing legacy score becomes visible under the newly owned username');
+
+const ownedShare=await call(legacy,'/v1/challenges',{...challengePayload,displayName:resolvedName},contender.token,200);
+assert.equal(ownedShare.displayName,resolvedName,'an owned username may be public share attribution');
+console.log('Linked collisions stay private until renamed',tag);
 
 // ---------------------------------------------------------------------------
 // Concurrency: the constraint, not a preflight check, decides.
