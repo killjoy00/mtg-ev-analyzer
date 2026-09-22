@@ -29,6 +29,8 @@ try {
  assert.equal((await registerHealthyCandidate(query,discovered,manifestHash)).rows.length,0);
  const report=await call('');assert.ok(report.sets.some(s=>s.set_id==='hob'));assert.equal(report.corpus_version,DRAFT_RUN_CORPUS_VERSION);
  const change=(oldStatus,status)=>call('/hob/status',{oldStatus,status,corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason:'QA lifecycle'});
+ // The CI database is a disposable Neon child. Remove inherited production-ready evidence so this pre-health assertion is isolated.
+ await query("UPDATE corpus_health_checks SET ready=false WHERE set_id='hob' AND corpus_version=$1 AND ready=true",[DRAFT_RUN_CORPUS_VERSION]);
  await change('Live','Paused');
  await call('/hob/status',{oldStatus:'Live',status:'Paused',corpusVersion:DRAFT_RUN_CORPUS_VERSION},409);
  await call('/hob/status',{oldStatus:'Paused',status:'Live',corpusVersion:DRAFT_RUN_CORPUS_VERSION},409);
