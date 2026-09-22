@@ -77,3 +77,17 @@ test('secure Auth release deploys the production recovery Worker from the exact 
   assert.match(workflow,/RELEASE_COMMIT: \$\{\{ github\.sha \}\}/);
   assert.match(workflow,/auth-webhook-control\.mjs deploy-production/);
 });
+
+
+test('production recovery smoke is main-only, fixed-target and secret-free',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/production-recovery-smoke.yml',import.meta.url),'utf8');
+  const source=fs.readFileSync(new URL('../scripts/auth-webhook-production-smoke.mjs',import.meta.url),'utf8');
+  assert.match(workflow,/branches: \[main\]/);
+  assert.match(workflow,/pack1-authhook\.killjoy00\.workers\.dev\/health\?quick=1/);
+  assert.match(workflow,/auth-webhook-production-smoke\.mjs/);
+  assert.doesNotMatch(workflow,/secrets\./);
+  assert.match(source,/ep-hidden-bonus-ayfmcpys\.neonauth/);
+  assert.match(source,/https:\/\/packone\.pro/);
+  assert.match(source,/delivered@resend\.dev/);
+  assert.doesNotMatch(source,/console\.log\([^\n]*(password|token|signature|cookie)/i);
+});
