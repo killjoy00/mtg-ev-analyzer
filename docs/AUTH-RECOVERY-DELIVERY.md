@@ -1,46 +1,39 @@
 # Pack One recovery email delivery
 
-Status: implementation candidate. Production Auth webhook remains disabled.
+Status: **production active**. Managed Neon remains the recovery-token issuer, Auth database owner, and password-reset authority. Pack One owns recovery email delivery and user-visible reset links.
 
-## Objective
+## Production state
 
-Managed Neon remains the recovery-token issuer, Auth database owner, and password-reset authority. Pack One takes over only recovery email delivery so user-visible email content and reset links are Pack One-owned.
+Production Neon Auth branch:
 
-## Phase 0 live evidence
+- project: `patient-shadow-91417882`
+- branch: `br-orange-feather-ayps8kep` (`main`)
+- Auth base: `https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth`
 
-The separate Pack One Auth QA project proved the deployed Managed Neon behavior:
+Production recovery receiver:
 
-- password recovery emits `send.magic_link`;
-- `X-Neon-Signature`, `X-Neon-Signature-Kid`, `X-Neon-Timestamp`, `X-Neon-Event-Type`, `X-Neon-Event-Id`, and `X-Neon-Delivery-Attempt` are present;
-- the payload event is `send.magic_link` with `event_data.link_type = "forget-password"`;
-- the payload exposes the raw recovery token;
-- the webhook token SHA-256 exactly matched the token portion of the newly created `neon_auth.verification.identifier = 'reset-password:' + token` row;
-- the detached Ed25519 JWS verified against the QA Auth JWKS using the exact raw request bytes;
-- the observed successful delivery was attempt 1;
-- while the webhook was enabled, no corresponding managed QA recovery email appeared through the existing SMTP path.
+- service: `pack1-authhook`
+- webhook: `https://pack1-authhook.killjoy00.workers.dev/webhook`
+- health: `https://pack1-authhook.killjoy00.workers.dev/health?quick=1`
+- sender: `Pack One <accounts@packone.pro>`
+- subject: `Reset Your Password - Pack One`
+- reset URL: `https://packone.pro/reset-password/#token=<raw-token>`
 
-The QA webhook has been disabled again after the probe.
+Production Neon Auth webhook configuration is fixed to:
 
-## Architecture deviation from the original handoff
+- enabled: `true`
+- URL: `https://pack1-authhook.killjoy00.workers.dev/webhook`
+- events: `send.magic_link` only
+- timeout: 5 seconds
+- `send.otp`: not enabled
 
-The original handoff proposed a dedicated Neon Function. Live Managed Neon configuration rejected webhook URLs on Neon infrastructure with:
+The configuration is managed by the reviewed main-only workflow `.github/workflows/production-auth-webhook-config.yml`. Its request file is `.github/production-auth-webhook-config-request.json`.
 
-`Cannot use Neon infrastructure domains`
+## Architecture
 
-That contradicts the proposed hosting location, not the security boundary or product design.
+Managed Neon issues and redeems the recovery credential. Pack One never replaces the Auth database or reset authority.
 
-The persistent receiver is therefore a dedicated Cloudflare Worker:
-
-- QA service: `pack1-authhook-qa`
-- production service: `pack1-authhook`
-- server-to-server `workers.dev` endpoint
-- not routed through `api.packone.pro`
-- no change to `edge/gateway.mjs`
-- no browser CORS, cookies, CSRF, Pack One session, or ingress secret
-
-The Neon Auth signature is the webhook authentication boundary.
-
-## Handler contract
+The persistent receiver is a dedicated Cloudflare Worker because Managed Neon rejects Neon-infrastructure webhook destinations. The production receiver is intentionally separate from `api.packone.pro` and `edge/gateway.mjs`.
 
 The Worker allows only:
 
@@ -51,36 +44,72 @@ For webhook requests it:
 
 1. enforces a 64 KiB body limit;
 2. preserves exact raw bytes;
-3. validates timestamp freshness;
+3. validates the Neon timestamp freshness window;
 4. selects the JWKS key by `kid`, caches it, and refetches on failed verification;
-5. verifies the detached Ed25519 JWS over the exact raw request bytes;
-6. parses JSON only after verification;
-7. accepts only `send.magic_link` + `forget-password`;
-8. requires the header and payload event IDs to match;
-9. hands the event to a per-event Durable Object;
-10. sends through Resend with the Neon event ID as the namespaced idempotency key;
-11. stores only the successful provider message ID and send timestamp for server-side dedupe;
-12. returns 2xx for successful or duplicate delivery.
+5. requires protected JWS `alg = EdDSA` and a matching `kid`;
+6. verifies the detached Ed25519 JWS over the exact raw request bytes;
+7. parses JSON only after signature verification;
+8. accepts only `send.magic_link` with `event_data.link_type = "forget-password"`;
+9. requires payload/header event IDs to match;
+10. hands the event to a per-event Durable Object;
+11. sends through Resend with a namespaced Neon event-ID idempotency key;
+12. stores only the successful provider message ID and send timestamp for duplicate suppression;
+13. returns 2xx for successful or already-delivered events.
 
-Raw recovery tokens, signatures, and recipient addresses are never logged.
+Raw recovery tokens, signatures, recipient addresses, and credentials are not logged.
 
-## Email
+## Live QA evidence
 
-Production sender is fixed server-side:
+The separate QA Auth project proved the provider contract before production activation:
 
-`Pack One <accounts@packone.pro>`
+- password recovery emits `send.magic_link`;
+- all six expected `X-Neon-*` headers were observed;
+- the payload event was `send.magic_link` with `link_type = "forget-password"`;
+- the raw recovery token was present;
+- the webhook token SHA-256 exactly matched the token portion of the contemporaneous `neon_auth.verification.identifier = 'reset-password:' + token` row;
+- detached Ed25519 verification succeeded against the QA JWKS using the exact raw request body;
+- enabling the webhook suppressed the managed QA recovery email;
+- a real Pack One QA email was delivered through Resend with the Pack One fragment URL;
+- the same token completed the password reset and sign-in with the new password;
+- measured successful webhook totals included 456 ms and 617 ms for first/warm acceptance requests;
+- post-send retry acceptance observed three attempts: one send plus two duplicate-safe retries, with totals 423 ms, 19 ms, and 21 ms;
+- pre-send forced-failure acceptance observed three Managed Neon delivery attempts with no email send; totals were 151 ms, 0 ms, and 0 ms;
+- disabling the QA webhook restored the managed Neon email path immediately, including its Neon-hosted recovery URL and Neon footer.
 
-Production subject remains:
+The QA webhook is disabled after acceptance. Temporary QA probe/helper functions, triggers, users, and recovery rows were removed.
 
-`Reset Your Password - Pack One`
+## Production release and smoke evidence
 
-Production reset URL:
+The production recovery Worker is part of the secure-auth release workflow and is deployed from the exact reviewed release revision. The successful secure-auth release also passed the normal production gateway, credentialed CORS, player cookie, and Google OAuth start smoke.
 
-`https://packone.pro/reset-password/#token=<raw-token>`
+The initial production smoke intentionally caught a configuration problem: the Worker was healthy, but the production Auth webhook API reported:
 
-The email contains no visible Neon hostname or Neon footer. The copy/paste fallback is the same Pack One fragment URL.
+- enabled: `false`
+- URL: empty
+- events: empty
+- timeout: 5 seconds
 
-QA uses the existing QA sender and localhost reset destination so the separate QA Auth token is never confused with production Auth.
+That explained why Managed Neon still sent its built-in recovery email.
+
+The reviewed production webhook-config workflow then set and re-read the exact recovery-only configuration above.
+
+The corrected production smoke passed:
+
+- disposable production signup: HTTP 200;
+- password-reset request: HTTP 200;
+- signup time: 336 ms;
+- reset-request time: 1299 ms;
+- a production `neon_auth.verification` recovery row was created;
+- the recovery-row token SHA-256 was `6dec9d07839275131231d2ae94c07940bce21a6dcc695f6e2dee93b8d5370fa4`;
+- the token in the delivered Pack One email hashed to the exact same value;
+- Resend reported the email delivered;
+- sender was `Pack One <accounts@packone.pro>`;
+- subject was `Reset Your Password - Pack One`;
+- the email used only `https://packone.pro/reset-password/#token=...`;
+- the email contained no Neon-hosted reset URL and no Neon Auth footer;
+- no second managed-Neon email appeared for the corrected smoke.
+
+The disposable production user and recovery row were removed after the smoke.
 
 ## Reset-page rollback compatibility
 
@@ -89,19 +118,47 @@ The reset page permanently supports both:
 - Pack One fragment: `#token=<token>`
 - managed-email fallback query: `?token=<token>`
 
-Fragment wins if both are present. The page immediately removes query and fragment material with `history.replaceState` and keeps the token only in memory.
+Fragment wins if both are present. The page immediately removes query and fragment material from the visible URL/history and keeps the token only in memory for the current attempt.
 
-## Release discipline
+## Release and rollback
 
-QA uses `.github/auth-webhook-request.json` and the dedicated QA release workflow. The QA workflow cannot deploy production.
+QA deployment/testing uses:
 
-Production integration into the secure-auth release workflow is intentionally deferred until these QA gates are complete:
+- `.github/auth-webhook-request.json`
+- `.github/workflows/auth-webhook-release.yml`
 
-1. Pack One email delivery through Resend;
-2. real reset completion;
-3. cold/warm latency measurement;
-4. forced-failure retry measurement;
-5. duplicate suppression;
-6. managed-email fallback after disabling the QA webhook.
+Production Worker deployment is part of:
 
-Production Managed Neon email remains the active recovery path until final production webhook enablement.
+- `.github/workflows/secure-auth-release.yml`
+
+Production webhook configuration uses:
+
+- `.github/production-auth-webhook-config-request.json`
+- `.github/workflows/production-auth-webhook-config.yml`
+
+The production config workflow supports two fixed operations:
+
+- `ensure-enabled`: require the exact recovery-only subscription;
+- `disable`: disable the webhook while preserving the fixed URL/event/timeout contract.
+
+Emergency rollback is therefore:
+
+1. change the reviewed production config request operation to `disable`;
+2. merge the request;
+3. verify the workflow re-reads `enabled = false`;
+4. Managed Neon resumes its existing SMTP recovery email path.
+
+QA already proved that disabling the webhook restores the managed recovery path. The Pack One reset page retains the managed-token fallback permanently, so rollback does not require an application release.
+
+## Security boundaries preserved
+
+This work did **not** change:
+
+- Managed Neon as token issuer/reset authority;
+- custom SMTP/DKIM/SPF;
+- Google OAuth identity/configuration;
+- the first-party production gateway security model;
+- session revocation behavior after reset;
+- the existing raw-token redemption path in the growth function.
+
+The recovery-email Resend credential is dedicated, sending-only, and restricted to the verified `packone.pro` domain.
