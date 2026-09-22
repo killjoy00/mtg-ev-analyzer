@@ -10,7 +10,7 @@ Pack One remains the eight-decision game in [CHARTER](CHARTER.md): three univers
 | --- | --- |
 | Browser | GitHub Pages serves main. PR156 released the light tournament design: self-hosted Barlow Condensed and Source Sans 3, numbered Daily scorecards, larger controls, and matching editorial typography. PR160 adds the third Daily, visible ranked/guest state and Elite set picker. PR162 publicly activates Patreon; PR163 adds both-tier ad suppression with Google delivery still disabled. Current application release: `4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5`. |
 | Production functions | `draftrunapi` deployment 26, `pack1growth` 17, and `pack1api` 20 all answer with release `4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5`. Development run 35463356101 and production run 35463480967 passed all three complete Daily flows. Independent health-marker reads passed afterward. |
-| Schema | Reviewed additive migrations through 0032 are applied to development and production, including the v4 Traditional component guards. Historical destructive migration 0016 was not replayed. |
+| Schema | Reviewed additive migrations through 0033 are applied to development and production, including owned Pack One username uniqueness and the v4 Traditional component guards. Historical destructive migration 0016 was not replayed. |
 | Corpus / selection | `elite-trophy-colour-stage-v8` / `eight-pick-v4`. The v8 parent remains immutable while separately versioned supplemental source components extend current inventory. |
 | Model / scoring | Current v8 evidence uses leakage-corrected `strong-player-colour-stage-v4`, trained on Premier evidence. Traditional source rows do not train or calibrate the model. Historical v3 remains readable; the scoring curve is unchanged. |
 | New-run eligibility | `trophy-implied-score-20-v1`; the indexed threshold is equivalent to the rounded implied-score floor. Historical games retain their recorded policy. |
@@ -63,14 +63,15 @@ Verify schema, deploy a reviewed main SHA to development, pass its acceptance fl
 
 `players.display_name` carries two different things, and only one of them is a username.
 
-An account-linked player's name is a public identity: it appears on the Daily leaderboard and, when the profile is public, on a public profile. An anonymous browser's name is a local nickname that the client replays from localStorage on every `/v1/player/session` call, and the QA harnesses deliberately reuse a handful of those nicknames across many guest rows. `players.username_owned` marks the first kind, and migration 0033 makes only those unique.
+An account-linked player's name becomes a public identity only when `players.username_owned` is true: owned names may appear on leaderboards, public profiles and attributed challenges. An anonymous browser's name is a local nickname that the client replays from localStorage on every `/v1/player/session` call, and the QA harnesses deliberately reuse a handful of those nicknames across many guest rows. Migration 0033 makes only owned usernames unique.
 
 - Uniqueness is a Postgres partial unique index, `players_username_uq` over `pack1_username_key(display_name)` where `username_owned`. The index is the authority; the application catches its violation rather than relying on an availability check, which could only narrow the race.
 - Comparison ignores case and whitespace. `Ryan`, `ryan`, `RYAN` and `  Ryan ` are one username. `worker/username.mjs` mirrors the SQL key function, so the application and the database agree on what counts as the same name.
 - Every casing of the generic `Pack Player` placeholder is excluded, so anonymous and never-customized players keep sharing it.
 - Uniqueness ignores `profile_public`: a private account still owns its username.
 - A duplicate attempt answers `409` with `That username is already taken.` A Postgres constraint error never reaches the caller.
-- Ownership is taken at two moments. A profile rename (`PATCH /v1/profile`) takes it deliberately, and reverting to the placeholder releases it. Linking an account takes it for the nickname the browser was already using, but only when free: a taken nickname still links successfully and stays unowned, and that player must rename before publishing a profile.
+- Ownership is taken at two moments. A profile rename (`PATCH /v1/profile`) takes it deliberately, and reverting to the placeholder releases it. Linking an account takes it for the nickname the browser was already using, but only when free: a taken nickname still links successfully and stays unowned.
+- Account linkage by itself is not a public identity. Ranked Daily attachment, score promotion, Draft Run and legacy leaderboards, and attributed challenge shares require an owned username. A linked player whose nickname is already owned by somebody else stays linked but remains unranked/unattributed until choosing a free username; anonymous challenge attribution is shown generically as `A friend`.
 - `merge_pack1_player` adopts a source name onto a placeholder target only when nobody owns it. A taken name is left with its owner, and the merge completes rather than raising the constraint.
 - A replayed localStorage nickname can never overwrite an owned username; both workers keep the stored name in that case.
 
