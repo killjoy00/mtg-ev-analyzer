@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac,createHash} from 'node:crypto';
 import {premiumPatreonMembership,validPatreonPolicy,PATREON_POLICY} from '../patreon-policy.mjs';
-import {parsePatreonMembership,rawMembershipFromIdentity,verifyPatreonSignature,handlePatreon,patreonAccountAllowed} from '../worker/patreon.mjs';
+import {parsePatreonMembership,rawMembershipFromIdentity,verifyPatreonSignature,handlePatreon,patreonAccountAllowed,applyPatreonMembership} from '../worker/patreon.mjs';
 import {reconcilePatreon} from '../scripts/patreon-reconcile.mjs';
 const policy={enabled:true,campaignId:'100',premiumTierIds:['200']};
 const member=(tier='200',attrs={})=>({type:'member',id:'m1',attributes:{patron_status:'active_patron',last_charge_status:'Paid',currently_entitled_amount_cents:500,...attrs},relationships:{user:{data:{id:'u1'}},campaign:{data:{id:'100'}},currently_entitled_tiers:{data:[{id:tier}]}}});
@@ -56,6 +56,17 @@ test('reconciliation follows all pages and includes missing members for revocati
   const result=await reconcilePatreon(query,{policy,getPage:async()=>++page===1?{data:[member()],links:{next:'page2'}}:{data:[]}});
   assert.equal(result.applied,2);assert.equal(result.pages,2);
   assert.equal(writes[0][12],true);assert.equal(writes[1][12],false);assert.equal(writes[1][11],4);
+});
+
+test('premium grants tolerate delayed hourly reconciliation without becoming indefinite',async()=>{
+  let sql='';
+  const query=async(statement)=>{sql=statement;return {rows:[{applied:1}]};};
+  await applyPatreonMembership(query,'11111111-1111-4111-8111-111111111111','u1',{
+    memberId:'m1',campaignId:'100',status:'active_patron',lastChargeStatus:'Paid',
+    entitledAmountCents:500,isFreeTrial:false,isGifted:false,tierIds:['200'],
+  },{policy,revision:0,observedAt:'2026-09-22T00:00:00.000Z'});
+  assert.match(sql,/interval '12 hours'/);
+  assert.doesNotMatch(sql,/interval '3 hours'/);
 });
 
 test('controlled linking accepts only the authorized account, never an email or player claim',()=>{
