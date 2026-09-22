@@ -1,4 +1,4 @@
-import {PATREON_POLICY,validPatreonPolicy,premiumPatreonMembership,adFreePatreonMembership} from '../patreon-policy.mjs';
+import {PATREON_POLICY,validPatreonPolicy,currentPatreonMembership,premiumPatreonMembership,adFreePatreonMembership} from '../patreon-policy.mjs';
 import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
 
 const PROVIDER='patreon';
@@ -126,6 +126,21 @@ function rawMembershipFromIdentity(data,policy=PATREON_POLICY) {
   return {userId,member:membership(matching,userId)};
 }
 
+export function effectivePatreonMembership(row,policy=PATREON_POLICY) {
+  if(!row)return 'unknown';
+  const member={
+    campaignId:row.provider_campaign_id||null,
+    tierIds:typeof row.tier_ids==='string'?JSON.parse(row.tier_ids):row.tier_ids||[],
+    status:row.membership_status||null,
+    lastChargeStatus:row.last_charge_status||null,
+    isFreeTrial:truthy(row.is_free_trial),
+    isGifted:truthy(row.is_gifted),
+  };
+  if(premiumPatreonMembership(member,policy))return 'elite_entitled';
+  if(currentPatreonMembership(member,policy))return 'active_non_elite';
+  return row.last_synced_at?'not_entitled':'unknown';
+}
+
 async function readRaw(request,maximumBytes=262144) {
   const length=Number(request.headers.get('content-length'));
   if(Number.isFinite(length)&&length>maximumBytes)fail('Webhook payload too large.',413);
@@ -166,6 +181,7 @@ async function status(query,authUserId) {
       tier_ids:typeof row.tier_ids==='string'?JSON.parse(row.tier_ids):row.tier_ids||[],
       connected_at:row.connected_at,
       last_synced_at:row.last_synced_at,
+      effective_state:effectivePatreonMembership(row),
       sync_pending:Boolean(row.sync_requested_at),
     }:null,
     capabilities:grants.rows.map(row=>row.capability),
@@ -220,16 +236,26 @@ export async function handlePatreon(request,{query,authSession,json}) {
       RETURNING auth_user_id`,[hash,PROVIDER]);
     if(!consumed.rows[0])return redirect('expired');
     if(!patreonAccountAllowed(consumed.rows[0].auth_user_id))return redirect('unavailable');
+    const authUserId=consumed.rows[0].auth_user_id;
     try {
       const observedAt=new Date().toISOString();
       const tokens=await exchangeCode(code);
       if(!tokens.access_token)throw Error('Patreon token exchange returned no access token.');
       const resolved=rawMembershipFromIdentity(await identity(tokens.access_token));
-      const applied=await applyPatreonMembership(query,consumed.rows[0].auth_user_id,resolved.userId,resolved.member,{link:true,observedAt,oauthStateHash:hash});
+      const existing=await query('SELECT provider_user_id FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider=$2',[authUserId,PROVIDER]);
+      if(existing.rows[0]&&String(existing.rows[0].provider_user_id)!==resolved.userId) {
+        await query('DELETE FROM provider_oauth_states WHERE state_hash=$1',[hash]);
+        return redirect('identity-mismatch');
+      }
+      const applied=await applyPatreonMembership(query,authUserId,resolved.userId,resolved.member,{link:true,observedAt,oauthStateHash:hash});
       await query('DELETE FROM provider_oauth_states WHERE state_hash=$1',[hash]);
       if(!applied)return redirect('expired');
       return redirect('connected');
     } catch(error) {
+      if(error?.code==='23505') {
+        await query('DELETE FROM provider_oauth_states WHERE state_hash=$1',[hash]).catch(()=>{});
+        return redirect('conflict');
+      }
       console.error('Patreon OAuth callback failed',Number(error.providerStatus||error.status||500));
       return redirect('error');
     }
