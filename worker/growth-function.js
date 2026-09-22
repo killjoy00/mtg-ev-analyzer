@@ -786,7 +786,7 @@ async function handleSession(request) {
   return json({ token, playerId: id, displayName, profileKey: meta?.profile_key || null });
 }
 
-const SERVER_EVENTS=new Set(['account_claimed','public_profile_enabled','leaderboard_name_changed','achievement_unlocked','archive_milestone_reached','streak_milestone_reached','game_started','daily_started','game_completed']);
+const SERVER_EVENTS=new Set(['account_claimed','username_ownership_conflict','public_profile_enabled','leaderboard_name_changed','achievement_unlocked','archive_milestone_reached','streak_milestone_reached','game_started','daily_started','game_completed']);
 async function handleEvents(request) {
   const id = await player(request);
   const payload = await readJson(request);
