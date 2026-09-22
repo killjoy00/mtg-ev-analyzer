@@ -118,6 +118,10 @@ test('Pack One recovery template uses only a fragment reset URL and contains no 
     expiresAt:'2026-09-21T21:00:00.000Z',
   });
   assert.equal(rendered.url,'https://packone.pro/reset-password/#token='+token);
+  assert.match(rendered.html,/bgcolor="#171918"/);
+  assert.match(rendered.html,/>P<sup[^>]*>1<\/sup><\/td>/);
+  assert.match(rendered.html,/padding-left:11px[^>]*>Pack One<\/td>/);
+  assert.doesNotMatch(rendered.html,/<img\b/i);
   for(const body of [rendered.text,rendered.html]) {
     assert.match(body,/Pack One/);
     assert.match(body,/https:\/\/packone\.pro\/reset-password\/#token=/);
