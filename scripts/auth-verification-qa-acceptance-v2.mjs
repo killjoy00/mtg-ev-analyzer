@@ -4,10 +4,10 @@ import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 
 const PROJECT='patient-shadow-91417882';
-const BRANCH='br-icy-mouse-ay0ansqm';
+const BRANCH='br-polished-meadow-ay3jy6hn';
 const PROD_BRANCH='br-orange-feather-ayps8kep';
 const DEV_BRANCH='br-twilight-hill-ayffyd2b';
-const AUTH_BASE='https://ep-odd-shadow-ayvvof09.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const AUTH_BASE='https://ep-steep-butterfly-aylouwr9.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const PROD_WEBHOOK='https://pack1-authhook.killjoy00.workers.dev/webhook';
 const WORKER='pack1-authverify-qa-temp';
 
@@ -163,7 +163,7 @@ async function workerTelemetry(base){
   return response.json();
 }
 async function waitHealth(base,commit){
-  for(let attempt=0;attempt<20;attempt+=1){
+  for(let attempt=0;attempt<80;attempt+=1){
     try{
       const response=await fetch(base+'/health?quick=1',{redirect:'error',signal:AbortSignal.timeout(5000)});
       if(response.ok){
