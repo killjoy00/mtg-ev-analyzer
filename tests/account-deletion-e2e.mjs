@@ -70,7 +70,7 @@ async function submitDeletion(page) {
   await form.waitFor();
   await form.locator('[name="currentPassword"]').fill('fixture-current-value');
   await form.locator('[name="confirm"]').check();
-  await form.getByRole('button',{name:'Permanently delete account'}).click();
+  await form.getByRole('button',{name:'Delete Account'}).click();
 }
 
 for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
@@ -84,7 +84,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       await page.goto(base+'/tests/credential-management-harness.html');
       await openAccountTab(page);
       await page.locator('#account-delete').waitFor();
-      assert.match(await page.locator('.profile-danger').textContent(),/server-side recovery finishes the irreversible operation/i);
+      assert.match(await page.locator('.profile-danger').textContent(),/This cannot be undone/i);
+      assert.equal((await page.locator('#delete-account-title').textContent())?.trim(),'Delete Account');
       await submitDeletion(page);
       await page.waitForURL('**/?account=deleting');
       try {
