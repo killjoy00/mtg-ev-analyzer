@@ -31,8 +31,12 @@ jobs:
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const value=JSON.parse(fs.readFileSync('.github/auth-verification-qa-request.json','utf8'));
-          if(JSON.stringify(Object.keys(value).sort())!==JSON.stringify(['operation','reason']))throw Error('Invalid QA verification request.');
+          if(JSON.stringify(Object.keys(value).sort())!==JSON.stringify(['authBase','branch','operation','reason']))throw Error('Invalid QA verification request.');
           if(value.operation!=='run'||typeof value.reason!=='string'||value.reason.length<12)throw Error('Invalid QA verification request.');
+          if(!/^br-[a-z0-9-]{6,60}$/.test(value.branch||''))throw Error('Invalid QA verification branch.');
+          if(['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(value.branch))throw Error('QA verification must not target production or development.');
+          const authBase=new URL(value.authBase);
+          if(authBase.protocol!=='https:'||!authBase.hostname.endsWith('.neon.tech')||authBase.pathname!=='/pack1/auth')throw Error('Invalid QA verification Auth base.');
           NODE
       - name: Install pinned QA verification tools
         run: npm install --prefix "$RUNNER_TEMP/auth-verification-tools" --no-audit --no-fund neon@5.0.0 wrangler@4.132.0

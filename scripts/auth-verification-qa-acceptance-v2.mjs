@@ -3,11 +3,15 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 
+// The disposable branch changes every attempt. It lives in the reviewed request
+// file the workflow already validates, so a retry is a one-line request change
+// rather than a code change. The runtime fences below still decide what is safe.
+const REQUEST=JSON.parse(fs.readFileSync(new URL('../.github/auth-verification-qa-request.json',import.meta.url),'utf8'));
 const PROJECT='patient-shadow-91417882';
-const BRANCH='br-floral-truth-ayt6qqq9';
+const BRANCH=String(REQUEST.branch||'');
 const PROD_BRANCH='br-orange-feather-ayps8kep';
 const DEV_BRANCH='br-twilight-hill-ayffyd2b';
-const AUTH_BASE='https://ep-damp-tooth-aywz0vw6.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const AUTH_BASE=String(REQUEST.authBase||'');
 const PROD_WEBHOOK='https://pack1-authhook.killjoy00.workers.dev/webhook';
 const WORKER='pack1-authverify-qa-temp';
 
@@ -171,56 +175,30 @@ async function waitVerificationDelivery(base){
   }
   throw Error('Successful verification delivery telemetry was not observed.');
 }
-async function resend(pathname){
-  const response=await fetch('https://api.resend.com'+pathname,{
-    headers:{authorization:'Bearer '+process.env.PACK1_AUTH_RESEND_API_KEY},
-    redirect:'error',
-    signal:AbortSignal.timeout(10000),
-  });
-  assert(response.ok,'Resend QA evidence lookup failed.');
-  return response.json();
+function validatedQaAuthLink(value){
+  try{
+    const base=new URL(AUTH_BASE);
+    const link=new URL(value);
+    const basePath=base.pathname.endsWith('/')?base.pathname:base.pathname+'/';
+    if(link.protocol!=='https:'||link.origin!==base.origin||!link.pathname.startsWith(basePath)||!link.pathname.endsWith('/verify-email'))return null;
+    if(!link.searchParams.get('token'))return null;
+    return link.href;
+  }catch{return null;}
 }
-function verificationEmailIds(body){
-  const rows=Array.isArray(body?.data)?body.data:[];
-  return new Set(rows.filter(row=>
-    row?.subject==='Verify Your Email - Pack One QA'
-    && Array.isArray(row?.to)
-    && row.to.includes('delivered@resend.dev')
-  ).map(row=>row.id).filter(Boolean));
-}
-function extractDeliveredVerificationLink(email){
-  const source=typeof email?.text==='string'?email.text:'';
-  const urls=source.match(/https:\/\/[^\s<>"']+/g)||[];
-  const base=new URL(AUTH_BASE);
-  const basePath=base.pathname.endsWith('/')?base.pathname:base.pathname+'/';
-  for(const raw of urls){
-    try{
-      const url=new URL(raw.replace(/&amp;/g,'&'));
-      if(url.origin!==base.origin||!url.pathname.startsWith(basePath)||!url.pathname.endsWith('/verify-email'))continue;
-      if(!url.searchParams.get('token'))continue;
-      return url.href;
-    }catch{}
-  }
-  return null;
-}
-async function waitDeliveredVerificationLink(beforeIds){
+async function waitPendingVerificationLink(base,evidenceKey){
   for(let attempt=0;attempt<40;attempt+=1){
-    const listed=await resend('/emails?limit=50');
-    const rows=Array.isArray(listed?.data)?listed.data:[];
-    const row=rows.find(item=>
-      !beforeIds.has(item?.id)
-      && item?.subject==='Verify Your Email - Pack One QA'
-      && Array.isArray(item?.to)
-      && item.to.includes('delivered@resend.dev')
-    );
-    if(row?.id){
-      const detail=await resend('/emails/'+encodeURIComponent(row.id));
-      const link=extractDeliveredVerificationLink(detail);
-      if(link)return link;
-    }
-    await sleep(750);
+    const response=await fetch(base+'/qa/pending-verification',{
+      headers:{authorization:'Bearer '+evidenceKey},
+      redirect:'error',
+      signal:AbortSignal.timeout(10000),
+    });
+    assert(response.ok,'QA verification evidence endpoint failed.');
+    const body=await response.json();
+    const link=validatedQaAuthLink(body?.linkUrl);
+    if(link)return link;
+    await sleep(500);
   }
-  throw Error('Delivered verification email link was not found.');
+  throw Error('Protected QA verification link was not available.');
 }
 async function clickDeliveredVerification(link){
   const response=await fetch(link,{redirect:'manual',signal:AbortSignal.timeout(15000)});
@@ -267,9 +245,18 @@ async function main(){
     PACK1_AUTH_RESEND_API_KEY:process.env.PACK1_AUTH_RESEND_API_KEY,
   }))assert(typeof value==='string'&&value.length>=20,name+' is missing or too short.');
   assert(process.env.PACK1_AUTH_RESEND_API_KEY.startsWith('re_'),'Resend credential format is invalid.');
+  assert(/^br-[a-z0-9-]{6,60}$/.test(BRANCH),'Reviewed request must name a Neon branch.');
   assert(BRANCH!==PROD_BRANCH&&BRANCH!==DEV_BRANCH,'Acceptance must target a disposable branch.');
+  // A malformed or missing base must fail as a stated requirement, not as a
+  // bare TypeError from the URL constructor.
+  let authBase=null;
+  try{authBase=new URL(AUTH_BASE);}catch{authBase=null;}
+  assert(authBase&&authBase.protocol==='https:'&&authBase.hostname.endsWith('.neon.tech')&&authBase.pathname==='/pack1/auth',
+    'Reviewed request must name a Neon Auth base on the disposable branch.');
   const commit=String(process.env.GITHUB_SHA||'');
   assert(/^[a-f0-9]{40}$/.test(commit),'Exact acceptance revision is required.');
+  const qaEvidenceKey=randomBytes(32).toString('base64url');
+  console.log('::add-mask::'+qaEvidenceKey);
 
   const meta=await branchMeta();
   assert(meta.parent_id===PROD_BRANCH,'Acceptance branch must be a production child.');
@@ -308,7 +295,6 @@ async function main(){
       PACK1_RELEASE_COMMIT:commit,
       PACK1_FORCE_DELIVERY_FAILURE:'0',
       PACK1_FORCE_RETRY_AFTER_SEND:'0',
-      PACK1_QA_AUTO_VERIFY_AFTER_SEND:'0',
     },
   }),{mode:0o600});
 
@@ -317,7 +303,10 @@ async function main(){
   let primaryError=null;
   try{
     run(wrangler,['deploy','--config',configPath]);
-    run(wrangler,['secret','bulk','--config',configPath],JSON.stringify({RESEND_API_KEY:process.env.PACK1_AUTH_RESEND_API_KEY}));
+    run(wrangler,['secret','bulk','--config',configPath],JSON.stringify({
+      RESEND_API_KEY:process.env.PACK1_AUTH_RESEND_API_KEY,
+      PACK1_QA_EVIDENCE_KEY:qaEvidenceKey,
+    }));
     await waitHealth(workerBase,commit);
 
     const legacyEmail='pack1-verification-legacy-'+String(process.env.GITHUB_RUN_ID||Date.now())+'@example.com';
@@ -353,7 +342,6 @@ async function main(){
     }));
 
     const email='delivered@resend.dev';
-    const beforeVerificationEmails=verificationEmailIds(await resend('/emails?limit=50'));
     const password='P1-'+randomBytes(24).toString('base64url')+'!';
     console.log('::add-mask::'+password);
     const signup=await authPost('/sign-up/email',{name:'Pack One Verification QA',email,password});
@@ -363,7 +351,7 @@ async function main(){
     console.log('AUTH_VERIFY_QA_SIGNUP '+JSON.stringify({status:signup.status,user_present:true,session_present:false}));
 
     await waitVerificationDelivery(workerBase);
-    const deliveredLink=await waitDeliveredVerificationLink(beforeVerificationEmails);
+    const deliveredLink=await waitPendingVerificationLink(workerBase,qaEvidenceKey);
     await clickDeliveredVerification(deliveredLink);
     const signin=await waitSignin(email,password);
     console.log('AUTH_VERIFY_QA_SIGNIN_AFTER '+JSON.stringify({
@@ -383,7 +371,7 @@ async function main(){
     assert(entries.some(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='forget-password'),'Successful recovery delivery telemetry was not observed.');
     console.log('AUTH_VERIFY_QA_TELEMETRY '+JSON.stringify(entries.map(entry=>({
       status:entry.status,event_type:entry.event_type||null,link_type:entry.link_type||null,
-      duplicate:Boolean(entry.duplicate),qa_auto_verified:Boolean(entry.qa_auto_verified),
+      duplicate:Boolean(entry.duplicate),
     }))));
   }catch(error){
     primaryError=error;
