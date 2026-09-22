@@ -101,5 +101,8 @@ test('production Auth webhook config workflow is fixed to recovery-only subscrip
   assert.match(workflow,/enabled_events:\['send\.magic_link'\]/);
   assert.match(workflow,/timeout_seconds:5/);
   assert.match(workflow,/secrets\.NEON_API_KEY/);
+  assert.match(workflow,/ensure-enabled','disable/);
+  assert.match(workflow,/enabled:operation==='ensure-enabled'/);
+  assert.match(workflow,/steps\.request\.outputs\.operation == 'ensure-enabled'/);
   assert.doesNotMatch(workflow,/send\.otp/);
 });
