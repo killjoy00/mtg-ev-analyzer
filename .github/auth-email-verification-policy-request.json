@@ -1,0 +1,1 @@
+{"operation":"enable-optional-email-verification","reason":"Part of #246 Phase 1: send Pack One verification links on password signup without requiring verification for authentication.","required_worker_commit":"59faf9c0b179d694213c3aeb3b50e2c1c6f3f8a5"}
