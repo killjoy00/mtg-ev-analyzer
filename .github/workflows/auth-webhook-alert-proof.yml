@@ -39,7 +39,7 @@ jobs:
         run: node scripts/auth-webhook-alert-proof.mjs production-service
 
       - name: Install pinned QA deployment tools
-        run: npm install --prefix "$RUNNER_TEMP/auth-webhook-tools" --no-audit --no-fund wrangler@4.132.0
+        run: npm install --prefix "$RUNNER_TEMP/auth-webhook-tools" --no-audit --no-fund wrangler@4.132.0 neon@4.17.4
 
       - name: Deploy genuine QA delivery-failure mode with retained logs
         id: deploy
