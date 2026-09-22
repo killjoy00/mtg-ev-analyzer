@@ -4,8 +4,8 @@ import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const PROJECT='patient-shadow-91417882';
-export const BRANCH='br-square-water-ay71uef3';
-export const AUTH_BASE='https://ep-weathered-surf-ay5urlmr.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+export const BRANCH='br-sparkling-cake-ay7lbnra';
+export const AUTH_BASE='https://ep-odd-haze-ay2s6wy2.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const WORKER='pack1-auth-webhook-probe-temp';
 const EMAIL_CONFIG_PATH='/projects/'+PROJECT+'/branches/'+BRANCH+'/auth/email_and_password';
 
@@ -237,11 +237,7 @@ async function probeMode(mode,originalEmail,workerUrl,neon){
   const summary=evidence?evidenceSummary(evidence):null;
   if(summary)assert(summary.signature_verified,'Managed Neon verification webhook signature did not verify.');
   const verification=verificationState(neon,email);
-  assert(verification.user_found,'QA verification probe user was not persisted.');
-  assert(verification.email_verified===false,'QA verification probe user unexpectedly verified before acceptance.');
-  assert(Number(verification.verification_count)>=1,'QA verification probe did not persist a verification credential.');
-
-  console.log('AUTH_VERIFICATION_TAXONOMY '+JSON.stringify({
+  const taxonomy={
     mode,
     signup_status:signup.status,
     signup_user_present:Boolean(signup.json?.user?.id||signup.json?.id),
@@ -251,7 +247,13 @@ async function probeMode(mode,originalEmail,workerUrl,neon){
     webhook_event_captured:Boolean(summary),
     evidence:summary,
     verification_state:verification,
-  }));
+  };
+  console.log('AUTH_VERIFICATION_TAXONOMY '+JSON.stringify(taxonomy));
+
+  assert(verification.user_found,'QA verification probe user was not persisted.');
+  assert(verification.email_verified===false,'QA verification probe user unexpectedly verified before acceptance.');
+  if(mode==='otp')assert(Number(verification.verification_count)>=1,'QA OTP verification probe did not persist a verification credential.');
+  if(mode==='link')assert(summary,'QA link verification probe did not emit a subscribed signed webhook event.');
 }
 
 export async function main(){
