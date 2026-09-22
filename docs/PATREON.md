@@ -49,8 +49,9 @@ members on an unread page. A revision check discards snapshots overtaken by a
 webhook, reconnect, or disconnect. Snapshot and grant changes are atomic.
 
 Membership changes normally take effect at the next hourly sync; GitHub schedules
-may be delayed. Grants expire three hours after the last successful provider
-snapshot. Provider/API failures cannot extend access indefinitely. The workflow
+may be delayed by several hours. Grants expire twelve hours after the last successful
+provider snapshot so ordinary scheduler delays do not demote valid members between
+syncs. Provider/API failures still cannot extend access indefinitely. The workflow
 fails visibly on an expired creator token; it does not rotate secrets silently.
 
 ## Configuration
