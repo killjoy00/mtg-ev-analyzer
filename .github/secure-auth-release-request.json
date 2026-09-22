@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Part of #246: promote the current Auth Worker including verification delivery, verification-specific expiry copy, and QA hardening before enabling optional production verification."}
+{"operation":"deploy-secure-auth","reason":"Part of #181: promote the merged Patreon Elite activation backend and exact server-derived membership/identity-safety changes to development and production; verify exact release markers after deployment."}
