@@ -11,6 +11,8 @@ test('production authhook alert polls retained logs and routes failures to assig
   assert.match(workflow,/node scripts\/auth-webhook-alert\.mjs check/);
   assert.match(workflow,/node scripts\/auth-webhook-alert\.mjs alert/);
   assert.match(source,/workers\/observability\/telemetry\/query/);
+  assert.match(source,/datasets:\['cloudflare-workers'\]/);
+  assert.match(source,/PACK1_AUTHHOOK_ALERT_SERVICE/);
   assert.match(source,/user\/tokens\/verify/);
   assert.match(source,/observability telemetry query/);
   assert.match(source,/HTTP '\+response\.status/);
@@ -18,4 +20,6 @@ test('production authhook alert polls retained logs and routes failures to assig
   assert.match(source,/assignees:\[owner\]/);
   for(const status of ['invalid_signature','delivery_failure','rejected_event'])assert.match(source,new RegExp(status));
   assert.doesNotMatch(source,/PACK1_DELETION_ADMIN_EMAIL/);
+  const control=fs.readFileSync(new URL('../scripts/auth-webhook-control.mjs',import.meta.url),'utf8');
+  assert.match(control,/observability:\{enabled:true,logs:\{enabled:true,invocation_logs:true,head_sampling_rate:1,persist:true\}\}/);
 });
