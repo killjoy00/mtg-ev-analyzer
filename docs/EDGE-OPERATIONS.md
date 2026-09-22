@@ -48,7 +48,7 @@ Run [35288291535](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/3528
 Keep the existing read-only `CLOUDFLARE_AUDIT_TOKEN`. Create a separate token for operations:
 
 1. Open [Cloudflare API Tokens](https://dash.cloudflare.com/profile/api-tokens) → **Create Token** → **Create Custom Token**. Name it `Pack One GitHub gateway operations`.
-2. Add **Account → Workers Scripts → Edit**. Under account resources, include only the account containing `packone.pro`.
+2. Grant **Editor** at the **Workers product scope** for the account containing `packone.pro`. Cloudflare's September 2026 Workers permission model maps the legacy `Workers Scripts Edit`, `Workers Observability Edit`, and `Workers Observability Telemetry Edit` permissions to this product-scoped Editor role. The retained-log alert uses `POST /accounts/{account_id}/workers/observability/telemetry/query`; Cloudflare's API reference still names its accepted legacy permission as `Workers Observability Write`. If the dashboard shows the legacy custom-token permission table instead of Workers roles, grant the legacy Workers observability telemetry edit/write permission as well as Workers Scripts Edit.
 3. Add **Zone → Zone → Read** and **Zone → DNS → Read**. Under zone resources, include only `packone.pro`.
 4. Choose an expiry appropriate for ongoing operations, for example 90 days, and create the token. Record its expiry for rotation. Do not add billing, membership, global account administration, broad DNS edit or R2 permissions.
 5. Open [repository Actions secrets](https://github.com/killjoy00/mtg-ev-analyzer/settings/secrets/actions) → **New repository secret**. Name it **`CLOUDFLARE_EDGE_TOKEN`**, paste the token as the value, and save.
