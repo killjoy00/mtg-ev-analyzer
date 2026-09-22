@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 
-const AUTH_BASE='https://ep-bold-king-ay0y1jwz.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const AUTH_BASE='https://ep-weathered-surf-ay5urlmr.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const WORKER='pack1-auth-webhook-probe-temp';
 
 function run(binary,args) {
