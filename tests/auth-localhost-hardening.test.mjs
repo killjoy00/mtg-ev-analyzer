@@ -9,6 +9,9 @@ import {
   PROD_ORIGINS,
   QA_BRANCH,
   PROD_BRANCH,
+  QA_AUTH_BASE,
+  PROD_AUTH_BASE,
+  deleteAuthUser,
 } from '../scripts/auth-localhost-hardening.mjs';
 
 test('allow-localhost CLI output parser requires a boolean',()=>{
@@ -76,7 +79,7 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(source,/removeProviderUser/);
   assert.match(source,/SELECT count\(\*\) FROM account_links WHERE auth_user_id=/);
   assert.doesNotMatch(source,/DATABASE_URL|DELETE\s+FROM|UPDATE\s+neon_auth|INSERT\s+INTO\s+neon_auth/i);
-  assert.match(source,/SELECT count\(\*\) FROM account_links WHERE auth_user_id=/);
+  assert.doesNotMatch(source,/runNeon\(\['psql'[\s\S]{0,400}?\b(DELETE|UPDATE|INSERT|TRUNCATE|ALTER)\b/i);
   assert.match(source,/runNeon\(\['psql',branch,'--project-id',PROJECT_ID,'--database-name','pack1'/);
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/branches:\s*\[main\]/);
@@ -91,4 +94,108 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(workflow,/neon@5\.0\.0/);
   assert.match(workflow,/auth-localhost-hardening\.mjs qa/);
   assert.match(workflow,/auth-localhost-hardening\.mjs production/);
+
+  const rollbackBlock=source.indexOf('if(coreError){');
+  const rollbackEnable=source.indexOf('setAllowLocalhost(PROD_BRANCH,true)',rollbackBlock);
+  const cleanupThrow=source.indexOf('if(cleanupErrors.length)throw Error');
+  assert.ok(rollbackBlock>=0,'production rollback block must exist');
+  assert.ok(rollbackEnable>rollbackBlock,'rollback must re-enable localhost only inside the core failure block');
+  assert.ok(cleanupThrow>rollbackEnable,'cleanup errors must throw only after the rollback block');
+});
+
+test('deleteAuthUser injects provider cleanup and service-principal validation seams with the correct Auth base',async()=>{
+  const calls=[];
+  const serviceChecks=[];
+  const removeProviderUserFn=async options=>{
+    calls.push(options);
+    assert.equal(typeof options.validateServicePrincipal,'function');
+    assert.equal(await options.validateServicePrincipal('service-principal-id'),true);
+    return {kind:'success'};
+  };
+  const servicePrincipalUnlinkedFn=async(branchName,serviceId)=>{
+    serviceChecks.push({branchName,serviceId});
+    return true;
+  };
+
+  assert.deepEqual(
+    await deleteAuthUser(PROD_BRANCH,'prod-user-id',{removeProviderUserFn,servicePrincipalUnlinkedFn}),
+    {kind:'success'},
+  );
+  assert.deepEqual(
+    await deleteAuthUser(QA_BRANCH,'qa-user-id',{removeProviderUserFn,servicePrincipalUnlinkedFn}),
+    {kind:'success'},
+  );
+
+  assert.equal(calls[0].authBase,PROD_AUTH_BASE);
+  assert.equal(calls[0].authUserId,'prod-user-id');
+  assert.equal(calls[1].authBase,QA_AUTH_BASE);
+  assert.equal(calls[1].authUserId,'qa-user-id');
+  assert.deepEqual(serviceChecks,[
+    {branchName:PROD_BRANCH,serviceId:'service-principal-id'},
+    {branchName:QA_BRANCH,serviceId:'service-principal-id'},
+  ]);
+});
+
+test('deleteAuthUser preserves success and not_found cleanup outcomes',async()=>{
+  for(const expected of [{kind:'success'},{kind:'not_found'}]){
+    const actual=await deleteAuthUser(PROD_BRANCH,'target-user',{
+      removeProviderUserFn:async()=>expected,
+      servicePrincipalUnlinkedFn:async()=>true,
+    });
+    assert.deepEqual(actual,expected);
+  }
+});
+
+test('deleteAuthUser retries a retryable transient once and preserves the provider code',async()=>{
+  let attempts=0;
+  const sleeps=[];
+  await assert.rejects(
+    deleteAuthUser(PROD_BRANCH,'target-user',{
+      removeProviderUserFn:async()=>{
+        attempts+=1;
+        return {kind:'transient',code:'PROVIDER_RATE_LIMIT'};
+      },
+      servicePrincipalUnlinkedFn:async()=>true,
+      sleepFn:async ms=>{sleeps.push(ms);},
+    }),
+    error=>error?.kind==='transient'&&error?.code==='PROVIDER_RATE_LIMIT',
+  );
+  assert.equal(attempts,2);
+  assert.deepEqual(sleeps,[250]);
+});
+
+test('deleteAuthUser does not retry operator_review and preserves the provider code',async()=>{
+  let attempts=0;
+  const sleeps=[];
+  await assert.rejects(
+    deleteAuthUser(PROD_BRANCH,'target-user',{
+      removeProviderUserFn:async()=>{
+        attempts+=1;
+        return {kind:'operator_review',code:'PROVIDER_FORBIDDEN'};
+      },
+      servicePrincipalUnlinkedFn:async()=>true,
+      sleepFn:async ms=>{sleeps.push(ms);},
+    }),
+    error=>error?.kind==='operator_review'&&error?.code==='PROVIDER_FORBIDDEN',
+  );
+  assert.equal(attempts,1);
+  assert.deepEqual(sleeps,[]);
+});
+
+test('deleteAuthUser does not retry provider timeouts near the job budget',async()=>{
+  let attempts=0;
+  const sleeps=[];
+  await assert.rejects(
+    deleteAuthUser(PROD_BRANCH,'target-user',{
+      removeProviderUserFn:async()=>{
+        attempts+=1;
+        return {kind:'transient',code:'PROVIDER_TIMEOUT'};
+      },
+      servicePrincipalUnlinkedFn:async()=>true,
+      sleepFn:async ms=>{sleeps.push(ms);},
+    }),
+    error=>error?.kind==='transient'&&error?.code==='PROVIDER_TIMEOUT',
+  );
+  assert.equal(attempts,1);
+  assert.deepEqual(sleeps,[]);
 });

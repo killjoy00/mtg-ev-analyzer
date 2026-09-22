@@ -88,6 +88,8 @@ Cleanup reuses Pack One's existing reviewed Better Auth provider-deletion path f
 
 The hardening controller does not directly `DELETE`, `UPDATE`, or `INSERT` rows in the `neon_auth` schema.
 
+Cleanup preserves the provider deletion outcome instead of collapsing failures into one generic error. `success` and `not_found` are accepted. `operator_review` fails immediately without retry. Fast transient outcomes from rate limiting, provider 5xx responses, network failures, or the service-principal link check get at most one retry after 250 ms. `PROVIDER_TIMEOUT` is deliberately not retried so a slow provider cannot consume more of the 12-minute production hardening job budget. Surfaced cleanup errors retain both the typed outcome and provider error code.
+
 After the final production run, a read-only query confirmed **zero** remaining `pack1-auth-hardening-* @example.com` or `delivered@resend.dev` smoke users.
 
 ## Security boundaries preserved
