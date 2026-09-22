@@ -10,7 +10,7 @@ const {default:api}=await import('../worker/draft-run-function.mjs');
 const user=crypto.randomUUID(),token=crypto.randomUUID();
 async function call(path,body,status=200,auth=token){const r=await api.fetch(new Request('https://packone.pro/v1/admin/corpus'+path,{method:body?'POST':'GET',headers:{'content-type':'application/json',...(auth?{'x-pack1-auth-session':auth}:{})},body:body?JSON.stringify(body):undefined}));const data=await r.json();assert.equal(r.status,status,JSON.stringify(data));return data;}
 const original=(await query("SELECT status FROM draft_run_environment_policy WHERE set_id='hob'")).rows[0].status;
-let check;const discovered='qa-candidate-'+crypto.randomUUID().slice(0,8);
+let check;let preexistingReadyChecks=[];const discovered='qa-candidate-'+crypto.randomUUID().slice(0,8);
 try {
  await call('',null,401,null);
  await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[user,'QA corpus admin',`${user}@example.invalid`]);
@@ -29,6 +29,7 @@ try {
  assert.equal((await registerHealthyCandidate(query,discovered,manifestHash)).rows.length,0);
  const report=await call('');assert.ok(report.sets.some(s=>s.set_id==='hob'));assert.equal(report.corpus_version,DRAFT_RUN_CORPUS_VERSION);
  const change=(oldStatus,status)=>call('/hob/status',{oldStatus,status,corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason:'QA lifecycle'});
+ preexistingReadyChecks=(await query("UPDATE corpus_health_checks SET ready=false WHERE set_id='hob' AND corpus_version=$1 AND ready=true RETURNING id",[DRAFT_RUN_CORPUS_VERSION])).rows.map(row=>row.id);
  await change('Live','Paused');
  await call('/hob/status',{oldStatus:'Live',status:'Paused',corpusVersion:DRAFT_RUN_CORPUS_VERSION},409);
  await call('/hob/status',{oldStatus:'Paused',status:'Live',corpusVersion:DRAFT_RUN_CORPUS_VERSION},409);
@@ -50,6 +51,7 @@ try {
  await query('DELETE FROM draft_run_verified_sets WHERE set_id=$1',[discovered]);
  await query("UPDATE draft_run_environment_policy SET status=$1 WHERE set_id='hob'",[original]);
  if(check)await query('DELETE FROM corpus_health_checks WHERE id=$1::bigint',[check]);
+ if(preexistingReadyChecks.length)await query('UPDATE corpus_health_checks SET ready=true WHERE id=ANY($1::bigint[])',[preexistingReadyChecks]);
  await query("DELETE FROM corpus_set_versions WHERE corpus_version='qa-future-manifest'");
  await query('DELETE FROM corpus_status_events WHERE auth_user_id=$1::uuid',[user]);
  await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[user]);
