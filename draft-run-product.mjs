@@ -165,7 +165,7 @@ function renderResult() {
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; alternatives earn up to 95 from held-out strong-player support.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=5')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
 export async function returnToValidatedDaily(runId,{standing=null}={}) {
@@ -235,8 +235,8 @@ function renderLoadFailure(error,isBoard) {
     const premium=['custom_corpus','unlimited_cube_practice'].includes(error.capability);
     const signedIn=hasAccountSession();
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite on Patreon':'Sign in to become Elite')+'</button>':''}${!premium&&!signedIn?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs')).renderAccount();});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=5')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=5')).renderAccount();});return;
   }
   console.warn('Draft Run page failed to load',error?.message);
   const retry=`<button class="button primary" type="button" data-run-retry="1">Try again</button>`;
