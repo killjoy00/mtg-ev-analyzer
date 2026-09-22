@@ -106,30 +106,27 @@ The verification delivery boundary receives the validated `link_url` but not the
 
 Other signed event/link types remain rejected and observable without logging credentials.
 
-## What the QA acceptance does and does not prove
+## Acceptance evidence boundaries
 
-The repository Resend credential is send-only: delivery succeeds, but the workflow
-cannot list or read sent messages. Rather than broaden that credential, the QA
-acceptance takes its evidence from the Worker.
+Pack One intentionally separates two kinds of verification evidence:
 
-On a signed `email-verification` event the temporary QA Worker stores the already
-validated Neon link in a Durable Object whose name is derived from a random
-per-run secret, so stale evidence from an earlier run cannot be read. The runner
-retrieves it from `/qa/pending-verification` only after signup has returned,
-re-validates it against the disposable Auth base, clicks it without logging it,
-and then proves sign-in. That route exists only when `PACK1_AUTH_ENV=qa` and
-requires the per-run secret; production returns 404.
+- **Delivered-email evidence:** a real delivered Pack One verification email has already been inspected through Resend, including branding and the delivered Neon `/verify-email` link shape. This is the evidence that the email content itself contains the expected verification link.
+- **Automated CI evidence:** the disposable-branch acceptance should prove the signed Neon webhook is accepted, the already validated verification URL can be redeemed only after signup completes, `neon_auth.user.emailVerified` becomes true, and password sign-in succeeds afterward.
 
-So the acceptance proves: signed event verified, link validated, redemption marks
-the user verified, sign-in succeeds afterwards and 403s before, and password
-recovery still delivers independently.
+Automated CI must not be described as proof of mailbox contents unless it actually reads the delivered message. Resend API keys currently expose only `sending_access` or `full_access`; there is no read-only key scope. Pack One will not broaden the production send credential or add a full-access QA credential solely to make CI read messages. The safer acceptance design is a QA-only one-shot redemption seam that never returns or logs the stored verification URL/token.
 
-It does **not** prove the delivered message body. Reaching the send boundary is
-observed as `status: sent_or_duplicate` telemetry, which means Resend accepted the
-message, not that the rendered email contained the link. Email content is covered
-by the `renderVerificationEmail` unit tests and by one-time manual inspection of a
-real delivered QA message. Do not read a green acceptance run as proof of
-delivered content.
+That seam is now implemented. On a signed `email-verification` event the temporary
+QA Worker stores the already validated Neon link in a Durable Object whose name is
+derived from a random per-run secret, so stale evidence from an earlier run cannot
+be read. The runner fetches it from `/qa/pending-verification` only after signup has
+returned, re-validates it against the disposable Auth base, clicks it without
+logging it, and then proves sign-in. That route exists only when
+`PACK1_AUTH_ENV=qa` and requires the per-run secret as a bearer token; production
+returns 404.
+
+Reaching the send boundary is observed as `status: sent_or_duplicate` telemetry,
+which means Resend accepted the message — not that the rendered email contained the
+link. A green acceptance run is therefore not proof of delivered content.
 
 ## Production gate
 

@@ -176,7 +176,7 @@ test('Pack One verification template uses the exact validated Neon link with Pac
     assert.match(body,/auth\.verify\.example\/pack1\/auth\/verify-email/);
     assert.doesNotMatch(body,/Reset your password/);
     // Regression: both templates share expiryCopy, which said "reset link" in
-    // the verification email until the noun became an explicit argument.
+    // the verification email until the noun became a call-site argument.
     assert.match(body,/This verification link expires at 2026-09-22 21:00:00 UTC\./);
     assert.doesNotMatch(body,/reset link/i);
   }

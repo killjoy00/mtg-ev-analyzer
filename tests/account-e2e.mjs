@@ -4,7 +4,9 @@ const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}}),errors=[];
 page.on('pageerror',e=>errors.push(e.message));
-let signed=false,claims=0;
+const patreonDisconnected={configured:true,webhook_configured:false,connected:false,membership:null,capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
+const patreonElite={configured:true,webhook_configured:false,connected:true,membership:{effective_state:'elite_entitled',sync_pending:false},capabilities:['custom_corpus','unlimited_cube_practice'],support_url:'https://www.patreon.com/c/PackOne'};
+let signed=false,claims=0,patreonStatus=patreonDisconnected;
 
 await page.route('https://www.patreon.com/**',route=>route.fulfill({
   contentType:'text/html',
@@ -23,7 +25,7 @@ await page.route('https://**-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**'
   if(path==='/v1/account/link'){claims++;assert.equal(route.request().headers()['x-pack1-auth-session'],'auth-fixture');body={token:'claimed-fixture',merged:true};}
   if(path==='/v1/account/session'){status=signed?200:401;body=signed?{session:{token:'auth-fixture'},user:{email:'qa@example.invalid',name:'Test Player'}}:{error:'Signed out'};}
   if(path==='/v1/account/signout')signed=false;
-  if(path==='/v1/patreon/status')body={configured:true,webhook_configured:false,connected:false,membership:null,capabilities:[],support_url:'https://www.patreon.com/c/PackOne'};
+  if(path==='/v1/patreon/status')body=patreonStatus;
   if(path==='/v1/profile/me')body={player:{claimed:signed,profile_public:false,display_name:'Test Player'},summary:{games:3},achievements:[]};
   await route.fulfill({status,contentType:'application/json',body:JSON.stringify(body)});
 });
@@ -93,6 +95,16 @@ try {
     assert.match(await page.locator('.profile-membership').textContent(),/Become Elite on Patreon/);
     assert.match(await page.locator('.profile-membership').textContent(),/Already a member\? Connect Patreon/);
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-api-session-v1')),'claimed-fixture');
+
+    if(kind==='signin') {
+      patreonStatus=patreonElite;
+      await page.evaluate(async()=>{const profiles=await import('./profile-product.mjs?v=6');await profiles.renderMyProfile();});
+      await page.locator('#profile-account-tab').click();
+      await page.locator('#patreon-connect').waitFor();
+      assert.match(await page.locator('.profile-membership').textContent(),/Elite active/);
+      assert.equal((await page.locator('#patreon-connect').textContent())?.trim(),'Refresh Patreon access');
+      patreonStatus=patreonDisconnected;
+    }
 
     await page.evaluate(()=>localStorage.setItem('pack1-player-name-v1','Test Player'));
     await page.locator('#account-signout').click();

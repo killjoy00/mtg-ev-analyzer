@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"2026-09-22: Deploy recovery-alert hardening from #346: explicit Workers Logs persistence for QA and production, explicit cloudflare-workers alert queries, parameterized service targeting, and a genuine QA-only delivery fault that exercises the normal delivery_failure path."}
+{"operation":"deploy-secure-auth","reason":"Part of #246: deploy the current signed email-verification Auth Worker before any production verification flag change; verify the exact live release marker afterward."}
