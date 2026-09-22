@@ -188,6 +188,7 @@ try {
   assert.match(conflict,/already connected to another Pack One account/i);
   assert.doesNotMatch(conflict,/qa@example\.invalid|22222222-2222-4222-8222-222222222222/i);
   assert.equal(connectCalls,0);
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('pack1-patreon-activation-v1')),null,'identity conflict is terminal for this activation attempt');
 
   // A different Patreon identity cannot silently replace the account's existing provider link.
   await reset({isSigned:true,status:supporter});
@@ -195,6 +196,7 @@ try {
   await page.goto(base+'/?patreon=identity-mismatch');
   await page.getByText('This Pack One account is already connected to a different Patreon account.',{exact:true}).waitFor();
   assert.equal(connectCalls,0);
+  assert.equal(await page.evaluate(()=>sessionStorage.getItem('pack1-patreon-activation-v1')),null,'identity mismatch is terminal for this activation attempt');
 
   assert.deepEqual(errors,[]);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
