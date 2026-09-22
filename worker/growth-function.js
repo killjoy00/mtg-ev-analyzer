@@ -646,6 +646,7 @@ async function handleAccountSignup(request) {
     name:String(payload.name||'').trim().slice(0,80),
     email:String(payload.email||'').trim(),
     password:String(payload.password||''),
+    callbackURL:ACCOUNT_RETURN+'?auth=verify',
   }});
   const established=await establishAccount(data);
   if(!established)return json({ok:true,verificationRequired:true,user:data?.user||null},202);
@@ -709,6 +710,39 @@ async function handlePasswordResetRequest(request) {
     // collapsed to the same public response as a successful request.
   }
   return json({ok:true,message:RESET_REQUEST_MESSAGE});
+}
+
+const VERIFICATION_REQUEST_MESSAGE="If an unverified account exists for that email, we've sent a verification link.";
+
+async function consumeVerificationLimit(email) {
+  const key=recoveryRateKey('verification:'+email);
+  await query('DELETE FROM account_recovery_rate_limits WHERE expires_at<=now()');
+  const result=await query(`INSERT INTO account_recovery_rate_limits(limit_key,attempts,expires_at)
+    VALUES($1,1,now()+interval '15 minutes')
+    ON CONFLICT(limit_key) DO UPDATE SET
+      attempts=CASE WHEN account_recovery_rate_limits.expires_at<=now() THEN 1 ELSE account_recovery_rate_limits.attempts+1 END,
+      expires_at=CASE WHEN account_recovery_rate_limits.expires_at<=now() THEN now()+interval '15 minutes' ELSE account_recovery_rate_limits.expires_at END
+    RETURNING attempts,expires_at`,[key]);
+  return {limited:Number(result.rows[0]?.attempts||0)>RESET_LIMIT_MAX,expiresAt:result.rows[0]?.expires_at,key};
+}
+
+async function handleVerificationEmailRequest(request) {
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const payload=await readJson(request);
+  const email=normalizedRecoveryEmail(payload.email);
+  const limit=await consumeVerificationLimit(email);
+  if(limit.limited)return json({error:'Too many verification email requests. Please try again later.'},429);
+  try {
+    await neonAuth('/send-verification-email',{method:'POST',body:{
+      email,
+      callbackURL:ACCOUNT_RETURN+'?auth=verify',
+    }});
+  } catch(error) {
+    if(Number(error?.status||500)>=500)throw Object.assign(Error('Email verification is temporarily unavailable.'),{status:503});
+    // Provider/account-specific 4xx responses are intentionally collapsed so
+    // this public endpoint does not reveal whether an address has an account.
+  }
+  return json({ok:true,message:VERIFICATION_REQUEST_MESSAGE});
 }
 
 function recoveryToken(value) {
@@ -1418,6 +1452,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signup') return handleAccountSignup(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signin') return handleAccountSignin(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/send-verification-email') return handleVerificationEmailRequest(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/request-password-reset') return handlePasswordResetRequest(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/reset-password') return handlePasswordReset(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/password-change') return handlePasswordChange(request);

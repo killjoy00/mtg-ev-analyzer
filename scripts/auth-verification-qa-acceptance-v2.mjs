@@ -169,11 +169,12 @@ async function workerTelemetry(base){
   assert(response.ok,'QA telemetry unavailable.');
   return response.json();
 }
-async function waitVerificationDelivery(base){
+async function waitVerificationDelivery(base,minCount=1){
   for(let attempt=0;attempt<40;attempt+=1){
     const telemetry=await workerTelemetry(base);
     const entries=Array.isArray(telemetry?.entries)?telemetry.entries:[];
-    if(entries.some(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='email-verification'))return entries;
+    const verification=entries.filter(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='email-verification');
+    if(verification.length>=minCount)return entries;
     await sleep(500);
   }
   throw Error('Successful verification delivery telemetry was not observed.');
@@ -227,6 +228,26 @@ async function clickDeliveredVerification(link){
   }
   throw Error('Delivered verification link returned HTTP '+response.status+'.');
 }
+async function assertRepeatedVerificationRejected(link){
+  const response=await fetch(link,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+  let error=null;
+  if(response.status>=300&&response.status<400){
+    const location=response.headers.get('location');
+    if(location){
+      const redirectUrl=new URL(location,AUTH_BASE);
+      error=redirectUrl.searchParams.get('error')||redirectUrl.searchParams.get('code')||null;
+    }
+  }else{
+    let body=null;try{body=await response.json();}catch{}
+    error=body?.error||body?.code||body?.message||null;
+  }
+  assert(!(response.ok&&!error),'Repeated verification link unexpectedly succeeded.');
+  console.log('AUTH_VERIFY_QA_REPEAT_LINK '+JSON.stringify({
+    status:response.status,
+    rejected:true,
+    error_code:error?String(error).slice(0,80):null,
+  }));
+}
 async function waitHealth(base,commit){
   for(let attempt=0;attempt<80;attempt+=1){
     try{
@@ -269,7 +290,7 @@ async function main(){
   const wrangler=tool('wrangler');
   const originalEmail=emailGet(neon);
   const originalWebhook=webhookGet(neon);
-  assert(originalEmail.email_verification_method==='otp'&&!originalEmail.require_email_verification&&!originalEmail.send_verification_email_on_sign_up,'Unexpected email-verification baseline.');
+  assert(originalEmail.email_verification_method==='link'&&!originalEmail.require_email_verification&&originalEmail.send_verification_email_on_sign_up&&!originalEmail.send_verification_email_on_sign_in,'Unexpected Phase 1 email-verification baseline.');
   assert(originalWebhook.enabled&&originalWebhook.webhook_url===PROD_WEBHOOK&&originalWebhook.enabled_events.includes('send.magic_link'),'Unexpected webhook baseline.');
   console.log('AUTH_VERIFY_QA_ORIGINAL_EMAIL '+JSON.stringify(originalEmail));
   console.log('AUTH_VERIFY_QA_ORIGINAL_WEBHOOK '+JSON.stringify(originalWebhook));
@@ -347,15 +368,25 @@ async function main(){
     const email='delivered@resend.dev';
     const password='P1-'+randomBytes(24).toString('base64url')+'!';
     console.log('::add-mask::'+password);
-    const signup=await authPost('/sign-up/email',{name:'Pack One Verification QA',email,password});
+    const signup=await authPost('/sign-up/email',{name:'Pack One Verification QA',email,password,callbackURL:'https://packone.pro/?auth=verify'});
     assert(signup.status>=200&&signup.status<300,'Verification QA signup failed with HTTP '+signup.status+'.');
     assert(Boolean(signup.json?.user?.id||signup.json?.id),'Verification QA signup did not return a user.');
     assert(!signup.json?.session&&!signup.json?.token,'Verification QA signup unexpectedly returned a session.');
     console.log('AUTH_VERIFY_QA_SIGNUP '+JSON.stringify({status:signup.status,user_present:true,session_present:false}));
 
-    await waitVerificationDelivery(workerBase);
+    await waitVerificationDelivery(workerBase,1);
+    const firstLink=await waitPendingVerificationLink(workerBase,qaEvidenceKey);
+    assert(new URL(firstLink).searchParams.get('callbackURL')==='https://packone.pro/?auth=verify','Signup verification callback did not preserve the fixed Pack One return state.');
+
+    const resend=await authPost('/send-verification-email',{email,callbackURL:'https://packone.pro/?auth=verify'});
+    assert(resend.status>=200&&resend.status<300,'QA verification resend failed with HTTP '+resend.status+'.');
+    console.log('AUTH_VERIFY_QA_RESEND '+JSON.stringify({status:resend.status}));
+    await waitVerificationDelivery(workerBase,2);
     const deliveredLink=await waitPendingVerificationLink(workerBase,qaEvidenceKey);
+    assert(new URL(deliveredLink).searchParams.get('callbackURL')==='https://packone.pro/?auth=verify','Resent verification callback did not preserve the fixed Pack One return state.');
+
     await clickDeliveredVerification(deliveredLink);
+    await assertRepeatedVerificationRejected(deliveredLink);
     const signin=await waitSignin(email,password);
     console.log('AUTH_VERIFY_QA_SIGNIN_AFTER '+JSON.stringify({
       status:signin.status,

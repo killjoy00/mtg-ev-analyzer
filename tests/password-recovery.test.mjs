@@ -81,6 +81,36 @@ test('email limiter identity is normalized HMAC, stable, secret-specific, and no
   process.env.PACK1_RATE_LIMIT_SECRET='r'.repeat(64);
 });
 
+test('verification resend ignores browser callback input, is enumeration-safe, and uses a separate HMAC limiter namespace',async()=>{
+  const email='verify@example.com';
+  const okCalls=installFetch({providerStatus:200});
+  const ok=await growth.fetch(request('/v1/account/send-verification-email?callbackURL=https%3A%2F%2Fevil.test',{
+    email,callbackURL:'https://evil.test/',
+  }));
+  const okBody=await ok.json();
+  assert.equal(ok.status,200);
+  const provider=okCalls.find(x=>x.kind==='provider');
+  assert.ok(provider.url.endsWith('/send-verification-email'));
+  assert.deepEqual(provider.body,{email,callbackURL:'https://packone.pro/?auth=verify'});
+  const limiter=okCalls.find(x=>x.kind==='db'&&x.sql.includes('INSERT INTO account_recovery_rate_limits'));
+  assert.match(limiter.params[0],/^[a-f0-9]{64}$/);
+  assert.notEqual(limiter.params[0],recoveryRateKey(email));
+  assert.ok(!JSON.stringify(okCalls).includes('evil.test'));
+
+  const unknownCalls=installFetch({providerStatus:404});
+  const unknown=await growth.fetch(request('/v1/account/send-verification-email',{email:'unknown@example.com'}));
+  assert.equal(unknown.status,200);
+  assert.deepEqual(await unknown.json(),okBody);
+  assert.ok(unknownCalls.some(x=>x.kind==='provider'));
+});
+
+test('verification resend rate limit blocks provider delivery',async()=>{
+  const calls=installFetch({attempts:6});
+  const response=await growth.fetch(request('/v1/account/send-verification-email',{email:'verify@example.com'}));
+  assert.equal(response.status,429);
+  assert.equal(calls.some(x=>x.kind==='provider'),false);
+});
+
 test('reset request ignores hostile redirect inputs and sends only the exact server destination',async()=>{
   const calls=installFetch();
   const response=await growth.fetch(request('/v1/account/request-password-reset?redirectTo=https%3A%2F%2Fevil.test%2F',{
