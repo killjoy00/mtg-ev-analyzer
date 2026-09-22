@@ -287,7 +287,9 @@ test('QA forced delivery fault fails at the DO boundary and records natural deli
     AUTH_BASE:'https://auth.qa-delivery-failure.example',
     RECOVERY_DEDUPE:{
       idFromName:value=>value,
-      get:()=>dedupe,
+      get:()=>({
+        fetch:(url,init)=>dedupe.fetch(new Request(url,init)),
+      }),
     },
   };
   try {
