@@ -44,5 +44,8 @@ test('activation emits a measurable start, OAuth, and success funnel',()=>{
   assert.match(funnel,/abandoned_activation_sessions/);
   assert.match(funnel,/activation_success_rate/);
   assert.match(funnel,/elite_upgrade_handoff/);
+  assert.match(growth,/elite_upgrade_handoff/);
+  assert.match(growth,/await flushEvents\(\)\.catch/);
+  assert.match(activation,/await flushEvents\(\)\.catch/);
 });
 
