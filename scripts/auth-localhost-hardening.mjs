@@ -88,16 +88,9 @@ export function readConfigSnapshot(branch){
   });
 }
 
-export async function deleteAuthUser(fetcher,branch,userId){
+export function deleteAuthUser(branch,userId){
   if(!safeString(userId,128))return;
-  const response=await fetcher('https://console.neon.tech/api/v2/projects/'+PROJECT_ID+'/branches/'+branch+'/auth/users/'+encodeURIComponent(userId),{
-    method:'DELETE',
-    headers:{accept:'application/json',authorization:'Bearer '+process.env.NEON_API_KEY},
-    redirect:'error',
-    signal:AbortSignal.timeout(15000),
-  });
-  if(response.status===404)return;
-  if(!response.ok)throw Error('Neon Auth user cleanup failed; HTTP '+response.status+'.');
+  runNeon(['neon-auth','user','delete',userId,...authArgs(branch)]);
 }
 
 function responseCode(body){
@@ -225,10 +218,12 @@ export async function runQa({fetcher=fetch}={}){
 
 export async function runProduction({fetcher=fetch}={}){
   validateRequestFile(JSON.parse(fs.readFileSync(REQUEST_FILE,'utf8')));
-  // One-time cleanup from failed production run 35689038420. These are disposable smoke users only.
-  for(const userId of ['3a238e01-6e6c-4d96-b719-e321e39ff00c','252acfa7-57fa-4774-9048-6de5dcc4f160']){
-    await deleteAuthUser(fetcher,PROD_BRANCH,userId);
-  }
+  // One-time cleanup of disposable smoke users left by the two pre-CLI-5.0 verification runs.
+  for(const userId of [
+    '3a238e01-6e6c-4d96-b719-e321e39ff00c',
+    '252acfa7-57fa-4774-9048-6de5dcc4f160',
+    '4fb31297-251d-48b5-b2ee-cd698d5ac8a1',
+  ]) deleteAuthUser(PROD_BRANCH,userId);
   const beforeSnapshot=readConfigSnapshot(PROD_BRANCH);
   const before=getAllowLocalhost(PROD_BRANCH);
   let changed=false;
@@ -283,7 +278,7 @@ export async function runProduction({fetcher=fetch}={}){
   const cleanupErrors=[];
   for(const [label,userId] of [['sign-in smoke',signInUserId],['recovery smoke',recoveryUserId]]){
     if(!userId)continue;
-    try{await deleteAuthUser(fetcher,PROD_BRANCH,userId);}
+    try{deleteAuthUser(PROD_BRANCH,userId);}
     catch(error){cleanupErrors.push(label+': '+String(error?.message||'cleanup failed'));}
   }
 
