@@ -1,0 +1,87 @@
+name: QA auth recovery alert proof
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - '.github/workflows/auth-webhook-alert-proof.yml'
+      - 'scripts/auth-webhook-alert-proof.mjs'
+      - 'scripts/auth-webhook-alert.mjs'
+      - 'scripts/auth-webhook-control.mjs'
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: pack1-authhook-alert-proof
+  cancel-in-progress: true
+
+jobs:
+  proof:
+    if: github.head_ref == 'release/345-authhook-alert-proof'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+      PACK1_AUTH_RESEND_API_KEY: ${{ secrets.PACK1_AUTH_RESEND_API_KEY }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
+      RELEASE_COMMIT: ${{ github.event.pull_request.head.sha }}
+      PACK1_QA_AUTH_BASE_OVERRIDE: https://ep-holy-hall-b5uw4nql.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Prove exact production service filter against known traffic
+        run: node scripts/auth-webhook-alert-proof.mjs production-service
+
+      - name: Install pinned QA deployment tools
+        run: npm install --prefix "$RUNNER_TEMP/auth-webhook-tools" --no-audit --no-fund wrangler@4.132.0 neon@4.17.4
+
+      - name: Deploy genuine QA delivery-failure mode with retained logs
+        id: deploy
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-webhook-tools
+        run: node scripts/auth-webhook-control.mjs deploy-qa-fail
+
+      - name: Trigger one signed genuine QA delivery failure
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-webhook-tools
+        run: node scripts/auth-webhook-alert-proof.mjs qa-fault
+
+      - name: Route retained QA failure through the real alert code
+        env:
+          PACK1_AUTHHOOK_ALERT_SERVICE: pack1-authhook-qa
+          PACK1_AUTHHOOK_ALERT_TITLE: '[authhook alert test] QA recovery webhook failure'
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in {1..24}; do
+            output="$(node scripts/auth-webhook-alert.mjs alert)"
+            printf '%s\n' "$output"
+            if grep -Eq 'route (created|commented); new events [1-9]' <<<"$output"; then
+              exit 0
+            fi
+            sleep 15
+          done
+          echo "::error::QA retained-log alert did not route within six minutes."
+          exit 1
+
+      - name: Restore QA Worker to current reviewed main configuration
+        if: always() && steps.deploy.outcome != 'skipped'
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-webhook-tools
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git checkout --detach origin/main
+          unset PACK1_QA_AUTH_BASE_OVERRIDE
+          export RELEASE_COMMIT="$(git rev-parse HEAD)"
+          node scripts/auth-webhook-control.mjs deploy-qa
