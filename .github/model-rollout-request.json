@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "username-attention-dev-20260922",
-  "reason": "Deploy PR 341 username attention messaging, pending Daily recovery, admin observability, and updated documentation after all required gates passed.",
+  "request_id": "username-attention-prod-20260922",
+  "reason": "Promote PR 341 username attention release after exact SHA 4a6d920 passed development deployment, revision coverage, and all three Daily acceptance flows.",
   "commit": "4a6d920ec4c2f985fdd2b1749a55f57dac363305",
-  "target": "development"
+  "target": "production"
 }
