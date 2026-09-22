@@ -1,1 +1,1 @@
-{"operation":"probe-email-verification","reason":"Issue #246 measurement only: compare OTP and link verification webhook taxonomy on the isolated QA Auth project, then restore all QA settings."}
+{"operation":"probe-email-verification","reason":"Issue #246 retry after measured Workers.dev propagation race: rerun the isolated OTP/link taxonomy probe with bounded receiver readiness checks."}
