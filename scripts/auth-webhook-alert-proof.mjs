@@ -1,12 +1,15 @@
-import path from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {randomBytes} from 'node:crypto';
+import {removeProviderUser} from '../worker/account-deletion.mjs';
+
 const CF_ZONE='packone.pro';
 const PROD_SERVICE='pack1-authhook';
 const PROD_HEALTH='https://pack1-authhook.killjoy00.workers.dev/health?quick=1';
-const QA_PROJECT='late-fire-55708539';
-const QA_BRANCH='br-super-snow-b5ufhq30';
+const QA_PROJECT='patient-shadow-91417882';
+const QA_BRANCH='br-shy-resonance-ayf5djjc';
+const QA_AUTH_BASE='https://ep-still-math-ayzm00u3.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const QA_WORKER='https://pack1-authhook-qa.killjoy00.workers.dev';
-const QA_HELPER='https://br-super-snow-b5ufhq30-pack1qareset.compute.c-7.us-east-2.aws.neon.tech/';
+const QA_ORIGIN='http://localhost:4173';
 
 async function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 function requireSecret(value,name){
@@ -46,25 +49,11 @@ async function serviceEvents(accountId,service,from,to){
       dry:true,
       limit:500,
       view:'events',
-      parameters:{
-        datasets:['cloudflare-workers'],
-        filterCombination:'and',
-        filters,
-      },
+      parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters},
     }),
   });
   const rows=body?.result?.events?.events;
   return Array.isArray(rows)?rows:[];
-}
-function safeEventShape(row){
-  const metadata=row?.$metadata&&typeof row.$metadata==='object'?row.$metadata:{};
-  return {
-    timestamp:typeof row?.timestamp==='number'?row.timestamp:null,
-    service:typeof metadata.service==='string'?metadata.service:null,
-    type:typeof metadata.type==='string'?metadata.type:null,
-    level:typeof metadata.level==='string'?metadata.level:null,
-    metadata_keys:Object.keys(metadata).filter(key=>/^[A-Za-z0-9_.-]{1,64}$/.test(key)).sort().slice(0,40),
-  };
 }
 async function proveProductionService(){
   const accountId=await cloudflareAccountId();
@@ -76,14 +65,6 @@ async function proveProductionService(){
     const rows=await serviceEvents(accountId,null,started-60000,Date.now());
     const recent=rows.filter(row=>Number.isFinite(Number(row?.timestamp))&&Number(row.timestamp)>=started-5000);
     if(!recent.length)continue;
-    const services=[...new Set(recent.map(row=>row?.$metadata?.service).filter(value=>typeof value==='string'&&value.length<=128))].sort();
-    const shapes=recent.slice(-20).map(safeEventShape);
-    console.log('PRODUCTION_SERVICE_DIAGNOSTIC '+JSON.stringify({
-      health_status:health.status,
-      recent_events:recent.length,
-      services,
-      shapes,
-    }));
     const hits=recent.filter(row=>row?.$metadata?.service===PROD_SERVICE);
     if(!hits.length)throw Error('Retained production traffic exists, but none uses the expected pack1-authhook service value.');
     console.log('PRODUCTION_SERVICE_PROOF '+JSON.stringify({
@@ -96,39 +77,22 @@ async function proveProductionService(){
   throw Error('No retained cloudflare-workers events appeared after the known production health request.');
 }
 
-function neonBin(){
-  if(!process.env.EDGE_TOOLS_DIR)throw Error('EDGE_TOOLS_DIR is required.');
-  return path.join(process.env.EDGE_TOOLS_DIR,'node_modules/.bin/neon');
-}
-function runNeon(args){
+async function qaWebhookConfig(method='GET',value=null){
   requireSecret(process.env.NEON_API_KEY,'NEON_API_KEY');
-  try{
-    return execFileSync(neonBin(),args,{encoding:'utf8',stdio:['ignore','pipe','pipe'],env:process.env});
-  }catch(error){
-    throw Error('QA Auth control failed; exit '+(Number.isInteger(error?.status)?error.status:'unknown')+'.');
-  }
-}
-function qaWebhookGet(){
-  const text=runNeon([
-    'neon-auth','config','webhook','get',
-    '--project-id',QA_PROJECT,
-    '--branch',QA_BRANCH,
-    '--output','json',
-  ]).trim();
-  return text?JSON.parse(text):null;
-}
-function qaWebhookUpdate(value){
-  const args=[
-    'neon-auth','config','webhook','update',
-    '--project-id',QA_PROJECT,
-    '--branch',QA_BRANCH,
-    '--enabled='+String(Boolean(value?.enabled)),
-  ];
-  if(value?.webhook_url)args.push('--url',String(value.webhook_url));
-  for(const event of Array.isArray(value?.enabled_events)?value.enabled_events:[])args.push('--enabled-events',String(event));
-  if(Number.isInteger(Number(value?.timeout_seconds)))args.push('--timeout',String(Number(value.timeout_seconds)));
-  runNeon(args);
-  return qaWebhookGet();
+  const endpoint='https://console.neon.tech/api/v2/projects/'+QA_PROJECT+'/branches/'+QA_BRANCH+'/auth/webhooks';
+  const response=await fetch(endpoint,{
+    method,
+    headers:{
+      accept:'application/json',
+      authorization:'Bearer '+process.env.NEON_API_KEY,
+      ...(value?{'content-type':'application/json'}:{}),
+    },
+    ...(value?{body:JSON.stringify(value)}:{}),
+    redirect:'error',
+    signal:AbortSignal.timeout(15000),
+  });
+  if(!response.ok)throw Error('Disposable Auth webhook API failed with HTTP '+response.status+'.');
+  return response.json();
 }
 function safeWebhookConfig(value){
   return {
@@ -145,16 +109,16 @@ function exactQaWebhook(config){
     && config.enabled_events[0]==='send.magic_link'
     && config.timeout_seconds===5;
 }
-async function helperRequest(){
-  const response=await fetch(QA_HELPER+'?mode=request',{redirect:'error',signal:AbortSignal.timeout(30000)});
-  const text=await response.text();
-  let body=null;
-  try{body=text?JSON.parse(text):null;}catch{}
-  if(!body||typeof body!=='object'||Array.isArray(body))throw Error('QA alert helper returned invalid JSON.');
-  const allowed=new Set(['ok','stage','user_id','signup_status','request_status','reset_status','signin_status','signup_ms','request_ms','reset_ms','signin_ms','error']);
-  for(const key of Object.keys(body))if(!allowed.has(key))throw Error('QA alert helper returned unexpected output.');
-  if(/token|password|signature|authorization|cookie/i.test(JSON.stringify(body)))throw Error('QA alert helper output was not sanitized.');
-  return {status:response.status,body};
+async function postAuth(pathname,body){
+  const response=await fetch(QA_AUTH_BASE+pathname,{
+    method:'POST',
+    headers:{origin:QA_ORIGIN,'content-type':'application/json'},
+    body:JSON.stringify(body),
+    redirect:'manual',
+    signal:AbortSignal.timeout(30000),
+  });
+  const data=await response.json().catch(()=>({}));
+  return {status:response.status,data};
 }
 async function qaTelemetry(){
   const response=await fetch(QA_WORKER+'/qa/telemetry',{redirect:'error',signal:AbortSignal.timeout(15000)});
@@ -162,8 +126,34 @@ async function qaTelemetry(){
   if(!response.ok||!Array.isArray(body?.entries))throw Error('QA authhook telemetry endpoint is unavailable.');
   return body.entries;
 }
+function runNeon(args){
+  const bin=String(process.env.NEON_BIN||'');
+  if(!bin)throw Error('NEON_BIN is required.');
+  try{
+    return execFileSync(bin,args,{encoding:'utf8',stdio:['ignore','pipe','pipe'],env:process.env});
+  }catch(error){
+    throw Error('Neon cleanup command failed; exit '+(Number.isInteger(error?.status)?error.status:'unknown')+'.');
+  }
+}
+function servicePrincipalUnlinked(serviceId){
+  if(!/^[0-9a-f-]{36}$/i.test(String(serviceId||'')))return false;
+  const sql="SELECT count(*) FROM account_links WHERE auth_user_id='"+serviceId+"'::uuid";
+  const output=runNeon(['psql',QA_BRANCH,'--project-id',QA_PROJECT,'--database-name','pack1','--','-XAtc',sql]).trim();
+  return output==='0';
+}
+async function deleteDisposableUser(userId){
+  if(!userId)return;
+  const result=await removeProviderUser({
+    authBase:QA_AUTH_BASE,
+    authUserId:userId,
+    validateServicePrincipal:async serviceId=>servicePrincipalUnlinked(serviceId),
+  });
+  if(!['success','not_found'].includes(result.kind))
+    throw Error('Disposable Auth user cleanup failed: '+String(result.code||result.kind)+'.');
+  console.log('QA_ALERT_PROOF_USER_CLEANUP '+result.kind);
+}
 async function triggerGenuineQaFault(){
-  const original=safeWebhookConfig(qaWebhookGet());
+  const original=safeWebhookConfig(await qaWebhookConfig());
   console.log('QA_ALERT_PROOF_ORIGINAL_CONFIG '+JSON.stringify(original));
   const desired={
     enabled:true,
@@ -171,23 +161,34 @@ async function triggerGenuineQaFault(){
     enabled_events:['send.magic_link'],
     timeout_seconds:5,
   };
-  if(original.enabled&&!exactQaWebhook(original))throw Error('QA Auth webhook is already enabled with a different configuration; refusing to overwrite it.');
+  if(original.enabled&&!exactQaWebhook(original))throw Error('Disposable Auth webhook is already enabled with a different configuration; refusing to overwrite it.');
 
   const before=await qaTelemetry();
   const prior=new Set(before.map(entry=>JSON.stringify(entry)));
+  const run=String(process.env.GITHUB_RUN_ID||Date.now());
+  const attempt=String(process.env.GITHUB_RUN_ATTEMPT||'1');
+  const email='pack1-alert-proof-'+run+'-'+attempt+'@example.com';
+  const password='P1-'+randomBytes(24).toString('base64url')+'!';
+  console.log('::add-mask::'+password);
+
   let changed=false;
+  let userId=null;
+  let primaryError=null;
   try{
+    const signup=await postAuth('/sign-up/email',{email,password,name:'Pack One Alert Proof'});
+    if(signup.status<200||signup.status>=300)throw Error('Disposable Auth signup failed with HTTP '+signup.status+'.');
+    userId=String(signup.data?.user?.id||signup.data?.id||'');
+    if(!/^[0-9a-f-]{36}$/i.test(userId))throw Error('Disposable Auth signup did not return a valid user id.');
+
     if(!exactQaWebhook(original)){
-      const enabled=safeWebhookConfig(qaWebhookUpdate(desired));
-      if(!exactQaWebhook(enabled))throw Error('QA Auth webhook did not match the exact proof configuration.');
+      const enabled=safeWebhookConfig(await qaWebhookConfig('PUT',desired));
+      if(!exactQaWebhook(enabled))throw Error('Disposable Auth webhook did not match the exact proof configuration.');
       changed=true;
       console.log('QA_ALERT_PROOF_ENABLED_CONFIG '+JSON.stringify(enabled));
     }
 
-    const helper=await helperRequest();
-    if(helper.status!==200||helper.body?.stage!=='request_only')throw Error('QA alert helper did not complete request setup.');
-    const requestStatus=Number(helper.body?.request_status||0);
-    if(requestStatus<200||requestStatus>=300)throw Error('QA proof reset request was not accepted by Managed Neon.');
+    const reset=await postAuth('/request-password-reset',{email,redirectTo:QA_ORIGIN+'/reset-password/'});
+    if(reset.status<200||reset.status>=300)throw Error('Disposable Auth reset request failed with HTTP '+reset.status+'.');
 
     let match=null;
     for(let poll=0;poll<30;poll++){
@@ -208,12 +209,23 @@ async function triggerGenuineQaFault(){
       link_type:match.link_type,
       delivery_attempt:String(match.delivery_attempt||''),
     }));
-  } finally {
-    if(changed){
-      const restored=safeWebhookConfig(qaWebhookUpdate(original));
-      console.log('QA_ALERT_PROOF_FINAL_CONFIG '+JSON.stringify(restored));
-    }
+  }catch(error){
+    primaryError=error;
   }
+
+  const cleanupErrors=[];
+  if(changed){
+    try{
+      const restored=safeWebhookConfig(await qaWebhookConfig('PUT',original));
+      console.log('QA_ALERT_PROOF_FINAL_CONFIG '+JSON.stringify(restored));
+    }catch(error){cleanupErrors.push('webhook restore: '+String(error?.message||'failed'));}
+  }
+  if(userId){
+    try{await deleteDisposableUser(userId);}
+    catch(error){cleanupErrors.push('user cleanup: '+String(error?.message||'failed'));}
+  }
+  if(primaryError)throw primaryError;
+  if(cleanupErrors.length)throw Error('QA alert proof cleanup failed: '+cleanupErrors.join('; ')+'.');
 }
 
 const mode=process.argv[2];
