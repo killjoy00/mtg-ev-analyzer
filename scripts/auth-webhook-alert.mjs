@@ -157,7 +157,7 @@ async function githubJson(fetcher,url,token,options={}) {
   return body;
 }
 
-export async function routeGithubAlert(fetcher,{repository,token,events,now=Date.now()}) {
+export async function routeGithubAlert(fetcher,{repository,token,events,now=Date.now(),title=ALERT_TITLE}) {
   if(!Array.isArray(events)||events.length===0)return {action:'none',count:0};
   if(typeof token!=='string'||token.length<20)throw Error('GITHUB_TOKEN is missing or too short.');
   const match=/^([^/]+)\/([^/]+)$/.exec(String(repository||''));
@@ -165,11 +165,11 @@ export async function routeGithubAlert(fetcher,{repository,token,events,now=Date
   const [,owner,repo]=match;
   const base='https://api.github.com/repos/'+owner+'/'+repo;
   const issues=await githubJson(fetcher,base+'/issues?state=open&per_page=100',token);
-  const existing=Array.isArray(issues)?issues.find(issue=>issue?.title===ALERT_TITLE&&!issue?.pull_request):null;
+  const existing=Array.isArray(issues)?issues.find(issue=>issue?.title===title&&!issue?.pull_request):null;
   if(!existing) {
     const created=await githubJson(fetcher,base+'/issues',token,{
       method:'POST',
-      body:JSON.stringify({title:ALERT_TITLE,body:renderAlertBody(events),assignees:[owner]}),
+      body:JSON.stringify({title,body:renderAlertBody(events),assignees:[owner]}),
     });
     return {action:'created',count:events.length,issue_number:created?.number||null};
   }
@@ -187,13 +187,14 @@ export async function runAlert({fetcher=fetch,env=process.env,now=Date.now(),mod
   const verified=mode==='check'?await verifyCloudflareToken(fetcher,env.CLOUDFLARE_EDGE_TOKEN):null;
   if(verified)console.log('Cloudflare token active; token id '+verified.id+'.');
   const service=env.PACK1_AUTHHOOK_ALERT_SERVICE||'pack1-authhook';
+  const title=env.PACK1_AUTHHOOK_ALERT_TITLE||ALERT_TITLE;
   const events=await queryAlertEvents(fetcher,env.CLOUDFLARE_EDGE_TOKEN,now,service);
   if(mode==='check') {
     console.log('Auth webhook alert query access verified; matching retained failures: '+events.length+'.');
     return {action:'checked',count:events.length};
   }
   if(mode!=='alert')throw Error('Unknown auth webhook alert mode.');
-  const result=await routeGithubAlert(fetcher,{repository:env.GITHUB_REPOSITORY,token:env.GITHUB_TOKEN,events,now});
+  const result=await routeGithubAlert(fetcher,{repository:env.GITHUB_REPOSITORY,token:env.GITHUB_TOKEN,events,now,title});
   console.log('Auth webhook alert route '+result.action+'; new events '+result.count+'.');
   return result;
 }
