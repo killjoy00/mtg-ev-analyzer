@@ -70,11 +70,13 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   const retry='<button class="button primary" id="patreon-activation-oauth" type="button">Check Patreon again</button>';
   const support=`<a class="button secondary" href="${esc(patreon?.support_url||PATREON_POLICY.supportUrl)}" rel="noopener noreferrer">Review membership on Patreon</a>`;
   if(result==='conflict') {
+    clearPatreonActivation();
     shell('<h2>This Patreon account is already connected to another Pack One account.</h2><p>Sign in to the Pack One account previously connected to this Patreon identity, or disconnect Patreon from that account first. Pack One does not expose details about the other account.</p>',
       '<a class="button primary" data-patreon-activation-exit href="?account=signin">Open account access</a><a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     return;
   }
   if(result==='identity-mismatch') {
+    clearPatreonActivation();
     shell('<h2>This Pack One account is already connected to a different Patreon account.</h2><p>To switch Patreon identities, disconnect Patreon from My Pack One first, then start activation again.</p>',
       '<a class="button primary" data-patreon-activation-exit href="?account=patreon">Open My Pack One</a><a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     return;
