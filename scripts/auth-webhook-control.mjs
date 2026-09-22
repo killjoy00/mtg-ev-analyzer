@@ -8,6 +8,7 @@ const CONFIGS={
     authBase:'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
     sender:'Pack One QA <qa-accounts@packone.pro>',
     subject:'Reset Your Password - Pack One QA',
+    verificationSubject:'Verify Your Email - Pack One QA',
     resetOrigin:'http://localhost:4173',
   },
   production:{
@@ -15,6 +16,7 @@ const CONFIGS={
     authBase:'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth',
     sender:'Pack One <accounts@packone.pro>',
     subject:'Reset Your Password - Pack One',
+    verificationSubject:'Verify Your Email - Pack One',
     resetOrigin:'https://packone.pro',
   },
 };
@@ -118,6 +120,7 @@ async function deploy(target,{forceFailure=false,forceRetryAfterSend=false}={}) 
       RESET_ORIGIN:cfg.resetOrigin,
       SENDER:cfg.sender,
       SUBJECT:cfg.subject,
+      VERIFICATION_SUBJECT:cfg.verificationSubject,
       PACK1_RELEASE_COMMIT:commit,
       PACK1_FORCE_DELIVERY_FAILURE:forceFailure?'1':'0',
       PACK1_FORCE_RETRY_AFTER_SEND:forceRetryAfterSend?'1':'0',
