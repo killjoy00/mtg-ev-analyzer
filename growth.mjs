@@ -40,10 +40,11 @@ async function claimCurrentSession() {
   const session=await getAuthSession(); if(!session?.user) return null;
   const validationRunId=pendingDailyRunValidation;
   const linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
-  pendingDailyRunValidation=null;
+  const usernameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required'].includes(linked?.rankingIdentity?.reason));
+  if(!usernameAttention)pendingDailyRunValidation=null;
   currentAccount=session;
   syncAccountNav(true);
-  return {linked,validationRunId};
+  return {linked,validationRunId:linked?.validatedDailyScore?validationRunId:null};
 }
 
 export async function beginEliteUpgrade({ source='unknown' } = {}) {
@@ -99,6 +100,17 @@ async function returnToValidatedDaily(validationRunId,linked,source) {
   await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null});
 }
 
+document.addEventListener('pack1:profile-updated',async eventObject=>{
+  if(!pendingDailyRunValidation||eventObject.detail?.usernameOwned!==true)return;
+  const validationRunId=pendingDailyRunValidation;
+  try {
+    const linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
+    if(!linked?.validatedDailyScore)return;
+    pendingDailyRunValidation=null;
+    await returnToValidatedDaily(validationRunId,linked,'username_fix');
+  } catch {}
+});
+
 export async function renderAccount({ validateDailyRunId = null, intent = null, source = 'account', notice = '', mode = null } = {}) {
   if(validateDailyRunId) pendingDailyRunValidation=validateDailyRunId;
   document.body.classList.remove('is-game');
@@ -117,6 +129,17 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
     } catch(error) {
       renderAccountError(app,error,()=>renderAccount({validateDailyRunId:validationRunId,intent,source,mode}));
+      return;
+    }
+    const usernameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required'].includes(linked?.rankingIdentity?.reason));
+    if(usernameAttention) {
+      pendingDailyRunValidation=validationRunId;
+      const profiles=await import('./profile-product.mjs?v=5');
+      profiles.installProfileProductLayer();
+      (await import('./profile-polish.mjs?v=5')).installProfilePolish();
+      await profiles.renderMyProfile();
+      document.querySelector('#profile-account-tab')?.click();
+      document.querySelector('#profile-account input[name="displayName"]')?.focus();
       return;
     }
     pendingDailyRunValidation=null;
