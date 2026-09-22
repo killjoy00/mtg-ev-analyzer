@@ -78,7 +78,7 @@ export async function applyPatreonMembership(query,authUserId,providerUserId,mem
   ), grants AS (
     INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference,revoked_at,expires_at)
     SELECT saved.auth_user_id,c.capability,'patreon',$2,
-      CASE WHEN $13::boolean THEN NULL ELSE now() END,$11::timestamptz+interval '3 hours'
+      CASE WHEN $13::boolean THEN NULL ELSE now() END,$11::timestamptz+interval '12 hours'
     FROM saved CROSS JOIN (VALUES ('custom_corpus'),('unlimited_cube_practice')) c(capability)
     ON CONFLICT(auth_user_id,capability,provider,provider_reference)
     DO UPDATE SET revoked_at=EXCLUDED.revoked_at,expires_at=EXCLUDED.expires_at
