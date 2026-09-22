@@ -253,7 +253,7 @@ export async function handlePatreon(request,{query,authSession,json}) {
     target.searchParams.set('response_type','code');
     target.searchParams.set('client_id',process.env.PATREON_CLIENT_ID);
     target.searchParams.set('redirect_uri',redirectUri());
-    target.searchParams.set('scope','identity');
+    target.searchParams.set('scope','identity identity.memberships');
     target.searchParams.set('state',state);
     return json({url:target.toString()});
   }
