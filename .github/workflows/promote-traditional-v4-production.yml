@@ -1,0 +1,105 @@
+name: One-shot Traditional v4 production promotion
+
+on:
+  push:
+    branches:
+      - ops/traditional-v4-prod-promote-20260921
+    paths:
+      - .github/workflows/promote-traditional-v4-production.yml
+
+permissions:
+  actions: write
+  contents: write
+
+jobs:
+  promote:
+    if: github.event.head_commit.message == 'Promote Traditional v4 production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref_name }}
+
+      - name: Run reviewed production release sequence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -uo pipefail
+          workflow=publish-puzzle-components.yml
+          result_file=ops/traditional-v4-production-results.json
+          mkdir -p ops /tmp/traditional-v4-production
+          baseline_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+          printf '[]' > /tmp/traditional-v4-production/results.json
+
+          append_result() {
+            local file="$1"
+            jq --slurpfile row "$file" '. + $row' /tmp/traditional-v4-production/results.json > /tmp/traditional-v4-production/results.next
+            mv /tmp/traditional-v4-production/results.next /tmp/traditional-v4-production/results.json
+          }
+
+          run_release() {
+            local source="$1"
+            local action="$2"
+            local label="$action-$source"
+            local current_sha before after new_ids id rc
+
+            current_sha="$(gh api "repos/$GITHUB_REPOSITORY/commits/main" --jq .sha)"
+            if [[ "$current_sha" != "$baseline_sha" ]]; then
+              jq -n --arg source "$source" --arg action "$action" --arg expected "$baseline_sha" --arg actual "$current_sha"                 '{source:$source,action:$action,run_id:null,status:"blocked_main_changed",conclusion:null,expected_main_sha:$expected,actual_main_sha:$actual}'                 > "/tmp/traditional-v4-production/$label.json"
+              append_result "/tmp/traditional-v4-production/$label.json"
+              return 3
+            fi
+
+            before="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --event workflow_dispatch --branch main --limit 100 --json databaseId --jq '.[].databaseId' | sort -n)"
+
+            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main               -f target=production               -f action="$action"               -f source="$source"
+
+            id=""
+            for attempt in $(seq 1 60); do
+              after="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --event workflow_dispatch --branch main --limit 100 --json databaseId --jq '.[].databaseId' | sort -n)"
+              new_ids="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | sed '/^$/d')"
+              if [[ "$(printf '%s\n' "$new_ids" | sed '/^$/d' | wc -l)" -eq 1 ]]; then
+                id="$new_ids"
+                break
+              fi
+              if [[ "$(printf '%s\n' "$new_ids" | sed '/^$/d' | wc -l)" -gt 1 ]]; then
+                jq -n --arg source "$source" --arg action "$action" --arg ids "$new_ids"                   '{source:$source,action:$action,run_id:null,status:"ambiguous_new_runs",conclusion:null,new_run_ids:$ids}'                   > "/tmp/traditional-v4-production/$label.json"
+                append_result "/tmp/traditional-v4-production/$label.json"
+                return 4
+              fi
+              sleep 2
+            done
+
+            if [[ -z "$id" ]]; then
+              jq -n --arg source "$source" --arg action "$action"                 '{source:$source,action:$action,run_id:null,status:"dispatch_not_observed",conclusion:null}'                 > "/tmp/traditional-v4-production/$label.json"
+              append_result "/tmp/traditional-v4-production/$label.json"
+              return 2
+            fi
+
+            set +e
+            gh run watch "$id" --repo "$GITHUB_REPOSITORY" --exit-status
+            rc=$?
+            set -e
+
+            gh run view "$id" --repo "$GITHUB_REPOSITORY"               --json databaseId,status,conclusion,url,headSha,createdAt,updatedAt               --jq --arg source "$source" --arg action "$action" '. + {source:$source,action:$action,run_id:.databaseId} | del(.databaseId)'               > "/tmp/traditional-v4-production/$label.json"
+            append_result "/tmp/traditional-v4-production/$label.json"
+            return "$rc"
+          }
+
+          overall=0
+          run_release v4-regular-phase2 stage || overall=$?
+          if [[ "$overall" -eq 0 ]]; then run_release v4-powered-cube stage || overall=$?; fi
+          if [[ "$overall" -eq 0 ]]; then run_release v4-regular-phase2 publish || overall=$?; fi
+          if [[ "$overall" -eq 0 ]]; then run_release v4-powered-cube publish || overall=$?; fi
+
+          jq -n             --arg target production             --arg baseline_main_sha "$baseline_sha"             --slurpfile runs /tmp/traditional-v4-production/results.json             '{target:$target,baseline_main_sha:$baseline_main_sha,runs:$runs[0]}'             > "$result_file"
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$result_file"
+          git commit -m "Record Traditional v4 production promotion run IDs [skip ci]"
+          git push origin "HEAD:$GITHUB_REF_NAME"
+
+          exit "$overall"
