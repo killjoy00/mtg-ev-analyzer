@@ -1,0 +1,42 @@
+name: verify Pack One email ownership flow in QA
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/auth-verification-qa-request.json']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack1-auth-verification-qa
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+      PACK1_AUTH_RESEND_API_KEY: ${{ secrets.PACK1_AUTH_RESEND_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate reviewed QA verification request
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const value=JSON.parse(fs.readFileSync('.github/auth-verification-qa-request.json','utf8'));
+          if(JSON.stringify(Object.keys(value).sort())!==JSON.stringify(['operation','reason']))throw Error('Invalid QA verification request.');
+          if(value.operation!=='run'||typeof value.reason!=='string'||value.reason.length<12)throw Error('Invalid QA verification request.');
+          NODE
+      - name: Install pinned QA verification tools
+        run: npm install --prefix "$RUNNER_TEMP/auth-verification-tools" --no-audit --no-fund neon@5.0.0 wrangler@4.132.0
+      - name: Run disposable email-verification acceptance
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-verification-tools
+        run: node scripts/auth-verification-qa-acceptance.mjs
