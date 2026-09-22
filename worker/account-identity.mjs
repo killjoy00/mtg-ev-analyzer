@@ -1,4 +1,5 @@
 import {accountSession} from './account-session.mjs';
+import {isPlaceholderUsername} from './username.mjs';
 
 // Player bearer tokens identify a device/session. Account capabilities require
 // a currently valid first-party account session and the authoritative link.
@@ -12,10 +13,28 @@ export async function accountIdentity(request, query, owner) {
   return {...account,session_source:auth.source};
 }
 
-// Public ranking recognizes only an established signed player that currently
-// owns its username. A linked account whose guest nickname collided with an
-// existing owner stays linked, but is not a public identity until it renames.
+// Keep public-identity eligibility explicit. This lets the product distinguish
+// an anonymous guest from an account that is linked but still needs a unique
+// username before it can participate in ranked/public identity surfaces.
+export async function rankingIdentityStatus(query, owner) {
+  const result=await query(
+    'SELECT a.auth_user_id,a.player_id,p.display_name,p.username_owned FROM players p LEFT JOIN account_links a ON a.player_id=p.id WHERE p.id=$1::uuid LIMIT 1',
+    [owner],
+  );
+  const row=result.rows[0];
+  if(!row?.auth_user_id)return {eligible:false,reason:'guest',display_name:null};
+  const owned=row.username_owned===true||row.username_owned==='t'||row.username_owned==='true'||row.username_owned===1||row.username_owned==='1';
+  if(owned)return {eligible:true,reason:null,auth_user_id:row.auth_user_id,player_id:row.player_id,display_name:row.display_name};
+  return {
+    eligible:false,
+    reason:isPlaceholderUsername(row.display_name)?'username_required':'username_taken',
+    auth_user_id:row.auth_user_id,
+    player_id:row.player_id,
+    display_name:row.display_name,
+  };
+}
+
 export async function linkedPlayerIdentity(query, owner) {
-  const result=await query('SELECT a.auth_user_id,a.player_id,p.display_name FROM account_links a JOIN players p ON p.id=a.player_id WHERE a.player_id=$1::uuid AND p.username_owned=true',[owner]);
-  return result.rows[0]||null;
+  const status=await rankingIdentityStatus(query,owner);
+  return status.eligible?status:null;
 }
