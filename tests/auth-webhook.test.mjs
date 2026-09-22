@@ -3,9 +3,12 @@ import assert from 'node:assert/strict';
 import {
   authWebhook,
   renderRecoveryEmail,
+  renderVerificationEmail,
   sendRecoveryEmail,
+  sendVerificationEmail,
   RecoveryEventDedupe,
   validateRecoveryEvent,
+  validateVerificationEvent,
   verifyNeonWebhook,
 } from '../edge/auth-webhook.mjs';
 
@@ -20,6 +23,7 @@ async function signedFixture({
   linkType='forget-password',
   token='fixture-token-1234567890',
   email='person@example.com',
+  linkUrl=null,
   timestamp=Date.now(),
   kid='test-kid',
 }={}) {
@@ -32,7 +36,7 @@ async function signedFixture({
     timestamp:new Date(timestamp).toISOString(),
     context:{endpoint_id:'fixture',project_name:'Pack One QA'},
     user:{id:'u1',name:'Fixture',email,image:null,role:'user',banned:false,email_verified:true,created_at:new Date(timestamp).toISOString(),updated_at:new Date(timestamp).toISOString(),ban_reason:null,ban_expires:null},
-    event_data:{link_type:linkType,link_url:'https://vendor.invalid/reset/'+token,token,expires_at:new Date(timestamp+60*60*1000).toISOString(),ip_address:'127.0.0.1',user_agent:'test'},
+    event_data:{link_type:linkType,link_url:linkUrl||('https://vendor.invalid/reset/'+token),token,expires_at:new Date(timestamp+60*60*1000).toISOString(),ip_address:'127.0.0.1',user_agent:'test'},
   };
   const raw=encoder.encode(JSON.stringify(payload));
   const protectedB64=b64url(encoder.encode(JSON.stringify({alg:'EdDSA',kid})));
@@ -112,6 +116,26 @@ test('recovery event validation accepts only the proven send.magic_link forget-p
   assert.equal(validateRecoveryEvent(fixture.payload,mismatched),null);
 });
 
+test('verification event validation accepts only the measured send.magic_link email-verification shape on the configured Auth origin',async()=>{
+  const authBase='https://auth.verify.example/pack1/auth';
+  const linkUrl=authBase+'/verify-email?token=fixture-token-1234567890&callbackURL=https%3A%2F%2Fpackone.pro%2F';
+  const fixture=await signedFixture({linkType:'email-verification',linkUrl});
+  assert.deepEqual(validateVerificationEvent(fixture.payload,fixture.headers,authBase),{
+    eventId:'evt_test_12345678',
+    email:'person@example.com',
+    linkUrl,
+    expiresAt:fixture.payload.event_data.expires_at,
+    eventType:'send.magic_link',
+    linkType:'email-verification',
+  });
+
+  assert.equal(validateRecoveryEvent(fixture.payload,fixture.headers),null);
+  assert.equal(validateVerificationEvent({...fixture.payload,event_data:{...fixture.payload.event_data,link_type:'forget-password'}},fixture.headers,authBase),null);
+  assert.equal(validateVerificationEvent({...fixture.payload,event_data:{...fixture.payload.event_data,link_url:'https://evil.example/verify?token=stolen'}},fixture.headers,authBase),null);
+  assert.equal(validateVerificationEvent({...fixture.payload,event_data:{...fixture.payload.event_data,link_url:'http://auth.verify.example/pack1/auth/verify-email?token=x'}},fixture.headers,authBase),null);
+  assert.equal(validateVerificationEvent({...fixture.payload,event_data:{...fixture.payload.event_data,link_url:'https://auth.verify.example/other/verify-email?token=x'}},fixture.headers,authBase),null);
+});
+
 test('Pack One recovery template uses only a fragment reset URL and contains no visible vendor host',()=>{
   const token='fixture-token-1234567890';
   const rendered=renderRecoveryEmail({
@@ -130,6 +154,25 @@ test('Pack One recovery template uses only a fragment reset URL and contains no 
     assert.doesNotMatch(body,/neon\.tech/i);
     assert.doesNotMatch(body,/Neon Auth/i);
     assert.doesNotMatch(body,/\?token=/);
+  }
+});
+
+test('Pack One verification template uses the exact validated Neon link with Pack One branding',()=>{
+  const linkUrl='https://auth.verify.example/pack1/auth/verify-email?token=fixture-token-1234567890';
+  const rendered=renderVerificationEmail({
+    linkUrl,
+    expiresAt:'2026-09-22T21:00:00.000Z',
+  });
+  assert.equal(rendered.url,linkUrl);
+  assert.match(rendered.html,/bgcolor="#171918"/);
+  assert.match(rendered.html,/>P<sup[^>]*>1<\/sup><\/td>/);
+  assert.match(rendered.html,/Verify your email/i);
+  assert.match(rendered.html,/Verify email/);
+  assert.doesNotMatch(rendered.html,/<img\b/i);
+  for(const body of [rendered.text,rendered.html]){
+    assert.match(body,/Pack One/);
+    assert.match(body,/auth\.verify\.example\/pack1\/auth\/verify-email/);
+    assert.doesNotMatch(body,/Reset your password/);
   }
 });
 
@@ -158,6 +201,31 @@ test('Resend delivery fixes sender server-side and uses Neon event id for idempo
   assert.deepEqual(body.to,['person@example.com']);
   assert.match(body.html,/https:\/\/packone\.pro\/reset-password\/#token=/);
   assert.doesNotMatch(body.html,/neon\.tech/i);
+});
+
+test('verification delivery uses a separate subject and idempotency namespace',async()=>{
+  const calls=[];
+  const result=await sendVerificationEmail({
+    RESEND_API_KEY:'re_fixture',
+    SENDER:'Pack One <accounts@packone.pro>',
+    VERIFICATION_SUBJECT:'Verify Your Email - Pack One',
+  },{
+    eventId:'evt_verify_12345678',
+    email:'person@example.com',
+    linkUrl:'https://auth.verify.example/pack1/auth/verify-email?token=fixture-token-1234567890',
+    expiresAt:'2026-09-22T21:00:00.000Z',
+    linkType:'email-verification',
+  },async(url,init)=>{
+    calls.push({url,init});
+    return Response.json({id:'email_verify_fixture_123'},{status:200});
+  });
+  assert.deepEqual(result,{id:'email_verify_fixture_123'});
+  assert.equal(calls.length,1);
+  assert.equal(calls[0].init.headers['idempotency-key'],'neon-auth/send.magic_link/email-verification/evt_verify_12345678');
+  const body=JSON.parse(calls[0].init.body);
+  assert.equal(body.subject,'Verify Your Email - Pack One');
+  assert.match(body.html,/Verify your email/i);
+  assert.match(body.html,/https:\/\/auth\.verify\.example\/pack1\/auth\/verify-email/);
 });
 
 test('webhook handler rejects unsigned requests and hands a verified event to the dedupe boundary',async()=>{
@@ -190,6 +258,138 @@ test('webhook handler rejects unsigned requests and hands a verified event to th
     assert.equal(received.id,'id:evt_test_12345678');
     assert.equal(received.body.token,'fixture-token-1234567890');
   } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
+
+test('webhook handler accepts a verified email-verification event without forwarding the raw token',async()=>{
+  const authBase='https://auth.verify-handler.example/pack1/auth';
+  const fixture=await signedFixture({
+    kid:'verify-handler-kid',
+    linkType:'email-verification',
+    linkUrl:authBase+'/verify-email?token=fixture-token-1234567890',
+  });
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async url=>{
+    if(String(url)===authBase+'/.well-known/jwks.json')return Response.json({keys:[fixture.jwk]});
+    throw Error('unexpected network call');
+  };
+  let received=null;
+  const env={
+    AUTH_BASE:authBase,
+    RECOVERY_DEDUPE:{
+      idFromName:value=>'id:'+value,
+      get:id=>({
+        fetch:async(_url,init)=>{
+          received={id,body:JSON.parse(init.body)};
+          return responseJson({ok:true});
+        },
+      }),
+    },
+  };
+  try{
+    const response=await authWebhook(new Request('https://hook.example/webhook',{method:'POST',headers:fixture.headers,body:fixture.raw}),env);
+    assert.equal(response.status,204);
+    assert.equal(received.id,'id:evt_test_12345678');
+    assert.equal(received.body.linkType,'email-verification');
+    assert.equal(received.body.linkUrl,fixture.payload.event_data.link_url);
+    assert.equal('token' in received.body,false);
+  }finally{
+    globalThis.fetch=originalFetch;
+  }
+});
+
+test('QA verification acceptance may redeem the exact delivered link only after a successful send',async()=>{
+  const linkUrl='https://auth.qa-auto.example/pack1/auth/verify-email?token=fixture-token';
+  const calls=[];
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    if(String(url)==='https://api.resend.com/emails')return Response.json({id:'email_qa_verify_fixture'},{status:200});
+    if(String(url)===linkUrl)return new Response(null,{status:302,headers:{location:'https://packone.pro/'}});
+    throw Error('unexpected network call');
+  };
+  const stored=new Map();
+  const dedupe=new RecoveryEventDedupe({
+    storage:{
+      get:async key=>stored.get(key),
+      put:async(key,value)=>stored.set(key,value),
+    },
+  },{
+    PACK1_AUTH_ENV:'qa',
+    PACK1_QA_AUTO_VERIFY_AFTER_SEND:'1',
+    AUTH_BASE:'https://auth.qa-auto.example/pack1/auth',
+    RESEND_API_KEY:'re_fixture',
+    SENDER:'Pack One QA <qa-accounts@packone.pro>',
+    VERIFICATION_SUBJECT:'Verify Your Email - Pack One QA',
+  });
+  try{
+    const response=await dedupe.fetch(new Request('https://pack1.internal/send',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        eventId:'evt_verify_auto_12345678',
+        email:'person@example.com',
+        linkUrl,
+        expiresAt:'2026-09-22T22:00:00.000Z',
+        eventType:'send.magic_link',
+        linkType:'email-verification',
+      }),
+    }));
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.qaAutoVerified,true);
+    assert.equal(calls.length,2);
+    assert.equal(calls[0].url,'https://api.resend.com/emails');
+    assert.equal(calls[1].url,linkUrl);
+    assert.equal(calls[1].init.redirect,'manual');
+    assert.ok(stored.has('sent'));
+  }finally{
+    globalThis.fetch=originalFetch;
+  }
+});
+
+test('production ignores QA verification auto-redemption even if the flag is set',async()=>{
+  const linkUrl='https://auth.prod-auto.example/pack1/auth/verify-email?token=fixture-token';
+  const calls=[];
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    if(String(url)==='https://api.resend.com/emails')return Response.json({id:'email_prod_verify_fixture'},{status:200});
+    throw Error('production must not redeem verification links automatically');
+  };
+  const stored=new Map();
+  const dedupe=new RecoveryEventDedupe({
+    storage:{
+      get:async key=>stored.get(key),
+      put:async(key,value)=>stored.set(key,value),
+    },
+  },{
+    PACK1_AUTH_ENV:'production',
+    PACK1_QA_AUTO_VERIFY_AFTER_SEND:'1',
+    AUTH_BASE:'https://auth.prod-auto.example/pack1/auth',
+    RESEND_API_KEY:'re_fixture',
+    SENDER:'Pack One <accounts@packone.pro>',
+    VERIFICATION_SUBJECT:'Verify Your Email - Pack One',
+  });
+  try{
+    const response=await dedupe.fetch(new Request('https://pack1.internal/send',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        eventId:'evt_verify_prod_12345678',
+        email:'person@example.com',
+        linkUrl,
+        expiresAt:'2026-09-22T22:00:00.000Z',
+        eventType:'send.magic_link',
+        linkType:'email-verification',
+      }),
+    }));
+    assert.equal(response.status,200);
+    assert.equal((await response.json()).qaAutoVerified,false);
+    assert.equal(calls.length,1);
+    assert.equal(calls[0].url,'https://api.resend.com/emails');
+  }finally{
     globalThis.fetch=originalFetch;
   }
 });
