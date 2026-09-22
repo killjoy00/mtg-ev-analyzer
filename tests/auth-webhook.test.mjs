@@ -294,3 +294,38 @@ test('QA retry-after-send mode returns retryable failure after one successful de
     globalThis.fetch=originalFetch;
   }
 });
+
+
+test('production ignores QA fault-injection flags even if dashboard vars are set',async()=>{
+  const fixture=await signedFixture({kid:'prod-fault-guard-kid'});
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async url=>{
+    if(String(url)==='https://auth.prod-fault-guard.example/.well-known/jwks.json')return Response.json({keys:[fixture.jwk]});
+    throw Error('unexpected network call');
+  };
+  let deliveryCalls=0;
+  const env={
+    PACK1_AUTH_ENV:'production',
+    PACK1_FORCE_DELIVERY_FAILURE:'1',
+    PACK1_FORCE_RETRY_AFTER_SEND:'1',
+    AUTH_BASE:'https://auth.prod-fault-guard.example',
+    RECOVERY_DEDUPE:{
+      idFromName:value=>value,
+      get:()=>({
+        fetch:async()=>{
+          deliveryCalls++;
+          return Response.json({ok:true,duplicate:false});
+        },
+      }),
+    },
+  };
+  try {
+    const response=await authWebhook(new Request('https://hook.example/webhook',{
+      method:'POST',headers:fixture.headers,body:fixture.raw,
+    }),env);
+    assert.equal(response.status,204);
+    assert.equal(deliveryCalls,1);
+  } finally {
+    globalThis.fetch=originalFetch;
+  }
+});
