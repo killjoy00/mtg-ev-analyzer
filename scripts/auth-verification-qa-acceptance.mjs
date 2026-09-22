@@ -229,16 +229,17 @@ async function main(){
     },
   };
   fs.writeFileSync(configPath,JSON.stringify(workerConfig),{mode:0o600});
-  run(wrangler,['deploy','--config',configPath]);
-  run(wrangler,['secret','bulk','--config',configPath],JSON.stringify({RESEND_API_KEY:process.env.PACK1_AUTH_RESEND_API_KEY}));
   const workerBase='https://'+WORKER+'.'+accountSubdomain+'.workers.dev';
-  await waitHealth(workerBase,commit);
 
   let emailChanged=false;
   let webhookChanged=false;
   let authUserId=null;
   let primaryError=null;
   try{
+    run(wrangler,['deploy','--config',configPath]);
+    run(wrangler,['secret','bulk','--config',configPath],JSON.stringify({RESEND_API_KEY:process.env.PACK1_AUTH_RESEND_API_KEY}));
+    await waitHealth(workerBase,commit);
+
     webhookChanged=true;
     const probeWebhook=webhookUpdate(neon,{
       enabled:true,
