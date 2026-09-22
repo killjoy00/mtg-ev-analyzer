@@ -32,6 +32,11 @@ def prepare(source: Path, out: Path):
     ):
         raise ValueError("Source is not the pinned v4 Powered Cube research component")
     if (
+        digest(source / "puzzles.jsonl.gz") != manifest.get("puzzle_file_sha256")
+        or digest(source / "trophies.jsonl.gz") != manifest.get("ledger_file_sha256")
+    ):
+        raise ValueError("v4 Cube research artifact checksum mismatch")
+    if (
         evidence.get("set") != "powered-cube"
         or evidence.get("parent_corpus_version") != PARENT
         or evidence.get("model_version") != MODEL
