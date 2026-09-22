@@ -306,7 +306,7 @@ test('QA verification acceptance may redeem the exact delivered link only after 
   globalThis.fetch=async(url,init={})=>{
     calls.push({url:String(url),init});
     if(String(url)==='https://api.resend.com/emails')return Response.json({id:'email_qa_verify_fixture'},{status:200});
-    if(String(url)===linkUrl)return new Response(null,{status:302,headers:{location:'https://packone.pro/'}});
+    if(String(url)===linkUrl)return new Response('verified',{status:200});
     throw Error('unexpected network call');
   };
   const stored=new Map();
@@ -342,7 +342,7 @@ test('QA verification acceptance may redeem the exact delivered link only after 
     assert.equal(calls.length,2);
     assert.equal(calls[0].url,'https://api.resend.com/emails');
     assert.equal(calls[1].url,linkUrl);
-    assert.equal(calls[1].init.redirect,'manual');
+    assert.equal(calls[1].init.redirect,'follow');
     assert.ok(stored.has('sent'));
   }finally{
     globalThis.fetch=originalFetch;
