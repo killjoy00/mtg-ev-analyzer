@@ -1,7 +1,7 @@
 import { escapeHtml as esc } from './html.mjs';
 import { connectPatreon, getAuthSession, loadPatreonStatus } from './growth-api.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
-import { trackEvent as event } from './retention-events.mjs';
+import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
 const ACTIVATION_KEY='pack1-patreon-activation-v1';
 
@@ -42,6 +42,7 @@ async function startOAuth(source) {
   let target=null;
   try {target=new URL(String(result?.url||''));} catch {}
   if(!target||target.protocol!=='https:'||target.hostname!=='www.patreon.com')throw Error('Patreon did not return a valid authorization URL.');
+  await flushEvents().catch(()=>{});
   location.assign(target.toString());
 }
 
