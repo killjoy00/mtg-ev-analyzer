@@ -875,6 +875,7 @@ async function validateDailyRunScore(runId, playerId, authUserId) {
        FROM draft_run_sessions s
        WHERE s.id=$1::uuid AND s.player_id=$2::uuid AND s.day=$4::date
          AND EXISTS(SELECT 1 FROM identity_allowed)
+         AND EXISTS(SELECT 1 FROM players p WHERE p.id=s.player_id AND p.username_owned=true)
          AND s.score IS NOT NULL AND NOT s.leaderboard_eligible
          AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
          AND NOT EXISTS (
