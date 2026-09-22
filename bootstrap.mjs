@@ -37,7 +37,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   await installHistoricalShare();
 } else {
   // Paint play links before identity/profile requests. Profiles load on demand.
-  const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account')
+  const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
     ? await import('./daily-home.mjs?v=6') : null;
   home?.renderDailyHome();
   const growthReady = import('./growth.mjs?v=6');
@@ -73,6 +73,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     if (!['deleted','deleting'].includes(params.get('account'))) {
       await (await growthReady).renderAccount({source:'route'});
+      if(params.get('account')==='patreon')document.querySelector('#profile-account-tab')?.click();
     }
   } else if (params.has('profile')) {
     await identityReady;
