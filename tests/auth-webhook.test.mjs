@@ -151,6 +151,8 @@ test('Pack One recovery template uses only a fragment reset URL and contains no 
   for(const body of [rendered.text,rendered.html]) {
     assert.match(body,/Pack One/);
     assert.match(body,/https:\/\/packone\.pro\/reset-password\/#token=/);
+    assert.match(body,/This reset link expires at/);
+    assert.doesNotMatch(body,/This verification link expires/);
     assert.doesNotMatch(body,/neon\.tech/i);
     assert.doesNotMatch(body,/Neon Auth/i);
     assert.doesNotMatch(body,/\?token=/);
@@ -172,6 +174,8 @@ test('Pack One verification template uses the exact validated Neon link with Pac
   for(const body of [rendered.text,rendered.html]){
     assert.match(body,/Pack One/);
     assert.match(body,/auth\.verify\.example\/pack1\/auth\/verify-email/);
+    assert.match(body,/This verification link expires at/);
+    assert.doesNotMatch(body,/This reset link expires/);
     assert.doesNotMatch(body,/Reset your password/);
   }
 });
