@@ -31,7 +31,6 @@ jobs:
     timeout-minutes: 10
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      NEON_BIN: ${{ runner.temp }}/neon-tools/node_modules/.bin/neon
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -40,6 +39,8 @@ jobs:
       - name: Install pinned Neon CLI
         run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@4.17.4
       - name: Prove localhost capability in QA and restore QA
+        env:
+          NEON_BIN: ${{ runner.temp }}/neon-tools/node_modules/.bin/neon
         run: node scripts/auth-localhost-hardening.mjs qa
 
   production:
@@ -48,7 +49,6 @@ jobs:
     timeout-minutes: 12
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      NEON_BIN: ${{ runner.temp }}/neon-tools/node_modules/.bin/neon
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -57,4 +57,6 @@ jobs:
       - name: Install pinned Neon CLI
         run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@4.17.4
       - name: Disable production localhost allowance and verify auth flows
+        env:
+          NEON_BIN: ${{ runner.temp }}/neon-tools/node_modules/.bin/neon
         run: node scripts/auth-localhost-hardening.mjs production
