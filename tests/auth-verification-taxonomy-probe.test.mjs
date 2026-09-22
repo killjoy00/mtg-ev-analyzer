@@ -71,3 +71,11 @@ test('sanitized webhook evidence records OTP/link shape without retaining secret
   for(const secret of ['secret@example.com','secret-token','123456','secret subject','secret body'])
     assert.ok(!serialized.includes(secret));
 });
+
+test('Auth probe staging waits for Workers.dev propagation before failing',()=>{
+  const source=fs.readFileSync(new URL('../scripts/auth-webhook-probe-stage.mjs',import.meta.url),'utf8');
+  assert.match(source,/for\(let i=0;i<20;i\+=1\)/);
+  assert.match(source,/await sleep\(750\)/);
+  assert.match(source,/if\(response\.ok\)return/);
+  assert.match(source,/Temporary Auth probe Worker health check failed/);
+});

@@ -28,6 +28,18 @@ async function cf(route) {
   if(!body.success)throw Error('Cloudflare rejected probe receiver setup.');
   return body.result;
 }
+async function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+async function waitForHealth(workerUrl) {
+  for(let i=0;i<20;i+=1) {
+    try {
+      const response=await fetch(workerUrl+'/health',{redirect:'error',signal:AbortSignal.timeout(15000)});
+      if(response.ok)return;
+    } catch {}
+    await sleep(750);
+  }
+  throw Error('Temporary Auth probe Worker health check failed.');
+}
+
 async function main() {
   if(!process.env.CLOUDFLARE_EDGE_TOKEN)throw Error('Cloudflare operations credential is missing.');
   if(!process.env.EDGE_TOOLS_DIR)throw Error('Pinned deployment tools are missing.');
@@ -67,8 +79,7 @@ async function main() {
   run(wrangler,['deploy','--config',configPath]);
 
   const workerUrl=`https://${WORKER}.${accountSubdomain}.workers.dev`;
-  const health=await fetch(workerUrl+'/health',{redirect:'error',signal:AbortSignal.timeout(15000)});
-  if(!health.ok)throw Error('Temporary Auth probe Worker health check failed.');
+  await waitForHealth(workerUrl);
 
   console.log('AUTH_PROBE_RECEIVER_URL '+workerUrl);
   console.log('AUTH_PROBE_WEBHOOK_URL '+workerUrl+'/webhook');
