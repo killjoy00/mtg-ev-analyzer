@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import { completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, signInAccount, signOutAccount, signUpAccount, startGoogleSignIn } from './growth-api.mjs';
+import { completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startGoogleSignIn } from './growth-api.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { trackEvent as event } from './retention-events.mjs';
 
@@ -67,6 +67,26 @@ export async function renderForgotPassword() {
     } catch(error) {
       status.textContent=error?.message||'Password recovery is temporarily unavailable.';
       button.disabled=false;
+    }
+  });
+}
+
+export async function renderVerificationRecovery(message='This verification link has expired or is no longer valid. Request a new link.') {
+  document.body.classList.remove('is-game');
+  const app=document.querySelector('#app');if(!app)return;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Email verification</p><h1>Get a new verification link.</h1><p>${esc(message)}</p><p>Verification links expire after 15 minutes.</p></header><div class="account-columns"><div><form class="account-form" id="account-verification-resend-form"><label>Email<input required type="email" name="email" autocomplete="email"></label><button class="button primary" type="submit">Send a new verification link</button><p class="form-error" aria-live="polite"></p></form></div></div><div class="account-actions"><button class="button secondary" id="account-verification-back" type="button">Back to sign in</button></div></section>`;
+  document.querySelector('#account-verification-back')?.addEventListener('click',()=>void renderAccount({mode:'signin'}));
+  document.querySelector('#account-verification-resend-form')?.addEventListener('submit',async e=>{
+    e.preventDefault();const form=e.currentTarget,status=form.querySelector('.form-error');
+    if(!setFormPending(form,true,'Sending…'))return;
+    status.textContent='';
+    try {
+      const {email}=Object.fromEntries(new FormData(form));
+      const result=await requestVerificationEmail(email);
+      form.innerHTML=`<p class="form-success" role="status">${esc(result?.message||"If an unverified account exists for that email, we've sent a verification link.")}</p>`;
+    } catch(error) {
+      status.textContent=error?.message||'Email verification is temporarily unavailable.';
+      setFormPending(form,false);
     }
   });
 }
@@ -212,7 +232,17 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       event('auth_sign_up',{source});
       if(!authCompleted(auth)) {
         const card=document.querySelector('.account-auth-card');
-        if(card)card.innerHTML=`<div class="form-success account-verification-success" role="status"><h2>Check your email</h2><p>Check your email — we sent a verification link to ${esc(data.email)}. Open it to finish creating your Pack One account.</p></div><button class="button secondary" id="account-verification-signin" type="button">Back to sign in</button>`;
+        if(card)card.innerHTML=`<div class="form-success account-verification-success" role="status"><h2>Check your email</h2><p>Check your email — we sent a verification link to ${esc(data.email)}. Open it to finish creating your Pack One account.</p><p>Verification links expire after 15 minutes.</p></div><button class="button secondary" id="account-verification-resend" type="button">Send a new verification link</button><button class="button secondary" id="account-verification-signin" type="button">Back to sign in</button><p id="account-verification-status" aria-live="polite"></p>`;
+        document.querySelector('#account-verification-resend')?.addEventListener('click',async e=>{
+          const button=e.currentTarget,status=document.querySelector('#account-verification-status');
+          button.disabled=true;if(status){status.className='';status.textContent='';}
+          try {
+            const result=await requestVerificationEmail(data.email);
+            if(status){status.className='form-success';status.textContent=result?.message||"If an unverified account exists for that email, we've sent a verification link.";}
+          } catch(error) {
+            if(status){status.className='form-error';status.textContent=error?.message||'Email verification is temporarily unavailable.';}
+          } finally {button.disabled=false;}
+        });
         document.querySelector('#account-verification-signin')?.addEventListener('click',()=>void renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode:'signin'}));
         return;
       }
@@ -255,6 +285,20 @@ function shareCompletedAnalytics(eventObject) {
 
 export async function resumeAccountAuth(status) {
   const flow=takeAuthFlow()||{};
+  if(status==='verify') {
+    const current=new URL(location.href);
+    const error=current.searchParams.get('error');
+    current.searchParams.delete('auth');
+    current.searchParams.delete('error');
+    current.searchParams.delete('error_description');
+    history.replaceState({},'',current.pathname+(current.searchParams.size?'?'+current.searchParams:''));
+    if(error) {
+      event('auth_verification_failed',{source:flow.source||'unknown'});
+      return renderVerificationRecovery('This verification link has expired or is no longer valid. Request a new link.');
+    }
+    event('auth_verification_completed',{source:flow.source||'unknown'});
+    return renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account',notice:'Email verified.'});
+  }
   if(status==='google') {
     try {
       await completeGoogleSignIn();
