@@ -78,6 +78,9 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(workflow,/branches:\s*\[main\]/);
   assert.match(workflow,/github\.event_name == 'pull_request'/);
   assert.match(workflow,/NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}/);
+  assert.doesNotMatch(workflow,/env:\s*\n(?:\s+[^\n]+\n)*\s+NEON_BIN: \$\{\{ runner\.temp \}\}/);
+  assert.match(workflow,/name: Prove localhost capability in QA and restore QA[\s\S]*?env:[\s\S]*?NEON_BIN: \$\{\{ runner\.temp \}\}/);
+  assert.match(workflow,/name: Disable production localhost allowance and verify auth flows[\s\S]*?env:[\s\S]*?NEON_BIN: \$\{\{ runner\.temp \}\}/);
   assert.match(workflow,/neon@4\.17\.4/);
   assert.match(workflow,/auth-localhost-hardening\.mjs qa/);
   assert.match(workflow,/auth-localhost-hardening\.mjs production/);
