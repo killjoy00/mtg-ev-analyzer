@@ -1,1 +1,1 @@
-{"operation":"disable-production-localhost","reason":"Issue #245: prove Managed Neon Auth localhost behavior in QA, restore QA, then disable localhost allowance in production and verify intended origins and auth flows."}
+{"operation":"disable-production-localhost","reason":"Issue #245 execution request after the reviewed localhost-hardening controller landed on main; QA proof passed and was restored before production."}
