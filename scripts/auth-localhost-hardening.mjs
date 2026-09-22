@@ -96,16 +96,35 @@ function servicePrincipalUnlinked(branch,serviceId){
   return output==='0';
 }
 
-export async function deleteAuthUser(branch,userId){
-  if(!safeString(userId,128))return;
+const CLEANUP_RETRY_DELAYS_MS=[1000,3000];
+
+async function cleanupDelay(ms){
+  await new Promise(resolve=>setTimeout(resolve,ms));
+}
+
+export async function deleteAuthUser(branch,userId,{removeUser=removeProviderUser,sleepFn=cleanupDelay}={}){
+  if(!safeString(userId,128))return {kind:'skipped'};
   const authBase=branch===PROD_BRANCH?PROD_AUTH_BASE:QA_AUTH_BASE;
-  const result=await removeProviderUser({
-    authBase,
-    authUserId:userId,
-    validateServicePrincipal:async serviceId=>servicePrincipalUnlinked(branch,serviceId),
-  });
-  if(!['success','not_found'].includes(result.kind))
-    throw Error('Provider Auth user cleanup failed: '+String(result.code||result.kind)+'.');
+  let result=null;
+  for(let attempt=1;attempt<=CLEANUP_RETRY_DELAYS_MS.length+1;attempt++){
+    result=await removeUser({
+      authBase,
+      authUserId:userId,
+      validateServicePrincipal:async serviceId=>servicePrincipalUnlinked(branch,serviceId),
+    });
+    if(['success','not_found'].includes(result?.kind))return result;
+    if(result?.kind==='transient'&&attempt<=CLEANUP_RETRY_DELAYS_MS.length){
+      await sleepFn(CLEANUP_RETRY_DELAYS_MS[attempt-1]);
+      continue;
+    }
+    const code=String(result?.code||result?.kind||'UNKNOWN');
+    if(result?.kind==='transient')
+      throw Error('Provider Auth user cleanup transient after '+attempt+' attempts: '+code+'.');
+    if(result?.kind==='operator_review')
+      throw Error('Provider Auth user cleanup requires operator review: '+code+'.');
+    throw Error('Provider Auth user cleanup returned unexpected outcome: '+code+'.');
+  }
+  throw Error('Provider Auth user cleanup exhausted unexpectedly.');
 }
 
 function responseCode(body){
