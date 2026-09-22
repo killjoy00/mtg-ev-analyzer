@@ -56,10 +56,16 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await (await growthReady).resumeAccountAuth(params.get('auth'));
   } else if (params.has('patreon')) {
     await identityReady;
-    const profiles=await import('./profile-product.mjs?v=6');
-    profiles.installProfileProductLayer();
-    (await import('./profile-polish.mjs?v=6')).installProfilePolish();
-    await profiles.renderMyProfile();
+    const patreonResult=params.get('patreon');
+    const growth=await growthReady;
+    if(patreonResult==='activate'||growth.hasPatreonActivationIntent()) {
+      await growth.renderPatreonActivation({result:patreonResult==='activate'?null:patreonResult,source:patreonResult==='activate'?'welcome_note':'oauth_return'});
+    } else {
+      const profiles=await import('./profile-product.mjs?v=6');
+      profiles.installProfileProductLayer();
+      (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+      await profiles.renderMyProfile();
+    }
     const clean=new URL(location.href);clean.searchParams.delete('patreon');
     history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
   } else if (home) home.installDailyHome(identityReady);
