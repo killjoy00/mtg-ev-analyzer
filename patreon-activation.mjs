@@ -108,6 +108,10 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   }
 
   const state=patreon?.membership?.effective_state||'unknown';
+  if(patreon?.membership?.sync_pending||(result==='connected'&&state==='unknown')) {
+    shell('<h2>Your Patreon account is connected.</h2><p>We’re waiting for the latest membership update.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
+    bindOAuth(source);return;
+  }
   if(state==='active_non_elite') {
     shell('<h2>Patreon is connected, but Elite is not active.</h2><p>Pack One currently sees a non-Elite Patreon membership. If you just upgraded, check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',
       retry+`<a class="button secondary" href="${esc(patreon?.support_url||PATREON_POLICY.supportUrl)}" rel="noopener noreferrer">Upgrade to Elite on Patreon</a>`);
@@ -115,10 +119,6 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   }
   if(state==='not_entitled') {
     shell('<h2>Patreon is connected, but Pack One does not currently see an active Elite entitlement.</h2><p>Review the membership on Patreon or authorize again to check the latest provider state.</p><p id="patreon-activation-status" aria-live="polite"></p>',support+retry);
-    bindOAuth(source);return;
-  }
-  if(patreon?.membership?.sync_pending||result==='connected') {
-    shell('<h2>Your Patreon account is connected.</h2><p>We’re waiting for the latest membership update.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     bindOAuth(source);return;
   }
   shell('<h2>Patreon is connected.</h2><p>Pack One could not classify the latest membership state yet. Check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
