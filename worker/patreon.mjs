@@ -127,7 +127,7 @@ function rawMembershipFromIdentity(data,policy=PATREON_POLICY) {
 }
 
 export function effectivePatreonMembership(row,policy=PATREON_POLICY) {
-  if(!row)return 'unknown';
+  if(!row||!row.last_synced_at)return 'unknown';
   const member={
     campaignId:row.provider_campaign_id||null,
     tierIds:typeof row.tier_ids==='string'?JSON.parse(row.tier_ids):row.tier_ids||[],
