@@ -6,8 +6,6 @@ on:
     paths:
       - '.github/workflows/auth-webhook-alert-proof.yml'
       - 'scripts/auth-webhook-alert-proof.mjs'
-      - 'scripts/auth-webhook-alert.mjs'
-      - 'scripts/auth-webhook-control.mjs'
 
 permissions:
   contents: read
@@ -28,7 +26,6 @@ jobs:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       GITHUB_TOKEN: ${{ github.token }}
       RELEASE_COMMIT: ${{ github.event.pull_request.head.sha }}
-      PACK1_QA_AUTH_BASE_OVERRIDE: https://ep-holy-hall-b5uw4nql.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth
     steps:
       - uses: actions/checkout@v4
         with:
@@ -42,7 +39,7 @@ jobs:
         run: node scripts/auth-webhook-alert-proof.mjs production-service
 
       - name: Install pinned QA deployment tools
-        run: npm install --prefix "$RUNNER_TEMP/auth-webhook-tools" --no-audit --no-fund wrangler@4.132.0 neon@4.17.4
+        run: npm install --prefix "$RUNNER_TEMP/auth-webhook-tools" --no-audit --no-fund wrangler@4.132.0
 
       - name: Deploy genuine QA delivery-failure mode with retained logs
         id: deploy
@@ -82,6 +79,5 @@ jobs:
           set -euo pipefail
           git fetch origin main
           git checkout --detach origin/main
-          unset PACK1_QA_AUTH_BASE_OVERRIDE
           export RELEASE_COMMIT="$(git rev-parse HEAD)"
           node scripts/auth-webhook-control.mjs deploy-qa
