@@ -6,6 +6,8 @@ import {
   normalizeConfigSnapshot,
   validateRequestFile,
   socialStart,
+  deleteAuthUser,
+  PROD_AUTH_BASE,
   PROD_ORIGINS,
   QA_BRANCH,
   PROD_BRANCH,
@@ -55,6 +57,52 @@ test('social probe sends an origin-bound Google OAuth start without following re
   assert.equal(body.disableRedirect,true);
 });
 
+test('deleteAuthUser retries transient outcomes and succeeds without collapsing the type',async()=>{
+  const calls=[];
+  const waits=[];
+  const userId='11111111-1111-4111-8111-111111111111';
+  const result=await deleteAuthUser(PROD_BRANCH,userId,{
+    removeUser:async options=>{
+      calls.push(options);
+      if(calls.length<3)return {kind:'transient',code:'PROVIDER_RATE_LIMIT'};
+      return {kind:'success'};
+    },
+    sleepFn:async ms=>{waits.push(ms);},
+  });
+  assert.deepEqual(result,{kind:'success'});
+  assert.equal(calls.length,3);
+  assert.deepEqual(waits,[1000,3000]);
+  assert.equal(calls[0].authBase,PROD_AUTH_BASE);
+  assert.equal(calls[0].authUserId,userId);
+  assert.equal(typeof calls[0].validateServicePrincipal,'function');
+});
+
+test('deleteAuthUser surfaces operator review distinctly and does not retry it',async()=>{
+  let calls=0;
+  await assert.rejects(
+    deleteAuthUser(PROD_BRANCH,'22222222-2222-4222-8222-222222222222',{
+      removeUser:async()=>{calls++;return {kind:'operator_review',code:'PROVIDER_FORBIDDEN'};},
+      sleepFn:async()=>{throw Error('operator review must not sleep');},
+    }),
+    /requires operator review: PROVIDER_FORBIDDEN/
+  );
+  assert.equal(calls,1);
+});
+
+test('deleteAuthUser distinguishes exhausted transient cleanup after bounded retries',async()=>{
+  let calls=0;
+  const waits=[];
+  await assert.rejects(
+    deleteAuthUser(PROD_BRANCH,'33333333-3333-4333-8333-333333333333',{
+      removeUser:async()=>{calls++;return {kind:'transient',code:'PROVIDER_RATE_LIMIT'};},
+      sleepFn:async ms=>{waits.push(ms);},
+    }),
+    /transient after 3 attempts: PROVIDER_RATE_LIMIT/
+  );
+  assert.equal(calls,3);
+  assert.deepEqual(waits,[1000,3000]);
+});
+
 test('hardening contract is QA-first, production-fixed, reversible on failure, and avoids Auth-table mutation',()=>{
   const source=fs.readFileSync(new URL('../scripts/auth-localhost-hardening.mjs',import.meta.url),'utf8');
   const workflow=fs.readFileSync(new URL('../.github/workflows/auth-localhost-hardening.yml',import.meta.url),'utf8');
@@ -76,8 +124,11 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(source,/removeProviderUser/);
   assert.match(source,/SELECT count\(\*\) FROM account_links WHERE auth_user_id=/);
   assert.doesNotMatch(source,/DATABASE_URL|DELETE\s+FROM|UPDATE\s+neon_auth|INSERT\s+INTO\s+neon_auth/i);
-  assert.match(source,/SELECT count\(\*\) FROM account_links WHERE auth_user_id=/);
+  assert.doesNotMatch(source,/psql[\s\S]{0,400}?\b(DELETE|UPDATE|INSERT|TRUNCATE|ALTER)\b/i);
   assert.match(source,/runNeon\(\['psql',branch,'--project-id',PROJECT_ID,'--database-name','pack1'/);
+  const rollbackIndex=source.indexOf('if(coreError){');
+  const cleanupErrorIndex=source.indexOf('if(cleanupErrors.length)');
+  assert.ok(rollbackIndex>=0&&cleanupErrorIndex>rollbackIndex,'cleanup errors must be thrown only after core rollback handling');
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/branches:\s*\[main\]/);
   assert.match(workflow,/github\.event_name == 'pull_request'/);
