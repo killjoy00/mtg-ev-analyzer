@@ -24,7 +24,7 @@ for(const s of prepared.filter(s=>s.health.ready)) {
   console.log(JSON.stringify({set:s.sid,component,status:'Candidate',publication:'deferred',reason:'Parent environment is not Live'}));
   pending.push(s);continue;
  }
- const result=await handleCorpusAdmin(new Request(`https://packone.pro/v1/admin/corpus/${s.sid}/components/${component}/status`,{method:'POST'}),query,async()=>({oldStatus:'Candidate',status:'Live',corpusVersion:parent,reason:'Owner-authorized puzzle-source expansion; frozen Premier v3 unchanged. Reviewed publication '+identity.run_id}),null,identity);
+ const result=await handleCorpusAdmin(new Request(`https://packone.pro/v1/admin/corpus/${s.sid}/components/${component}/status`,{method:'POST'}),query,async()=>({oldStatus:'Candidate',status:'Live',corpusVersion:parent,reason:'Owner-authorized puzzle-source expansion; frozen Premier grader unchanged. Reviewed publication '+identity.run_id}),null,identity);
  console.log(JSON.stringify(result));live.push(s);
 }
 await verifyComponents(query,live,'Live');
