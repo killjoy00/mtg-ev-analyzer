@@ -74,8 +74,9 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(source,/request-password-reset/);
   assert.match(source,/delivered@resend\.dev/);
   assert.doesNotMatch(source,/\bpsql\b|DATABASE_URL|DELETE\s+FROM|UPDATE\s+neon_auth|INSERT\s+INTO\s+neon_auth/i);
-  assert.match(workflow,/release\/245-disable-localhost/);
-  assert.match(workflow,/branches:\s*\[main, release\/245-disable-localhost\]/);
+  assert.match(workflow,/pull_request:/);
+  assert.match(workflow,/branches:\s*\[main\]/);
+  assert.match(workflow,/github\.event_name == 'pull_request'/);
   assert.match(workflow,/NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}/);
   assert.match(workflow,/neon@4\.17\.4/);
   assert.match(workflow,/auth-localhost-hardening\.mjs qa/);
