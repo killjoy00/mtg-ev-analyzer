@@ -264,7 +264,9 @@ export async function main(){
   const originalWebhook=webhookGet(neon);
   console.log('AUTH_VERIFICATION_ORIGINAL_EMAIL_CONFIG '+JSON.stringify(originalEmail));
   console.log('AUTH_VERIFICATION_ORIGINAL_WEBHOOK_CONFIG '+JSON.stringify(originalWebhook));
-  if(originalWebhook.enabled)throw Error('QA Auth webhook is already enabled; refusing to overwrite an active configuration.');
+  assert(originalWebhook.enabled,'Disposable production child did not inherit the active recovery webhook.');
+  assert(originalWebhook.enabled_events.includes('send.magic_link'),'Disposable production child recovery webhook is missing send.magic_link.');
+  assert(originalWebhook.webhook_url==='https://pack1-authhook.killjoy00.workers.dev/webhook','Disposable production child recovery webhook target is unexpected.');
 
   const workerUrl=await probeWorkerUrl();
   const health=await fetch(workerUrl+'/health',{redirect:'error',signal:AbortSignal.timeout(15000)});
@@ -274,13 +276,13 @@ export async function main(){
   let webhookChanged=false;
   let primaryError=null;
   try{
+    webhookChanged=true;
     webhookUpdate(neon,{
       enabled:true,
       webhook_url:workerUrl+'/webhook',
       enabled_events:['send.magic_link','send.otp'],
       timeout_seconds:5,
     });
-    webhookChanged=true;
     const enabledWebhook=webhookGet(neon);
     assert(enabledWebhook.enabled,'QA verification probe webhook did not enable.');
     assert(enabledWebhook.enabled_events.includes('send.magic_link'),'QA verification probe webhook is missing send.magic_link.');

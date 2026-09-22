@@ -1,1 +1,1 @@
-{"operation":"probe-email-verification","reason":"Issue #246: measure link-only verification on disposable production child br-square-water-ay71uef3 with inherited custom Resend SMTP; restore all Auth settings afterward."}
+{"operation":"probe-email-verification","reason":"Issue #246: temporarily swap the inherited recovery webhook only on disposable child br-square-water-ay71uef3, measure link verification taxonomy, and restore the exact inherited webhook/config."}
