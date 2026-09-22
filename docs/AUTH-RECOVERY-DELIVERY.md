@@ -58,6 +58,20 @@ For webhook requests it:
 
 Raw recovery tokens, signatures, recipient addresses, and credentials are not logged.
 
+## Failure observability and alerting
+
+Production Workers observability is enabled for `pack1-authhook`. The structured `pack1_authhook_timing` record now covers three failure classes that require operator attention:
+
+- `invalid_signature`: signature/timestamp/JWKS verification failed;
+- `delivery_failure`: a verified recovery event could not be delivered through the dedupe/Resend boundary;
+- `rejected_event`: the request was signature-verified and parsed, but its signed event shape was not accepted by the recovery-only contract.
+
+`rejected_event` records include only bounded `event_type` and `link_type` values, delivery attempt, and timings. Tokens, email addresses, signatures, and raw payloads are not logged. In QA the same rejected-event details are also written to the existing hashed-event telemetry store, so event-taxonomy probes can observe the signed `event_type` / `link_type` pair without exposing recovery credentials.
+
+`.github/workflows/auth-webhook-alert.yml` polls Cloudflare Workers Observability every five minutes with a fifteen-minute lookback. It filters only the production `pack1-authhook` timing records above and deduplicates overlap by Cloudflare event ID. New failures are routed to an open GitHub issue titled `[authhook alert] Production recovery webhook failure`, assigned to the repository owner; if that issue has been closed, the next failure creates a new assigned issue. The workflow never copies raw Worker log payloads into GitHub.
+
+The alert query uses Cloudflare's supported Workers Observability telemetry API and therefore requires the existing `CLOUDFLARE_EDGE_TOKEN` to include `Workers Observability Write`. Pull requests run the same retained-log query in check-only mode so a missing permission fails before merge instead of silently disabling the alert.
+
 ## Live QA evidence
 
 The separate QA Auth project proved the provider contract before production activation:
