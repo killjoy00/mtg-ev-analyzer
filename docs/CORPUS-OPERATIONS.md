@@ -16,7 +16,7 @@ No lifecycle action deletes or changes puzzles, results, shares, sessions or sch
 
 The reviewed-main **Corpus Operations** workflow runs daily and can be dispatched for development or production. It discovers official 17Lands Premier archives, checks source ETag/last-modified metadata, obtains Scryfall set identity and release date, records non-serving discoveries, runs the existing qualified-trophy/context-model importer, verifies checksums and ledger accounting, loads immutable puzzles, records source dispositions and executes health verification. Only passing imports become Candidate. The workflow never promotes a set to Live.
 
-Existing versions are frozen: discovery records source freshness, but an updated archive does not automatically retrain a model or replace decisions in an existing corpus version. Such changes need a reviewed versioned regeneration. New-set models use the current frozen model implementation and qualified-player standard. Traditional data remains outside production pending the separate research decision.
+Existing versions are frozen: discovery records source freshness, but an updated archive does not automatically retrain a model or replace decisions in an existing corpus version. Such changes need a reviewed versioned regeneration. New-set models use the current frozen model implementation and qualified-player standard. Reviewed Traditional v4 playable components are a separate additive source lifecycle: stage Candidate in development, explicitly publish eligible components in development, stage the identical artifacts in production, then explicitly publish production. Production publish requires matching development publication eligibility and fails closed otherwise. Traditional data still does not train or calibrate the Premier model.
 
 Completed rebuild checkpoints are split by storage contract: git retains manifests, ledgers, hashes, path models and other tracked outputs, while gitignored replay shards are checkpointed to the model-versioned R2 namespace and verified before each ephemeral Actions runner exits. Final validation hydrates those shards from R2 on a fresh runner before publication. Source archives remain disposable downloads; historical database records are retained. The importer no longer invokes historical data-purge commands.
 
@@ -48,6 +48,16 @@ Previously reviewed Live sets are grandfathered at migration. Missing modern hea
 Premier trophies include 7–0, 7–1 and 7–2 with the existing experience/skill standard. New ledgers store wins/losses separately from immutable puzzle payloads. Imported older ledgers without losses report unknown; they must not be described as audited 7–0-only data. Outcomes and qualified/source/included/excluded totals appear wherever recorded.
 
 Custom-set practice requires complete P1P1–P1P8 coverage with at least 16 independent medium/hard sources at each position. Live sets with incomplete opening-pack archives can still contribute valid later decisions to mixed runs; they are not offered as self-contained custom-set runs. The full historical inventory is retained.
+
+## Supplemental Traditional components
+
+Current v4 supplemental identities are `traditional-premier-v4-phase2-v1` for regular environments and `traditional-cube-p2p7-v4-v1` for Powered Cube. They are pinned to parent `elite-trophy-colour-stage-v8` and model `strong-player-colour-stage-v4`.
+
+Component publication is parent-aware. A ready component under a Live parent can move Candidate -> Live; a ready component under a Candidate parent remains Candidate. In the September 21 release this leaves SIR staged but non-serving. HBG, HOB, KTK and PIO failed the reviewed regular v4 admission gates and have no v4 component. Powered Cube v4 serves only P1P2-P1P7.
+
+Live Traditional components extend the same environment-level serving universe as retained Premier inventory. They do not replace the Premier parent or create a separate player-facing Traditional mode. Current new games use Live components only; existing schedules and sessions keep their pinned IDs and remain readable regardless of later component status.
+
+The complete September 21 release evidence, including the safe blocked production publish that exposed the required development-publication prerequisite, is in [Traditional v4 production release closeout](reports/TRADITIONAL-V4-RELEASE-2026-09-21.md).
 
 ## Serving score floor
 
