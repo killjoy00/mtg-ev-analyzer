@@ -4,14 +4,26 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {DRAFT_RUN_CORPUS_VERSION as parent,selectDraftRun,gradeDraftRunPick,validateDraftRunPuzzle} from '../draft-run.mjs';
-import {CUBE_TRADITIONAL_COMPONENT_VERSION as component} from '../corpus-components.mjs';
+import {CUBE_TRADITIONAL_COMPONENT_VERSION as defaultComponent,modelVersionForComponent,supportedComponent} from '../corpus-components.mjs';
 import {corpusMembership} from '../worker/corpus-components.mjs';
 import {selectDatabaseRun,decodePuzzleMetadata} from '../worker/draft-run-selection.mjs';
-const query=corpusDatabase(process.argv[2]),parse=x=>typeof x==='string'?JSON.parse(x):x;
+const query=corpusDatabase(process.argv[2]),component=process.argv[3]||defaultComponent,parse=x=>typeof x==='string'?JSON.parse(x):x;
+assert.ok(supportedComponent(component),'Unsupported Cube component');
+const expectedModel=modelVersionForComponent(component);
+const info=(await query(`SELECT c.status,c.model_version,c.parent_version,v.manifest
+ FROM corpus_components c JOIN corpus_set_versions v ON v.set_id=c.set_id AND v.corpus_version=c.component_version
+ WHERE c.set_id='powered-cube' AND c.component_version=$1`,[component])).rows[0];
+assert.ok(info,'Cube component missing');
+const manifest=parse(info.manifest);
+assert.equal(info.status,'Live');assert.equal(info.parent_version,parent);assert.equal(info.model_version,expectedModel);
+assert.equal(manifest.serving_window?.first_pick,2);assert.equal(manifest.serving_window?.last_pick,7);
+const stored=(await query('SELECT count(*)::int n FROM draft_run_verified_puzzles WHERE set_id=\'powered-cube\' AND corpus_version=$1',[component])).rows[0];
+assert.equal(Number(stored.n),Number(manifest.puzzles));
 const rows=(await query(`SELECT p.puzzle_id,p.set_id,p.corpus_version,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band
  FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r USING(puzzle_id) WHERE (${corpusMembership({serving:true})}) AND p.set_id='powered-cube' AND p.interesting AND p.pack_number=1 AND p.pick_number BETWEEN 2 AND 9 AND r.difficulty_version='support-ratio-v1'`,[parent])).rows.map(decodePuzzleMetadata);
-assert.equal(rows.filter(p=>p.corpus_version===component).length,1295);
-assert.ok(rows.filter(p=>p.corpus_version===component).every(p=>p.pick_number<=7));
+const componentRows=rows.filter(p=>p.corpus_version===component);
+assert.ok(componentRows.length>0,'Published Cube component has no interesting serving inventory');
+assert.ok(componentRows.every(p=>p.pick_number<=7));
 const eligible=rows.filter(meetsServingQuality);
 const check=run=>{assert.ok(run.every(p=>impliedTrophyScore(p)>=20));assert.equal(run.length,8);assert.equal(new Set(run.map(p=>p.source_draft_hash)).size,8);assert.deepEqual(run.map(p=>p.pick_number),[2,3,4,5,6,7,8,9]);assert.ok(run.slice(6).every(p=>p.corpus_version===parent));};
 let traditional=0,sqlTraditional=0;const byPick={};
@@ -20,5 +32,5 @@ for(let i=0;i<20;i++){const seed='cube-source-'+i,run=await selectDatabaseRun(qu
 assert.ok(traditional>0&&sqlTraditional>0,'Expanded inventory participates in ordinary selection');
 const puzzles=(await query('SELECT payload FROM draft_run_verified_puzzles WHERE corpus_version=$1',[component])).rows.map(r=>parse(r.payload));
 for(const p of puzzles){assert.ok(validateDraftRunPuzzle(p,component));assert.equal(gradeDraftRunPick(p,p.historical_pick_id).score,100);for(const c of p.candidates)if(c.id!==p.historical_pick_id)assert.ok(gradeDraftRunPick(p,c.id).score<=95);}
-const evidence={passed:true,serving_policy_version:SERVING_POLICY_VERSION,traditional_serving_decisions:eligible.filter(p=>p.corpus_version===component).length,runs:10000,sql_runs:20,traditional_decisions_selected:traditional,sql_traditional_decisions_selected:sqlTraditional,traditional_by_pick:byPick,model_changed:false};
+const evidence={passed:true,component,model_version:expectedModel,serving_policy_version:SERVING_POLICY_VERSION,traditional_serving_decisions:eligible.filter(p=>p.corpus_version===component).length,runs:10000,sql_runs:20,traditional_decisions_selected:traditional,sql_traditional_decisions_selected:sqlTraditional,traditional_by_pick:byPick,model_changed:false};
 fs.mkdirSync('generated',{recursive:true});fs.writeFileSync('generated/cube-expansion-verification.json',JSON.stringify(evidence,null,2));console.log(JSON.stringify(evidence));
