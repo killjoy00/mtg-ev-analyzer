@@ -18,6 +18,7 @@ test('email verification QA acceptance is pinned to a disposable production chil
   assert.match(source,/emailUpdate\(neon,originalEmail\)/);
   assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
   assert.match(source,/neon-auth','user','delete'/);
+  assert.match(source,/try\{\s*run\(wrangler,\['deploy'/);
   assert.match(source,/AUTH_VERIFY_QA_WORKER_CLEANED true/);
   assert.doesNotMatch(source,/br-orange-feather-ayps8kep[^\n]*emailUpdate/);
 });
