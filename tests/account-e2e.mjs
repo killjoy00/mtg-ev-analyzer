@@ -74,7 +74,9 @@ try {
   await page.locator('#account-signin').waitFor();
   assert.equal(await page.locator('#account-signup').count(),0);
   assert.equal(await page.locator('.player-profile-page').count(),0);
-  assert.match(await page.locator('.account-page header').textContent(),/A free account saves your record and enables leaderboard participation\./);
+  assert.match(await page.locator('.account-page').textContent(),/A free account saves your record and enables leaderboard participation\./);
+  assert.equal((await page.locator('.account-page h1').textContent())?.trim(),'Sign In');
+  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Sign in with Google');
   await page.screenshot({path:'artifacts/ui-account-mobile.png',fullPage:true});
 
   for(const kind of ['signin','signup']) {
