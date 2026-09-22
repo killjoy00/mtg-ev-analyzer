@@ -17,9 +17,9 @@ import {
 import { loadReplayJson } from './replay-data.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 import { trackEvent } from './retention-events.mjs';
-import { nextMilestones } from './progression.mjs?v=5';
+import { nextMilestones } from './progression.mjs?v=6';
 import { PATREON_POLICY } from './patreon-policy.mjs';
-import { renderAccount, renderDeletionState } from './growth.mjs?v=5';
+import { renderAccount, renderDeletionState } from './growth.mjs?v=6';
 import {
   bestPercentile,
   environmentProgress,
@@ -49,7 +49,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=5', import.meta.url).href;
+  link.href = new URL('./profile.css?v=6', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
