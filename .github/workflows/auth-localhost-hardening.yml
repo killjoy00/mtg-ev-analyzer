@@ -49,6 +49,8 @@ jobs:
     timeout-minutes: 12
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
+      PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
