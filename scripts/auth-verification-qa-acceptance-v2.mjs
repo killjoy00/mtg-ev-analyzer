@@ -4,10 +4,10 @@ import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 
 const PROJECT='patient-shadow-91417882';
-const BRANCH='br-polished-meadow-ay3jy6hn';
+const BRANCH='br-long-bar-ayqfnpn4';
 const PROD_BRANCH='br-orange-feather-ayps8kep';
 const DEV_BRANCH='br-twilight-hill-ayffyd2b';
-const AUTH_BASE='https://ep-steep-butterfly-aylouwr9.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const AUTH_BASE='https://ep-shy-butterfly-aygy0fuj.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const PROD_WEBHOOK='https://pack1-authhook.killjoy00.workers.dev/webhook';
 const WORKER='pack1-authverify-qa-temp';
 
@@ -149,11 +149,11 @@ async function authPost(pathname,body){
 }
 async function waitSignin(email,password){
   let last=0;
-  for(let attempt=0;attempt<30;attempt+=1){
+  for(const delay of [2000,5000,10000]){
+    await sleep(delay);
     const signin=await authPost('/sign-in/email',{email,password,rememberMe:true});
     last=signin.status;
     if(signin.status>=200&&signin.status<300&&Boolean(signin.json?.token||signin.json?.session?.token))return signin;
-    await sleep(500);
   }
   throw Error('Verified QA sign-in did not succeed; last HTTP '+last+'.');
 }
@@ -161,6 +161,15 @@ async function workerTelemetry(base){
   const response=await fetch(base+'/qa/telemetry',{redirect:'error',signal:AbortSignal.timeout(10000)});
   assert(response.ok,'QA telemetry unavailable.');
   return response.json();
+}
+async function waitVerificationDelivery(base){
+  for(let attempt=0;attempt<40;attempt+=1){
+    const telemetry=await workerTelemetry(base);
+    const entries=Array.isArray(telemetry?.entries)?telemetry.entries:[];
+    if(entries.some(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='email-verification'&&entry.qa_auto_verified===true))return entries;
+    await sleep(500);
+  }
+  throw Error('Successful verification delivery/redemption telemetry was not observed.');
 }
 async function waitHealth(base,commit){
   for(let attempt=0;attempt<80;attempt+=1){
@@ -277,6 +286,7 @@ async function main(){
     assert(!signup.json?.session&&!signup.json?.token,'Verification QA signup unexpectedly returned a session.');
     console.log('AUTH_VERIFY_QA_SIGNUP '+JSON.stringify({status:signup.status,user_present:true,session_present:false}));
 
+    await waitVerificationDelivery(workerBase);
     const signin=await waitSignin(email,password);
     console.log('AUTH_VERIFY_QA_SIGNIN_AFTER '+JSON.stringify({
       status:signin.status,

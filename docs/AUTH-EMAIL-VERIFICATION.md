@@ -1,6 +1,6 @@
 # Pack One email ownership verification
 
-Status: **delivery implementation in review; production verification remains disabled**.
+Status: **delivery implementation merged; production verification remains disabled pending migration and final QA acceptance**.
 
 Issue: #246.
 
@@ -62,7 +62,9 @@ A read-only production query on 2026-09-22 found:
 - verified credential users: **0**;
 - unverified credential users: **4**.
 
-Therefore production `require_email_verification` must **not** be enabled until the impact on pre-existing unverified credential accounts has been measured and a supported grandfathering/migration policy has been chosen. Enabling the flag without that gate could block existing password users at their next sign-in.
+A disposable production-child acceptance test then created an unverified credential account while verification was disabled. That account signed in successfully with HTTP 200. After the same branch was switched to `require_email_verification=true`, the exact same account immediately received HTTP 403 at sign-in. Managed Neon therefore does **not** grandfather pre-existing unverified credential users when the requirement is enabled.
+
+If production were flipped today, the four currently unverified credential accounts would be expected to be blocked on their next password sign-in. Production `require_email_verification` must remain disabled until those accounts are migrated/verified with an explicitly supported user flow.
 
 ## Target policy
 
