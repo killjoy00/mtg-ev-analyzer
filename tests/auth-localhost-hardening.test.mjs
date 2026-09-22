@@ -73,12 +73,16 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(source,/sign-in\/email/);
   assert.match(source,/request-password-reset/);
   assert.match(source,/delivered@resend\.dev/);
-  assert.match(source,/neon-auth','user','delete/);
+  assert.match(source,/removeProviderUser/);
+  assert.match(source,/SELECT count\(\*\) FROM account_links WHERE auth_user_id=/);
+  assert.match(source,/admin\/remove-user/);
   assert.doesNotMatch(source,/\bpsql\b|DATABASE_URL|DELETE\s+FROM|UPDATE\s+neon_auth|INSERT\s+INTO\s+neon_auth/i);
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/branches:\s*\[main\]/);
   assert.match(workflow,/github\.event_name == 'pull_request'/);
   assert.match(workflow,/NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}/);
+  assert.match(workflow,/PACK1_DELETION_ADMIN_EMAIL: \$\{\{ secrets\.PACK1_DELETION_ADMIN_EMAIL \}\}/);
+  assert.match(workflow,/PACK1_DELETION_ADMIN_PASSWORD: \$\{\{ secrets\.PACK1_DELETION_ADMIN_PASSWORD \}\}/);
   assert.match(workflow,/timeout-minutes: 10\n    env:\n      NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}\n    steps:/);
   assert.match(workflow,/timeout-minutes: 12\n    env:\n      NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}\n    steps:/);
   assert.match(workflow,/name: Prove localhost capability in QA and restore QA[\s\S]*?env:[\s\S]*?NEON_BIN: \$\{\{ runner\.temp \}\}/);
