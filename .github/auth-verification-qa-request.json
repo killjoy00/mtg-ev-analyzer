@@ -1,1 +1,1 @@
-{"operation":"run","reason":"Issue #246: deploy the new Auth email-verification handler only to a temporary QA Worker and prove delivered verification, verified sign-in, recovery delivery, rollback, and cleanup on disposable branch br-old-surf-ayfjob8u."}
+{"operation":"run","reason":"Issue #246 rerun: fresh disposable branch br-icy-mouse-ay0ansqm follows the full verification redirect chain, measures legacy unverified-account behavior, proves recovery, restores settings, removes the temporary Worker, and deletes the entire branch."}

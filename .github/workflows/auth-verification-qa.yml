@@ -39,4 +39,4 @@ jobs:
       - name: Run disposable email-verification acceptance
         env:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-verification-tools
-        run: node scripts/auth-verification-qa-acceptance.mjs
+        run: node scripts/auth-verification-qa-acceptance-v2.mjs
