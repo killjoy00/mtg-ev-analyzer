@@ -96,16 +96,50 @@ function servicePrincipalUnlinked(branch,serviceId){
   return output==='0';
 }
 
-export async function deleteAuthUser(branch,userId){
+const CLEANUP_RETRY_DELAY_MS=250;
+const RETRYABLE_CLEANUP_CODES=new Set([
+  'PROVIDER_RATE_LIMIT',
+  'PROVIDER_5XX',
+  'PROVIDER_NETWORK',
+  'PROVIDER_ADMIN_LINK_CHECK',
+]);
+
+function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
+
+function providerCleanupError(result){
+  const kind=result?.kind==='transient'?'transient':'operator_review';
+  const code=String(result?.code||result?.kind||'PROVIDER_FAILURE');
+  const message=kind==='transient'
+    ?'Provider Auth user cleanup transient failure: '+code+'.'
+    :'Provider Auth user cleanup requires operator review: '+code+'.';
+  return Object.assign(Error(message),{kind,code});
+}
+
+export async function deleteAuthUser(branch,userId,{
+  removeProviderUserFn=removeProviderUser,
+  servicePrincipalUnlinkedFn=servicePrincipalUnlinked,
+  sleepFn=sleep,
+}={}){
   if(!safeString(userId,128))return;
   const authBase=branch===PROD_BRANCH?PROD_AUTH_BASE:QA_AUTH_BASE;
-  const result=await removeProviderUser({
-    authBase,
-    authUserId:userId,
-    validateServicePrincipal:async serviceId=>servicePrincipalUnlinked(branch,serviceId),
-  });
-  if(!['success','not_found'].includes(result.kind))
-    throw Error('Provider Auth user cleanup failed: '+String(result.code||result.kind)+'.');
+  const validateServicePrincipal=async serviceId=>servicePrincipalUnlinkedFn(branch,serviceId);
+
+  for(let attempt=1;attempt<=2;attempt+=1){
+    const result=await removeProviderUserFn({
+      authBase,
+      authUserId:userId,
+      validateServicePrincipal,
+    });
+    if(['success','not_found'].includes(result.kind))return result;
+    const retryable=result.kind==='transient'
+      && attempt===1
+      && RETRYABLE_CLEANUP_CODES.has(String(result.code||''));
+    if(retryable){
+      await sleepFn(CLEANUP_RETRY_DELAY_MS);
+      continue;
+    }
+    throw providerCleanupError(result);
+  }
 }
 
 function responseCode(body){
