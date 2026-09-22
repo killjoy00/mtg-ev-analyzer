@@ -9,11 +9,18 @@ import {
 } from '../scripts/auth-verification-taxonomy-probe.mjs';
 import {sanitizedPayload} from '../edge/auth-webhook-probe.mjs';
 
-test('verification taxonomy probe is pinned to the disposable QA Auth project',()=>{
-  assert.equal(PROJECT,'late-fire-55708539');
-  assert.equal(BRANCH,'br-super-snow-b5ufhq30');
+test('verification taxonomy probe is pinned to one disposable non-serving Pack One Auth branch',()=>{
+  assert.equal(PROJECT,'patient-shadow-91417882');
+  assert.equal(BRANCH,'br-wandering-brook-ayf9dopn');
   const source=fs.readFileSync(new URL('../scripts/auth-verification-taxonomy-probe.mjs',import.meta.url),'utf8');
-  assert.doesNotMatch(source,/patient-shadow-91417882|br-orange-feather-ayps8kep|br-twilight-hill-ayffyd2b/);
+  const stage=fs.readFileSync(new URL('../scripts/auth-webhook-probe-stage.mjs',import.meta.url),'utf8');
+  for(const forbidden of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b','ep-hidden-bonus-ayfmcpys','ep-spring-dream-ayq2a5qt']){
+    assert.ok(!source.includes(forbidden));
+    assert.ok(!stage.includes(forbidden));
+  }
+  assert.match(source,/br-wandering-brook-ayf9dopn/);
+  assert.match(source,/ep-bold-king-ay0y1jwz/);
+  assert.match(stage,/ep-bold-king-ay0y1jwz/);
   assert.match(source,/finally\s*\{/);
   assert.match(source,/updateEmailConfig\(originalEmail\)/);
   assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
