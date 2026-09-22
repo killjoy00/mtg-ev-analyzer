@@ -95,7 +95,7 @@ function setFormPending(form,pending,label) {
 
 async function returnToValidatedDaily(validationRunId,linked,source) {
   event('daily_score_validated',{source});
-  const draft=await import('./draft-run-product.mjs');
+  const draft=await import('./draft-run-product.mjs?v=5');
   await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null});
 }
 
@@ -126,9 +126,9 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       return;
     }
     if(intent==='elite') { handoffToPatreon(source); return; }
-    const profiles=await import('./profile-product.mjs');
+    const profiles=await import('./profile-product.mjs?v=5');
     profiles.installProfileProductLayer();
-    (await import('./profile-polish.mjs')).installProfilePolish();
+    (await import('./profile-polish.mjs?v=5')).installProfilePolish();
     await profiles.renderMyProfile();
     return;
   }
@@ -174,7 +174,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     }
   });
   document.querySelector('#account-forgot')?.addEventListener('click',()=>void renderForgotPassword());
-  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;await (await import('./profile-product.mjs')).renderMyProfile();});
+  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;await (await import('./profile-product.mjs?v=5')).renderMyProfile();});
   document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;document.querySelector('#brand-home')?.click();});
 
   const signup=document.querySelector('#account-signup');
