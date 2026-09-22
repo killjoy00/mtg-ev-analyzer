@@ -78,6 +78,8 @@ An account-linked player's name becomes a public identity only when `players.use
 
 Deployment order is fixed: 0033 must be applied before the application release that reads it, because worker SQL on the session, link and profile paths references `username_owned` and `pack1_username_key`. `scripts/verify-neon-schema.mjs` asserts all four signals and fails the deploy gate until the migration lands.
 
+Operational recovery, admin monitoring and the regression contract are documented in [Username identity and ranking](USERNAME-IDENTITY.md).
+
 ## Live September 19 feature release
 
 - Third Daily (`latest`) has its own fixed schedule, status, share link and leaderboard, using only the newest Live released regular set.
