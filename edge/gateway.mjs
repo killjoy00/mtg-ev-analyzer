@@ -36,7 +36,7 @@ function permitted(service,path,method,search,mode) {
   if(service==='growth') {
     if(method==='POST'&&[
       '/v1/session','/v1/player/session','/v1/player/migrate',
-      '/v1/account/signup','/v1/account/signin','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete','/v1/account/migrate',
+      '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete','/v1/account/migrate',
       '/v1/account/link','/v1/account/link-browser','/v1/account/signout',
       '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect',
     ].includes(path))return true;

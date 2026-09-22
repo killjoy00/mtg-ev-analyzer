@@ -27,9 +27,16 @@ test('Google errors have an independent surface and account analytics keep sourc
   assert.match(growth,/event\('daily_score_validated',\{source\}\)/);
 });
 
-test('verification-required signup is a success state',()=>{
+test('verification-required signup offers resend and expired-link recovery',()=>{
   assert.match(growth,/Check your email — we sent a verification link to/);
+  assert.match(growth,/Verification links expire after 15 minutes/);
   assert.match(growth,/account-verification-success/);
+  assert.match(growth,/account-verification-resend/);
+  assert.match(growth,/requestVerificationEmail\(data\.email\)/);
+  assert.match(growth,/renderVerificationRecovery/);
+  assert.match(growth,/status==='verify'/);
+  assert.match(growth,/auth_verification_failed/);
+  assert.match(growth,/auth_verification_completed/);
   assert.match(growth,/account-verification-signin/);
 });
 
