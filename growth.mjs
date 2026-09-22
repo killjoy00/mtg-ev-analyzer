@@ -2,7 +2,7 @@ import { escapeHtml as esc } from './html.mjs';
 import { completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startGoogleSignIn } from './growth-api.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs';
-import { trackEvent as event } from './retention-events.mjs';
+import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
 let currentAccount = null;
 let pendingDailyRunValidation = null;
@@ -31,8 +31,9 @@ function formMarkup(kind) {
   return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="email"></label>${kind==='signup'?'<label>Display name<input required name="name" minlength="2" maxlength="24" autocomplete="nickname"></label>':''}<label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p class="form-error" aria-live="polite"></p></form>`;
 }
 
-function handoffToPatreon(source='account') {
+async function handoffToPatreon(source='account') {
   event('elite_upgrade_handoff',{source});
+  await flushEvents().catch(()=>{});
   location.assign(PATREON_POLICY.supportUrl);
 }
 
@@ -177,7 +178,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       return;
     }
     if(intent==='patreon-activate') { await renderPatreonActivation({source}); return; }
-    if(intent==='elite') { handoffToPatreon(source); return; }
+    if(intent==='elite') { await handoffToPatreon(source); return; }
     const profiles=await import('./profile-product.mjs?v=6');
     profiles.installProfileProductLayer();
     (await import('./profile-polish.mjs?v=6')).installProfilePolish();
@@ -261,7 +262,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       const claimed=await claimCurrentSession();
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
       if(activatingPatreon){await renderPatreonActivation({source});return;}
-      if(upgradingElite){handoffToPatreon(source);return;}
+      if(upgradingElite){await handoffToPatreon(source);return;}
       await renderAccount({intent,source});
     } catch(error) {
       err.textContent=error?.message||'Account creation failed.';
@@ -283,7 +284,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       event('auth_sign_in',{source});
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
       if(activatingPatreon){await renderPatreonActivation({source});return;}
-      if(upgradingElite){handoffToPatreon(source);return;}
+      if(upgradingElite){await handoffToPatreon(source);return;}
       await renderAccount({intent,source});
     } catch(error) {
       err.textContent=error?.message||'Sign in failed.';
