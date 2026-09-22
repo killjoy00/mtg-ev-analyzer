@@ -287,6 +287,10 @@ export async function signInAccount({email,password}) {
   return data;
 }
 
+export async function requestVerificationEmail(email) {
+  return api('/v1/account/send-verification-email',{method:'POST',body:{email:String(email||'')},auth:false});
+}
+
 export async function requestPasswordReset(email) {
   return api('/v1/account/request-password-reset',{method:'POST',body:{email:String(email||'')},auth:false});
 }
