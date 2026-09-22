@@ -1,4 +1,4 @@
-# Inspection trigger refreshed after PR #314 merge.
+# Inspection trigger refreshed after regular success and Cube dispatch.
 name: Inspect recent reviewed release runs
 
 on:
