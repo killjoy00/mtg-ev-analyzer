@@ -6,6 +6,7 @@ import {
   normalizeConfigSnapshot,
   validateRequestFile,
   socialStart,
+  deleteAuthUser,
   PROD_ORIGINS,
   QA_BRANCH,
   PROD_BRANCH,
@@ -55,6 +56,19 @@ test('social probe sends an origin-bound Google OAuth start without following re
   assert.equal(body.disableRedirect,true);
 });
 
+test('Auth smoke cleanup uses the supported Neon management API',async()=>{
+  let call=null;
+  process.env.NEON_API_KEY='test-key';
+  await deleteAuthUser(async(url,init)=>{
+    call={url,init};
+    return new Response(null,{status:204});
+  },PROD_BRANCH,'00000000-0000-0000-0000-000000000001');
+  assert.equal(call.init.method,'DELETE');
+  assert.equal(call.init.headers.authorization,'Bearer test-key');
+  assert.match(call.url,/\/projects\/patient-shadow-91417882\/branches\/br-orange-feather-ayps8kep\/auth\/users\/00000000-0000-0000-0000-000000000001$/);
+  delete process.env.NEON_API_KEY;
+});
+
 test('hardening contract is QA-first, production-fixed, reversible on failure, and avoids Auth-table mutation',()=>{
   const source=fs.readFileSync(new URL('../scripts/auth-localhost-hardening.mjs',import.meta.url),'utf8');
   const workflow=fs.readFileSync(new URL('../.github/workflows/auth-localhost-hardening.yml',import.meta.url),'utf8');
@@ -74,6 +88,7 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(source,/request-password-reset/);
   assert.match(source,/delivered@resend\.dev/);
   assert.doesNotMatch(source,/\bpsql\b|DATABASE_URL|DELETE\s+FROM|UPDATE\s+neon_auth|INSERT\s+INTO\s+neon_auth/i);
+  assert.match(source,/console\.neon\.tech\/api\/v2\/projects\/.*\/auth\/users/);
   assert.match(workflow,/pull_request:/);
   assert.match(workflow,/branches:\s*\[main\]/);
   assert.match(workflow,/github\.event_name == 'pull_request'/);
