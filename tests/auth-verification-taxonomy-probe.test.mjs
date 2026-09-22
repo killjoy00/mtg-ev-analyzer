@@ -34,7 +34,9 @@ test('verification state fallback is read-only and never emits credential conten
   assert.match(source,/LEFT JOIN neon_auth\.verification/);
   assert.match(source,/replace\(v\.identifier,lower\(u\.email\),'<email>'\)/);
   assert.doesNotMatch(source,/\b(?:DELETE|UPDATE|INSERT|TRUNCATE|ALTER)\s+(?:TABLE\s+)?neon_auth\./i);
-  assert.doesNotMatch(source,/console\.log\([^\n]*(?:password|email\s*[,+]|v\.value)/i);
+  const passwordLogs=source.match(/console\.log\([^\n]*password[^\n]*\)/gi)||[];
+  assert.deepEqual(passwordLogs,["console.log('::add-mask::'+password)"]);
+  assert.doesNotMatch(source,/console\.log\([^\n]*(?:email\s*[,+]|v\.value)/i);
 });
 
 test('verification modes change only the intended email/password policy fields',()=>{
