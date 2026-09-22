@@ -1,1 +1,1 @@
-{"operation":"probe-email-verification","reason":"Part of #246: measure link verification send-on-signup enabled with require-email-verification disabled on disposable production child br-summer-credit-ay2vkyhc, then restore inherited Auth and webhook settings."}
+{"operation":"probe-email-verification","reason":"Part of #246: rerun the optional link-verification matrix on br-summer-credit-ay2vkyhc with retry-safe Workers.dev readiness and unconditional temporary receiver cleanup."}
