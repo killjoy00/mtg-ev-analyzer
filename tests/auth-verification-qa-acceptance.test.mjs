@@ -4,12 +4,13 @@ import fs from 'node:fs';
 
 test('email verification QA acceptance is pinned to a fresh disposable production child and deletes it',()=>{
   const source=fs.readFileSync(new URL('../scripts/auth-verification-qa-acceptance-v2.mjs',import.meta.url),'utf8');
-  assert.match(source,/BRANCH='br-icy-mouse-ay0ansqm'/);
+  assert.match(source,/BRANCH='br-polished-meadow-ay3jy6hn'/);
   assert.match(source,/PROD_BRANCH='br-orange-feather-ayps8kep'/);
   assert.match(source,/assert\(BRANCH!==PROD_BRANCH&&BRANCH!==DEV_BRANCH/);
   assert.match(source,/meta\.parent_id===PROD_BRANCH/);
   assert.match(source,/meta\.default===false&&meta\.protected===false&&Boolean\(meta\.expires_at\)/);
   assert.match(source,/PACK1_QA_AUTO_VERIFY_AFTER_SEND:'1'/);
+  assert.match(source,/attempt<80/);
   assert.match(source,/email_verification_method:'link'/);
   assert.match(source,/require_email_verification:true/);
   assert.match(source,/AUTH_VERIFY_QA_LEGACY_AFTER_POLICY/);
