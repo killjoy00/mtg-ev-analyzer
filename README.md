@@ -2,13 +2,14 @@
 
 [Play Pack One](https://packone.pro): eight decisions from real trophy drafts. Choose a card, then see the trophy drafter's pick and model-supported alternatives.
 
-The homepage starts with **Daily Draft Run**, **Daily Powered Cube** and **Daily Latest Set**. Each is a separate universal, fixed challenge per Eastern date, with no rerolls. The latest-set game uses only the newest Live released set. All support anonymous play and sharing. A signed player linked to an account before starting is ranked immediately. A guest who completes a fixed Daily can explicitly sign in/link on that same Eastern game date to validate that completed first attempt and make it leaderboard-eligible; the run must belong to the resolved player, the account identity must still be attachable, the run must be complete and still unranked, and there must not already be a score for that player/date/environment. A valid account session adds unlimited regular practice. Elite members can choose sets for balanced random practice from the homepage.
+The homepage starts with **Daily Draft Run**, **Daily Powered Cube** and **Daily Latest Set**. Each is a separate universal, fixed challenge per Eastern date, with no rerolls. The latest-set game uses only the newest Live released set. All support anonymous play and sharing. A signed player linked to an account before starting is ranked immediately only when that player owns a unique username. A linked account whose current nickname is already owned stays linked but remains unranked until it chooses a free username; Pack One warns before the Daily and keeps the recovery action visible in My Pack One. A guest who completes a fixed Daily can explicitly sign in/link on that same Eastern game date to validate that completed first attempt and make it leaderboard-eligible; if username ownership blocks validation, the pending validation can complete after a unique username is saved. The run must belong to the resolved player, the account identity must still be attachable, the run must be complete and still unranked, and there must not already be a score for that player/date/environment. A valid account session adds unlimited regular practice. Elite members can choose sets for balanced random practice from the homepage.
 
 **100 means you matched the trophy drafter. Other choices earn up to 95 based on model support.** The model is the partial-credit engine.
 
 ## Read first
 
 - [Current implementation and deployment state](docs/CURRENT-STATE.md)
+- [Username identity, recovery and admin monitoring](docs/USERNAME-IDENTITY.md)
 - [Product contract](docs/CHARTER.md)
 - [Corpus and selection](docs/DATA-MANAGEMENT.md), [Corpus Operations](docs/CORPUS-OPERATIONS.md)
 - [Scoring](docs/SCORING-AND-DIFFICULTY.md), [Traditional research](results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md)
