@@ -234,10 +234,20 @@ export async function authWebhook(request,env) {
   try {payload=JSON.parse(new TextDecoder().decode(rawBytes));}
   catch {return new Response(null,{status:400});}
 
-  const event=validateRecoveryEvent(payload,request.headers);
-  if(!event)return new Response(null,{status:400});
-
   const deliveryAttempt=request.headers.get('x-neon-delivery-attempt');
+  const event=validateRecoveryEvent(payload,request.headers);
+  if(!event) {
+    const details={
+      status:'rejected_event',
+      event_type:safeString(payload?.event_type,64),
+      link_type:safeString(payload?.event_data?.link_type,64),
+      verify_ms:verifyMs,
+      total_ms:Date.now()-started,
+    };
+    logTiming(env,deliveryAttempt,details);
+    await recordQaTelemetry(env,payload?.event_id||request.headers.get('x-neon-event-id'),deliveryAttempt,details);
+    return new Response(null,{status:400});
+  }
   if(env.PACK1_AUTH_ENV==='qa'&&env.PACK1_FORCE_DELIVERY_FAILURE==='1') {
     const details={status:'forced_failure',verify_ms:verifyMs,total_ms:Date.now()-started};
     logTiming(env,deliveryAttempt,details);
