@@ -1,4 +1,4 @@
-const ALERT_TITLE='[authhook alert] Production recovery webhook failure';
+const DEFAULT_ALERT_TITLE='[authhook alert] Production recovery webhook failure';
 const ALERT_STATUSES=new Set(['invalid_signature','delivery_failure','rejected_event']);
 const QUERY_WINDOW_MS=15*60*1000;
 const RECENT_COMMENT_WINDOW_MS=30*60*1000;
@@ -13,38 +13,42 @@ export function buildTelemetryQuery(from,to,service='pack1-authhook') {
     timeframe:{from,to},
     dry:true,
     limit:200,
+    view:'events',
     parameters:{
       datasets:['cloudflare-workers'],
       filterCombination:'and',
       filters:[
         {key:'$metadata.service',operation:'eq',type:'string',value:service},
-        {key:'$metadata.message',operation:'includes',type:'string',value:'"type":"pack1_authhook_timing"'},
+        {key:'type',operation:'eq',type:'string',value:'pack1_authhook_timing'},
         {
           kind:'group',
           filterCombination:'or',
           filters:[...ALERT_STATUSES].map(status=>({
-            key:'$metadata.message',operation:'includes',type:'string',value:'"status":"'+status+'"',
+            key:'status',operation:'eq',type:'string',value:status,
           })),
         },
       ],
-      view:'events',
     },
   };
 }
 
-function eventMessage(event) {
-  if(typeof event?.$metadata?.message==='string')return event.$metadata.message;
-  if(typeof event?.source==='string')return event.source;
+function timingPayload(event) {
+  const source=event?.source;
+  if(source&&typeof source==='object'&&!Array.isArray(source))return source;
+  if(typeof source==='string') {
+    try {return JSON.parse(source);} catch {}
+  }
+  const message=event?.$metadata?.message;
+  if(typeof message==='string') {
+    try {return JSON.parse(message);} catch {}
+  }
   return null;
 }
 
 export function parseAlertEvent(event) {
   const id=boundedString(event?.$metadata?.id,160);
-  const message=eventMessage(event);
-  if(!id||!message)return null;
-  let timing;
-  try {timing=JSON.parse(message);} catch {return null;}
-  if(timing?.type!=='pack1_authhook_timing'||!ALERT_STATUSES.has(timing?.status))return null;
+  const timing=timingPayload(event);
+  if(!id||timing?.type!=='pack1_authhook_timing'||!ALERT_STATUSES.has(timing?.status))return null;
   const timestamp=Number(event?.timestamp);
   const at=Number.isFinite(timestamp)?new Date(timestamp).toISOString():null;
   return {
@@ -157,7 +161,7 @@ async function githubJson(fetcher,url,token,options={}) {
   return body;
 }
 
-export async function routeGithubAlert(fetcher,{repository,token,events,now=Date.now()}) {
+export async function routeGithubAlert(fetcher,{repository,token,events,now=Date.now(),title=DEFAULT_ALERT_TITLE}) {
   if(!Array.isArray(events)||events.length===0)return {action:'none',count:0};
   if(typeof token!=='string'||token.length<20)throw Error('GITHUB_TOKEN is missing or too short.');
   const match=/^([^/]+)\/([^/]+)$/.exec(String(repository||''));
@@ -165,11 +169,11 @@ export async function routeGithubAlert(fetcher,{repository,token,events,now=Date
   const [,owner,repo]=match;
   const base='https://api.github.com/repos/'+owner+'/'+repo;
   const issues=await githubJson(fetcher,base+'/issues?state=open&per_page=100',token);
-  const existing=Array.isArray(issues)?issues.find(issue=>issue?.title===ALERT_TITLE&&!issue?.pull_request):null;
+  const existing=Array.isArray(issues)?issues.find(issue=>issue?.title===title&&!issue?.pull_request):null;
   if(!existing) {
     const created=await githubJson(fetcher,base+'/issues',token,{
       method:'POST',
-      body:JSON.stringify({title:ALERT_TITLE,body:renderAlertBody(events),assignees:[owner]}),
+      body:JSON.stringify({title,body:renderAlertBody(events),assignees:[owner]}),
     });
     return {action:'created',count:events.length,issue_number:created?.number||null};
   }
@@ -187,13 +191,14 @@ export async function runAlert({fetcher=fetch,env=process.env,now=Date.now(),mod
   const verified=mode==='check'?await verifyCloudflareToken(fetcher,env.CLOUDFLARE_EDGE_TOKEN):null;
   if(verified)console.log('Cloudflare token active; token id '+verified.id+'.');
   const service=env.PACK1_AUTHHOOK_ALERT_SERVICE||'pack1-authhook';
+  const title=env.PACK1_AUTHHOOK_ALERT_TITLE||DEFAULT_ALERT_TITLE;
   const events=await queryAlertEvents(fetcher,env.CLOUDFLARE_EDGE_TOKEN,now,service);
   if(mode==='check') {
     console.log('Auth webhook alert query access verified; matching retained failures: '+events.length+'.');
     return {action:'checked',count:events.length};
   }
   if(mode!=='alert')throw Error('Unknown auth webhook alert mode.');
-  const result=await routeGithubAlert(fetcher,{repository:env.GITHUB_REPOSITORY,token:env.GITHUB_TOKEN,events,now});
+  const result=await routeGithubAlert(fetcher,{repository:env.GITHUB_REPOSITORY,token:env.GITHUB_TOKEN,events,now,title});
   console.log('Auth webhook alert route '+result.action+'; new events '+result.count+'.');
   return result;
 }
