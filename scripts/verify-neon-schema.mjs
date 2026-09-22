@@ -26,6 +26,10 @@ const result=await query(`SELECT
   to_regprocedure('pack1_identity_attachment_allowed(uuid)') IS NOT NULL account_deletion_identity_guard,
   to_regprocedure('pack1_begin_account_deletion(uuid,uuid)') IS NOT NULL account_deletion_begin_function,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='account_deletion_player_tombstone_uq') account_deletion_player_tombstone,
+  to_regprocedure('pack1_username_key(text)') IS NOT NULL username_key_function,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='players' AND column_name='username_owned') username_ownership,
+  EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='players_username_uq') unique_usernames,
+  (SELECT pg_get_functiondef('merge_pack1_player(uuid,uuid)'::regprocedure) LIKE '%username_owned%') username_safe_merge,
   EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='account_deletion_operations'::regclass AND pg_get_constraintdef(oid) LIKE '%operator_review%') account_deletion_states,
   EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='account_credential_rate_limits'::regclass AND pg_get_constraintdef(oid) LIKE '%account_delete_init%') account_deletion_limits,
   EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='account_sessions' AND column_name='csrf_hash') account_session_csrf,
@@ -40,6 +44,8 @@ const result=await query(`SELECT
   (SELECT count(*)=2 FROM pg_constraint WHERE conname IN ('draft_run_sessions_puzzle_ids_check','draft_run_schedules_puzzle_ids_check')
     AND pg_get_constraintdef(oid) ~ '\\m8\\M' AND pg_get_constraintdef(oid) ~ '\\m10\\M') lengths,
   position('jsonb_array_length(s.puzzle_ids)' in pg_get_viewdef('draft_run_measurements'::regclass))>0 measurements`);
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0032 first.`);
+// Worker SQL references `username_owned` and `pack1_username_key` on the
+// session and profile paths, so 0033 has to land before the code that reads it.
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0033 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');

@@ -10,6 +10,7 @@ import {accountRuntimeConfig} from './account-config.mjs';
 import {clearCredentialLimit,consumeCredentialLimit,trustedCredentialNetwork} from './account-credential-limits.mjs';
 import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,deletionRecoveryKey,finishProviderPhase,loadDeletionOperation,maintenanceBatch,removeProviderUser,stuckDeletion,sweepExpiredVerification,verificationSweepEnabled} from './account-deletion.mjs';
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
+import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 const ACCOUNT_CONFIG=accountRuntimeConfig();
 const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
 const TOKEN_PREFIX = 'p1_';
@@ -69,7 +70,7 @@ async function query(sql, params = []) {
     },
     body: JSON.stringify({ query: sql, params: params.map((value) => (value == null ? null : String(value))) }),
   });
-  if (!response.ok) throw new Error(`Database query failed (${response.status}): ${await response.text()}`);
+  if (!response.ok) throw dbError(response.status, await response.text());
   const data = await response.json();
   const names = (data.fields || []).map((field) => field.name);
   return {
@@ -78,11 +79,16 @@ async function query(sql, params = []) {
   };
 }
 
-
-function normalizeName(value) {
-  const cleaned = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 24);
-  if (cleaned.length < 2) throw Object.assign(new Error('Display name must be 2-24 characters.'), { status: 400 });
-  return cleaned;
+// Constraint violations are part of the contract, not just a failure: callers
+// translate a username collision into a user-facing conflict, so the Postgres
+// error identity has to survive the HTTP hop.
+function dbError(status, text) {
+  let detail = {};
+  try { detail = JSON.parse(text) || {}; } catch {}
+  return Object.assign(new Error(`Database query failed (${status}): ${text}`), {
+    pgCode: detail.code ? String(detail.code) : null,
+    pgConstraint: detail.constraint ? String(detail.constraint) : null,
+  });
 }
 
 function bool(value) {
@@ -139,13 +145,44 @@ async function player(request, required = true) {
   return id;
 }
 
+// A browser nickname must never overwrite an owned username: the client replays
+// whatever localStorage holds, so an established account would otherwise have
+// its public identity replaced by a stale name, or collide with the owner of it.
 async function upsertPlayer(id, name) {
-  const displayName = normalizeName(name || 'Pack Player');
-  await query(
-    'INSERT INTO players(id,display_name) VALUES($1::uuid,$2) ON CONFLICT(id) DO UPDATE SET display_name=EXCLUDED.display_name,updated_at=now()',
+  const displayName = normalizeName(name || PLACEHOLDER_USERNAME);
+  const result = await query(
+    `INSERT INTO players(id,display_name) VALUES($1::uuid,$2)
+     ON CONFLICT(id) DO UPDATE SET
+       display_name=CASE WHEN players.username_owned THEN players.display_name ELSE EXCLUDED.display_name END,
+       updated_at=now()
+     RETURNING display_name`,
     [id, displayName],
   );
-  return displayName;
+  return result.rows[0]?.display_name || displayName;
+}
+
+// Claiming an account makes the name this browser was already using a real
+// identity, but only when nobody owns it yet. A taken name is left unowned so
+// linking always succeeds; the player then has to rename to publish a profile.
+async function reserveUsername(playerId) {
+  try {
+    await query(
+      `UPDATE players p SET username_owned=true,updated_at=now()
+       WHERE p.id=$1::uuid
+         AND NOT p.username_owned
+         AND pack1_username_key(p.display_name) <> pack1_username_key($2)
+         AND NOT EXISTS (
+           SELECT 1 FROM players other
+           WHERE other.id <> p.id AND other.username_owned
+             AND pack1_username_key(other.display_name)=pack1_username_key(p.display_name)
+         )`,
+      [playerId, PLACEHOLDER_USERNAME],
+    );
+  } catch (error) {
+    // A concurrent claim of the same name is the expected loss here, and it
+    // must not fail the account link that is already committed.
+    if (!isUsernameConflict(error)) throw error;
+  }
 }
 
 async function authSession(request,options={}) {
@@ -923,6 +960,8 @@ async function handleLink(request,{browser=false}={}) {
     }
   }
 
+  await reserveUsername(id);
+
   const validatedDailyScore = validateDailyRunId
     ? await validateDailyRunScore(validateDailyRunId, id, auth.user_id)
     : false;
@@ -1292,18 +1331,26 @@ async function handleProfileUpdate(request) {
   if (favorite && !allowedSets.has(favorite)) throw Object.assign(new Error('Choose a playable environment.'), { status: 400 });
   if (showcase && !unlocked.has(showcase)) throw Object.assign(new Error('Showcase an achievement you have unlocked.'), { status: 400 });
 
-  await query(
-    `WITH previous AS MATERIALIZED (SELECT profile_public,display_name FROM players WHERE id=$1::uuid FOR UPDATE), changed AS (UPDATE players
-     SET display_name=$2,profile_public=$3::boolean,favorite_set_id=$4,showcase_achievement=$5,updated_at=now()
-     FROM previous WHERE id=$1::uuid RETURNING previous.profile_public was_public,previous.display_name old_display_name),
-     events(event_name) AS (
-       SELECT 'public_profile_enabled' FROM changed WHERE NOT was_public AND $3::boolean
-       UNION ALL
-       SELECT 'leaderboard_name_changed' FROM changed WHERE old_display_name IS DISTINCT FROM $2
-     )
-     INSERT INTO analytics_events(player_id,event_name) SELECT $1::uuid,event_name FROM events`,
-    [id, displayName, profilePublic, favorite, showcase],
-  );
+  // This is the one path where an account owner deliberately chooses a name, so
+  // it is also where ownership is taken. `players_username_uq` decides whether
+  // the name is free: a preflight check could only narrow the race, not close
+  // it. Reverting to the placeholder releases the previous name.
+  try {
+    await query(
+      `WITH previous AS MATERIALIZED (SELECT profile_public,display_name FROM players WHERE id=$1::uuid FOR UPDATE), changed AS (UPDATE players
+       SET display_name=$2,profile_public=$3::boolean,favorite_set_id=$4,showcase_achievement=$5,username_owned=$6::boolean,updated_at=now()
+       FROM previous WHERE id=$1::uuid RETURNING previous.profile_public was_public,previous.display_name old_display_name),
+       events(event_name) AS (
+         SELECT 'public_profile_enabled' FROM changed WHERE NOT was_public AND $3::boolean
+         UNION ALL
+         SELECT 'leaderboard_name_changed' FROM changed WHERE old_display_name IS DISTINCT FROM $2
+       )
+       INSERT INTO analytics_events(player_id,event_name) SELECT $1::uuid,event_name FROM events`,
+      [id, displayName, profilePublic, favorite, showcase, !isPlaceholderUsername(displayName)],
+    );
+  } catch (error) {
+    rethrowUsernameConflict(error);
+  }
   const updatedMeta = await profileMetaByPlayer(id);
   return json(await buildProfile(id, updatedMeta, { own: true }));
 }
