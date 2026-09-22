@@ -1,4 +1,4 @@
-import {FROZEN_CONTEXT_MODEL_VERSION,supportedComponent} from '../corpus-components.mjs';
+import {modelVersionForComponent,supportedComponent} from '../corpus-components.mjs';
 export function corpusMembership({serving=false,parameter=1}={}) {
  const live=serving?" AND c.status='Live'":'';
  // Bound the version index, then enforce publication independently per set.
@@ -8,7 +8,7 @@ export function corpusMembership({serving=false,parameter=1}={}) {
 }
 export async function componentBelongsTo(query,puzzle,parentVersion) {
  if(puzzle?.corpus_version===parentVersion)return true;
- if(!supportedComponent(puzzle?.corpus_version)||puzzle.model_version!==FROZEN_CONTEXT_MODEL_VERSION)return false;
+ if(!supportedComponent(puzzle?.corpus_version)||puzzle.model_version!==modelVersionForComponent(puzzle.corpus_version))return false;
  return Boolean((await query('SELECT 1 FROM corpus_components WHERE set_id=$1 AND parent_version=$2 AND component_version=$3',
   [puzzle.set_id,parentVersion,puzzle.corpus_version])).rows.length);
 }
