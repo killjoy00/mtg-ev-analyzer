@@ -52,8 +52,8 @@ const rename=(player,displayName,status=200)=>
 async function claim(label,displayName) {
   const session=await guest(displayName);
   const auth=await account(label);
-  await call(growth,'/v1/account/link',{},session.token,200,{headers:auth.headers});
-  return {...session,auth};
+  const link=await call(growth,'/v1/account/link',{},session.token,200,{headers:auth.headers});
+  return {...session,auth,link};
 }
 
 // ---------------------------------------------------------------------------
@@ -162,8 +162,20 @@ assert.equal((await stored(adopter.playerId)).display_name,freeNickname);
 const contender=await claim('contender',username);
 assert.equal((await stored(contender.playerId)).display_name,username,'linking never fails over a taken nickname');
 assert.equal(await owned(contender.playerId),false,'a taken nickname is not reserved');
+assert.deepEqual(contender.link.rankingIdentity,{eligible:false,reason:'username_taken'},
+  'linking reports why this account is not rank-eligible');
 assert.equal(await linkedPlayerIdentity(query,contender.playerId),null,
   'an unowned collision is linked but is not a public ranked identity');
+const attentionProfile=await call(growth,'/v1/profile/me',undefined,contender.token,200);
+assert.equal(attentionProfile.player.username_owned,false,'My Pack One receives the persistent attention state');
+const attentionStatus=await call(draftRun,'/v1/daily-status',undefined,contender.token,200);
+assert.deepEqual(attentionStatus.ranking_identity,{eligible:false,reason:'username_taken'},
+  'Daily home receives an explicit username reason rather than treating the account as a guest');
+const conflictEvents=await query(
+  "SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='username_ownership_conflict'",
+  [contender.playerId],
+);
+assert.equal(Number(conflictEvents.rows[0].n),1,'the collision emits one structured admin-observable event');
 
 // Recreate the original bug directly: both linked players have the same stored
 // nickname, but only the legitimate owner may surface on public leaderboards.
@@ -218,6 +230,9 @@ assert.equal((await rename(contender,resolvedName)).player.display_name,resolved
 assert.equal(await owned(contender.playerId),true);
 assert.equal((await linkedPlayerIdentity(query,contender.playerId)).display_name,resolvedName,
   'the renamed account becomes a public ranked identity');
+const resolvedStatus=await call(draftRun,'/v1/daily-status',undefined,contender.token,200);
+assert.deepEqual(resolvedStatus.ranking_identity,{eligible:true,reason:null},
+  'the Daily warning clears immediately after a successful rename');
 
 const renamedDraftBoard=await call(draftRun,'/v1/leaderboard?period=all&environment=mixed',undefined,null,200);
 assert.ok(renamedDraftBoard.rows.some(row=>row.display_name===resolvedName),
