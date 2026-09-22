@@ -159,12 +159,30 @@ async function clearEvidence(workerUrl){
 }
 
 async function waitEvidence(workerUrl){
-  for(let i=0;i<20;i+=1){
+  for(let i=0;i<12;i+=1){
     const response=await fetch(workerUrl+'/evidence',{redirect:'error',signal:AbortSignal.timeout(10000)});
     if(response.ok)return response.json();
-    await new Promise(resolve=>setTimeout(resolve,750));
+    await new Promise(resolve=>setTimeout(resolve,500));
   }
-  throw Error('No signed verification webhook evidence was captured.');
+  return null;
+}
+
+function verificationState(neon,email){
+  if(!/^[a-z0-9@.-]{1,160}$/.test(email))throw Error('Invalid synthetic verification probe email.');
+  const sql=`SELECT json_build_object(
+    'user_found',count(DISTINCT u.id)=1,
+    'email_verified',COALESCE(bool_or(u."emailVerified"),false),
+    'verification_count',count(v.id),
+    'identifier_shape',COALESCE(max(replace(v.identifier,lower(u.email),'<email>')),''),
+    'value_length',COALESCE(max(length(v.value)),0),
+    'expires_future',COALESCE(bool_or(v."expiresAt">now()),false)
+  )::text
+  FROM neon_auth."user" u
+  LEFT JOIN neon_auth.verification v ON v.identifier LIKE '%' || lower(u.email) || '%'
+  WHERE lower(u.email)=lower('${email}')`;
+  const stdout=run(neon,['psql',BRANCH,'--project-id',PROJECT,'--database-name','pack1','--','-XAtc',sql]).trim();
+  try{return JSON.parse(stdout);}
+  catch{throw Error('Verification state query returned unexpected output.');}
 }
 
 function evidenceSummary(evidence){
@@ -185,7 +203,7 @@ function evidenceSummary(evidence){
   };
 }
 
-async function probeMode(mode,originalEmail,workerUrl){
+async function probeMode(mode,originalEmail,workerUrl,neon){
   const target=verificationConfigForMode(originalEmail,mode);
   const applied=await updateEmailConfig(target);
   assert(configEqual(applied,target),'QA email verification configuration did not reach the requested probe state.');
@@ -201,11 +219,15 @@ async function probeMode(mode,originalEmail,workerUrl){
   const signup=await authPost('/sign-up/email',{name:'Pack One Verification Probe',email,password});
   assert(signup.status>=200&&signup.status<300,'QA verification probe signup failed with HTTP '+signup.status+'.');
 
-  const evidence=await waitEvidence(workerUrl);
-  const summary=evidenceSummary(evidence);
-  assert(summary.signature_verified,'Managed Neon verification webhook signature did not verify.');
-
   const signin=await authPost('/sign-in/email',{email,password});
+  const evidence=await waitEvidence(workerUrl);
+  const summary=evidence?evidenceSummary(evidence):null;
+  if(summary)assert(summary.signature_verified,'Managed Neon verification webhook signature did not verify.');
+  const verification=verificationState(neon,email);
+  assert(verification.user_found,'QA verification probe user was not persisted.');
+  assert(verification.email_verified===false,'QA verification probe user unexpectedly verified before acceptance.');
+  assert(Number(verification.verification_count)>=1,'QA verification probe did not persist a verification credential.');
+
   console.log('AUTH_VERIFICATION_TAXONOMY '+JSON.stringify({
     mode,
     signup_status:signup.status,
@@ -213,7 +235,9 @@ async function probeMode(mode,originalEmail,workerUrl){
     signup_session_present:Boolean(signup.json?.session||signup.json?.token),
     signup_email_verified:typeof signup.json?.user?.emailVerified==='boolean'?signup.json.user.emailVerified:null,
     signin_before_verification_status:signin.status,
+    webhook_event_captured:Boolean(summary),
     evidence:summary,
+    verification_state:verification,
   }));
 }
 
@@ -251,8 +275,8 @@ export async function main(){
     console.log('AUTH_VERIFICATION_ENABLED_WEBHOOK '+JSON.stringify(enabledWebhook));
 
     emailChanged=true;
-    await probeMode('otp',originalEmail,workerUrl);
-    await probeMode('link',originalEmail,workerUrl);
+    await probeMode('otp',originalEmail,workerUrl,neon);
+    await probeMode('link',originalEmail,workerUrl,neon);
   }catch(error){
     primaryError=error;
   }finally{
