@@ -14,7 +14,7 @@ test('only the exact premium campaign and tier unlock tools, never the supporter
   assert.equal(premiumPatreonMembership(parsePatreonMembership(member('201',{currently_entitled_amount_cents:100000})),policy),false);
   assert.equal(premiumPatreonMembership({...parsePatreonMembership(member()),campaignId:'999'},policy),false);
   assert.equal(premiumPatreonMembership(parsePatreonMembership(member())),false);
-  for(const attrs of [{patron_status:'declined_patron'},{last_charge_status:'Declined'},{last_charge_status:'Refunded'}])assert.equal(premiumPatreonMembership(parsePatreonMembership(member('200',attrs)),policy),false);
+  for(const attrs of [{patron_status:'declined_patron'},{last_charge_status:'Declined'},{last_charge_status:'Refunded'},{last_charge_status:'Fraud'},{last_charge_status:'Deleted'}])assert.equal(premiumPatreonMembership(parsePatreonMembership(member('200',attrs)),policy),false);
   for(const attrs of [{is_free_trial:true,currently_entitled_amount_cents:0,patron_status:null},{is_gifted:true,currently_entitled_amount_cents:0,patron_status:null},{patron_status:'former_patron'}])assert.equal(premiumPatreonMembership(parsePatreonMembership(member('200',attrs)),policy),true);
   assert.equal(premiumPatreonMembership({...parsePatreonMembership(member()),tierIds:[]},policy),false);
 });
