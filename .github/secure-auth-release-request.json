@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"2026-09-21: Deploy the production recovery Worker with Workers observability enabled and QA-only fault-injection guards from issue #315. Production Neon webhook subscription configuration is unchanged."}
+{"operation":"deploy-secure-auth","reason":"2026-09-21: Retry the secure-auth release after adding migration 0032 to both schema phases. This carries the already-merged recovery observability hardening through the previously blocked production Worker deploy."}
