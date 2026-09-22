@@ -132,6 +132,25 @@ try {
   await page.waitForURL(base+'/');
   assert.equal(await page.evaluate(()=>sessionStorage.getItem('pack1-patreon-activation-v1')),null,'deliberate exit clears activation intent');
 
+  // A signed-in, unconnected member starts the authoritative Patreon activation directly.
+  await reset({isSigned:true,status:disconnected});
+  await page.goto(base+'/?patreon=activate');
+  await page.waitForURL(/https:\/\/www\.patreon\.com\/oauth2\/authorize/);
+  assert.equal(connectCalls,1);
+
+  // Provider-unavailable and generic callback errors stay distinct and recoverable.
+  for(const [result,heading] of [
+    ['unavailable','Patreon linking is temporarily unavailable.'],
+    ['error','Patreon could not be connected.'],
+  ]) {
+    await reset({isSigned:true,status:disconnected});
+    await page.evaluate(()=>sessionStorage.setItem('pack1-patreon-activation-v1',JSON.stringify({source:'oauth_return'})));
+    await page.goto(base+'/?patreon='+result);
+    await page.getByText(heading,{exact:true}).waitFor();
+    assert.equal(await page.getByRole('button',{name:'Check Patreon again',exact:true}).count(),1);
+    assert.equal(connectCalls,0);
+  }
+
   // Already Elite is terminal success and never starts unnecessary OAuth.
   await reset({isSigned:true,status:elite});
   await page.goto(base+'/?patreon=activate');
