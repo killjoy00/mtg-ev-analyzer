@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {FROZEN_PREMIER_AUDIT_CORPUS_VERSION,validateAudit,applyAudit} from '../scripts/load-source-exclusions.mjs';
 
 const blockedHash='c'.repeat(32);
@@ -30,7 +31,7 @@ test('audit loader requires the complete frozen v7 accounting and rejects transf
   r=>r.production_changed=true,
   r=>r.sets[0].approved_outcomes={'7-3':3},
   r=>r.sets[0].approved_sources=2,
-  r=>r.sets[0].corpus_version='elite-trophy-colour-stage-v8',
+  r=>r.sets[0].corpus_version=DRAFT_RUN_CORPUS_VERSION,
  ]) {
   const r=report();change(r);assert.throws(()=>validateAudit(r));
  }
