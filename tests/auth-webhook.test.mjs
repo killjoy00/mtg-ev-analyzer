@@ -299,6 +299,100 @@ test('webhook handler accepts a verified email-verification event without forwar
   }
 });
 
+test('QA verification acceptance may redeem the exact delivered link only after a successful send',async()=>{
+  const linkUrl='https://auth.qa-auto.example/pack1/auth/verify-email?token=fixture-token';
+  const calls=[];
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    if(String(url)===linkUrl)return new Response(null,{status:302,headers:{location:'https://packone.pro/'}});
+    throw Error('unexpected network call');
+  };
+  const stored=new Map();
+  const dedupe=new RecoveryEventDedupe({
+    storage:{
+      get:async key=>stored.get(key),
+      put:async(key,value)=>stored.set(key,value),
+    },
+  },{
+    PACK1_AUTH_ENV:'qa',
+    PACK1_QA_AUTO_VERIFY_AFTER_SEND:'1',
+    AUTH_BASE:'https://auth.qa-auto.example/pack1/auth',
+    RESEND_API_KEY:'re_fixture',
+    SENDER:'Pack One QA <qa-accounts@packone.pro>',
+    VERIFICATION_SUBJECT:'Verify Your Email - Pack One QA',
+  });
+  try{
+    const response=await dedupe.fetch(new Request('https://pack1.internal/send',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        eventId:'evt_verify_auto_12345678',
+        email:'person@example.com',
+        linkUrl,
+        expiresAt:'2026-09-22T22:00:00.000Z',
+        eventType:'send.magic_link',
+        linkType:'email-verification',
+      }),
+    }));
+    assert.equal(response.status,200);
+    const body=await response.json();
+    assert.equal(body.qaAutoVerified,true);
+    assert.equal(calls.length,2);
+    assert.equal(calls[0].url,'https://api.resend.com/emails');
+    assert.equal(calls[1].url,linkUrl);
+    assert.equal(calls[1].init.redirect,'manual');
+    assert.ok(stored.has('sent'));
+  }finally{
+    globalThis.fetch=originalFetch;
+  }
+});
+
+test('production ignores QA verification auto-redemption even if the flag is set',async()=>{
+  const linkUrl='https://auth.prod-auto.example/pack1/auth/verify-email?token=fixture-token';
+  const calls=[];
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async(url,init={})=>{
+    calls.push({url:String(url),init});
+    if(String(url)==='https://api.resend.com/emails')return Response.json({id:'email_prod_verify_fixture'},{status:200});
+    throw Error('production must not redeem verification links automatically');
+  };
+  const stored=new Map();
+  const dedupe=new RecoveryEventDedupe({
+    storage:{
+      get:async key=>stored.get(key),
+      put:async(key,value)=>stored.set(key,value),
+    },
+  },{
+    PACK1_AUTH_ENV:'production',
+    PACK1_QA_AUTO_VERIFY_AFTER_SEND:'1',
+    AUTH_BASE:'https://auth.prod-auto.example/pack1/auth',
+    RESEND_API_KEY:'re_fixture',
+    SENDER:'Pack One <accounts@packone.pro>',
+    VERIFICATION_SUBJECT:'Verify Your Email - Pack One',
+  });
+  try{
+    const response=await dedupe.fetch(new Request('https://pack1.internal/send',{
+      method:'POST',
+      headers:{'content-type':'application/json'},
+      body:JSON.stringify({
+        eventId:'evt_verify_prod_12345678',
+        email:'person@example.com',
+        linkUrl,
+        expiresAt:'2026-09-22T22:00:00.000Z',
+        eventType:'send.magic_link',
+        linkType:'email-verification',
+      }),
+    }));
+    assert.equal(response.status,200);
+    assert.equal((await response.json()).qaAutoVerified,false);
+    assert.equal(calls.length,1);
+    assert.equal(calls[0].url,'https://api.resend.com/emails');
+  }finally{
+    globalThis.fetch=originalFetch;
+  }
+});
+
 test('health endpoint exposes only environment and exact release marker',async()=>{
   const response=await authWebhook(new Request('https://hook.example/health?quick=1'),{
     PACK1_AUTH_ENV:'qa',
