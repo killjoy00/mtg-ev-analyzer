@@ -256,7 +256,7 @@ export async function handlePatreon(request,{query,authSession,json}) {
       }
       return redirect('connected');
     } catch(error) {
-      if(error?.code==='23505') {
+      if(error?.pgCode==='23505'||error?.code==='23505') {
         await query('DELETE FROM provider_oauth_states WHERE state_hash=$1',[hash]).catch(()=>{});
         return redirect('conflict');
       }
