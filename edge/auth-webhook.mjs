@@ -252,8 +252,16 @@ export class RecoveryEventDedupe {
         ? async()=>new Response(null,{status:503})
         : fetch;
       const result=await sendAuthEmail(this.env,event,providerFetch);
+      let qaAutoVerified=false;
+      if(this.env.PACK1_AUTH_ENV==='qa'
+        && this.env.PACK1_QA_AUTO_VERIFY_AFTER_SEND==='1'
+        && event.linkType==='email-verification') {
+        const verified=await fetch(event.linkUrl,{redirect:'manual',signal:AbortSignal.timeout(10000)});
+        if(verified.status<200||verified.status>=400)throw Error('QA verification link redemption failed');
+        qaAutoVerified=true;
+      }
       await this.storage.put('sent',{messageId:result.id,sentAt:new Date().toISOString()});
-      return responseJson({ok:true,duplicate:false});
+      return responseJson({ok:true,duplicate:false,qaAutoVerified});
     } catch {
       return responseJson({ok:false},502);
     }
