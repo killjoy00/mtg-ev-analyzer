@@ -155,7 +155,7 @@ export function renderVerificationEmail({linkUrl,expiresAt}) {
     '',
     url,
     '',
-    escapedExpiration.replace(/&[^;]+;/g,''),
+    expiration,
     '',
     'If you did not create a Pack One account, you can ignore this email.',
   ].join('\n');
