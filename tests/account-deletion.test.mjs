@@ -172,6 +172,7 @@ test('schema and release bookkeeping include migration 0031 in both stages',()=>
   assert.match(verify,/account_deletion_operations/);
   const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   assert.equal((release.match(/migrations\/0031_account_deletion\.sql/g)||[]).length,2);
+  assert.equal((release.match(/migrations\/0032_traditional_v4_components\.sql/g)||[]).length,2);
 });
 
 test('public gateway allows deletion but not maintenance endpoint',()=>{
