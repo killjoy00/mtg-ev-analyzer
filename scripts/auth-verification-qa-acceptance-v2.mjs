@@ -3,10 +3,13 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 
-// The disposable branch changes every attempt. It lives in the reviewed request
-// file the workflow already validates, so a retry is a one-line request change
-// rather than a code change. The runtime fences below still decide what is safe.
-const REQUEST=JSON.parse(fs.readFileSync(new URL('../.github/auth-verification-qa-request.json',import.meta.url),'utf8'));
+// The disposable branch changes every attempt. Push-triggered runs use the
+// reviewed request file; workflow_dispatch runs use the same validated shape
+// normalized by the workflow into RUNNER_TEMP.
+const requestPath=process.env.AUTH_VERIFICATION_QA_REQUEST_PATH
+  ?path.resolve(process.env.AUTH_VERIFICATION_QA_REQUEST_PATH)
+  :new URL('../.github/auth-verification-qa-request.json',import.meta.url);
+const REQUEST=JSON.parse(fs.readFileSync(requestPath,'utf8'));
 const PROJECT='patient-shadow-91417882';
 const BRANCH=String(REQUEST.branch||'');
 const PROD_BRANCH='br-orange-feather-ayps8kep';
