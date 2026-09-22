@@ -4,7 +4,20 @@ import fs from 'node:fs';
 
 test('email verification QA acceptance is pinned to a fresh disposable production child and deletes it',()=>{
   const source=fs.readFileSync(new URL('../scripts/auth-verification-qa-acceptance-v2.mjs',import.meta.url),'utf8');
-  assert.match(source,/BRANCH='br-blue-voice-ayx1qa7q'/);
+  // The branch moves every attempt, so pin the mechanism and the fences rather
+  // than the value: a retry changes the reviewed request file, not this test.
+  const request=JSON.parse(fs.readFileSync(new URL('../.github/auth-verification-qa-request.json',import.meta.url),'utf8'));
+  const workflow=fs.readFileSync(new URL('../.github/workflows/auth-verification-qa.yml',import.meta.url),'utf8');
+  assert.deepEqual(Object.keys(request).sort(),['authBase','branch','operation','reason']);
+  assert.match(request.branch,/^br-[a-z0-9-]{6,60}$/);
+  assert.ok(!['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(request.branch));
+  assert.match(request.authBase,/^https:\/\/[a-z0-9-]+\.neonauth\.[a-z0-9.-]+\.neon\.tech\/pack1\/auth$/);
+  assert.match(workflow,/\['authBase','branch','operation','reason'\]/);
+  assert.match(workflow,/QA verification must not target production or development/);
+  assert.match(source,/const BRANCH=String\(REQUEST\.branch\|\|''\)/);
+  assert.match(source,/const AUTH_BASE=String\(REQUEST\.authBase\|\|''\)/);
+  assert.match(source,/\/\^br-\[a-z0-9-\]\{6,60\}\$\/\.test\(BRANCH\)/);
+  assert.match(source,/authBase\.pathname==='\/pack1\/auth'/);
   assert.match(source,/PROD_BRANCH='br-orange-feather-ayps8kep'/);
   assert.match(source,/assert\(BRANCH!==PROD_BRANCH&&BRANCH!==DEV_BRANCH/);
   assert.match(source,/meta\.parent_id===PROD_BRANCH/);

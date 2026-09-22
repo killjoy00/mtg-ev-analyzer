@@ -154,6 +154,8 @@ test('Pack One recovery template uses only a fragment reset URL and contains no 
     assert.doesNotMatch(body,/neon\.tech/i);
     assert.doesNotMatch(body,/Neon Auth/i);
     assert.doesNotMatch(body,/\?token=/);
+    assert.match(body,/This reset link expires at 2026-09-21 21:00:00 UTC\./);
+    assert.doesNotMatch(body,/verification link/i);
   }
 });
 
@@ -173,6 +175,26 @@ test('Pack One verification template uses the exact validated Neon link with Pac
     assert.match(body,/Pack One/);
     assert.match(body,/auth\.verify\.example\/pack1\/auth\/verify-email/);
     assert.doesNotMatch(body,/Reset your password/);
+    // Regression: both templates share expiryCopy, which said "reset link" in
+    // the verification email until the noun became an explicit argument.
+    assert.match(body,/This verification link expires at 2026-09-22 21:00:00 UTC\./);
+    assert.doesNotMatch(body,/reset link/i);
+  }
+});
+
+test('an unreadable expiry keeps each template on its own link noun',()=>{
+  const recovery=renderRecoveryEmail({resetOrigin:'https://packone.pro',token:'t'.repeat(20),expiresAt:'not-a-date'});
+  const verification=renderVerificationEmail({
+    linkUrl:'https://auth.verify.example/pack1/auth/verify-email?token='+'t'.repeat(20),
+    expiresAt:null,
+  });
+  for(const body of [recovery.text,recovery.html]) {
+    assert.match(body,/This reset link expires soon\./);
+    assert.doesNotMatch(body,/verification link/i);
+  }
+  for(const body of [verification.text,verification.html]) {
+    assert.match(body,/This verification link expires soon\./);
+    assert.doesNotMatch(body,/reset link/i);
   }
 });
 

@@ -106,6 +106,31 @@ The verification delivery boundary receives the validated `link_url` but not the
 
 Other signed event/link types remain rejected and observable without logging credentials.
 
+## What the QA acceptance does and does not prove
+
+The repository Resend credential is send-only: delivery succeeds, but the workflow
+cannot list or read sent messages. Rather than broaden that credential, the QA
+acceptance takes its evidence from the Worker.
+
+On a signed `email-verification` event the temporary QA Worker stores the already
+validated Neon link in a Durable Object whose name is derived from a random
+per-run secret, so stale evidence from an earlier run cannot be read. The runner
+retrieves it from `/qa/pending-verification` only after signup has returned,
+re-validates it against the disposable Auth base, clicks it without logging it,
+and then proves sign-in. That route exists only when `PACK1_AUTH_ENV=qa` and
+requires the per-run secret; production returns 404.
+
+So the acceptance proves: signed event verified, link validated, redemption marks
+the user verified, sign-in succeeds afterwards and 403s before, and password
+recovery still delivers independently.
+
+It does **not** prove the delivered message body. Reaching the send boundary is
+observed as `status: sent_or_duplicate` telemetry, which means Resend accepted the
+message, not that the rendered email contained the link. Email content is covered
+by the `renderVerificationEmail` unit tests and by one-time manual inspection of a
+real delivered QA message. Do not read a green acceptance run as proof of
+delivered content.
+
 ## Production gate
 
 Before enabling production verification, QA must prove end-to-end:

@@ -3,11 +3,15 @@ import path from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 
+// The disposable branch changes every attempt. It lives in the reviewed request
+// file the workflow already validates, so a retry is a one-line request change
+// rather than a code change. The runtime fences below still decide what is safe.
+const REQUEST=JSON.parse(fs.readFileSync(new URL('../.github/auth-verification-qa-request.json',import.meta.url),'utf8'));
 const PROJECT='patient-shadow-91417882';
-const BRANCH='br-blue-voice-ayx1qa7q';
+const BRANCH=String(REQUEST.branch||'');
 const PROD_BRANCH='br-orange-feather-ayps8kep';
 const DEV_BRANCH='br-twilight-hill-ayffyd2b';
-const AUTH_BASE='https://ep-cool-frost-ay6t2kys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const AUTH_BASE=String(REQUEST.authBase||'');
 const PROD_WEBHOOK='https://pack1-authhook.killjoy00.workers.dev/webhook';
 const WORKER='pack1-authverify-qa-temp';
 
@@ -241,7 +245,14 @@ async function main(){
     PACK1_AUTH_RESEND_API_KEY:process.env.PACK1_AUTH_RESEND_API_KEY,
   }))assert(typeof value==='string'&&value.length>=20,name+' is missing or too short.');
   assert(process.env.PACK1_AUTH_RESEND_API_KEY.startsWith('re_'),'Resend credential format is invalid.');
+  assert(/^br-[a-z0-9-]{6,60}$/.test(BRANCH),'Reviewed request must name a Neon branch.');
   assert(BRANCH!==PROD_BRANCH&&BRANCH!==DEV_BRANCH,'Acceptance must target a disposable branch.');
+  // A malformed or missing base must fail as a stated requirement, not as a
+  // bare TypeError from the URL constructor.
+  let authBase=null;
+  try{authBase=new URL(AUTH_BASE);}catch{authBase=null;}
+  assert(authBase&&authBase.protocol==='https:'&&authBase.hostname.endsWith('.neon.tech')&&authBase.pathname==='/pack1/auth',
+    'Reviewed request must name a Neon Auth base on the disposable branch.');
   const commit=String(process.env.GITHUB_SHA||'');
   assert(/^[a-f0-9]{40}$/.test(commit),'Exact acceptance revision is required.');
   const qaEvidenceKey=randomBytes(32).toString('base64url');

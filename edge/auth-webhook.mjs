@@ -46,10 +46,12 @@ function validatedAuthLink(authBase,value) {
     return null;
   }
 }
-function expiryCopy(expiresAt) {
+// Both templates share this sentence, so the link noun is explicit rather than
+// defaulted: a verification email must never tell the reader about a reset link.
+function expiryCopy(expiresAt,linkLabel) {
   const value=Date.parse(expiresAt||'');
-  if(!Number.isFinite(value))return 'This reset link expires soon.';
-  return 'This reset link expires at '+new Date(value).toISOString().replace('T',' ').replace('.000Z',' UTC')+'.';
+  if(!Number.isFinite(value))return 'This '+linkLabel+' link expires soon.';
+  return 'This '+linkLabel+' link expires at '+new Date(value).toISOString().replace('T',' ').replace('.000Z',' UTC')+'.';
 }
 
 async function loadVerificationKey(authBase,kid,fetcher=fetch,now=Date.now(),force=false) {
@@ -125,7 +127,7 @@ export function validateVerificationEvent(payload,headers,authBase) {
 
 export function renderRecoveryEmail({resetOrigin,token,expiresAt}) {
   const url=resetUrl(resetOrigin,token);
-  const expiration=expiryCopy(expiresAt);
+  const expiration=expiryCopy(expiresAt,'reset');
   const escapedUrl=escapeHtml(url);
   const escapedExpiration=escapeHtml(expiration);
   const text=[
@@ -145,7 +147,7 @@ export function renderRecoveryEmail({resetOrigin,token,expiresAt}) {
 
 export function renderVerificationEmail({linkUrl,expiresAt}) {
   const url=String(linkUrl||'');
-  const expiration=expiryCopy(expiresAt);
+  const expiration=expiryCopy(expiresAt,'verification');
   const escapedUrl=escapeHtml(url);
   const escapedExpiration=escapeHtml(expiration);
   const text=[
