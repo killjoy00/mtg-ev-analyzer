@@ -1,1 +1,1 @@
-{"operation":"run","reason":"Issue #246 rate-limit-safe rerun: fresh disposable branch br-long-bar-ayqfnpn4 waits for successful verification telemetry before a few spaced sign-in attempts, then proves recovery and deletes the entire branch."}
+{"operation":"run","reason":"Issue #246 delivered-link acceptance: fresh disposable branch br-floral-truth-ayt6qqq9 waits for the branded Resend message after signup, extracts and validates its verification URL without logging the token, clicks it, proves sign-in and recovery, then deletes the branch."}
