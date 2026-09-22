@@ -17,6 +17,7 @@ Production recovery receiver:
 - health: `https://pack1-authhook.killjoy00.workers.dev/health?quick=1`
 - sender: `Pack One <accounts@packone.pro>`
 - subject: `Reset Your Password - Pack One`
+- header brand: inline email-safe `P¹` Pack One mark matching the site header; no remote image dependency
 - reset URL: `https://packone.pro/reset-password/#token=<raw-token>`
 
 Production Neon Auth webhook configuration is fixed to:
@@ -70,7 +71,7 @@ Production Workers observability is enabled for `pack1-authhook`. The structured
 
 `.github/workflows/auth-webhook-alert.yml` polls Cloudflare Workers Observability every five minutes with a fifteen-minute lookback. It filters only the production `pack1-authhook` timing records above and deduplicates overlap by Cloudflare event ID. New failures are routed to an open GitHub issue titled `[authhook alert] Production recovery webhook failure`, assigned to the repository owner; if that issue has been closed, the next failure creates a new assigned issue. The workflow never copies raw Worker log payloads into GitHub.
 
-The alert query uses Cloudflare's supported Workers Observability telemetry API and therefore requires the existing `CLOUDFLARE_EDGE_TOKEN` to include `Workers Observability Write`. Pull requests run the same retained-log query in check-only mode so a missing permission fails before merge instead of silently disabling the alert.
+The alert query uses Cloudflare's supported Workers Observability telemetry API. The working production token has passed the live query. In Cloudflare's legacy custom-token UI the writable permission is shown as **Account → Workers Observability → Edit**; Cloudflare's API reference may describe the corresponding capability as `Workers Observability Write`. Pull requests run the same retained-log query in check-only mode so a missing permission fails before merge instead of silently disabling the alert.
 
 ## Live QA evidence
 
@@ -163,6 +164,10 @@ Emergency rollback is therefore:
 4. Managed Neon resumes its existing SMTP recovery email path.
 
 QA already proved that disabling the webhook restores the managed recovery path. The Pack One reset page retains the managed-token fallback permanently, so rollback does not require an application release.
+
+## Related production Auth hardening
+
+Production localhost-origin hardening is documented separately in [`AUTH-HARDENING.md`](AUTH-HARDENING.md). That runbook records the final `allow_localhost:false` production state, QA restore behavior, intended-origin verification, rollback logic, and disposable smoke-user cleanup.
 
 ## Security boundaries preserved
 
