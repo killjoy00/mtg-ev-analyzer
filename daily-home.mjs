@@ -23,9 +23,12 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
   // would be equally wrong.
   const eliteLabel=profile?.membership?.connected?'Upgrade to Elite':'Become Elite';
   const eliteCta=`<button class="button secondary" data-home-elite>${eliteLabel}</button>`;
+  const rankingReason=profile?.ranking_identity?.reason;
+  const usernameAttention=rankingReason==='username_taken'||rankingReason==='username_required';
   const ordered = [...games].sort((a, b) => Number(status[a.key].complete) - Number(status[b.key].complete));
   return `<section class="daily-home" data-daily-home data-completed="${status.completed}">
     <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Match a trophy drafter. See how your choices compare.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
+    ${usernameAttention?'<aside class="daily-home-identity-warning" role="alert"><div><strong>Choose a unique username before playing a Daily.</strong><p>Your account still needs a unique username. Until you choose one, Daily results will not appear on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change username</button></aside>':''}
     <div class="daily-home-games">${ordered.map(game => {
       const result = status[game.key];
       return `<article class="daily-home-game ${result.complete ? 'is-complete' : 'is-unplayed'}" data-environment="${game.environment}">
@@ -54,6 +57,13 @@ export function renderDailyHome(profile = null, unavailable = false) {
   lastDay = easternDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, unavailable);
   document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=5')).renderAccount());
+  document.querySelector('[data-home-username]')?.addEventListener('click', async () => {
+    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=5')).renderAccount({notice:'Choose a unique username to join Daily leaderboards.'});return;}
+    const profiles=await import('./profile-product.mjs?v=5');
+    await profiles.renderMyProfile();
+    document.querySelector('#profile-account-tab')?.click();
+    document.querySelector('#profile-account input[name="displayName"]')?.focus();
+  });
   document.querySelectorAll('[data-home-elite]').forEach(button => button.addEventListener('click', async () => (await import('./growth.mjs?v=5')).beginEliteUpgrade({source:'home'})));
 }
 
