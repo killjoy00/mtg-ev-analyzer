@@ -1,7 +1,3 @@
-import path from 'node:path';
-import {execFileSync} from 'node:child_process';
-import {randomBytes} from 'node:crypto';
-
 const CF_ZONE='packone.pro';
 const PROD_SERVICE='pack1-authhook';
 const PROD_HEALTH='https://pack1-authhook.killjoy00.workers.dev/health?quick=1';
@@ -105,63 +101,48 @@ async function proveProductionService(){
   throw Error('No retained cloudflare-workers events appeared after the known production health request.');
 }
 
-function neonBin(){
-  if(!process.env.EDGE_TOOLS_DIR)throw Error('EDGE_TOOLS_DIR is required.');
-  return path.join(process.env.EDGE_TOOLS_DIR,'node_modules/.bin/neon');
-}
-function runNeon(args){
+async function qaWebhookConfig(method='GET',value=null){
   requireSecret(process.env.NEON_API_KEY,'NEON_API_KEY');
-  try{
-    return execFileSync(neonBin(),args,{encoding:'utf8',stdio:['ignore','pipe','pipe'],env:process.env});
-  }catch(error){
-    throw Error('QA Auth control failed; exit '+(Number.isInteger(error?.status)?error.status:'unknown')+'.');
-  }
-}
-function runNeonJson(args){
-  const text=runNeon([...args,'--output','json']).trim();
-  return text?JSON.parse(text):null;
+  const endpoint='https://console.neon.tech/api/v2/projects/'+QA_PROJECT+'/branches/'+QA_BRANCH+'/auth/webhooks';
+  const response=await fetch(endpoint,{
+    method,
+    headers:{
+      accept:'application/json',
+      authorization:'Bearer '+process.env.NEON_API_KEY,
+      ...(value?{'content-type':'application/json'}:{}),
+    },
+    ...(value?{body:JSON.stringify(value)}:{}),
+    redirect:'error',
+    signal:AbortSignal.timeout(15000),
+  });
+  if(!response.ok)throw Error('QA Auth webhook API failed with HTTP '+response.status+'.');
+  return response.json();
 }
 function safeWebhookConfig(value){
-  const source=value?.webhook||value?.config||value||{};
   return {
-    enabled:Boolean(source.enabled),
-    webhook_url:source.webhook_url||source.url||null,
-    enabled_events:Array.isArray(source.enabled_events)?source.enabled_events:[],
-    timeout_seconds:source.timeout_seconds??source.timeout??null,
+    enabled:Boolean(value?.enabled),
+    webhook_url:typeof value?.webhook_url==='string'?value.webhook_url:'',
+    enabled_events:Array.isArray(value?.enabled_events)?value.enabled_events:[],
+    timeout_seconds:Number(value?.timeout_seconds||0),
   };
 }
-function getWebhookConfig(){
-  return safeWebhookConfig(runNeonJson([
-    'neon-auth','config','webhook','get',
-    '--project-id',QA_PROJECT,
-    '--branch',QA_BRANCH,
-  ]));
+function exactQaWebhook(config){
+  return config.enabled===true
+    && config.webhook_url===QA_WORKER+'/webhook'
+    && config.enabled_events.length===1
+    && config.enabled_events[0]==='send.magic_link'
+    && config.timeout_seconds===5;
 }
-function updateWebhookConfig(value){
-  const args=[
-    'neon-auth','config','webhook','update',
-    '--project-id',QA_PROJECT,
-    '--branch',QA_BRANCH,
-    '--enabled='+String(Boolean(value?.enabled)),
-  ];
-  if(value?.webhook_url)args.push('--url',String(value.webhook_url));
-  for(const event of Array.isArray(value?.enabled_events)?value.enabled_events:[])args.push('--enabled-events',String(event));
-  if(Number.isFinite(Number(value?.timeout_seconds))&&Number(value.timeout_seconds)>0)args.push('--timeout',String(Number(value.timeout_seconds)));
-  runNeon(args);
-  return getWebhookConfig();
-}
-async function authPost(pathname,body){
-  const response=await fetch(QA_AUTH_BASE+pathname,{
-    method:'POST',
-    headers:{origin:QA_ORIGIN,'content-type':'application/json'},
-    body:JSON.stringify(body),
-    redirect:'manual',
-    signal:AbortSignal.timeout(30000),
-  });
+async function helperRequest(){
+  const response=await fetch(QA_HELPER+'?mode=request',{redirect:'error',signal:AbortSignal.timeout(30000)});
   const text=await response.text();
-  let json=null;
-  try{json=text?JSON.parse(text):null;}catch{}
-  return {status:response.status,json};
+  let body=null;
+  try{body=text?JSON.parse(text):null;}catch{}
+  if(!body||typeof body!=='object'||Array.isArray(body))throw Error('QA alert helper returned invalid JSON.');
+  const allowed=new Set(['ok','stage','user_id','signup_status','request_status','reset_status','signin_status','signup_ms','request_ms','reset_ms','signin_ms','error']);
+  for(const key of Object.keys(body))if(!allowed.has(key))throw Error('QA alert helper returned unexpected output.');
+  if(/token|password|signature|authorization|cookie/i.test(JSON.stringify(body)))throw Error('QA alert helper output was not sanitized.');
+  return {status:response.status,body};
 }
 async function qaTelemetry(){
   const response=await fetch(QA_WORKER+'/qa/telemetry',{redirect:'error',signal:AbortSignal.timeout(15000)});
@@ -170,33 +151,31 @@ async function qaTelemetry(){
   return body.entries;
 }
 async function triggerGenuineQaFault(){
-  const original=getWebhookConfig();
+  const original=safeWebhookConfig(await qaWebhookConfig());
   console.log('QA_ALERT_PROOF_ORIGINAL_CONFIG '+JSON.stringify(original));
-  if(original.enabled)throw Error('Disposable QA webhook is unexpectedly enabled; refusing to overwrite it.');
+  const desired={
+    enabled:true,
+    webhook_url:QA_WORKER+'/webhook',
+    enabled_events:['send.magic_link'],
+    timeout_seconds:5,
+  };
+  if(original.enabled&&!exactQaWebhook(original))throw Error('QA Auth webhook is already enabled with a different configuration; refusing to overwrite it.');
 
   const before=await qaTelemetry();
   const prior=new Set(before.map(entry=>JSON.stringify(entry)));
-  const run=String(process.env.GITHUB_RUN_ID||Date.now());
-  const attempt=String(process.env.GITHUB_RUN_ATTEMPT||'1');
-  const email='pack1-alert-proof-'+run+'-'+attempt+'@example.com';
-  const password='P1-'+randomBytes(24).toString('base64url')+'!';
-  console.log('::add-mask::'+password);
   let changed=false;
   try{
-    const signup=await authPost('/sign-up/email',{email,password,name:'Pack One Alert Proof'});
-    if(signup.status<200||signup.status>=300)throw Error('QA proof signup failed with HTTP '+signup.status+'.');
+    if(!exactQaWebhook(original)){
+      const enabled=safeWebhookConfig(await qaWebhookConfig('PUT',desired));
+      if(!exactQaWebhook(enabled))throw Error('QA Auth webhook did not match the exact proof configuration.');
+      changed=true;
+      console.log('QA_ALERT_PROOF_ENABLED_CONFIG '+JSON.stringify(enabled));
+    }
 
-    const enabled=updateWebhookConfig({
-      enabled:true,
-      webhook_url:QA_WORKER+'/webhook',
-      enabled_events:['send.magic_link'],
-      timeout_seconds:5,
-    });
-    changed=true;
-    console.log('QA_ALERT_PROOF_ENABLED_CONFIG '+JSON.stringify(enabled));
-
-    const reset=await authPost('/request-password-reset',{email,redirectTo:QA_ORIGIN+'/reset-password/'});
-    if(reset.status<200||reset.status>=300)throw Error('QA proof reset request failed with HTTP '+reset.status+'.');
+    const helper=await helperRequest();
+    if(helper.status!==200||helper.body?.stage!=='request_only')throw Error('QA alert helper did not complete request setup.');
+    const requestStatus=Number(helper.body?.request_status||0);
+    if(requestStatus<200||requestStatus>=300)throw Error('QA proof reset request was not accepted by Managed Neon.');
 
     let match=null;
     for(let poll=0;poll<30;poll++){
@@ -219,7 +198,7 @@ async function triggerGenuineQaFault(){
     }));
   }finally{
     if(changed){
-      const restored=updateWebhookConfig(original);
+      const restored=safeWebhookConfig(await qaWebhookConfig('PUT',original));
       console.log('QA_ALERT_PROOF_FINAL_CONFIG '+JSON.stringify(restored));
     }
   }
