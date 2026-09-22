@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "username-identity-dev-20260921",
-  "reason": "Deploy the reviewed owned-username public-identity fix to development after PR 336 passed unit, browser, and isolated Neon backend gates.",
+  "request_id": "username-identity-prod-20260921",
+  "reason": "Promote the reviewed owned-username public-identity fix to production after the exact same release SHA passed development deployment and all three Daily acceptance flows.",
   "commit": "6738441200831e0772374da765e54174c1419ea3",
-  "target": "development"
+  "target": "production"
 }
