@@ -136,20 +136,20 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   const validatingDaily=Boolean(pendingDailyRunValidation);
   const upgradingElite=intent==='elite';
   const authMode=mode==='signup'||mode==='signin'?mode:(validatingDaily||upgradingElite?'signup':'signin');
-  const heading=validatingDaily?'Add your score to the leaderboard.':upgradingElite?'Unlock Elite practice.':'Save your progress.';
+  const heading=validatingDaily?'Add your score to the leaderboard.':upgradingElite?'Unlock Elite practice.':authMode==='signup'?'Create Account':'Sign In';
   const intro=validatingDaily
     ? 'Sign in or create a free account to validate this Daily score and add it to today’s leaderboard.'
     : upgradingElite
       ? 'Create or sign in to your free Pack One account first. Then we’ll send you to Patreon to choose Elite.'
-      : 'A free account saves your record and enables leaderboard participation.';
+      : '';
   const google=firstPartyAuthEnabled()
-    ? '<div class="account-social"><h2>Choose how to continue</h2><button class="button primary" id="account-google" type="button">Continue with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p><div class="account-divider" aria-hidden="true"><span>or use email</span></div></div>'
+    ? '<div class="account-social"><button class="button primary" id="account-google" type="button">Sign in with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p></div>'
     : '';
-  const modeHeading=authMode==='signup'?'Create account':'Sign in';
   const toggleCopy=authMode==='signup'
     ? 'Already have an account? <button class="text-button" id="account-mode-toggle" type="button">Sign in</button>'
     : 'New to Pack One? <button class="text-button" id="account-mode-toggle" type="button">Create account</button>';
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account access</p><h1>${heading}</h1><p>${intro}</p>${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header>${google}<div class="account-auth-card"><h2>${modeHeading}</h2>${formMarkup(authMode)}<p class="account-mode-toggle">${toggleCopy}</p></div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite?'Not now — keep playing':'Keep playing as guest'}</button></div></section>`;
+  const accountNote=authMode==='signin'?'<small>A free account saves your record and enables leaderboard participation.</small>':'';
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account Access</p><h1>${heading}</h1>${intro?`<p>${intro}</p>`:''}${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header><div class="account-auth-card">${formMarkup(authMode)}</div>${google}<div class="account-new-user"><p>${toggleCopy}</p>${accountNote}</div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite?'Not now — keep playing':'Keep playing as guest'}</button></div></section>`;
 
   document.querySelector('#account-mode-toggle')?.addEventListener('click',()=>void renderAccount({
     validateDailyRunId:pendingDailyRunValidation,

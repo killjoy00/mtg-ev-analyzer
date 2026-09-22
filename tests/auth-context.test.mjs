@@ -7,9 +7,8 @@ const [growth,draft]=await Promise.all([
   readFile(new URL('../draft-run-product.mjs',import.meta.url),'utf8'),
 ]);
 
-test('account access renders one contextual email mode with neutral Google copy',()=>{
-  assert.match(growth,/Continue with Google/);
-  assert.doesNotMatch(growth,/Sign In With Google/);
+test('account access renders one contextual email mode with explicit Google sign-in copy',()=>{
+  assert.match(growth,/Sign in with Google/);
   const render=growth.slice(growth.indexOf('export async function renderAccount'),growth.indexOf('function shareCompletedAnalytics'));
   assert.doesNotMatch(render,/account-columns/,'auth screen must not render both email columns');
   assert.match(render,/validatingDaily\|\|upgradingElite\?'signup':'signin'/);

@@ -18,7 +18,7 @@ try {
  assert.ok(!requests.some(u=>/\/(app\.js|social\.mjs|home-today\.mjs|data\/catalog\.json|shards\/)/.test(u)),'No historical dependency tree on home');
  assert.ok(!requests.some(u=>/-pack1growth\.compute\.c-5\.us-east-2\.aws\.neon\.tech|draftrunapi\.compute\.c-5\.us-east-2\.aws\.neon\.tech/.test(u)),'Production browser uses the first-party account/gameplay gateway');
  await page.locator('#account-nav').click();await page.locator('#account-google').waitFor();
- assert.equal(await page.locator('#account-google').innerText(),'Continue with Google');
+ assert.equal(await page.locator('#account-google').innerText(),'Sign in with Google');
  assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-auth-session-v1')),null);
  await page.goto('https://packone.pro',{waitUntil:'domcontentloaded'});await page.locator('.daily-home-game a').first().waitFor();
  await page.screenshot({path:'artifacts/production/home-mobile.png',fullPage:true});

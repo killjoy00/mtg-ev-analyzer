@@ -303,8 +303,6 @@ function buildAchievements({ summary, bySet, byMode, streak, dailyHistory, envir
   const bestScore = num(summary.best_score);
   const challengeWins = num(summary.challenge_wins);
   const cube = bySet.find((row) => row.set_id === 'powered-cube');
-  const top3 = byMode.find((row) => row.mode === 'top3');
-  const full = byMode.find((row) => row.mode === 'full');
   const draftRun = byMode.find((row) => row.mode === 'draft_run');
   const percentiles = dailyHistory.filter(row=>row.final!==false).map((row) => num(row.percentile, 0)).filter((value) => value > 0);
   const bestPercentile = percentiles.length ? Math.min(...percentiles) : null;
@@ -335,27 +333,6 @@ function buildAchievements({ summary, bySet, byMode, streak, dailyHistory, envir
     flagAchievement('top25', 'Top Quarter', 'Finish in the top 25% of a Daily leaderboard with at least 10 players.', bestPercentile != null && bestPercentile <= 25, bestPercentile ? `Top ${bestPercentile}% best` : 'No qualifying Daily yet'),
     flagAchievement('top10', 'Top Ten Percent', 'Finish in the top 10% of a Daily leaderboard with at least 10 players.', bestPercentile != null && bestPercentile <= 10, bestPercentile ? `Top ${bestPercentile}% best` : 'No qualifying Daily yet'),
     flagAchievement('top1', 'One Percent', 'Finish in the top 1% of a Daily leaderboard with at least 10 players.', bestPercentile === 1, bestPercentile ? `Top ${bestPercentile}% best` : 'No qualifying Daily yet'),
-    flagAchievement(
-      'top3_specialist',
-      'Top 3 Specialist',
-      'Average 80+ across at least 20 Top 3 games.',
-      num(top3?.games) >= 20 && num(top3?.average_score) >= 80,
-      `${num(top3?.games)}/20 plays · ${num(top3?.average_score).toFixed(1)} avg`,
-    ),
-    flagAchievement(
-      'full_specialist',
-      'Full Pack Specialist',
-      'Average 80+ across at least 20 Full Pack games.',
-      num(full?.games) >= 20 && num(full?.average_score) >= 80,
-      `${num(full?.games)}/20 plays · ${num(full?.average_score).toFixed(1)} avg`,
-    ),
-    flagAchievement(
-      'two_way',
-      'Two-Way Drafter',
-      'Play at least 10 Top 3 games and 10 Full Pack games.',
-      num(top3?.games) >= 10 && num(full?.games) >= 10,
-      `${Math.min(num(top3?.games), 10)}/10 Top 3 · ${Math.min(num(full?.games), 10)}/10 Full`,
-    ),
   ];
 }
 

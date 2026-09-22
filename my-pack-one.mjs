@@ -101,7 +101,6 @@ function profileAside(profile,progress,account,patreon) {
   const email=account?.user?.email||'';
   return '<section class="my-side-card my-profile-card" aria-labelledby="my-profile-card-title">'+
     '<div class="my-profile-head"><div class="my-avatar" aria-hidden="true">'+esc(initials(profile.player.display_name))+'</div><div><h2 id="my-profile-card-title">'+esc(profile.player.display_name)+'</h2>'+(email?'<p>'+esc(email)+'</p>':'')+'</div></div>'+
-    '<button type="button" class="button secondary" id="profile-edit">Edit profile</button>'+
     '<ul class="my-profile-facts"><li><span>Membership</span><strong>'+(elite?'Elite':'Free')+'</strong></li><li><span>Public profile</span><strong>'+(profile.player.profile_public?'On':'Off')+'</strong></li>'+(favorite?'<li><span>Favorite environment</span><strong>'+esc(favorite.name)+'</strong></li>':'')+(showcased?'<li><span>Showcase</span><strong>'+esc(showcased.label)+'</strong></li>':'')+'</ul>'+
   '</section>';
 }
