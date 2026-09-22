@@ -154,7 +154,7 @@ function settingsMarkup(profile, progress, account, patreon) {
       ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',error:'Patreon could not be connected. Please try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
       <div class="profile-membership-actions">
         <a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${supportUrl}" rel="noopener noreferrer">${patreon?.configured!==true?'Open Patreon':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite on Patreon':'Become Elite on Patreon'}</a>
-        ${!elite&&patreon?.configured===true?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
+        ${patreon?.configured===true?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
         ${patreon?.connected?'<button type="button" class="text-button" id="patreon-disconnect">Disconnect Patreon</button>':''}
         <span id="patreon-status" aria-live="polite"></span>
       </div>
