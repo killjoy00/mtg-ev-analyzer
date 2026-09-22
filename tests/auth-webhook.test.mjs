@@ -299,96 +299,108 @@ test('webhook handler accepts a verified email-verification event without forwar
   }
 });
 
-test('QA verification acceptance may redeem the exact delivered link only after a successful send',async()=>{
-  const linkUrl='https://auth.qa-auto.example/pack1/auth/verify-email?token=fixture-token';
-  const calls=[];
-  const originalFetch=globalThis.fetch;
-  globalThis.fetch=async(url,init={})=>{
-    calls.push({url:String(url),init});
-    if(String(url)==='https://api.resend.com/emails')return Response.json({id:'email_qa_verify_fixture'},{status:200});
-    if(String(url)===linkUrl)return new Response('verified',{status:200});
-    throw Error('unexpected network call');
-  };
+test('QA Durable Object stores pending verification evidence separately from delivery dedupe',async()=>{
   const stored=new Map();
   const dedupe=new RecoveryEventDedupe({
     storage:{
       get:async key=>stored.get(key),
       put:async(key,value)=>stored.set(key,value),
     },
-  },{
-    PACK1_AUTH_ENV:'qa',
-    PACK1_QA_AUTO_VERIFY_AFTER_SEND:'1',
-    AUTH_BASE:'https://auth.qa-auto.example/pack1/auth',
-    RESEND_API_KEY:'re_fixture',
-    SENDER:'Pack One QA <qa-accounts@packone.pro>',
-    VERIFICATION_SUBJECT:'Verify Your Email - Pack One QA',
-  });
-  try{
-    const response=await dedupe.fetch(new Request('https://pack1.internal/send',{
-      method:'POST',
-      headers:{'content-type':'application/json'},
-      body:JSON.stringify({
-        eventId:'evt_verify_auto_12345678',
-        email:'person@example.com',
-        linkUrl,
-        expiresAt:'2026-09-22T22:00:00.000Z',
-        eventType:'send.magic_link',
-        linkType:'email-verification',
-      }),
-    }));
-    assert.equal(response.status,200);
-    const body=await response.json();
-    assert.equal(body.qaAutoVerified,true);
-    assert.equal(calls.length,2);
-    assert.equal(calls[0].url,'https://api.resend.com/emails');
-    assert.equal(calls[1].url,linkUrl);
-    assert.equal(calls[1].init.redirect,'follow');
-    assert.ok(stored.has('sent'));
-  }finally{
-    globalThis.fetch=originalFetch;
-  }
+  },{});
+  const linkUrl='https://auth.qa-evidence.example/pack1/auth/verify-email?token=fixture-token';
+  const post=await dedupe.fetch(new Request('https://pack1.internal/pending-verification',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({linkUrl}),
+  }));
+  assert.equal(post.status,200);
+  const get=await dedupe.fetch(new Request('https://pack1.internal/pending-verification'));
+  assert.deepEqual(await get.json(),{linkUrl});
+  assert.equal(stored.has('sent'),false);
 });
 
-test('production ignores QA verification auto-redemption even if the flag is set',async()=>{
-  const linkUrl='https://auth.prod-auto.example/pack1/auth/verify-email?token=fixture-token';
-  const calls=[];
-  const originalFetch=globalThis.fetch;
-  globalThis.fetch=async(url,init={})=>{
-    calls.push({url:String(url),init});
-    if(String(url)==='https://api.resend.com/emails')return Response.json({id:'email_prod_verify_fixture'},{status:200});
-    throw Error('production must not redeem verification links automatically');
+test('QA pending verification evidence is secret-protected and hidden in production',async()=>{
+  const linkUrl='https://auth.qa-evidence.example/pack1/auth/verify-email?token=fixture-token';
+  const secret='q'.repeat(48);
+  const evidenceStub={
+    fetch:async()=>Response.json({linkUrl}),
   };
-  const stored=new Map();
-  const dedupe=new RecoveryEventDedupe({
-    storage:{
-      get:async key=>stored.get(key),
-      put:async(key,value)=>stored.set(key,value),
+  const qaEnv={
+    PACK1_AUTH_ENV:'qa',
+    PACK1_QA_EVIDENCE_KEY:secret,
+    RECOVERY_DEDUPE:{
+      idFromName:value=>value,
+      get:id=>{
+        assert.equal(id,'__qa_verification_evidence__');
+        return evidenceStub;
+      },
     },
-  },{
+  };
+  assert.equal((await authWebhook(new Request('https://hook.example/qa/pending-verification'),qaEnv)).status,401);
+  assert.equal((await authWebhook(new Request('https://hook.example/qa/pending-verification',{
+    headers:{authorization:'Bearer wrong'},
+  }),qaEnv)).status,401);
+  const allowed=await authWebhook(new Request('https://hook.example/qa/pending-verification',{
+    headers:{authorization:'Bearer '+secret},
+  }),qaEnv);
+  assert.equal(allowed.status,200);
+  assert.deepEqual(await allowed.json(),{linkUrl});
+
+  const prod=await authWebhook(new Request('https://hook.example/qa/pending-verification',{
+    headers:{authorization:'Bearer '+secret},
+  }),{
+    ...qaEnv,
     PACK1_AUTH_ENV:'production',
-    PACK1_QA_AUTO_VERIFY_AFTER_SEND:'1',
-    AUTH_BASE:'https://auth.prod-auto.example/pack1/auth',
-    RESEND_API_KEY:'re_fixture',
-    SENDER:'Pack One <accounts@packone.pro>',
-    VERIFICATION_SUBJECT:'Verify Your Email - Pack One',
   });
-  try{
-    const response=await dedupe.fetch(new Request('https://pack1.internal/send',{
-      method:'POST',
-      headers:{'content-type':'application/json'},
-      body:JSON.stringify({
-        eventId:'evt_verify_prod_12345678',
-        email:'person@example.com',
-        linkUrl,
-        expiresAt:'2026-09-22T22:00:00.000Z',
-        eventType:'send.magic_link',
-        linkType:'email-verification',
+  assert.equal(prod.status,404);
+});
+
+test('signed QA verification delivery records the validated link for later acceptance without raw token telemetry',async()=>{
+  const authBase='https://auth.qa-evidence-handler.example/pack1/auth';
+  const linkUrl=authBase+'/verify-email?token=fixture-token-1234567890';
+  const fixture=await signedFixture({
+    kid:'qa-evidence-handler-kid',
+    linkType:'email-verification',
+    linkUrl,
+  });
+  const originalFetch=globalThis.fetch;
+  globalThis.fetch=async url=>{
+    if(String(url)===authBase+'/.well-known/jwks.json')return Response.json({keys:[fixture.jwk]});
+    throw Error('unexpected network call');
+  };
+  const evidence=[];
+  const telemetry=[];
+  const env={
+    PACK1_AUTH_ENV:'qa',
+    AUTH_BASE:authBase,
+    RECOVERY_DEDUPE:{
+      idFromName:value=>value,
+      get:id=>({
+        fetch:async(_url,init)=>{
+          if(id==='evt_test_12345678')return Response.json({ok:true,duplicate:false});
+          if(id==='__qa_verification_evidence__'){
+            evidence.push(JSON.parse(init.body));
+            return Response.json({ok:true});
+          }
+          if(id==='__qa_telemetry__'){
+            telemetry.push(JSON.parse(init.body));
+            return Response.json({ok:true});
+          }
+          throw Error('unexpected Durable Object id');
+        },
       }),
-    }));
-    assert.equal(response.status,200);
-    assert.equal((await response.json()).qaAutoVerified,false);
-    assert.equal(calls.length,1);
-    assert.equal(calls[0].url,'https://api.resend.com/emails');
+    },
+  };
+  try{
+    const response=await authWebhook(new Request('https://hook.example/webhook',{
+      method:'POST',headers:fixture.headers,body:fixture.raw,
+    }),env);
+    assert.equal(response.status,204);
+    assert.deepEqual(evidence,[{linkUrl}]);
+    assert.equal(telemetry.length,1);
+    assert.equal(telemetry[0].link_type,'email-verification');
+    assert.equal('token' in telemetry[0],false);
+    assert.equal('linkUrl' in telemetry[0],false);
   }finally{
     globalThis.fetch=originalFetch;
   }
