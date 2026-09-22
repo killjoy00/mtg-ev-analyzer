@@ -37,6 +37,10 @@ test('verification taxonomy probe is pinned to one disposable non-serving Pack O
   assert.match(source,/webhookChanged=true;[\s\S]{0,80}webhookUpdate\(neon/);
   assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
   assert.match(source,/AUTH_VERIFICATION_TAXONOMY/);
+  assert.match(source,/for\(let attempt=0;attempt<20;attempt\+=1\)/);
+  assert.match(source,/await new Promise\(resolve=>setTimeout\(resolve,750\)\)/);
+  const workflow=fs.readFileSync(new URL('../.github/workflows/edge-preview.yml',import.meta.url),'utf8');
+  assert.match(workflow,/probe-email-verification' && always\(\)/);
   assert.match(source,/Optional verification unexpectedly blocked password sign-in/);
   assert.match(source,/Optional verification sign-in did not return a session/);
   assert.match(source,/if\(mode==='otp'\)assert\(Number\(verification\.verification_count\)>=1/);
