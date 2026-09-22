@@ -130,6 +130,19 @@ async function upsertPlayer(playerId, displayName) {
   return result.rows[0]?.display_name || name;
 }
 
+// Only an account-linked player that owns its username may publish that name.
+// Anonymous/local nicknames remain usable, but public leaderboards and shares
+// must never present them as an established identity.
+async function publicUsername(playerId) {
+  const result=await query(
+    `SELECT p.display_name FROM players p
+     WHERE p.id=$1::uuid AND p.username_owned=true
+       AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=p.id)`,
+    [playerId],
+  );
+  return result.rows[0]?.display_name||null;
+}
+
 async function staticJson(path) {
   const relative = String(path).replace(/^\.\//, '');
   const origin = /^data\/[^/]+\/shards\/[^/]+\.json$/.test(relative)
@@ -203,11 +216,17 @@ async function handlePlayer(request) {
 
 async function leaderboardPosition(date, setId, mode, score) {
   const totalResult = await query(
-    'SELECT count(*) total FROM scores WHERE challenge_date=$1::date AND set_id=$2 AND mode=$3',
+    `SELECT count(*) total FROM scores s JOIN players p ON p.id=s.player_id
+     WHERE s.challenge_date=$1::date AND s.set_id=$2 AND s.mode=$3
+       AND p.username_owned=true
+       AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)`,
     [date, setId, mode],
   );
   const rankResult = await query(
-    'SELECT 1+count(DISTINCT score) rank FROM scores WHERE challenge_date=$1::date AND set_id=$2 AND mode=$3 AND score>$4::int',
+    `SELECT 1+count(DISTINCT s.score) rank FROM scores s JOIN players p ON p.id=s.player_id
+     WHERE s.challenge_date=$1::date AND s.set_id=$2 AND s.mode=$3 AND s.score>$4::int
+       AND p.username_owned=true
+       AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)`,
     [date, setId, mode, score],
   );
   const total = Number(totalResult.rows[0]?.total || 0);
@@ -322,6 +341,8 @@ async function handleLeaderboard(request) {
        FROM scores s
        JOIN players p ON p.id=s.player_id
        WHERE s.challenge_date >= $1::date AND s.mode=$2 ${extraWhere}
+         AND p.username_owned=true
+         AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=s.player_id)
        GROUP BY s.player_id,p.display_name
      )
      SELECT dense_rank() OVER(ORDER BY points DESC,average_score DESC,plays DESC) rank,
@@ -391,7 +412,8 @@ async function handleCreateChallenge(request) {
     throw Object.assign(new Error('Challenge requires a complete pack and Top 3.'), { status: 400 });
   }
   const result = gradeTopThree(pack, selectedIds, String(payload.historicalId || ''));
-  const displayName = await upsertPlayer(playerId, payload.displayName);
+  await upsertPlayer(playerId, payload.displayName);
+  const displayName = await publicUsername(playerId) || 'A friend';
   const id = crypto.randomUUID().replaceAll('-', '').slice(0, 12);
 
   await query(
