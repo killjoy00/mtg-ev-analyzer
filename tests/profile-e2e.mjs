@@ -151,6 +151,8 @@ try {
   assert.match((await page.locator('.my-archive-summary').textContent()) || '', new RegExp(`6/${catalogTotal}\\s*environments played`));
   assert.equal(await page.locator('[data-environment-id="powered-cube"].is-played').count(), 1, 'Powered Cube must be part of archive progression');
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /Top 7%/i);
+  assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /Kamigawa: Neon Dynasty/i);
+  assert.equal(await page.locator('#profile-edit').count(),0,'Stats sidebar does not duplicate the Account-tab edit action');
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
   assert.equal(await page.locator('[data-profile-section="archive"]').getAttribute('open'), null, 'large archive starts collapsed');
