@@ -62,7 +62,12 @@ async function persistResult(s) {
   // All career, environment, ranked, and funnel writes commit together.
   await query(`WITH ranked AS (
     INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json,is_featured)
-    SELECT $1::uuid,$2::date,$16,'draft_run',$3::int,$4,$5::jsonb,$6::jsonb,true WHERE $2::date IS NOT NULL AND $18::boolean
+    SELECT $1::uuid,$2::date,$16,'draft_run',$3::int,$4,$5::jsonb,$6::jsonb,true
+    WHERE $2::date IS NOT NULL AND $18::boolean
+      AND EXISTS (
+        SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
+        WHERE a.player_id=$1::uuid AND p.username_owned=true
+      )
     ON CONFLICT(player_id,challenge_date,set_id,mode) DO NOTHING
   ), result AS (
     INSERT INTO game_results(player_id,set_id,mode,score,grade,seed,is_daily,challenge_id,opponent_name,opponent_score,outcome,client_result_id)
@@ -84,14 +89,21 @@ async function responseFor(s) {
   const current=complete ? null : publicDraftRunPuzzle(await puzzle(s.puzzle_ids[s.answers.length],s.corpus_version));
   const other=s.challenge_id ? await share(s.challenge_id) : null;
   const comparison=other ? {name:other.display_name,score:other.score,exact:JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids)} : null;
+  const rankedIdentity=s.day&&s.leaderboard_eligible?await linkedPlayerIdentity(query,s.player_id):null;
   let standing=null;
-  if(complete && s.day && s.leaderboard_eligible) {
-    const r=await query(`SELECT count(*) total,1+count(*) FILTER(WHERE score>$2::int) rank,count(*) FILTER(WHERE score>=$2::int) through_ties FROM scores WHERE challenge_date=$1::date AND mode='draft_run' AND set_id=$3 AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=scores.player_id)`,[s.day,s.score,environmentOf(s)]);
+  if(complete && s.day && s.leaderboard_eligible && rankedIdentity) {
+    const r=await query(`SELECT count(*) total,1+count(*) FILTER(WHERE score>$2::int) rank,count(*) FILTER(WHERE score>=$2::int) through_ties
+      FROM scores
+      WHERE challenge_date=$1::date AND mode='draft_run' AND set_id=$3
+        AND EXISTS (
+          SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
+          WHERE a.player_id=scores.player_id AND p.username_owned=true
+        )`,[s.day,s.score,environmentOf(s)]);
     const row=r.rows[0],total=Number(row.total);
     standing={rank:Number(row.rank),total,percentile:total>=10?Math.max(1,Math.ceil(Number(row.through_ties)/total*100)):null,final:s.day<gameDateKey()};
   }
-  const rankedName=s.day&&s.leaderboard_eligible?(await linkedPlayerIdentity(query,s.player_id))?.display_name||null:null;
-  return {ranked_name:rankedName,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:s.leaderboard_eligible,environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
+  const rankedName=rankedIdentity?.display_name||null;
+  return {ranked_name:rankedName,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:Boolean(s.leaderboard_eligible&&rankedIdentity),environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
 }
 
 async function start(request) {
@@ -203,7 +215,7 @@ async function createShare(request,id) {
   if(s.answers.length!==runLength(s)) fail('Finish the run before sharing it.');
   if(s.day)return json({daily:true,day:s.day,environment:environmentOf(s),url:`/?game=draft-run&daily=1${environmentOf(s)!=='mixed'?'&set='+environmentOf(s):''}`});
   if(s.challenge_id){const original=await share(s.challenge_id);if(JSON.stringify(original.puzzle_ids)===JSON.stringify(s.puzzle_ids))return json({id:original.id});}
-  const name=(await query('SELECT display_name FROM players WHERE id=$1::uuid',[owner])).rows[0]?.display_name||'A friend';
+  const name=(await linkedPlayerIdentity(query,owner))?.display_name||'A friend';
   const key=crypto.randomUUID().replaceAll('-','').slice(0,24);
   const r=await query(`INSERT INTO draft_run_shares(id,session_id,display_name,score,puzzle_ids) VALUES($1,$2::uuid,$3,$4::int,$5::jsonb) ON CONFLICT(session_id) DO UPDATE SET session_id=EXCLUDED.session_id RETURNING id`,[key,id,name,s.score,JSON.stringify(s.puzzle_ids)]);
   return json({id:r.rows[0].id});
@@ -230,10 +242,17 @@ async function leaderboard(request) {
   const today=gameDateKey();
   const start=period==='daily'?today:period==='month'?today.slice(0,8)+'01':period==='week'?(()=>{const d=new Date(today+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);})():'2000-01-01';
   const r=await query(`WITH results AS (
-    SELECT player_id,round(avg(score),1) score,count(*) days FROM scores WHERE mode='draft_run' AND set_id=$3 AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=scores.player_id) AND challenge_date BETWEEN $1::date AND $2::date GROUP BY player_id
-  ) SELECT rank() OVER(ORDER BY r.score DESC) rank,r.score,r.days,p.display_name,CASE WHEN p.profile_public AND
-      (SELECT count(*) FROM players x WHERE x.profile_public AND lower(x.display_name)=lower(p.display_name))=1 THEN p.profile_key END profile_key
-    FROM results r JOIN players p ON p.id=r.player_id ORDER BY r.score DESC,r.days DESC,p.display_name LIMIT 100`,[start,today,environment]);
+    SELECT player_id,round(avg(score),1) score,count(*) days FROM scores
+    WHERE mode='draft_run' AND set_id=$3
+      AND EXISTS (
+        SELECT 1 FROM account_links a JOIN players owned ON owned.id=a.player_id
+        WHERE a.player_id=scores.player_id AND owned.username_owned=true
+      )
+      AND challenge_date BETWEEN $1::date AND $2::date
+    GROUP BY player_id
+  ) SELECT rank() OVER(ORDER BY r.score DESC) rank,r.score,r.days,p.display_name,CASE WHEN p.profile_public AND p.username_owned AND
+      (SELECT count(*) FROM players x WHERE x.profile_public AND x.username_owned AND lower(x.display_name)=lower(p.display_name))=1 THEN p.profile_key END profile_key
+    FROM results r JOIN players p ON p.id=r.player_id AND p.username_owned=true ORDER BY r.score DESC,r.days DESC,p.display_name LIMIT 100`,[start,today,environment]);
   return json({period,environment,start,today,rows:r.rows.map(r=>({...r,rank:Number(r.rank),score:Number(r.score),days:Number(r.days)}))});
 }
 
