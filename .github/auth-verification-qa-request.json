@@ -1,1 +1,1 @@
-{"operation":"run","reason":"Issue #246 readiness rerun: fresh disposable branch br-polished-meadow-ay3jy6hn allows Cloudflare propagation before the same verification, legacy-account, recovery, rollback, Worker cleanup, and whole-branch cleanup acceptance."}
+{"operation":"run","reason":"Issue #246 rate-limit-safe rerun: fresh disposable branch br-long-bar-ayqfnpn4 waits for successful verification telemetry before a few spaced sign-in attempts, then proves recovery and deletes the entire branch."}
