@@ -48,11 +48,11 @@ async function serviceEvents(accountId,service,from,to){
       timeframe:{from,to},
       dry:true,
       limit:500,
+      view:'events',
       parameters:{
         datasets:['cloudflare-workers'],
         filterCombination:'and',
         filters,
-        view:'events',
       },
     }),
   });
