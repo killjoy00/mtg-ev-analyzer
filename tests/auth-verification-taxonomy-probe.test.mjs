@@ -11,16 +11,16 @@ import {sanitizedPayload} from '../edge/auth-webhook-probe.mjs';
 
 test('verification taxonomy probe is pinned to one disposable non-serving Pack One Auth branch',()=>{
   assert.equal(PROJECT,'patient-shadow-91417882');
-  assert.equal(BRANCH,'br-square-water-ay71uef3');
+  assert.equal(BRANCH,'br-sparkling-cake-ay7lbnra');
   const source=fs.readFileSync(new URL('../scripts/auth-verification-taxonomy-probe.mjs',import.meta.url),'utf8');
   const stage=fs.readFileSync(new URL('../scripts/auth-webhook-probe-stage.mjs',import.meta.url),'utf8');
   for(const forbidden of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b','ep-hidden-bonus-ayfmcpys','ep-spring-dream-ayq2a5qt']){
     assert.ok(!source.includes(forbidden));
     assert.ok(!stage.includes(forbidden));
   }
-  assert.match(source,/br-square-water-ay71uef3/);
-  assert.match(source,/ep-weathered-surf-ay5urlmr/);
-  assert.match(stage,/ep-weathered-surf-ay5urlmr/);
+  assert.match(source,/br-sparkling-cake-ay7lbnra/);
+  assert.match(source,/ep-odd-haze-ay2s6wy2/);
+  assert.match(stage,/ep-odd-haze-ay2s6wy2/);
   assert.match(source,/finally\s*\{/);
   assert.match(source,/updateEmailConfig\(neon,originalEmail\)/);
   assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
@@ -36,6 +36,10 @@ test('verification taxonomy probe is pinned to one disposable non-serving Pack O
   assert.match(source,/pack1-authhook\.killjoy00\.workers\.dev\/webhook/);
   assert.match(source,/webhookChanged=true;[\s\S]{0,80}webhookUpdate\(neon/);
   assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
+  assert.match(source,/AUTH_VERIFICATION_TAXONOMY/);
+  assert.match(source,/if\(mode==='otp'\)assert\(Number\(verification\.verification_count\)>=1/);
+  assert.match(source,/if\(mode==='link'\)assert\(summary/);
+  assert.doesNotMatch(source,/if\(mode==='link'\)[^\n]*verification_count/);
 });
 
 test('verification state fallback is read-only and never emits credential contents',()=>{
