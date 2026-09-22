@@ -79,6 +79,7 @@ async function reset({isSigned=false,status=disconnected,verify=false}={}){
 }
 
 async function fill(kind){
+  await page.locator('#account-signin,#account-signup').first().waitFor();
   if(await page.locator('#account-'+kind).count()===0)await page.locator('#account-mode-toggle').click();
   const form=page.locator('#account-'+kind);await form.waitFor();
   if(kind==='signup')await form.locator('[name="name"]').fill('QA Player');
