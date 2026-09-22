@@ -59,6 +59,23 @@ Verify schema, deploy a reviewed main SHA to development, pass its acceptance fl
 
 [Design system](DESIGN-SYSTEM.md), [initial rebuild audit](REBUILD-2026-09-18.md), [distribution](../results/rebuild-2026-09-18/DAILY-DISTRIBUTION.md), [Traditional research](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md), [scoring](../results/rebuild-2026-09-18/SCORING-RESULTS.md).
 
+## Pack One usernames
+
+`players.display_name` carries two different things, and only one of them is a username.
+
+An account-linked player's name is a public identity: it appears on the Daily leaderboard and, when the profile is public, on a public profile. An anonymous browser's name is a local nickname that the client replays from localStorage on every `/v1/player/session` call, and the QA harnesses deliberately reuse a handful of those nicknames across many guest rows. `players.username_owned` marks the first kind, and migration 0033 makes only those unique.
+
+- Uniqueness is a Postgres partial unique index, `players_username_uq` over `pack1_username_key(display_name)` where `username_owned`. The index is the authority; the application catches its violation rather than relying on an availability check, which could only narrow the race.
+- Comparison ignores case and whitespace. `Ryan`, `ryan`, `RYAN` and `  Ryan ` are one username. `worker/username.mjs` mirrors the SQL key function, so the application and the database agree on what counts as the same name.
+- Every casing of the generic `Pack Player` placeholder is excluded, so anonymous and never-customized players keep sharing it.
+- Uniqueness ignores `profile_public`: a private account still owns its username.
+- A duplicate attempt answers `409` with `That username is already taken.` A Postgres constraint error never reaches the caller.
+- Ownership is taken at two moments. A profile rename (`PATCH /v1/profile`) takes it deliberately, and reverting to the placeholder releases it. Linking an account takes it for the nickname the browser was already using, but only when free: a taken nickname still links successfully and stays unowned, and that player must rename before publishing a profile.
+- `merge_pack1_player` adopts a source name onto a placeholder target only when nobody owns it. A taken name is left with its owner, and the merge completes rather than raising the constraint.
+- A replayed localStorage nickname can never overwrite an owned username; both workers keep the stored name in that case.
+
+Deployment order is fixed: 0033 must be applied before the application release that reads it, because worker SQL on the session, link and profile paths references `username_owned` and `pack1_username_key`. `scripts/verify-neon-schema.mjs` asserts all four signals and fails the deploy gate until the migration lands.
+
 ## Live September 19 feature release
 
 - Third Daily (`latest`) has its own fixed schedule, status, share link and leaderboard, using only the newest Live released regular set.

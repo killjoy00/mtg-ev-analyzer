@@ -2,6 +2,7 @@ import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {readJson} from './request-json.mjs';
 import { challengeIndex, featuredSetId, firstPackPicks, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from './core.mjs';
+import { PLACEHOLDER_USERNAME, normalizeDisplayName } from './username.mjs';
 
 const STATIC_ORIGIN = 'https://packone.pro';
 const REPLAY_SHARD_ORIGIN = 'https://data.packone.pro';
@@ -67,11 +68,7 @@ async function query(sql, params = []) {
   };
 }
 
-function normalizeName(value) {
-  const cleaned = String(value || '').trim().replace(/\s+/g, ' ').slice(0, 24);
-  if (cleaned.length < 2) throw Object.assign(new Error('Display name must be 2-24 characters.'), { status: 400 });
-  return cleaned;
-}
+const normalizeName = normalizeDisplayName;
 
 function base64Url(buffer) {
   return Buffer.from(buffer).toString('base64url');
@@ -116,13 +113,21 @@ async function authPlayer(request, required = true) {
 }
 
 
+// This legacy worker rewrites the display name on every ranked submission from
+// whatever the client holds in localStorage. An owned username is off limits to
+// that: it would replace an account's public identity, or collide with the
+// player who owns the name. The stored name wins and is echoed back.
 async function upsertPlayer(playerId, displayName) {
-  const name = normalizeName(displayName || 'Pack Player');
-  await query(
-    'INSERT INTO players(id,display_name) VALUES($1::uuid,$2) ON CONFLICT(id) DO UPDATE SET display_name=EXCLUDED.display_name,updated_at=now()',
+  const name = normalizeName(displayName || PLACEHOLDER_USERNAME);
+  const result = await query(
+    `INSERT INTO players(id,display_name) VALUES($1::uuid,$2)
+     ON CONFLICT(id) DO UPDATE SET
+       display_name=CASE WHEN players.username_owned THEN players.display_name ELSE EXCLUDED.display_name END,
+       updated_at=now()
+     RETURNING display_name`,
     [playerId, name],
   );
-  return name;
+  return result.rows[0]?.display_name || name;
 }
 
 async function staticJson(path) {

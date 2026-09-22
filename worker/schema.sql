@@ -8,6 +8,7 @@ CREATE TABLE IF NOT EXISTS players (
   display_name text NOT NULL CHECK (char_length(display_name) BETWEEN 2 AND 24),
   profile_key text NOT NULL DEFAULT substr(md5(random()::text || clock_timestamp()::text), 1, 16),
   profile_public boolean NOT NULL DEFAULT false,
+  username_owned boolean NOT NULL DEFAULT false,
   favorite_set_id text,
   showcase_achievement text,
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -15,6 +16,25 @@ CREATE TABLE IF NOT EXISTS players (
 );
 CREATE UNIQUE INDEX IF NOT EXISTS players_profile_key_uq ON players(profile_key);
 CREATE INDEX IF NOT EXISTS players_public_profile_idx ON players(profile_key) WHERE profile_public = true;
+CREATE INDEX IF NOT EXISTS players_public_name_idx ON players(lower(display_name)) WHERE profile_public;
+
+-- Owned usernames are unique case-insensitively; anonymous nicknames and the
+-- generic placeholder are not. See migrations/0033_unique_usernames.sql for why
+-- `username_owned` gates the index, and worker/username.mjs for the application
+-- mirror of this key.
+CREATE OR REPLACE FUNCTION pack1_username_key(value text)
+RETURNS text
+LANGUAGE sql
+IMMUTABLE
+PARALLEL SAFE
+STRICT
+AS $pack1$
+  SELECT lower(btrim(regexp_replace(value, '\s+', ' ', 'g')))
+$pack1$;
+
+CREATE UNIQUE INDEX IF NOT EXISTS players_username_uq
+  ON players (pack1_username_key(display_name))
+  WHERE username_owned AND pack1_username_key(display_name) <> 'pack player';
 
 CREATE TABLE IF NOT EXISTS scores (
   id bigserial PRIMARY KEY,
