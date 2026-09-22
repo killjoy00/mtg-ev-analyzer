@@ -277,8 +277,15 @@ export async function main(){
   assert(originalWebhook.webhook_url==='https://pack1-authhook.killjoy00.workers.dev/webhook','Disposable production child recovery webhook target is unexpected.');
 
   const workerUrl=await probeWorkerUrl();
-  const health=await fetch(workerUrl+'/health',{redirect:'error',signal:AbortSignal.timeout(15000)});
-  if(!health.ok)throw Error('Temporary verification probe Worker is not staged.');
+  let workerReady=false;
+  for(let attempt=0;attempt<20;attempt+=1){
+    try{
+      const health=await fetch(workerUrl+'/health',{redirect:'error',signal:AbortSignal.timeout(10000)});
+      if(health.ok){workerReady=true;break;}
+    }catch{}
+    await new Promise(resolve=>setTimeout(resolve,750));
+  }
+  if(!workerReady)throw Error('Temporary verification probe Worker is not staged.');
 
   let emailChanged=false;
   let webhookChanged=false;
