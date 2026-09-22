@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "username-identity-prod-20260921",
-  "reason": "Promote the reviewed owned-username public-identity fix to production after the exact same release SHA passed development deployment and all three Daily acceptance flows.",
-  "commit": "6738441200831e0772374da765e54174c1419ea3",
-  "target": "production"
+  "request_id": "username-attention-dev-20260922",
+  "reason": "Deploy PR 341 username attention messaging, pending Daily recovery, admin observability, and updated documentation after all required gates passed.",
+  "commit": "4a6d920ec4c2f985fdd2b1749a55f57dac363305",
+  "target": "development"
 }
