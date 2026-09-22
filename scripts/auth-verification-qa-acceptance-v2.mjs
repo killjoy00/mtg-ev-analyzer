@@ -360,7 +360,7 @@ async function main(){
     assert(entries.some(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='forget-password'),'Successful recovery delivery telemetry was not observed.');
     console.log('AUTH_VERIFY_QA_TELEMETRY '+JSON.stringify(entries.map(entry=>({
       status:entry.status,event_type:entry.event_type||null,link_type:entry.link_type||null,
-      duplicate:Boolean(entry.duplicate),qa_auto_verified:Boolean(entry.qa_auto_verified),
+      duplicate:Boolean(entry.duplicate),
     }))));
   }catch(error){
     primaryError=error;
