@@ -74,7 +74,7 @@ await page.route('https://www.patreon.com/**',route=>route.fulfill({contentType:
 
 async function reset({isSigned=false,status=disconnected,verify=false}={}){
   signed=isSigned;verificationRequired=verify;patreonStatus=status;connectCalls=0;linkCalls=0;
-  await page.goto(base+'/tests/auth-context-harness.html');
+  await page.goto(base+'/leaderboard-config.js');
   await page.evaluate(()=>{sessionStorage.clear();localStorage.clear();});
 }
 
