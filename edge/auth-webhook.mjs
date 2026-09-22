@@ -162,6 +162,7 @@ export class RecoveryEventDedupe {
     let event;
     try {event=await request.json();} catch {return responseJson({ok:false},400);}
     if(!validEventId(event?.eventId)||!validEmail(event?.email)||!safeString(event?.token,512)||!safeString(event?.expiresAt,128))return responseJson({ok:false},400);
+    if(this.env.PACK1_AUTH_ENV==='qa'&&this.env.PACK1_FORCE_DELIVERY_FAILURE==='1')return responseJson({ok:false,forced:true},502);
 
     try {
       const result=await sendRecoveryEmail(this.env,event);
@@ -248,13 +249,6 @@ export async function authWebhook(request,env) {
     await recordQaTelemetry(env,payload?.event_id||request.headers.get('x-neon-event-id'),deliveryAttempt,details);
     return new Response(null,{status:400});
   }
-  if(env.PACK1_AUTH_ENV==='qa'&&env.PACK1_FORCE_DELIVERY_FAILURE==='1') {
-    const details={status:'forced_failure',verify_ms:verifyMs,total_ms:Date.now()-started};
-    logTiming(env,deliveryAttempt,details);
-    await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
-    return new Response(null,{status:503});
-  }
-
   const deliveryStarted=Date.now();
   const id=env.RECOVERY_DEDUPE.idFromName(event.eventId);
   const stub=env.RECOVERY_DEDUPE.get(id);
@@ -265,7 +259,17 @@ export async function authWebhook(request,env) {
   });
   const deliveryMs=Date.now()-deliveryStarted;
   if(!result.ok) {
-    const details={status:'delivery_failure',verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
+    if(env.PACK1_AUTH_ENV==='qa'&&env.PACK1_FORCE_DELIVERY_FAILURE==='1') {
+      await recordQaTelemetry(env,event.eventId,deliveryAttempt,{status:'forced_failure',verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started});
+    }
+    const details={
+      status:'delivery_failure',
+      event_type:safeString(payload?.event_type,64),
+      link_type:safeString(payload?.event_data?.link_type,64),
+      verify_ms:verifyMs,
+      delivery_ms:deliveryMs,
+      total_ms:Date.now()-started,
+    };
     logTiming(env,deliveryAttempt,details);
     await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
     return new Response(null,{status:502});
