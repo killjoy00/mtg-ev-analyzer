@@ -1,3 +1,4 @@
+# Inspection trigger refreshed after PR #314 merge.
 name: Inspect recent reviewed release runs
 
 on:
