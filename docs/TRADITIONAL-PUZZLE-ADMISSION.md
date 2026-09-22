@@ -1,4 +1,36 @@
-# Traditional puzzle admission, 18 September 2026
+# Traditional puzzle admission and publication
+
+Current production status updated September 21, 2026. Historical September 18 v3 evidence is retained below rather than rewritten.
+
+## September 21 v4 release
+
+Issue #164's held-fold stage-reference dependency was corrected in the separately versioned v8/v4 build. Traditional admission was then revalidated against the leakage-corrected Premier-trained `strong-player-colour-stage-v4` grader without using Traditional rows for model training or calibration.
+
+The current additive component identities are:
+
+- regular: `traditional-premier-v4-phase2-v1`
+- Powered Cube: `traditional-cube-p2p7-v4-v1`
+
+Both are pinned to Premier parent `elite-trophy-colour-stage-v8`. Historical v3 components remain readable and retain their original v3 model identity.
+
+The v4 regular revalidation passed the same 22 environments as the historical Phase 2 decision: MSH, SOS, EOE, FIN, TDM, DFT, FDN, DSK, BLB, MH3, OTJ, MKM, LCI, WOE, LTR, MOM, ONE, BRO, DMU, SNC, NEO and SIR. HBG, HOB, KTK and PIO remain blocked. There were no regular v3-to-v4 admission flips.
+
+Production publication is complete. Twenty-one regular v4 components are Live; SIR remains Candidate because its parent environment is Candidate. Powered Cube v4 is Live only for P1P2-P1P7. Traditional P1P8/P1P9 remain excluded.
+
+Publication is supplemental, not a replacement or separate mode. For eligible regular environments, current new-game selection can draw Live Traditional or retained Premier puzzles from the same serving universe under the ordinary set, pick, difficulty, source-uniqueness and serving-quality rules. Powered Cube Traditional inventory joins only the Powered Cube environment.
+
+The reviewed lifecycle is development stage -> development publish -> production stage -> production publish. Production publish requires matching development publication eligibility; a development Candidate under a Live parent must block production publication. This prerequisite stopped run 35678284122 before production mutation and was preserved rather than weakened.
+
+Final accepted runs:
+- development stage: 35675750660 (regular), 35676281911 (Cube)
+- production stage: 35677378980 (regular), 35678122885 (Cube)
+- development publish: 35678556011 (regular), 35678774912 (Cube)
+- production publish: 35679143746 (regular), 35679407781 (Cube)
+- complete fail-closed promotion chain: 35678538754
+
+All final preservation, serving-quality, Daily coverage and Cube historical-selection checks passed. See [Traditional v4 production release closeout](reports/TRADITIONAL-V4-RELEASE-2026-09-21.md) for the full evidence trail.
+
+## Historical September 18 v3 admission record
 
 Puzzle sources and model training are independent. Keep the frozen Premier-trained v3 evidence, coefficients, display calibration and linear partial-credit curve. The observed trophy decision always earns 100; alternatives remain capped at 95.
 
