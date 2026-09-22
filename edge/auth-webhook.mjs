@@ -31,6 +31,21 @@ function resetUrl(origin,token) {
   base.hash='token='+encodeURIComponent(token);
   return base.href;
 }
+function validatedAuthLink(authBase,value) {
+  const raw=safeString(value,2048);
+  const configured=safeString(authBase,2048);
+  if(!raw||!configured)return null;
+  try {
+    const base=new URL(configured);
+    const link=new URL(raw);
+    const basePath=base.pathname.endsWith('/')?base.pathname:base.pathname+'/';
+    if(base.protocol!=='https:'||link.protocol!=='https:'||link.username||link.password)return null;
+    if(link.origin!==base.origin||!link.pathname.startsWith(basePath))return null;
+    return link.href;
+  } catch {
+    return null;
+  }
+}
 function expiryCopy(expiresAt) {
   const value=Date.parse(expiresAt||'');
   if(!Number.isFinite(value))return 'This reset link expires soon.';
@@ -94,6 +109,20 @@ export function validateRecoveryEvent(payload,headers) {
   return {eventId,email,token,expiresAt,eventType:payload.event_type,linkType:payload.event_data.link_type};
 }
 
+export function validateVerificationEvent(payload,headers,authBase) {
+  const headerType=headers.get('x-neon-event-type');
+  const eventId=headers.get('x-neon-event-id');
+  if(headerType!=='send.magic_link'||payload?.event_type!=='send.magic_link')return null;
+  if(!validEventId(eventId)||payload?.event_id!==eventId)return null;
+  if(payload?.event_data?.link_type!=='email-verification')return null;
+
+  const linkUrl=validatedAuthLink(authBase,payload?.event_data?.link_url);
+  const expiresAt=safeString(payload?.event_data?.expires_at,128);
+  const email=payload?.user?.email;
+  if(!linkUrl||!expiresAt||!validEmail(email))return null;
+  return {eventId,email,linkUrl,expiresAt,eventType:payload.event_type,linkType:payload.event_data.link_type};
+}
+
 export function renderRecoveryEmail({resetOrigin,token,expiresAt}) {
   const url=resetUrl(resetOrigin,token);
   const expiration=expiryCopy(expiresAt);
@@ -111,6 +140,26 @@ export function renderRecoveryEmail({resetOrigin,token,expiresAt}) {
     'If you did not request this reset, you can ignore this email. Your password will not change unless the reset link is used.',
   ].join('\n');
   const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge"></head><body style="margin:0;padding:0;background-color:#f5f5f5;"><table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td align="center" style="padding-top:32px;padding-right:16px;padding-bottom:32px;padding-left:16px;background-color:#f5f5f5;"><table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:600px;background-color:#ffffff;"><tr><td style="padding-top:32px;padding-right:32px;padding-bottom:16px;padding-left:32px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td width="40" height="40" align="center" valign="middle" bgcolor="#171918" style="width:40px;height:40px;background-color:#171918;border-radius:10px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:40px;color:#ffffff;font-weight:800;letter-spacing:-0.2px;text-align:center;">P<sup style="font-size:8px;line-height:0;vertical-align:5px;">1</sup></td><td style="padding-left:11px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:18px;color:#171918;font-weight:700;">Pack One</td></tr></table></td></tr><tr><td style="padding-top:0;padding-right:32px;padding-bottom:16px;padding-left:32px;font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:28px;color:#111111;font-weight:700;">Reset your password</td></tr><tr><td style="padding-top:0;padding-right:32px;padding-bottom:24px;padding-left:32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#333333;">We received a request to reset the password for your Pack One account.</td></tr><tr><td align="center" style="padding-top:0;padding-right:32px;padding-bottom:24px;padding-left:32px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td bgcolor="#111111" style="background-color:#111111;"><a href="'+escapedUrl+'" style="display:inline-block;padding-top:14px;padding-right:24px;padding-bottom:14px;padding-left:24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:20px;color:#ffffff;text-decoration:none;font-weight:700;">Reset password</a></td></tr></table></td></tr><tr><td style="padding-top:0;padding-right:32px;padding-bottom:12px;padding-left:32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#555555;">'+escapedExpiration+'</td></tr><tr><td style="padding-top:0;padding-right:32px;padding-bottom:12px;padding-left:32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#555555;">If you did not request this reset, you can ignore this email. Your password will not change unless the reset link is used.</td></tr><tr><td style="padding-top:0;padding-right:32px;padding-bottom:32px;padding-left:32px;font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:20px;color:#777777;word-break:break-all;">Copy and paste this Pack One link if the button does not work:<br><a href="'+escapedUrl+'" style="font-family:Arial,Helvetica,sans-serif;font-size:12px;line-height:20px;color:#333333;text-decoration:underline;">'+escapedUrl+'</a></td></tr></table></td></tr></table></body></html>';
+  return {url,text,html};
+}
+
+export function renderVerificationEmail({linkUrl,expiresAt}) {
+  const url=String(linkUrl||'');
+  const expiration=expiryCopy(expiresAt);
+  const escapedUrl=escapeHtml(url);
+  const escapedExpiration=escapeHtml(expiration);
+  const text=[
+    'Verify your Pack One email',
+    '',
+    'Confirm this email address to finish creating your Pack One account.',
+    '',
+    url,
+    '',
+    escapedExpiration.replace(/&[^;]+;/g,''),
+    '',
+    'If you did not create a Pack One account, you can ignore this email.',
+  ].join('\n');
+  const html='<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta http-equiv="X-UA-Compatible" content="IE=edge"></head><body style="margin:0;padding:0;background-color:#f5f5f5;"><table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td align="center" style="padding-top:32px;padding-right:16px;padding-bottom:32px;padding-left:16px;background-color:#f5f5f5;"><table width="100%" cellpadding="0" cellspacing="0" border="0" role="presentation" style="max-width:600px;background-color:#ffffff;"><tr><td style="padding-top:32px;padding-right:32px;padding-bottom:16px;padding-left:32px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td width="40" height="40" align="center" valign="middle" bgcolor="#171918" style="width:40px;height:40px;background-color:#171918;border-radius:10px;font-family:Arial,Helvetica,sans-serif;font-size:13px;line-height:40px;color:#ffffff;font-weight:800;letter-spacing:-0.2px;text-align:center;">P<sup style="font-size:8px;line-height:0;vertical-align:5px;">1</sup></td><td style="padding-left:11px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:18px;color:#171918;font-weight:700;">Pack One</td></tr></table></td></tr><tr><td style="padding-top:0;padding-right:32px;padding-bottom:16px;padding-left:32px;font-family:Arial,Helvetica,sans-serif;font-size:18px;line-height:28px;color:#111111;font-weight:700;">Verify your email</td></tr><tr><td style="padding-top:0;padding-right:32px;padding-bottom:24px;padding-left:32px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:24px;color:#333333;">Confirm this email address to finish creating your Pack One account.</td></tr><tr><td align="center" style="padding-top:0;padding-right:32px;padding-bottom:24px;padding-left:32px;"><table cellpadding="0" cellspacing="0" border="0" role="presentation"><tr><td bgcolor="#111111" style="background-color:#111111;"><a href="'+escapedUrl+'" style="display:inline-block;padding-top:14px;padding-right:24px;padding-bottom:14px;padding-left:24px;font-family:Arial,Helvetica,sans-serif;font-size:16px;line-height:20px;color:#ffffff;text-decoration:none;font-weight:700;">Verify email</a></td></tr></table></td></tr><tr><td style="padding-top:0;padding-right:32px;padding-bottom:12px;padding-left:32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#555555;">'+escapedExpiration+'</td></tr><tr><td style="padding-top:0;padding-right:32px;padding-bottom:32px;padding-left:32px;font-family:Arial,Helvetica,sans-serif;font-size:14px;line-height:22px;color:#555555;">If you did not create a Pack One account, you can ignore this email.</td></tr></table></td></tr></table></body></html>';
   return {url,text,html};
 }
 
@@ -139,6 +188,37 @@ export async function sendRecoveryEmail(env,event,fetcher=fetch) {
   return {id:body.id};
 }
 
+export async function sendVerificationEmail(env,event,fetcher=fetch) {
+  if(!env.RESEND_API_KEY||!env.SENDER||!env.VERIFICATION_SUBJECT)throw Error('Verification email service is not configured');
+  const rendered=renderVerificationEmail({linkUrl:event.linkUrl,expiresAt:event.expiresAt});
+  const response=await fetcher('https://api.resend.com/emails',{
+    method:'POST',
+    headers:{
+      authorization:'Bearer '+env.RESEND_API_KEY,
+      'content-type':'application/json',
+      'idempotency-key':'neon-auth/send.magic_link/email-verification/'+event.eventId,
+    },
+    body:JSON.stringify({
+      from:env.SENDER,
+      to:[event.email],
+      subject:env.VERIFICATION_SUBJECT,
+      html:rendered.html,
+      text:rendered.text,
+    }),
+    signal:AbortSignal.timeout(5000),
+  });
+  if(!response.ok)throw Error('Verification email delivery failed');
+  const body=await response.json();
+  if(!safeString(body?.id,128))throw Error('Verification email provider returned an invalid response');
+  return {id:body.id};
+}
+
+async function sendAuthEmail(env,event,fetcher=fetch) {
+  if(event?.linkType==='forget-password')return sendRecoveryEmail(env,event,fetcher);
+  if(event?.linkType==='email-verification')return sendVerificationEmail(env,event,fetcher);
+  throw Error('Unsupported Auth email event');
+}
+
 export class RecoveryEventDedupe {
   constructor(state,env) {
     this.storage=state.storage;
@@ -161,13 +241,17 @@ export class RecoveryEventDedupe {
 
     let event;
     try {event=await request.json();} catch {return responseJson({ok:false},400);}
-    if(!validEventId(event?.eventId)||!validEmail(event?.email)||!safeString(event?.token,512)||!safeString(event?.expiresAt,128))return responseJson({ok:false},400);
+    const commonValid=validEventId(event?.eventId)&&validEmail(event?.email)&&safeString(event?.expiresAt,128);
+    const recoveryValid=event?.linkType==='forget-password'&&safeString(event?.token,512);
+    const verificationValid=event?.linkType==='email-verification'
+      && validatedAuthLink(this.env.AUTH_BASE,event?.linkUrl)===event?.linkUrl;
+    if(!commonValid||(!recoveryValid&&!verificationValid))return responseJson({ok:false},400);
 
     try {
       const providerFetch=this.env.PACK1_AUTH_ENV==='qa'&&this.env.PACK1_FORCE_DELIVERY_FAILURE==='1'
         ? async()=>new Response(null,{status:503})
         : fetch;
-      const result=await sendRecoveryEmail(this.env,event,providerFetch);
+      const result=await sendAuthEmail(this.env,event,providerFetch);
       await this.storage.put('sent',{messageId:result.id,sentAt:new Date().toISOString()});
       return responseJson({ok:true,duplicate:false});
     } catch {
@@ -238,7 +322,8 @@ export async function authWebhook(request,env) {
   catch {return new Response(null,{status:400});}
 
   const deliveryAttempt=request.headers.get('x-neon-delivery-attempt');
-  const event=validateRecoveryEvent(payload,request.headers);
+  const event=validateRecoveryEvent(payload,request.headers)
+    || validateVerificationEvent(payload,request.headers,env.AUTH_BASE);
   if(!event) {
     const details={
       status:'rejected_event',
@@ -268,7 +353,7 @@ export async function authWebhook(request,env) {
   }
   let deliveryResult={};
   try {deliveryResult=await result.json();} catch {}
-  const details={status:'sent_or_duplicate',duplicate:Boolean(deliveryResult?.duplicate),verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
+  const details={status:'sent_or_duplicate',event_type:event.eventType,link_type:event.linkType,duplicate:Boolean(deliveryResult?.duplicate),verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
   logTiming(env,deliveryAttempt,details);
   await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
   if(env.PACK1_AUTH_ENV==='qa'&&env.PACK1_FORCE_RETRY_AFTER_SEND==='1')return new Response(null,{status:503});
