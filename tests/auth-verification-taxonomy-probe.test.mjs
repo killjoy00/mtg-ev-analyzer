@@ -26,6 +26,17 @@ test('verification taxonomy probe is pinned to one disposable non-serving Pack O
   assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
 });
 
+test('verification state fallback is read-only and never emits credential contents',()=>{
+  const source=fs.readFileSync(new URL('../scripts/auth-verification-taxonomy-probe.mjs',import.meta.url),'utf8');
+  assert.match(source,/run\(neon,\['psql',BRANCH,'--project-id',PROJECT,'--database-name','pack1','--','-XAtc',sql\]\)/);
+  assert.match(source,/SELECT json_build_object\(/);
+  assert.match(source,/FROM neon_auth\."user"/);
+  assert.match(source,/LEFT JOIN neon_auth\.verification/);
+  assert.match(source,/replace\(v\.identifier,lower\(u\.email\),'<email>'\)/);
+  assert.doesNotMatch(source,/\b(?:DELETE|UPDATE|INSERT|TRUNCATE|ALTER)\s+(?:TABLE\s+)?neon_auth\./i);
+  assert.doesNotMatch(source,/console\.log\([^\n]*(?:password|email\s*[,+]|v\.value)/i);
+});
+
 test('verification modes change only the intended email/password policy fields',()=>{
   const original=safeEmailConfig({
     enabled:true,
