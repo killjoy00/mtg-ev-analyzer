@@ -331,7 +331,7 @@ test('QA pending verification evidence is secret-protected and hidden in product
     RECOVERY_DEDUPE:{
       idFromName:value=>value,
       get:id=>{
-        assert.equal(id,'__qa_verification_evidence__');
+        assert.match(id,/^__qa_verification_evidence__:[a-f0-9]{16}$/);
         return evidenceStub;
       },
     },
@@ -372,13 +372,14 @@ test('signed QA verification delivery records the validated link for later accep
   const telemetry=[];
   const env={
     PACK1_AUTH_ENV:'qa',
+    PACK1_QA_EVIDENCE_KEY:'e'.repeat(48),
     AUTH_BASE:authBase,
     RECOVERY_DEDUPE:{
       idFromName:value=>value,
       get:id=>({
         fetch:async(_url,init)=>{
           if(id==='evt_test_12345678')return Response.json({ok:true,duplicate:false});
-          if(id==='__qa_verification_evidence__'){
+          if(/^__qa_verification_evidence__:[a-f0-9]{16}$/.test(id)){
             evidence.push(JSON.parse(init.body));
             return Response.json({ok:true});
           }
