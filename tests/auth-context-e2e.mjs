@@ -115,7 +115,9 @@ try {
   await fresh({source:'nav',width:390});
   await page.locator('#account-signin').waitFor();
   assert.equal(await page.locator('#account-signup').count(),0);
-  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Continue with Google');
+  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Sign in with Google');
+  assert.equal((await page.locator('.account-page h1').textContent())?.trim(),'Sign In');
+  assert.match((await page.locator('.account-new-user').textContent())||'',/New to Pack One\?\s*Create account/i);
   await page.screenshot({path:'artifacts/ui-auth-signin-390.png',fullPage:true});
 
   await page.setViewportSize({width:1440,height:900});
