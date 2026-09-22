@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac,createHash} from 'node:crypto';
 import {premiumPatreonMembership,validPatreonPolicy,PATREON_POLICY} from '../patreon-policy.mjs';
-import {parsePatreonMembership,rawMembershipFromIdentity,verifyPatreonSignature,handlePatreon,patreonAccountAllowed,applyPatreonMembership} from '../worker/patreon.mjs';
+import {parsePatreonMembership,rawMembershipFromIdentity,effectivePatreonMembership,verifyPatreonSignature,handlePatreon,patreonAccountAllowed,applyPatreonMembership} from '../worker/patreon.mjs';
 import {reconcilePatreon} from '../scripts/patreon-reconcile.mjs';
 const policy={enabled:true,campaignId:'100',premiumTierIds:['200']};
 const member=(tier='200',attrs={})=>({type:'member',id:'m1',attributes:{patron_status:'active_patron',last_charge_status:'Paid',currently_entitled_amount_cents:500,...attrs},relationships:{user:{data:{id:'u1'}},campaign:{data:{id:'100'}},currently_entitled_tiers:{data:[{id:tier}]}}});
@@ -26,6 +26,84 @@ test('identity never falls back to another creator or unlinked included member',
   data.data.relationships.memberships.data=[];assert.equal(rawMembershipFromIdentity(data,policy).member,null);
 });
 
+test('server-derived effective membership state follows the entitlement policy',()=>{
+  const row={provider_campaign_id:'100',membership_status:'active_patron',last_charge_status:'Paid',tier_ids:['200'],is_free_trial:false,is_gifted:false,last_synced_at:'2026-09-22T00:00:00Z'};
+  assert.equal(effectivePatreonMembership(row,policy),'elite_entitled');
+  assert.equal(effectivePatreonMembership({...row,tier_ids:['201']},policy),'active_non_elite');
+  assert.equal(effectivePatreonMembership({...row,membership_status:'declined_patron'},policy),'not_entitled');
+  assert.equal(effectivePatreonMembership({...row,last_charge_status:'Refunded'},policy),'not_entitled');
+  assert.equal(effectivePatreonMembership({...row,membership_status:'former_patron'},policy),'elite_entitled');
+  assert.equal(effectivePatreonMembership({...row,provider_campaign_id:'999'},policy),'not_entitled');
+  assert.equal(effectivePatreonMembership({...row,last_synced_at:null},policy),'unknown');
+});
+
+test('Patreon connect keeps the Phase 0 approved identity scope',async()=>{
+  const prior=Object.fromEntries(['PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_WEBHOOK_SECRET'].map(k=>[k,process.env[k]]));
+  Object.assign(process.env,{PATREON_CLIENT_ID:'fixture-client',PATREON_CLIENT_SECRET:'fixture-secret',PATREON_WEBHOOK_SECRET:'fixture-webhook'});
+  try {
+    const response=await handlePatreon(new Request('https://packone.pro/v1/patreon/connect',{method:'POST'}),{
+      query:async sql=>sql.includes('INSERT INTO provider_oauth_states')?{rows:[{state_hash:'fixture'}]}:{rows:[]},
+      authSession:async()=>({user_id:'11111111-1111-4111-8111-111111111111'}),
+      json:(d,s)=>Response.json(d,{status:s||200}),
+    });
+    assert.equal(response.status,200);
+    const target=new URL((await response.json()).url);
+    assert.equal(target.searchParams.get('scope'),'identity');
+  } finally {
+    for(const [key,value] of Object.entries(prior)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+  }
+});
+
+test('Patreon callback refuses to silently replace an existing linked Patreon identity',async()=>{
+  const priorEnv=Object.fromEntries(['PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_WEBHOOK_SECRET'].map(k=>[k,process.env[k]]));
+  const priorFetch=globalThis.fetch;
+  Object.assign(process.env,{PATREON_CLIENT_ID:'fixture-client',PATREON_CLIENT_SECRET:'fixture-secret',PATREON_WEBHOOK_SECRET:'fixture-webhook'});
+  globalThis.fetch=async url=>{
+    if(String(url).includes('/api/oauth2/token'))return Response.json({access_token:'fixture-token'});
+    return Response.json({data:{type:'user',id:'new-patreon',relationships:{memberships:{data:[]}}},included:[]});
+  };
+  try {
+    const query=async(sql)=>{
+      if(sql.startsWith('UPDATE provider_oauth_states SET consumed_at'))return {rows:[{auth_user_id:'11111111-1111-4111-8111-111111111111'}]};
+      if(sql.startsWith('SELECT provider_user_id'))return {rows:[{provider_user_id:'original-patreon'}]};
+      if(sql.startsWith('DELETE FROM provider_oauth_states'))return {rows:[]};
+      throw Error('Unexpected query: '+sql.slice(0,60));
+    };
+    const response=await handlePatreon(new Request('https://packone.pro/v1/patreon/callback?state='+('a'.repeat(64))+'&code=fixture'),{query,authSession:async()=>null,json:(d,s)=>Response.json(d,{status:s||200})});
+    assert.equal(response.status,302);
+    assert.equal(new URL(response.headers.get('location')).searchParams.get('patreon'),'identity-mismatch');
+  } finally {
+    globalThis.fetch=priorFetch;
+    for(const [key,value] of Object.entries(priorEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+  }
+});
+
+test('Patreon callback maps provider identity uniqueness to a safe conflict result',async()=>{
+  const priorEnv=Object.fromEntries(['PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_WEBHOOK_SECRET'].map(k=>[k,process.env[k]]));
+  const priorFetch=globalThis.fetch;
+  Object.assign(process.env,{PATREON_CLIENT_ID:'fixture-client',PATREON_CLIENT_SECRET:'fixture-secret',PATREON_WEBHOOK_SECRET:'fixture-webhook'});
+  globalThis.fetch=async url=>{
+    if(String(url).includes('/api/oauth2/token'))return Response.json({access_token:'fixture-token'});
+    return Response.json({data:{type:'user',id:'provider-owned-elsewhere',relationships:{memberships:{data:[]}}},included:[]});
+  };
+  try {
+    const query=async(sql)=>{
+      if(sql.startsWith('UPDATE provider_oauth_states SET consumed_at'))return {rows:[{auth_user_id:'11111111-1111-4111-8111-111111111111'}]};
+      if(sql.startsWith('SELECT provider_user_id'))return {rows:[]};
+      if(sql.startsWith('WITH identity_allowed')){const error=Error('duplicate');error.code='23505';throw error;}
+      if(sql.startsWith('DELETE FROM provider_oauth_states'))return {rows:[]};
+      throw Error('Unexpected query: '+sql.slice(0,60));
+    };
+    const response=await handlePatreon(new Request('https://packone.pro/v1/patreon/callback?state='+('b'.repeat(64))+'&code=fixture'),{query,authSession:async()=>null,json:(d,s)=>Response.json(d,{status:s||200})});
+    assert.equal(response.status,302);
+    const location=new URL(response.headers.get('location'));
+    assert.equal(location.searchParams.get('patreon'),'conflict');
+    assert.equal(location.searchParams.size,1,'conflict redirect must not disclose another Pack One account');
+  } finally {
+    globalThis.fetch=priorFetch;
+    for(const [key,value] of Object.entries(priorEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+  }
+});
 test('raw webhook bytes must match the HMAC signature',()=>{
   const raw=Buffer.from('{"data":{}}'),secret='test';
   const signature=createHmac('md5',secret).update(raw).digest('hex');
