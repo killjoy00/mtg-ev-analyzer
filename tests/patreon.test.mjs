@@ -39,6 +39,25 @@ test('unconfigured linking does not touch provider API or create OAuth state',as
   });assert.equal(response.status,503);
 });
 
+test('Patreon OAuth requests identity plus the documented membership scope',async()=>{
+  const prior=Object.fromEntries(['PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_WEBHOOK_SECRET'].map(k=>[k,process.env[k]]));
+  Object.assign(process.env,{PATREON_CLIENT_ID:'fixture-client',PATREON_CLIENT_SECRET:'fixture-secret',PATREON_WEBHOOK_SECRET:'fixture-webhook'});
+  try {
+    const response=await handlePatreon(new Request('https://packone.pro/v1/patreon/connect',{method:'POST'}),{
+      query:async sql=>sql.includes('INSERT INTO provider_oauth_states')?{rows:[{state_hash:'fixture'}]}:{rows:[]},
+      authSession:async()=>({user_id:'11111111-1111-4111-8111-111111111111'}),
+      json:(d,s)=>Response.json(d,{status:s||200}),
+    });
+    assert.equal(response.status,200);
+    const target=new URL((await response.json()).url);
+    assert.equal(target.searchParams.get('scope'),'identity identity.memberships');
+  } finally {
+    for(const [key,value] of Object.entries(prior)) {
+      if(value===undefined)delete process.env[key]; else process.env[key]=value;
+    }
+  }
+});
+
 test('failed pagination never applies a partial membership snapshot',async()=>{
   let calls=0,writes=0;
   const query=async(sql)=>{if(!sql.startsWith('SELECT'))writes++;return {rows:[{auth_user_id:'a',provider_user_id:'u1',sync_revision:0}]};};
