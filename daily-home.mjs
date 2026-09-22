@@ -52,7 +52,7 @@ export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = f
 export function renderDailyHome(profile = null, unavailable = false) {
   if (!document.querySelector('[data-daily-home-style]')) {
     const link = document.createElement('link'); link.rel = 'stylesheet';
-    link.href = './daily-home.css?v=3'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
+    link.href = './daily-home.css?v=4'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
   }
   lastDay = easternDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, unavailable);
