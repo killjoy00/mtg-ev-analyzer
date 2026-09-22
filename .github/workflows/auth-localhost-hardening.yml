@@ -2,7 +2,14 @@ name: harden production Neon Auth localhost
 
 on:
   push:
-    branches: [main, release/245-disable-localhost]
+    branches: [main]
+    paths:
+      - '.github/auth-localhost-hardening-request.json'
+      - '.github/workflows/auth-localhost-hardening.yml'
+      - 'scripts/auth-localhost-hardening.mjs'
+      - 'tests/auth-localhost-hardening.test.mjs'
+  pull_request:
+    branches: [main]
     paths:
       - '.github/auth-localhost-hardening-request.json'
       - '.github/workflows/auth-localhost-hardening.yml'
@@ -19,7 +26,7 @@ concurrency:
 
 jobs:
   qa:
-    if: github.ref == 'refs/heads/release/245-disable-localhost'
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -36,7 +43,7 @@ jobs:
         run: node scripts/auth-localhost-hardening.mjs qa
 
   production:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 12
     env:
