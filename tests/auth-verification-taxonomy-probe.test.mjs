@@ -11,16 +11,16 @@ import {sanitizedPayload} from '../edge/auth-webhook-probe.mjs';
 
 test('verification taxonomy probe is pinned to one disposable non-serving Pack One Auth branch',()=>{
   assert.equal(PROJECT,'patient-shadow-91417882');
-  assert.equal(BRANCH,'br-sparkling-cake-ay7lbnra');
+  assert.equal(BRANCH,'br-summer-credit-ay2vkyhc');
   const source=fs.readFileSync(new URL('../scripts/auth-verification-taxonomy-probe.mjs',import.meta.url),'utf8');
   const stage=fs.readFileSync(new URL('../scripts/auth-webhook-probe-stage.mjs',import.meta.url),'utf8');
   for(const forbidden of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b','ep-hidden-bonus-ayfmcpys','ep-spring-dream-ayq2a5qt']){
     assert.ok(!source.includes(forbidden));
     assert.ok(!stage.includes(forbidden));
   }
-  assert.match(source,/br-sparkling-cake-ay7lbnra/);
-  assert.match(source,/ep-odd-haze-ay2s6wy2/);
-  assert.match(stage,/ep-odd-haze-ay2s6wy2/);
+  assert.match(source,/br-summer-credit-ay2vkyhc/);
+  assert.match(source,/ep-curly-brook-ayo21u1k/);
+  assert.match(stage,/ep-curly-brook-ayo21u1k/);
   assert.match(source,/finally\s*\{/);
   assert.match(source,/updateEmailConfig\(neon,originalEmail\)/);
   assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
@@ -29,7 +29,7 @@ test('verification taxonomy probe is pinned to one disposable non-serving Pack O
   assert.doesNotMatch(source,/origin:'http:\/\/localhost/);
   assert.match(source,/delivered@resend\.dev/);
   assert.doesNotMatch(source,/await probeMode\('otp'/);
-  assert.match(source,/await probeMode\('link'/);
+  assert.match(source,/await probeMode\('link',originalEmail,workerUrl,neon,false\)/);
   assert.doesNotMatch(source,/refusing to overwrite an active configuration/);
   assert.match(source,/originalWebhook\.enabled/);
   assert.match(source,/originalWebhook\.enabled_events\.includes\('send\.magic_link'\)/);
@@ -37,6 +37,8 @@ test('verification taxonomy probe is pinned to one disposable non-serving Pack O
   assert.match(source,/webhookChanged=true;[\s\S]{0,80}webhookUpdate\(neon/);
   assert.match(source,/webhookUpdate\(neon,originalWebhook\)/);
   assert.match(source,/AUTH_VERIFICATION_TAXONOMY/);
+  assert.match(source,/Optional verification unexpectedly blocked password sign-in/);
+  assert.match(source,/Optional verification sign-in did not return a session/);
   assert.match(source,/if\(mode==='otp'\)assert\(Number\(verification\.verification_count\)>=1/);
   assert.match(source,/if\(mode==='link'\)assert\(summary/);
   assert.doesNotMatch(source,/if\(mode==='link'\)[^\n]*verification_count/);
@@ -75,6 +77,12 @@ test('verification modes change only the intended email/password policy fields',
     ...original,
     email_verification_method:'link',
     require_email_verification:true,
+    send_verification_email_on_sign_up:true,
+  });
+  assert.deepEqual(verificationConfigForMode(original,'link',false),{
+    ...original,
+    email_verification_method:'link',
+    require_email_verification:false,
     send_verification_email_on_sign_up:true,
   });
   assert.throws(()=>verificationConfigForMode(original,'other'),/Unsupported verification probe mode/);
