@@ -126,25 +126,32 @@ async function writeEvidence(env,evidence) {
     body:JSON.stringify(evidence),
   });
 }
-async function sanitizedPayload(rawBytes) {
+export async function sanitizedPayload(rawBytes) {
   let payload;
   try {payload=JSON.parse(new TextDecoder().decode(rawBytes));}
   catch {return {json_valid:false};}
 
-  const token=typeof payload?.event_data?.token==='string'?payload.event_data.token:'';
-  const linkUrl=typeof payload?.event_data?.link_url==='string'?payload.event_data.link_url:'';
+  const eventData=payload?.event_data&&typeof payload.event_data==='object'?payload.event_data:{};
+  const token=typeof eventData.token==='string'?eventData.token:'';
+  const otp=typeof eventData.otp==='string'?eventData.otp:'';
+  const linkUrl=typeof eventData.link_url==='string'?eventData.link_url:'';
   let linkHost=null;
   try {linkHost=linkUrl?new URL(linkUrl).hostname:null;} catch {}
   return {
     json_valid:true,
     event_type_payload:payload?.event_type||null,
+    top_level_keys:Object.keys(payload||{}).sort().slice(0,40),
+    event_data_keys:Object.keys(eventData).sort().slice(0,40),
     payload_shape:payloadShape(payload),
+    template_shape:payloadShape(eventData.template??payload?.template),
     user_email_present:typeof payload?.user?.email==='string',
-    link_type:payload?.event_data?.link_type||null,
+    link_type:eventData.link_type||null,
     link_host:linkHost,
     token_present:Boolean(token),
     token_length:token.length,
     token_sha256:token?await sha256Hex(token):null,
+    otp_present:Boolean(otp),
+    otp_length:otp.length,
   };
 }
 
