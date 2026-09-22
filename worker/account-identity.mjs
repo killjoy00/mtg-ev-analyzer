@@ -12,9 +12,10 @@ export async function accountIdentity(request, query, owner) {
   return {...account,session_source:auth.source};
 }
 
-// Public ranking recognizes the established signed player, independently of
-// an active account session. Never use this identity for account capabilities.
+// Public ranking recognizes only an established signed player that currently
+// owns its username. A linked account whose guest nickname collided with an
+// existing owner stays linked, but is not a public identity until it renames.
 export async function linkedPlayerIdentity(query, owner) {
-  const result=await query('SELECT a.auth_user_id,a.player_id,p.display_name FROM account_links a JOIN players p ON p.id=a.player_id WHERE a.player_id=$1::uuid',[owner]);
+  const result=await query('SELECT a.auth_user_id,a.player_id,p.display_name FROM account_links a JOIN players p ON p.id=a.player_id WHERE a.player_id=$1::uuid AND p.username_owned=true',[owner]);
   return result.rows[0]||null;
 }
