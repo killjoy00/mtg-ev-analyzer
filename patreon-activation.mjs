@@ -18,6 +18,7 @@ function shell(body,actions='') {
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app');if(!app)return;
   app.innerHTML=`<section class="account-page growth-page patreon-activation-page"><header><p class="eyebrow">Membership</p><h1>Activate Pack One Elite</h1><p>Pack One verifies Elite directly with Patreon before unlocking premium practice.</p></header><div class="message-card">${body}${actions?`<div class="account-actions">${actions}</div>`:''}</div></section>`;
+  document.querySelectorAll('[data-patreon-activation-exit]').forEach(link=>link.addEventListener('click',clearPatreonActivation));
 }
 
 async function startOAuth(source) {
@@ -44,7 +45,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   try {account=await getAuthSession();}
   catch(error) {
     shell(`<h2>Account access is temporarily unavailable.</h2><p>${esc(error?.message||'Please try again.')}</p>`,
-      '<button class="button primary" id="patreon-activation-retry" type="button">Try again</button><a class="button secondary" href="./">Back to Pack One</a>');
+      '<button class="button primary" id="patreon-activation-retry" type="button">Try again</button><a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     document.querySelector('#patreon-activation-retry')?.addEventListener('click',()=>void renderPatreonActivation({result,source,onSignedOut}));
     return;
   }
@@ -54,7 +55,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   try {patreon=await loadPatreonStatus();}
   catch(error) {
     shell(`<h2>Patreon is temporarily unavailable.</h2><p>${esc(error?.message||'Pack One could not check your membership.')}</p><p id="patreon-activation-status" aria-live="polite"></p>`,
-      '<button class="button primary" id="patreon-activation-oauth" type="button">Try Patreon again</button><a class="button secondary" href="./">Back to Pack One</a>');
+      '<button class="button primary" id="patreon-activation-oauth" type="button">Try Patreon again</button><a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     bindOAuth(source);return;
   }
 
@@ -70,24 +71,24 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   const support=`<a class="button secondary" href="${esc(patreon?.support_url||PATREON_POLICY.supportUrl)}" rel="noopener noreferrer">Review membership on Patreon</a>`;
   if(result==='conflict') {
     shell('<h2>This Patreon account is already connected to another Pack One account.</h2><p>Sign in to the Pack One account previously connected to this Patreon identity, or disconnect Patreon from that account first. Pack One does not expose details about the other account.</p>',
-      '<a class="button primary" href="?account=signin">Sign in to another account</a><a class="button secondary" href="./">Back to Pack One</a>');
+      '<a class="button primary" data-patreon-activation-exit href="?account=signin">Open account access</a><a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     return;
   }
   if(result==='identity-mismatch') {
     shell('<h2>This Pack One account is already connected to a different Patreon account.</h2><p>To switch Patreon identities, disconnect Patreon from My Pack One first, then start activation again.</p>',
-      '<a class="button primary" href="?account=patreon">Open My Pack One</a><a class="button secondary" href="./">Back to Pack One</a>');
+      '<a class="button primary" data-patreon-activation-exit href="?account=patreon">Open My Pack One</a><a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     return;
   }
   if(result==='expired') {
-    shell('<h2>Your Patreon authorization expired.</h2><p>Nothing was activated from the expired request. Start Patreon authorization again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" href="./">Back to Pack One</a>');
+    shell('<h2>Your Patreon authorization expired.</h2><p>Nothing was activated from the expired request. Start Patreon authorization again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     bindOAuth(source);return;
   }
   if(result==='unavailable') {
-    shell('<h2>Patreon linking is temporarily unavailable.</h2><p>Your Pack One account is unchanged. Try the authorization again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" href="./">Back to Pack One</a>');
+    shell('<h2>Patreon linking is temporarily unavailable.</h2><p>Your Pack One account is unchanged. Try the authorization again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     bindOAuth(source);return;
   }
   if(result==='error') {
-    shell('<h2>Patreon could not be connected.</h2><p>Your Pack One account is unchanged. Try Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" href="./">Back to Pack One</a>');
+    shell('<h2>Patreon could not be connected.</h2><p>Your Pack One account is unchanged. Try Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     bindOAuth(source);return;
   }
   if(patreon?.configured!==true) {
@@ -97,7 +98,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   }
   if(!patreon?.connected) {
     shell('<h2>Authorize Patreon to activate Elite.</h2><p>You are signed in to Pack One. Patreon authorization is the remaining step.</p><p id="patreon-activation-status" aria-live="polite">Opening Patreon…</p>',
-      '<button class="button primary" id="patreon-activation-oauth" type="button">Activate Elite</button><a class="button secondary" href="./">Not now</a>');
+      '<button class="button primary" id="patreon-activation-oauth" type="button">Activate Elite</button><a class="button secondary" data-patreon-activation-exit href="./">Not now</a>');
     bindOAuth(source);
     try {await startOAuth(source);} catch(error) {
       const status=document.querySelector('#patreon-activation-status');if(status)status.textContent=error?.message||'Use Activate Elite to try again.';
@@ -117,9 +118,9 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
     bindOAuth(source);return;
   }
   if(patreon?.membership?.sync_pending||result==='connected') {
-    shell('<h2>Your Patreon account is connected.</h2><p>We’re waiting for the latest membership update.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" href="./">Back to Pack One</a>');
+    shell('<h2>Your Patreon account is connected.</h2><p>We’re waiting for the latest membership update.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
     bindOAuth(source);return;
   }
-  shell('<h2>Patreon is connected.</h2><p>Pack One could not classify the latest membership state yet. Check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" href="./">Back to Pack One</a>');
+  shell('<h2>Patreon is connected.</h2><p>Pack One could not classify the latest membership state yet. Check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');
   bindOAuth(source);
 }
