@@ -255,6 +255,66 @@ test('QA telemetry stores only sanitized retry fields and is hidden outside QA',
   assert.equal(prod.status,404);
 });
 
+test('QA forced delivery fault fails at the DO boundary and records natural delivery failure taxonomy',async()=>{
+  const fixture=await signedFixture({kid:'qa-delivery-failure-kid'});
+  const originalFetch=globalThis.fetch;
+  const originalLog=console.log;
+  globalThis.fetch=async url=>{
+    if(String(url)==='https://auth.qa-delivery-failure.example/.well-known/jwks.json')return Response.json({keys:[fixture.jwk]});
+    throw Error('unexpected network call');
+  };
+  const timingLogs=[];
+  console.log=value=>timingLogs.push(String(value));
+  let storedTelemetry=[];
+  const storage={
+    get:async key=>{
+      if(key==='sent')return null;
+      if(key==='qa_telemetry')return storedTelemetry;
+      return null;
+    },
+    put:async(key,value)=>{
+      if(key==='qa_telemetry')storedTelemetry=value;
+      else if(key==='sent')throw Error('forced failure must not mark the event sent');
+    },
+  };
+  const dedupe=new RecoveryEventDedupe({storage},{
+    PACK1_AUTH_ENV:'qa',
+    PACK1_FORCE_DELIVERY_FAILURE:'1',
+  });
+  const env={
+    PACK1_AUTH_ENV:'qa',
+    PACK1_FORCE_DELIVERY_FAILURE:'1',
+    AUTH_BASE:'https://auth.qa-delivery-failure.example',
+    RECOVERY_DEDUPE:{
+      idFromName:value=>value,
+      get:()=>({
+        fetch:(url,init)=>dedupe.fetch(new Request(url,init)),
+      }),
+    },
+  };
+  try {
+    const response=await authWebhook(new Request('https://hook.example/webhook',{
+      method:'POST',headers:fixture.headers,body:fixture.raw,
+    }),env);
+    assert.equal(response.status,502);
+    assert.deepEqual(storedTelemetry.map(entry=>entry.status),['forced_failure','delivery_failure']);
+    const delivery=storedTelemetry.at(-1);
+    assert.equal(delivery.event_type,'send.magic_link');
+    assert.equal(delivery.link_type,'forget-password');
+    assert.equal('token' in delivery,false);
+    assert.equal('email' in delivery,false);
+
+    const parsed=timingLogs.map(line=>{try{return JSON.parse(line);}catch{return null;}}).filter(Boolean);
+    assert.equal(parsed.some(entry=>entry.status==='forced_failure'),false);
+    const timing=parsed.find(entry=>entry.status==='delivery_failure');
+    assert.equal(timing?.event_type,'send.magic_link');
+    assert.equal(timing?.link_type,'forget-password');
+  } finally {
+    globalThis.fetch=originalFetch;
+    console.log=originalLog;
+  }
+});
+
 test('QA retry-after-send mode returns retryable failure after one successful deduped send boundary',async()=>{
   const fixture=await signedFixture({kid:'qa-retry-kid'});
   const originalFetch=globalThis.fetch;

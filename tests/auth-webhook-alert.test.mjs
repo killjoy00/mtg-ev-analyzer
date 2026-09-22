@@ -2,12 +2,15 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {buildTelemetryQuery,extractAlertEvents,renderAlertBody,routeGithubAlert} from '../scripts/auth-webhook-alert.mjs';
 
-test('query targets only production authhook timing failures',()=>{
-  const q=buildTelemetryQuery(1000,2000);
+test('query targets the Workers Logs dataset and parameterized authhook service',()=>{
+  const q=buildTelemetryQuery(1000,2000,'pack1-authhook-qa');
   assert.deepEqual(q.timeframe,{from:1000,to:2000});
+  assert.equal(q.dry,true);
   assert.equal(q.parameters.view,'events');
+  assert.deepEqual(q.parameters.datasets,['cloudflare-workers']);
+  const service=q.parameters.filters.find(filter=>filter?.key==='$metadata.service');
+  assert.deepEqual(service,{key:'$metadata.service',operation:'eq',type:'string',value:'pack1-authhook-qa'});
   const json=JSON.stringify(q);
-  assert.match(json,/pack1-authhook/);
   assert.match(json,/pack1_authhook_timing/);
   for(const status of ['invalid_signature','delivery_failure','rejected_event'])assert.match(json,new RegExp(status));
 });

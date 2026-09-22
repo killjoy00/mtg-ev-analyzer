@@ -7,17 +7,17 @@ function boundedString(value,max) {
   return typeof value==='string'&&value.length>0&&value.length<=max?value:null;
 }
 
-export function buildTelemetryQuery(from,to) {
+export function buildTelemetryQuery(from,to,service='pack1-authhook') {
   return {
     queryId:'pack1-authhook-production-failures',
     timeframe:{from,to},
     dry:true,
     limit:200,
     parameters:{
-      datasets:[],
+      datasets:['cloudflare-workers'],
       filterCombination:'and',
       filters:[
-        {key:'$metadata.service',operation:'eq',type:'string',value:'pack1-authhook'},
+        {key:'$metadata.service',operation:'eq',type:'string',value:service},
         {key:'$metadata.message',operation:'includes',type:'string',value:'"type":"pack1_authhook_timing"'},
         {
           kind:'group',
@@ -102,13 +102,13 @@ export async function verifyCloudflareToken(fetcher,token) {
   return {id,status};
 }
 
-export async function queryAlertEvents(fetcher,token,now=Date.now()) {
+export async function queryAlertEvents(fetcher,token,now=Date.now(),service='pack1-authhook') {
   if(typeof token!=='string'||token.length<20)throw Error('CLOUDFLARE_EDGE_TOKEN is missing or too short.');
   const zones=await cloudflareJson(fetcher,'https://api.cloudflare.com/client/v4/zones?name=packone.pro&per_page=50',token,{},'zone lookup');
   const active=Array.isArray(zones?.result)?zones.result.filter(zone=>zone?.status==='active'):[];
   if(active.length!==1||!/^[a-f0-9]{32}$/.test(active[0]?.account?.id||''))throw Error('Expected one active Pack One Cloudflare zone with an account id.');
   const accountId=active[0].account.id;
-  const payload=buildTelemetryQuery(now-QUERY_WINDOW_MS,now);
+  const payload=buildTelemetryQuery(now-QUERY_WINDOW_MS,now,service);
   const result=await cloudflareJson(
     fetcher,
     'https://api.cloudflare.com/client/v4/accounts/'+accountId+'/workers/observability/telemetry/query',
@@ -186,7 +186,8 @@ export async function routeGithubAlert(fetcher,{repository,token,events,now=Date
 export async function runAlert({fetcher=fetch,env=process.env,now=Date.now(),mode='alert'}={}) {
   const verified=mode==='check'?await verifyCloudflareToken(fetcher,env.CLOUDFLARE_EDGE_TOKEN):null;
   if(verified)console.log('Cloudflare token active; token id '+verified.id+'.');
-  const events=await queryAlertEvents(fetcher,env.CLOUDFLARE_EDGE_TOKEN,now);
+  const service=env.PACK1_AUTHHOOK_ALERT_SERVICE||'pack1-authhook';
+  const events=await queryAlertEvents(fetcher,env.CLOUDFLARE_EDGE_TOKEN,now,service);
   if(mode==='check') {
     console.log('Auth webhook alert query access verified; matching retained failures: '+events.length+'.');
     return {action:'checked',count:events.length};
