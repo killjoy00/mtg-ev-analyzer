@@ -57,7 +57,8 @@ test('social probe sends an origin-bound Google OAuth start without following re
 
 test('hardening contract is QA-first, production-fixed, reversible on failure, and avoids Auth-table mutation',()=>{
   const source=fs.readFileSync(new URL('../scripts/auth-localhost-hardening.mjs',import.meta.url),'utf8');
-  const workflow=fs.readFileSync(new URL('../.github/workflows/auth-localhost-hardening.yml',import.meta.url),'utf8');
+  const qaWorkflow=fs.readFileSync(new URL('../.github/workflows/auth-localhost-hardening.yml',import.meta.url),'utf8');
+  const testWorkflow=fs.readFileSync(new URL('../.github/workflows/test.yml',import.meta.url),'utf8');
   assert.equal(QA_BRANCH,'br-twilight-hill-ayffyd2b');
   assert.equal(PROD_BRANCH,'br-orange-feather-ayps8kep');
   assert.deepEqual(PROD_ORIGINS,[
@@ -74,11 +75,16 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(source,/request-password-reset/);
   assert.match(source,/delivered@resend\.dev/);
   assert.doesNotMatch(source,/\bpsql\b|DATABASE_URL|DELETE\s+FROM|UPDATE\s+neon_auth|INSERT\s+INTO\s+neon_auth/i);
-  assert.match(workflow,/pull_request:/);
-  assert.match(workflow,/branches:\s*\[main\]/);
-  assert.match(workflow,/github\.event_name == 'pull_request'/);
-  assert.match(workflow,/NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}/);
-  assert.match(workflow,/neon@4\.17\.4/);
-  assert.match(workflow,/auth-localhost-hardening\.mjs qa/);
-  assert.match(workflow,/auth-localhost-hardening\.mjs production/);
+  assert.match(qaWorkflow,/pull_request:/);
+  assert.match(qaWorkflow,/branches:\s*\[main\]/);
+  assert.doesNotMatch(qaWorkflow,/auth-localhost-hardening\.mjs production/);
+  assert.match(qaWorkflow,/NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}/);
+  assert.match(qaWorkflow,/neon@4\.17\.4/);
+  assert.match(qaWorkflow,/auth-localhost-hardening\.mjs qa/);
+  assert.match(testWorkflow,/Execute reviewed production localhost hardening/);
+  assert.match(testWorkflow,/github\.event_name == 'push'/);
+  assert.match(testWorkflow,/head_commit\.modified/);
+  assert.match(testWorkflow,/auth-localhost-hardening-request\.json/);
+  assert.match(testWorkflow,/NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}/);
+  assert.match(testWorkflow,/auth-localhost-hardening\.mjs production/);
 });
