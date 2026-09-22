@@ -38,8 +38,8 @@ jobs:
       - name: Prove exact production service filter against known traffic
         run: node scripts/auth-webhook-alert-proof.mjs production-service
 
-      - name: Install pinned QA deployment tool
-        run: npm install --prefix "$RUNNER_TEMP/auth-webhook-tools" --no-audit --no-fund wrangler@4.132.0
+      - name: Install pinned QA deployment tools
+        run: npm install --prefix "$RUNNER_TEMP/auth-webhook-tools" --no-audit --no-fund wrangler@4.132.0 neon@4.17.4
 
       - name: Deploy genuine QA delivery-failure mode with retained logs
         id: deploy
@@ -48,6 +48,8 @@ jobs:
         run: node scripts/auth-webhook-control.mjs deploy-qa-fail
 
       - name: Trigger one signed genuine QA delivery failure
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-webhook-tools
         run: node scripts/auth-webhook-alert-proof.mjs qa-fault
 
       - name: Route retained QA failure through the real alert code
