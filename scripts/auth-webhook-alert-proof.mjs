@@ -181,24 +181,27 @@ async function triggerGenuineQaFault(){
     if(reset.status<200||reset.status>=300)throw Error('QA proof reset request failed with HTTP '+reset.status+'.');
 
     let match=null;
+    let forced=null;
     for(let poll=0;poll<30;poll++){
       await sleep(1000);
       const entries=await qaTelemetry();
-      match=entries.find(entry=>
-        !prior.has(JSON.stringify(entry)) &&
+      const fresh=entries.filter(entry=>!prior.has(JSON.stringify(entry)));
+      match=fresh.find(entry=>
         entry?.status==='delivery_failure' &&
         entry?.event_type==='send.magic_link' &&
         entry?.link_type==='forget-password'
       )||null;
-      if(match)break;
+      forced=fresh.find(entry=>entry?.status==='forced_failure')||null;
+      if(match&&forced)break;
     }
     if(!match)throw Error('QA proof never observed the natural delivery_failure telemetry.');
-    const forced=before.length?null:null;
+    if(!forced)throw Error('QA proof lost the separate forced_failure marker.');
     console.log('QA_ALERT_PROOF_EVENT '+JSON.stringify({
       status:match.status,
       event_type:match.event_type,
       link_type:match.link_type,
       delivery_attempt:String(match.delivery_attempt||''),
+      forced_marker:true,
     }));
   }finally{
     if(changed){
