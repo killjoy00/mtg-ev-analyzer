@@ -4,8 +4,8 @@ import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 
 export const PROJECT='patient-shadow-91417882';
-export const BRANCH='br-sparkling-cake-ay7lbnra';
-export const AUTH_BASE='https://ep-odd-haze-ay2s6wy2.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+export const BRANCH='br-summer-credit-ay2vkyhc';
+export const AUTH_BASE='https://ep-curly-brook-ayo21u1k.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const WORKER='pack1-auth-webhook-probe-temp';
 const EMAIL_CONFIG_PATH='/projects/'+PROJECT+'/branches/'+BRANCH+'/auth/email_and_password';
 
@@ -24,13 +24,13 @@ export function safeEmailConfig(value){
   };
 }
 
-export function verificationConfigForMode(original,mode){
+export function verificationConfigForMode(original,mode,requireEmailVerification=true){
   if(!['otp','link'].includes(mode))throw Error('Unsupported verification probe mode.');
   return {
     ...safeEmailConfig(original),
     enabled:true,
     email_verification_method:mode,
-    require_email_verification:true,
+    require_email_verification:Boolean(requireEmailVerification),
     send_verification_email_on_sign_up:true,
     send_verification_email_on_sign_in:false,
     disable_sign_up:false,
@@ -216,8 +216,8 @@ function evidenceSummary(evidence){
   };
 }
 
-async function probeMode(mode,originalEmail,workerUrl,neon){
-  const target=verificationConfigForMode(originalEmail,mode);
+async function probeMode(mode,originalEmail,workerUrl,neon,requireEmailVerification=true){
+  const target=verificationConfigForMode(originalEmail,mode,requireEmailVerification);
   const applied=await updateEmailConfig(neon,target);
   assert(configEqual(applied,target),'QA email verification configuration did not reach the requested probe state.');
   console.log('AUTH_VERIFICATION_MODE_CONFIG '+JSON.stringify({mode,config:applied}));
@@ -239,6 +239,8 @@ async function probeMode(mode,originalEmail,workerUrl,neon){
   const verification=verificationState(neon,email);
   const taxonomy={
     mode,
+    require_email_verification:target.require_email_verification,
+    send_verification_email_on_sign_up:target.send_verification_email_on_sign_up,
     signup_status:signup.status,
     signup_user_present:Boolean(signup.json?.user?.id||signup.json?.id),
     signup_session_present:Boolean(signup.json?.session||signup.json?.token),
@@ -254,6 +256,10 @@ async function probeMode(mode,originalEmail,workerUrl,neon){
   assert(verification.email_verified===false,'QA verification probe user unexpectedly verified before acceptance.');
   if(mode==='otp')assert(Number(verification.verification_count)>=1,'QA OTP verification probe did not persist a verification credential.');
   if(mode==='link')assert(summary,'QA link verification probe did not emit a subscribed signed webhook event.');
+  if(!target.require_email_verification){
+    assert(signin.status>=200&&signin.status<300,'Optional verification unexpectedly blocked password sign-in with HTTP '+signin.status+'.');
+    assert(Boolean(signin.json?.token||signin.json?.session?.token),'Optional verification sign-in did not return a session.');
+  }
 }
 
 export async function main(){
@@ -292,7 +298,7 @@ export async function main(){
     console.log('AUTH_VERIFICATION_ENABLED_WEBHOOK '+JSON.stringify(enabledWebhook));
 
     emailChanged=true;
-    await probeMode('link',originalEmail,workerUrl,neon);
+    await probeMode('link',originalEmail,workerUrl,neon,false);
   }catch(error){
     primaryError=error;
   }finally{
