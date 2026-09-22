@@ -297,12 +297,22 @@ async function recordQaTelemetry(env,eventId,deliveryAttempt,details) {
     });
   } catch {}
 }
+function qaEvidenceKey(env) {
+  const key=safeString(env.PACK1_QA_EVIDENCE_KEY,256);
+  return key&&key.length>=32?key:null;
+}
+function qaEvidenceObjectName(env) {
+  const key=qaEvidenceKey(env);
+  if(!key)return null;
+  return '__qa_verification_evidence__:'+createHash('sha256').update(key).digest('hex').slice(0,16);
+}
 async function recordQaVerificationLink(env,event) {
   if(env.PACK1_AUTH_ENV!=='qa'||event?.linkType!=='email-verification'||!env.RECOVERY_DEDUPE)return;
   try {
     const linkUrl=validatedAuthLink(env.AUTH_BASE,event.linkUrl);
-    if(!linkUrl)return;
-    const id=env.RECOVERY_DEDUPE.idFromName('__qa_verification_evidence__');
+    const objectName=qaEvidenceObjectName(env);
+    if(!linkUrl||!objectName)return;
+    const id=env.RECOVERY_DEDUPE.idFromName(objectName);
     await env.RECOVERY_DEDUPE.get(id).fetch('https://pack1.internal/pending-verification',{
       method:'POST',
       headers:{'content-type':'application/json'},
@@ -311,9 +321,8 @@ async function recordQaVerificationLink(env,event) {
   } catch {}
 }
 function qaEvidenceAuthorized(request,env) {
-  const key=safeString(env.PACK1_QA_EVIDENCE_KEY,256);
-  if(!key||key.length<32)return false;
-  return request.headers.get('authorization')==='Bearer '+key;
+  const key=qaEvidenceKey(env);
+  return Boolean(key)&&request.headers.get('authorization')==='Bearer '+key;
 }
 
 export async function authWebhook(request,env) {
@@ -334,7 +343,9 @@ export async function authWebhook(request,env) {
     if(env.PACK1_AUTH_ENV!=='qa')return new Response(null,{status:404});
     if(request.method!=='GET')return new Response(null,{status:405});
     if(!qaEvidenceAuthorized(request,env))return new Response(null,{status:401});
-    const id=env.RECOVERY_DEDUPE.idFromName('__qa_verification_evidence__');
+    const objectName=qaEvidenceObjectName(env);
+    if(!objectName)return new Response(null,{status:401});
+    const id=env.RECOVERY_DEDUPE.idFromName(objectName);
     return env.RECOVERY_DEDUPE.get(id).fetch('https://pack1.internal/pending-verification');
   }
   if(url.pathname!=='/webhook')return new Response(null,{status:404});
