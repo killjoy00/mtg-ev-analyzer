@@ -1,4 +1,4 @@
-name: One-shot Traditional v4 development staging dispatcher
+name: One-shot Traditional v4 regular development staging
 
 on:
   push:
@@ -13,80 +13,56 @@ permissions:
 
 jobs:
   dispatch:
-    if: github.event.head_commit.message == 'Dispatch Traditional v4 development staging'
+    if: github.event.head_commit.message == 'Dispatch Traditional v4 regular development staging'
     runs-on: ubuntu-latest
-    timeout-minutes: 180
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.ref_name }}
 
-      - name: Dispatch reviewed development-stage runs
+      - name: Dispatch reviewed regular development stage
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          set -uo pipefail
+          set -u
           workflow=publish-puzzle-components.yml
-          result_file=ops/traditional-v4-dev-stage-results.json
+          source=v4-regular-phase2
+          result_file=ops/traditional-v4-regular-stage-result.json
           mkdir -p ops
 
-          stage_one() {
-            local source="$1"
-            local before after id rc conclusion
-            before="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --event workflow_dispatch --branch main --limit 50 --json databaseId --jq '.[].databaseId' | sort -n)"
+          before="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --event workflow_dispatch --branch main --limit 50 --json databaseId --jq '.[].databaseId' | sort -n)"
+          gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main \
+            -f target=development \
+            -f action=stage \
+            -f source="$source"
 
-            gh workflow run "$workflow" --repo "$GITHUB_REPOSITORY" --ref main \
-              -f target=development \
-              -f action=stage \
-              -f source="$source"
+          id=""
+          for attempt in $(seq 1 60); do
+            after="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --event workflow_dispatch --branch main --limit 50 --json databaseId --jq '.[].databaseId' | sort -n)"
+            id="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | tail -n 1)"
+            if [[ -n "$id" ]]; then break; fi
+            sleep 2
+          done
 
-            id=""
-            for attempt in $(seq 1 60); do
-              after="$(gh run list --repo "$GITHUB_REPOSITORY" --workflow "$workflow" --event workflow_dispatch --branch main --limit 50 --json databaseId --jq '.[].databaseId' | sort -n)"
-              id="$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after") | tail -n 1)"
-              if [[ -n "$id" ]]; then break; fi
-              sleep 2
-            done
-
-            if [[ -z "$id" ]]; then
-              jq -n --arg source "$source" '{source:$source,run_id:null,status:"dispatch_not_observed",conclusion:null}' > "/tmp/$source.json"
-              return 2
-            fi
-
+          if [[ -z "$id" ]]; then
+            jq -n --arg source "$source" '{target:"development",action:"stage",source:$source,run_id:null,status:"dispatch_not_observed",conclusion:null}' > "$result_file"
+            rc=2
+          else
             set +e
             gh run watch "$id" --repo "$GITHUB_REPOSITORY" --exit-status
             rc=$?
             set -e
-
-            conclusion="$(gh run view "$id" --repo "$GITHUB_REPOSITORY" --json conclusion --jq '.conclusion // ""')"
             gh run view "$id" --repo "$GITHUB_REPOSITORY" \
-              --json databaseId,status,conclusion,url,headSha,createdAt,updatedAt \
-              --jq --arg source "$source" '. + {source:$source,run_id:.databaseId} | del(.databaseId)' \
-              > "/tmp/$source.json"
-            return "$rc"
-          }
-
-          regular_rc=0
-          stage_one v4-regular-phase2 || regular_rc=$?
-
-          cube_rc=99
-          if [[ "$regular_rc" -eq 0 ]]; then
-            cube_rc=0
-            stage_one v4-powered-cube || cube_rc=$?
-          else
-            jq -n '{source:"v4-powered-cube",run_id:null,status:"not_dispatched_after_regular_failure",conclusion:null}' > /tmp/v4-powered-cube.json
+              --json databaseId,status,conclusion,url,headSha,createdAt,updatedAt > /tmp/run.json
+            jq --arg source "$source" '. + {target:"development",action:"stage",source:$source,run_id:.databaseId} | del(.databaseId)' \
+              /tmp/run.json > "$result_file"
           fi
-
-          jq -s '{target:"development",action:"stage",runs:.}' \
-            /tmp/v4-regular-phase2.json /tmp/v4-powered-cube.json > "$result_file"
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add "$result_file"
-          git commit -m "Record Traditional v4 development staging run IDs [skip ci]"
+          git commit -m "Record Traditional v4 regular development stage [skip ci]"
           git push origin "HEAD:$GITHUB_REF_NAME"
-
-          if [[ "$regular_rc" -ne 0 || "$cube_rc" -ne 0 ]]; then
-            exit 1
-          fi
+          exit "$rc"
