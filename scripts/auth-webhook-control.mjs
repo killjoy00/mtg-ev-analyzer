@@ -95,7 +95,6 @@ async function waitForHealth(base,{commit,environment}) {
 async function deploy(target,{forceFailure=false,forceRetryAfterSend=false}={}) {
   const cfg=CONFIGS[target];
   if(!cfg)throw Error('Unknown Auth webhook deployment target.');
-  const authBase=target==='qa'&&process.env.PACK1_QA_AUTH_BASE_OVERRIDE?String(process.env.PACK1_QA_AUTH_BASE_OVERRIDE):cfg.authBase;
   validateEnvironment();
   const commit=String(process.env.RELEASE_COMMIT||process.env.GITHUB_SHA||'');
   if(!/^[a-f0-9]{40}$/.test(commit))throw Error('Exact release commit is required.');
@@ -114,7 +113,7 @@ async function deploy(target,{forceFailure=false,forceRetryAfterSend=false}={}) 
     durable_objects:{bindings:[{name:'RECOVERY_DEDUPE',class_name:'RecoveryEventDedupe'}]},
     migrations:[{tag:'v1',new_sqlite_classes:['RecoveryEventDedupe']}],
     vars:{
-      AUTH_BASE:authBase,
+      AUTH_BASE:cfg.authBase,
       PACK1_AUTH_ENV:target==='production'?'production':'qa',
       RESET_ORIGIN:cfg.resetOrigin,
       SENDER:cfg.sender,
