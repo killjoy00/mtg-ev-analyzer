@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"2026-09-21: Deploy the Pack One P¹ brand mark in the production password-reset email for #328 while preserving the existing recovery URL, sender, subject, and webhook contract."}
+{"operation":"deploy-secure-auth","reason":"2026-09-21: Deploy the merged Patreon grant-expiry fix from #330 so active Elite capabilities remain valid for 12 hours after the last successful authoritative provider snapshot, preventing scheduler delays from demoting valid members."}
