@@ -44,17 +44,6 @@ jobs:
         if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
         run: python scripts/audit_datasets.py --fail-on-error
 
-      - name: Issue 245 QA localhost capability probe
-        if: github.event_name == 'pull_request' && github.head_ref == 'release/245-disable-localhost' && github.event.pull_request.head.repo.full_name == github.repository
-        shell: bash
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          NEON_BIN: ${{ runner.temp }}/neon-auth-tools/node_modules/.bin/neon
-        run: |
-          set -euo pipefail
-          npm install --prefix "$RUNNER_TEMP/neon-auth-tools" --no-audit --no-fund neon@4.17.4
-          node scripts/auth-localhost-hardening.mjs qa
-
       # Keep this last so implementation regressions are visible even while a
       # release-critical secret is intentionally not yet provisioned. A
       # same-repository PR still cannot go green or merge without all three.
