@@ -35,7 +35,6 @@ ALTER TABLE draft_run_verified_puzzles ADD CONSTRAINT draft_run_source_evidence_
      AND payload->>'player_rank_tier' IN ('diamond','mythic')
    )
  )
- )
  OR
  (
   payload->>'source_event_type'='TradDraft'
