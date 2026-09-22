@@ -252,15 +252,15 @@ export class RecoveryEventDedupe {
         ? async()=>new Response(null,{status:503})
         : fetch;
       const result=await sendAuthEmail(this.env,event,providerFetch);
+      await this.storage.put('sent',{messageId:result.id,sentAt:new Date().toISOString()});
       let qaAutoVerified=false;
       if(this.env.PACK1_AUTH_ENV==='qa'
         && this.env.PACK1_QA_AUTO_VERIFY_AFTER_SEND==='1'
         && event.linkType==='email-verification') {
-        const verified=await fetch(event.linkUrl,{redirect:'manual',signal:AbortSignal.timeout(10000)});
-        if(verified.status<200||verified.status>=400)throw Error('QA verification link redemption failed');
+        const verified=await fetch(event.linkUrl,{redirect:'follow',signal:AbortSignal.timeout(15000)});
+        if(!verified.ok)throw Error('QA verification link redemption failed');
         qaAutoVerified=true;
       }
-      await this.storage.put('sent',{messageId:result.id,sentAt:new Date().toISOString()});
       return responseJson({ok:true,duplicate:false,qaAutoVerified});
     } catch {
       return responseJson({ok:false},502);
@@ -361,7 +361,7 @@ export async function authWebhook(request,env) {
   }
   let deliveryResult={};
   try {deliveryResult=await result.json();} catch {}
-  const details={status:'sent_or_duplicate',event_type:event.eventType,link_type:event.linkType,duplicate:Boolean(deliveryResult?.duplicate),verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
+  const details={status:'sent_or_duplicate',event_type:event.eventType,link_type:event.linkType,duplicate:Boolean(deliveryResult?.duplicate),qa_auto_verified:env.PACK1_AUTH_ENV==='qa'?Boolean(deliveryResult?.qaAutoVerified):undefined,verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
   logTiming(env,deliveryAttempt,details);
   await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
   if(env.PACK1_AUTH_ENV==='qa'&&env.PACK1_FORCE_RETRY_AFTER_SEND==='1')return new Response(null,{status:503});
