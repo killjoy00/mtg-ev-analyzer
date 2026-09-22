@@ -1,13 +1,6 @@
-name: harden production Neon Auth localhost
+name: prove Neon Auth localhost behavior in QA
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/auth-localhost-hardening-request.json'
-      - '.github/workflows/auth-localhost-hardening.yml'
-      - 'scripts/auth-localhost-hardening.mjs'
-      - 'tests/auth-localhost-hardening.test.mjs'
   pull_request:
     branches: [main]
     paths:
@@ -15,18 +8,17 @@ on:
       - '.github/workflows/auth-localhost-hardening.yml'
       - 'scripts/auth-localhost-hardening.mjs'
       - 'tests/auth-localhost-hardening.test.mjs'
-  workflow_dispatch:
+      - '.github/workflows/test.yml'
 
 permissions:
   contents: read
 
 concurrency:
-  group: pack1-auth-localhost-hardening
+  group: pack1-auth-localhost-qa
   cancel-in-progress: false
 
 jobs:
   qa:
-    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -41,20 +33,3 @@ jobs:
         run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@4.17.4
       - name: Prove localhost capability in QA and restore QA
         run: node scripts/auth-localhost-hardening.mjs qa
-
-  production:
-    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    timeout-minutes: 12
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      NEON_BIN: ${{ runner.temp }}/neon-tools/node_modules/.bin/neon
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Install pinned Neon CLI
-        run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@4.17.4
-      - name: Disable production localhost allowance and verify auth flows
-        run: node scripts/auth-localhost-hardening.mjs production
