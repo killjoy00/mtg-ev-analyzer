@@ -7,7 +7,7 @@ import { sortPackByRarity } from './replay-data.mjs';
 import {rateDraftRunPuzzle,DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from './draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,DRAFT_RUN_LENGTH,isEightPickVersion,earlyRoundsForSelection,eligibleRunPuzzle,regularRunSet,chooseRunSet,runDifficultyBands,dailyRequiredSets,releasedRunSets,requiredSetRounds} from './draft-run-policy.mjs';
 import {gameDateKey} from './game-date.mjs';
-import {FROZEN_CONTEXT_MODEL_VERSION,approvedTraditionalSource,supportedComponent} from './corpus-components.mjs';
+import {approvedTraditionalSource,modelVersionForComponent,supportedComponent} from './corpus-components.mjs';
 
 const EPSILON = 1e-9;
 export const DRAFT_RUN_SCORING_VERSION = 'trophy-consensus-v3';
@@ -221,7 +221,7 @@ export function validateDraftRunPuzzle(puzzle, expectedVersion = DRAFT_RUN_CORPU
     ((puzzle.source_event_type??'PremierDraft')==='PremierDraft'
       ? Number(puzzle.event_match_wins)===7 && (puzzle.event_match_losses==null||[0,1,2].includes(Number(puzzle.event_match_losses)))
       : puzzle.source_event_type==='TradDraft' && approvedTraditionalSource(puzzle) &&
-        puzzle.model_version===FROZEN_CONTEXT_MODEL_VERSION && puzzle.model_source_event==='PremierDraft' &&
+        puzzle.model_version===modelVersionForComponent(puzzle.corpus_version) && puzzle.model_source_event==='PremierDraft' &&
         Number(puzzle.event_match_wins)===3 && puzzle.event_match_losses===0 && pick<=8 && rateSkill) &&
     Number(puzzle.player_games_lower_bound) >= 100 &&
     (legacySkill || rateSkill) && puzzle.source_evidence === 'official_archive_trajectory' &&
