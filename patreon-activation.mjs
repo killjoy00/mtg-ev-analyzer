@@ -1,11 +1,25 @@
 import { escapeHtml as esc } from './html.mjs';
 import { connectPatreon, getAuthSession, loadPatreonStatus } from './growth-api.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
+import { trackEvent as event } from './retention-events.mjs';
 
 const ACTIVATION_KEY='pack1-patreon-activation-v1';
 
+function activationIntent() {
+  try {const raw=sessionStorage.getItem(ACTIVATION_KEY);return raw?JSON.parse(raw):null;} catch {return null;}
+}
+function activationSource(fallback='activation') {
+  return String(activationIntent()?.source||fallback||'activation').slice(0,80);
+}
 export function rememberPatreonActivation(source='welcome_note') {
-  try {sessionStorage.setItem(ACTIVATION_KEY,JSON.stringify({source:String(source||'activation').slice(0,80)}));} catch {}
+  try {
+    const existing=activationIntent();
+    if(existing)return existing;
+    const intent={source:String(source||'activation').slice(0,80)};
+    sessionStorage.setItem(ACTIVATION_KEY,JSON.stringify(intent));
+    event('patreon_activation_started',{source:intent.source});
+    return intent;
+  } catch {return null;}
 }
 export function hasPatreonActivationIntent() {
   try {return Boolean(sessionStorage.getItem(ACTIVATION_KEY));} catch {return false;}
@@ -23,6 +37,7 @@ function shell(body,actions='') {
 
 async function startOAuth(source) {
   rememberPatreonActivation(source);
+  event('patreon_activation_oauth_started',{source:activationSource(source)});
   const result=await connectPatreon();
   let target=null;
   try {target=new URL(String(result?.url||''));} catch {}
@@ -61,6 +76,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
 
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   if(elite) {
+    event('patreon_activation_succeeded',{source:activationSource(source)});
     clearPatreonActivation();
     shell('<h2>Elite is active.</h2><p>Powered Cube practice and custom-set practice are unlocked.</p>',
       '<a class="button primary" href="?game=draft-run&custom=1">Choose your sets</a><a class="button secondary" href="?game=draft-run&set=powered-cube">Start Powered Cube practice</a>');
