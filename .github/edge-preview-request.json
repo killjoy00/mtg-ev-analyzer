@@ -1,1 +1,1 @@
-{"operation":"probe-email-verification","reason":"Issue #246 final measurement: use fresh disposable production child br-sparkling-cake-ay7lbnra, log signed link taxonomy before link-specific assertions, then restore inherited webhook/config."}
+{"operation":"probe-email-verification","reason":"Part of #246: measure link verification send-on-signup enabled with require-email-verification disabled on disposable production child br-summer-credit-ay2vkyhc, then restore inherited Auth and webhook settings."}
