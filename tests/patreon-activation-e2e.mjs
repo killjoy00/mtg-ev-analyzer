@@ -19,6 +19,7 @@ let verificationRequired=false;
 let patreonStatus=disconnected;
 let connectCalls=0;
 let linkCalls=0;
+let eventNames=[];
 
 await page.route('**/leaderboard-config.js',route=>route.fulfill({
   status:200,
@@ -55,7 +56,10 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
     connectCalls++;
     body={url:'https://www.patreon.com/oauth2/authorize?response_type=code&client_id=fixture&redirect_uri=https%3A%2F%2Fexample.invalid%2Fcallback&scope=identity&state='+String(connectCalls).padStart(64,'a')};
   } else if(path==='/v1/events'){
-    body={ok:true,accepted:1};
+    const input=route.request().postDataJSON();
+    const events=Array.isArray(input?.events)?input.events:[input];
+    eventNames.push(...events.map(event=>event?.name).filter(Boolean));
+    body={ok:true,accepted:events.length};
   } else if(path==='/v1/profile/me'){
     body={player:{claimed:true,profile_public:false,display_name:'QA Player'},summary:{games:1},achievements:[],by_set:[],best_environments:[],daily_history:[],recent:[],trend:[]};
   }
@@ -73,7 +77,7 @@ await page.route('https://accounts.google.test/**',route=>route.fulfill({content
 await page.route('https://www.patreon.com/**',route=>route.fulfill({contentType:'text/html',body:'<!doctype html><title>Patreon fixture</title><p>Patreon</p>'}));
 
 async function reset({isSigned=false,status=disconnected,verify=false}={}){
-  signed=isSigned;verificationRequired=verify;patreonStatus=status;connectCalls=0;linkCalls=0;
+  signed=isSigned;verificationRequired=verify;patreonStatus=status;connectCalls=0;linkCalls=0;eventNames=[];
   await page.goto(base+'/leaderboard-config.js');
   await page.evaluate(()=>{sessionStorage.clear();localStorage.clear();});
 }
@@ -99,9 +103,13 @@ try {
   await page.waitForURL(/https:\/\/www\.patreon\.com\/oauth2\/authorize/);
   assert.equal(connectCalls,1);
   assert.ok(linkCalls>0);
+  assert.ok(eventNames.includes('patreon_activation_started'));
+  assert.ok(eventNames.includes('patreon_activation_oauth_started'));
   patreonStatus=elite;
   await page.goto(base+'/?patreon=connected');
   await page.getByText('Elite is active.',{exact:true}).waitFor();
+  await page.waitForTimeout(250);
+  assert.ok(eventNames.includes('patreon_activation_succeeded'));
   assert.equal(await page.getByRole('link',{name:'Choose your sets',exact:true}).count(),1);
   assert.equal(await page.getByRole('link',{name:'Start Powered Cube practice',exact:true}).count(),1);
   assert.equal(await page.evaluate(()=>sessionStorage.getItem('pack1-patreon-activation-v1')),null,'terminal success clears activation intent');
