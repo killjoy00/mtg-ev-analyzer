@@ -12,8 +12,15 @@ test('email verification QA acceptance is pinned to a fresh disposable productio
   assert.match(request.branch,/^br-[a-z0-9-]{6,60}$/);
   assert.ok(!['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(request.branch));
   assert.match(request.authBase,/^https:\/\/[a-z0-9-]+\.neonauth\.[a-z0-9.-]+\.neon\.tech\/pack1\/auth$/);
+  assert.match(workflow,/workflow_dispatch:/);
+  assert.match(workflow,/DISPATCH_BRANCH: \$\{\{ inputs\.branch \}\}/);
+  assert.match(workflow,/DISPATCH_AUTH_BASE: \$\{\{ inputs\.authBase \}\}/);
+  assert.match(workflow,/DISPATCH_REASON: \$\{\{ inputs\.reason \}\}/);
+  assert.match(workflow,/GITHUB_EVENT_NAME==='workflow_dispatch'/);
   assert.match(workflow,/\['authBase','branch','operation','reason'\]/);
+  assert.match(workflow,/AUTH_VERIFICATION_QA_REQUEST_PATH=/);
   assert.match(workflow,/QA verification must not target production or development/);
+  assert.match(source,/AUTH_VERIFICATION_QA_REQUEST_PATH/);
   assert.match(source,/const BRANCH=String\(REQUEST\.branch\|\|''\)/);
   assert.match(source,/const AUTH_BASE=String\(REQUEST\.authBase\|\|''\)/);
   assert.match(source,/\/\^br-\[a-z0-9-\]\{6,60\}\$\/\.test\(BRANCH\)/);
@@ -54,6 +61,7 @@ test('email verification QA acceptance is pinned to a fresh disposable productio
 test('QA verification workflow uses the v2 runner and remains main-only',()=>{
   const workflow=fs.readFileSync(new URL('../.github/workflows/auth-verification-qa.yml',import.meta.url),'utf8');
   assert.match(workflow,/branches: \[main\]/);
+  assert.match(workflow,/workflow_dispatch:/);
   assert.match(workflow,/auth-verification-qa-request\.json/);
   assert.match(workflow,/scripts\/auth-verification-qa-acceptance-v2\.mjs/);
   assert.doesNotMatch(workflow,/deploy-production|secure-auth-release|PROD_BRANCH/);
