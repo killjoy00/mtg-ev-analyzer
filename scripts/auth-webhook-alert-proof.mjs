@@ -40,17 +40,18 @@ async function cloudflareAccountId(){
   return id;
 }
 async function serviceEvents(accountId,service,from,to){
+  const filters=service?[{key:'$metadata.service',operation:'eq',type:'string',value:service}]:[];
   const body=await cfJson('/accounts/'+accountId+'/workers/observability/telemetry/query',{
     method:'POST',
     body:JSON.stringify({
       queryId:'pack1-authhook-service-proof',
       timeframe:{from,to},
       dry:true,
-      limit:200,
+      limit:500,
       parameters:{
         datasets:['cloudflare-workers'],
         filterCombination:'and',
-        filters:[{key:'$metadata.service',operation:'eq',type:'string',value:service}],
+        filters,
         view:'events',
       },
     }),
@@ -58,33 +59,50 @@ async function serviceEvents(accountId,service,from,to){
   const rows=body?.result?.events?.events;
   return Array.isArray(rows)?rows:[];
 }
+function safeEventShape(row){
+  const metadata=row?.$metadata&&typeof row.$metadata==='object'?row.$metadata:{};
+  return {
+    timestamp:typeof row?.timestamp==='number'?row.timestamp:null,
+    service:typeof metadata.service==='string'?metadata.service:null,
+    type:typeof metadata.type==='string'?metadata.type:null,
+    level:typeof metadata.level==='string'?metadata.level:null,
+    metadata_keys:Object.keys(metadata).filter(key=>/^[A-Za-z0-9_.-]{1,64}$/.test(key)).sort().slice(0,40),
+  };
+}
 async function proveProductionService(){
   const accountId=await cloudflareAccountId();
   const started=Date.now();
   const health=await fetch(PROD_HEALTH,{redirect:'error',signal:AbortSignal.timeout(15000)});
   if(!health.ok)throw Error('Production authhook health probe failed with HTTP '+health.status+'.');
-  for(let attempt=0;attempt<36;attempt++){
+
+  for(let attempt=0;attempt<24;attempt++){
     if(attempt)await sleep(5000);
     const now=Date.now();
-    const rows=await serviceEvents(accountId,PROD_SERVICE,started-60000,now);
-    const hits=rows.filter(row=>
-      row?.$metadata?.service===PROD_SERVICE &&
-      Number.isFinite(Number(row?.timestamp)) &&
-      Number(row.timestamp)>=started-5000
-    );
-    if(hits.length){
-      const sample=hits.at(-1);
-      console.log('PRODUCTION_SERVICE_PROOF '+JSON.stringify({
+    const rows=await serviceEvents(accountId,null,started-60000,now);
+    const recent=rows.filter(row=>Number.isFinite(Number(row?.timestamp))&&Number(row.timestamp)>=started-5000);
+    if(recent.length){
+      const services=[...new Set(recent.map(row=>row?.$metadata?.service).filter(value=>typeof value==='string'&&value.length<=128))].sort();
+      const shapes=[];
+      for(const row of recent.slice(-20))shapes.push(safeEventShape(row));
+      console.log('PRODUCTION_SERVICE_DIAGNOSTIC '+JSON.stringify({
         health_status:health.status,
-        service:PROD_SERVICE,
-        matching_events:hits.length,
-        sample_type:typeof sample?.$metadata?.type==='string'?sample.$metadata.type:null,
-        sample_level:typeof sample?.$metadata?.level==='string'?sample.$metadata.level:null,
+        recent_events:recent.length,
+        services,
+        shapes,
       }));
-      return;
+      const hits=recent.filter(row=>row?.$metadata?.service===PROD_SERVICE);
+      if(hits.length){
+        console.log('PRODUCTION_SERVICE_PROOF '+JSON.stringify({
+          health_status:health.status,
+          service:PROD_SERVICE,
+          matching_events:hits.length,
+        }));
+        return;
+      }
+      throw Error('Retained production traffic exists, but none uses the expected pack1-authhook service value.');
     }
   }
-  throw Error('No retained production authhook event appeared for known post-probe traffic.');
+  throw Error('No retained cloudflare-workers events appeared after the known production health request.');
 }
 
 function neonBin(){
