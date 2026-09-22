@@ -109,7 +109,7 @@ async function deploy(target,{forceFailure=false,forceRetryAfterSend=false}={}) 
     compatibility_flags:['nodejs_compat'],
     workers_dev:true,
     preview_urls:false,
-    observability:{enabled:false},
+    observability:{enabled:target==='production'},
     durable_objects:{bindings:[{name:'RECOVERY_DEDUPE',class_name:'RecoveryEventDedupe'}]},
     migrations:[{tag:'v1',new_sqlite_classes:['RecoveryEventDedupe']}],
     vars:{

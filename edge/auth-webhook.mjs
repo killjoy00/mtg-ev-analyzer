@@ -238,7 +238,7 @@ export async function authWebhook(request,env) {
   if(!event)return new Response(null,{status:400});
 
   const deliveryAttempt=request.headers.get('x-neon-delivery-attempt');
-  if(env.PACK1_FORCE_DELIVERY_FAILURE==='1') {
+  if(env.PACK1_AUTH_ENV==='qa'&&env.PACK1_FORCE_DELIVERY_FAILURE==='1') {
     const details={status:'forced_failure',verify_ms:verifyMs,total_ms:Date.now()-started};
     logTiming(env,deliveryAttempt,details);
     await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
@@ -265,7 +265,7 @@ export async function authWebhook(request,env) {
   const details={status:'sent_or_duplicate',duplicate:Boolean(deliveryResult?.duplicate),verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
   logTiming(env,deliveryAttempt,details);
   await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
-  if(env.PACK1_FORCE_RETRY_AFTER_SEND==='1')return new Response(null,{status:503});
+  if(env.PACK1_AUTH_ENV==='qa'&&env.PACK1_FORCE_RETRY_AFTER_SEND==='1')return new Response(null,{status:503});
   return new Response(null,{status:204});
 }
 
