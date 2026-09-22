@@ -4,10 +4,10 @@ import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 
 const PROJECT='patient-shadow-91417882';
-const BRANCH='br-long-bar-ayqfnpn4';
+const BRANCH='br-floral-truth-ayt6qqq9';
 const PROD_BRANCH='br-orange-feather-ayps8kep';
 const DEV_BRANCH='br-twilight-hill-ayffyd2b';
-const AUTH_BASE='https://ep-shy-butterfly-aygy0fuj.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const AUTH_BASE='https://ep-damp-tooth-aywz0vw6.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const PROD_WEBHOOK='https://pack1-authhook.killjoy00.workers.dev/webhook';
 const WORKER='pack1-authverify-qa-temp';
 
@@ -166,10 +166,85 @@ async function waitVerificationDelivery(base){
   for(let attempt=0;attempt<40;attempt+=1){
     const telemetry=await workerTelemetry(base);
     const entries=Array.isArray(telemetry?.entries)?telemetry.entries:[];
-    if(entries.some(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='email-verification'&&entry.qa_auto_verified===true))return entries;
+    if(entries.some(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='email-verification'))return entries;
     await sleep(500);
   }
-  throw Error('Successful verification delivery/redemption telemetry was not observed.');
+  throw Error('Successful verification delivery telemetry was not observed.');
+}
+async function resend(pathname){
+  const response=await fetch('https://api.resend.com'+pathname,{
+    headers:{authorization:'Bearer '+process.env.PACK1_AUTH_RESEND_API_KEY},
+    redirect:'error',
+    signal:AbortSignal.timeout(10000),
+  });
+  assert(response.ok,'Resend QA evidence lookup failed.');
+  return response.json();
+}
+function verificationEmailIds(body){
+  const rows=Array.isArray(body?.data)?body.data:[];
+  return new Set(rows.filter(row=>
+    row?.subject==='Verify Your Email - Pack One QA'
+    && Array.isArray(row?.to)
+    && row.to.includes('delivered@resend.dev')
+  ).map(row=>row.id).filter(Boolean));
+}
+function extractDeliveredVerificationLink(email){
+  const source=typeof email?.text==='string'?email.text:'';
+  const urls=source.match(/https:\/\/[^\s<>"']+/g)||[];
+  const base=new URL(AUTH_BASE);
+  const basePath=base.pathname.endsWith('/')?base.pathname:base.pathname+'/';
+  for(const raw of urls){
+    try{
+      const url=new URL(raw.replace(/&amp;/g,'&'));
+      if(url.origin!==base.origin||!url.pathname.startsWith(basePath)||!url.pathname.endsWith('/verify-email'))continue;
+      if(!url.searchParams.get('token'))continue;
+      return url.href;
+    }catch{}
+  }
+  return null;
+}
+async function waitDeliveredVerificationLink(beforeIds){
+  for(let attempt=0;attempt<40;attempt+=1){
+    const listed=await resend('/emails?limit=50');
+    const rows=Array.isArray(listed?.data)?listed.data:[];
+    const row=rows.find(item=>
+      !beforeIds.has(item?.id)
+      && item?.subject==='Verify Your Email - Pack One QA'
+      && Array.isArray(item?.to)
+      && item.to.includes('delivered@resend.dev')
+    );
+    if(row?.id){
+      const detail=await resend('/emails/'+encodeURIComponent(row.id));
+      const link=extractDeliveredVerificationLink(detail);
+      if(link)return link;
+    }
+    await sleep(750);
+  }
+  throw Error('Delivered verification email link was not found.');
+}
+async function clickDeliveredVerification(link){
+  const response=await fetch(link,{redirect:'manual',signal:AbortSignal.timeout(15000)});
+  if(response.status>=300&&response.status<400){
+    const location=response.headers.get('location');
+    assert(location,'Verification redirect location is missing.');
+    const redirectUrl=new URL(location,AUTH_BASE);
+    const error=redirectUrl.searchParams.get('error');
+    assert(!error,'Delivered verification link was rejected with '+String(error||'unknown')+'.');
+    console.log('AUTH_VERIFY_QA_LINK_CLICK '+JSON.stringify({
+      status:response.status,
+      redirect_origin:redirectUrl.origin,
+      redirect_path:redirectUrl.pathname,
+      error:null,
+    }));
+    return;
+  }
+  if(response.ok){
+    let body=null;try{body=await response.json();}catch{}
+    assert(body?.status===true,'Delivered verification link returned an unexpected success response.');
+    console.log('AUTH_VERIFY_QA_LINK_CLICK '+JSON.stringify({status:response.status,redirect_origin:null,redirect_path:null,error:null}));
+    return;
+  }
+  throw Error('Delivered verification link returned HTTP '+response.status+'.');
 }
 async function waitHealth(base,commit){
   for(let attempt=0;attempt<80;attempt+=1){
@@ -233,7 +308,7 @@ async function main(){
       PACK1_RELEASE_COMMIT:commit,
       PACK1_FORCE_DELIVERY_FAILURE:'0',
       PACK1_FORCE_RETRY_AFTER_SEND:'0',
-      PACK1_QA_AUTO_VERIFY_AFTER_SEND:'1',
+      PACK1_QA_AUTO_VERIFY_AFTER_SEND:'0',
     },
   }),{mode:0o600});
 
@@ -278,6 +353,7 @@ async function main(){
     }));
 
     const email='delivered@resend.dev';
+    const beforeVerificationEmails=verificationEmailIds(await resend('/emails?limit=50'));
     const password='P1-'+randomBytes(24).toString('base64url')+'!';
     console.log('::add-mask::'+password);
     const signup=await authPost('/sign-up/email',{name:'Pack One Verification QA',email,password});
@@ -287,6 +363,8 @@ async function main(){
     console.log('AUTH_VERIFY_QA_SIGNUP '+JSON.stringify({status:signup.status,user_present:true,session_present:false}));
 
     await waitVerificationDelivery(workerBase);
+    const deliveredLink=await waitDeliveredVerificationLink(beforeVerificationEmails);
+    await clickDeliveredVerification(deliveredLink);
     const signin=await waitSignin(email,password);
     console.log('AUTH_VERIFY_QA_SIGNIN_AFTER '+JSON.stringify({
       status:signin.status,
@@ -301,7 +379,7 @@ async function main(){
 
     const telemetry=await workerTelemetry(workerBase);
     const entries=Array.isArray(telemetry?.entries)?telemetry.entries:[];
-    assert(entries.some(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='email-verification'&&entry.qa_auto_verified===true),'Successful verification delivery/redemption telemetry was not observed.');
+    assert(entries.some(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='email-verification'),'Successful verification delivery telemetry was not observed.');
     assert(entries.some(entry=>entry.status==='sent_or_duplicate'&&entry.link_type==='forget-password'),'Successful recovery delivery telemetry was not observed.');
     console.log('AUTH_VERIFY_QA_TELEMETRY '+JSON.stringify(entries.map(entry=>({
       status:entry.status,event_type:entry.event_type||null,link_type:entry.link_type||null,
