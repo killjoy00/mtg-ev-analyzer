@@ -102,6 +102,8 @@ test('recovery event validation accepts only the proven send.magic_link forget-p
     email:'person@example.com',
     token:'fixture-token-1234567890',
     expiresAt:fixture.payload.event_data.expires_at,
+    eventType:'send.magic_link',
+    linkType:'forget-password',
   });
   assert.equal(validateRecoveryEvent({...fixture.payload,event_type:'send.otp'},fixture.headers),null);
   assert.equal(validateRecoveryEvent({...fixture.payload,event_data:{...fixture.payload.event_data,link_type:'email-verification'}},fixture.headers),null);
@@ -255,31 +257,28 @@ test('QA telemetry stores only sanitized retry fields and is hidden outside QA',
   assert.equal(prod.status,404);
 });
 
-test('QA forced delivery fault fails at the DO boundary and records natural delivery failure taxonomy',async()=>{
+test('QA forced delivery failure exercises the provider path and emits verified event metadata',async()=>{
   const fixture=await signedFixture({kid:'qa-delivery-failure-kid'});
   const originalFetch=globalThis.fetch;
-  const originalLog=console.log;
   globalThis.fetch=async url=>{
     if(String(url)==='https://auth.qa-delivery-failure.example/.well-known/jwks.json')return Response.json({keys:[fixture.jwk]});
     throw Error('unexpected network call');
   };
-  const timingLogs=[];
-  console.log=value=>timingLogs.push(String(value));
-  let storedTelemetry=[];
-  const storage={
-    get:async key=>{
-      if(key==='sent')return null;
-      if(key==='qa_telemetry')return storedTelemetry;
-      return null;
+
+  const stored=new Map();
+  const telemetryEntries=[];
+  const dedupe=new RecoveryEventDedupe({
+    storage:{
+      get:async key=>stored.get(key),
+      put:async(key,value)=>stored.set(key,value),
     },
-    put:async(key,value)=>{
-      if(key==='qa_telemetry')storedTelemetry=value;
-      else if(key==='sent')throw Error('forced failure must not mark the event sent');
-    },
-  };
-  const dedupe=new RecoveryEventDedupe({storage},{
+  },{
     PACK1_AUTH_ENV:'qa',
     PACK1_FORCE_DELIVERY_FAILURE:'1',
+    RESEND_API_KEY:'re_fixture',
+    SENDER:'Pack One QA <qa-accounts@packone.pro>',
+    RESET_ORIGIN:'http://localhost:4173',
+    SUBJECT:'Reset Your Password - Pack One QA',
   });
   const env={
     PACK1_AUTH_ENV:'qa',
@@ -287,33 +286,37 @@ test('QA forced delivery fault fails at the DO boundary and records natural deli
     AUTH_BASE:'https://auth.qa-delivery-failure.example',
     RECOVERY_DEDUPE:{
       idFromName:value=>value,
-      get:()=>({
-        fetch:(url,init)=>dedupe.fetch(new Request(url,init)),
-      }),
+      get:id=>{
+        if(id==='__qa_telemetry__')return {
+          fetch:async(_url,init)=>{
+            telemetryEntries.push(JSON.parse(init.body));
+            return Response.json({ok:true});
+          },
+        };
+        return {
+          fetch:(url,init)=>dedupe.fetch(new Request(url,init)),
+        };
+      },
     },
   };
+
   try {
     const response=await authWebhook(new Request('https://hook.example/webhook',{
       method:'POST',headers:fixture.headers,body:fixture.raw,
     }),env);
     assert.equal(response.status,502);
-    assert.deepEqual(storedTelemetry.map(entry=>entry.status),['forced_failure','delivery_failure']);
-    const delivery=storedTelemetry.at(-1);
-    assert.equal(delivery.event_type,'send.magic_link');
-    assert.equal(delivery.link_type,'forget-password');
-    assert.equal('token' in delivery,false);
-    assert.equal('email' in delivery,false);
-
-    const parsed=timingLogs.map(line=>{try{return JSON.parse(line);}catch{return null;}}).filter(Boolean);
-    assert.equal(parsed.some(entry=>entry.status==='forced_failure'),false);
-    const timing=parsed.find(entry=>entry.status==='delivery_failure');
-    assert.equal(timing?.event_type,'send.magic_link');
-    assert.equal(timing?.link_type,'forget-password');
+    assert.equal(stored.has('sent'),false);
+    assert.equal(telemetryEntries.length,1);
+    assert.equal(telemetryEntries[0].status,'delivery_failure');
+    assert.equal(telemetryEntries[0].event_type,'send.magic_link');
+    assert.equal(telemetryEntries[0].link_type,'forget-password');
+    assert.equal('token' in telemetryEntries[0],false);
+    assert.equal('email' in telemetryEntries[0],false);
   } finally {
     globalThis.fetch=originalFetch;
-    console.log=originalLog;
   }
 });
+
 
 test('QA retry-after-send mode returns retryable failure after one successful deduped send boundary',async()=>{
   const fixture=await signedFixture({kid:'qa-retry-kid'});

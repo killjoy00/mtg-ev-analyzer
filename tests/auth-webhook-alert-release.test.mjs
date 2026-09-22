@@ -12,7 +12,11 @@ test('production authhook alert polls retained logs and routes failures to assig
   assert.match(workflow,/node scripts\/auth-webhook-alert\.mjs alert/);
   assert.match(source,/workers\/observability\/telemetry\/query/);
   assert.match(source,/datasets:\['cloudflare-workers'\]/);
+  assert.match(source,/view:'events'/);
+  assert.match(source,/key:'type'.*value:'pack1_authhook_timing'/s);
+  assert.match(source,/key:'status'/);
   assert.match(source,/PACK1_AUTHHOOK_ALERT_SERVICE/);
+  assert.doesNotMatch(source,/key:'\$metadata\.message'.*pack1_authhook_timing/s);
   assert.match(source,/user\/tokens\/verify/);
   assert.match(source,/observability telemetry query/);
   assert.match(source,/HTTP '\+response\.status/);

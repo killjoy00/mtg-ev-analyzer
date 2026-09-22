@@ -91,7 +91,7 @@ export function validateRecoveryEvent(payload,headers) {
   const expiresAt=safeString(payload?.event_data?.expires_at,128);
   const email=payload?.user?.email;
   if(!token||!expiresAt||!validEmail(email))return null;
-  return {eventId,email,token,expiresAt};
+  return {eventId,email,token,expiresAt,eventType:payload.event_type,linkType:payload.event_data.link_type};
 }
 
 export function renderRecoveryEmail({resetOrigin,token,expiresAt}) {
@@ -162,10 +162,12 @@ export class RecoveryEventDedupe {
     let event;
     try {event=await request.json();} catch {return responseJson({ok:false},400);}
     if(!validEventId(event?.eventId)||!validEmail(event?.email)||!safeString(event?.token,512)||!safeString(event?.expiresAt,128))return responseJson({ok:false},400);
-    if(this.env.PACK1_AUTH_ENV==='qa'&&this.env.PACK1_FORCE_DELIVERY_FAILURE==='1')return responseJson({ok:false,forced:true},502);
 
     try {
-      const result=await sendRecoveryEmail(this.env,event);
+      const providerFetch=this.env.PACK1_AUTH_ENV==='qa'&&this.env.PACK1_FORCE_DELIVERY_FAILURE==='1'
+        ? async()=>new Response(null,{status:503})
+        : fetch;
+      const result=await sendRecoveryEmail(this.env,event,providerFetch);
       await this.storage.put('sent',{messageId:result.id,sentAt:new Date().toISOString()});
       return responseJson({ok:true,duplicate:false});
     } catch {
@@ -259,17 +261,7 @@ export async function authWebhook(request,env) {
   });
   const deliveryMs=Date.now()-deliveryStarted;
   if(!result.ok) {
-    if(env.PACK1_AUTH_ENV==='qa'&&env.PACK1_FORCE_DELIVERY_FAILURE==='1') {
-      await recordQaTelemetry(env,event.eventId,deliveryAttempt,{status:'forced_failure',verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started});
-    }
-    const details={
-      status:'delivery_failure',
-      event_type:safeString(payload?.event_type,64),
-      link_type:safeString(payload?.event_data?.link_type,64),
-      verify_ms:verifyMs,
-      delivery_ms:deliveryMs,
-      total_ms:Date.now()-started,
-    };
+    const details={status:'delivery_failure',event_type:event.eventType,link_type:event.linkType,verify_ms:verifyMs,delivery_ms:deliveryMs,total_ms:Date.now()-started};
     logTiming(env,deliveryAttempt,details);
     await recordQaTelemetry(env,event.eventId,deliveryAttempt,details);
     return new Response(null,{status:502});
