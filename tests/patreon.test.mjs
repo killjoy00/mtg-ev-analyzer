@@ -90,7 +90,7 @@ test('Patreon callback maps provider identity uniqueness to a safe conflict resu
     const query=async(sql)=>{
       if(sql.startsWith('UPDATE provider_oauth_states SET consumed_at'))return {rows:[{auth_user_id:'11111111-1111-4111-8111-111111111111'}]};
       if(sql.startsWith('SELECT provider_user_id'))return {rows:[]};
-      if(sql.startsWith('WITH identity_allowed')){const error=Error('duplicate');error.code='23505';throw error;}
+      if(sql.startsWith('WITH identity_allowed')){const error=Error('duplicate');error.pgCode='23505';throw error;}
       if(sql.startsWith('DELETE FROM provider_oauth_states'))return {rows:[]};
       throw Error('Unexpected query: '+sql.slice(0,60));
     };
