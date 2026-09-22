@@ -1,6 +1,7 @@
 import { escapeHtml as esc } from './html.mjs';
 import { completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, signInAccount, signOutAccount, signUpAccount, startGoogleSignIn } from './growth-api.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
+import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs';
 import { trackEvent as event } from './retention-events.mjs';
 
 let currentAccount = null;
@@ -20,6 +21,11 @@ function syncAccountNav(signedIn=Boolean(currentAccount?.user)) {
   if(nav)nav.textContent=signedIn?'My Pack One':'Sign in';
 }
 export function accountSignedIn() {return Boolean(currentAccount?.user);}
+export { hasPatreonActivationIntent };
+export async function renderPatreonActivation(options={}) {
+  const source=options.source||'welcome_note';
+  return renderPatreonActivationPage({...options,source,onSignedOut:()=>renderAccount({intent:'patreon-activate',source})});
+}
 
 function formMarkup(kind) {
   return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="email"></label>${kind==='signup'?'<label>Display name<input required name="name" minlength="2" maxlength="24" autocomplete="nickname"></label>':''}<label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p class="form-error" aria-live="polite"></p></form>`;
@@ -112,6 +118,8 @@ document.addEventListener('pack1:profile-updated',async eventObject=>{
 });
 
 export async function renderAccount({ validateDailyRunId = null, intent = null, source = 'account', notice = '', mode = null } = {}) {
+  if(!intent&&hasPatreonActivationIntent())intent='patreon-activate';
+  if(intent==='patreon-activate')rememberPatreonActivation(source);
   if(validateDailyRunId) pendingDailyRunValidation=validateDailyRunId;
   document.body.classList.remove('is-game');
   const app=document.querySelector('#app'); if(!app) return;
@@ -148,6 +156,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       catch(error) {renderAccountError(app,error,()=>void (async()=>{await returnToValidatedDaily(validationRunId,linked,source);})());}
       return;
     }
+    if(intent==='patreon-activate') { await renderPatreonActivation({source}); return; }
     if(intent==='elite') { handoffToPatreon(source); return; }
     const profiles=await import('./profile-product.mjs?v=6');
     profiles.installProfileProductLayer();
@@ -158,13 +167,16 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
 
   const validatingDaily=Boolean(pendingDailyRunValidation);
   const upgradingElite=intent==='elite';
-  const authMode=mode==='signup'||mode==='signin'?mode:(validatingDaily||upgradingElite?'signup':'signin');
-  const heading=validatingDaily?'Add your score to the leaderboard.':upgradingElite?'Unlock Elite practice.':authMode==='signup'?'Create Account':'Sign In';
+  const activatingPatreon=intent==='patreon-activate';
+  const authMode=mode==='signup'||mode==='signin'?mode:(validatingDaily||upgradingElite||activatingPatreon?'signup':'signin');
+  const heading=validatingDaily?'Add your score to the leaderboard.':activatingPatreon?'Activate Pack One Elite':upgradingElite?'Unlock Elite practice.':authMode==='signup'?'Create Account':'Sign In';
   const intro=validatingDaily
     ? 'Sign in or create a free account to validate this Daily score and add it to today’s leaderboard.'
-    : upgradingElite
-      ? 'Create or sign in to your free Pack One account first. Then we’ll send you to Patreon to choose Elite.'
-      : '';
+    : activatingPatreon
+      ? 'Sign in or create your free Pack One account. Then authorize Patreon so Pack One can verify and activate Elite.'
+      : upgradingElite
+        ? 'Create or sign in to your free Pack One account first. Then we’ll send you to Patreon to choose Elite.'
+        : '';
   const google=firstPartyAuthEnabled()
     ? '<div class="account-social"><button class="button primary" id="account-google" type="button">Sign in with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p></div>'
     : '';
@@ -172,7 +184,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     ? 'Already have an account? <button class="text-button" id="account-mode-toggle" type="button">Sign in</button>'
     : 'New to Pack One? <button class="text-button" id="account-mode-toggle" type="button">Create account</button>';
   const accountNote=authMode==='signin'?'<small>A free account saves your record and enables leaderboard participation.</small>':'';
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account Access</p><h1>${heading}</h1>${intro?`<p>${intro}</p>`:''}${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header><div class="account-auth-card">${formMarkup(authMode)}</div>${google}<div class="account-new-user"><p>${toggleCopy}</p>${accountNote}</div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite?'Not now — keep playing':'Keep playing as guest'}</button></div></section>`;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account Access</p><h1>${heading}</h1>${intro?`<p>${intro}</p>`:''}${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header><div class="account-auth-card">${formMarkup(authMode)}</div>${google}<div class="account-new-user"><p>${toggleCopy}</p>${accountNote}</div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite&&!activatingPatreon?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite||activatingPatreon?'Not now — keep playing':'Keep playing as guest'}</button></div></section>`;
 
   document.querySelector('#account-mode-toggle')?.addEventListener('click',()=>void renderAccount({
     validateDailyRunId:pendingDailyRunValidation,
@@ -197,8 +209,8 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     }
   });
   document.querySelector('#account-forgot')?.addEventListener('click',()=>void renderForgotPassword());
-  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;await (await import('./profile-product.mjs?v=6')).renderMyProfile();});
-  document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;document.querySelector('#brand-home')?.click();});
+  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=6')).renderMyProfile();});
+  document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();document.querySelector('#brand-home')?.click();});
 
   const signup=document.querySelector('#account-signup');
   signup?.addEventListener('submit',async e=>{
@@ -218,6 +230,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       }
       const claimed=await claimCurrentSession();
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
+      if(activatingPatreon){await renderPatreonActivation({source});return;}
       if(upgradingElite){handoffToPatreon(source);return;}
       await renderAccount({intent,source});
     } catch(error) {
@@ -239,6 +252,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       const claimed=await claimCurrentSession();
       event('auth_sign_in',{source});
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
+      if(activatingPatreon){await renderPatreonActivation({source});return;}
       if(upgradingElite){handoffToPatreon(source);return;}
       await renderAccount({intent,source});
     } catch(error) {
