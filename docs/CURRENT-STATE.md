@@ -97,4 +97,28 @@ Public Patreon activation PR162 passed development 35462022892 and production 35
 
 PR163 passed full unit 35462928388, browser 35462928378 and isolated database 35462928376 gates. Its intercepted browser tests cover disabled delivery, Supporter/Elite suppression, stale/unknown/failed membership handling, nonmembers, guests and account changes. Existing ad slots start hidden in HTML. The published `ad-config.js` remains disabled, and the live editorial preview URL shows no ad slot. Google ads remain disabled. TCGplayer affiliate routing is active; this document does not assert any commission amount.
 
+## Dormant Daily-home advertising preparation
+
+This release restores exactly one static `data-ad-slot="home"` after `#app`
+inside `.app-shell`. It is eligible only while the Daily home is rendered,
+can fill at most once per full page load, is cleared permanently for that page
+load when an in-place view leaves the Daily home, and is never eligible in
+gameplay or result views. Editorial `article-top` remains a separate explicit
+mapping and is still unconfigured.
+
+The public AdSense client is `ca-pub-1217971050094766` and the dormant home unit
+is `1543495960`; `ad-config.js` remains `enabled:false`. This is wiring for a
+future reviewed activation, not authorization to serve ads. Google approval,
+applicable consent/privacy work and explicit owner authorization remain required.
+
+Supporter ($3) and Elite ($7) ad-free behavior continues to use exact campaign,
+tier and provider state IDs rather than payment amount. Active, still-entitled
+former, free-trial and gifted qualifying memberships suppress ads; declined and
+refunded/fraud/deleted states retain their existing non-ad-free result. A
+signed-out Patreon member is a guest. Pack One-originated account/Patreon changes
+write a nonce-only browser signal that clears an open ad across tabs and never
+refills it on that page load. Direct patreon.com changes and backend
+webhook/scheduled-sync changes do not emit that signal, so an already-open tab
+can retain an ad until reload.
+
 [Activation and final deployment evidence](../results/release-2026-09-19/patreon-activation.json), [handoff closeout](reports/HANDOFF-CLOSEOUT-2026-09-19.md), [detailed model/scoring report](reports/MODEL-AND-SCORING-2026-09-19.md), and [Traditional v4 production release closeout](reports/TRADITIONAL-V4-RELEASE-2026-09-21.md). Historical release snapshots are retained with their original as-of state.
