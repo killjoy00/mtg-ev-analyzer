@@ -122,10 +122,17 @@ try{
     assert.equal(domOrder,true,'continuation precedes analysis and pack review in DOM order');
     if(expectedGrade.historicalMatch){
       assert.match(await page.locator('.run-feedback-copy').innerText(),/You matched the trophy drafter\./);
-      assert.equal(await page.locator('.run-trophy-thumb').count(),0,'trophy matches do not repeat a card thumbnail');
+      assert.equal(await page.locator('.run-reveal-pick').count(),1,'trophy match still shows the shared card once');
+      assert.match(await page.locator('.run-reveal-picks').innerText(),/Trophy and Your Pick/);
+      assert.equal(await page.locator('.run-reveal-pick.is-shared [data-zoom]').getAttribute('data-zoom'),selected,'shared reveal card is the player and trophy pick');
       assert.equal(await page.locator('.run-feedback-copy p').count(),0,'trophy match needs no filler sentence');
     }else{
-      assert.equal(await page.locator('.run-trophy-thumb').count(),1,'non-match shows one compact trophy thumbnail');
+      assert.equal(await page.locator('.run-reveal-pick').count(),2,'non-match pairs the player and trophy cards');
+      const revealText=await page.locator('.run-reveal-picks').innerText();
+      assert.match(revealText,/Your Pick/);
+      assert.match(revealText,/Trophy Pick/);
+      assert.equal(await page.locator('.run-reveal-pick.is-mine [data-zoom]').getAttribute('data-zoom'),selected,'player reveal card matches the locked pick');
+      assert.equal(await page.locator('.run-reveal-pick.is-trophy [data-zoom]').getAttribute('data-zoom'),p.historical_pick_id,'trophy reveal card matches the historical pick');
       assert.equal(await page.locator('.run-feedback-copy p').count(),1,'compact non-match has at most one explanatory sentence');
       const chosenName=p.candidates.find(c=>c.id===selected)?.name;
       const compactCopy=await page.locator('.run-feedback-copy p').innerText();
@@ -137,6 +144,8 @@ try{
       const wordCount=(await page.locator('.run-feedback').innerText()).trim().split(/\s+/).length;
       assert.ok(wordCount<45,`compact reveal remains short (${wordCount} words)`);
     }
+    const revealCardBox=await page.locator('.run-reveal-pick').first().boundingBox();
+    assert.ok(revealCardBox&&revealCardBox.width>=90,`compact reveal card is visibly larger (${revealCardBox?.width}px)`);
     if(round===0){
       const feedbackBox=await page.locator('.run-feedback').boundingBox();assert.ok(feedbackBox&&feedbackBox.height<280,`compact mobile result stays under 280px (${feedbackBox?.height})`);
       const prefix=`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}`;
