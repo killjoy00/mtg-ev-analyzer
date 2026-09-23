@@ -1,5 +1,6 @@
 import {ACCOUNT_SIGNAL_KEY,hasAccountSession,loadPatreonStatus} from './growth-api.mjs';
 import {onAppRender} from './render-lifecycle.mjs';
+import {tcgplayerAffiliateActive,tcgplayerMagicUrl} from './tcgplayer.mjs';
 
 const SLOT_CONFIG_KEYS=Object.freeze({home:'home','article-top':'articleTop'});
 const sessionPresent=()=>{try{return hasAccountSession();}catch{return false;}};
@@ -18,10 +19,14 @@ export function syncAccountNavigation({doc=document,signedIn=null}={}) {
   if(nav.tagName==='A')nav.setAttribute('href','/?account=1');
 }
 
-export async function advertisingAllowed({enabled,client,game=false,accountToken,checkMembership}) {
-  if(!enabled||!client||game)return false;
+export async function promotionalContentAllowed({active=true,game=false,accountToken,checkMembership}) {
+  if(!active||game)return false;
   if(!accountToken)return true;
   try{return (await checkMembership()).ads_allowed===true;}catch{return false;}
+}
+
+export async function advertisingAllowed({enabled,client,game=false,accountToken,checkMembership}) {
+  return promotionalContentAllowed({active:Boolean(enabled&&client),game,accountToken,checkMembership});
 }
 
 function gameView(doc,location) {
@@ -30,25 +35,43 @@ function gameView(doc,location) {
 }
 
 function clearRows(rows) {
-  rows.forEach(({slot})=>{slot.hidden=true;slot.replaceChildren();});
+  rows.forEach(({slot})=>{
+    slot.hidden=true;
+    slot.replaceChildren();
+    delete slot.dataset.slotContent;
+  });
 }
 
 export async function initializeAds({doc=document,location=globalThis.location,
   cfg=globalThis.PACKONE_ADSENSE||{},accountToken=undefined,
   checkMembership=loadPatreonStatus}={}) {
   const slots=[...doc.querySelectorAll('[data-ad-slot]')];
-  // Hide before asynchronous work. Preview queries cannot bypass the release gate.
-  slots.forEach(slot=>{slot.hidden=true;slot.replaceChildren();});
-  if(!slots.length||cfg.enabled!==true||!cfg.client)return;
+  // Hide before asynchronous work. Preview queries cannot bypass either release gate.
+  slots.forEach(slot=>{slot.hidden=true;slot.replaceChildren();delete slot.dataset.slotContent;});
+  if(!slots.length)return;
 
-  const usable=slots.map(slot=>({slot,placement:slot.dataset.adSlot,id:slotIdForPlacement(cfg,slot.dataset.adSlot)})).filter(row=>row.id);
-  if(!usable.length)return;
+  const googleActive=cfg.enabled===true&&Boolean(cfg.client);
+  // The affiliate unit is a fallback, never a companion placement. Once the
+  // reviewed Google gate is enabled, a broken/missing Google config fails closed
+  // rather than silently restoring affiliate content.
+  const affiliateActive=cfg.enabled!==true&&tcgplayerAffiliateActive();
+  if(!googleActive&&!affiliateActive)return;
+
+  const googleRows=googleActive
+    ? slots.map(slot=>({slot,placement:slot.dataset.adSlot,id:slotIdForPlacement(cfg,slot.dataset.adSlot)})).filter(row=>row.id)
+    : [];
+  const staticRows=googleRows.filter(row=>row.placement!=='home');
+  const homeRows=googleActive
+    ? googleRows.filter(row=>row.placement==='home')
+    : slots.filter(slot=>slot.dataset.adSlot==='home').map(slot=>({slot,placement:'home',id:''}));
+  const activeRows=[...staticRows,...homeRows];
+  if(!activeRows.length)return;
 
   let stopped=false,script=null,unsubscribe=null;
   const suppress=()=>{
     if(stopped)return;
     stopped=true;
-    clearRows(usable);
+    clearRows(activeRows);
     script?.remove();
     unsubscribe?.();
   };
@@ -57,7 +80,7 @@ export async function initializeAds({doc=document,location=globalThis.location,
     if(event.key==='pack1-auth-session-v1'||event.key===ACCOUNT_SIGNAL_KEY||event.key===null)suppress();
   });
 
-  const fill=rows=>{
+  const fillGoogle=rows=>{
     if(stopped||!rows.length)return;
     if(!script){
       script=doc.createElement('script');
@@ -68,21 +91,75 @@ export async function initializeAds({doc=document,location=globalThis.location,
     for(const {slot,id} of rows){
       const ad=doc.createElement('ins');ad.className='adsbygoogle';ad.style.display='block';
       Object.assign(ad.dataset,{adClient:cfg.client,adSlot:id,adFormat:'auto',fullWidthResponsive:'true'});
+      slot.dataset.slotContent='google';
       slot.appendChild(ad);slot.hidden=false;
       (globalThis.adsbygoogle=globalThis.adsbygoogle||[]).push({});
     }
   };
 
-  // Editorial placements keep their existing one-shot load-time behavior.
-  const staticRows=usable.filter(row=>row.placement!=='home');
+  const fillAffiliate=rows=>{
+    if(stopped||!rows.length)return;
+    const href=tcgplayerMagicUrl();
+    if(!href)return;
+    for(const {slot} of rows){
+      const promo=doc.createElement('div');
+      promo.className='tcg-affiliate-promo';
+
+      const link=doc.createElement('a');
+      link.className='tcg-affiliate-link';
+      link.href=href;
+      link.target='_blank';
+      link.rel='sponsored noopener';
+      link.dataset.tcgplayerLink='1';
+      link.dataset.tcgplayerSurface='daily_home_banner';
+      link.setAttribute('aria-label','Shop Magic on TCGplayer (affiliate link)');
+
+      const logoWrap=doc.createElement('span');
+      logoWrap.className='tcg-affiliate-logo-wrap';
+      const logo=doc.createElement('img');
+      logo.className='tcg-affiliate-logo';
+      logo.src='/assets/tcgplayer-logo-primary-stroke.webp';
+      logo.alt='TCGplayer';
+      logo.width=512;
+      logo.height=227;
+      logo.loading='lazy';
+      logo.decoding='async';
+      logoWrap.appendChild(logo);
+
+      const copy=doc.createElement('span');
+      copy.className='tcg-affiliate-copy';
+      const headline=doc.createElement('strong');
+      headline.textContent='Shop Magic on TCGplayer';
+      const detail=doc.createElement('span');
+      detail.textContent='Singles, sealed product, and more';
+      copy.append(headline,detail);
+
+      const cta=doc.createElement('span');
+      cta.className='tcg-affiliate-cta';
+      cta.textContent='Shop TCGplayer →';
+
+      link.append(logoWrap,copy,cta);
+
+      const disclosure=doc.createElement('p');
+      disclosure.className='tcg-affiliate-disclosure';
+      disclosure.textContent='Affiliate link — Pack One may earn a commission from purchases.';
+
+      promo.append(link,disclosure);
+      slot.dataset.slotContent='affiliate';
+      slot.appendChild(promo);
+      slot.hidden=false;
+    }
+  };
+
+  // Editorial placements keep their existing one-shot Google behavior. The
+  // TCGplayer fallback is deliberately Daily-home-only.
   if(staticRows.length){
     const token=accountToken===undefined?(sessionPresent()?'session':null):accountToken;
     const signed=Boolean(token);
     const allowed=await advertisingAllowed({enabled:cfg.enabled,client:cfg.client,game:gameView(doc,location),accountToken:token,checkMembership});
-    if(allowed&&!stopped&&signed===sessionPresent())fill(staticRows);
+    if(allowed&&!stopped&&signed===sessionPresent())fillGoogle(staticRows);
   }
 
-  const homeRows=usable.filter(row=>row.placement==='home');
   if(!homeRows.length)return;
 
   // The Daily home is a positive allowlist. Wait for its first render, evaluate
@@ -104,12 +181,12 @@ export async function initializeAds({doc=document,location=globalThis.location,
     }
     state.seen=true;
     // A successful fill is spent for refill purposes, but its listener stays
-    // alive until the view leaves Daily so the rendered ad can be cleared.
+    // alive until the view leaves Daily so the rendered promotion can be cleared.
     if(state.spent||state.checked||state.checking)return;
     state.checked=true;state.checking=true;
     const token=accountToken===undefined?(sessionPresent()?'session':null):accountToken;
     const signed=Boolean(token);
-    const allowed=await advertisingAllowed({enabled:cfg.enabled,client:cfg.client,game:false,accountToken:token,checkMembership});
+    const allowed=await promotionalContentAllowed({active:true,game:false,accountToken:token,checkMembership});
     state.checking=false;
     if(stopped||state.spent)return;
     if(!doc.querySelector('#app')?.querySelector('[data-daily-home]')){
@@ -119,12 +196,13 @@ export async function initializeAds({doc=document,location=globalThis.location,
       state.spent=true;clearRows(homeRows);stopWatchingHome();return;
     }
     state.spent=true;
-    if(allowed){state.filled=true;fill(homeRows);}
-    else stopWatchingHome();
+    if(allowed){
+      state.filled=true;
+      if(googleActive)fillGoogle(homeRows);else fillAffiliate(homeRows);
+    } else stopWatchingHome();
   };
   unsubscribe=onAppRender(handleHomeRender);
 }
-
 if(typeof document!=='undefined') {
   syncAccountNavigation();
   globalThis.addEventListener?.('packone-account-changed',()=>syncAccountNavigation());
@@ -134,8 +212,12 @@ if(typeof document!=='undefined') {
 }
 
 export const adsReady=typeof document==='undefined'?Promise.resolve():(async()=>{
-  // Static editorial pages need the game's public API endpoints. Disabled ads
-  // neither load this configuration nor request membership or Google scripts.
-  if(globalThis.PACKONE_ADSENSE?.enabled&&!globalThis.PACK1_API)await import('./leaderboard-config.js');
+  // Google editorial delivery and the signed-in Daily-home affiliate fallback
+  // need the public API configuration. Guests still render the affiliate unit
+  // without a membership request.
+  const homeAffiliate=Boolean(document.querySelector('[data-ad-slot="home"]'))
+    &&globalThis.PACKONE_ADSENSE?.enabled!==true
+    &&tcgplayerAffiliateActive();
+  if((globalThis.PACKONE_ADSENSE?.enabled||homeAffiliate)&&!globalThis.PACK1_API)await import('./leaderboard-config.js');
   await initializeAds();
 })();
