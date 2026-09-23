@@ -1,7 +1,8 @@
 {
-  "operation": "deploy",
-  "request_id": "neon-schedulers-prod-20260923",
-  "reason": "Promote the development-tested Neon scheduler handlers to production before trigger activation.",
-  "target": "production",
-  "commit": "4029202c96bebe893419efa91dd0eeea3407d285"
+  "operation": "production-browser",
+  "request_id": "daily-pacific-after-inactivity-20260923-v3",
+  "reason": "Collect two Neon-idle-confirmed after-inactivity startup samples for each Pack One Daily after the scheduler-aware production rollout.",
+  "first_environment": "all",
+  "measurement_mode": true,
+  "measurement_samples": 2
 }
