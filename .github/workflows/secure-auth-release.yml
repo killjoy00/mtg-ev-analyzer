@@ -69,7 +69,7 @@ jobs:
           [[ "$PACK1_DELETION_ADMIN_EMAIL" == *@* ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is missing or malformed.'; exit 1; }
           test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16 || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is missing or too short.'; exit 1; }
           [[ "$PACK1_AUTH_RESEND_API_KEY" == re_* ]] || { echo '::error::PACK1_AUTH_RESEND_API_KEY is missing or malformed.'; exit 1; }
-          [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
+          [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
 
       - name: Build exact Neon function revision
         env:
