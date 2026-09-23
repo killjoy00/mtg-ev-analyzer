@@ -46,6 +46,9 @@ export function rolloutDispatch(request) {
   } else if(operation==='daily-generation') {
     if(!['development','production'].includes(target))throw Error('Invalid Daily generation target.');
     workflow='daily-generation.yml';inputs={target};extra=['target'];
+  } else if(operation==='daily-calendar-migration') {
+    if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid Daily calendar migration request.');
+    workflow='daily-calendar-migration.yml';inputs={commit,target};extra=['commit','target'];
   } else if(operation==='browser') {
     workflow='e2e.yml';
   } else if(operation==='deploy') {
