@@ -13,7 +13,7 @@ function authId(value) {
 }
 
 function configuredKey(env=process.env) {
-  const key=String(env.PACK1_ACCOUNT_DELETE_RESEND_API_KEY||'').trim();
+  const key=String(env.PACK1_ACCOUNT_DELETE_RESEND_API_KEY||'');
   return key.startsWith('re_')&&key.length>3?key:null;
 }
 
