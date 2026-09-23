@@ -69,24 +69,30 @@ jobs:
           status=$(curl -sS --max-time 120 -o "$RUNNER_TEMP/daily-generation.json" -w '%{http_code}' \
             -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
             --data "$body" "$URL")
-          if [[ "$status" != 200 ]]; then
-            echo "::error::Daily generation failed (HTTP $status)."
-            exit 1
-          fi
-          node --input-type=module <<'NODE'
+          HTTP_STATUS="$status" node --input-type=module <<'NODE'
           import fs from 'node:fs';
           const data=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/daily-generation.json','utf8'));
+          const httpStatus=Number(process.env.HTTP_STATUS);
           const top=new Set(['ok','date','success','results','duration_ms']);
-          if(Object.keys(data).some(key=>!top.has(key))||data.ok!==true||data.success!==true||!Array.isArray(data.results)) {
+          if(Object.keys(data).some(key=>!top.has(key))||typeof data.ok!=='boolean'||typeof data.success!=='boolean'||!Array.isArray(data.results)) {
             throw Error('Unexpected Daily generation response shape.');
           }
-          const allowed=new Set(['environment','status','duration_ms']);
           const validEnvironment=new Set(['mixed','powered-cube','latest']);
-          const validStatus=new Set(['created','already_exists']);
+          const validStatus=new Set(['created','already_exists','failed']);
+          const validErrorClass=new Set(['availability_error','request_error','server_error','internal_error']);
+          const seen=new Set();
           for(const row of data.results) {
-            if(Object.keys(row).some(key=>!allowed.has(key))||!validEnvironment.has(row.environment)||!validStatus.has(row.status)||!Number.isFinite(row.duration_ms)) {
+            const allowed=row.status==='failed'
+              ?new Set(['environment','status','error_class','duration_ms'])
+              :new Set(['environment','status','duration_ms']);
+            if(Object.keys(row).some(key=>!allowed.has(key))||!validEnvironment.has(row.environment)||!validStatus.has(row.status)||!Number.isFinite(row.duration_ms)||seen.has(row.environment)) {
               throw Error('Unexpected Daily generation result shape.');
             }
+            if(row.status==='failed'&&!validErrorClass.has(row.error_class))throw Error('Unexpected Daily generation failure class.');
+            seen.add(row.environment);
+          }
+          if(seen.size!==3||data.success!==data.results.every(row=>row.status!=='failed')||data.ok!==data.success) {
+            throw Error('Unexpected Daily generation aggregate status.');
           }
           const lines=[
             '# Daily generation',
@@ -94,10 +100,11 @@ jobs:
             `- date: ${data.date}`,
             `- duration: ${data.duration_ms} ms`,
             '',
-            '| environment | status | duration (ms) |',
-            '|---|---|---:|',
-            ...data.results.map(row=>`| ${row.environment} | ${row.status} | ${row.duration_ms} |`),
+            '| environment | status | failure class | duration (ms) |',
+            '|---|---|---|---:|',
+            ...data.results.map(row=>`| ${row.environment} | ${row.status} | ${row.error_class||''} | ${row.duration_ms} |`),
           ];
           fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,lines.join('\n')+'\n');
           console.log(JSON.stringify({date:data.date,results:data.results,duration_ms:data.duration_ms}));
+          if(httpStatus!==200||data.success!==true)throw Error(`Daily generation incomplete (HTTP ${httpStatus}).`);
           NODE
