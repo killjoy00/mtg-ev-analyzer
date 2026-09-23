@@ -32,7 +32,7 @@ No ad activation or Google account change was performed.
 
 ## TCGplayer / Impact: active affiliate trial
 
-TCGplayer approved Pack One's Impact referral application on September 19, 2026. Existing revealed-card comparisons and selected set articles now route their card-search links through the approved referral URL using the Impact deep-link form `https://partner.tcgplayer.com/c/7742974/1780961/21018?u={url}`. Pack One preserves the card-specific TCGplayer destination by URL-encoding it into `{url}`.
+TCGplayer approved Pack One's Impact referral application on September 19, 2026. Draft Run's revealed-card comparison links live inside the optional `Why this score?` analysis rather than the compact default reveal; selected set articles continue to use the same card-search links. Both route through the approved referral URL using the Impact deep-link form `https://partner.tcgplayer.com/c/7742974/1780961/21018?u={url}`. Pack One preserves the card-specific TCGplayer destination by URL-encoding it into `{url}`.
 
 The code continues to record `tcgplayer_click` with card, set (when supplied), surface and affiliate-active status. Applicable links use `rel="sponsored noopener"`, and visible copy identifies them as affiliate links or places an affiliate disclosure directly beside the link group. Pack One may earn a commission from eligible purchases at no added cost to the buyer.
 
