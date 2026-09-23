@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger,zonedDateTime} from '../worker/neon-trigger.mjs';
 import {NEON_PROJECT_ID,PRODUCTION_BRANCH,NEON_SCHEDULERS,reconcileNeonSchedulers} from '../scripts/reconcile-neon-schedulers.mjs';
@@ -84,4 +85,17 @@ test('scheduler reconciliation updates known triggers, creates missing ones, and
   assert.equal(calls.filter(call=>call.method==='PATCH').length,1);
   assert.equal(calls.filter(call=>call.method==='POST').length,2);
   assert.equal(calls.some(call=>JSON.stringify(call.body||{}).includes('unrelated-trigger')),false);
+});
+
+test('scheduler release is manual-only and verifies exact production function revision before enable',()=>{
+  const flow=fs.readFileSync('.github/workflows/neon-scheduler-release.yml','utf8');
+  assert.match(flow,/workflow_dispatch:/);
+  assert.doesNotMatch(flow,/^\s*schedule:/m);
+  assert.match(flow,/NEON_API_KEY/);
+  assert.match(flow,/RELEASE_COMMIT/);
+  assert.match(flow,/git rev-parse origin\/main/);
+  assert.match(flow,/br-orange-feather-ayps8kep-draftrunapi/);
+  assert.match(flow,/br-orange-feather-ayps8kep-pack1growth/);
+  assert.match(flow,/release_commit/);
+  assert.match(flow,/reconcile-neon-schedulers\.mjs "\$ACTION"/);
 });
