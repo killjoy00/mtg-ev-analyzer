@@ -4,6 +4,11 @@ import {createHash,createPublicKey,verify as verifySignature} from 'node:crypto'
 const MAX_BODY_BYTES=64*1024;
 const MAX_CLOCK_SKEW_MS=5*60*1000;
 const JWKS_CACHE_MS=10*60*1000;
+// Every send leaves a Durable Object behind, so the terminal state expires. A
+// day is far beyond Neon's three retries, which arrive seconds apart, and the
+// Resend idempotency key covers the same event independently inside its own
+// window, so dropping the marker cannot resurrect a duplicate send.
+const DEDUPE_RETENTION_MS=24*60*60*1000;
 const textEncoder=new TextEncoder();
 const keyCache=new Map();
 
@@ -46,9 +51,12 @@ function validatedAuthLink(authBase,value) {
     return null;
   }
 }
-function expiryCopy(expiresAt,linkLabel='reset link') {
+// A wrong noun is worse than a vague one, so an unrecognised label degrades to
+// "This link" rather than inheriting whichever template was written first.
+const EXPIRY_LABELS=new Set(['reset link','verification link']);
+function expiryCopy(expiresAt,linkLabel) {
   const value=Date.parse(expiresAt||'');
-  const label=linkLabel==='verification link'?'verification link':'reset link';
+  const label=EXPIRY_LABELS.has(linkLabel)?linkLabel:'link';
   if(!Number.isFinite(value))return 'This '+label+' expires soon.';
   return 'This '+label+' expires at '+new Date(value).toISOString().replace('T',' ').replace('.000Z',' UTC')+'.';
 }
@@ -225,6 +233,12 @@ export class RecoveryEventDedupe {
     this.storage=state.storage;
     this.env=env;
   }
+  async expireLater() {
+    await this.storage.setAlarm(Date.now()+DEDUPE_RETENTION_MS);
+  }
+  async alarm() {
+    await this.storage.deleteAll();
+  }
   async fetch(request) {
     const url=new URL(request.url);
     if(url.pathname==='/telemetry') {
@@ -235,6 +249,7 @@ export class RecoveryEventDedupe {
       const entries=await this.storage.get('qa_telemetry')||[];
       entries.push(entry);
       await this.storage.put('qa_telemetry',entries.slice(-30));
+      await this.expireLater();
       return responseJson({ok:true});
     }
     if(url.pathname==='/pending-verification') {
@@ -245,6 +260,7 @@ export class RecoveryEventDedupe {
       const linkUrl=safeString(value?.linkUrl,2048);
       if(!linkUrl)return responseJson({ok:false},400);
       await this.storage.put('qa_pending_verification',linkUrl);
+      await this.expireLater();
       return responseJson({ok:true});
     }
     if(request.method!=='POST')return new Response(null,{status:405});
@@ -264,6 +280,7 @@ export class RecoveryEventDedupe {
         : fetch;
       const result=await sendAuthEmail(this.env,event,providerFetch);
       await this.storage.put('sent',{messageId:result.id,sentAt:new Date().toISOString()});
+      await this.expireLater();
       return responseJson({ok:true,duplicate:false});
     } catch {
       return responseJson({ok:false},502);

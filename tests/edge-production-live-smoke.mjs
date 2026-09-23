@@ -59,6 +59,7 @@ const target=new URL(google.url);
 assert.equal(target.protocol,'https:');
 const rejected=await fetch(base+'/growth/v1/player/session',{
   method:'POST',headers:{origin:'https://example.invalid','content-type':'application/json'},body:'{}',redirect:'manual',
+  signal:AbortSignal.timeout(30000),
 });
 assert.equal(rejected.status,403);
 console.log('Production first-party gateway, player cookie, credentialed CORS and browser-origin Google OAuth start passed.');
