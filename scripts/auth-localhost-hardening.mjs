@@ -183,10 +183,11 @@ function requireSocialRejected(result,label){
   assert(!(result.status>=200&&result.status<300),label+' was still accepted after localhost was disabled.');
 }
 
-async function signupAndSignIn(fetcher){
-  const run=String(process.env.GITHUB_RUN_ID||Date.now());
-  const attempt=String(process.env.GITHUB_RUN_ATTEMPT||'1');
-  const email='pack1-auth-hardening-'+run+'-'+attempt+'@example.com';
+async function signupAndSignIn(fetcher,{requireEmailVerification=false}={}){
+  // Use Resend's delivery test recipient now that production signup emits a
+  // verification email. This avoids intentionally bouncing smoke mail at a
+  // reserved example.com address.
+  const email='delivered@resend.dev';
   const password='P1-'+randomBytes(24).toString('base64url')+'!';
   const signup=await postAuth(fetcher,PROD_AUTH_BASE,'/sign-up/email',PROD_ORIGINS[0],{
     email,password,name:'Pack One Auth Hardening Smoke',
@@ -197,31 +198,22 @@ async function signupAndSignIn(fetcher){
   const signin=await postAuth(fetcher,PROD_AUTH_BASE,'/sign-in/email',PROD_ORIGINS[0],{
     email,password,
   });
-  assert(signin.status>=200&&signin.status<300,'Production email/password sign-in smoke failed; HTTP '+signin.status+'.');
-  assert(signin.data?.user?.id===userId,'Production email/password sign-in returned a different user.');
-  return {userId,signupStatus:signup.status,signinStatus:signin.status};
+  if(requireEmailVerification){
+    assert(signin.status===403,'Production unverified sign-in should be blocked by required verification; HTTP '+signin.status+'.');
+  }else{
+    assert(signin.status>=200&&signin.status<300,'Production email/password sign-in smoke failed; HTTP '+signin.status+'.');
+    assert(signin.data?.user?.id===userId,'Production email/password sign-in returned a different user.');
+  }
+  return {userId,email,signupStatus:signup.status,signinStatus:signin.status,requireEmailVerification};
 }
 
-async function recoverySmoke(fetcher){
-  const email='delivered@resend.dev';
-  const password='P1-'+randomBytes(24).toString('base64url')+'!';
-  const signup=await postAuth(fetcher,PROD_AUTH_BASE,'/sign-up/email',PROD_ORIGINS[0],{
-    email,password,name:'Pack One Recovery Delivery Smoke',
-  });
-  let createdUserId=null;
-  if(signup.status>=200&&signup.status<300){
-    createdUserId=safeString(signup.data?.user?.id,128);
-    assert(createdUserId,'Recovery delivery smoke signup did not return a user id.');
-  }else{
-    const existing=/exist|already/i.test(String(signup.code||''));
-    assert(existing,'Recovery delivery smoke could not prepare the Resend test recipient; HTTP '+signup.status+'.');
-  }
+async function recoverySmoke(fetcher,email){
   const reset=await postAuth(fetcher,PROD_AUTH_BASE,'/request-password-reset',PROD_ORIGINS[0],{
     email,
     redirectTo:'https://packone.pro/reset-password/',
   });
   assert(reset.status>=200&&reset.status<300,'Production password recovery request failed; HTTP '+reset.status+'.');
-  return {createdUserId,resetStatus:reset.status};
+  return {resetStatus:reset.status};
 }
 
 export function validateRequestFile(value){
@@ -271,7 +263,6 @@ export async function runProduction({fetcher=fetch}={}){
   const before=getAllowLocalhost(PROD_BRANCH);
   let changed=false;
   let signInUserId=null;
-  let recoveryUserId=null;
   let coreError=null;
   let results=null;
 
@@ -295,11 +286,11 @@ export async function runProduction({fetcher=fetch}={}){
       originResults.push({origin,status:result.status});
     }
 
-    const email=await signupAndSignIn(fetcher);
+    const requireEmailVerification=Boolean(beforeSnapshot.emailPassword?.require_email_verification);
+    const email=await signupAndSignIn(fetcher,{requireEmailVerification});
     signInUserId=email.userId;
 
-    const recovery=await recoverySmoke(fetcher);
-    recoveryUserId=recovery.createdUserId;
+    const recovery=await recoverySmoke(fetcher,email.email);
 
     const afterSnapshot=readConfigSnapshot(PROD_BRANCH);
     assert(jsonText(afterSnapshot)===jsonText(beforeSnapshot),'Production Auth settings changed outside allow_localhost.');
@@ -312,6 +303,7 @@ export async function runProduction({fetcher=fetch}={}){
       intended_origins:originResults,
       signup_status:email.signupStatus,
       signin_status:email.signinStatus,
+      require_email_verification:email.requireEmailVerification,
       reset_request_status:recovery.resetStatus,
     };
   }catch(error){
@@ -319,7 +311,7 @@ export async function runProduction({fetcher=fetch}={}){
   }
 
   const cleanupErrors=[];
-  for(const [label,userId] of [['sign-in smoke',signInUserId],['recovery smoke',recoveryUserId]]){
+  for(const [label,userId] of [['auth smoke',signInUserId]]){
     if(!userId)continue;
     try{await deleteAuthUser(PROD_BRANCH,userId);}
     catch(error){cleanupErrors.push(label+': '+String(error?.message||'cleanup failed'));}
