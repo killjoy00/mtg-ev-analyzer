@@ -107,7 +107,14 @@ try{
     assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),'—');
     assert.equal(await page.locator('.run-pack-review').getAttribute('open'),null);assert.equal(answers.length,round+1);
     assert.equal(await page.locator('.run-card-score').count(),0);
-    if(round===0){await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-consensus-mobile.png`,fullPage:true});}
+    if(round===0){
+      const prefix=`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}`;
+      await page.screenshot({path:`${prefix}-reveal-mobile.png`});
+      await page.setViewportSize({width:1440,height:1000});await noOverflow();
+      await page.screenshot({path:`${prefix}-reveal-desktop.png`});
+      await page.setViewportSize({width:390,height:844});await noOverflow();
+      await page.screenshot({path:`${prefix}-consensus-mobile.png`,fullPage:true});
+    }
     await page.locator('#run-next').click();
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
