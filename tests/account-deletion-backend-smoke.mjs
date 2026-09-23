@@ -23,6 +23,8 @@ const draftOwnerSession=crypto.randomUUID();
 const draftRetainedSession=crypto.randomUUID();
 const recovery='b'.repeat(64);
 const deletionEnv={PACK1_RATE_LIMIT_SECRET:'h'.repeat(64)};
+const verificationAuth=crypto.randomUUID();
+const verificationRaceAuth=crypto.randomUUID();
 
 try {
   // Exercise the shared advisory lock with two independent runtime queries.
@@ -63,7 +65,6 @@ try {
 
   // Passwordless deletion verification state is one-row, replaceable, expiring,
   // and consumed atomically by Auth UUID + HMAC.
-  const verificationAuth=crypto.randomUUID();
   await query(`INSERT INTO account_deletion_verifications(auth_user_id,code_hmac,created_at,expires_at)
     VALUES($1::uuid,$2,now()-interval '2 minutes',now()-interval '1 minute')`,[
       verificationAuth,deletionCodeHmac(verificationAuth,'11111111',deletionEnv),
@@ -89,6 +90,36 @@ try {
   ]);
   assert.equal(consumeResults.filter(Boolean).length,1,'concurrent code consumption must have exactly one winner');
   assert.equal(Number((await query('SELECT count(*)::int n FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[verificationAuth])).rows[0].n),0);
+
+  // Race issuance against tombstone creation on the same per-user advisory-lock
+  // boundary. Issuance may win before deletion, or it may fail after deletion;
+  // once the tombstone exists, a later resend must never create or replace state.
+  const [issueRace,deletionRace]=await Promise.allSettled([
+    storeDeletionVerification(query,{
+      authUserId:verificationRaceAuth,
+      codeHmac:deletionCodeHmac(verificationRaceAuth,'66666666',deletionEnv),
+    }),
+    beginDeletion(query,{authUserId:verificationRaceAuth}),
+  ]);
+  assert.equal(deletionRace.status,'fulfilled','deletion must commit in the verification issuance race');
+  if(issueRace.status==='rejected')assert.equal(issueRace.reason?.code,'ACCOUNT_DELETING');
+  const raceRowBefore=Number((await query(
+    'SELECT count(*)::int n FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',
+    [verificationRaceAuth],
+  )).rows[0].n);
+  await assert.rejects(
+    storeDeletionVerification(query,{
+      authUserId:verificationRaceAuth,
+      codeHmac:deletionCodeHmac(verificationRaceAuth,'77777777',deletionEnv),
+    }),
+    error=>error?.code==='ACCOUNT_DELETING',
+    'resend after the deletion tombstone commits must be refused',
+  );
+  const raceRowAfter=Number((await query(
+    'SELECT count(*)::int n FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',
+    [verificationRaceAuth],
+  )).rows[0].n);
+  assert.equal(raceRowAfter,raceRowBefore,'post-tombstone resend must not recreate or replace verification state');
 
   await query('INSERT INTO players(id,display_name) VALUES($1::uuid,$2),($3::uuid,$4)',[
     player,'QA Deleted Player',other,'QA Retained Player',
@@ -177,6 +208,6 @@ try {
   await query('DELETE FROM draft_run_sessions WHERE player_id=$1::uuid OR player_id=$2::uuid',[player,other]);
   await query('DELETE FROM game_results WHERE player_id=$1::uuid OR player_id=$2::uuid',[other,player]);
   await query('DELETE FROM share_challenges WHERE player_id=$1::uuid',[player]);
-  await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[verificationAuth]);
+  await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid OR auth_user_id=$2::uuid',[verificationAuth,verificationRaceAuth]);
   await query('DELETE FROM players WHERE id=$1::uuid OR id=$2::uuid',[other,player]);
 }
