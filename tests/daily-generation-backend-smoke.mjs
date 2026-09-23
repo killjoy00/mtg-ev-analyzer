@@ -98,7 +98,7 @@ const guest=await playerCall('/v1/session',{displayName:'QA Daily generation fal
 const run=await playerCall('/v1/runs',{daily:true,environment:'latest'},guest.token);
 assert.equal(run.day,day);assert.equal(run.environment,'latest');assert.equal(run.run_length,8);
 rows=(await query("SELECT jsonb_array_length(puzzle_ids)::int decisions FROM draft_run_schedules WHERE day=$1::date AND environment='latest'",[day])).rows;
-assert.deepEqual(rows,[{decisions:8}]);
+assert.deepEqual(rows.map(row=>({decisions:Number(row.decisions)})),[{decisions:8}]);
 
 console.log(JSON.stringify({
   daily_generation:'passed',
