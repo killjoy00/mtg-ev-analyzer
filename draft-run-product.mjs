@@ -34,7 +34,7 @@ async function loadSetNames() {
 const app=()=>document.querySelector('#app');
 function styles() {
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=4';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=5';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -60,14 +60,21 @@ function pool(p) {
   const cardLabel=`${p.prior_picks.length} card${p.prior_picks.length===1?'':'s'} · in pick order`;
   return `<section class="run-pool" aria-label="Original drafter’s earlier picks"><h2>Their earlier picks <small>${cardLabel}</small></h2><p>Choose for this drafter’s pool.</p><div class="run-pool-cards">${p.prior_picks.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)}</span></button>`).join('')}</div></section>`;
 }
-// Keep the default reveal visual compact. On a non-match the trophy card is
-// still available at a glance, while the fuller player/trophy comparison lives
-// in the optional analysis layer.
-function compactTrophyThumbnail(p,answer) {
-  if(answer.historicalMatch) return '';
-  const trophy=(p.candidates||[]).find(c=>c.id===answer.historicalId);
-  if(!trophy) return '';
-  return `<figure class="run-trophy-thumb"><span>Trophy pick</span><button type="button" data-zoom="${esc(trophy.id)}" aria-label="Enlarge trophy pick: ${esc(trophy.name)}">${image(trophy)}</button></figure>`;
+// Keep the default reveal visual compact while making the actual comparison
+// visible at a glance. Non-matches pair the player's card with the trophy card;
+// matches still show the shared card once.
+function compactRevealCards(p,answer) {
+  const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
+  const mine=byId.get(answer.selectedId),trophy=byId.get(answer.historicalId);
+  const cardFigure=(card,label,cls='')=>card
+    ? `<figure class="run-reveal-pick ${cls}"><span>${esc(label)}</span><button type="button" data-zoom="${esc(card.id)}" aria-label="Enlarge ${esc(label)}: ${esc(card.name)}">${image(card)}</button></figure>`
+    : '';
+  if(answer.historicalMatch) {
+    const shared=mine||trophy;
+    return shared?`<div class="run-reveal-picks is-match">${cardFigure(shared,'Trophy and Your Pick','is-shared')}</div>`:'';
+  }
+  const cards=`${cardFigure(mine,'Your Pick','is-mine')}${cardFigure(trophy,'Trophy Pick','is-trophy')}`;
+  return cards?`<div class="run-reveal-picks">${cards}</div>`:'';
 }
 function revealComparison(p,answer) {
   const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
@@ -111,7 +118,7 @@ function render() {
     ${rankingStateMarkup(run)}
     ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed — this result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
-    ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactTrophyThumbnail(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}</div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
+    ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactRevealCards(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}</div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
     ''}
     ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:cardGrid(p)}
     ${answer?'':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
