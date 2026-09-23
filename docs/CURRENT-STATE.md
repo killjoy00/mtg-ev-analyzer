@@ -9,8 +9,8 @@ Pack One remains the eight-decision game in [CHARTER](CHARTER.md): three univers
 | Layer | Verified release |
 | --- | --- |
 | Browser | GitHub Pages serves `main`. Runtime behavior through `89ee3ef93f97f57c766e5889076166f6a720a3b9` passed Pages deployment 35818127581; this documentation closeout does not change browser runtime. The September 23 Patreon release adds the Welcome Note route `/?patreon=activate`, focused mobile activation/recovery states, and browser UX-stage funnel markers. PR390 also enables required email-verification Phase 2. |
-| Production functions | The reviewed secure release for #181 deployed exact revision `aac69a28c4cb70d609fcc78c7ef2de390914c54d` through development and production (run 35817596160). `pack1growth` contains the server-authoritative `elite_activated` transition metric; production smoke 35817596155 and the final live gateway/OAuth smoke passed. |
-| Schema | Reviewed additive migrations through 0033 are applied to development and production, including owned Pack One username uniqueness and the v4 Traditional component guards. Historical destructive migration 0016 was not replayed. |
+| Production functions | The reviewed secure release for #406/#407 deployed exact `main` revision `b65822a52e3df82ac8f14dffce87d6caa78a223b` through development and production (run 35904920142). `pack1growth` now includes passwordless account-deletion email verification while retaining the server-authoritative `elite_activated` transition metric; the production function deploy, recovery webhook Worker, fixed first-party gateway, and final live gateway/OAuth smoke all passed. |
+| Schema | Reviewed additive migrations through 0034 are applied to development and production, including owned Pack One username uniqueness, the v4 Traditional component guards, and `account_deletion_verifications` for passwordless deletion proof. Historical destructive migration 0016 was not replayed. |
 | Corpus / selection | `elite-trophy-colour-stage-v8` / `eight-pick-v4`. The v8 parent remains immutable while separately versioned supplemental source components extend current inventory. |
 | Model / scoring | Current v8 evidence uses leakage-corrected `strong-player-colour-stage-v4`, trained on Premier evidence. Traditional source rows do not train or calibrate the model. Historical v3 remains readable; the scoring curve is unchanged. |
 | New-run eligibility | `trophy-implied-score-20-v1`; the indexed threshold is equivalent to the rounded implied-score floor. Historical games retain their recorded policy. |
@@ -21,6 +21,7 @@ Pages success does not imply backend deployment or corpus publication. All three
 
 ## Release evidence
 
+- PR406 added passwordless account-deletion email verification and passed gateway runtime, backend schema, E2E, replay-backed test, production-data audit, and release-secret gates before merge. PR407 carried the protected release request; secure-auth run 35904920142 applied migration 0034 in development and production, deployed the exact reviewed `main` revision `b65822a52e3df82ac8f14dffce87d6caa78a223b`, deployed the recovery webhook Worker and fixed gateway, and passed the final live gateway/OAuth smoke. Real inbox delivery/deletion remains a separate human operational canary.
 - PR155 reconciles source evidence, migration order, metadata fallbacks, and indexed serving selection; unit, browser, database and pinned-artifact gates pass.
 - PR156 supplies the tournament visual system and removes dormant More Modes and retired practice-launch modules. Historical shared challenges remain readable.
 - PR157 makes image maintenance explicit and serializes corpus writers.
@@ -57,7 +58,7 @@ The reviewed implementation now supports fresh deletion proof for an authenticat
 
 The new temporary state is `account_deletion_verifications`: one row per Auth UUID containing only a keyed code HMAC and timestamps. Production delivery uses the dedicated send-only `PACK1_ACCOUNT_DELETE_RESEND_API_KEY` and constant sender `Pack One <accounts@packone.pro>`; development intentionally receives no deletion-mail key. The health field `deletion_email_configured` reports only locally well-formed key presence (the expected `re_` shape), not provider credential validity, domain verification, or delivery.
 
-Production throwaway delivery test: pending post-merge release validation.
+Production release completed 2026-09-23 through secure-auth run 35904920142 at exact `main` revision `b65822a52e3df82ac8f14dffce87d6caa78a223b`. Migration 0034, the production functions, recovery webhook Worker, fixed first-party gateway, and final live gateway/OAuth smoke passed; the production smoke also required `deletion_email_configured:true`. The remaining validation is the explicitly authorized human inbox/deletion canary: confirm delivery from `Pack One <accounts@packone.pro>` to a disposable Google-only account and complete deletion without signing that identity in again.
 
 Google-only password-reset-to-password behavior remains unverified and is not a blocker. The same provider-independent deletion-email design can support future Sign in with Apple accounts, but Apple private-relay delivery/domain configuration remains separate future rollout work; Apple authentication is not implemented by this change.
 
