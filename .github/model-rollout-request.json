@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "neon-schedulers-dev-20260923",
-  "reason": "Deploy the merged Neon scheduler handlers to development before production activation.",
-  "target": "development",
+  "request_id": "neon-schedulers-prod-20260923",
+  "reason": "Promote the development-tested Neon scheduler handlers to production before trigger activation.",
+  "target": "production",
   "commit": "4029202c96bebe893419efa91dd0eeea3407d285"
 }
