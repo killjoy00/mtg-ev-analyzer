@@ -53,6 +53,12 @@ The temporary performance/SQL test branch `release-tournament-20260919` (`br-col
 
 ## Architecture and future changes
 
+### Runtime boundary
+
+The current public runtime is rooted in `bootstrap.mjs`. The homepage is served through `daily-home.mjs`, current gameplay through `draft-run-product.mjs`, and previously published historical challenge links through `historical-share.mjs`.
+
+`app.js` is intentionally preserved dormant architecture for the Top 3 / Full Pack implementation. It is not a current runtime entrypoint. Keep it for product optionality, and do not treat edits there as changes to the live Daily Draft Run unless the bootstrap/runtime boundary is intentionally changed. Tests may continue to cover preserved behavior even when that behavior is not currently served.
+
 GitHub Pages hosts the client. Production functions use Neon branch `br-orange-feather-ayps8kep`; development uses `br-twilight-hill-ayffyd2b`, in project `patient-shadow-91417882`. Keep the existing architecture.
 
 Verify schema, deploy a reviewed main SHA to development, pass its acceptance flow, then deploy that identical SHA to production and verify all three markers plus gameplay. Never restore development over production. Corpus publication remains an explicit authenticated and audited operation.
