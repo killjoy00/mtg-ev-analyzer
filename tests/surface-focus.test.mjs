@@ -49,6 +49,11 @@ test('Draft Run reveal puts continuation before disclosures and restores result 
 });
 
 
+test('Draft Run result footnote keeps its muted spacing', async () => {
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.run-result-page \.run-note\{color:var\(--muted\);line-height:1\.6;margin:24px 0\}/);
+});
+
 test('mobile reveal keeps Next pick in a bottom safe-area dock', async () => {
   const css = await readFile('draft-run.css', 'utf8');
   assert.match(css, /\.draft-run-page:has\(\.run-next-dock\)\{padding-bottom:calc\(72px \+ env\(safe-area-inset-bottom\)\)/);

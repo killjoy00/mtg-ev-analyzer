@@ -2,11 +2,15 @@ import { escapeHtml as esc } from './html.mjs';
 
 export function compactDraftRunFeedback(answer) {
   if (!answer || answer.historicalMatch) return '';
-  if (answer.modelTargetDisagreement) return 'The trophy drafter made an unusual choice relative to the model.';
+  const selectedName=String(answer.selectedName||'').trim();
+  const withChoice=message=>selectedName
+    ? `You chose ${selectedName} — ${message.charAt(0).toLowerCase()}${message.slice(1)}`
+    : message;
+  if (answer.modelTargetDisagreement) return withChoice('The trophy drafter made an unusual choice relative to the model.');
   const score=Number(answer.score);
-  if (Number.isFinite(score) && score>=85) return 'A strongly supported alternative.';
-  if (Number.isFinite(score) && score>=60) return 'A plausible alternative.';
-  return 'The model found less support for this choice.';
+  if (Number.isFinite(score) && score>=85) return withChoice('A strongly supported alternative.');
+  if (Number.isFinite(score) && score>=60) return withChoice('A plausible alternative.');
+  return withChoice('The model found less support for this choice.');
 }
 
 // Only call with a locked answer. A support ratio is a comparative model
