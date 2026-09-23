@@ -19,3 +19,9 @@ Dated earlier reviews are historical evidence. Superseded core documents are ret
 ## September 21 Traditional v4 release
 
 - [Traditional v4 production release closeout](reports/TRADITIONAL-V4-RELEASE-2026-09-21.md): leakage-corrected v8/v4 revalidation, exact component identities, stage/publish run IDs, production serving state, blocked/deferred sets, preservation checks, and the required development-publication prerequisite.
+
+
+## September 23 Pacific Daily and Neon scheduler release
+
+- [Pacific Daily and Neon scheduler rollout closeout](reports/PACIFIC-DAILY-NEON-SCHEDULER-CLOSEOUT-2026-09-23.md): migration/deploy chain, production scheduler activation, five idle-confirmed startup measurements, and final operating boundary.
+- [Neon scheduled maintenance](NEON-SCHEDULERS.md): active trigger definitions, identity boundary, recovery workflow, activation and rollback.

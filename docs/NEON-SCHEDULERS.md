@@ -1,6 +1,6 @@
 # Neon scheduled maintenance
 
-Prepared 2026-09-23. Neon Function Triggers own recurring Pack One backend maintenance after the scheduler release is explicitly enabled. Merging scheduler-aware code does not create or enable a trigger.
+Prepared 2026-09-23. Production activation completed 2026-09-23 through PR #434 and scheduler release run 35926957155. Neon Function Triggers now own recurring Pack One backend maintenance. Merging scheduler-aware code by itself still does not create or enable a trigger.
 
 ## Production triggers
 
@@ -32,4 +32,6 @@ Enabling requires the exact deployed SHA. The release workflow proves that SHA i
 
 Disable is the immediate rollback: it preserves each definition but stops future scheduled runs. GitHub manual recovery remains available. A trigger already queued for the imminent minute can still fire, so all mutating handlers remain idempotent or bounded.
 
-Do not enable these triggers until the Pacific Daily migration, exact-SHA production function deployment, and production Daily-generation verification have all completed successfully.
+Production activation completed only after the Pacific Daily migration, exact-SHA production function deployment, and production Daily-generation verification had all completed successfully. The enabled production functions serve exact scheduler-aware revision `4029202c96bebe893419efa91dd0eeea3407d285`.
+
+For future re-enables after a backend change, preserve the same boundary: first prove the reviewed scheduler-aware revision is live in both production functions, then run the reviewed `neon-schedulers` enable operation. The September 23 rollout and after-inactivity evidence are recorded in [the rollout closeout](reports/PACIFIC-DAILY-NEON-SCHEDULER-CLOSEOUT-2026-09-23.md).
