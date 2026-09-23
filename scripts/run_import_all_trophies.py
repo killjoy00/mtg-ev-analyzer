@@ -43,8 +43,6 @@ def resilient_request(url, method='GET'):
             except Exception:
                 pass
             if code not in _TRANSIENT_HTTP:
-                # resolve_images intentionally treats an exact Scryfall 404 as an
-                # unresolved image rather than a fatal import. Preserve that API.
                 raise
             if attempt == 3:
                 raise RuntimeError(f'HTTP {code} for {url}: {reason}') from None
