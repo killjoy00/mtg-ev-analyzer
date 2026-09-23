@@ -90,7 +90,10 @@ test('card-image maintenance dispatch is fixed and takes no arbitrary inputs',()
 test('production browser verification accepts only fixed Daily measurement inputs',()=>{
  assert.equal(rolloutDispatch({...common,operation:'production-browser'}).workflow,'production-browser.yml');
  assert.deepEqual(rolloutDispatch({...common,operation:'production-browser',first_environment:'latest',measurement_mode:true}),{
-   workflow:'production-browser.yml',body:{ref:'main',inputs:{first_environment:'latest',measurement_mode:'true'}},
+   workflow:'production-browser.yml',body:{ref:'main',inputs:{first_environment:'latest',measurement_mode:'true',measurement_samples:'1'}},
+ });
+ assert.deepEqual(rolloutDispatch({...common,operation:'production-browser',first_environment:'all',measurement_mode:true,measurement_samples:2}),{
+   workflow:'production-browser.yml',body:{ref:'main',inputs:{first_environment:'all',measurement_mode:'true',measurement_samples:'2'}},
  });
  for(const extra of [
    {origin:'https://example.com'},
@@ -98,6 +101,10 @@ test('production browser verification accepts only fixed Daily measurement input
    {first_environment:'other',measurement_mode:true},
    {first_environment:'mixed',measurement_mode:'true'},
    {first_environment:'mixed'},
+   {first_environment:'all',measurement_mode:false,measurement_samples:2},
+   {first_environment:'all',measurement_mode:true,measurement_samples:0},
+   {first_environment:'all',measurement_mode:true,measurement_samples:4},
+   {first_environment:'all',measurement_mode:true,measurement_samples:'2'},
  ])assert.throws(()=>rolloutDispatch({...common,operation:'production-browser',...extra}));
 });
 
