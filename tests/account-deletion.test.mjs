@@ -22,6 +22,7 @@ import {
   deletionCodeHmac,
   deletionEmailConfigured,
   deletionEmailForAuth,
+  sendDeletionEmail,
 } from '../worker/account-deletion-verification.mjs';
 
 const AUTH='11111111-1111-4111-8111-111111111111';
@@ -59,6 +60,25 @@ test('deletion code HMAC is keyed, Auth-bound and deletion-specific',()=>{
   assert.equal(actual,expected);
   assert.notEqual(actual,deletionCodeHmac('55555555-5555-4555-8555-555555555555',code,env));
   assert.throws(()=>deletionCodeHmac(AUTH,'1234',env),error=>error?.code==='DELETE_CODE_INVALID');
+});
+
+test('deletion email is send-only content and does not place the code or identifiers in a URL',async()=>{
+  let request=null;
+  await sendDeletionEmail({
+    email:'verified@example.test',
+    code:'12345678',
+    env:{PACK1_ACCOUNT_DELETE_RESEND_API_KEY:'re_fixture'},
+    fetcher:async(url,options)=>{request={url,options};return new Response('{}',{status:200});},
+  });
+  assert.equal(request.url,'https://api.resend.com/emails');
+  const body=JSON.parse(request.options.body);
+  assert.equal(body.from,'Pack One <accounts@packone.pro>');
+  assert.deepEqual(body.to,['verified@example.test']);
+  assert.match(body.text,/12345678/);
+  assert.match(body.text,/about 10 minutes/i);
+  assert.match(body.text,/did not request account deletion/i);
+  assert.doesNotMatch(request.url,new RegExp([AUTH,PLAYER].join('|')));
+  assert.doesNotMatch(body.text,new RegExp([AUTH,PLAYER,OP].join('|')));
 });
 
 test('deletion capability reads the current verified Auth email server-side',async()=>{
@@ -315,6 +335,7 @@ test('all Auth identity attachment surfaces share deletion serialization',()=>{
   for(const path of [
     'worker/account-session.mjs',
     'worker/account-credential-limits.mjs',
+    'worker/account-deletion-verification.mjs',
     'worker/patreon.mjs',
     'worker/capabilities.mjs',
     'worker/measurement-admin.mjs',
@@ -385,6 +406,50 @@ test('manual controls redeploy the current release without migrations',()=>{
   assert.doesNotMatch(flow,/tests\/.*deletion.*control|node scripts\/.*deletion.*health/i);
 });
 
+
+test('deletion email deployment policy stays production-only and smoke expectations are caller-owned',()=>{
+  const deploy=fs.readFileSync('.github/workflows/deploy-functions.yml','utf8');
+  const secure=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
+  const releaseSmoke=fs.readFileSync('tests/release-functions-smoke.mjs','utf8');
+  const refresh=fs.readFileSync('.github/workflows/refresh-powered-cube-images.yml','utf8');
+  const traditional=fs.readFileSync('.github/workflows/traditional-puzzles.yml','utf8');
+  assert.match(deploy,/--expect-deletion-email=false/);
+  assert.match(deploy,/--expect-deletion-email=\$DELETION_EMAIL_EXPECTED/);
+  assert.match(releaseSmoke,/expectedDeletionEmail=null/);
+  assert.match(releaseSmoke,/expectedDeletionEmail!==null/);
+  assert.doesNotMatch(releaseSmoke,/production.*deletion_email_configured|deletion_email_configured.*production/i);
+  assert.doesNotMatch(refresh,/expect-deletion-email/);
+  assert.doesNotMatch(traditional,/expect-deletion-email/);
+  const devBlock=secure.slice(secure.indexOf('Deploy exact revision to development'),secure.indexOf('Verify activated Patreon secrets before production'));
+  const prodBlock=secure.slice(secure.indexOf('Deploy the development-tested revision to production'));
+  assert.doesNotMatch(devBlock,/--env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=/);
+  assert.match(devBlock,/--expect-deletion-email=false/);
+  assert.match(prodBlock,/--env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=/);
+  assert.match(prodBlock,/--expect-deletion-email=true/);
+});
+
+test('emergency control can disable deletion without a usable mail key but refuses to leave deletion enabled without one',()=>{
+  const flow=fs.readFileSync('.github/workflows/account-deletion-controls.yml','utf8');
+  assert.match(flow,/deletion_email_key_valid=0/);
+  assert.match(flow,/PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_\*/);
+  assert.match(flow,/\$delete" == 1 && "\$deletion_email_key_valid" != 1/);
+  assert.match(flow,/if \[\[ "\$DELETION_EMAIL_EXPECTED" == 1 \]\]; then\s*extra\+\=\(--env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=/s);
+  assert.match(flow,/hasOwnProperty\.call\(x,"deletion_email_configured"\)/);
+  assert.match(flow,/git checkout --detach "\$commit"/);
+  assert.doesNotMatch(flow,/node (?:tests|scripts)\/[^\n]*(?:deletion-email|deletion.*health)/i);
+});
+
+test('production code contains no deletion-code exposure switch or response field',()=>{
+  const files=[
+    'worker/account-deletion-verification.mjs',
+    'worker/growth-function.js',
+    'growth-api.mjs',
+  ].map(path=>fs.readFileSync(path,'utf8')).join('\n');
+  assert.doesNotMatch(files,/PACK1_[A-Z0-9_]*(?:EXPOSE|DEBUG|TEST)[A-Z0-9_]*DELETE[A-Z0-9_]*CODE|DELETE[A-Z0-9_]*CODE[A-Z0-9_]*(?:EXPOSE|DEBUG|TEST)/);
+  const startSource=fs.readFileSync('worker/growth-function.js','utf8');
+  const start=startSource.slice(startSource.indexOf('async function handleAccountDeleteVerificationStart'),startSource.indexOf('async function handleAccountDelete(request)'));
+  assert.doesNotMatch(start,/json\([^\n]*\bcode\b/);
+});
 
 test('secure-auth release smoke is deletion-specific and corpus-independent',()=>{
   const flow=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
