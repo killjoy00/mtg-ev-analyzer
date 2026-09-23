@@ -5,28 +5,40 @@ import {chromium} from 'playwright';
 const browser=await chromium.launch({headless:true,channel:'chrome'});
 const page=await browser.newPage({viewport:{width:390,height:844}});
 const errors=[],requests=[],metrics=[];
+const measurementMode=process.env.PACK1_DAILY_MEASUREMENT==='1';
+const requestedFirst=process.env.PACK1_DAILY_FIRST||'mixed';
+const allEnvironments=['mixed','powered-cube','latest'];
+assert.ok(allEnvironments.includes(requestedFirst),'PACK1_DAILY_FIRST must be mixed, powered-cube or latest');
+const environments=[requestedFirst,...allEnvironments.filter(environment=>environment!==requestedFirst)];
+const runEnvironments=measurementMode?environments.slice(0,1):environments;
 page.on('pageerror',e=>errors.push(e.message));page.on('request',r=>requests.push(r.url()));
 await fs.mkdir('artifacts/production',{recursive:true});
 await page.addInitScript(()=>localStorage.setItem('pack1-player-name-v1','QA production mobile'));
 const overflow=async()=>assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'No horizontal overflow');
 try {
- let t=Date.now();await page.goto('https://packone.pro',{waitUntil:'domcontentloaded'});await page.locator('.daily-home-game a').first().waitFor();
+ let homepageStart=Date.now(),t=homepageStart;await page.goto('https://packone.pro',{waitUntil:'domcontentloaded'});await page.locator('.daily-home-game a').first().waitFor();
  metrics.push({action:'homepage_play_ctas',ms:Date.now()-t});
  assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),3);
  const config=await page.evaluate(()=>window.PACK1_API);
  assert.equal(config.firstParty,true);assert.equal(config.growthUrl,'https://api.packone.pro/growth');assert.equal(config.draftRunUrl,'https://api.packone.pro/draft');
  assert.ok(!requests.some(u=>/\/(app\.js|social\.mjs|home-today\.mjs|data\/catalog\.json|shards\/)/.test(u)),'No historical dependency tree on home');
  assert.ok(!requests.some(u=>/-pack1growth\.compute\.c-5\.us-east-2\.aws\.neon\.tech|draftrunapi\.compute\.c-5\.us-east-2\.aws\.neon\.tech/.test(u)),'Production browser uses the first-party account/gameplay gateway');
- await page.locator('#account-nav').click();await page.locator('#account-google').waitFor();
- assert.equal(await page.locator('#account-google').innerText(),'Sign in with Google');
- assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-auth-session-v1')),null);
- await page.goto('https://packone.pro',{waitUntil:'domcontentloaded'});await page.locator('.daily-home-game a').first().waitFor();
+ if(!measurementMode) {
+  await page.locator('#account-nav').click();await page.locator('#account-google').waitFor();
+  assert.equal(await page.locator('#account-google').innerText(),'Sign in with Google');
+  assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-auth-session-v1')),null);
+  homepageStart=Date.now();
+  await page.goto('https://packone.pro',{waitUntil:'domcontentloaded'});await page.locator('.daily-home-game a').first().waitFor();
+ }
  await page.screenshot({path:'artifacts/production/home-mobile.png',fullPage:true});
- for(const [index,environment] of ['mixed','powered-cube','latest'].entries()) {
+ for(const [index,environment] of runEnvironments.entries()) {
   t=Date.now();const startResponse=page.waitForResponse(r=>new URL(r.url()).pathname.endsWith('/v1/runs')&&r.request().method()==='POST');
   await page.locator(`[data-environment="${environment}"] a`).click();
   let state=await (await startResponse).json();await page.locator('.run-cards').waitFor();
-  metrics.push({action:environment+'_first_pack',ms:Date.now()-t});
+  const firstCardsAt=Date.now(),clickMs=firstCardsAt-t;
+  metrics.push({action:environment+'_first_pack',ms:clickMs});
+  metrics.push({action:environment+'_click_to_first_cards',ms:clickMs});
+  if(index===0)metrics.push({action:environment+'_homepage_to_first_cards',ms:firstCardsAt-homepageStart});
   assert.equal(state.run_length,8);assert.match(await page.locator('.run-ranking-state').innerText(),/Playing as guest/);assert.equal(state.leaderboard_eligible,false);
   assert.deepEqual(state.rerolls,{set:0,pack:0});assert.equal(await page.locator('[data-reroll]').count(),0);
   for(let round=0;round<8;round++) {
@@ -55,6 +67,6 @@ try {
   assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),2-index);
   await page.screenshot({path:`artifacts/production/home-completed-${index+1}.png`,fullPage:true});
  }
- assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,metrics}));
- await fs.writeFile('artifacts/production/measurements.json',JSON.stringify({passed:true,metrics},null,2));
+ assert.deepEqual(errors,[]);console.log(JSON.stringify({passed:true,measurement_mode:measurementMode,first_environment:requestedFirst,metrics}));
+ await fs.writeFile('artifacts/production/measurements.json',JSON.stringify({passed:true,measurement_mode:measurementMode,first_environment:requestedFirst,metrics},null,2));
 } finally {await browser.close();}
