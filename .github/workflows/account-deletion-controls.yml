@@ -38,6 +38,7 @@ jobs:
       PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
       PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
       PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
+      PACK1_ACCOUNT_DELETE_RESEND_API_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
       PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
       PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
       PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
@@ -60,6 +61,8 @@ jobs:
           test ${#PACK1_RATE_LIMIT_SECRET} -ge 32
           [[ "$PACK1_DELETION_ADMIN_EMAIL" == *@* ]]
           test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16
+          deletion_email_key_valid=0
+          [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* ]] && deletion_email_key_valid=1
           case "$TARGET" in
             development)
               branch=br-twilight-hill-ayffyd2b
@@ -79,10 +82,21 @@ jobs:
           current_sweep=$(node -e 'const x=JSON.parse(process.argv[1]);process.stdout.write(x.verification_sweep_enabled?"1":"0")' "$body")
           case "$DELETE_INPUT" in enabled) delete=1;; disabled) delete=0;; unchanged) delete=$current_delete;; esac
           case "$SWEEP_INPUT" in enabled) sweep=1;; disabled) sweep=0;; unchanged) sweep=$current_sweep;; esac
+          deletion_email_expected=0
+          if [[ "$TARGET" == production ]]; then
+            if [[ "$delete" == 1 && "$deletion_email_key_valid" != 1 ]]; then
+              echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY must be present and start with re_ while production account deletion remains enabled.'
+              exit 1
+            fi
+            if [[ "$deletion_email_key_valid" == 1 ]]; then
+              deletion_email_expected=1
+            fi
+          fi
           echo "TARGET_BRANCH=$branch" >> "$GITHUB_ENV"
           echo "RELEASE_COMMIT=$commit" >> "$GITHUB_ENV"
           echo "DELETE_VALUE=$delete" >> "$GITHUB_ENV"
           echo "SWEEP_VALUE=$sweep" >> "$GITHUB_ENV"
+          echo "DELETION_EMAIL_EXPECTED=$deletion_email_expected" >> "$GITHUB_ENV"
           git checkout --detach "$commit"
 
       - name: Build exact currently deployed function revision
@@ -101,6 +115,9 @@ jobs:
             --env "PACK1_ACCOUNT_DELETION_ENABLED=$DELETE_VALUE"
             --env "PACK1_VERIFICATION_SWEEP_ENABLED=$SWEEP_VALUE"
           )
+          if [[ "$DELETION_EMAIL_EXPECTED" == 1 ]]; then
+            extra+=(--env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY")
+          fi
           if [[ -n "$PATREON_CLIENT_ID" && -n "$PATREON_CLIENT_SECRET" && -n "$PATREON_WEBHOOK_SECRET" ]]; then
             extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
           fi
@@ -117,9 +134,10 @@ jobs:
           fi
           for i in {1..12}; do
             body=$(curl -fsS --max-time 30 "$health") || { sleep 3; continue; }
-            if BODY="$body" node -e 'const x=JSON.parse(process.env.BODY);if(x.release_commit!==process.env.RELEASE_COMMIT||Number(x.account_deletion_enabled)!==Number(process.env.DELETE_VALUE)||Number(x.verification_sweep_enabled)!==Number(process.env.SWEEP_VALUE))process.exit(1)' 2>/dev/null; then
+            if BODY="$body" node -e 'const x=JSON.parse(process.env.BODY);if(x.release_commit!==process.env.RELEASE_COMMIT||Number(x.account_deletion_enabled)!==Number(process.env.DELETE_VALUE)||Number(x.verification_sweep_enabled)!==Number(process.env.SWEEP_VALUE))process.exit(1);if(Object.prototype.hasOwnProperty.call(x,"deletion_email_configured")&&Number(x.deletion_email_configured)!==Number(process.env.DELETION_EMAIL_EXPECTED))process.exit(1)' 2>/dev/null; then
               echo "Account deletion enabled: $DELETE_VALUE"
               echo "Verification sweep enabled: $SWEEP_VALUE"
+              echo "Deletion email configured expectation: $DELETION_EMAIL_EXPECTED (asserted only when the deployed revision exposes the field)"
               echo "Reviewed revision preserved: $RELEASE_COMMIT"
               exit 0
             fi
