@@ -21,7 +21,7 @@ assert.doesNotMatch(home, /id="home-editorial"/);
 assert.equal((home.match(/data-ad-slot="home"/g)||[]).length,1,'home has exactly one dormant ad slot');
 assert.match(home, /<main id="app" class="app"><\/main>\s*<aside class="ad-slot" data-ad-slot="home" hidden aria-label="Advertisement"><\/aside>\s*<\/div>\s*<footer class="site-footer app-footer">/,'home ad slot stays directly after main inside app-shell');
 assert.doesNotMatch(home, /googlesyndication/i,'Google loader stays out of index.html');
-assert.match(home, /href="visual-c\.css\?v=5"/,'home must bust the CSS cache for the affiliate-banner styles');
+assert.match(home, /href="visual-c\.css\?v=6"/,'home must bust the CSS cache for the affiliate-banner styles');
 assert.match(home, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/);
 assert.doesNotMatch(home, /href="\/methodology\/"[^>]*>Method<\/a>/);
 assert.match(home, /class="topbar"/);
