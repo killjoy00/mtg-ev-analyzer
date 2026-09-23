@@ -62,7 +62,7 @@ jobs:
           [[ "$PACK1_DELETION_ADMIN_EMAIL" == *@* ]]
           test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16
           deletion_email_key_valid=0
-          [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* ]] && deletion_email_key_valid=1
+          [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] && deletion_email_key_valid=1
           case "$TARGET" in
             development)
               branch=br-twilight-hill-ayffyd2b
