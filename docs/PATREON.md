@@ -165,10 +165,13 @@ practice capabilities. A stale snapshot, pending sync, failed request or unknown
 response suppresses advertising. This conservative advertising behavior does not
 extend expired premium gameplay grants. Sign-in and a connected membership are
 required on the current browser; a signed-out Patreon member is treated as a
-guest. One dormant Daily-home-only banner is wired with client
+guest. One Daily-home-only monetization slot is wired with AdSense client
 `ca-pub-1217971050094766` and unit `1543495960`, while `enabled:false`
-keeps all Google delivery off and no gameplay ads exist. Pack One-originated
-account and Patreon transitions broadcast a nonce-only cross-tab signal that
-clears an open ad without refilling it. Changes made directly on patreon.com or
-by backend webhooks/scheduled sync do not emit that browser signal, so an
-already-open tab can retain its ad until reload.
+keeps all Google delivery off. While that Google gate is disabled, the slot may
+show the TCGplayer affiliate fallback to advertising-eligible visitors; qualifying
+Supporter and Elite memberships suppress that promotion too. Neither provider is
+shown in gameplay. Pack One-originated account and Patreon transitions broadcast
+a nonce-only cross-tab signal that clears an open promotion without refilling it.
+Changes made directly on patreon.com or by backend webhooks/scheduled sync do not
+emit that browser signal, so an already-open tab can retain its promotion until
+reload.

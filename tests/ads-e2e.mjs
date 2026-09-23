@@ -101,12 +101,42 @@ try{
     await page.goto(base);
     await page.locator('[data-daily-home]').waitFor();
     const slot=page.locator('[data-ad-slot="home"]');
+    const promo=page.locator('.tcg-affiliate-promo');
+    const link=page.locator('.tcg-affiliate-link');
+    const logo=page.locator('.tcg-affiliate-logo');
+    await promo.waitFor({state:'visible'});
     assert.equal(await slot.count(),1);
-    assert.notEqual(await slot.getAttribute('hidden'),null);
-    assert.deepEqual(await slot.evaluate(el=>({display:getComputedStyle(el).display,height:el.getBoundingClientRect().height})),{display:'none',height:0});
-    assert.equal(state.google,0);
-    assert.equal(state.membership,0);
+    assert.equal(await slot.getAttribute('hidden'),null);
+    assert.equal(await slot.getAttribute('data-slot-content'),'affiliate');
+    assert.match(await link.getAttribute('href'),/^https:\/\/partner\.tcgplayer\.com\/c\/7742974\/1780961\/21018\?u=/);
+    assert.equal(await link.getAttribute('rel'),'sponsored noopener');
+    assert.equal(await link.getAttribute('data-tcgplayer-surface'),'daily_home_banner');
+    assert.equal(await page.locator('.tcg-affiliate-copy strong').textContent(),'Shop Magic on TCGplayer');
+    assert.equal(await page.locator('.tcg-affiliate-copy > span').textContent(),'Singles, sealed product, and more');
+    assert.equal(await page.locator('.tcg-affiliate-cta').textContent(),'Shop TCGplayer →');
+    assert.equal(await page.locator('.tcg-affiliate-disclosure').textContent(),'Affiliate link — Pack One may earn a commission from purchases.');
+    await logo.waitFor({state:'visible'});
+    const image=await logo.evaluate(el=>({
+      src:new URL(el.currentSrc||el.src).pathname,
+      naturalWidth:el.naturalWidth,
+      naturalHeight:el.naturalHeight,
+      width:el.getBoundingClientRect().width,
+      height:el.getBoundingClientRect().height,
+    }));
+    assert.equal(image.src,'/assets/tcgplayer-logo-primary-stroke.webp');
+    assert.deepEqual([image.naturalWidth,image.naturalHeight],[512,227]);
+    assert.ok(Math.abs((image.width/image.height)-(512/227))<0.02,'official TCGplayer logo must preserve its aspect ratio');
+    assert.equal(state.google,0,'affiliate fallback never contacts Google');
+    assert.equal(state.membership,0,'guest affiliate fallback skips membership');
     assert.deepEqual(state.blocked,[]);
+
+    for(const width of [320,390,1280]){
+      await page.setViewportSize({width,height:width===1280?900:844});
+      const dimensions=await page.evaluate(()=>({client:document.documentElement.clientWidth,scroll:document.documentElement.scrollWidth}));
+      assert.ok(dimensions.scroll<=dimensions.client,'affiliate banner must not overflow at '+width+'px');
+      assert.ok((await promo.boundingBox()).width>0,'affiliate banner must remain measurable at '+width+'px');
+      await page.screenshot({path:'artifacts/tcgplayer-home-'+width+'.png',fullPage:true});
+    }
     await context.close();
   }
 
@@ -157,6 +187,20 @@ try{
     await context.close();
   }
 
+  {
+    const context=await browser.newContext({viewport:{width:390,height:844}});
+    await context.addInitScript(()=>localStorage.setItem('pack1-auth-session-v1','ad-test-account'));
+    const page=await context.newPage(),state=await installRoutes(page,{signed:true,config:'disabled',status:{ad_free:false,ads_allowed:true}});
+    await page.goto(base);
+    await page.locator('[data-daily-home]').waitFor();
+    await waitFor(state,'membership',1);
+    await page.locator('.tcg-affiliate-promo').waitFor({state:'visible'});
+    assert.equal(await page.locator('[data-ad-slot="home"]').getAttribute('data-slot-content'),'affiliate');
+    assert.equal(state.google,0);
+    assert.equal(state.membership,1);
+    await context.close();
+  }
+
   for(const scenario of [
     {name:'ad-free membership',status:{ad_free:true,ads_allowed:false}},
     {name:'unknown response',status:{}},
@@ -174,6 +218,23 @@ try{
     await context.close();
   }
 
+  for(const scenario of [
+    {name:'affiliate ad-free membership',status:{ad_free:true,ads_allowed:false}},
+    {name:'affiliate unknown response',status:{}},
+    {name:'affiliate provider failure',status:{},error:true},
+  ]){
+    const context=await browser.newContext({viewport:{width:390,height:844}});
+    await context.addInitScript(()=>localStorage.setItem('pack1-auth-session-v1','ad-test-account'));
+    const page=await context.newPage(),state=await installRoutes(page,{signed:true,config:'disabled',status:scenario.status,error:scenario.error});
+    await page.goto(base);
+    await page.locator('[data-daily-home]').waitFor();
+    await waitFor(state,'membership',1);
+    assert.equal(state.google,0,scenario.name+' must not contact Google');
+    assert.equal(await page.locator('.tcg-affiliate-promo').count(),0,scenario.name);
+    assert.notEqual(await page.locator('[data-ad-slot="home"]').getAttribute('hidden'),null,scenario.name);
+    await context.close();
+  }
+
   {
     const context=await browser.newContext({viewport:{width:390,height:844}});
     const pageA=await context.newPage(),stateA=await installRoutes(pageA,{signed:false});
@@ -184,6 +245,39 @@ try{
     await pageA.locator('[data-ad-slot="home"]').waitFor({state:'hidden'});
     assert.equal(await pageA.locator('ins.adsbygoogle').count(),0);
     assert.equal(stateA.google,1,'cross-tab signal clears without a replacement');
+    await context.close();
+  }
+
+  {
+    const context=await browser.newContext({viewport:{width:390,height:844}});
+    const pageA=await context.newPage(),stateA=await installRoutes(pageA,{signed:false,config:'disabled'});
+    await pageA.goto(base);
+    await pageA.locator('[data-daily-home]').waitFor();
+    await pageA.locator('.tcg-affiliate-promo').waitFor({state:'visible'});
+    const pageB=await context.newPage();await installRoutes(pageB,{config:'disabled'});
+    await pageB.goto(base+'/how-it-works/');
+    await pageB.evaluate(async()=>{(await import('/growth-api.mjs')).signalAccountChange();});
+    await pageA.locator('[data-ad-slot="home"]').waitFor({state:'hidden'});
+    assert.equal(await pageA.locator('.tcg-affiliate-promo').count(),0);
+    assert.equal(stateA.google,0,'affiliate invalidation never contacts Google');
+    await pageA.evaluate(async()=>{(await import('/daily-home.mjs')).renderDailyHome();});
+    await pageA.locator('[data-daily-home]').waitFor();
+    assert.notEqual(await pageA.locator('[data-ad-slot="home"]').getAttribute('hidden'),null,'cleared affiliate cannot refill in-place');
+    await context.close();
+  }
+
+  {
+    const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage();
+    const state=await installRoutes(page,{signed:false,config:'disabled'});
+    await page.goto(base+'/?game=draft-run');
+    await page.evaluate(async()=>{
+      await (await import('/ads.mjs')).adsReady;
+      await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+    });
+    assert.equal(await page.locator('.tcg-affiliate-promo').count(),0,'gameplay never renders the affiliate fallback');
+    assert.notEqual(await page.locator('[data-ad-slot="home"]').getAttribute('hidden'),null);
+    assert.equal(state.google,0);
+    assert.equal(state.membership,0,'gameplay rejects affiliate fallback before membership lookup');
     await context.close();
   }
 
@@ -209,5 +303,5 @@ try{
     await context.close();
   }
 
-  console.log('Advertising browser contract passed: dormant home placement, one-shot lifecycle, membership failures, cross-tab invalidation, visuals and editorial mapping.');
+  console.log('Advertising browser contract passed: TCGplayer fallback, Google placement, one-shot lifecycle, membership failures, cross-tab invalidation, responsive visuals, gameplay exclusion and editorial mapping.');
 }finally{await browser.close();}

@@ -8,9 +8,11 @@ The $3 Supporter and $7 Elite Member tiers both include ad-free browsing while s
 
 The Elite Patreon Welcome Note directs members to `https://packone.pro/?patreon=activate`. Pack One signs the member into the existing account flow as needed, authorizes Patreon only when necessary, and unlocks benefits only from authoritative provider-derived capabilities. Browser `patreon_activation_succeeded` is descriptive UX telemetry; conversion/abandonment reporting uses the server-only `elite_activated` entitlement transition with a 24-hour maturity window. Issue #181 is closed.
 
-The ad loader checks backend membership before requesting Google's script. A single dormant banner exists only after the Daily-home content and applicable practice/custom links; it is outside `#app` so Daily re-renders cannot replace it. No ads appear in gameplay or result views. Unknown, stale, pending, failed or older-backend membership responses keep advertising hidden. A signed-out Patreon member is treated as a guest because Pack One cannot verify the membership without the Pack One account session.
+The Daily-home monetization slot sits after the Daily content and applicable practice/custom links, outside `#app` so Daily re-renders cannot replace it. While Google delivery is disabled, the slot can show one TCGplayer affiliate promotion; when Google is enabled, the affiliate fallback is disabled rather than stacked with an AdSense unit. Neither provider appears in gameplay or result views, and the TCGplayer fallback is not used on editorial placements.
 
-Account, Patreon-connect/disconnect and Elite-activation flows emit a nonce-only localStorage signal plus a same-tab event. An open tab clears any rendered ad on those signals and never refills it before a full reload. Changes made directly on patreon.com or by backend webhooks/scheduled reconciliation do not pass through a Pack One tab, so an already-open tab can retain its existing ad until reload.
+Guests may see the affiliate promotion without a membership lookup. Signed-in accounts use the same conservative `ads_allowed` boundary as display advertising: qualifying ad-free memberships suppress the affiliate promotion, and unknown, stale, pending or failed membership states keep the slot hidden. A signed-out Patreon member is treated as a guest because Pack One cannot verify the membership without the Pack One account session.
+
+Account, Patreon-connect/disconnect and Elite-activation flows emit a nonce-only localStorage signal plus a same-tab event. An open tab clears any rendered Google or affiliate promotion on those signals and never refills it before a full reload. Changes made directly on patreon.com or by backend webhooks/scheduled reconciliation do not pass through a Pack One tab, so an already-open tab can retain its existing promotion until reload.
 
 ## Google AdSense: deferred
 
@@ -34,7 +36,9 @@ TCGplayer approved Pack One's Impact referral application on September 19, 2026.
 
 The code continues to record `tcgplayer_click` with card, set (when supplied), surface and affiliate-active status. Applicable links use `rel="sponsored noopener"`, and visible copy identifies them as affiliate links or places an affiliate disclosure directly beside the link group. Pack One may earn a commission from eligible purchases at no added cost to the buyer.
 
-Keep this as a small, relevant experiment: no banners, store page, pricing feed or extra purchase prompts. Compare actual Impact conversions against outbound clicks before expanding placement. Affiliate links are not for the owner's personal purchases.
+The Daily-home fallback is the one approved expansion of this experiment. It uses the official TCGplayer logo asset on a neutral Pack One surface, routes the CTA through the approved Impact deep-link template to TCGplayer's Magic category, carries the visible disclosure “Affiliate link — Pack One may earn a commission from purchases.”, and records the surface as `daily_home_banner`. The logo is served locally; no TCGplayer or Impact script/pixel loads merely because the banner is displayed.
+
+Keep this measured: no store section, pricing feed, gameplay/result banner or additional affiliate placements. Compare the home-banner outbound clicks with Impact conversion reporting before expanding further. Affiliate links are not for the owner's personal purchases.
 
 TCGplayer documents its [Impact-based affiliate program](https://docs.tcgplayer.com/docs/tcgplayer-affiliate-program). Its [partner guidelines](https://help.tcgplayer.com/hc/en-us/articles/31411199594391-TCGplayer-Partner-Guidelines) require clear disclosure and prohibit personal use of affiliate links.
 

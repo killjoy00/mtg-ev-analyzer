@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {advertisingAllowed,slotIdForPlacement} from '../ads.mjs';
+import {advertisingAllowed,promotionalContentAllowed,slotIdForPlacement} from '../ads.mjs';
 import {adFreePatreonMembership,premiumPatreonMembership,PATREON_POLICY} from '../patreon-policy.mjs';
 import {patreonAdvertisingStatus} from '../worker/patreon.mjs';
 import {ACCOUNT_SIGNAL_KEY,signalAccountChange} from '../growth-api.mjs';
+import {tcgplayerAffiliateUrl,tcgplayerHomeBannerActive,tcgplayerMagicUrl} from '../tcgplayer.mjs';
 
 test('ad placement names map explicitly and never fall back',()=>{
   const cfg={slots:{home:'home-id',articleTop:'article-id',articleInline:'inline-id'}};
@@ -70,4 +71,46 @@ test('ad release gate makes no membership request and uncertain accounts never l
   assert.equal(await advertisingAllowed({...options,checkMembership:async()=>{throw Error('offline');}}),false);
   assert.equal(await advertisingAllowed(options),true);
   assert.equal(await advertisingAllowed({...options,accountToken:null}),true);
+});
+
+
+test('affiliate promotion shares the conservative ad-free eligibility boundary',async()=>{
+  let calls=0;
+  const allowed=async()=>{calls++;return {ads_allowed:true};};
+  assert.equal(await promotionalContentAllowed({active:false,accountToken:'account',checkMembership:allowed}),false);
+  assert.equal(await promotionalContentAllowed({active:true,game:true,accountToken:'account',checkMembership:allowed}),false);
+  assert.equal(calls,0,'inactive/game views must stop before membership lookup');
+  assert.equal(await promotionalContentAllowed({active:true,accountToken:null,checkMembership:allowed}),true);
+  assert.equal(calls,0,'guests never need a membership lookup');
+  assert.equal(await promotionalContentAllowed({active:true,accountToken:'account',checkMembership:allowed}),true);
+  assert.equal(calls,1);
+  for(const response of [{ad_free:true,ads_allowed:false},{},{ads_allowed:null}]){
+    assert.equal(await promotionalContentAllowed({active:true,accountToken:'account',checkMembership:async()=>response}),false);
+  }
+  assert.equal(await promotionalContentAllowed({active:true,accountToken:'account',checkMembership:async()=>{throw Error('offline');}}),false);
+});
+
+test('TCGplayer home destination uses the approved Impact deep-link template',()=>{
+  const saved=globalThis.PACKONE_TCGPLAYER;
+  globalThis.PACKONE_TCGPLAYER={
+    impactDeepLinkTemplate:'https://partner.tcgplayer.com/c/7742974/1780961/21018?u={url}',
+    homeBannerEnabled:true,
+    homeDestination:'https://www.tcgplayer.com/categories/trading-and-collectible-card-games/magic-the-gathering'
+  };
+  try{
+    const target='https://www.tcgplayer.com/categories/trading-and-collectible-card-games/magic-the-gathering';
+    const magic=tcgplayerMagicUrl();
+    assert.equal(tcgplayerHomeBannerActive(),true);
+    assert.equal(magic,tcgplayerAffiliateUrl(target));
+    globalThis.PACKONE_TCGPLAYER.homeBannerEnabled=false;
+    assert.equal(tcgplayerHomeBannerActive(),false);
+    globalThis.PACKONE_TCGPLAYER.homeBannerEnabled=true;
+    const parsed=new URL(magic);
+    assert.equal(parsed.hostname,'partner.tcgplayer.com');
+    assert.equal(parsed.pathname,'/c/7742974/1780961/21018');
+    assert.equal(parsed.searchParams.get('u'),target);
+  } finally {
+    if(saved===undefined)delete globalThis.PACKONE_TCGPLAYER;
+    else globalThis.PACKONE_TCGPLAYER=saved;
+  }
 });
