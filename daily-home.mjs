@@ -1,5 +1,5 @@
 import { loadDailyStatus } from './growth-api.mjs';
-import { todayStatus, easternDateKey } from './today-status.mjs';
+import { todayStatus, gameDateKey } from './today-status.mjs';
 
 let generation = 0;
 let installed = false;
@@ -10,7 +10,7 @@ const games = [
   { key: 'latest', number: '03', label: 'The newest release', environment: 'latest', title: 'Daily Latest Set', description: 'Eight decisions. Only the latest set.', href: '?game=draft-run&set=latest&daily=1' },
 ];
 
-export function dailyHomeMarkup(profile, day = easternDateKey(), unavailable = false) {
+export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = false) {
   const status = todayStatus(profile, day);
   const dailyDate=new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));
   const capabilities=profile?.capabilities||[];
@@ -54,7 +54,7 @@ export function renderDailyHome(profile = null, unavailable = false) {
     const link = document.createElement('link'); link.rel = 'stylesheet';
     link.href = './daily-home.css?v=4'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
   }
-  lastDay = easternDateKey();
+  lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, unavailable);
   document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=6')).renderAccount());
   document.querySelector('[data-home-username]')?.addEventListener('click', async () => {
@@ -71,15 +71,15 @@ export function installDailyHome(identityReady = Promise.resolve()) {
   if (installed) return; installed = true;
   async function refresh() {
     if (!document.querySelector('[data-daily-home]')) return;
-    const version = ++generation, day = easternDateKey();
+    const version = ++generation, day = gameDateKey();
     await identityReady;
     const profile = await loadDailyStatus().catch(() => null);
-    if (version !== generation || day !== easternDateKey() || !document.querySelector('[data-daily-home]')) return;
+    if (version !== generation || day !== gameDateKey() || !document.querySelector('[data-daily-home]')) return;
     renderDailyHome(profile, !profile);
   }
   document.addEventListener('pack1:result-completed', refresh);
   window.addEventListener('focus', refresh);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });
-  setInterval(() => { if (lastDay !== easternDateKey()) void refresh(); }, 60000);
+  setInterval(() => { if (lastDay !== gameDateKey()) void refresh(); }, 60000);
   void refresh();
 }
