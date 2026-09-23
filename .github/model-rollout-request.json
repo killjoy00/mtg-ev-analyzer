@@ -1,7 +1,7 @@
 {
-  "operation": "deploy",
-  "request_id": "neon-schedulers-prod-20260923",
-  "reason": "Promote the development-tested Neon scheduler handlers to production before trigger activation.",
-  "target": "production",
+  "operation": "neon-schedulers",
+  "request_id": "neon-schedulers-enable-20260923",
+  "reason": "Enable the reviewed Neon Daily generation and account-deletion maintenance schedulers after exact-revision production deployment passed.",
+  "action": "enable",
   "commit": "4029202c96bebe893419efa91dd0eeea3407d285"
 }
