@@ -1,7 +1,14 @@
 // HTTP acceptance using private QA guests. Dailies are unranked and immutable.
 import assert from 'node:assert/strict';
 const [branch,commit]=process.argv.slice(2);
-if(!/^br-[a-z0-9-]+$/.test(branch||'')||!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Usage: release-functions-smoke.mjs BRANCH_ID FULL_COMMIT_SHA [--daily] (legacy --practice also runs unranked Daily acceptance)');
+if(!/^br-[a-z0-9-]+$/.test(branch||'')||!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Usage: release-functions-smoke.mjs BRANCH_ID FULL_COMMIT_SHA [--daily] [--expect-deletion-email=true|false] (legacy --practice also runs unranked Daily acceptance)');
+const emailExpectationArg=process.argv.find(value=>value.startsWith('--expect-deletion-email='));
+let expectedDeletionEmail=null;
+if(emailExpectationArg) {
+  const value=emailExpectationArg.split('=',2)[1];
+  if(!['true','false'].includes(value))throw Error('--expect-deletion-email must be true or false.');
+  expectedDeletionEmail=value==='true';
+}
 const timings=[];
 async function call(slug,path,body,token,status=200) {
   const start=performance.now();
@@ -28,6 +35,8 @@ async function verifyMarkers({settle=false}={}) {
       const h=await call(slug,'/health?quick=1');
       assert.equal(h.ok,true);
       if(h.release_commit===commit) {
+        if(slug==='pack1growth'&&expectedDeletionEmail!==null)
+          assert.equal(h.deletion_email_configured,expectedDeletionEmail,'pack1growth deletion email configuration');
         const waited=Math.round((Date.now()-started)/1000);
         // Absorbing this silently would hide a pipeline getting slower.
         if(waited>=POLL_MS/1000)console.log(`${slug}: settled on ${commit.slice(0,7)} after ${waited}s`);
