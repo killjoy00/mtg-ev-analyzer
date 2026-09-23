@@ -46,7 +46,7 @@ jobs:
           set -euo pipefail
           if [[ "$PACK1_DAILY_MEASUREMENT" != 1 ]]; then
             test "$PACK1_DAILY_FIRST" != all
-            PACK1_DAILY_FIRST="$PACK1_DAILY_FIRST" PACK1_DAILY_MEASUREMENT=0 node tests/production-browser-smoke.mjs
+            env -u NEON_API_KEY PACK1_DAILY_FIRST="$PACK1_DAILY_FIRST" PACK1_DAILY_MEASUREMENT=0 node tests/production-browser-smoke.mjs
             exit 0
           fi
 
@@ -99,7 +99,7 @@ jobs:
             await sleep(15000);
           }
           NODE
-              PACK1_DAILY_FIRST="$environment" PACK1_DAILY_MEASUREMENT=1 node tests/production-browser-smoke.mjs
+              env -u NEON_API_KEY PACK1_DAILY_FIRST="$environment" PACK1_DAILY_MEASUREMENT=1 node tests/production-browser-smoke.mjs
               mv artifacts/production/measurements.json "artifacts/production/measurements-${environment}-${sample}.json"
             done
           done
