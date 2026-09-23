@@ -67,6 +67,10 @@ secrets. Existing client and creator-token secrets remain separate.
    creator token secrets using the values from the owner's Patreon API client,
    then rerun sync. Never send secret values through chat or commit them.
 
-The initial real billing-change/signed-webhook observation is still outstanding;
-fixture coverage and successful API reconciliation are documented separately in
-[the runbook](PATREON.md). No purchase or subscription change was made on your behalf.
+The next genuine billing/tier change is still outstanding. Production already
+contains one signed, campaign-matching webhook receipt from
+2026-09-19T19:08:21Z; that verifies acceptance by the signed route but does not
+independently prove provider origin because any holder of the signing secret
+could produce an indistinguishable request. Fixture coverage and successful API
+reconciliation are documented separately in [the runbook](PATREON.md). No
+purchase or subscription change was made on your behalf.
