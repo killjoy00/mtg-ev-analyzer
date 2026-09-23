@@ -3,15 +3,21 @@ on:
   workflow_dispatch:
     inputs:
       first_environment:
-        description: 'Daily to run first'
+        description: 'Daily to run first; use all only for controlled measurement suites'
         type: choice
-        options: [mixed, powered-cube, latest]
+        options: [mixed, powered-cube, latest, all]
         default: mixed
         required: true
       measurement_mode:
-        description: 'Measure only the first Daily and skip pre-click account navigation'
+        description: 'Measure only the requested Daily(s) and skip pre-click account navigation'
         type: boolean
         default: false
+        required: true
+      measurement_samples:
+        description: 'Counted after-inactivity samples per requested Daily'
+        type: choice
+        options: ['1', '2', '3']
+        default: '1'
         required: true
 permissions:
   contents: read
@@ -21,7 +27,7 @@ concurrency:
 jobs:
   browser:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - run: test "$GITHUB_REF" = refs/heads/main
@@ -33,7 +39,70 @@ jobs:
         env:
           PACK1_DAILY_FIRST: ${{ inputs.first_environment }}
           PACK1_DAILY_MEASUREMENT: ${{ inputs.measurement_mode && '1' || '0' }}
-        run: node tests/production-browser-smoke.mjs
+          PACK1_MEASUREMENT_SAMPLES: ${{ inputs.measurement_samples }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$PACK1_DAILY_MEASUREMENT" != 1 ]]; then
+            test "$PACK1_DAILY_FIRST" != all
+            PACK1_DAILY_FIRST="$PACK1_DAILY_FIRST" PACK1_DAILY_MEASUREMENT=0 node tests/production-browser-smoke.mjs
+            exit 0
+          fi
+
+          if [[ "$PACK1_DAILY_FIRST" == all ]]; then
+            environments=(mixed powered-cube latest)
+          else
+            environments=("$PACK1_DAILY_FIRST")
+          fi
+          mkdir -p artifacts/production
+
+          for environment in "${environments[@]}"; do
+            for sample in $(seq 1 "$PACK1_MEASUREMENT_SAMPLES"); do
+              export PACK1_MEASUREMENT_ENVIRONMENT="$environment"
+              export PACK1_MEASUREMENT_SAMPLE="$sample"
+              export PACK1_NEON_IDLE_FILE="artifacts/production/neon-idle-${environment}-${sample}.json"
+              node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const project='patient-shadow-91417882';
+          const branch='br-orange-feather-ayps8kep';
+          const key=process.env.NEON_API_KEY;
+          if(!key)throw Error('Neon control credential is missing.');
+          const deadline=Date.now()+12*60*1000;
+          const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
+          for(;;) {
+            const response=await fetch(
+              `https://console.neon.tech/api/v2/projects/${project}/branches/${branch}/endpoints`,
+              {headers:{authorization:`Bearer ${key}`,accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(30000)},
+            );
+            if(!response.ok)throw Error(`Neon control-plane endpoint check failed (HTTP ${response.status}).`);
+            const payload=await response.json();
+            const endpoints=Array.isArray(payload)?payload:payload.endpoints;
+            if(!Array.isArray(endpoints))throw Error('Unexpected Neon endpoint inventory response.');
+            const rw=endpoints.filter(endpoint=>endpoint.branch_id===branch&&endpoint.type==='read_write');
+            if(rw.length!==1)throw Error(`Expected exactly one production read-write compute; found ${rw.length}.`);
+            const state=rw[0].current_state;
+            if(state==='idle') {
+              const checked_at=new Date().toISOString();
+              fs.writeFileSync(process.env.PACK1_NEON_IDLE_FILE,JSON.stringify({
+                environment:process.env.PACK1_MEASUREMENT_ENVIRONMENT,
+                sample:Number(process.env.PACK1_MEASUREMENT_SAMPLE),
+                branch,
+                state,
+                checked_at,
+              },null,2));
+              fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+                `- Neon idle confirmed before ${process.env.PACK1_MEASUREMENT_ENVIRONMENT} sample ${process.env.PACK1_MEASUREMENT_SAMPLE} at ${checked_at}\n`);
+              break;
+            }
+            if(Date.now()>=deadline)throw Error(`Production Draft Run compute did not become idle before the measurement deadline (last state: ${state||'unknown'}).`);
+            await sleep(15000);
+          }
+          NODE
+              PACK1_DAILY_FIRST="$environment" PACK1_DAILY_MEASUREMENT=1 node tests/production-browser-smoke.mjs
+              mv artifacts/production/measurements.json "artifacts/production/measurements-${environment}-${sample}.json"
+            done
+          done
       - uses: actions/upload-artifact@v4
         if: always()
         with:
