@@ -20,7 +20,7 @@ Trigger-only requests require Neon's `X-Neon-Trigger-Invocation-Id` edge-atteste
 
 `.github/workflows/daily-generation.yml` remains manual-only and keeps its exact GitHub OIDC identity as a break-glass verifier. Scheduled GitHub OIDC identities are no longer accepted for Daily generation.
 
-`.github/workflows/account-deletion-maintenance.yml` remains both manual and scheduled, but its scheduled path is read-only. Twice an hour it calls `/internal/account-deletion-maintenance-status` only to surface stuck or operator-review deletion work in Actions. A manual dispatch still calls the mutating maintenance endpoint and can recover work if the Neon trigger is disabled or unhealthy.
+`.github/workflows/account-deletion-maintenance.yml` remains both manual and scheduled, but its scheduled path is read-only. Every ten minutes, five minutes after the Neon maintenance cadence, it calls `/internal/account-deletion-maintenance-status` only to surface stuck or operator-review deletion work in Actions. A manual dispatch still calls the mutating maintenance endpoint and can recover work if the Neon trigger is disabled or unhealthy.
 
 The public Cloudflare gateway exposes neither internal maintenance route.
 
