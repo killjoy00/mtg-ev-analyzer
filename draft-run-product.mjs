@@ -5,7 +5,7 @@ import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
 import { escapeHtml as esc } from './html.mjs';
-import { consensusFeedback } from './draft-run-feedback.mjs';
+import { compactDraftRunFeedback, consensusFeedback } from './draft-run-feedback.mjs';
 import { tcgplayerUrl } from './tcgplayer.mjs';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
@@ -60,9 +60,15 @@ function pool(p) {
   const cardLabel=`${p.prior_picks.length} card${p.prior_picks.length===1?'':'s'} · in pick order`;
   return `<section class="run-pool" aria-label="Original drafter’s earlier picks"><h2>Their earlier picks <small>${cardLabel}</small></h2><p>Choose for this drafter’s pool.</p><div class="run-pool-cards">${p.prior_picks.map((c,i)=>`<button type="button" data-zoom-prior="${i}" aria-label="View previous pick ${i+1}: ${esc(c.name)}">${image(c)}<span>${i+1}. ${esc(c.name)}</span></button>`).join('')}</div></section>`;
 }
-// The reveal names two cards, but in the grid below they sit wherever the pack
-// put them — often a screen or more apart, and never both visible alongside the
-// verdict. Put the pair in the panel itself so the comparison is one glance.
+// Keep the default reveal visual compact. On a non-match the trophy card is
+// still available at a glance, while the fuller player/trophy comparison lives
+// in the optional analysis layer.
+function compactTrophyThumbnail(p,answer) {
+  if(answer.historicalMatch) return '';
+  const trophy=(p.candidates||[]).find(c=>c.id===answer.historicalId);
+  if(!trophy) return '';
+  return `<figure class="run-trophy-thumb"><span>Trophy pick</span><button type="button" data-zoom="${esc(trophy.id)}" aria-label="Enlarge trophy pick: ${esc(trophy.name)}">${image(trophy)}</button></figure>`;
+}
 function revealComparison(p,answer) {
   const byId=new Map((p.candidates||[]).map(c=>[c.id,c]));
   const mine=byId.get(answer.selectedId),trophy=byId.get(answer.historicalId);
@@ -71,6 +77,15 @@ function revealComparison(p,answer) {
   if(answer.historicalMatch||!trophy||trophy.id===mine.id)
     return `<div class="run-compare is-match">${cell(mine,'Your pick · trophy pick','is-mine')}</div>`;
   return `<div class="run-compare">${cell(mine,'Your pick','is-mine')}${cell(trophy,'Trophy pick','is-trophy')}</div>`;
+}
+function revealAnalysis(p,answer) {
+  return `<details class="run-analysis"><summary>Why this score?</summary><div class="run-analysis-body">${revealComparison(p,answer)}${consensusFeedback(answer)}</div></details>`;
+}
+function compactResultLabel(answer,sentence='') {
+  const verdict=answer.historicalMatch
+    ? 'You matched the trophy drafter.'
+    : `The trophy drafter took ${answer.historicalName}.`;
+  return `${answer.score} out of 100. ${verdict}${sentence?` ${sentence}`:''}`;
 }
 function cardGrid(p,answer=null) {
   const candidates=sortPackByRarity(p.candidates);
@@ -90,18 +105,20 @@ function render() {
   if(answer||run.complete){clock.clear();viewKey=null;}
   if(run.complete&&!answer) {renderResult();return;}
   const p=answer?.puzzle||run.current;
+  const compactSentence=answer?compactDraftRunFeedback(answer):'';
   document.body.classList.add('is-game');
   app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
     ${rankingStateMarkup(run)}
     ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed — this result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
-    ${answer?`<section class="run-feedback" aria-live="polite"><strong>${answer.score}<small>/100</small></strong><div class="run-feedback-copy"><h2>${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2><p>${answer.historicalMatch?'Full points.':`You chose ${esc(answer.selectedName)}. ${answer.score>=85?'A strongly supported alternative.':answer.score>=60?'A plausible alternative.':'The model found less support for this choice.'}`}</p>${answer.modelTargetDisagreement?'<p>The trophy drafter made an unusual choice relative to the model. Strong alternatives still receive their normal credit.</p>':''}</div>${revealComparison(p,answer)}${consensusFeedback(answer)}<div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>`:
+    ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactTrophyThumbnail(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}</div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
     ''}
-    ${answer?`<details class="run-pack-review"><summary>Review the pack and earlier picks</summary>${pool(p)}${cardGrid(p,answer)}</details>`:cardGrid(p)}
-    ${answer?'<p class="run-note">Trophy pick: 100. Other choices earn up to 95 from contextual strong-player support. Matching the trophy drafter is the goal of this game.</p>':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
+    ${answer?`<details class="run-pack-review"><summary>Review the pack</summary>${pool(p)}${cardGrid(p,answer)}</details>`:cardGrid(p)}
+    ${answer?'':`<div class="run-lock"><div class="run-lock-choice"><span id="run-selection-label">Choose a card</span><button class="button primary" id="run-lock" disabled>Lock pick</button></div>${run.day||run.comparison?.exact?'':`<div class="run-tools"><div>${cube()||run.custom_set_ids?.length?'':`<button class="button secondary" data-reroll="set" ${!run.rerolls.set||run.set_reroll_allowed===false?'disabled':''}>Reroll set · ${run.rerolls.set}</button>`}<button class="button secondary" data-reroll="pack" ${!run.rerolls.pack?'disabled':''}>Reroll pack · ${run.rerolls.pack}</button></div></div>`}</div>`}
     <p class="run-error" id="run-error" role="alert"></p></section>`;
   bind(p,answer);
-  if(!answer) recordView();
+  if(answer) document.querySelector('#run-feedback-result')?.focus({preventScroll:true});
+  else recordView();
 }
 function zoom(card) {
   const dialog=document.createElement('dialog');dialog.className='run-card-dialog';dialog.innerHTML=`<button class="button secondary" autofocus>Close</button>${image(card)}<p>${esc(card.name)}</p>`;
