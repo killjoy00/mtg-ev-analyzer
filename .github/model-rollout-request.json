@@ -1,7 +1,6 @@
 {
-  "operation": "neon-schedulers",
-  "request_id": "neon-schedulers-enable-20260923",
-  "reason": "Enable the reviewed Neon Daily generation and account-deletion maintenance schedulers after exact-revision production deployment passed.",
-  "action": "enable",
-  "commit": "4029202c96bebe893419efa91dd0eeea3407d285"
+  "operation": "card-image-release",
+  "request_id": "packone-main-art-fallback-20260923",
+  "reason": "Deploy the reviewed bulk-miss fallback fix and refresh all served Pack One card images, including Powered Cube regressions for Enduring Innocence and Abhorrent Oculus.",
+  "commit": "66e2537e6e0ce913b8c9277c93b2646ea8a77109"
 }
