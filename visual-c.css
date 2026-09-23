@@ -745,6 +745,7 @@ body .run-review-list li {
 
 /* Dormant Daily-home display ad surface. Hidden must win over pack1.css. */
 .ad-slot[hidden] { display: none !important; }
+.ad-slot > .adsbygoogle { width: 100%; }
 .app-shell > .ad-slot[data-ad-slot="home"] {
   width: min(1120px, calc(100% - 48px));
   margin: 24px auto 34px;
