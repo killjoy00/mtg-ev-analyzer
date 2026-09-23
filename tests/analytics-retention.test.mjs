@@ -12,3 +12,13 @@ test('current retention views use the Pacific product calendar without rewriting
   assert.doesNotMatch(canonical,/America\/New_York/);
   assert.match(canonical,/America\/Los_Angeles/);
 });
+
+
+test('release schema verification requires Pacific retention views', async () => {
+  const source = await readFile('scripts/verify-neon-schema.mjs', 'utf8');
+  assert.ok(source.includes('analytics_retention_cohorts'));
+  assert.ok(source.includes('analytics_daily_next_day_retention'));
+  assert.ok(source.includes('America/Los_Angeles'));
+  assert.ok(source.includes('America/New_York'));
+  assert.ok(source.includes('through 0035 first'));
+});
