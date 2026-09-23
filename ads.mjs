@@ -112,7 +112,7 @@ export async function initializeAds({doc=document,location=globalThis.location,
       link.rel='sponsored noopener';
       link.dataset.tcgplayerLink='1';
       link.dataset.tcgplayerSurface='daily_home_banner';
-      link.setAttribute('aria-label','Shop Magic on TCGplayer (affiliate link)');
+      link.setAttribute('aria-label','Shop Magic cards on TCGplayer (affiliate link)');
 
       const logoWrap=doc.createElement('span');
       logoWrap.className='tcg-affiliate-logo-wrap';
@@ -128,14 +128,14 @@ export async function initializeAds({doc=document,location=globalThis.location,
       const copy=doc.createElement('span');
       copy.className='tcg-affiliate-copy';
       const headline=doc.createElement('strong');
-      headline.textContent='Shop Magic on TCGplayer';
+      headline.textContent='Shop Magic cards';
       const detail=doc.createElement('span');
       detail.textContent='Singles, sealed product, and more';
       copy.append(headline,detail);
 
       const cta=doc.createElement('span');
       cta.className='tcg-affiliate-cta';
-      cta.textContent='Shop TCGplayer →';
+      cta.textContent='Shop now →';
 
       link.append(logoWrap,copy,cta);
 
