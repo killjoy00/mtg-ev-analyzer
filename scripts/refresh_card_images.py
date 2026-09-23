@@ -17,14 +17,15 @@ from __future__ import annotations
 import gzip
 import hashlib
 import json
+import time
 from pathlib import Path
 from typing import Optional
 
 try:
-    from fetch_card_metadata import aliases, image_url, metadata_for_alias, printing_rank, special_flags
+    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags
     from refresh_powered_cube_images import all_printings
 except ModuleNotFoundError:
-    from scripts.fetch_card_metadata import aliases, image_url, metadata_for_alias, printing_rank, special_flags
+    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags
     from scripts.refresh_powered_cube_images import all_printings
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -142,6 +143,25 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
                 if key not in set_rank or rank < set_rank[key]:
                     set_rank[key] = rank
                     set_best[key] = card
+
+    # Scryfall's default_cards bulk export intentionally omits a small number
+    # of digital/rebalanced or otherwise non-default card identities. Resolve
+    # only those bulk misses through the shared exact-name resolver, which
+    # follows the card's prints_search_uri and applies the same main-art policy.
+    missing_from_bulk = sorted(wanted - global_best.keys())
+    for name in missing_from_bulk:
+        global_card = fetch_named(name)
+        if global_card and image_url(global_card, name):
+            global_best[name] = global_card
+            global_rank[name] = printing_rank(global_card, name)
+        for sid in sorted(sets_by_name.get(name) or []):
+            preferred = None if sid == "powered-cube" else sid
+            chosen = global_card if preferred is None else fetch_named(name, preferred)
+            if chosen and image_url(chosen, name):
+                key = (sid, name)
+                set_best[key] = chosen
+                set_rank[key] = printing_rank(chosen, name, preferred)
+            time.sleep(0.15)
 
     records_by_set: dict[str, dict[str, dict]] = {}
     selection_details: dict[str, dict] = {}
@@ -298,6 +318,21 @@ def main() -> int:
         "card_id_name_collisions": len(report["card_id_name_collisions"]),
     }
     print(json.dumps(summary, sort_keys=True))
+    problems = {
+        "unresolved_names": {
+            sid: item["unresolved_names"]
+            for sid, item in report["sets"].items()
+            if item["unresolved_names"]
+        },
+        "remaining_special_printings": {
+            sid: item["remaining_special_printings"]
+            for sid, item in report["sets"].items()
+            if item["remaining_special_printings"]
+        },
+        "card_id_name_collisions": report["card_id_name_collisions"],
+    }
+    if any(problems.values()):
+        print(json.dumps({"card_image_refresh_problems": problems}, sort_keys=True))
     if unresolved_total:
         raise SystemExit("Main-art refresh left unresolved card names; refusing publication.")
     if special_total:

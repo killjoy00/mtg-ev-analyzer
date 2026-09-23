@@ -52,6 +52,53 @@ class CardImageRefreshTests(unittest.TestCase):
         self.assertEqual(details["abc"], {})
         self.assertEqual(details["powered-cube"], {})
 
+    def test_bulk_missing_name_uses_shared_named_resolver(self):
+        fallback = self.card(
+            "fallback",
+            "hbg",
+            "2022-07-07",
+            "https://img/a-monster-manual.jpg",
+            name="A-Monster Manual",
+            digital=True,
+        )
+        with mock.patch.object(refresh, "all_printings", return_value=iter([])), mock.patch.object(
+            refresh, "fetch_named", return_value=fallback
+        ) as named:
+            by_set, global_records, details = refresh.resolve_inventory({
+                "hbg": {"A-Monster Manual"},
+            })
+        self.assertEqual(by_set["hbg"]["A-Monster Manual"]["image_url"], "https://img/a-monster-manual.jpg")
+        self.assertEqual(global_records["A-Monster Manual"]["image_url"], "https://img/a-monster-manual.jpg")
+        self.assertEqual(details["hbg"], {})
+        self.assertGreaterEqual(named.call_count, 1)
+
+    def test_reported_cube_cards_choose_base_dsk_printing(self):
+        for name, collector in (("Enduring Innocence", "6"), ("Abhorrent Oculus", "42")):
+            with self.subTest(name=name):
+                base = self.card(
+                    f"{name}-base",
+                    "dsk",
+                    "2024-09-27",
+                    f"https://img/{name}-base.jpg",
+                    name=name,
+                    collector_number=collector,
+                )
+                alternate = self.card(
+                    f"{name}-alternate",
+                    "dsk",
+                    "2024-09-27",
+                    f"https://img/{name}-alternate.jpg",
+                    name=name,
+                    collector_number="386",
+                    variation=True,
+                    border_color="borderless",
+                    frame_effects=["showcase"],
+                )
+                with mock.patch.object(refresh, "all_printings", return_value=iter([alternate, base])):
+                    by_set, _, details = refresh.resolve_inventory({"powered-cube": {name}})
+                self.assertEqual(by_set["powered-cube"][name]["image_url"], f"https://img/{name}-base.jpg")
+                self.assertEqual(details["powered-cube"], {})
+
     def test_patch_card_changes_display_metadata_only(self):
         original = {
             "id": "alpha",
