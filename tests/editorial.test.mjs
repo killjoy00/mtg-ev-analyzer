@@ -18,7 +18,10 @@ for (const path of ['how-it-works/index.html','scoring/index.html','methodology/
 }
 const home = await readFile('index.html','utf8');
 assert.doesNotMatch(home, /id="home-editorial"/);
-assert.doesNotMatch(home, /data-ad-slot="home"/);
+assert.equal((home.match(/data-ad-slot="home"/g)||[]).length,1,'home has exactly one dormant ad slot');
+assert.match(home, /<main id="app" class="app"><\/main>\s*<aside class="ad-slot" data-ad-slot="home" hidden aria-label="Advertisement"><\/aside>\s*<\/div>\s*<footer class="site-footer app-footer">/,'home ad slot stays directly after main inside app-shell');
+assert.doesNotMatch(home, /googlesyndication/i,'Google loader stays out of index.html');
+assert.match(home, /href="visual-c\.css\?v=4"/,'home must bust the CSS cache for the hidden-slot fix');
 assert.match(home, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/);
 assert.doesNotMatch(home, /href="\/methodology\/"[^>]*>Method<\/a>/);
 assert.match(home, /class="topbar"/);
@@ -108,6 +111,10 @@ const admin = await readFile('admin/index.html','utf8');
 assert.match(admin, /class="brand-mark"[^>]*><span>P<\/span><sup>1<\/sup>/i);
 const ads = await readFile('ad-config.js','utf8');
 assert.match(ads, /enabled:\s*false/);
+assert.match(ads, /client:\s*'ca-pub-1217971050094766'/);
+assert.match(ads, /home:\s*'1543495960'/);
+const homeCss = await readFile('visual-c.css','utf8');
+assert.match(homeCss, /\.ad-slot\[hidden\]\s*\{\s*display:\s*none\s*!important;/);
 const tcg = await readFile('tcgplayer.mjs','utf8');
 assert.match(tcg, /rel = 'sponsored noopener'/);
 assert.match(tcg, /tcgplayer_click/);
