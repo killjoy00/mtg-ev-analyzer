@@ -33,7 +33,7 @@ test('Daily generation accepts only the exact reviewed main workflow identity',a
   assert.deepEqual(await verifyDailyGenerationToken(token(),getKeys,now),{
     run_id:'123',sha:'a'.repeat(40),workflow_ref:DAILY_GENERATION_WORKFLOW,
   });
-  assert.equal((await verifyDailyGenerationToken(token({...claims,event_name:'schedule'}),getKeys,now)).run_id,'123');
+  await assert.rejects(verifyDailyGenerationToken(token({...claims,event_name:'schedule'}),getKeys,now),e=>e?.status===403);
 });
 
 test('Daily generation rejects forged or widened GitHub identities',async()=>{

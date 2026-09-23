@@ -128,3 +128,22 @@ test('Daily calendar migration is exact-revision and target-only',()=>{
  assert.equal(rolloutDispatch({...request,target:'production'}).body.inputs.target,'production');
  for(const extra of [{commit:'main'},{target:'other'},{migration:'0034'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
+
+test('Neon scheduler release is fixed, reviewed, and exact-revision on enable',()=>{
+ const enable={...common,operation:'neon-schedulers',action:'enable',commit:'c'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(enable),{
+   workflow:'neon-scheduler-release.yml',
+   body:{ref:'main',inputs:{action:'enable',commit:'c'.repeat(40)}},
+ });
+ assert.deepEqual(rolloutDispatch({...common,operation:'neon-schedulers',action:'disable'}),{
+   workflow:'neon-scheduler-release.yml',
+   body:{ref:'main',inputs:{action:'disable'}},
+ });
+ for(const bad of [
+   {...enable,action:'other'},
+   {...enable,commit:'main'},
+   {...common,operation:'neon-schedulers',action:'disable',commit:'c'.repeat(40)},
+   {...enable,target:'production'},
+   {...enable,workflow:'other.yml'},
+ ])assert.throws(()=>rolloutDispatch(bad));
+});
