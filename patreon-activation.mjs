@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import { connectPatreon, getAuthSession, loadPatreonStatus } from './growth-api.mjs';
+import { connectPatreon, getAuthSession, loadPatreonStatus, signalAccountChange } from './growth-api.mjs';
 import { PATREON_POLICY } from './patreon-policy.mjs';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
@@ -77,6 +77,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
 
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   if(elite) {
+    signalAccountChange();
     event('patreon_activation_succeeded',{source:activationSource(source)});
     clearPatreonActivation();
     shell('<h2>Elite is active.</h2><p>Powered Cube practice and custom-set practice are unlocked.</p>',

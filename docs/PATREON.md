@@ -6,12 +6,16 @@ Creator API reconciliation run 35461859312 confirmed the exact Elite tier and
 renewed both premium grants. Public release 053541429b7adf01168eb27b344204e706ca67f9
 passed development 35462022892 and production 35462227708; all three health markers
 were verified independently. Discovery run 35459558651 verified the required secrets.
-The verified policy maps campaign **16808916** to **Elite Member 29631843 ($5)**.
+The verified policy maps campaign **16808916** to **Elite Member 29631843 ($7)**.
 **Supporter 29631835 ($3)** and the free tier **29623888** grant no premium tools.
-Regular practice remains free to authenticated Pack One accounts. Both paid tiers
-include display-ad suppression when signed in and connected; Google ads remain
-disabled pending approval and a separate owner activation. This benefit is
-independent of premium practice grants.
+Regular practice remains free to authenticated Pack One accounts. Supporter and
+Elite include display-ad suppression while the user is signed in to Pack One and
+the Patreon link is verified. Ad-free eligibility comes from campaign, tier and
+provider state IDs, never price. Active, still-entitled former, free-trial and
+gifted qualifying memberships are ad-free; declined memberships and
+declined/refunded/fraud/deleted charge states are not. Google ads remain disabled
+pending approval, consent/privacy work and a separate owner activation. This
+benefit is independent of premium practice grants.
 
 The OAuth client, creator credentials and webhook signing secret are present in
 GitHub. No secret values were exposed. The connection requires the account owner
@@ -156,5 +160,11 @@ response supplies `ad_free` and `ads_allowed`; it never grants Supporter the Eli
 practice capabilities. A stale snapshot, pending sync, failed request or unknown
 response suppresses advertising. This conservative advertising behavior does not
 extend expired premium gameplay grants. Sign-in and a connected membership are
-required on the current browser; a signed-out visitor cannot be identified as a
-member. All Google delivery remains off in `ad-config.js`.
+required on the current browser; a signed-out Patreon member is treated as a
+guest. One dormant Daily-home-only banner is wired with client
+`ca-pub-1217971050094766` and unit `1543495960`, while `enabled:false`
+keeps all Google delivery off and no gameplay ads exist. Pack One-originated
+account and Patreon transitions broadcast a nonce-only cross-tab signal that
+clears an open ad without refilling it. Changes made directly on patreon.com or
+by backend webhooks/scheduled sync do not emit that browser signal, so an
+already-open tab can retain its ad until reload.

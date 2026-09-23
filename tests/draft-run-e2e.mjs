@@ -9,7 +9,7 @@ const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).fla
 const environment=process.env.PACK1_TEST_ENVIRONMENT||'mixed',cube=environment==='powered-cube';
 const selectionVersion=process.env.PACK1_TEST_SELECTION_VERSION||'eight-pick-v3';
 const daily=process.env.PACK1_TEST_DAILY==='1';
-let shareCalls=0,eliteAccess=false;
+let shareCalls=0,eliteAccess=false,adGoogle=0,adMembership=0;
 let puzzles=selectDraftRun(corpus,'browser-contract',environment,{selectionVersion}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
 const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
@@ -21,6 +21,7 @@ await page.addInitScript(()=>{Object.defineProperty(navigator,'share',{configura
 await page.route('**/*-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
   const path=new URL(route.request().url()).pathname;let body={ok:true};
   if(path==='/v1/session')body={token:'test-token'};
+  if(path==='/v1/patreon/status')adMembership++;
   if(path==='/v1/events'){events.push(...(route.request().postDataJSON().events||[]));}
   if(path==='/v1/profile/me')body={player:{display_name:'Test Guest',claimed:false},summary:{games:0},achievements:[]};
   await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
@@ -48,9 +49,16 @@ try{
   await page.goto(base);
   await page.locator('[data-daily-home]').waitFor();
   await noOverflow();
+  await page.route('**/ad-config.js',route=>route.fulfill({contentType:'text/javascript',body:"window.PACKONE_ADSENSE={enabled:true,client:'ca-pub-fixture',slots:{home:'1543495960',articleTop:'',articleInline:''}};"}));
+  await page.route('https://pagead2.googlesyndication.com/**',route=>{adGoogle++;return route.fulfill({contentType:'text/javascript',body:''});});
+  for(const host of ['googleads.g.doubleclick.net','tpc.googlesyndication.com','fundingchoicesmessages.google.com'])await page.route('https://'+host+'/**',route=>{adGoogle++;return route.abort();});
   if(daily)await page.locator(`[data-environment="${environment}"] a`).click();
   else await page.goto(base+'/?game=draft-run'+(cube?'&set=powered-cube':''));
   await page.locator('.run-cards').waitFor();
+  assert.equal(await page.locator('[data-ad-slot="home"]').count(),1,'game shell retains the dormant static slot');
+  assert.equal(await page.locator('[data-ad-slot="home"]:visible').count(),0,'game view never exposes the home ad slot');
+  assert.equal(adGoogle,0,'enabled mock still makes no Google request in gameplay');
+  assert.equal(adMembership,0,'gameplay is rejected before membership lookup');
   assert.equal(await page.locator('.run-steps li').count(),puzzles.length);assert.equal(await page.locator('.run-pool').count(),cube?1:0);assert.equal(await page.locator('.run-card-score').count(),0);
   assert.doesNotMatch(await page.locator('.run-heading').innerText(),/difficulty/i);
   const displayNames=JSON.parse(fs.readFileSync('data/set-display-names.json','utf8')).names;

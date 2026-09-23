@@ -1,10 +1,12 @@
 const TOKEN_KEY = 'pack1-api-session-v1';
 const AUTH_TOKEN_KEY = 'pack1-auth-session-v1';
+export const ACCOUNT_SIGNAL_KEY = 'pack1-account-signal-v1';
 const NAME_KEY = 'pack1-player-name-v1';
 const CSRF_COOKIE = '__Secure-pack1_csrf';
 const GOOGLE_RETURN = 'https://packone.pro/?auth=google';
 const ACCOUNT_RETURN = 'https://packone.pro/';
 let sessionPromise = null, migrationPromise = null, identityRetired = false;
+let accountSignalCounter = 0;
 
 function baseUrl() { return String(window.PACK1_API?.growthUrl || window.PACK1_API?.url || '').replace(/\/$/, ''); }
 function draftUrl() { return String(window.PACK1_API?.draftRunUrl || '').replace(/\/$/, ''); }
@@ -26,9 +28,20 @@ export function hasAccountSession() { return firstPartyAuthEnabled()?Boolean(acc
 // Compatibility helper for callers that only need a signed-in hint. In the
 // first-party path this never exposes an account credential.
 export const storedAccountToken = () => firstPartyAuthEnabled()?(hasAccountSession()?'first-party':''):loadAuthToken();
+function accountSignalNonce() {
+  accountSignalCounter += 1;
+  const random=globalThis.crypto?.randomUUID?.()||Math.random().toString(36).slice(2);
+  return `${Date.now().toString(36)}-${accountSignalCounter.toString(36)}-${random}`;
+}
+export function signalAccountChange({storage=globalThis.localStorage,target=globalThis}={}) {
+  const payload=JSON.stringify({nonce:accountSignalNonce()});
+  try { storage?.setItem?.(ACCOUNT_SIGNAL_KEY,payload); } catch {}
+  try { if(typeof Event==='function')target?.dispatchEvent?.(new Event('packone-account-changed')); } catch {}
+  return payload;
+}
 function clearLegacyAuth() {
   try { localStorage.removeItem(AUTH_TOKEN_KEY); } catch {}
-  globalThis.dispatchEvent?.(new Event('packone-account-changed'));
+  signalAccountChange();
 }
 export function savePackToken(token) { try { localStorage.setItem(TOKEN_KEY, token); } catch {} return token; }
 export function packApiConfigured() { return /^https:\/\//.test(baseUrl()); }
@@ -269,21 +282,28 @@ export async function connectPatreon() {
   return api('/v1/patreon/connect',{method:'POST',body:{},auth:false,authSession});
 }
 export async function disconnectPatreon() {
-  if(firstPartyAuthEnabled()){await ensureMigrations();return api('/v1/patreon/disconnect',{method:'POST',body:{},auth:false});}
-  const authSession=loadAuthToken();if(!authSession)throw new Error('Sign in before disconnecting Patreon.');
-  return api('/v1/patreon/disconnect',{method:'POST',body:{},auth:false,authSession});
+  let data;
+  if(firstPartyAuthEnabled()){await ensureMigrations();data=await api('/v1/patreon/disconnect',{method:'POST',body:{},auth:false});}
+  else {
+    const authSession=loadAuthToken();if(!authSession)throw new Error('Sign in before disconnecting Patreon.');
+    data=await api('/v1/patreon/disconnect',{method:'POST',body:{},auth:false,authSession});
+  }
+  signalAccountChange();
+  return data;
 }
 
 export async function signUpAccount({name,email,password}) {
-  if(firstPartyAuthEnabled())return authRequest('/sign-up/email',{method:'POST',body:{name,email,password}});
+  const firstParty=firstPartyAuthEnabled();
   const data=await authRequest('/sign-up/email',{method:'POST',body:{name,email,password}});
-  if(data?.token){try{localStorage.setItem(AUTH_TOKEN_KEY,data.token);}catch{}globalThis.dispatchEvent?.(new Event('packone-account-changed'));}
+  if(firstParty)signalAccountChange();
+  else if(data?.token){try{localStorage.setItem(AUTH_TOKEN_KEY,data.token);}catch{}signalAccountChange();}
   return data;
 }
 export async function signInAccount({email,password}) {
-  if(firstPartyAuthEnabled())return authRequest('/sign-in/email',{method:'POST',body:{email,password,rememberMe:true}});
+  const firstParty=firstPartyAuthEnabled();
   const data=await authRequest('/sign-in/email',{method:'POST',body:{email,password,rememberMe:true}});
-  if(data?.token){try{localStorage.setItem(AUTH_TOKEN_KEY,data.token);}catch{}globalThis.dispatchEvent?.(new Event('packone-account-changed'));}
+  if(firstParty)signalAccountChange();
+  else if(data?.token){try{localStorage.setItem(AUTH_TOKEN_KEY,data.token);}catch{}signalAccountChange();}
   return data;
 }
 

@@ -741,3 +741,20 @@ body .run-review-list li {
  .top-nav-button{font-size:12px;padding-left:4px;padding-right:4px}
  .top-actions #account-nav{padding-left:4px}
 }
+
+
+/* Dormant Daily-home display ad surface. Hidden must win over pack1.css. */
+.ad-slot[hidden] { display: none !important; }
+.ad-slot > .adsbygoogle { width: 100%; }
+.app-shell > .ad-slot[data-ad-slot="home"] {
+  width: min(1120px, calc(100% - 48px));
+  margin: 24px auto 34px;
+  border: 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+@media (max-width: 760px) {
+  .app-shell > .ad-slot[data-ad-slot="home"] { width: calc(100% - 36px); }
+}

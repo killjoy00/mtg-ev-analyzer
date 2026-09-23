@@ -4,24 +4,26 @@ Updated September 23, 2026. Google ads remain disabled at the owner's direction 
 
 ## Membership
 
-The $3 Supporter and $5 Elite Member tiers both include ad-free browsing while signed in to Pack One with Patreon connected. Only Elite grants unlimited Cube practice and custom-set practice; regular practice remains free for authenticated accounts. Exact campaign/tier matching is authoritative, never payment amount.
+The $3 Supporter and $7 Elite Member tiers both include ad-free browsing while signed in to Pack One with Patreon connected and verified. The policy is keyed to the Pack One campaign, tier IDs and provider state, never price: active patrons, former patrons that still retain the qualifying tier, free trials and gifted qualifying memberships are ad-free; declined memberships and declined/refunded/fraud/deleted charge states are not. Only Elite grants unlimited Cube practice and custom-set practice; regular practice remains free for authenticated accounts.
 
 The Elite Patreon Welcome Note directs members to `https://packone.pro/?patreon=activate`. Pack One signs the member into the existing account flow as needed, authorizes Patreon only when necessary, and unlocks benefits only from authoritative provider-derived capabilities. Browser `patreon_activation_succeeded` is descriptive UX telemetry; conversion/abandonment reporting uses the server-only `elite_activated` entitlement transition with a 24-hour maturity window. Issue #181 is closed.
 
-The ad loader checks backend membership before requesting Google's script. Supporter/Elite members receive no Google script or ad slot. Unknown, stale, pending, failed or older-backend membership responses keep ads hidden. Account changes immediately clear existing slots. Static placeholders are hidden even with JavaScript disabled. `?adpreview=1` cannot bypass disabled advertising. No ads appear in active gameplay, and no ad slots have been added to the homepage.
+The ad loader checks backend membership before requesting Google's script. A single dormant banner exists only after the Daily-home content and applicable practice/custom links; it is outside `#app` so Daily re-renders cannot replace it. No ads appear in gameplay or result views. Unknown, stale, pending, failed or older-backend membership responses keep advertising hidden. A signed-out Patreon member is treated as a guest because Pack One cannot verify the membership without the Pack One account session.
 
-Signed-out visitors cannot be identified as members; members must sign in and connect Patreon on that browser. Provider membership changes flow through the hourly authoritative sync. This suppression is independent of practice grants and does not grant Supporter premium gameplay.
+Account, Patreon-connect/disconnect and Elite-activation flows emit a nonce-only localStorage signal plus a same-tab event. An open tab clears any rendered ad on those signals and never refills it before a full reload. Changes made directly on patreon.com or by backend webhooks/scheduled reconciliation do not pass through a Pack One tab, so an already-open tab can retain its existing ad until reload.
 
 ## Google AdSense: deferred
 
-`ad-config.js` remains `enabled: false`, with empty client/slot values. Publisher verification metadata and `ads.txt` remain in place; they do not establish approval or load ads. No Google ad request is made by the disabled loader.
+`ad-config.js` remains `enabled: false`. The public client is `ca-pub-1217971050094766` and the dormant Daily-home unit is `1543495960`; `articleTop` remains empty and Auto Ads are not used. Publisher verification metadata and `ads.txt` remain in place. With the release gate disabled, the loader makes no membership request and no Google advertising request. Static ad placeholders remain hidden even with JavaScript disabled, and `?adpreview=1` cannot bypass the disabled release gate.
 
-After approval, and only when the owner asks to activate ads:
+This is technically prepared for later activation, not ready merely because a boolean can be flipped. Google AdSense approval, applicable consent/privacy work and explicit owner authorization all remain blockers to live delivery.
 
-1. Confirm approval in the AdSense account and copy the public publisher/client and manual slot IDs.
-2. Confirm the applicable consent setup and privacy copy before enabling delivery.
-3. Configure a limited editorial placement; keep Auto Ads and gameplay placements off.
-4. Re-run guest, free-account, Supporter, Elite and failed-membership checks before release. Neither paid tier should contact Google's advertising endpoint.
+After those blockers are cleared, and only when the owner asks to activate ads:
+
+1. Confirm approval in the AdSense account and re-confirm the public publisher/client and manual home-unit ID.
+2. Complete the applicable consent setup and privacy copy before enabling delivery.
+3. Enable only the reviewed Daily-home placement; keep Auto Ads, article ads and gameplay/result placements off.
+4. Re-run guest, free-account, Supporter, Elite, stale/unknown and failed-membership checks before release. Qualifying ad-free memberships must not contact Google's advertising endpoint.
 5. Measure whether revenue justifies any effect on completion, return visits and page speed.
 
 No ad activation or Google account change was performed.

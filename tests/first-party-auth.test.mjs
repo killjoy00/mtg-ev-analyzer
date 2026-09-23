@@ -20,7 +20,8 @@ globalThis.window={PACK1_API:{
 }};
 let assigned=null;
 globalThis.location={href:'https://packone.pro/?auth=google&neon_auth_session_verifier=fixture-verifier',assign:url=>{assigned=String(url);}};
-globalThis.dispatchEvent=()=>{};
+const dispatched=[];
+globalThis.dispatchEvent=event=>{dispatched.push(event.type);return true;};
 const calls=[];
 globalThis.fetch=async(url,options={})=>{
   const u=new URL(url),path=u.pathname,headers=new Headers(options.headers||{});
@@ -29,6 +30,8 @@ globalThis.fetch=async(url,options={})=>{
   if(path==='/growth/v1/player/session')return Response.json({ok:true,playerId:'player'});
   if(path==='/growth/v1/account/migrate')return Response.json({ok:true,migrated:true,user:{id:'user',email:'qa@example.invalid',name:'QA'}});
   if(path==='/growth/v1/account/session')return Response.json({user:{id:'user',email:'qa@example.invalid',name:'QA'},session:{expiresAt:'2099-01-01T00:00:00Z'}});
+  if(path==='/growth/v1/account/signup')return Response.json({user:{id:'signup-user',email:'new@example.invalid',name:'New QA'}});
+  if(path==='/growth/v1/account/signin')return Response.json({user:{id:'signin-user',email:'qa@example.invalid',name:'QA'}});
   if(path==='/growth/v1/profile')return Response.json({player:{display_name:'QA Changed'}});
   if(path==='/growth/v1/account/request-password-reset')return Response.json({ok:true,message:'generic'});
   if(path==='/growth/v1/account/reset-password')return Response.json({ok:true});
@@ -100,4 +103,30 @@ test('password recovery stays behind the Pack One first-party API and never acce
   const reset=calls.findLast(row=>row.path==='/growth/v1/account/reset-password');
   assert.equal(reset.host,'api.packone.pro');
   assert.deepEqual(JSON.parse(reset.body),{token:'fixture-token-123456',newPassword:'new-password-123'});
+});
+
+
+test('first-party cookie path identifies an account session',()=>{
+  const saved=document.cookie;
+  document.cookie='__Secure-pack1_csrf='+'d'.repeat(43);
+  assert.equal(auth.hasAccountSession(),true);
+  document.cookie='';
+  assert.equal(auth.hasAccountSession(),false);
+  document.cookie=saved;
+});
+
+test('first-party sign-up and sign-in dispatch account changes and rotate the cross-tab signal',async()=>{
+  const before=dispatched.length;
+  await auth.signUpAccount({name:'New QA',email:'new@example.invalid',password:'password-123'});
+  const first=store.get(auth.ACCOUNT_SIGNAL_KEY);
+  assert.ok(first);
+  await auth.signInAccount({email:'qa@example.invalid',password:'password-123'});
+  const second=store.get(auth.ACCOUNT_SIGNAL_KEY);
+  assert.ok(second);
+  assert.notEqual(first,second);
+  assert.deepEqual(Object.keys(JSON.parse(first)),['nonce']);
+  assert.deepEqual(Object.keys(JSON.parse(second)),['nonce']);
+  assert.equal(dispatched.slice(before).filter(name=>name==='packone-account-changed').length,2);
+  assert.ok(calls.some(row=>row.path==='/growth/v1/account/signup'));
+  assert.ok(calls.some(row=>row.path==='/growth/v1/account/signin'));
 });

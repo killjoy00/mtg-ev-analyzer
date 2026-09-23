@@ -31,8 +31,15 @@ and use the Patreon controls. **Connect Patreon** links an unconnected account;
 Patreon** removes only Patreon-derived grants and linkage. Switching Patreon identities
 requires an explicit disconnect first.
 
-Supporter helps fund the site and includes future ad-free browsing; Elite also unlocks
-premium practice. Google ads remain disabled for everyone pending approval.
+Supporter ($3) and Elite ($7) both include ad-free browsing while signed in to
+Pack One with Patreon connected and verified; Elite also unlocks premium practice.
+Entitlements are determined from campaign, tier and provider state IDs, never the
+price. A signed-out Patreon member is treated as a guest. One Daily-home-only
+AdSense banner is wired but dormant (`enabled:false`); Google approval,
+consent/privacy work and explicit owner authorization are still required before
+delivery. Pack One-originated account or Patreon transitions clear an existing ad
+across open tabs, but provider/backend changes that never pass through a Pack One
+tab are only picked up after reload.
 
 ## Existing provider configuration
 
