@@ -91,7 +91,7 @@ test('only the signed main trophy import can request fixed serving statistics ma
   await assert.rejects(handleTrophyImport(request(current),async()=>{throw Error('maintenance failed');}),/maintenance failed/);
 });
 
-test('Cube image refresh changes display metadata only',async()=>{
+test('card image refresh changes display metadata only for registered environments',async()=>{
   const rows=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
   const sample=structuredClone(rows[0]);
   const original=structuredClone(sample);
@@ -129,11 +129,16 @@ test('Cube image refresh changes display metadata only',async()=>{
     stored.candidates.map(card=>({id:card.id,name:card.name,model_probability:card.model_probability})),
     original.candidates.map(card=>({id:card.id,name:card.name,model_probability:card.model_probability})),
   );
-  await assert.rejects(refreshTrophyImages(query,'msh',mapping),/limited to Powered Cube/);
+  stored={...structuredClone(original),set_id:'msh'};
+  const regular=await refreshTrophyImages(query,'msh',mapping);
+  assert.equal(regular.set_id,'msh');
+  assert.equal(regular.puzzles,1);
+  assert.equal(stored.candidates.find(card=>card.name===target.name).image_url,replacement);
+  await assert.rejects(refreshTrophyImages(query,'not-a-real-environment',mapping),/registered environment/);
   await assert.rejects(refreshTrophyImages(query,'powered-cube',[{name:target.name,image_url:'http://bad.example/card.jpg'}]),/Invalid image mapping/);
 });
 
-test('legacy image markers clear only after every served card has an HTTPS image',async()=>{
+test('image markers clear only after every served card has an HTTPS image',async()=>{
   const updates=[];
   const query=async(sql,params=[])=>{
     if(sql.includes('SELECT s.corpus_version'))return {rows:[{corpus_version:DRAFT_RUN_CORPUS_VERSION,puzzles:123,missing_images:0}]};
@@ -158,7 +163,9 @@ test('legacy image markers clear only after every served card has an HTTPS image
   };
   await assert.rejects(normalizeResolvedImageMarkers(missingQuery,['hbg']),/images are missing/);
   assert.equal(wrote,false);
-  await assert.rejects(normalizeResolvedImageMarkers(query,['msh']),/limited to verified legacy sets/);
+  const regular=await normalizeResolvedImageMarkers(query,['msh']);
+  assert.deepEqual(regular.normalized.map(item=>item.set_id),['msh']);
+  await assert.rejects(normalizeResolvedImageMarkers(query,['not-a-real-environment']),/registered environments/);
 });
 
 import {verifyCorpusPublicationToken,CORPUS_PUBLICATION_AUDIENCE,CORPUS_PUBLICATION_WORKFLOW} from '../worker/trophy-import-auth.mjs';
