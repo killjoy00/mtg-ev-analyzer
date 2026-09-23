@@ -104,7 +104,7 @@ assert.equal(finish.rank,3);assert.equal(finish.percentile,60);assert.equal(fini
 const old=board+'old';
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date-500,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),old]);
 for(const [offset,suffix] of [[501,'repeat-a'],[502,'repeat-b']]) {
-  await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date-$4,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),board+suffix,offset]);
+  await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date - $4::int,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),board+suffix,offset]);
 }
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT $1::uuid,$2::date-n,$3,'full',40,'D','[]'::jsonb FROM generate_series(2,125) n",[owner.playerId,gameDateKey(),board]);
 p=await call(growth,'/v1/profile/me',undefined,owner.token);assert.equal(p.daily_history.length,120);assert.equal(p.best_final_percentile,10);assert.ok(p.achievements.find(a=>a.id==='top10').unlocked);assert.ok(p.achievements.find(a=>a.id==='top10_repeat').unlocked);
