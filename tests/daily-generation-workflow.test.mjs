@@ -11,7 +11,9 @@ test('Daily generation workflow uses short-lived OIDC and sanitizes endpoint out
   assert.match(source,/br-twilight-hill-ayffyd2b-draftrunapi/);
   assert.match(source,/br-orange-feather-ayps8kep-draftrunapi/);
   assert.match(source,/Unexpected Daily generation response shape/);
-  assert.match(source,/new Set\(\['environment','status','duration_ms'\]\)/);
+  assert.match(source,/new Set\(\['environment','status','error_class','duration_ms'\]\)/);
+  assert.match(source,/availability_error/);
+  assert.match(source,/Daily generation incomplete/);
   assert.doesNotMatch(source,/cat .*daily-generation\.json/);
   assert.doesNotMatch(source,/echo .*TOKEN/);
 });
