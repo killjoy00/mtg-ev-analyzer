@@ -60,7 +60,7 @@ test('production scheduler definitions are narrow, UTC and point only at reviewe
   ]);
 });
 
-test('scheduler reconciliation updates known triggers, creates missing ones, and preserves unrelated triggers',async()=>{
+test('scheduler reconciliation prepares every definition disabled before enabling and preserves unrelated triggers',async()=>{
   const calls=[];
   const existing={
     type:'schedule',
@@ -76,15 +76,38 @@ test('scheduler reconciliation updates known triggers, creates missing ones, and
     calls.push({url:String(url),method:options.method||'GET',body:options.body?JSON.parse(options.body):null});
     if((options.method||'GET')==='GET')return Response.json({triggers:[existing,{name:'unrelated-trigger',type:'schedule'}]});
     const body=JSON.parse(options.body);
-    const trigger={...body,trigger_id:body.name==='pack1-daily-primary'?'trigger-existing':'trigger-'+body.name,inherited:false,next_run_at:'2041-01-01T00:00:00Z'};
+    const id=String(url).includes('/trigger-')?String(url).split('/').at(-1):body.name==='pack1-daily-primary'?'trigger-existing':'trigger-'+body.name;
+    const trigger={...body,trigger_id:id,inherited:false,next_run_at:'2041-01-01T00:00:00.000000Z'};
     return Response.json({trigger},{status:(options.method||'GET')==='POST'?201:200});
   };
   const result=await reconcileNeonSchedulers({enabled:true,apiKey:'napi_'+'x'.repeat(40),fetcher});
   assert.equal(result.enabled,true);
   assert.equal(result.results.length,3);
-  assert.equal(calls.filter(call=>call.method==='PATCH').length,1);
   assert.equal(calls.filter(call=>call.method==='POST').length,2);
+  assert.equal(calls.filter(call=>call.method==='PATCH').length,4);
+  const mutations=calls.filter(call=>call.method!=='GET');
+  assert.deepEqual(mutations.slice(0,3).map(call=>call.body.enabled),[false,false,false]);
+  assert.deepEqual(mutations.slice(3).map(call=>call.body.enabled),[true,true,true]);
   assert.equal(calls.some(call=>JSON.stringify(call.body||{}).includes('unrelated-trigger')),false);
+});
+
+test('scheduler activation rolls every prepared trigger back to disabled when an enable fails',async()=>{
+  const calls=[];let enableCount=0;
+  const fetcher=async(url,options={})=>{
+    const method=options.method||'GET',body=options.body?JSON.parse(options.body):null;
+    calls.push({url:String(url),method,body});
+    if(method==='GET')return Response.json({triggers:[]});
+    if(body.enabled===true&&++enableCount===2)return Response.json({error:'fixture'},{status:500});
+    const id=String(url).includes('/trigger-')?String(url).split('/').at(-1):'trigger-'+body.name;
+    return Response.json({trigger:{...body,trigger_id:id,inherited:false}},{status:method==='POST'?201:200});
+  };
+  await assert.rejects(
+    reconcileNeonSchedulers({enabled:true,apiKey:'napi_'+'x'.repeat(40),fetcher}),
+    /Neon trigger control failed/,
+  );
+  const afterFailure=calls.slice(calls.findIndex(call=>call.body?.enabled===true)+2);
+  assert.equal(afterFailure.length,3);
+  assert.ok(afterFailure.every(call=>call.method==='PATCH'&&call.body.enabled===false));
 });
 
 test('scheduler release is manual-only and verifies exact production function revision before enable',()=>{
