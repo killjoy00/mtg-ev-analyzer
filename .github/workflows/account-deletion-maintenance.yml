@@ -2,8 +2,8 @@ name: account deletion maintenance
 
 on:
   schedule:
-    # Keep the 10-minute recovery cadence, but avoid crowded round-minute GitHub scheduler slots.
-    - cron: '9,19,29,39,49,59 * * * *'
+    # Neon performs maintenance every 10 minutes. GitHub only checks for operator attention.
+    - cron: '17,47 * * * *'
   workflow_dispatch:
 
 permissions:
@@ -32,15 +32,24 @@ jobs:
           echo "::add-mask::$token"
           echo "token=$token" >> "$GITHUB_OUTPUT"
 
-      - name: Resume deletions, sweep expired verification rows, and detect stuck work
+      - name: Run manual recovery or scheduled read-only attention check
         id: run
         shell: bash
         env:
           TOKEN: ${{ steps.oidc.outputs.token }}
-          URL: https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/internal/account-deletion-maintenance
+          EVENT_NAME: ${{ github.event_name }}
         run: |
           set -euo pipefail
-          status=$(curl -sS --max-time 60 -o "$RUNNER_TEMP/maintenance.json" -w '%{http_code}'             -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' "$URL")
+          base=https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/internal
+          if [[ "$EVENT_NAME" == schedule ]]; then
+            url="$base/account-deletion-maintenance-status"
+            mode=attention-check
+          else
+            url="$base/account-deletion-maintenance"
+            mode=manual-recovery
+          fi
+          echo "mode=$mode" >> "$GITHUB_OUTPUT"
+          status=$(curl -sS --max-time 60 -o "$RUNNER_TEMP/maintenance.json" -w '%{http_code}'             -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' "$url")
           cat "$RUNNER_TEMP/maintenance.json"
           node --input-type=module <<'NODE'
           import fs from 'node:fs';
@@ -49,6 +58,7 @@ jobs:
           const lines=[
             '# Account deletion maintenance',
             '',
+            `- mode: ${data.report_only?'attention check':'manual recovery'}`,
             `- deletion enabled: ${Boolean(data.deletion_enabled)}`,
             `- verification sweep enabled: ${Boolean(data.sweep_enabled)}`,
             `- expired verification rows swept: ${data.swept_expired_verifications??'disabled'}`,
