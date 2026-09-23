@@ -54,6 +54,15 @@ test('Draft Run reveal puts continuation before disclosures and restores result 
 });
 
 
+test('Draft Run previous-card context stays visible and visually distinct', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  assert.match(source, /No Previous Cards Selected/);
+  assert.match(source, /Already selected by this drafter\./);
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.run-pool-empty\{[^}]*background:var\(--surface-soft\)/);
+  assert.match(css, /\.run-pool-cards button\{[^}]*background:var\(--surface-soft\)/);
+});
+
 test('Draft Run result footnote keeps its muted spacing', async () => {
   const css = await readFile('draft-run.css', 'utf8');
   assert.match(css, /\.run-result-page \.run-note\{color:var\(--muted\);line-height:1\.6;margin:24px 0\}/);
