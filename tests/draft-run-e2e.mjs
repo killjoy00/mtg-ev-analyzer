@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
 import {chromium} from 'playwright';
-import {selectDraftRun,selectDraftRunReroll,interestingDraftRunPuzzle,publicDraftRunPuzzle,gradeDraftRunPick} from '../draft-run.mjs';
+import {selectDraftRun,selectDraftRunReroll,interestingDraftRunPuzzle,publicDraftRunPuzzle,gradeDraftRunPick,calibratedSupports,supportSharpening} from '../draft-run.mjs';
+import {rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).flatMap(f=>JSON.parse(gunzipSync(fs.readFileSync('corpus/draft-run/'+f)))).filter(interestingDraftRunPuzzle);
@@ -39,7 +40,9 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
   }else if(path.endsWith('/pick')){
     const req=route.request().postDataJSON(),p=puzzles[answers.length];assert.equal(req.revision,revision);assert.equal(req.puzzleId,p.puzzle_id);
     assert.equal(req.viewId,views.at(-1).viewId);assert.ok(Number.isInteger(req.activeMs)&&req.activeMs>=0);
-    answers.push({...gradeDraftRunPick(p,req.cardId),puzzle:publicDraftRunPuzzle(p),ranking:p.candidates.map(c=>({id:c.id,name:c.name,support:c.model_probability,score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
+    const grade=gradeDraftRunPick(p,req.cardId),evidence=rateDraftRunPuzzle(p),calibrated=calibratedSupports(p.candidates,supportSharpening(p.corpus_version));
+    grade.modelTargetDisagreement=evidence.modelTargetDisagreement;
+    answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:[...p.candidates].sort((a,b)=>b.model_probability-a.model_probability).map(c=>({id:c.id,name:c.name,support:calibrated.get(c.id),score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
   }else if(path==='/v1/daily-status')body=eliteAccess?{player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice']}:{player:{claimed:false},capabilities:[]};
   else if(path==='/v1/leaderboard')body={rows:[],period:'daily'};
   else body=snapshot();
@@ -94,27 +97,74 @@ try{
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-mobile.png`,fullPage:true});
   await page.setViewportSize({width:1440,height:1000});await noOverflow();await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-desktop.png`,fullPage:true});await page.setViewportSize({width:390,height:844});
+  const weakChoice=puzzles[0].candidates.filter(c=>c.id!==puzzles[0].historical_pick_id).sort((a,b)=>gradeDraftRunPick(puzzles[0],a.id).score-gradeDraftRunPick(puzzles[0],b.id).score)[0];
+  assert.ok(weakChoice&&gradeDraftRunPick(puzzles[0],weakChoice.id).score<60,'round one fixture provides a weak non-match');
+  assert.equal(rateDraftRunPuzzle(puzzles[0]).modelTargetDisagreement,false,'browser weak-state fixture is not the rare target-disagreement case');
+  const exerciseStrong=!daily&&!cube&&selectionVersion==='eight-pick-v3';
+  const strongRound=exerciseStrong?puzzles.findIndex((p,i)=>i>0&&!rateDraftRunPuzzle(p).modelTargetDisagreement&&p.candidates.some(c=>c.id!==p.historical_pick_id&&gradeDraftRunPick(p,c.id).score>=85)):-1;
+  if(exerciseStrong)assert.ok(strongRound>0,'default browser fixture provides a strong supported alternative after round one');
+  const strongChoice=strongRound>0?puzzles[strongRound].candidates.filter(c=>c.id!==puzzles[strongRound].historical_pick_id&&gradeDraftRunPick(puzzles[strongRound],c.id).score>=85).sort((a,b)=>gradeDraftRunPick(puzzles[strongRound],b.id).score-gradeDraftRunPick(puzzles[strongRound],a.id).score)[0]:null;
   for(let round=0;round<puzzles.length;round++){
     const p=puzzles[round];if(cube)assert.equal(p.set_id,'powered-cube');assert.equal(await page.locator('.run-pool-cards>button').count(),p.pick_number-1);
-    const selected=round===0?p.candidates.filter(c=>c.id!==p.historical_pick_id).sort((a,b)=>a.model_probability-b.model_probability)[0].id:p.historical_pick_id;
+    const selected=round===0?weakChoice.id:round===strongRound?strongChoice.id:p.historical_pick_id;
+    const expectedGrade=gradeDraftRunPick(p,selected);
     await page.locator(`[data-pick="${selected}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
     assert.equal(views.at(-1).puzzleId,p.puzzle_id,'Feedback must not record the next decision as viewed');
-    assert.match(await page.locator('.run-feedback').innerText(),/100/);
-    await page.getByRole('heading',{name:'Model’s strongest choice: '+gradeDraftRunPick(p,p.historical_pick_id).consensusName,exact:true}).waitFor();
-    assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
-    assert.equal(await page.locator('.run-consensus-leaders li').first().locator('[data-zoom]').getAttribute('data-zoom'),p.historical_pick_id);
-    assert.doesNotMatch(await page.locator('.run-consensus-leaders li').first().innerText(),/%/);
-    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),'—');
-    assert.equal(await page.locator('.run-pack-review').getAttribute('open'),null);assert.equal(answers.length,round+1);
-    assert.equal(await page.locator('.run-card-score').count(),0);
+    assert.equal(Number.parseInt(await page.locator('.run-feedback-score').innerText(),10),expectedGrade.score,'visible pick score matches gradeDraftRunPick');
+    assert.equal(await page.evaluate(()=>document.activeElement?.id),'run-feedback-result','locked result receives deterministic focus');
+    assert.equal(await page.locator('.run-analysis').getAttribute('open'),null,'analysis stays collapsed by default');
+    assert.equal(await page.locator('.run-pack-review').getAttribute('open'),null,'pack review stays collapsed by default');
+    assert.equal(await page.locator('.run-card-shop:visible').count(),0,'affiliate links stay out of the compact default result');
+    const domOrder=await page.evaluate(()=>{
+      const next=document.querySelector('#run-next'),analysis=document.querySelector('.run-analysis'),pack=document.querySelector('.run-pack-review');
+      return Boolean(next&&analysis&&pack&&(next.compareDocumentPosition(analysis)&Node.DOCUMENT_POSITION_FOLLOWING)&&(analysis.compareDocumentPosition(pack)&Node.DOCUMENT_POSITION_FOLLOWING));
+    });
+    assert.equal(domOrder,true,'continuation precedes analysis and pack review in DOM order');
+    if(expectedGrade.historicalMatch){
+      assert.match(await page.locator('.run-feedback-copy').innerText(),/You matched the trophy drafter\./);
+      assert.equal(await page.locator('.run-trophy-thumb').count(),0,'trophy matches do not repeat a card thumbnail');
+      assert.equal(await page.locator('.run-feedback-copy p').count(),0,'trophy match needs no filler sentence');
+    }else{
+      assert.equal(await page.locator('.run-trophy-thumb').count(),1,'non-match shows one compact trophy thumbnail');
+      assert.equal(await page.locator('.run-feedback-copy p').count(),1,'compact non-match has at most one explanatory sentence');
+      assert.doesNotMatch(await page.locator('.run-feedback').innerText(),/Model’s strongest|leading model support|partial credit/i);
+      if(round===0)assert.match(await page.locator('.run-feedback-copy p').innerText(),/less support/);
+      if(round===strongRound)assert.match(await page.locator('.run-feedback-copy p').innerText(),/strongly supported alternative/);
+      const wordCount=(await page.locator('.run-feedback').innerText()).trim().split(/\s+/).length;
+      assert.ok(wordCount<45,`compact reveal remains short (${wordCount} words)`);
+    }
     if(round===0){
+      const feedbackBox=await page.locator('.run-feedback').boundingBox();assert.ok(feedbackBox&&feedbackBox.height<280,`compact mobile result stays under 280px (${feedbackBox?.height})`);
       const prefix=`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}`;
       await page.screenshot({path:`${prefix}-reveal-mobile.png`});
       await page.setViewportSize({width:1440,height:1000});await noOverflow();
       await page.screenshot({path:`${prefix}-reveal-desktop.png`});
       await page.setViewportSize({width:390,height:844});await noOverflow();
-      await page.screenshot({path:`${prefix}-consensus-mobile.png`,fullPage:true});
     }
+    await page.keyboard.press('Tab');assert.equal(await page.evaluate(()=>document.activeElement?.id),'run-next','Next pick is the next Tab stop after the focused result');
+    await page.locator('.run-analysis>summary').click();
+    await page.getByRole('heading',{name:'Model’s strongest choice: '+expectedGrade.consensusName,exact:true}).waitFor();
+    assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
+    assert.equal(await page.locator('.run-consensus-leaders li').first().locator('[data-zoom]').getAttribute('data-zoom'),p.historical_pick_id);
+    assert.doesNotMatch(await page.locator('.run-consensus-leaders li').first().innerText(),/%/);
+    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),'—');
+    assert.equal(await page.locator('.run-consensus details').count(),0,'analysis does not retain a nested comparison disclosure');
+    const shops=page.locator('.run-analysis .run-card-shop');
+    assert.ok(await shops.count()>=1,'revealed-card commerce links remain in analysis');
+    assert.equal(await shops.first().getAttribute('rel'),'sponsored noopener');
+    assert.equal(await shops.first().getAttribute('data-tcgplayer-surface'),'draft_run_reveal');
+    assert.match(await shops.first().getAttribute('href'),/^https:\/\/partner\.tcgplayer\.com\//);
+    if(round===0){
+      const beforeClicks=events.filter(event=>event.name==='tcgplayer_click').length;
+      await shops.first().evaluate(el=>{el.addEventListener('click',event=>event.preventDefault(),{once:true});el.click();});
+      for(let i=0;i<30&&events.filter(event=>event.name==='tcgplayer_click').length===beforeClicks;i++)await page.waitForTimeout(50);
+      const commerce=events.filter(event=>event.name==='tcgplayer_click').at(-1);
+      assert.ok(commerce,'TCGplayer reveal click is instrumented');
+      assert.equal(commerce.props.surface,'draft_run_reveal');
+      await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-consensus-mobile.png`,fullPage:true});
+    }
+    assert.equal(answers.length,round+1);
+    assert.equal(await page.locator('.run-card-score').count(),0);
     await page.locator('#run-next').click();
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
@@ -125,7 +175,7 @@ try{
   await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-result-mobile.png`,fullPage:true});
   await page.locator('#run-share').click();await page.waitForFunction(()=>Boolean(window.__runShare));
   assert.equal((await page.locator('#run-share-status').textContent())?.trim(),'');
-  const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.text,new RegExp('🟩{'+(puzzles.length-1)+'}','u'));assert.equal(shared.files,undefined);assert.doesNotMatch(shared.url,/profile|token/);
+  const shared=await page.evaluate(()=>window.__runShare);const expectedSquares=answers.map(a=>a.historicalMatch?'🟩':a.score>=85?'🟦':a.score>=60?'🟨':a.score>=25?'🟧':'⬛').join('');assert.ok(shared.text.includes(expectedSquares),'share text reflects the answers exercised by this browser run');assert.equal(shared.files,undefined);assert.doesNotMatch(shared.url,/profile|token/);
   if(daily){
     assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.url,/daily=1/);assert.match(shared.url,/ref=result_share/);assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
     assert.equal(await page.locator('#run-challenge').count(),0);
