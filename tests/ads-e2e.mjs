@@ -133,7 +133,7 @@ try{
     await page.setViewportSize({width:390,height:844});
     await page.locator('#account-nav').click();
     await page.locator('#account-signin').waitFor();
-    assert.notEqual(await page.locator('[data-ad-slot="home"]').getAttribute('hidden'),null);
+    await page.locator('[data-ad-slot="home"]').waitFor({state:'hidden'});
     assert.equal(await page.locator('ins.adsbygoogle').count(),0);
     assert.equal(state.google,1);
     await page.evaluate(async()=>{(await import('/daily-home.mjs')).renderDailyHome();});
