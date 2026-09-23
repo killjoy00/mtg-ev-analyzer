@@ -8,7 +8,7 @@ Pack One remains the eight-decision game in [CHARTER](CHARTER.md): three univers
 
 | Layer | Verified release |
 | --- | --- |
-| Browser | GitHub Pages serves current `main` (`89ee3ef93f97f57c766e5889076166f6a720a3b9`; Pages deployment 35818127581 passed). The September 23 Patreon closeout adds the Welcome Note route `/?patreon=activate`, focused mobile activation/recovery states, and browser UX-stage funnel markers. PR390 also enables required email-verification Phase 2. |
+| Browser | GitHub Pages serves `main`. Runtime behavior through `89ee3ef93f97f57c766e5889076166f6a720a3b9` passed Pages deployment 35818127581; this documentation closeout does not change browser runtime. The September 23 Patreon release adds the Welcome Note route `/?patreon=activate`, focused mobile activation/recovery states, and browser UX-stage funnel markers. PR390 also enables required email-verification Phase 2. |
 | Production functions | The reviewed secure release for #181 deployed exact revision `aac69a28c4cb70d609fcc78c7ef2de390914c54d` through development and production (run 35817596160). `pack1growth` contains the server-authoritative `elite_activated` transition metric; production smoke 35817596155 and the final live gateway/OAuth smoke passed. |
 | Schema | Reviewed additive migrations through 0033 are applied to development and production, including owned Pack One username uniqueness and the v4 Traditional component guards. Historical destructive migration 0016 was not replayed. |
 | Corpus / selection | `elite-trophy-colour-stage-v8` / `eight-pick-v4`. The v8 parent remains immutable while separately versioned supplemental source components extend current inventory. |
