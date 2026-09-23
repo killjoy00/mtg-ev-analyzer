@@ -78,11 +78,17 @@ let renamed=await call(growth,'/v1/profile',{displayName:leaderboardName},owner.
 assert.equal(renamed.player.display_name,leaderboardName);
 renamed=await call(growth,'/v1/profile',{displayName:leaderboardName},owner.token,200,{method:'PATCH',headers:authHeaders});
 assert.equal(renamed.player.display_name,leaderboardName);
+renamed=await call(growth,'/v1/profile',{showcaseAchievement:'first'},owner.token,200,{method:'PATCH',headers:authHeaders});
+assert.equal(renamed.player.showcase_achievement,'first');
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) VALUES($1::uuid,$2::date,'mixed','draft_run',100,'A','[]'::jsonb) ON CONFLICT DO NOTHING",[owner.playerId,gameDateKey()]);
 const namedBoard=await call(runApi,'/v1/leaderboard?period=daily&environment=mixed');
-assert.equal(namedBoard.rows.find(row=>row.display_name===leaderboardName)?.display_name,leaderboardName);
+const namedRow=namedBoard.rows.find(row=>row.display_name===leaderboardName);
+assert.equal(namedRow?.display_name,leaderboardName);
+assert.equal(namedRow?.showcase_achievement,'first');
 await call(growth,'/v1/profile',{profilePublic:true},owner.token,200,{method:'PATCH',headers:authHeaders});
 const publicProfile=await call(growth,'/v1/profile/'+history.player.profile_key);
+const profileLookup=await call(growth,'/v1/profile-lookup',{names:[leaderboardName]});
+assert.equal(profileLookup.profiles[leaderboardName.toLowerCase()]?.showcase_achievement,'first');
 assert.doesNotMatch(JSON.stringify(publicProfile),/auth_user_id|player_id|@example|token|email|claimed/);
 await call(growth,'/v1/profile',{profilePublic:false},owner.token,200,{method:'PATCH',headers:authHeaders});
 await call(growth,'/v1/profile/'+history.player.profile_key,undefined,undefined,404);
@@ -97,8 +103,11 @@ let p=await call(growth,'/v1/profile/me',undefined,owner.token),finish=p.daily_h
 assert.equal(finish.rank,3);assert.equal(finish.percentile,60);assert.equal(finish.final,true);
 const old=board+'old';
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date-500,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),old]);
+for(const [offset,suffix] of [[501,'repeat-a'],[502,'repeat-b']]) {
+  await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT p.id::uuid,$2::date-$4,$3,'top3',p.score,'B','[]'::jsonb FROM jsonb_to_recordset($1::jsonb)p(id text,score int)",[JSON.stringify([owner.playerId,...peers].map((id,i)=>({id,score:i?50:90}))),gameDateKey(),board+suffix,offset]);
+}
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT $1::uuid,$2::date-n,$3,'full',40,'D','[]'::jsonb FROM generate_series(2,125) n",[owner.playerId,gameDateKey(),board]);
-p=await call(growth,'/v1/profile/me',undefined,owner.token);assert.equal(p.daily_history.length,120);assert.equal(p.best_final_percentile,10);assert.ok(p.achievements.find(a=>a.id==='top10').unlocked);
+p=await call(growth,'/v1/profile/me',undefined,owner.token);assert.equal(p.daily_history.length,120);assert.equal(p.best_final_percentile,10);assert.ok(p.achievements.find(a=>a.id==='top10').unlocked);assert.ok(p.achievements.find(a=>a.id==='top10_repeat').unlocked);
 const achievementsBefore=(await query("SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='achievement_unlocked'",[owner.playerId])).rows[0].n;
 await call(growth,'/v1/profile/me',undefined,owner.token);
 assert.equal((await query("SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='achievement_unlocked'",[owner.playerId])).rows[0].n,achievementsBefore);
