@@ -40,6 +40,22 @@ jobs:
         with:
           node-version: 24
 
+      - name: Enforce Pacific calendar cutover window
+        shell: bash
+        run: |
+          set -euo pipefail
+          eastern_hour=$(TZ=America/New_York date +%H)
+          if (( 10#$eastern_hour < 3 )); then
+            echo '::error::Pacific Daily calendar cutover is allowed only from 03:00 through 23:59 Eastern.'
+            exit 1
+          fi
+          {
+            echo '### Pacific Daily calendar cutover safety'
+            echo
+            echo '- Migration started inside the 03:00-23:59 Eastern release window.'
+            echo '- The production deploy must finish before midnight Eastern; otherwise revert the merge before midnight.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
       - name: Resolve reviewed commit and target
         shell: bash
         run: |
