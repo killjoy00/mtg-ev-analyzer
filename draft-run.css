@@ -60,6 +60,7 @@
 .run-consensus th:first-child{width:65%}.run-consensus td{white-space:nowrap}
 .run-consensus .run-model-note{margin-top:12px;color:var(--muted);font-size:12px}
 .run-image-share{margin:12px 0}
+.run-result-page .run-note{color:var(--muted);line-height:1.6;margin:24px 0}
 
 @media(min-width:601px){
   .run-feedback{flex-wrap:nowrap}
