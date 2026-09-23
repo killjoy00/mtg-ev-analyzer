@@ -9,6 +9,7 @@ if (location.hostname === 'killjoy00.github.io') {
 
 const params = new URLSearchParams(location.search);
 if (params.get('ref') === 'result_share' && params.get('game') === 'draft-run' && params.get('daily') === '1') {
+  window.PACK1_ENTRY_SOURCE = 'result_share';
   params.delete('ref');
   history.replaceState({}, '', `${location.pathname}${params.size ? '?' + params : ''}${location.hash}`);
   const { trackEvent } = await import('./retention-events.mjs');

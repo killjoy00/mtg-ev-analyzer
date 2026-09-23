@@ -9,7 +9,7 @@ const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).fla
 const environment=process.env.PACK1_TEST_ENVIRONMENT||'mixed',cube=environment==='powered-cube';
 const selectionVersion=process.env.PACK1_TEST_SELECTION_VERSION||'eight-pick-v3';
 const daily=process.env.PACK1_TEST_DAILY==='1';
-let shareCalls=0,eliteAccess=false,adGoogle=0,adMembership=0;
+let shareCalls=0,eliteAccess=false,adGoogle=0,adMembership=0,runStarts=[];
 let puzzles=selectDraftRun(corpus,'browser-contract',environment,{selectionVersion}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
 const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
@@ -28,7 +28,8 @@ await page.route('**/*-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async
 });
 await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
   const path=new URL(route.request().url()).pathname;let body;
-  if(path.endsWith('/share')){shareCalls++;body={id:shareId};}
+  if(path==='/v1/runs'&&route.request().method()==='POST'){runStarts.push(route.request().postDataJSON());body=snapshot();}
+  else if(path.endsWith('/share')){shareCalls++;body={id:shareId};}
   else if(path.endsWith('/view')){const req=route.request().postDataJSON();assert.equal(req.revision,revision);assert.equal(req.puzzleId,puzzles[answers.length].puzzle_id);views.push(req);body={ok:true};}
   else if(path.includes('/challenges/')||path.includes('/shared-runs/'))body={id:shareId,name:'Your friend',score:88,environment,run_length:puzzles.length};
   else if(path.endsWith('/reroll')){
@@ -123,6 +124,8 @@ try{
     assert.equal(await page.locator('#run-challenge').count(),0);
     await page.goto(shared.url);
     await page.waitForFunction(()=>!new URL(location.href).searchParams.has('ref'));
+    await page.waitForFunction(()=>Boolean(new URL(location.href).searchParams.get('run')));
+    assert.equal(runStarts.at(-1).source,'result_share');
     for(let i=0;i<30&&!events.some(event=>event.name==='daily_share_arrival');i++)await page.waitForTimeout(100);
     const arrivals=events.filter(event=>event.name==='daily_share_arrival');
     assert.equal(arrivals.length,1);assert.equal(arrivals[0].props.source,'result_share');assert.equal(arrivals[0].props.daily,true);
