@@ -1,7 +1,7 @@
 {
   "operation": "daily-calendar-migration",
-  "request_id": "daily-pacific-migration-prod-20260923",
-  "reason": "Apply reviewed migration 0035 to production after development migration deploy and OIDC Daily generation verification all passed.",
+  "request_id": "daily-pacific-migration-prod-20260923-v2",
+  "reason": "Apply reviewed migration 0035 to production after development migration, exact-SHA deploy, and Daily generation verification passed.",
   "commit": "75c3519eb262815acb8f8901603056cbe32dc7af",
   "target": "production"
 }
