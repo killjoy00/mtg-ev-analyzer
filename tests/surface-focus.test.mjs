@@ -43,7 +43,12 @@ test('Draft Run reveal puts continuation before disclosures and restores result 
   assert.match(render,/id="run-feedback-result" tabindex="-1"/);
   assert.match(render,/focus\(\{preventScroll:true\}\)/);
   assert.doesNotMatch(render,/aria-live=/);
+  assert.match(source,/function compactRevealCards/);
+  assert.match(source,/Trophy and Your Pick/);
+  assert.doesNotMatch(source,/compactTrophyThumbnail|run-trophy-thumb/);
   const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.run-reveal-pick\{flex:0 0 108px;width:108px/);
+  assert.match(css, /@media\(max-width:600px\)[\s\S]*\.run-reveal-pick\{flex-basis:92px;width:92px\}/);
   assert.match(css, /@media\(min-width:601px\)[\s\S]*\.run-feedback\{flex-wrap:nowrap\}/);
   assert.match(css, /\.run-next-dock #run-next\{white-space:nowrap\}/);
 });
