@@ -8,6 +8,7 @@ test('production measurement suite fails closed unless Neon reports the producti
   assert.match(source,/measurement_samples:/);
   assert.match(source,/options:\s*\['1', '2', '3'\]/);
   assert.match(source,/NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}/);
+  assert.match(source,/env -u NEON_API_KEY PACK1_DAILY_FIRST/);
   assert.match(source,/patient-shadow-91417882/);
   assert.match(source,/br-orange-feather-ayps8kep/);
   assert.match(source,/branches\/\$\{branch\}\/endpoints/);
