@@ -1,10 +1,12 @@
 # Pack One monetization
 
-Updated September 19, 2026. Google ads remain disabled at the owner's direction while approval is pending. Public Patreon linking is active.
+Updated September 23, 2026. Google ads remain disabled at the owner's direction while approval is pending. Public Patreon linking and the Elite post-purchase activation flow are active.
 
 ## Membership
 
 The $3 Supporter and $5 Elite Member tiers both include ad-free browsing while signed in to Pack One with Patreon connected. Only Elite grants unlimited Cube practice and custom-set practice; regular practice remains free for authenticated accounts. Exact campaign/tier matching is authoritative, never payment amount.
+
+The Elite Patreon Welcome Note directs members to `https://packone.pro/?patreon=activate`. Pack One signs the member into the existing account flow as needed, authorizes Patreon only when necessary, and unlocks benefits only from authoritative provider-derived capabilities. Browser `patreon_activation_succeeded` is descriptive UX telemetry; conversion/abandonment reporting uses the server-only `elite_activated` entitlement transition with a 24-hour maturity window. Issue #181 is closed.
 
 The ad loader checks backend membership before requesting Google's script. Supporter/Elite members receive no Google script or ad slot. Unknown, stale, pending, failed or older-backend membership responses keep ads hidden. Account changes immediately clear existing slots. Static placeholders are hidden even with JavaScript disabled. `?adpreview=1` cannot bypass disabled advertising. No ads appear in active gameplay, and no ad slots have been added to the homepage.
 

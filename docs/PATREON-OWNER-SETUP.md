@@ -1,19 +1,38 @@
 # Patreon setup and owner operations
 
-Setup is complete. Public Patreon linking is live. Your real Elite connection,
-disconnect/reconnect, custom-set practice and creator API reconciliation passed
-on September 19, 2026. No further setup or credentials are needed now.
+Setup is complete. Public Patreon linking and the Elite post-purchase activation
+flow are live. The real Elite connection, disconnect/reconnect, custom-set practice
+and creator API reconciliation passed September 19, 2026. The Welcome Note activation
+flow and server-authoritative activation measurement closed issue #181 on September
+23, 2026. No further setup or credentials are needed now.
 
-## Normal member connection
+## Normal Elite post-purchase activation
 
-1. Open [Pack One](https://packone.pro/) and sign in.
-2. Open **Account** on Pack One, then find **Patreon** and select **Connect Patreon**.
-3. Authorize the Patreon account with the intended membership and return to Pack One.
-4. Elite members can select **Choose your sets** on the homepage or start Cube practice.
+The Elite tier Welcome Note points members to:
 
-This Account menu is on Pack One, not in Patreon's own navigation. Supporter helps
-fund the site and includes future ad-free browsing; Elite also unlocks premium
-practice. Google ads remain disabled for everyone pending approval.
+`https://packone.pro/?patreon=activate`
+
+1. Open the activation link from the Patreon Welcome Note.
+2. Sign in to Pack One if needed.
+3. If the Pack One account is not already linked and entitled, authorize Patreon and
+   return to Pack One.
+4. When authoritative capabilities show Elite, Pack One shows **Elite is active** and
+   exposes **Choose your sets** and Powered Cube practice.
+
+An already-entitled Elite account intentionally stops at **Elite is active** without
+another OAuth round trip. That steady-state visit is not a new `elite_activated`
+transition.
+
+## Account Patreon controls
+
+For manual linking or recovery, sign in to Pack One, open **My Pack One → Account**,
+and use the Patreon controls. **Connect Patreon** links an unconnected account;
+**Refresh Patreon access** reauthorizes the same linked Patreon identity; **Disconnect
+Patreon** removes only Patreon-derived grants and linkage. Switching Patreon identities
+requires an explicit disconnect first.
+
+Supporter helps fund the site and includes future ad-free browsing; Elite also unlocks
+premium practice. Google ads remain disabled for everyone pending approval.
 
 ## Existing provider configuration
 

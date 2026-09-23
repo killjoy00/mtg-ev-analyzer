@@ -1,11 +1,11 @@
 # Request and identity integrity
 
-Reviewed 2026-09-21. Backend changes that depend on schema changes require the matching migration before function deployment; merging code does not deploy Neon Functions.
+Reviewed 2026-09-23. Backend changes that depend on schema changes require the matching migration before function deployment; merging code does not deploy Neon Functions.
 
 ## Implemented protections
 
 - Both legacy and growth APIs use `worker/request-json.mjs`: JSON objects only, valid UTF-8, at most 128 KiB measured while streaming, with explicit 400/413/415 responses. Session creation validates before token/identity work; invalid bodies no longer silently create guests.
-- Analytics submission requires a signed guest/player token. Browser submissions cannot create server-owned account, public-profile, achievement or Draft Run start/completion milestones. Legacy browser events such as `game_start`, `daily_completed` and `challenge_complete` remain descriptive client observations; they are not proof of scoring or unique humans. Authoritative results remain in `scores` and `game_results`.
+- Analytics submission requires a signed guest/player token. Browser submissions cannot create server-owned account, public-profile, achievement, Draft Run start/completion, or Patreon entitlement milestones. `elite_activated` is reserved server-only and is written only by the authoritative Patreon grant transition; `/v1/events` rejects it from browser payloads. Browser `patreon_activation_succeeded`, like legacy `game_start`, `daily_completed` and `challenge_complete`, is descriptive client observation rather than proof of entitlement, scoring, or unique humans. Authoritative Patreon activation remains in provider/grant state plus the server-written transition event; authoritative game results remain in `scores` and `game_results`.
 - Atomic database counters limit a player to 300 accepted analytics events per minute, 60 legacy career-result submissions per ten minutes, and 30 new Draft Run/Cube sessions per ten minutes. A resumed Daily returns before consuming a creation limit. Answering/resuming existing games remains available. Counters reuse one row per player/scope, work across function instances, reset after their window and return HTTP 429 with `Retry-After`.
 - Production CORS excludes localhost by default. An isolated local-development function may set `PACK1_ALLOW_LOCALHOST=1`; production should leave it unset. CORS is a browser policy, not authentication or an abuse firewall.
 - Growth JSON responses use `Cache-Control: no-store`; unexpected legacy database errors return a generic error. Fresh legacy signing-key initialization uses cryptographic random bytes, preserving any existing key.
