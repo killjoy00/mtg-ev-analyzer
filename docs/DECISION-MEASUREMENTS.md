@@ -55,6 +55,15 @@ never zero. Client timing is descriptive and cannot affect game scores.
   Model disagreement means the trophy card has less than 20% of the strongest
   candidate's model support, matching the existing scoring explanation flag.
 
+The owner console also shows the Daily result-share funnel: marked share-link
+arrivals, unique arriving browser identities, new Daily runs whose authoritative
+`daily_started` event carries `source=result_share`, and completions matched by
+run ID. Start conversion is starts / arrivals; completion conversion is completed
+attributed starts / attributed starts. Arrivals are best-effort client analytics,
+while starts and completions are server-written. The funnel follows the selected
+date range and environment only; the decision-specific run type, set, difficulty,
+pick and selection-version filters do not apply.
+
 Filters cover UTC date range (up to one year), environment, run type, set,
 difficulty band, real pick number and selection version. Groups show difficulty,
 pick depth, game position, set, model disagreement and the combined scoring /
