@@ -6,6 +6,7 @@ import {accountIdentity,linkedPlayerIdentity,rankingIdentityStatus} from './acco
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {verifyDailyGenerationToken} from './daily-generation-auth.mjs';
+import {DAILY_ENVIRONMENTS,generateDailyEnvironmentResults} from './daily-generation-results.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import growth, { query, player, readJson, json, withCors, gameDateKey } from './growth-function.js';
@@ -26,7 +27,6 @@ const runLength = s => s.puzzle_ids.length;
 const parse = value => typeof value === 'string' ? JSON.parse(value) : value;
 const fail = (message,status=400) => { throw Object.assign(new Error(message),{status}); };
 const DAILY_GENERATION_PATH='/internal/daily-generation';
-const DAILY_ENVIRONMENTS=['mixed','powered-cube','latest'];
 const DAILY_SCHEDULE_SELECT='SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets,serving_policy_version FROM draft_run_schedules WHERE day=$1::date AND environment=$2';
 const bearer=request=>{
   const value=String(request.headers.get('authorization')||'');
@@ -144,19 +144,16 @@ async function generateDailySchedules(request) {
   if(Object.keys(body).some(key=>key!=='day'))fail('Unexpected Daily generation input.');
   const day=String(body.day||''),currentDay=gameDateKey();
   if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||day!==currentDay)fail('Daily generation day denied.',409);
-  const started=Date.now(),results=[];
-  for(const environment of DAILY_ENVIRONMENTS) {
-    const environmentStarted=Date.now();
-    try {
-      const {created}=await ensureDailySchedule(day,environment);
-      results.push({environment,status:created?'created':'already_exists',duration_ms:Math.max(0,Date.now()-environmentStarted)});
-    } catch {
-      const duration_ms=Math.max(0,Date.now()-started);
-      console.error(JSON.stringify({event:'daily_generation_failed',date:day,environment,error_class:'generation_failed'}));
-      return json({ok:false,date:day,environment,success:false,error_class:'generation_failed',duration_ms},500);
-    }
-  }
-  return json({ok:true,date:day,success:true,results,duration_ms:Math.max(0,Date.now()-started)});
+  const started=Date.now();
+  const results=await generateDailyEnvironmentResults(day,ensureDailySchedule);
+  for(const row of results)if(row.status==='failed')console.error(JSON.stringify({
+    event:'daily_generation_failed',
+    date:day,
+    environment:row.environment,
+    error_class:row.error_class,
+  }));
+  const success=results.every(row=>row.status!=='failed');
+  return json({ok:success,date:day,success,results,duration_ms:Math.max(0,Date.now()-started)},success?200:500);
 }
 
 async function start(request) {
