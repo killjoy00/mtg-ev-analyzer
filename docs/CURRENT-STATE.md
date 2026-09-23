@@ -51,6 +51,16 @@ Signed webhook delivery is no longer wholly unobserved, and the route is no long
 
 The temporary performance/SQL test branch `release-tournament-20260919` (`br-cold-flower-ay5yimu1`) is isolated from serving and suspends while idle.
 
+## Passwordless account deletion verification
+
+The reviewed implementation now supports fresh deletion proof for an authenticated account without a password by sending a Pack One-owned, approximately 10-minute one-time code to the current verified Auth email. The existing current-password deletion proof and the durable deletion/recovery pipeline are unchanged. The browser/backend contract is additive through `deletion.method`, so an older browser remains safe against a newer backend and a newer browser keeps the old Google-only deletion-disabled state when an older backend omits the field.
+
+The new temporary state is `account_deletion_verifications`: one row per Auth UUID containing only a keyed code HMAC and timestamps. Production delivery uses the dedicated send-only `PACK1_ACCOUNT_DELETE_RESEND_API_KEY` and constant sender `Pack One <accounts@packone.pro>`; development intentionally receives no deletion-mail key. The health field `deletion_email_configured` reports only locally well-formed key presence (the expected `re_` shape), not provider credential validity, domain verification, or delivery.
+
+Production throwaway delivery test: pending post-merge release validation.
+
+Google-only password-reset-to-password behavior remains unverified and is not a blocker. The same provider-independent deletion-email design can support future Sign in with Apple accounts, but Apple private-relay delivery/domain configuration remains separate future rollout work; Apple authentication is not implemented by this change.
+
 ## Architecture and future changes
 
 ### Runtime boundary

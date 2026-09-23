@@ -330,12 +330,34 @@ export async function changeAccountPassword({currentPassword,newPassword}) {
   clearLegacyAuth();
   return data;
 }
-export async function deleteAccount({currentPassword}={}) {
+export async function startAccountDeletionVerification() {
   if(!firstPartyAuthEnabled())throw new Error('Account deletion requires the secure account session.');
   await ensureMigrations();
+  try {
+    return await api('/v1/account/delete/verification/start',{
+      method:'POST',
+      body:{confirm:true},
+      auth:false,
+    });
+  } catch(error) {
+    const status=Number(error?.status||0);
+    if(!status||(([403,404].includes(status))&&!error?.code)) {
+      throw Object.assign(new Error('Account deletion verification is temporarily unavailable. Please try again.'),{
+        status:503,code:'DELETION_VERIFICATION_UNAVAILABLE',
+      });
+    }
+    throw error;
+  }
+}
+export async function deleteAccount({currentPassword,code}={}) {
+  if(!firstPartyAuthEnabled())throw new Error('Account deletion requires the secure account session.');
+  await ensureMigrations();
+  const body={confirm:true};
+  if(currentPassword!==undefined)body.currentPassword=String(currentPassword||'');
+  if(code!==undefined)body.code=String(code||'');
   const data=await api('/v1/account/delete',{
     method:'POST',
-    body:{currentPassword:String(currentPassword||''),confirm:true},
+    body,
     auth:false,
   });
   // The deletion tombstone is committed before this response. From this point

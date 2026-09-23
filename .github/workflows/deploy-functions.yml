@@ -37,6 +37,7 @@ jobs:
       PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
       PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
       PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
+      PACK1_ACCOUNT_DELETE_RESEND_API_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,11 +59,19 @@ jobs:
           git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
           git checkout --detach "$RELEASE_COMMIT"
           case "$RELEASE_TARGET" in
-            development) branch=br-twilight-hill-ayffyd2b ;;
-            production) branch=br-orange-feather-ayps8kep ;;
+            development)
+              branch=br-twilight-hill-ayffyd2b
+              deletion_email_expected=false
+              ;;
+            production)
+              branch=br-orange-feather-ayps8kep
+              [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
+              deletion_email_expected=true
+              ;;
             *) exit 1 ;;
           esac
           echo "TARGET_BRANCH=$branch" >> "$GITHUB_ENV"
+          echo "DELETION_EMAIL_EXPECTED=$deletion_email_expected" >> "$GITHUB_ENV"
           echo "Deploying $RELEASE_COMMIT to $RELEASE_TARGET ($branch)"
 
       - name: Install pinned release tools
@@ -81,7 +90,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node tests/release-functions-smoke.mjs br-twilight-hill-ayffyd2b "$RELEASE_COMMIT" --daily
+          node tests/release-functions-smoke.mjs br-twilight-hill-ayffyd2b "$RELEASE_COMMIT" --daily --expect-deletion-email=false
           # The old frontend assumes ten picks. It must be replaced first.
           curl -fsS --max-time 30 https://packone.pro/draft-run-format.mjs -o "$RUNNER_TEMP/run-format.mjs"
           grep -q 'function draftRunLength' "$RUNNER_TEMP/run-format.mjs"
@@ -112,6 +121,9 @@ jobs:
                 --env "PACK1_DELETION_ADMIN_PASSWORD=$PACK1_DELETION_ADMIN_PASSWORD"
                 --env "PACK1_ACCOUNT_DELETION_ENABLED=1"
                 --env "PACK1_VERIFICATION_SWEEP_ENABLED=1")
+              if [[ "$RELEASE_TARGET" == production ]]; then
+                extra+=(--env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY")
+              fi
               if [[ "$RELEASE_TARGET" == production && "$PATREON_RUNTIME_ENABLED" == true ]]; then
                 extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
               fi
@@ -124,4 +136,4 @@ jobs:
       # "completed" deployment is not yet guaranteed to be what every instance
       # answers with. The closing marker check inside the smoke stays strict.
       - name: Verify revision, coverage and complete all three unranked Daily flows
-        run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$RELEASE_COMMIT" --daily --settle
+        run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$RELEASE_COMMIT" --daily --settle "--expect-deletion-email=$DELETION_EMAIL_EXPECTED"

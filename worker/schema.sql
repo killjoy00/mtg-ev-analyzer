@@ -125,6 +125,17 @@ CREATE UNIQUE INDEX IF NOT EXISTS account_deletion_player_tombstone_uq
 CREATE INDEX IF NOT EXISTS account_deletion_nonterminal_idx
   ON account_deletion_operations(updated_at,operation_id) WHERE state <> 'complete';
 
+-- Short-lived proof for passwordless account deletion. Only a keyed HMAC is
+-- persisted; a resend replaces the single row for the authenticated Auth UUID.
+CREATE TABLE IF NOT EXISTS account_deletion_verifications (
+  auth_user_id uuid PRIMARY KEY,
+  code_hmac text NOT NULL CHECK (code_hmac ~ '^[a-f0-9]{64}$'),
+  created_at timestamptz NOT NULL DEFAULT now(),
+  expires_at timestamptz NOT NULL
+);
+CREATE INDEX IF NOT EXISTS account_deletion_verifications_expiry_idx
+  ON account_deletion_verifications(expires_at);
+
 -- Identity attachment/deletion serialization must take a fresh visibility
 -- snapshot after waiting on the per-Auth-user advisory lock. Keeping the lock
 -- and tombstone check inside one caller statement can retain a pre-wait
