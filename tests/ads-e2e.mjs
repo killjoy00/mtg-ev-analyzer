@@ -270,7 +270,10 @@ try{
     const context=await browser.newContext({viewport:{width:390,height:844}}),page=await context.newPage();
     const state=await installRoutes(page,{signed:false,config:'disabled'});
     await page.goto(base+'/?game=draft-run');
-    await page.locator('.run-cards').waitFor();
+    await page.evaluate(async()=>{
+      await (await import('/ads.mjs')).adsReady;
+      await new Promise(resolve=>requestAnimationFrame(()=>resolve()));
+    });
     assert.equal(await page.locator('.tcg-affiliate-promo').count(),0,'gameplay never renders the affiliate fallback');
     assert.notEqual(await page.locator('[data-ad-slot="home"]').getAttribute('hidden'),null);
     assert.equal(state.google,0);
