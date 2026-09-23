@@ -65,7 +65,7 @@ jobs:
               ;;
             production)
               branch=br-orange-feather-ayps8kep
-              [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
+              [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
               deletion_email_expected=true
               ;;
             *) exit 1 ;;
