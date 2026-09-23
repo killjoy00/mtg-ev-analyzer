@@ -5,7 +5,14 @@ import assert from 'node:assert/strict';
 
 const [branch,commit]=process.argv.slice(2);
 if(!/^br-[a-z0-9-]+$/.test(branch||'')||!/^[a-f0-9]{40}$/.test(commit||'')) {
-  throw Error('Usage: secure-auth-release-smoke.mjs BRANCH_ID FULL_COMMIT_SHA [--settle]');
+  throw Error('Usage: secure-auth-release-smoke.mjs BRANCH_ID FULL_COMMIT_SHA [--settle] [--expect-deletion-email=true|false]');
+}
+const emailExpectationArg=process.argv.find(value=>value.startsWith('--expect-deletion-email='));
+let expectedDeletionEmail=null;
+if(emailExpectationArg) {
+  const value=emailExpectationArg.split('=',2)[1];
+  if(!['true','false'].includes(value))throw Error('--expect-deletion-email must be true or false.');
+  expectedDeletionEmail=value==='true';
 }
 const settle=process.argv.includes('--settle');
 const settleMs=settle?10*60*1000:0;
@@ -58,6 +65,8 @@ async function waitForGrowthHealth() {
 const growth=await waitForGrowthHealth();
 assert.equal(growth.account_deletion_enabled,true,'account deletion kill switch must be enabled');
 assert.equal(growth.verification_sweep_enabled,true,'verification sweep kill switch must be enabled');
+if(expectedDeletionEmail!==null)
+  assert.equal(growth.deletion_email_configured,expectedDeletionEmail,'deletion email configuration');
 
 // Non-destructive route proof: the endpoint must be mounted, accept only the
 // trusted first-party origin, and reject a request without the secure account
