@@ -63,7 +63,7 @@ try{
   assert.equal(await page.locator('[data-ad-slot="home"]:visible').count(),0,'game view never exposes the home ad slot');
   assert.equal(adGoogle,0,'enabled mock still makes no Google request in gameplay');
   assert.equal(adMembership,0,'gameplay is rejected before membership lookup');
-  assert.equal(await page.locator('.run-steps li').count(),puzzles.length);assert.equal(await page.locator('.run-pool').count(),cube?1:0);assert.equal(await page.locator('.run-card-score').count(),0);
+  assert.equal(await page.locator('.run-steps li').count(),puzzles.length);assert.equal(await page.locator('.run-pool').count(),1,'previous-card context always has a top slot');assert.equal(await page.locator('.run-pool-empty').count(),puzzles[0].pick_number===1?1:0);if(puzzles[0].pick_number===1)assert.equal((await page.locator('.run-pool-empty').innerText()).trim(),'No Previous Cards Selected');assert.equal(await page.locator('.run-card-score').count(),0);
   assert.doesNotMatch(await page.locator('.run-heading').innerText(),/difficulty/i);
   const displayNames=JSON.parse(fs.readFileSync('data/set-display-names.json','utf8')).names;
   await page.waitForFunction(name=>document.querySelector('.run-heading')?.textContent.includes(name),displayNames[puzzles[0].set_id]);
@@ -105,7 +105,7 @@ try{
   if(exerciseStrong)assert.ok(strongRound>0,'default browser fixture provides a strong supported alternative after round one');
   const strongChoice=strongRound>0?puzzles[strongRound].candidates.filter(c=>c.id!==puzzles[strongRound].historical_pick_id&&gradeDraftRunPick(puzzles[strongRound],c.id).score>=85).sort((a,b)=>gradeDraftRunPick(puzzles[strongRound],b.id).score-gradeDraftRunPick(puzzles[strongRound],a.id).score)[0]:null;
   for(let round=0;round<puzzles.length;round++){
-    const p=puzzles[round];if(cube)assert.equal(p.set_id,'powered-cube');assert.equal(await page.locator('.run-pool-cards>button').count(),p.pick_number-1);
+    const p=puzzles[round];if(cube)assert.equal(p.set_id,'powered-cube');assert.equal(await page.locator('.run-pool-cards>button').count(),p.pick_number-1);assert.equal(await page.locator('.run-pool-empty').count(),p.pick_number===1?1:0,'only first-pick states show the empty previous-card box');if(p.pick_number>1){assert.equal(await page.locator('.run-pool-note').innerText(),'Already selected by this drafter.');assert.notEqual(await page.locator('.run-pool-cards>button').first().evaluate(el=>getComputedStyle(el).backgroundColor),'rgba(0, 0, 0, 0)','previous cards use an off-color tile background');}
     const selected=round===0?weakChoice.id:round===strongRound?strongChoice.id:p.historical_pick_id;
     const expectedGrade=gradeDraftRunPick(p,selected);
     await page.locator(`[data-pick="${selected}"]`).click();await page.locator('#run-lock').click();await page.locator('#run-next').waitFor();
