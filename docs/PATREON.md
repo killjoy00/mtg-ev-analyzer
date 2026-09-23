@@ -145,9 +145,13 @@ not substitute for the real provider canary.
 
 ## Remaining real-provider acceptance
 
-A real billing/tier change and an actual signed provider webhook delivery have
-not been observed. Real connection/reconnection and authoritative API sync do not
-substitute for those events. Automated fixtures cover tier changes, revocation,
+A signature-valid, campaign-matching webhook receipt has been observed in
+production. That receipt confirms the deployed handler accepted a correctly signed
+member event, but it does not by itself prove a genuine Patreon billing/tier
+transition or uniquely prove Patreon authored the request. A real billing/tier
+change correlated with provider delivery and reconciliation evidence has not yet
+been observed. Real connection/reconnection and authoritative API sync do not
+substitute for that evidence. Automated fixtures cover tier changes, revocation,
 signatures, ordering, expiry and manual-grant preservation. Observe the next
 legitimate provider change without purchasing or cancelling subscriptions solely
 for testing. Started practice retains its recorded session; new paid practice
