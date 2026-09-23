@@ -89,10 +89,10 @@ function credentialSummary(){
   try{return JSON.parse(out);}catch{throw Error('Credential verification summary returned unexpected output.');}
 }
 export function validateRequest(value){
-  assert(value&&typeof value==='object'&&!Array.isArray(value),'Invalid optional verification request.');
-  assert(JSON.stringify(Object.keys(value).sort())===JSON.stringify(['operation','reason','required_worker_commit']),'Invalid optional verification request keys.');
-  assert(value.operation==='enable-optional-email-verification','Invalid optional verification operation.');
-  assert(typeof value.reason==='string'&&value.reason.trim().length>=12,'Invalid optional verification reason.');
+  assert(value&&typeof value==='object'&&!Array.isArray(value),'Invalid required verification request.');
+  assert(JSON.stringify(Object.keys(value).sort())===JSON.stringify(['operation','reason','required_worker_commit']),'Invalid required verification request keys.');
+  assert(value.operation==='enable-required-email-verification','Invalid required verification operation.');
+  assert(typeof value.reason==='string'&&value.reason.trim().length>=12,'Invalid required verification reason.');
   assert(/^[a-f0-9]{40}$/.test(String(value.required_worker_commit||'')),'Invalid required Worker commit.');
   return value;
 }
@@ -103,12 +103,12 @@ async function verifyWorker(commit,fetcher=fetch){
   assert(body?.service==='pack1authhook'&&body?.environment==='production','Production Auth Worker identity mismatch.');
   assert(body?.release_commit===commit,'Production Auth Worker release marker mismatch.');
 }
-export function optionalTarget(original){
+export function requiredTarget(original){
   return {
     ...safeEmailConfig(original),
     enabled:true,
     email_verification_method:'link',
-    require_email_verification:false,
+    require_email_verification:true,
     auto_sign_in_after_verification:true,
     send_verification_email_on_sign_up:true,
     send_verification_email_on_sign_in:false,
@@ -127,23 +127,23 @@ export async function runProduction({fetcher=fetch}={}){
 
   const users=credentialSummary();
   assert(Number(users.credential_count)===4,'Expected exactly four credential users for the approved migration.');
-  assert(Number(users.verified_count)===4&&Number(users.unverified_count)===0,'All migrated credential users must be verified before Phase 1.');
+  assert(Number(users.verified_count)===4&&Number(users.unverified_count)===0,'All credential users must be verified before Phase 2.');
   assert(Number(users.other_provider_links)===0,'Credential migration population unexpectedly has linked providers.');
 
   const original=emailConfig();
   const baseline={
     enabled:true,
-    email_verification_method:'otp',
+    email_verification_method:'link',
     require_email_verification:false,
     auto_sign_in_after_verification:true,
-    send_verification_email_on_sign_up:false,
+    send_verification_email_on_sign_up:true,
     send_verification_email_on_sign_in:false,
     disable_sign_up:false,
   };
-  const target=optionalTarget(original);
+  const target=requiredTarget(original);
 
   if(same(original,target)){
-    console.log('PRODUCTION_OPTIONAL_EMAIL_VERIFICATION '+JSON.stringify({changed:false,before:original,after:original,users}));
+    console.log('PRODUCTION_REQUIRED_EMAIL_VERIFICATION '+JSON.stringify({changed:false,before:original,after:original,users}));
     return;
   }
   assert(same(original,baseline),'Production email/password policy no longer matches the reviewed Phase 1 baseline.');
@@ -152,17 +152,17 @@ export async function runProduction({fetcher=fetch}={}){
   try{
     const after=updateEmailConfig(target);
     changed=true;
-    assert(same(after,target),'Production optional verification policy did not reach the exact target.');
+    assert(same(after,target),'Production required verification policy did not reach the exact target.');
     await verifyWorker(request.required_worker_commit,fetcher);
-    assert(allowLocalhost()===false,'Production localhost allowance changed during Phase 1 rollout.');
-    console.log('PRODUCTION_OPTIONAL_EMAIL_VERIFICATION '+JSON.stringify({changed:true,before:original,after,users}));
+    assert(allowLocalhost()===false,'Production localhost allowance changed during Phase 2 rollout.');
+    console.log('PRODUCTION_REQUIRED_EMAIL_VERIFICATION '+JSON.stringify({changed:true,before:original,after,users}));
   }catch(error){
     if(changed){
       try{
         const restored=updateEmailConfig(original);
         if(!same(restored,original))throw Error('rollback mismatch');
       }catch{
-        throw Error('Phase 1 verification rollout failed and automatic email-policy rollback also failed.');
+        throw Error('Phase 2 verification rollout failed and automatic email-policy rollback also failed.');
       }
     }
     throw error;
@@ -177,7 +177,7 @@ async function main(){
 
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
   main().catch(error=>{
-    console.error(String(error?.message||'Optional email verification rollout failed.'));
+    console.error(String(error?.message||'Required email verification rollout failed.'));
     process.exitCode=1;
   });
 }
