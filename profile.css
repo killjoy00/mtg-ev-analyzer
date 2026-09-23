@@ -162,14 +162,21 @@
 .achievement-card.showcase { border-color:var(--gold); box-shadow:inset 0 0 0 1px var(--gold); }
 .achievement-top { display:flex; justify-content:space-between; gap:8px; color:var(--muted); font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
 .achievement-top b { color:var(--gold); }
-.achievement-card h3 { margin:9px 0 5px; color:var(--ink); }
+.achievement-card-title { display:flex; align-items:center; gap:9px; margin:9px 0 5px; }
+.achievement-card-title .achievement-mark { width:34px; height:34px; }
+.achievement-card h3 { margin:0; color:var(--ink); }
 .achievement-card p { min-height:44px; margin:0 0 12px; font-size:11px; line-height:1.45; }
 .achievement-progress { height:5px; overflow:hidden; border-radius:0; background:var(--line); }
 .achievement-card > small { display:block; margin-top:7px; font-size:10px; }
 .achievement-actions { display:flex; gap:12px; margin-top:5px; }
 .achievement-actions .text-button { display:inline-flex; align-items:center; min-height:44px; padding:4px 0; font-size:12px; }
 
-.player-profile-link { color:inherit; text-decoration:underline; text-decoration-color:#b9c7bd; text-underline-offset:3px; }
+.profile-player-name,
+.profile-name-line { display:flex; align-items:center; gap:9px; min-width:0; }
+.profile-player-name .achievement-mark { width:34px; height:34px; }
+.profile-name-line .achievement-mark { flex:0 0 auto; }
+.profile-showcase-label { display:inline-flex; align-items:center; justify-content:flex-end; gap:6px; }
+.player-profile-link { display:inline-flex; align-items:center; gap:5px; color:inherit; text-decoration:underline; text-decoration-color:#b9c7bd; text-underline-offset:3px; }
 .player-profile-link:hover { color:var(--green-dark); }
 
 @media (max-width:900px) {
@@ -281,11 +288,11 @@
 
 .my-achievement-preview { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; }
 .my-achievement-badge { display:grid; grid-template-rows:36px auto auto; align-items:center; min-height:116px; padding:10px; border:1px solid var(--line); border-radius:10px; text-align:center; }
-.my-achievement-badge > span { font-size:24px; }
+.my-achievement-badge > .achievement-mark { width:34px; height:34px; margin:0 auto; }
 .my-achievement-badge strong { font-size:12px; line-height:1.25; }
 .my-achievement-badge small { margin-top:4px; color:var(--muted); font-size:10px; }
 .my-achievement-badge.is-locked { background:var(--surface-soft); color:var(--muted); }
-.my-achievement-badge.is-unlocked > span { color:var(--green-dark); }
+.my-achievement-badge.is-unlocked > .achievement-mark { opacity:1; }
 
 .my-game-preview li { display:grid; grid-template-columns:86px minmax(0,1fr) 48px 110px; gap:10px; align-items:center; min-height:42px; border-top:1px solid var(--line); }
 .my-daily-preview li { display:grid; grid-template-columns:68px minmax(130px,1fr) 40px 88px; gap:8px; align-items:center; min-height:48px; border-top:1px solid var(--line); }
@@ -304,9 +311,10 @@
 .my-pack-details > summary { min-height:44px; padding:13px 0 0; color:var(--green-dark); font-size:12px; font-weight:800; cursor:pointer; }
 .my-pack-details[open] > summary { margin-bottom:12px; }
 .my-achievement-list { display:grid; gap:8px; }
-.my-achievement-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:8px 14px; align-items:center; padding:12px; border:1px solid var(--line); border-radius:9px; }
+.my-achievement-row { display:grid; grid-template-columns:36px minmax(0,1fr) auto; gap:8px 12px; align-items:center; padding:12px; border:1px solid var(--line); border-radius:9px; }
+.my-achievement-row > .achievement-mark { width:34px; height:34px; }
 .my-achievement-row p { margin:4px 0 0; color:var(--muted); font-size:11px; line-height:1.45; }
-.my-achievement-row > span { color:var(--muted); font-size:11px; }
+.my-achievement-row > span:not(.achievement-mark) { color:var(--muted); font-size:11px; }
 .my-achievement-row.is-locked { background:var(--surface-soft); }
 .my-achievement-actions { grid-column:1/-1; display:flex; gap:14px; }
 .my-achievement-actions .text-button { min-height:44px; }
@@ -327,6 +335,7 @@
 .my-profile-head { display:grid; grid-template-columns:64px minmax(0,1fr); gap:14px; align-items:center; }
 .my-avatar { display:grid; width:64px; height:64px; place-items:center; border-radius:50%; background:var(--green-dark); color:#fff; font-size:23px; font-weight:900; letter-spacing:.02em; }
 .my-profile-head h2 { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.my-profile-head .profile-name-line { overflow:visible; }
 .my-profile-head p { margin:4px 0 0; overflow:hidden; color:var(--muted); font-size:12px; text-overflow:ellipsis; white-space:nowrap; }
 .my-profile-card > .button { width:100%; margin-top:14px; }
 .my-profile-facts { margin-top:12px; }
