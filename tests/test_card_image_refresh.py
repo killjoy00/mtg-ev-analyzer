@@ -99,6 +99,28 @@ class CardImageRefreshTests(unittest.TestCase):
                 self.assertEqual(by_set["powered-cube"][name]["image_url"], f"https://img/{name}-base.jpg")
                 self.assertEqual(details["powered-cube"], {})
 
+    def test_only_available_special_frame_is_marked_unavoidable(self):
+        only = self.card(
+            "only",
+            "sld",
+            "2024-11-04",
+            "https://img/black-panther.jpg",
+            name="Black Panther, Wakandan King",
+            border_color="borderless",
+            frame_effects=["inverted"],
+        )
+        with mock.patch.object(refresh, "all_printings", return_value=iter([only])):
+            by_set, _, details = refresh.resolve_inventory({
+                "msh": {"Black Panther, Wakandan King"},
+            })
+        self.assertEqual(
+            by_set["msh"]["Black Panther, Wakandan King"]["image_url"],
+            "https://img/black-panther.jpg",
+        )
+        detail = details["msh"]["Black Panther, Wakandan King"]
+        self.assertEqual(detail["special_flags"], ["borderless", "inverted"])
+        self.assertTrue(detail["special_unavoidable"])
+
     def test_patch_card_changes_display_metadata_only(self):
         original = {
             "id": "alpha",
