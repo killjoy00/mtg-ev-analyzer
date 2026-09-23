@@ -161,7 +161,8 @@ try{
       const commerce=events.filter(event=>event.name==='tcgplayer_click').at(-1);
       assert.ok(commerce,'TCGplayer reveal click is instrumented');
       assert.equal(commerce.props.surface,'draft_run_reveal');
-      await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-consensus-mobile.png`,fullPage:true});
+      await page.locator('.run-consensus').scrollIntoViewIfNeeded();
+      await page.screenshot({path:`artifacts/${selectionVersion==='first-pack-v2'?'legacy-':''}ui-${cube?'cube-run':'draft-run'}-consensus-mobile.png`});
     }
     assert.equal(answers.length,round+1);
     assert.equal(await page.locator('.run-card-score').count(),0);
