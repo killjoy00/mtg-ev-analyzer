@@ -755,6 +755,106 @@ body .run-review-list li {
   border-radius: 0;
   background: transparent;
 }
+.app-shell > .ad-slot[data-ad-slot="home"][data-slot-content="affiliate"] {
+  border: 1px solid var(--line);
+  background: #fff;
+}
+.tcg-affiliate-promo {
+  width: 100%;
+  color: var(--ink);
+  font-family: var(--sans);
+  font-size: 16px;
+  letter-spacing: normal;
+  text-transform: none;
+}
+.tcg-affiliate-link {
+  width: 100%;
+  padding: 18px 24px 10px;
+  display: grid;
+  grid-template-columns: minmax(150px, 220px) minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 28px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.tcg-affiliate-logo-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+  background: #fff;
+}
+.tcg-affiliate-logo {
+  display: block;
+  width: min(200px, 100%);
+  height: auto;
+}
+.tcg-affiliate-copy {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+.tcg-affiliate-copy strong {
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 27px;
+  font-weight: 600;
+  line-height: 1.05;
+  letter-spacing: 0;
+}
+.tcg-affiliate-copy > span {
+  color: var(--muted);
+  font-size: 15px;
+  line-height: 1.35;
+}
+.tcg-affiliate-cta {
+  min-height: 44px;
+  padding: 10px 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--green);
+  background: var(--green);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.tcg-affiliate-link:hover .tcg-affiliate-cta {
+  border-color: var(--green-dark);
+  background: var(--green-dark);
+}
+.tcg-affiliate-disclosure {
+  margin: 0;
+  padding: 0 24px 14px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: right;
+}
 @media (max-width: 760px) {
   .app-shell > .ad-slot[data-ad-slot="home"] { width: calc(100% - 36px); }
+  .tcg-affiliate-link {
+    padding: 16px 14px 10px;
+    grid-template-columns: 1fr;
+    gap: 10px;
+    text-align: center;
+  }
+  .tcg-affiliate-logo-wrap {
+    padding: 8px 18px;
+  }
+  .tcg-affiliate-logo {
+    width: min(180px, 72%);
+  }
+  .tcg-affiliate-copy strong {
+    font-size: 23px;
+  }
+  .tcg-affiliate-cta {
+    width: 100%;
+  }
+  .tcg-affiliate-disclosure {
+    padding: 0 14px 14px;
+    text-align: center;
+  }
 }
