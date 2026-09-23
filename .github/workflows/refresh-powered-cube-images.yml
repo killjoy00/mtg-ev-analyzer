@@ -1,8 +1,21 @@
-name: refresh Powered Cube card images
+name: refresh Pack One card images
+run-name: refresh Pack One card images / ${{ inputs.request_id || 'manual' }}
 
 # Image maintenance is an explicit operation, never a side effect of a code merge.
+# Keep this workflow path stable: the Draft Run API pins its OIDC identity.
 on:
   workflow_dispatch:
+    inputs:
+      request_id:
+        description: 'Fixed release request identifier used only to identify this run'
+        type: string
+        required: false
+        default: manual
+      code_commit:
+        description: 'Optional reviewed main commit whose image-maintenance code must run'
+        type: string
+        required: false
+        default: ''
 
 permissions:
   contents: write
@@ -15,7 +28,7 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 90
     env:
       DEV_IMPORT_API: https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
       PROD_IMPORT_API: https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
@@ -29,12 +42,20 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Fast-forward to latest main
+      - name: Resolve reviewed image-maintenance revision
         shell: bash
+        env:
+          CODE_COMMIT: ${{ inputs.code_commit }}
         run: |
           set -euo pipefail
           git fetch origin main
-          git reset --hard origin/main
+          if [[ -n "$CODE_COMMIT" ]]; then
+            [[ "$CODE_COMMIT" =~ ^[a-f0-9]{40}$ ]]
+            git merge-base --is-ancestor "$CODE_COMMIT" origin/main
+            git reset --hard "$CODE_COMMIT"
+          else
+            git reset --hard origin/main
+          fi
 
       - uses: actions/setup-python@v5
         with:
@@ -47,8 +68,8 @@ jobs:
       - name: Hydrate replay shards from R2
         run: bash scripts/r2_replay_shards.sh hydrate
 
-      - name: Normalize Powered Cube to readable standard printings
-        run: python scripts/refresh_powered_cube_images.py
+      - name: Normalize all served cards to deterministic main art
+        run: python scripts/refresh_card_images.py
 
       - name: Run full test suite
         run: npm test
@@ -59,27 +80,21 @@ jobs:
       - name: Upload refresh diagnostics
         uses: actions/upload-artifact@v4
         with:
-          name: powered-cube-image-refresh-${{ github.run_id }}-${{ github.run_attempt }}
+          name: card-image-refresh-${{ github.run_id }}-${{ github.run_attempt }}
           retention-days: 30
           if-no-files-found: error
           path: |
-            generated/powered-cube-standard-images.json
-            generated/powered-cube-image-refresh-report.json
+            generated/card-image-refresh/*.json
+            generated/card-image-refresh-report.json
 
       - name: Verify marked, matching backend releases
-        run: node scripts/verify-image-refresh-release.mjs
+        run: node scripts/verify-image-refresh-release.mjs "${{ inputs.code_commit }}"
 
-      - name: Publish normalized Cube shards to R2
-        shell: bash
-        run: |
-          set -euo pipefail
-          aws s3 sync data/powered-cube/shards "s3://${R2_BUCKET}/data/powered-cube/shards" \
-            --endpoint-url "$R2_ENDPOINT" \
-            --content-type 'application/json; charset=utf-8' \
-            --cache-control 'public, max-age=3600'
+      - name: Publish normalized replay shards to R2
+        run: bash scripts/r2_replay_shards.sh upload
 
       - name: Refresh development Draft Run image metadata
-        run: node scripts/refresh_powered_cube_backend_images.mjs "$DEV_IMPORT_API"
+        run: node scripts/refresh_card_backend_images.mjs "$DEV_IMPORT_API"
 
       - name: Verify development gameplay
         run: |
@@ -89,8 +104,8 @@ jobs:
 
       - name: Refresh production Draft Run image metadata
         run: |
-          node scripts/verify-image-refresh-release.mjs
-          node scripts/refresh_powered_cube_backend_images.mjs "$PROD_IMPORT_API"
+          node scripts/verify-image-refresh-release.mjs "${{ inputs.code_commit }}"
+          node scripts/refresh_card_backend_images.mjs "$PROD_IMPORT_API"
 
       - name: Verify production gameplay
         run: |
@@ -98,25 +113,23 @@ jobs:
           commit=$(curl -fsS --max-time 30 "$PROD_IMPORT_API/health?quick=1" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).release_commit))")
           node tests/release-functions-smoke.mjs br-orange-feather-ayps8kep "$commit" --daily
 
-      - name: Commit refreshed Cube image source of truth
+      - name: Commit refreshed card-image source of truth
         shell: bash
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add corpus/draft-run/powered-cube.json.gz corpus/draft-run/catalog.json corpus/draft-run/card-images.json
+          git add corpus/draft-run/*.json.gz corpus/draft-run/catalog.json corpus/draft-run/card-images.json
           if git diff --cached --quiet; then
-            echo 'Powered Cube display metadata is already normalized.'
+            echo 'Pack One display metadata is already normalized.'
             exit 0
           fi
-          git commit -m 'Refresh Powered Cube to standard card images [cube-images-refreshed]'
-          # Hydration and image normalization leave generated files modified.
-          # Publish only the explicit commit from a clean worktree; preserve
-          # those runtime files in the original checkout for diagnostics.
-          publish_dir="$(mktemp -d "${RUNNER_TEMP}/cube-image-publish.XXXXXX")"
+          git commit -m 'Refresh Pack One to main card art [card-images-refreshed]'
+          # Hydration and image normalization leave generated/runtime files modified.
+          # Publish only the explicit corpus commit from a clean worktree.
+          publish_dir="$(mktemp -d "${RUNNER_TEMP}/card-image-publish.XXXXXX")"
           trap 'git worktree remove --force "$publish_dir"' EXIT
           git worktree add --detach "$publish_dir" HEAD
           git fetch origin main
           git -C "$publish_dir" rebase origin/main
           git -C "$publish_dir" push origin HEAD:main
-

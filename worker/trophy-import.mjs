@@ -8,7 +8,6 @@ import {supportedComponent} from '../corpus-components.mjs';
 const allowed=new Set(catalog.sets.map(s=>s.id));
 const error=(message,status=400)=>Object.assign(Error(message),{status});
 const DISPLAY_FIELDS=new Set(['image_url','mana_cost','rarity','type_line']);
-const LEGACY_IMAGE_MARKER_SETS=new Set(['powered-cube','hbg','tmt']);
 
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 
@@ -59,7 +58,7 @@ function patchCards(cards,mapping,counters) {
 }
 
 export async function refreshTrophyImages(query,setId,rawMapping) {
-  if(setId!=='powered-cube')throw error('Image refresh is limited to Powered Cube');
+  if(!allowed.has(setId))throw error('Image refresh requires a registered environment');
   const mapping=normalizeImageMapping(rawMapping);
   let after='',seen=0,updatedPuzzles=0,updatedCards=0;
   for(;;) {
@@ -71,7 +70,7 @@ export async function refreshTrophyImages(query,setId,rawMapping) {
     const updates=[];
     for(const row of page.rows) {
       const current=parse(row.payload);
-      if(!validateDraftRunPuzzle(current)||current.set_id!==setId||current.puzzle_id!==row.puzzle_id)throw error('Stored Cube puzzle failed verification',409);
+      if(!validateDraftRunPuzzle(current)||current.set_id!==setId||current.puzzle_id!==row.puzzle_id)throw error('Stored puzzle failed image-refresh verification',409);
       const counters={cards:0};
       const next={
         ...current,
@@ -98,19 +97,19 @@ export async function refreshTrophyImages(query,setId,rawMapping) {
         RETURNING p.puzzle_id`,
         [JSON.stringify(updates),setId,VERSION],
       );
-      if(result.rows.length!==updates.length)throw error('Cube image refresh update count mismatch',409);
+      if(result.rows.length!==updates.length)throw error('Image refresh update count mismatch',409);
       updatedPuzzles+=updates.length;
     }
     if(page.rows.length<250)break;
   }
-  if(!seen)throw error('No Powered Cube puzzles are available',409);
+  if(!seen)throw error('No verified puzzles are available for image refresh',409);
   return {set_id:setId,mapping_entries:mapping.size,puzzles:seen,updated_puzzles:updatedPuzzles,updated_cards:updatedCards};
 }
 
 export async function normalizeResolvedImageMarkers(query,rawSetIds) {
-  if(!Array.isArray(rawSetIds)||!rawSetIds.length||rawSetIds.length>LEGACY_IMAGE_MARKER_SETS.size)throw error('Invalid image-marker set list');
+  if(!Array.isArray(rawSetIds)||!rawSetIds.length||rawSetIds.length>allowed.size)throw error('Invalid image-marker set list');
   const setIds=rawSetIds.map(value=>String(value||'').trim());
-  if(new Set(setIds).size!==setIds.length||setIds.some(setId=>!LEGACY_IMAGE_MARKER_SETS.has(setId)||!allowed.has(setId)))throw error('Image-marker normalization is limited to verified legacy sets');
+  if(new Set(setIds).size!==setIds.length||setIds.some(setId=>!allowed.has(setId)))throw error('Image-marker normalization requires registered environments');
   const normalized=[];
   for(const setId of setIds) {
     const status=(await query(

@@ -1,4 +1,5 @@
 name: deploy neon functions
+run-name: deploy ${{ inputs.target }} ${{ inputs.commit }}
 
 # Manual promotion of one reviewed main commit. Schema is verified, not mutated.
 on:
