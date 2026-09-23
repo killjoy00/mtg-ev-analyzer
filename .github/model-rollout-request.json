@@ -1,6 +1,7 @@
 {
-  "operation": "daily-generation",
-  "request_id": "daily-pacific-generate-dev-20260923",
-  "reason": "Verify the merged Pacific Daily pre-generation endpoint in development after exact-SHA deployment passed.",
-  "target": "development"
+  "operation": "daily-calendar-migration",
+  "request_id": "daily-pacific-migration-prod-20260923",
+  "reason": "Apply reviewed migration 0035 to production after development migration, exact-SHA deploy, and Daily generation verification passed.",
+  "commit": "75c3519eb262815acb8f8901603056cbe32dc7af",
+  "target": "production"
 }
