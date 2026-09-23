@@ -342,8 +342,15 @@ function buildAchievements({ summary, bySet, byMode, streak, dailyHistory, envir
   const challengeWins = num(summary.challenge_wins);
   const cube = bySet.find((row) => row.set_id === 'powered-cube');
   const draftRun = byMode.find((row) => row.mode === 'draft_run');
-  const percentiles = dailyHistory.filter(row=>row.final!==false).map((row) => num(row.percentile, 0)).filter((value) => value > 0);
-  const bestPercentile = percentiles.length ? Math.min(...percentiles) : null;
+  const finalizedPercentiles = dailyHistory.filter(row=>row.final!==false).map((row) => num(row.percentile, 0)).filter((value) => value > 0);
+  const bestPercentile = finalizedPercentiles.length ? Math.min(...finalizedPercentiles) : null;
+  const topTenFinishes = finalizedPercentiles.filter((value) => value <= 10).length;
+  const specialist = [...bySet].filter((row) => num(row.games) >= 5)
+    .sort((a,b)=>num(b.average_score)-num(a.average_score)||num(b.games)-num(a.games))[0] || null;
+  const specialistUnlocked = Boolean(specialist && num(specialist.average_score) >= 85);
+  const specialistProgress = specialist
+    ? `${String(specialist.set_id || '').toUpperCase()} · ${num(specialist.average_score).toFixed(1)} avg over ${num(specialist.games)} appearances`
+    : '5 appearances · 85+ average';
   const archiveComplete = environmentTotal > 0
     ? countAchievement('archive_complete', 'Archive Complete', 'Play every environment currently available in Pack One.', environmentsPlayed, environmentTotal)
     : flagAchievement('archive_complete', 'Archive Complete', 'Play every environment currently available in Pack One.', false, 'Catalog temporarily unavailable');
@@ -353,9 +360,10 @@ function buildAchievements({ summary, bySet, byMode, streak, dailyHistory, envir
     countAchievement('ten_games', 'Settling In', 'Complete 10 scored games.', games, 10),
     countAchievement('fifty_games', 'Draft Regular', 'Complete 50 scored games.', games, 50),
     countAchievement('hundred_games', 'Century', 'Complete 100 scored games.', games, 100),
-    countAchievement('first_run','First Draft Run','Finish all ten decisions in a Draft Run.',num(draftRun?.games),1),
-    countAchievement('ten_runs','Ten by Ten','Finish ten Draft Runs.',num(draftRun?.games),10),
+    countAchievement('first_run','First Draft Run','Finish all eight decisions in a Draft Run.',num(draftRun?.games),1),
+    countAchievement('ten_runs','Ten Runs','Finish ten Draft Runs.',num(draftRun?.games),10),
     flagAchievement('run_specialist','Draft Run Specialist','Average 80+ across at least 20 Draft Runs.',num(draftRun?.games)>=20&&num(draftRun?.average_score)>=80,`${Math.min(num(draftRun?.games),20)}/20 runs · ${num(draftRun?.average_score).toFixed(1)} avg`),
+    flagAchievement('set_specialist','Set Specialist','Average 85+ across at least five appearances in one environment.',specialistUnlocked,specialistProgress),
     flagAchievement('perfect', 'Perfect 100', 'Post a 100-point result.', bestScore >= 100, `${bestScore}/100 best`),
     countAchievement('streak3', 'Three in a Row', 'Complete ranked Daily Challenges on three consecutive game days.', streak, 3),
     countAchievement('streak7', 'One-Week Heater', 'Reach a seven-day Daily streak.', streak, 7),
@@ -370,6 +378,7 @@ function buildAchievements({ summary, bySet, byMode, streak, dailyHistory, envir
     countAchievement('challenge25', 'Table Captain', 'Win twenty-five friend challenges.', challengeWins, 25),
     flagAchievement('top25', 'Top Quarter', 'Finish in the top 25% of a Daily leaderboard with at least 10 players.', bestPercentile != null && bestPercentile <= 25, bestPercentile ? `Top ${bestPercentile}% best` : 'No qualifying Daily yet'),
     flagAchievement('top10', 'Top Ten Percent', 'Finish in the top 10% of a Daily leaderboard with at least 10 players.', bestPercentile != null && bestPercentile <= 10, bestPercentile ? `Top ${bestPercentile}% best` : 'No qualifying Daily yet'),
+    countAchievement('top10_repeat','Repeat Contender','Finish in the top 10% on three finalized Daily leaderboards with at least 10 players.',topTenFinishes,3),
     flagAchievement('top1', 'One Percent', 'Finish in the top 1% of a Daily leaderboard with at least 10 players.', bestPercentile === 1, bestPercentile ? `Top ${bestPercentile}% best` : 'No qualifying Daily yet'),
   ];
 }
@@ -1482,20 +1491,20 @@ async function handleProfileLookup(request) {
     `WITH wanted AS (
        SELECT lower(value) lookup FROM jsonb_array_elements_text($1::jsonb)
      ), matches AS (
-       SELECT w.lookup,p.display_name,p.profile_key,
+       SELECT w.lookup,p.display_name,p.profile_key,p.showcase_achievement,
               count(*) OVER (PARTITION BY w.lookup) match_count
        FROM wanted w
        JOIN players p ON lower(p.display_name)=w.lookup
        WHERE p.profile_public=true
      )
-     SELECT lookup,display_name,profile_key
+     SELECT lookup,display_name,profile_key,showcase_achievement
      FROM matches
      WHERE match_count=1`,
     [JSON.stringify(names)],
   );
   const profiles = {};
   for (const row of result.rows) {
-    profiles[row.lookup] = { display_name: row.display_name, profile_key: row.profile_key };
+    profiles[row.lookup] = { display_name: row.display_name, profile_key: row.profile_key, showcase_achievement: row.showcase_achievement || null };
   }
   return json({ profiles });
 }
