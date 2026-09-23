@@ -33,9 +33,19 @@ test('guest Daily results offer score validation instead of a career action', as
   assert.match(source, /username_taken/);
 });
 
-test('desktop reveal keeps Next pick in the top action row', async () => {
+test('Draft Run reveal puts continuation before disclosures and restores result focus', async () => {
+  const source = await readFile('draft-run-product.mjs', 'utf8');
+  const render = source.slice(source.indexOf('function render()'), source.indexOf('function zoom(card)'));
+  const next=render.indexOf('id="run-next"');
+  const analysis=render.indexOf('revealAnalysis(p,answer)');
+  const pack=render.indexOf('class="run-pack-review"');
+  assert.ok(next>=0&&analysis>next&&pack>analysis,'Next pick precedes both reveal disclosures in DOM order');
+  assert.match(render,/id="run-feedback-result" tabindex="-1"/);
+  assert.match(render,/focus\(\{preventScroll:true\}\)/);
+  assert.doesNotMatch(render,/aria-live=/);
   const css = await readFile('draft-run.css', 'utf8');
-  assert.match(css, /@media\(min-width:601px\)[\s\S]*\.run-feedback>\.run-next-dock\{grid-column:3;grid-row:1/);
+  assert.match(css, /@media\(min-width:601px\)[\s\S]*\.run-feedback\{flex-wrap:nowrap\}/);
+  assert.match(css, /\.run-next-dock #run-next\{white-space:nowrap\}/);
 });
 
 
