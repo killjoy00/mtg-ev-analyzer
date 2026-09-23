@@ -132,6 +132,8 @@ assert.match(adLoader, /\/assets\/tcgplayer-logo-primary-stroke\.webp/);
 assert.match(adLoader, /Affiliate link — Pack One may earn a commission from purchases\./);
 const tcgConfig = await readFile('tcgplayer-config.js','utf8');
 assert.match(tcgConfig, /partner\.tcgplayer\.com\/c\/7742974\/1780961\/21018\?u=\{url\}/);
+assert.match(tcgConfig, /homeBannerEnabled:\s*true/);
+assert.match(tcgConfig, /homeDestination:\s*'https:\/\/www\.tcgplayer\.com\/categories\/trading-and-collectible-card-games\/magic-the-gathering'/);
 assert.doesNotMatch(tcgConfig, /impactDeepLinkTemplate:\\s*''/);
 const terms = await readFile('terms/index.html','utf8');
 assert.match(terms, /id="advertising-and-affiliates"/i);
