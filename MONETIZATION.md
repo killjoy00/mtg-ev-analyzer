@@ -14,7 +14,7 @@ Account, Patreon-connect/disconnect and Elite-activation flows emit a nonce-only
 
 ## Google AdSense: deferred
 
-`ad-config.js` remains `enabled: false`. The public client is `ca-pub-1217971050094766` and the dormant Daily-home unit is `1543495960`; `articleTop` remains empty and Auto Ads are not used. Publisher verification metadata and `ads.txt` remain in place. With the release gate disabled, the loader makes no membership request and no Google advertising request.
+`ad-config.js` remains `enabled: false`. The public client is `ca-pub-1217971050094766` and the dormant Daily-home unit is `1543495960`; `articleTop` remains empty and Auto Ads are not used. Publisher verification metadata and `ads.txt` remain in place. With the release gate disabled, the loader makes no membership request and no Google advertising request. Static ad placeholders remain hidden even with JavaScript disabled, and `?adpreview=1` cannot bypass the disabled release gate.
 
 This is technically prepared for later activation, not ready merely because a boolean can be flipped. Google AdSense approval, applicable consent/privacy work and explicit owner authorization all remain blockers to live delivery.
 
