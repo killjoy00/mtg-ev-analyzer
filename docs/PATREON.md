@@ -167,8 +167,8 @@ extend expired premium gameplay grants. Sign-in and a connected membership are
 required on the current browser; a signed-out Patreon member is treated as a
 guest. One Daily-home-only monetization slot is wired with AdSense client
 `ca-pub-1217971050094766` and unit `1543495960`, while `enabled:false`
-keeps all Google delivery off. While that Google gate is disabled, the slot may
-show the TCGplayer affiliate fallback to advertising-eligible visitors; qualifying
+keeps all Google delivery off. While that Google gate is disabled, the slot
+shows the TCGplayer affiliate fallback to advertising-eligible visitors; qualifying
 Supporter and Elite memberships suppress that promotion too. Neither provider is
 shown in gameplay. Pack One-originated account and Patreon transitions broadcast
 a nonce-only cross-tab signal that clears an open promotion without refilling it.
