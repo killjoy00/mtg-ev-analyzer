@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Part of #181: deploy server-authoritative elite_activated transition measurement and browser-forgery reservation; promote the exact merged revision through development and production smoke."}
+{"operation":"deploy-secure-auth","reason":"Release #406: deploy passwordless account-deletion email verification from merged commit ff2babe58f9d6c4c8d06879851aea9050ea5f7a6; promote the exact reviewed main revision through development and production smoke."}
