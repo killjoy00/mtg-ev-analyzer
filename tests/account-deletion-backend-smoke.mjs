@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Requires an isolated fixture database.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 
-const {query}=await import('../worker/growth-function.js');
+const {default:growth,query}=await import('../worker/growth-function.js');
 const {beginDeletion,cleanupPackOne,sweepExpiredVerification}=await import('../worker/account-deletion.mjs');
 const {issueAccountSession}=await import('../worker/account-session.mjs');
 const {
@@ -26,7 +26,31 @@ const deletionEnv={PACK1_RATE_LIMIT_SECRET:'h'.repeat(64)};
 const verificationAuth=crypto.randomUUID();
 const verificationRaceAuth=crypto.randomUUID();
 
+async function deletionTrigger(name='pack1-account-deletion-maintenance',status=[200,503]) {
+  const invocationId='qa-delete-trigger-'+crypto.randomUUID();
+  const response=await growth.fetch(new Request('https://origin.test/internal/account-deletion-maintenance',{
+    method:'POST',
+    headers:{'content-type':'application/json','x-neon-trigger-invocation-id':invocationId},
+    body:JSON.stringify({
+      version:1,
+      invocation_id:invocationId,
+      trigger:{type:'schedule',id:'trigger-qa-delete',name},
+      data:{scheduled_at:'2041-06-15T16:09:00Z'},
+    }),
+  }));
+  const data=await response.json();
+  const allowed=Array.isArray(status)?status:[status];
+  assert.ok(allowed.includes(response.status),JSON.stringify({status:response.status,body:data}));
+  return data;
+}
+
 try {
+  const scheduled=await deletionTrigger();
+  assert.equal(scheduled.report_only,false);
+  assert.equal(Array.isArray(scheduled.advanced),true);
+  assert.equal(Array.isArray(scheduled.attention),true);
+  await deletionTrigger('wrong-trigger',403);
+
   // Exercise the shared advisory lock with two independent runtime queries.
   // The account is an existing Auth identity from this disposable Neon branch;
   // this test never mutates managed Auth user/account/session tables.
@@ -200,7 +224,7 @@ try {
   const again=await cleanupPackOne(query,cleaned,{recoveryKey:recovery});
   assert.equal(again.state,'provider_delete_pending','cleanup is rerunnable while provider deletion is pending');
 
-  console.log('Account deletion SQL cleanup passed: durable tombstone, cross-player preservation, hard deletes, and idempotent resume without managed-Auth fixture mutation.');
+  console.log('Account deletion SQL cleanup passed: Neon trigger auth, durable tombstone, cross-player preservation, hard deletes, and idempotent resume without managed-Auth fixture mutation.');
 } finally {
   await query(`DELETE FROM draft_run_shares WHERE session_id IN (
     SELECT id FROM draft_run_sessions WHERE player_id=$1::uuid OR player_id=$2::uuid
