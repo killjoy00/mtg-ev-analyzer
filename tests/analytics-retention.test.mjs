@@ -14,8 +14,8 @@ test('current retention views use the Pacific product calendar without rewriting
 });
 
 
-test('release schema verification requires Pacific retention views', async () => {
-  const source = await readFile('scripts/verify-neon-schema.mjs', 'utf8');
+test('release schema verification requires Pacific retention views', () => {
+  const source = fs.readFileSync('scripts/verify-neon-schema.mjs', 'utf8');
   assert.ok(source.includes('analytics_retention_cohorts'));
   assert.ok(source.includes('analytics_daily_next_day_retention'));
   assert.ok(source.includes('America/Los_Angeles'));
