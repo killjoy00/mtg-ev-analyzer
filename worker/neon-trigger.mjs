@@ -22,7 +22,7 @@ export function verifyNeonScheduleTrigger(request,body,{names}={}) {
   if(!id||id.length>MAX_TRIGGER_ID||!name||name.length>MAX_TRIGGER_NAME)denied();
   if(names&&(!names.has||!names.has(name)))denied();
   const when=new Date(scheduledAt);
-  if(!scheduledAt||!Number.isFinite(when.getTime())||when.toISOString()!==scheduledAt.replace('.000Z','Z')&&when.toISOString()!==scheduledAt)denied();
+  if(!/^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{1,6})?Z$/.test(scheduledAt)||!Number.isFinite(when.getTime()))denied();
   return {invocationId,id,name,scheduledAt};
 }
 
