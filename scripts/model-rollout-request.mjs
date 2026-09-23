@@ -49,6 +49,11 @@ export function rolloutDispatch(request) {
   } else if(operation==='daily-calendar-migration') {
     if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid Daily calendar migration request.');
     workflow='daily-calendar-migration.yml';inputs={commit,target};extra=['commit','target'];
+  } else if(operation==='neon-schedulers') {
+    if(!['enable','disable'].includes(action))throw Error('Invalid Neon scheduler action.');
+    if(action==='enable'&&!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Enabling Neon schedulers requires an exact main SHA.');
+    if(action==='disable'&&commit!==undefined)throw Error('Disabling Neon schedulers does not accept a commit.');
+    workflow='neon-scheduler-release.yml';inputs={action,...(action==='enable'?{commit}:{})};extra=['action',...(action==='enable'?['commit']:[])];
   } else if(operation==='browser') {
     workflow='e2e.yml';
   } else if(operation==='deploy') {
