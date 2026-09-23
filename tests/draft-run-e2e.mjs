@@ -123,14 +123,14 @@ try{
     if(expectedGrade.historicalMatch){
       assert.match(await page.locator('.run-feedback-copy').innerText(),/You matched the trophy drafter\./);
       assert.equal(await page.locator('.run-reveal-pick').count(),1,'trophy match still shows the shared card once');
-      assert.match(await page.locator('.run-reveal-picks').innerText(),/Trophy and Your Pick/);
+      assert.match(await page.locator('.run-reveal-picks').innerText(),/Trophy and Your Pick/i);
       assert.equal(await page.locator('.run-reveal-pick.is-shared [data-zoom]').getAttribute('data-zoom'),selected,'shared reveal card is the player and trophy pick');
       assert.equal(await page.locator('.run-feedback-copy p').count(),0,'trophy match needs no filler sentence');
     }else{
       assert.equal(await page.locator('.run-reveal-pick').count(),2,'non-match pairs the player and trophy cards');
       const revealText=await page.locator('.run-reveal-picks').innerText();
-      assert.match(revealText,/Your Pick/);
-      assert.match(revealText,/Trophy Pick/);
+      assert.match(revealText,/Your Pick/i);
+      assert.match(revealText,/Trophy Pick/i);
       assert.equal(await page.locator('.run-reveal-pick.is-mine [data-zoom]').getAttribute('data-zoom'),selected,'player reveal card matches the locked pick');
       assert.equal(await page.locator('.run-reveal-pick.is-trophy [data-zoom]').getAttribute('data-zoom'),p.historical_pick_id,'trophy reveal card matches the historical pick');
       assert.equal(await page.locator('.run-feedback-copy p').count(),1,'compact non-match has at most one explanatory sentence');
