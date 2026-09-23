@@ -1,4 +1,5 @@
 import { installRenderLifecycle } from './render-lifecycle.mjs';
+import { signalAccountChange } from './growth-api.mjs';
 
 // Authentication cookies are first-party to packone.pro. Treat the GitHub Pages
 // hostname as a publishing mirror, never as a second account origin.
@@ -57,6 +58,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   } else if (params.has('patreon')) {
     await identityReady;
     const patreonResult=params.get('patreon');
+    if(patreonResult==='connected')signalAccountChange();
     const growth=await growthReady;
     if(patreonResult==='activate'||growth.hasPatreonActivationIntent()) {
       await growth.renderPatreonActivation({result:patreonResult==='activate'?null:patreonResult,source:patreonResult==='activate'?'welcome_note':'oauth_return'});
