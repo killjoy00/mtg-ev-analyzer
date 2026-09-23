@@ -57,10 +57,14 @@ This reuses the existing Patreon client, campaign, tiers, webhook, callback and
 Pack One account infrastructure. Do not create a second Patreon client or another
 post-purchase communication path.
 
-Activation funnel measurement is recorded as `patreon_activation_started`,
-`patreon_activation_oauth_started`, and `patreon_activation_succeeded`. Run
-`analytics/patreon_activation_funnel.sql` for the 30-day handoff/activation funnel,
-including activation sessions that started but did not reach Elite success.
+Browser funnel stages are recorded as `patreon_activation_started`,
+`patreon_activation_oauth_started`, and `patreon_activation_succeeded`. The browser
+success event is UX telemetry only and is never the activation numerator.
+`applyPatreonMembership` writes the reserved server-only `elite_activated` event
+when authoritative Patreon premium grants transition from revoked/not-present to
+active. Run `analytics/patreon_activation_funnel.sql` for the 30-day funnel; its
+success and abandonment metrics use `elite_activated` with a 24-hour maturity
+window so delayed reconciliation can land before a journey is labeled abandoned.
 
 ## Synchronization and failure behavior
 

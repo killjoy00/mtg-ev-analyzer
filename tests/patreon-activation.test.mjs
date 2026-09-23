@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [activation,growth,bootstrap,funnel]=await Promise.all([
+const [activation,growth,bootstrap,funnel,growthWorker,patreonWorker]=await Promise.all([
   readFile(new URL('../patreon-activation.mjs',import.meta.url),'utf8'),
   readFile(new URL('../growth.mjs',import.meta.url),'utf8'),
   readFile(new URL('../bootstrap.mjs',import.meta.url),'utf8'),
   readFile(new URL('../analytics/patreon_activation_funnel.sql',import.meta.url),'utf8'),
+  readFile(new URL('../worker/growth-function.js',import.meta.url),'utf8'),
+  readFile(new URL('../worker/patreon.mjs',import.meta.url),'utf8'),
 ]);
 
 test('browser activation consumes server-derived Patreon state instead of reimplementing eligibility',()=>{
@@ -35,17 +37,24 @@ test('activation does not accept arbitrary browser return destinations',()=>{
   assert.match(activation,/target\.hostname!=='www\.patreon\.com'/);
 });
 
-test('activation emits a measurable start, OAuth, and success funnel',()=>{
+test('activation separates browser UX stages from the authoritative Elite transition',()=>{
   assert.match(activation,/patreon_activation_started/);
   assert.match(activation,/patreon_activation_oauth_started/);
   assert.match(activation,/patreon_activation_succeeded/);
   assert.match(activation,/trackEvent as event/);
-  assert.match(funnel,/event_props->>'session_id'/);
-  assert.match(funnel,/abandoned_activation_sessions/);
-  assert.match(funnel,/activation_success_rate/);
-  assert.match(funnel,/elite_upgrade_handoff/);
   assert.match(growth,/elite_upgrade_handoff/);
   assert.match(growth,/await flushEvents\(\)\.catch/);
   assert.match(activation,/await flushEvents\(\)\.catch/);
+
+  assert.match(growthWorker,/SERVER_EVENTS=.*elite_activated/);
+  assert.match(patreonWorker,/INSERT INTO analytics_events\(player_id,event_name,event_props\)/);
+  assert.match(patreonWorker,/'elite_activated'/);
+  assert.match(funnel,/event_name='elite_activated'/);
+  assert.match(funnel,/patreon_activation_succeeded'\) AS browser_success_at/);
+  assert.doesNotMatch(funnel,/patreon_activation_succeeded'\) AS activated_at/);
+  assert.match(funnel,/authoritatively_activated_sessions/);
+  assert.match(funnel,/handoff_to_authoritative_activation_rate/);
+  assert.match(funnel,/abandoned_activation_sessions/);
+  assert.match(funnel,/browser_success_without_authoritative_activation/);
 });
 
