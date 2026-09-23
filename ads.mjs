@@ -88,27 +88,39 @@ export async function initializeAds({doc=document,location=globalThis.location,
   // The Daily home is a positive allowlist. Wait for its first render, evaluate
   // eligibility exactly once, and never refill on this document after leaving,
   // an account/membership signal, a failed/uncertain check, or a successful fill.
-  const state={seen:false,checked:false,checking:false,spent:false};
+  const state={seen:false,checked:false,checking:false,spent:false,filled:false};
+  const stopWatchingHome=()=>{unsubscribe?.();unsubscribe=null;};
   const handleHomeRender=async()=>{
-    if(stopped||state.spent)return;
-    if(gameView(doc,location)){state.spent=true;clearRows(homeRows);return;}
+    if(stopped)return;
+    if(gameView(doc,location)){
+      state.spent=true;state.filled=false;clearRows(homeRows);stopWatchingHome();return;
+    }
     const home=Boolean(doc.querySelector('#app')?.querySelector('[data-daily-home]'));
     if(!home){
-      if(state.seen){state.spent=true;clearRows(homeRows);}
+      if(state.seen){
+        state.spent=true;state.filled=false;clearRows(homeRows);stopWatchingHome();
+      }
       return;
     }
     state.seen=true;
-    if(state.checked||state.checking)return;
+    // A successful fill is spent for refill purposes, but its listener stays
+    // alive until the view leaves Daily so the rendered ad can be cleared.
+    if(state.spent||state.checked||state.checking)return;
     state.checked=true;state.checking=true;
     const token=accountToken===undefined?(sessionPresent()?'session':null):accountToken;
     const signed=Boolean(token);
     const allowed=await advertisingAllowed({enabled:cfg.enabled,client:cfg.client,game:false,accountToken:token,checkMembership});
     state.checking=false;
     if(stopped||state.spent)return;
-    if(!doc.querySelector('#app')?.querySelector('[data-daily-home]')){state.spent=true;clearRows(homeRows);return;}
-    if(signed!==sessionPresent()){state.spent=true;clearRows(homeRows);return;}
+    if(!doc.querySelector('#app')?.querySelector('[data-daily-home]')){
+      state.spent=true;clearRows(homeRows);stopWatchingHome();return;
+    }
+    if(signed!==sessionPresent()){
+      state.spent=true;clearRows(homeRows);stopWatchingHome();return;
+    }
     state.spent=true;
-    if(allowed)fill(homeRows);
+    if(allowed){state.filled=true;fill(homeRows);}
+    else stopWatchingHome();
   };
   unsubscribe=onAppRender(handleHomeRender);
 }
