@@ -145,17 +145,13 @@ not substitute for the real provider canary.
 
 ## Remaining real-provider acceptance
 
-A real billing/tier change has not been observed. Production contains one signed,
-campaign-matching webhook receipt received at 2026-09-19T19:08:21Z. The handler
-writes a receipt only after signature, event and campaign checks, so this is
-evidence that the signed route accepted a matching delivery; the receipt alone
-cannot independently prove whether Patreon or another holder of the signing
-secret originated it. Real connection/reconnection and authoritative API sync do
-not substitute for a genuine billing/tier transition. Automated fixtures cover
-tier changes, revocation, signatures, ordering, expiry and manual-grant
-preservation. Observe the next legitimate provider change without purchasing or
-cancelling subscriptions solely for testing. Started practice retains its
-recorded session; new paid practice starts require current capabilities.
+A real billing/tier change and an actual signed provider webhook delivery have
+not been observed. Real connection/reconnection and authoritative API sync do not
+substitute for those events. Automated fixtures cover tier changes, revocation,
+signatures, ordering, expiry and manual-grant preservation. Observe the next
+legitimate provider change without purchasing or cancelling subscriptions solely
+for testing. Started practice retains its recorded session; new paid practice
+starts require current capabilities.
 
 ## Ad-free membership
 
