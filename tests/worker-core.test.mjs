@@ -25,9 +25,9 @@ test('worker Daily selector never repeats the prior replay', () => {
   }
 });
 
-test('worker Daily game day resets at midnight Eastern', () => {
+test('worker Daily game day resets at midnight Pacific', () => {
   assert.equal(gameDateKey(new Date('2026-09-07T00:30:00Z')), '2026-09-06');
-  assert.equal(gameDateKey(new Date('2026-09-07T04:30:00Z')), '2026-09-07');
+  assert.equal(gameDateKey(new Date('2026-09-07T07:30:00Z')), '2026-09-07');
 });
 
 test('worker top-three grading matches app set-first scoring', () => {
@@ -60,10 +60,10 @@ test('newest catalog set is the featured global challenge', () => {
   ] }), 'new');
 });
 
-test('period starts follow Eastern game-day monday and month boundaries', () => {
-  const beforeEasternMidnight = new Date('2026-09-07T00:30:00Z');
-  assert.equal(periodStart('daily', beforeEasternMidnight), '2026-09-06');
-  assert.equal(periodStart('weekly', beforeEasternMidnight), '2026-08-31');
-  assert.equal(periodStart('monthly', beforeEasternMidnight), '2026-09-01');
-  assert.equal(periodStart('all', beforeEasternMidnight), '1970-01-01');
+test('period starts follow Pacific game-day monday and month boundaries', () => {
+  const beforePacificMidnight = new Date('2026-09-07T00:30:00Z');
+  assert.equal(periodStart('daily', beforePacificMidnight), '2026-09-06');
+  assert.equal(periodStart('weekly', beforePacificMidnight), '2026-08-31');
+  assert.equal(periodStart('monthly', beforePacificMidnight), '2026-09-01');
+  assert.equal(periodStart('all', beforePacificMidnight), '1970-01-01');
 });

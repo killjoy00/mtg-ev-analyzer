@@ -2,6 +2,8 @@
 
 Reviewed 2026-09-23. Backend changes that depend on schema changes require the matching migration before function deployment; merging code does not deploy Neon Functions.
 
+The Pacific Daily calendar cutover has an additional release-timing invariant because the website changes calendar semantics as soon as the merge publishes while the backend remains on the old function revision until migration and deployment complete. Merge this cutover only from 03:00 through 23:59 Eastern. Then apply migration 0035 to development, deploy and verify the exact merged revision there, apply migration 0035 to production, and deploy the same revision to production. The production deploy must finish before midnight Eastern; if it cannot, revert the merge before midnight rather than carrying a website/backend calendar mismatch into the 00:00-03:00 Eastern interval. The fixed `daily-calendar-migration.yml` workflow is callable through the reviewed rollout-request bridge and rejects starts outside the 03:00-23:59 Eastern window.
+
 ## Implemented protections
 
 - Both legacy and growth APIs use `worker/request-json.mjs`: JSON objects only, valid UTF-8, at most 128 KiB measured while streaming, with explicit 400/413/415 responses. Session creation validates before token/identity work; invalid bodies no longer silently create guests.
@@ -9,7 +11,7 @@ Reviewed 2026-09-23. Backend changes that depend on schema changes require the m
 - Atomic database counters limit a player to 300 accepted analytics events per minute, 60 legacy career-result submissions per ten minutes, and 30 new Draft Run/Cube sessions per ten minutes. A resumed Daily returns before consuming a creation limit. Answering/resuming existing games remains available. Counters reuse one row per player/scope, work across function instances, reset after their window and return HTTP 429 with `Retry-After`.
 - Production CORS excludes localhost by default. An isolated local-development function may set `PACK1_ALLOW_LOCALHOST=1`; production should leave it unset. CORS is a browser policy, not authentication or an abuse firewall.
 - Growth JSON responses use `Cache-Control: no-store`; unexpected legacy database errors return a generic error. Fresh legacy signing-key initialization uses cryptographic random bytes, preserving any existing key.
-- One `game-date.mjs` implementation owns Eastern dates for frontend, Today, both backend modules and legacy aliases. Misnamed UTC callers are removed; DST and midnight regression cases cover every entry point.
+- One `game-date.mjs` implementation owns Pacific dates for frontend, Today, both backend modules and legacy aliases. Misnamed UTC callers are removed; DST and midnight regression cases cover every entry point.
 - Today refreshes on a completed result, return to the page and a date change. Old asynchronous results cannot overwrite newer state. Today and Profile subscribe to the common rendering lifecycle, now included in the architecture gate.
 
 ## Password recovery integrity

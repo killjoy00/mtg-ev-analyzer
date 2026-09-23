@@ -51,9 +51,13 @@ const result=await query(`SELECT
     ((table_name='draft_run_sessions' AND column_name IN ('result_persisted_at','daily_featured_sets')) OR (table_name='draft_run_schedules' AND column_name='daily_featured_sets'))) columns,
   (SELECT count(*)=2 FROM pg_constraint WHERE conname IN ('draft_run_sessions_puzzle_ids_check','draft_run_schedules_puzzle_ids_check')
     AND pg_get_constraintdef(oid) ~ '\\m8\\M' AND pg_get_constraintdef(oid) ~ '\\m10\\M') lengths,
-  position('jsonb_array_length(s.puzzle_ids)' in pg_get_viewdef('draft_run_measurements'::regclass))>0 measurements`);
+  position('jsonb_array_length(s.puzzle_ids)' in pg_get_viewdef('draft_run_measurements'::regclass))>0 measurements,
+  position('America/Los_Angeles' in pg_get_viewdef('analytics_retention_cohorts'::regclass))>0 retention_cohorts_pacific,
+  position('America/Los_Angeles' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))>0 daily_retention_pacific,
+  position('America/New_York' in pg_get_viewdef('analytics_retention_cohorts'::regclass))=0 retention_cohorts_not_eastern,
+  position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0034 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0035 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');

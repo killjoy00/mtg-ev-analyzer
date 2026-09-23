@@ -5,6 +5,8 @@ import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity,linkedPlayerIdentity,rankingIdentityStatus} from './account-identity.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
+import {verifyDailyGenerationToken} from './daily-generation-auth.mjs';
+import {DAILY_ENVIRONMENTS,generateDailyEnvironmentResults} from './daily-generation-results.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import growth, { query, player, readJson, json, withCors, gameDateKey } from './growth-function.js';
@@ -24,6 +26,12 @@ const environmentOf = s => s.environment || 'mixed';
 const runLength = s => s.puzzle_ids.length;
 const parse = value => typeof value === 'string' ? JSON.parse(value) : value;
 const fail = (message,status=400) => { throw Object.assign(new Error(message),{status}); };
+const DAILY_GENERATION_PATH='/internal/daily-generation';
+const DAILY_SCHEDULE_SELECT='SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets,serving_policy_version FROM draft_run_schedules WHERE day=$1::date AND environment=$2';
+const bearer=request=>{
+  const value=String(request.headers.get('authorization')||'');
+  return value.startsWith('Bearer ')?value.slice(7):'';
+};
 
 async function puzzle(id,corpusVersion) {
   const r=await query('SELECT payload FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[id]);
@@ -107,6 +115,47 @@ async function responseFor(s) {
   return {ranked_name:rankedName,ranking_identity:identityStatus?{eligible:identityStatus.eligible,reason:identityStatus.reason}:null,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:Boolean(s.leaderboard_eligible&&rankedIdentity),environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
 }
 
+async function ensureDailySchedule(day,environment) {
+  let schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
+  if(schedule)return {schedule,created:false};
+  let featuredSets=environment!=='powered-cube'
+    ?(await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION))
+      .filter(p=>p.regular_run&&p.release_date&&p.release_date<=day)
+      .sort((a,b)=>b.release_date.localeCompare(a.release_date)||a.set_id.localeCompare(b.set_id))
+      .slice(0,environment==='latest'?1:4).map(p=>p.set_id)
+    :[];
+  const seed=`daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`;
+  const selected=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day});
+  const plan=selected.map(p=>p.puzzle_id);
+  if(environment==='latest')featuredSets=[selected[0].set_id];
+  const inserted=await query(
+    'INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,difficulty_version,selection_version,daily_featured_sets,scoring_version,serving_policy_version) VALUES($1::date,$2,$3,$4::jsonb,$5,$6,$7::jsonb,$8,$9) ON CONFLICT(day,environment) DO NOTHING RETURNING day',
+    [day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets),DRAFT_RUN_SCORING_VERSION,SERVING_POLICY_VERSION],
+  );
+  schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
+  if(!schedule)fail('Daily schedule unavailable.',503);
+  return {schedule,created:Boolean(inserted.rows.length)};
+}
+
+async function generateDailySchedules(request) {
+  if(request.method!=='POST')fail('Not found.',404);
+  await verifyDailyGenerationToken(bearer(request));
+  const body=await readJson(request);
+  if(Object.keys(body).some(key=>key!=='day'))fail('Unexpected Daily generation input.');
+  const day=String(body.day||''),currentDay=gameDateKey();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||day!==currentDay)fail('Daily generation day denied.',409);
+  const started=Date.now();
+  const results=await generateDailyEnvironmentResults(day,ensureDailySchedule);
+  for(const row of results)if(row.status==='failed')console.error(JSON.stringify({
+    event:'daily_generation_failed',
+    date:day,
+    environment:row.environment,
+    error_class:row.error_class,
+  }));
+  const success=results.every(row=>row.status!=='failed');
+  return json({ok:success,date:day,success,results,duration_ms:Math.max(0,Date.now()-started)},success?200:500);
+}
+
 async function start(request) {
   const owner=await player(request),body=await readJson(request),daily=body.daily===true;
   const entrySource=daily&&body.source==='result_share'?'result_share':null;
@@ -142,15 +191,7 @@ async function start(request) {
   let ids,featuredSets=[],difficultyVersion=source?.difficulty_version||DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion=source?.selection_version||DRAFT_RUN_SELECTION_VERSION;
   if(source) ids=source.puzzle_ids;
   else if(day) {
-    let schedule=(await query('SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets,serving_policy_version FROM draft_run_schedules WHERE day=$1::date AND environment=$2',[day,environment])).rows[0];
-    if(!schedule) {
-      featuredSets=environment!=='powered-cube'?(await loadLiveSetMetadata(query,corpusVersion)).filter(p=>p.regular_run&&p.release_date&&p.release_date<=day).sort((a,b)=>b.release_date.localeCompare(a.release_date)||a.set_id.localeCompare(b.set_id)).slice(0,environment==='latest'?1:4).map(p=>p.set_id):[];
-      const selected=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day});
-      const plan=selected.map(p=>p.puzzle_id);
-      if(environment==='latest')featuredSets=[selected[0].set_id];
-      await query('INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,difficulty_version,selection_version,daily_featured_sets,scoring_version,serving_policy_version) VALUES($1::date,$2,$3,$4::jsonb,$5,$6,$7::jsonb,$8,$9) ON CONFLICT(day,environment) DO NOTHING',[day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets),DRAFT_RUN_SCORING_VERSION,SERVING_POLICY_VERSION]);
-      schedule=(await query('SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets,serving_policy_version FROM draft_run_schedules WHERE day=$1::date AND environment=$2',[day,environment])).rows[0];
-    }
+    const {schedule}=await ensureDailySchedule(day,environment);
     corpusVersion=schedule.corpus_version;scoringVersion=schedule.scoring_version;servingPolicy=schedule.serving_policy_version||LEGACY_SERVING_POLICY_VERSION;
     ids=parse(schedule.puzzle_ids);difficultyVersion=schedule.difficulty_version||LEGACY_DIFFICULTY_VERSION;
     selectionVersion=schedule.selection_version||PREVIOUS_SELECTION_VERSION;
@@ -261,6 +302,7 @@ async function leaderboard(request) {
 
 async function route(request) {
   const url=new URL(request.url),path=url.pathname;
+  if(path===DAILY_GENERATION_PATH) return generateDailySchedules(request);
   if(path==='/v1/trophy-import') return json(await handleTrophyImport(request,query));
   if(request.method==='OPTIONS') return new Response(null,{status:204});
   if(path.startsWith('/v1/admin/')) return json(await handleAdmin(request,query,readJson));
@@ -324,7 +366,8 @@ async function route(request) {
 }
 
 export default {async fetch(request) {
-  const denied=guardIngress(request);if(denied)return denied;
+  const internal=new URL(request.url).pathname===DAILY_GENERATION_PATH;
+  if(!internal){const denied=guardIngress(request);if(denied)return denied;}
   try {const response=await route(request);response.headers.set('cache-control','no-store');return withCors(response,request);}
   catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);const response=json({error:status===500?'Could not save your run. Please retry.':error.message,...(error.capability?{capability:error.capability}:{})},status);if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));return withCors(response,request);}
 }};

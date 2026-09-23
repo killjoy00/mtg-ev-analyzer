@@ -73,13 +73,37 @@ test('Patreon discovery is read-only and cannot activate memberships',()=>{
  assert.throws(()=>rolloutDispatch({...common,operation:'patreon-discovery',mode:'sync'}));
 });
 
-test('production browser verification cannot select a different origin or ref',()=>{
+test('production browser verification accepts only fixed Daily measurement inputs',()=>{
  assert.equal(rolloutDispatch({...common,operation:'production-browser'}).workflow,'production-browser.yml');
- assert.throws(()=>rolloutDispatch({...common,operation:'production-browser',origin:'https://example.com'}));
+ assert.deepEqual(rolloutDispatch({...common,operation:'production-browser',first_environment:'latest',measurement_mode:true}),{
+   workflow:'production-browser.yml',body:{ref:'main',inputs:{first_environment:'latest',measurement_mode:'true'}},
+ });
+ for(const extra of [
+   {origin:'https://example.com'},
+   {ref:'unreviewed'},
+   {first_environment:'other',measurement_mode:true},
+   {first_environment:'mixed',measurement_mode:'true'},
+   {first_environment:'mixed'},
+ ])assert.throws(()=>rolloutDispatch({...common,operation:'production-browser',...extra}));
+});
+
+test('Daily generation dispatch is target-only and fixed to the reviewed workflow',()=>{
+ const dev={...common,operation:'daily-generation',target:'development'};
+ assert.deepEqual(rolloutDispatch(dev),{workflow:'daily-generation.yml',body:{ref:'main',inputs:{target:'development'}}});
+ assert.equal(rolloutDispatch({...dev,target:'production'}).body.inputs.target,'production');
+ for(const extra of [{target:'other'},{day:'2041-01-01'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...dev,...extra}));
 });
 
 test('Patreon sync runs only the reviewed membership reconciliation workflow',()=>{
  const request={...common,operation:'patreon-sync'};
  assert.deepEqual(rolloutDispatch(request),{workflow:'patreon-reconcile.yml',body:{ref:'main',inputs:{mode:'sync'}}});
  for(const extra of [{campaign:'other'},{account:'other'},{ref:'branch'},{mode:'discover'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
+
+test('Daily calendar migration is exact-revision and target-only',()=>{
+ const request={...common,operation:'daily-calendar-migration',target:'development',commit:'b'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'daily-calendar-migration.yml',body:{ref:'main',inputs:{commit:'b'.repeat(40),target:'development'}}});
+ assert.equal(rolloutDispatch({...request,target:'production'}).body.inputs.target,'production');
+ for(const extra of [{commit:'main'},{target:'other'},{migration:'0034'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
 });

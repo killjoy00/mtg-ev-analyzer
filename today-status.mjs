@@ -1,5 +1,5 @@
-import {gameDateKey as easternDateKey} from './game-date.mjs';
-export {gameDateKey as easternDateKey} from './game-date.mjs';
+import {gameDateKey} from './game-date.mjs';
+export {gameDateKey} from './game-date.mjs';
 
 function completedDaily(profile, environment, dateKey) {
   return (profile?.daily_history || []).find((row) => (
@@ -21,7 +21,7 @@ function statusFor(profile, environment, dateKey) {
   };
 }
 
-export function todayStatus(profile, dateKey = easternDateKey()) {
+export function todayStatus(profile, dateKey = gameDateKey()) {
   const draftRun = statusFor(profile, 'mixed', dateKey);
   const cube = statusFor(profile, 'powered-cube', dateKey);
   const latest = statusFor(profile, 'latest', dateKey);

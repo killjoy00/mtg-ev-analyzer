@@ -34,9 +34,9 @@ try{
  assert.ok(await page.getByRole('link',{name:'Start Another Draft Run',exact:true}).isVisible());
  for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-dailies-complete-${width}.png`,fullPage:true});}
  both=false;
- await page.evaluate(()=>{window.__todayNow=Date.parse('2026-09-15T04:00:00Z');window.dispatchEvent(new Event('focus'));});await progress('0');
+ await page.evaluate(()=>{window.__todayNow=Date.parse('2026-09-15T07:00:00Z');window.dispatchEvent(new Event('focus'));});await progress('0');
  assert.equal(await page.locator('.daily-home time').getAttribute('datetime'),'2026-09-15');
  fail=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Daily progress is unavailable.',{exact:false}).waitFor();
  assert.equal(starts,0,'Reading Today must never reserve a ranked Daily');
- console.log('Daily home refresh passed: completion, stale response, Eastern rollover, unavailable status and no Daily reservation.');
+ console.log('Daily home refresh passed: completion, stale response, Pacific rollover, unavailable status and no Daily reservation.');
 }finally{await browser.close();}

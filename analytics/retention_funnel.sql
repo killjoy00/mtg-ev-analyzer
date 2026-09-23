@@ -16,7 +16,7 @@ SELECT *,round(returned_next_day::numeric/nullif(completed_players,0),3) next_da
 FROM analytics_daily_next_day_retention ORDER BY day DESC;
 
 -- Diagnostic event coverage; do not interpret these counts as unique people.
-SELECT (created_at AT TIME ZONE 'America/New_York')::date AS day,event_name,
+SELECT (created_at AT TIME ZONE 'America/Los_Angeles')::date AS day,event_name,
   event_props->>'mode' mode,count(*) events,count(DISTINCT player_id) players
 FROM analytics_events WHERE created_at>now()-interval '30 days'
 GROUP BY day,event_name,event_props->>'mode' ORDER BY day DESC,event_name;

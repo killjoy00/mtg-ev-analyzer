@@ -16,7 +16,7 @@ const ids=puzzles.map(p=>p.puzzle_id);
 const marker=`qa-retirement-${randomUUID()}`;
 const goodDay='9998-01-01',badDay='9998-01-02';
 try {
-  // Fixed fixture dates make this independent of today's Eastern date and
+  // Fixed fixture dates make this independent of today's Pacific date and
   // whether today's production plan happens to include a retired source.
   for(const [day,plan] of [[goodDay,ids],[badDay,[marker,...ids.slice(1)]]]) {
     await query(`INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,selection_version)
