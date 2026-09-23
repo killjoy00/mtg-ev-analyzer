@@ -115,6 +115,7 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
   await query('DELETE FROM provider_accounts WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM entitlement_grants WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[auth]);
+  await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM account_credential_rate_limits WHERE auth_user_id=$1::uuid',[auth]);
   if(recoveryKey)await query('DELETE FROM account_recovery_rate_limits WHERE limit_key=$1',[recoveryKey]);
   await query('DELETE FROM account_links WHERE auth_user_id=$1::uuid',[auth]);
