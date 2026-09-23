@@ -1,7 +1,7 @@
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {readJson} from './request-json.mjs';
-import { challengeIndex, featuredSetId, firstPackPicks, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from './core.mjs';
+import { challengeIndex, featuredSetId, firstPackPicks, GAME_TIME_ZONE, gameDateKey, gradeFullPack, gradeTopThree, periodStart } from './core.mjs';
 import { PLACEHOLDER_USERNAME, normalizeDisplayName } from './username.mjs';
 
 const STATIC_ORIGIN = 'https://packone.pro';
@@ -461,7 +461,7 @@ async function handleGetChallenge(id) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-api', version: 4, scoring: 'counterfactual-path-v3', date: gameDateKey(), timeZone: 'America/New_York' });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-api', version: 4, scoring: 'counterfactual-path-v3', date: gameDateKey(), timeZone: GAME_TIME_ZONE });
   if (request.method === 'POST' && url.pathname === '/v1/session') return handleSession(request);
   if (request.method === 'PATCH' && url.pathname === '/v1/player') return handlePlayer(request);
   if (request.method === 'POST' && url.pathname === '/v1/scores') return handleScore(request);
