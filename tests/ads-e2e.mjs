@@ -111,9 +111,9 @@ try{
     assert.match(await link.getAttribute('href'),/^https:\/\/partner\.tcgplayer\.com\/c\/7742974\/1780961\/21018\?u=/);
     assert.equal(await link.getAttribute('rel'),'sponsored noopener');
     assert.equal(await link.getAttribute('data-tcgplayer-surface'),'daily_home_banner');
-    assert.equal(await page.locator('.tcg-affiliate-copy strong').textContent(),'Shop Magic on TCGplayer');
+    assert.equal(await page.locator('.tcg-affiliate-copy strong').textContent(),'Shop Magic cards');
     assert.equal(await page.locator('.tcg-affiliate-copy > span').textContent(),'Singles, sealed product, and more');
-    assert.equal(await page.locator('.tcg-affiliate-cta').textContent(),'Shop TCGplayer →');
+    assert.equal(await page.locator('.tcg-affiliate-cta').textContent(),'Shop now →');
     assert.equal(await page.locator('.tcg-affiliate-disclosure').textContent(),'Affiliate link — Pack One may earn a commission from purchases.');
     await logo.waitFor({state:'visible'});
     const image=await logo.evaluate(el=>({
