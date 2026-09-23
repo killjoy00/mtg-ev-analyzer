@@ -781,7 +781,7 @@ body .run-review-list li {
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 12px;
+  padding: 24px;
   background: #fff;
 }
 .tcg-affiliate-logo {
@@ -842,7 +842,7 @@ body .run-review-list li {
     text-align: center;
   }
   .tcg-affiliate-logo-wrap {
-    padding: 8px 18px;
+    padding: 20px;
   }
   .tcg-affiliate-logo {
     width: min(180px, 72%);
