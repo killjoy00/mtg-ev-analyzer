@@ -2,8 +2,8 @@ name: account deletion maintenance
 
 on:
   schedule:
-    # Neon performs maintenance every 10 minutes. GitHub only checks for operator attention.
-    - cron: '17,47 * * * *'
+    # Neon performs maintenance every 10 minutes. GitHub checks for operator attention five minutes later.
+    - cron: '4,14,24,34,44,54 * * * *'
   workflow_dispatch:
 
 permissions:
