@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const HOME_SLOT='1543495960';
-const googleStub='(()=>{const q=window.adsbygoogle||[];const fill=()=>{const ad=document.querySelector("ins.adsbygoogle:not([data-test-filled])");if(ad){ad.dataset.testFilled="1";ad.innerHTML="<div data-test-creative style=\"min-height:90px;display:grid;place-items:center;width:100%\">Advertisement</div>";}};q.forEach(fill);const push=Array.prototype.push;q.push=function(){const n=push.apply(q,arguments);fill();return n;};window.adsbygoogle=q;fill();})();';
+const googleStub=`(()=>{const q=window.adsbygoogle||[];const fill=()=>{const ad=document.querySelector("ins.adsbygoogle:not([data-test-filled])");if(ad){ad.dataset.testFilled="1";ad.innerHTML='<div data-test-creative style="min-height:90px;display:grid;place-items:center;width:100%">Advertisement</div>';}};q.forEach(fill);const push=Array.prototype.push;q.push=function(){const n=push.apply(q,arguments);fill();return n;};window.adsbygoogle=q;fill();})();`;
 const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
 
 function dailyFixture(signed=false){
@@ -57,7 +57,7 @@ async function waitFor(state,key,value=1){
 
 async function assertOneFill(page,state,slotId=HOME_SLOT){
   try {
-    await page.locator('ins.adsbygoogle').waitFor({timeout:5000});
+    await page.locator('ins.adsbygoogle').waitFor({state:'attached',timeout:5000});
   } catch(error) {
     const debug=await page.evaluate(()=>({
       config:window.PACKONE_ADSENSE,
