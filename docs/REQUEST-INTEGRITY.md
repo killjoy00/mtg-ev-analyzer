@@ -1,6 +1,6 @@
 # Request and identity integrity
 
-Reviewed 2026-09-21. Backend changes that depend on schema changes require the matching migration before function deployment; merging code does not deploy Neon Functions.
+Reviewed 2026-09-23. Backend changes that depend on schema changes require the matching migration before function deployment; merging code does not deploy Neon Functions.
 
 ## Implemented protections
 
