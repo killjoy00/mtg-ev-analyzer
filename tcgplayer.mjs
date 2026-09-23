@@ -1,6 +1,7 @@
 import { sendEvents } from './growth-api.mjs';
 
 const SEARCH_BASE = 'https://www.tcgplayer.com/search/magic/product';
+const MAGIC_SHOP_BASE = 'https://www.tcgplayer.com/categories/trading-and-collectible-card-games/magic-the-gathering';
 
 function config() { return globalThis.PACKONE_TCGPLAYER || {}; }
 
@@ -11,11 +12,19 @@ export function tcgplayerDestination(cardName) {
   return url.toString();
 }
 
-export function tcgplayerUrl(cardName) {
-  const destination = tcgplayerDestination(cardName);
+export function tcgplayerAffiliateUrl(destination) {
+  const target = String(destination || '').trim();
   const template = String(config().impactDeepLinkTemplate || '').trim();
-  if (template && template.includes('{url}')) return template.replace('{url}', encodeURIComponent(destination));
-  return destination;
+  if (target && template && template.includes('{url}')) return template.replace('{url}', encodeURIComponent(target));
+  return target;
+}
+
+export function tcgplayerUrl(cardName) {
+  return tcgplayerAffiliateUrl(tcgplayerDestination(cardName));
+}
+
+export function tcgplayerMagicUrl() {
+  return tcgplayerAffiliateUrl(MAGIC_SHOP_BASE);
 }
 
 export function tcgplayerAffiliateActive() {
