@@ -1,3 +1,16 @@
+/*
+ * PRESERVED / DORMANT GAME ARCHITECTURE
+ *
+ * This file retains the Top 3 / Full Pack implementation intentionally. It is
+ * not loaded by the current Pack One runtime. bootstrap.mjs serves the current
+ * homepage through daily-home.mjs and current play through draft-run-product.mjs;
+ * previously published historical challenge links are handled by
+ * historical-share.mjs.
+ *
+ * Keep this architecture unless product direction changes. When changing the
+ * live Daily Draft Run, do not assume edits here affect production.
+ */
+
 import { escapeHtml as esc } from './html.mjs';
 import { gradePick, gradeTopThree, rankCandidates, summarizeResults } from './scoring.mjs';
 import { challengeIndex, gameDateKey } from './engagement.mjs';
