@@ -20,9 +20,9 @@ test('Daily selector never repeats the previous day when multiple replays exist'
   }
 });
 
-test('Daily game day resets at midnight Eastern instead of UTC', () => {
+test('Daily game day resets at midnight Pacific instead of UTC', () => {
   assert.equal(gameDateKey(new Date('2026-09-07T00:30:00Z')), '2026-09-06');
-  assert.equal(gameDateKey(new Date('2026-09-07T04:30:00Z')), '2026-09-07');
+  assert.equal(gameDateKey(new Date('2026-09-07T07:30:00Z')), '2026-09-07');
   assert.equal(previousGameDateKey('2026-03-01'), '2026-02-28');
 });
 
