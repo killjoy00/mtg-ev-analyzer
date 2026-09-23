@@ -119,8 +119,13 @@ try{
   assert.equal((await page.locator('#run-share-status').textContent())?.trim(),'');
   const shared=await page.evaluate(()=>window.__runShare);assert.match(shared.text,new RegExp('🟩{'+(puzzles.length-1)+'}','u'));assert.equal(shared.files,undefined);assert.doesNotMatch(shared.url,/profile|token/);
   if(daily){
-    assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.url,/daily=1/);assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
+    assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.url,/daily=1/);assert.match(shared.url,/ref=result_share/);assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
     assert.equal(await page.locator('#run-challenge').count(),0);
+    await page.goto(shared.url);
+    await page.waitForFunction(()=>!new URL(location.href).searchParams.has('ref'));
+    for(let i=0;i<30&&!events.some(event=>event.name==='daily_share_arrival');i++)await page.waitForTimeout(100);
+    const arrivals=events.filter(event=>event.name==='daily_share_arrival');
+    assert.equal(arrivals.length,1);assert.equal(arrivals[0].props.source,'result_share');assert.equal(arrivals[0].props.daily,true);
   }else{
     assert.match(shared.url,new RegExp('shared='+shareId));
     await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Play this run and compare/);await noOverflow();
