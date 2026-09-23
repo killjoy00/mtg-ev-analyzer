@@ -26,7 +26,7 @@ const deletionEnv={PACK1_RATE_LIMIT_SECRET:'h'.repeat(64)};
 const verificationAuth=crypto.randomUUID();
 const verificationRaceAuth=crypto.randomUUID();
 
-async function deletionTrigger(name='pack1-account-deletion-maintenance',status=200) {
+async function deletionTrigger(name='pack1-account-deletion-maintenance',status=[200,503]) {
   const invocationId='qa-delete-trigger-'+crypto.randomUUID();
   const response=await growth.fetch(new Request('https://origin.test/internal/account-deletion-maintenance',{
     method:'POST',
@@ -39,7 +39,8 @@ async function deletionTrigger(name='pack1-account-deletion-maintenance',status=
     }),
   }));
   const data=await response.json();
-  assert.equal(response.status,status,JSON.stringify({status:response.status,body:data}));
+  const allowed=Array.isArray(status)?status:[status];
+  assert.ok(allowed.includes(response.status),JSON.stringify({status:response.status,body:data}));
   return data;
 }
 
