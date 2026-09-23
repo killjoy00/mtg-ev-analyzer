@@ -11,6 +11,7 @@ import {clearCredentialLimit,consumeCredentialLimit,trustedCredentialNetwork} fr
 import {consumeDeletionVerification,createDeletionVerification,deletionEmailConfigured,deletionEmailForAuth} from './account-deletion-verification.mjs';
 import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,deletionRecoveryKey,finishProviderPhase,loadDeletionOperation,maintenanceBatch,removeProviderUser,stuckDeletion,sweepExpiredVerification,verificationSweepEnabled} from './account-deletion.mjs';
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
+import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 const ACCOUNT_CONFIG=accountRuntimeConfig();
 const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
@@ -20,6 +21,7 @@ const ACCOUNT_RETURN='https://packone.pro/';
 const STATIC_ORIGIN = 'https://packone.pro';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 const DAILY_RUN_ID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
+const DELETION_TRIGGER_NAMES=new Set(['pack1-account-deletion-maintenance']);
 let catalogCache = { at: 0, data: null };
 let signingKeyCache = { at: 0, key: null };
 
@@ -1330,9 +1332,39 @@ function bearer(request) {
   return value.startsWith('Bearer ')?value.slice(7):'';
 }
 
+async function deletionMaintenanceSnapshot({advanced=[],swept=null,reportOnly=false}={}) {
+  const remaining=await maintenanceBatch(query,{limit:50});
+  const attention=remaining.filter(row=>stuckDeletion(row)).map(row=>({
+    operation_id:row.operation_id,
+    state:row.state,
+    age_seconds:Math.max(0,Math.floor((Date.now()-new Date(row.created_at).getTime())/1000)),
+    attempts:Number(row.attempts||0),
+    error_code:row.last_error_code||null,
+  }));
+  return json({
+    ok:attention.length===0,
+    deletion_enabled:deletionEnabled(),
+    sweep_enabled:verificationSweepEnabled(),
+    report_only:reportOnly,
+    advanced,
+    swept_expired_verifications:swept,
+    attention,
+  },attention.length?503:200);
+}
+
+async function authorizeDeletionMaintenance(request,{allowTrigger=true}={}) {
+  if(neonTriggerInvocationHeader(request)) {
+    if(!allowTrigger)throw Object.assign(Error('Maintenance identity denied'),{status:403});
+    const body=await readJson(request);
+    return verifyNeonScheduleTrigger(request,body,{names:DELETION_TRIGGER_NAMES});
+  }
+  await verifyDeletionMaintenanceToken(bearer(request));
+  return null;
+}
+
 async function handleDeletionMaintenance(request) {
   if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
-  await verifyDeletionMaintenanceToken(bearer(request));
+  await authorizeDeletionMaintenance(request);
   const advanced=[];
   if(deletionEnabled()) {
     for(const operation of await maintenanceBatch(query,{limit:20})) {
@@ -1356,22 +1388,13 @@ async function handleDeletionMaintenance(request) {
     }
   }
   const swept=verificationSweepEnabled()?await sweepExpiredVerification(query,{limit:200}):null;
-  const remaining=await maintenanceBatch(query,{limit:50});
-  const attention=remaining.filter(row=>stuckDeletion(row)).map(row=>({
-    operation_id:row.operation_id,
-    state:row.state,
-    age_seconds:Math.max(0,Math.floor((Date.now()-new Date(row.created_at).getTime())/1000)),
-    attempts:Number(row.attempts||0),
-    error_code:row.last_error_code||null,
-  }));
-  return json({
-    ok:attention.length===0,
-    deletion_enabled:deletionEnabled(),
-    sweep_enabled:verificationSweepEnabled(),
-    advanced,
-    swept_expired_verifications:swept,
-    attention,
-  },attention.length?503:200);
+  return deletionMaintenanceSnapshot({advanced,swept});
+}
+
+async function handleDeletionMaintenanceStatus(request) {
+  if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
+  await authorizeDeletionMaintenance(request,{allowTrigger:false});
+  return deletionMaintenanceSnapshot({reportOnly:true});
 }
 
 async function handleSignout(request) {
@@ -1505,6 +1528,7 @@ async function route(request) {
   const url = new URL(request.url);
   if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured() });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
+  if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
@@ -1541,8 +1565,8 @@ async function route(request) {
 
 export default {
   async fetch(request) {
-    const maintenance=new URL(request.url).pathname==='/internal/account-deletion-maintenance';
-    if(!maintenance){const denied=guardIngress(request);if(denied)return denied;}
+    const internalMaintenance=new Set(['/internal/account-deletion-maintenance','/internal/account-deletion-maintenance-status']).has(new URL(request.url).pathname);
+    if(!internalMaintenance){const denied=guardIngress(request);if(denied)return denied;}
     try {
       return withCors(await route(request), request);
     } catch (error) {
