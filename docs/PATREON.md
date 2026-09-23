@@ -57,6 +57,11 @@ This reuses the existing Patreon client, campaign, tiers, webhook, callback and
 Pack One account infrastructure. Do not create a second Patreon client or another
 post-purchase communication path.
 
+Activation funnel measurement is recorded as `patreon_activation_started`,
+`patreon_activation_oauth_started`, and `patreon_activation_succeeded`. Run
+`analytics/patreon_activation_funnel.sql` for the 30-day handoff/activation funnel,
+including activation sessions that started but did not reach Elite success.
+
 ## Synchronization and failure behavior
 
 OAuth requests only `identity`, reads the linked user's membership in the creator
