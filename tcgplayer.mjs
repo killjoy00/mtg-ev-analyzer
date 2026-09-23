@@ -24,12 +24,16 @@ export function tcgplayerUrl(cardName) {
 }
 
 export function tcgplayerMagicUrl() {
-  return tcgplayerAffiliateUrl(MAGIC_SHOP_BASE);
+  return tcgplayerAffiliateUrl(String(config().homeDestination || '').trim() || MAGIC_SHOP_BASE);
 }
 
 export function tcgplayerAffiliateActive() {
   const template = String(config().impactDeepLinkTemplate || '').trim();
   return Boolean(template && template.includes('{url}'));
+}
+
+export function tcgplayerHomeBannerActive() {
+  return config().homeBannerEnabled === true && tcgplayerAffiliateActive();
 }
 
 function decorateStaticLinks() {
