@@ -37,7 +37,7 @@ Entitlements are determined from campaign, tier and provider state IDs, never th
 price. A signed-out Patreon member is treated as a guest. One Daily-home-only
 monetization slot is wired; AdSense remains dormant (`enabled:false`) pending
 Google approval, consent/privacy work and explicit owner authorization. While
-Google is disabled, the slot may show the TCGplayer affiliate fallback to
+Google is disabled, the slot shows the TCGplayer affiliate fallback to
 advertising-eligible visitors, and qualifying Supporter/Elite memberships suppress
 it as part of ad-free browsing. Pack One-originated account or Patreon transitions
 clear an existing promotion across open tabs, but provider/backend changes that

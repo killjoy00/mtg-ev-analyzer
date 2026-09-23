@@ -121,6 +121,13 @@ Magic category, and click surface `daily_home_banner`. Displaying the fallback
 does not load a TCGplayer/Impact script or pixel. Google activation replaces the
 affiliate promotion rather than stacking with it.
 
+Production closeout on September 23, 2026: PR #402 was squash-merged as
+`1fa1080bd7314c9b5af67c1dcecec43eff355898`. GitHub Pages deployment
+35883152325, production smoke 35883153703, post-merge test 35883153719 and
+post-merge E2E 35883153629 all completed successfully. The TCGplayer fallback is
+therefore live for advertising-eligible Daily-home visitors; AdSense remains
+`enabled:false`.
+
 Supporter ($3) and Elite ($7) ad-free behavior continues to use exact campaign,
 tier and provider state IDs rather than payment amount. Active, still-entitled
 former, free-trial and gifted qualifying memberships suppress both Google and the
