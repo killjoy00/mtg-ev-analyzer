@@ -1,3 +1,4 @@
+// Rebased release contract: keep orchestration pinned to reviewed main revisions.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
