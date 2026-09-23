@@ -1,7 +1,6 @@
 {
-  "operation": "deploy",
-  "request_id": "daily-pacific-deploy-prod-20260923-v2",
-  "reason": "Deploy exact merged PR 411 release revision to production after production migration 0035 passed and development proof completed.",
-  "commit": "75c3519eb262815acb8f8901603056cbe32dc7af",
+  "operation": "daily-generation",
+  "request_id": "daily-pacific-generate-prod-20260923",
+  "reason": "Verify the merged Pacific Daily pre-generation endpoint in production after exact-SHA deployment passes.",
   "target": "production"
 }
