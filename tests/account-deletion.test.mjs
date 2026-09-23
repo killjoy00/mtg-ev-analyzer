@@ -325,7 +325,7 @@ test('public gateway allows deletion but not maintenance endpoint',()=>{
 
 test('GitHub deletion workflow is manual recovery plus read-only scheduled alerting',()=>{
   const flow=fs.readFileSync('.github/workflows/account-deletion-maintenance.yml','utf8');
-  assert.match(flow,/cron: '17,47 \* \* \* \*'/);
+  assert.match(flow,/cron: '4,14,24,34,44,54 \\* \\* \\* \\*'/);
   assert.match(flow,/workflow_dispatch/);
   assert.match(flow,/id-token: write/);
   assert.match(flow,/group: pack1-account-deletion-maintenance/);
