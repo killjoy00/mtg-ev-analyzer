@@ -41,8 +41,8 @@ membership and exact Elite tier. The OAuth callback immediately reapplied the
 authoritative Elite snapshot and premium capabilities without waiting for scheduled
 reconciliation, so no broader Patreon membership scope is requested.
 
-After this activation release is deployed, replace the Elite tier's existing
-five-step Welcome Note instructions with:
+The Elite tier Welcome Note was updated on September 23, 2026 and now directs
+members to the production activation route:
 
 **Activate your Pack One Elite benefits**
 
@@ -50,8 +50,11 @@ Go to:
 
 `https://packone.pro/?patreon=activate`
 
-Sign in to Pack One if needed, then authorize Patreon. Pack One will verify your
-membership and unlock Elite benefits.
+Sign in to Pack One if needed, then authorize Patreon. Pack One will verify the
+membership and unlock Elite benefits. A live mobile acceptance from that Welcome
+Note link correctly short-circuited to **Elite is active** for the already-entitled
+owner account, without forcing another OAuth round trip or manufacturing another
+`elite_activated` transition. Issue #181 is closed.
 
 This reuses the existing Patreon client, campaign, tiers, webhook, callback and
 Pack One account infrastructure. Do not create a second Patreon client or another
