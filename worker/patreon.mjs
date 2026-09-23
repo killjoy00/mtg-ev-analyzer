@@ -7,6 +7,14 @@ const REDIRECT_URI='https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.u
 const RETURN_ORIGIN='https://packone.pro/';
 const USER_AGENT='Pack One - Membership Sync (https://packone.pro)';
 const MEMBER_FIELDS='currently_entitled_amount_cents,patron_status,last_charge_status,is_free_trial,is_gifted';
+// The grant set, the was-Elite-before probe and the activation transition gate
+// must always agree on what Elite means. Derive all three from this one list:
+// adding a capability here cannot leave elite_activated silently unable to fire.
+const ELITE_CAPABILITIES=['custom_corpus','unlimited_cube_practice'];
+if(!ELITE_CAPABILITIES.every(name=>/^[a-z_]{3,40}$/.test(name)))throw Error('Elite capability names must be plain identifiers.');
+const ELITE_CAPABILITY_LIST=ELITE_CAPABILITIES.map(name=>`'${name}'`).join(',');
+const ELITE_CAPABILITY_VALUES=ELITE_CAPABILITIES.map(name=>`('${name}')`).join(',');
+const ELITE_CAPABILITY_COUNT=ELITE_CAPABILITIES.length;
 const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
 const truthy=value=>value===true||value==='t'||value==='true'||value===1||value==='1';
 const amount=value=>{const n=Number(value);return Number.isFinite(n)&&n>=0?Math.round(n):0;};
@@ -73,10 +81,10 @@ export async function applyPatreonMembership(query,authUserId,providerUserId,mem
        AND $14::text IS NULL AND sync_revision=$12::bigint AND last_synced_at <= $11::timestamptz RETURNING auth_user_id`;
   const result=await query(`WITH ${identityGuard}saved AS (${save}), previous AS MATERIALIZED (
     SELECT saved.auth_user_id,
-      (SELECT count(DISTINCT eg.capability)=2
+      (SELECT count(DISTINCT eg.capability)=${ELITE_CAPABILITY_COUNT}
        FROM entitlement_grants eg
        WHERE eg.auth_user_id=saved.auth_user_id AND eg.provider='patreon'
-         AND eg.capability IN ('custom_corpus','unlimited_cube_practice')
+         AND eg.capability IN (${ELITE_CAPABILITY_LIST})
          AND eg.revoked_at IS NULL) AS elite_active_before
     FROM saved
   ), revoked AS (
@@ -87,7 +95,7 @@ export async function applyPatreonMembership(query,authUserId,providerUserId,mem
     INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference,revoked_at,expires_at)
     SELECT saved.auth_user_id,c.capability,'patreon',$2,
       CASE WHEN $13::boolean THEN NULL ELSE now() END,$11::timestamptz+interval '12 hours'
-    FROM saved CROSS JOIN (VALUES ('custom_corpus'),('unlimited_cube_practice')) c(capability)
+    FROM saved CROSS JOIN (VALUES ${ELITE_CAPABILITY_VALUES}) c(capability)
     ON CONFLICT(auth_user_id,capability,provider,provider_reference)
     DO UPDATE SET revoked_at=EXCLUDED.revoked_at,expires_at=EXCLUDED.expires_at
     RETURNING capability
@@ -99,7 +107,7 @@ export async function applyPatreonMembership(query,authUserId,providerUserId,mem
     FROM previous p
     JOIN account_links al ON al.auth_user_id=p.auth_user_id
     CROSS JOIN (SELECT count(DISTINCT capability)::int AS n FROM grants) g
-    WHERE $13::boolean AND NOT p.elite_active_before AND g.n=2
+    WHERE $13::boolean AND NOT p.elite_active_before AND g.n=${ELITE_CAPABILITY_COUNT}
     RETURNING id
   ) SELECT count(*)::int applied FROM saved`,values);
   return Number(result.rows[0]?.applied||0)===1;

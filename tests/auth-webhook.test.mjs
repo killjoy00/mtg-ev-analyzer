@@ -327,6 +327,8 @@ test('QA Durable Object stores pending verification evidence separately from del
     storage:{
       get:async key=>stored.get(key),
       put:async(key,value)=>stored.set(key,value),
+      setAlarm:async at=>stored.set('__alarm__',at),
+      deleteAll:async()=>stored.clear(),
     },
   },{});
   const linkUrl='https://auth.qa-evidence.example/pack1/auth/verify-email?token=fixture-token';
@@ -454,6 +456,8 @@ test('Durable Object dedupe returns success without a second Resend call after a
     storage:{
       get:async key=>key==='sent'?{messageId:'email_already_sent'}:null,
       put:async()=>{writes++;},
+      setAlarm:async()=>{writes++;},
+      deleteAll:async()=>{},
     },
   },{});
   const response=await dedupe.fetch(new Request('https://pack1.internal/send',{
@@ -472,11 +476,40 @@ test('Durable Object dedupe returns success without a second Resend call after a
 });
 
 
+test('a delivered send schedules its own expiry and the alarm clears the object',async()=>{
+  // Regression: every send left a Durable Object behind forever. The marker now
+  // expires well past Neon's retries, and the Resend idempotency key still
+  // covers the same event independently inside that window.
+  const stored=new Map();
+  const dedupe=new RecoveryEventDedupe({
+    storage:{
+      get:async key=>stored.get(key),
+      put:async(key,value)=>stored.set(key,value),
+      setAlarm:async at=>stored.set('__alarm__',at),
+      deleteAll:async()=>stored.clear(),
+    },
+  },{});
+  const before=Date.now();
+  await dedupe.fetch(new Request('https://pack1.internal/pending-verification',{
+    method:'POST',
+    headers:{'content-type':'application/json'},
+    body:JSON.stringify({linkUrl:'https://auth.retention.example/pack1/auth/verify-email?token=fixture-token'}),
+  }));
+  const alarm=stored.get('__alarm__');
+  assert.ok(alarm>=before+24*60*60*1000,'retention must outlast the provider retry window');
+  assert.ok(alarm<=Date.now()+25*60*60*1000,'retention must stay bounded');
+  await dedupe.alarm();
+  assert.equal(stored.size,0,'the alarm clears every key the object holds');
+});
+
 test('QA telemetry stores only sanitized retry fields and is hidden outside QA',async()=>{
   let stored=[];
+  let alarmAt=null;
   const storage={
     get:async key=>key==='qa_telemetry'?stored:null,
     put:async(key,value)=>{if(key==='qa_telemetry')stored=value;},
+    setAlarm:async at=>{alarmAt=at;},
+    deleteAll:async()=>{stored=[];},
   };
   const telemetry=new RecoveryEventDedupe({storage},{});
   const post=await telemetry.fetch(new Request('https://pack1.internal/telemetry',{
@@ -506,6 +539,8 @@ test('QA forced delivery failure exercises the provider path and emits verified 
     storage:{
       get:async key=>stored.get(key),
       put:async(key,value)=>stored.set(key,value),
+      setAlarm:async at=>stored.set('__alarm__',at),
+      deleteAll:async()=>stored.clear(),
     },
   },{
     PACK1_AUTH_ENV:'qa',

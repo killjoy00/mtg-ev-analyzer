@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {createHmac,createHash} from 'node:crypto';
+import fs from 'node:fs';
 import {premiumPatreonMembership,validPatreonPolicy,PATREON_POLICY} from '../patreon-policy.mjs';
 import {parsePatreonMembership,rawMembershipFromIdentity,effectivePatreonMembership,verifyPatreonSignature,handlePatreon,patreonAccountAllowed,applyPatreonMembership} from '../worker/patreon.mjs';
 import {reconcilePatreon} from '../scripts/patreon-reconcile.mjs';
@@ -162,3 +163,20 @@ test('public activation permits account linking but grants only the real Elite t
  assert.equal(premiumPatreonMembership({...active,tierIds:['29631835'],entitledAmountCents:100000}),false);
  assert.equal(premiumPatreonMembership({...active,tierIds:[]}),false);
 });
+
+test('Elite grant, prior-state probe and activation gate derive from one capability list',()=>{
+  // Regression: the transition gate hardcoded =2 against a literal capability
+  // list, so adding a third Elite capability would keep granting it while
+  // silently preventing elite_activated from ever firing again.
+  const source=fs.readFileSync(new URL('../worker/patreon.mjs',import.meta.url),'utf8');
+  const listed=source.match(/const ELITE_CAPABILITIES=\[([^\]]+)\]/);
+  assert.ok(listed,'the Elite capability list must be a single named constant');
+  const names=listed[1].split(',').map(part=>part.trim().replace(/^'|'$/g,''));
+  assert.deepEqual(names,['custom_corpus','unlimited_cube_practice']);
+  assert.match(source,/count\(DISTINCT eg\.capability\)=\$\{ELITE_CAPABILITY_COUNT\}/);
+  assert.match(source,/eg\.capability IN \(\$\{ELITE_CAPABILITY_LIST\}\)/);
+  assert.match(source,/VALUES \$\{ELITE_CAPABILITY_VALUES\}/);
+  assert.match(source,/g\.n=\$\{ELITE_CAPABILITY_COUNT\}/);
+  assert.doesNotMatch(source,/g\.n=\d/,'the transition gate must not hardcode a capability count');
+});
+
