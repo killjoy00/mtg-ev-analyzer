@@ -9,7 +9,7 @@ const guest=await (await growth.fetch(req('/v1/session',{displayName:'QA request
 assert.ok(guest.playerId);
 try {
   assert.equal((await growth.fetch(req('/v1/events',{events:[{name:'page_view'}]}))).status,401);
-  const r=await growth.fetch(req('/v1/events',{events:[{name:'account_claimed'},{name:'public_profile_enabled'},{name:'game_completed'},{name:'page_view'}]},guest.token));
+  const r=await growth.fetch(req('/v1/events',{events:[{name:'account_claimed'},{name:'public_profile_enabled'},{name:'game_completed'},{name:'elite_activated'},{name:'page_view'}]},guest.token));
   assert.equal(r.status,200);assert.equal((await r.json()).accepted,1);
   const events=(await query('SELECT event_name FROM analytics_events WHERE player_id=$1::uuid',[guest.playerId])).rows;
   assert.deepEqual(events.map(e=>e.event_name),['page_view']);
