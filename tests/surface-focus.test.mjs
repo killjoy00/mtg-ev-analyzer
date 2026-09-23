@@ -60,7 +60,8 @@ test('Draft Run previous-card context stays visible and visually distinct', asyn
   assert.match(source, /Already selected by this drafter\./);
   const css = await readFile('draft-run.css', 'utf8');
   assert.match(css, /\.run-pool-empty\{[^}]*background:var\(--surface-soft\)/);
-  assert.match(css, /\.run-pool-cards button\{[^}]*background:var\(--surface-soft\)/);
+  assert.match(css, /\.run-pool-cards\{[^}]*background:var\(--surface-soft\)/);
+  assert.match(css, /\.run-pool-cards button\{[^}]*background:transparent/);
 });
 
 test('Draft Run result footnote keeps its muted spacing', async () => {
