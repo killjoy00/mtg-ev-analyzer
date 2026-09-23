@@ -195,7 +195,7 @@ async function shareResult() {
   const button=document.querySelector('#run-share');button.disabled=true;
   try {
     const share=run.day?null:await api(`/v1/runs/${run.id}/share`,{});
-    const url=`${location.origin}${location.pathname}${gameUrl(run.day?'daily=1':'shared='+share.id)}`;
+    const url=`${location.origin}${location.pathname}${gameUrl(run.day?'daily=1&ref=result_share':'shared='+share.id)}`;
     trackEvent('share_click',{surface:'draft_run_result'});
     const result=await shareDraftRunCard(run,url);
     const status=document.querySelector('#run-share-status');
