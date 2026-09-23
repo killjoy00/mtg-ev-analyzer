@@ -1,5 +1,5 @@
 import { loadMyProfile } from './growth-api.mjs';
-import { todayStatus, easternDateKey } from './today-status.mjs';
+import { todayStatus, gameDateKey } from './today-status.mjs';
 import { onAppRender } from './render-lifecycle.mjs';
 
 let installed = false;
@@ -66,13 +66,13 @@ function markup(status) {
 }
 
 async function hydrate(section) {
-  const day=easternDateKey(),version=generation;
+  const day=gameDateKey(),version=generation;
   if (section.dataset.todayDate===day && (section.dataset.todayHydrated==='loading'||section.dataset.todayHydrated==='1')) return;
   section.dataset.todayDate=day;
   section.dataset.todayHydrated = 'loading';
   if (!profilePromise) profilePromise = loadMyProfile().catch(() => null);
   const profile = await profilePromise;
-  if (!section.isConnected || version!==generation || day!==easternDateKey()) return;
+  if (!section.isConnected || version!==generation || day!==gameDateKey()) return;
   section.innerHTML = markup(todayStatus(profile,day))+(profile?'':'<p role="status">Daily progress is unavailable. Play / continue still resumes your saved attempt.</p>');
   section.dataset.todayHydrated = '1';
   section.querySelector('[data-today-career]')?.addEventListener('click', () => document.querySelector('#account-nav')?.click());
@@ -106,5 +106,5 @@ export function installHomeToday() {
   document.addEventListener('pack1:result-completed',refresh);
   document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
   window.addEventListener('focus',refresh);
-  setInterval(()=>{const section=document.querySelector('[data-today-status="1"]');if(section&&section.dataset.todayDate!==easternDateKey())refresh();},60000);
+  setInterval(()=>{const section=document.querySelector('[data-today-status="1"]');if(section&&section.dataset.todayDate!==gameDateKey())refresh();},60000);
 }
