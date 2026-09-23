@@ -21,13 +21,12 @@ class FullTrophyTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             cache=Path(tmp)/'images.json'
             cache.write_text(json.dumps({'Deduce':{'image_url':'https://example.com/old.jpg'}}))
-            with patch('import_all_trophies.request',return_value=io.StringIO(json.dumps(card))) as request, patch('import_all_trophies.time.sleep'):
+            with patch('import_all_trophies.fetch_named',return_value=card) as fetch_named, patch('import_all_trophies.time.sleep'):
                 known=resolve_images({'Deduce','Complete'},{'Complete':complete},cache)
-            self.assertEqual(request.call_count,1)
-            self.assertIn('exact=Deduce',request.call_args.args[0])
+            fetch_named.assert_called_once_with('Deduce')
             self.assertEqual(known['Deduce']['type_line'],'Instant')
             self.assertEqual(known['Complete'],complete)
-            with patch('import_all_trophies.request',side_effect=AssertionError('Complete metadata must use cache')):
+            with patch('import_all_trophies.fetch_named',side_effect=AssertionError('Complete metadata must use cache')):
                 self.assertEqual(resolve_images({'Deduce','Complete'},known,cache),known)
 
     def test_trophies_have_no_replay_or_training_cap(self):

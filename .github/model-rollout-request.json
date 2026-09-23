@@ -1,7 +1,6 @@
 {
-  "operation": "daily-calendar-migration",
-  "request_id": "daily-pacific-migration-prod-20260923",
-  "reason": "Apply reviewed migration 0035 to production after development migration deploy and OIDC Daily generation verification all passed.",
-  "commit": "75c3519eb262815acb8f8901603056cbe32dc7af",
-  "target": "production"
+  "operation": "card-image-release",
+  "request_id": "packone-main-art-20260923",
+  "reason": "Deploy the reviewed deterministic main-card-art release through development and production, then refresh all served Pack One card images.",
+  "commit": "bc1a0e9f956e23621e86a27ca0ac84aa5001c545"
 }
