@@ -1,0 +1,103 @@
+name: generate Daily schedules
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Neon branch to verify'
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: pack1-daily-generation-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Resolve Pacific day and direct internal endpoint
+        id: target
+        shell: bash
+        env:
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          day=$(TZ=America/Los_Angeles date +%F)
+          case "$TARGET" in
+            development)
+              url=https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/internal/daily-generation
+              ;;
+            production)
+              url=https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/internal/daily-generation
+              ;;
+            *) exit 1 ;;
+          esac
+          echo "day=$day" >> "$GITHUB_OUTPUT"
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+
+      - name: Obtain short-lived Daily generation identity
+        id: oidc
+        shell: bash
+        env:
+          AUDIENCE: pack-one-daily-generation
+        run: |
+          set -euo pipefail
+          test -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" && test -n "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}"
+          response=$(curl -fsS --max-time 20 -H "Authorization: Bearer $ACTIONS_ID_TOKEN_REQUEST_TOKEN" \
+            "$ACTIONS_ID_TOKEN_REQUEST_URL&audience=$AUDIENCE")
+          token=$(node -e 'const x=JSON.parse(process.argv[1]);if(!x.value)process.exit(1);process.stdout.write(x.value)' "$response")
+          echo "::add-mask::$token"
+          echo "token=$token" >> "$GITHUB_OUTPUT"
+
+      - name: Generate or confirm all three Dailies
+        shell: bash
+        env:
+          TOKEN: ${{ steps.oidc.outputs.token }}
+          URL: ${{ steps.target.outputs.url }}
+          DAY: ${{ steps.target.outputs.day }}
+        run: |
+          set -euo pipefail
+          body=$(node -e 'process.stdout.write(JSON.stringify({day:process.argv[1]}))' "$DAY")
+          status=$(curl -sS --max-time 120 -o "$RUNNER_TEMP/daily-generation.json" -w '%{http_code}' \
+            -X POST -H "Authorization: Bearer $TOKEN" -H 'content-type: application/json' \
+            --data "$body" "$URL")
+          if [[ "$status" != 200 ]]; then
+            echo "::error::Daily generation failed (HTTP $status)."
+            exit 1
+          fi
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const data=JSON.parse(fs.readFileSync(process.env.RUNNER_TEMP+'/daily-generation.json','utf8'));
+          const top=new Set(['ok','date','success','results','duration_ms']);
+          if(Object.keys(data).some(key=>!top.has(key))||data.ok!==true||data.success!==true||!Array.isArray(data.results)) {
+            throw Error('Unexpected Daily generation response shape.');
+          }
+          const allowed=new Set(['environment','status','duration_ms']);
+          const validEnvironment=new Set(['mixed','powered-cube','latest']);
+          const validStatus=new Set(['created','already_exists']);
+          for(const row of data.results) {
+            if(Object.keys(row).some(key=>!allowed.has(key))||!validEnvironment.has(row.environment)||!validStatus.has(row.status)||!Number.isFinite(row.duration_ms)) {
+              throw Error('Unexpected Daily generation result shape.');
+            }
+          }
+          const lines=[
+            '# Daily generation',
+            '',
+            `- date: ${data.date}`,
+            `- duration: ${data.duration_ms} ms`,
+            '',
+            '| environment | status | duration (ms) |',
+            '|---|---|---:|',
+            ...data.results.map(row=>`| ${row.environment} | ${row.status} | ${row.duration_ms} |`),
+          ];
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,lines.join('\n')+'\n');
+          console.log(JSON.stringify({date:data.date,results:data.results,duration_ms:data.duration_ms}));
+          NODE
