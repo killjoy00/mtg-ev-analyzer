@@ -1,10 +1,11 @@
 import { escapeHtml as esc } from './html.mjs';
 
-export function compactRevealSentence(answer) {
+export function compactDraftRunFeedback(answer) {
   if (!answer || answer.historicalMatch) return '';
   if (answer.modelTargetDisagreement) return 'The trophy drafter made an unusual choice relative to the model.';
-  if (Number(answer.score) >= 85) return 'A strongly supported alternative.';
-  if (Number(answer.score) >= 60) return 'A plausible alternative.';
+  const score=Number(answer.score);
+  if (Number.isFinite(score) && score>=85) return 'A strongly supported alternative.';
+  if (Number.isFinite(score) && score>=60) return 'A plausible alternative.';
   return 'The model found less support for this choice.';
 }
 
@@ -23,9 +24,9 @@ export function consensusFeedback(answer) {
   return `<section class="run-consensus" aria-label="Trophy pick and model support">
     <h3>Model’s strongest choice: ${esc(answer.consensusName)}</h3>
     ${trophyName?`<p><strong>Trophy drafter: ${esc(trophyName)} — 100.</strong>${disagreement?`<br>Model’s strongest alternative: ${esc(answer.consensusName)} — 95. This was an excellent alternative according to the model; ${esc(trophyName)} was the choice in this successful trophy draft.`:''}</p>`:''}
-    <p>${answer.historicalId&&answer.selectedId===answer.historicalId?'You matched the trophy pick.':`Your pick has ${relative(answer.selectedSupport)} of the leading model support.`} Matching the trophy pick earns 100 regardless of model support. Other choices receive partial credit, up to 95, based on how strongly the model supports them.</p>
-    ${ranking.length ? `<h4>Top choices</h4><ol class="run-consensus-leaders">${ranking.slice(0, 3).map(c => `<li>${name(c)} <span>${c.id===answer.historicalId?'Trophy pick · 100 points':`${relative(c.support)} of leader · ${Number(c.score)} points`}</span></li>`).join('')}</ol>
-    <div class="run-consensus-all"><h4>All ${ranking.length} choices</h4><table><caption>Model support relative to the leader. The trophy match earns 100; alternative points use a separate partial-credit curve.</caption><thead><tr><th scope="col">Card</th><th scope="col">Support</th><th scope="col">Points</th></tr></thead><tbody>${ranking.map(c => `<tr><th scope="row">${name(c)}${c.id === answer.selectedId ? ' · Your pick' : ''}${c.id === answer.historicalId ? ' · Trophy pick' : ''}</th><td>${c.id===answer.historicalId?'—':relative(c.support)}</td><td>${Number(c.score)}</td></tr>`).join('')}</tbody></table></div>` : ''}
+    <p>${answer.historicalId&&answer.selectedId===answer.historicalId?'You matched the trophy pick.':`Your pick has ${relative(answer.selectedSupport)} of the leading model support.`} Matching the trophy drafter is the goal of this game: trophy matches earn 100 regardless of model support. Other choices receive partial credit, up to 95, based on how strongly the model supports them.</p>
+    ${ranking.length ? `<ol class="run-consensus-leaders">${ranking.slice(0, 3).map(c => `<li>${name(c)} <span>${c.id===answer.historicalId?'Trophy pick · 100 points':`${relative(c.support)} of leader · ${Number(c.score)} points`}</span></li>`).join('')}</ol>
+    <section class="run-consensus-all" aria-label="All choices by model support"><h4>Compare all ${ranking.length} choices</h4><div class="run-consensus-table-wrap"><table><caption>Model support relative to the leader. The trophy match earns 100; alternative points use a separate partial-credit curve.</caption><thead><tr><th scope="col">Card</th><th scope="col">Support</th><th scope="col">Points</th></tr></thead><tbody>${ranking.map(c => `<tr><th scope="row">${name(c)}${c.id === answer.selectedId ? ' · Your pick' : ''}${c.id === answer.historicalId ? ' · Trophy pick' : ''}</th><td>${c.id===answer.historicalId?'—':relative(c.support)}</td><td>${Number(c.score)}</td></tr>`).join('')}</tbody></table></div></section>` : ''}
     <p class="run-model-note">Model support reflects held-out strong-player choices. It does not establish a correct pick or predict a win rate.</p>
   </section>`;
 }
