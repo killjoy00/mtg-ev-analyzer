@@ -13,6 +13,7 @@ import argparse
 import csv
 import gzip
 import json
+import re
 import time
 import urllib.error
 import urllib.parse
@@ -21,9 +22,24 @@ from pathlib import Path
 from typing import Dict, Iterable, Optional, Sequence
 
 USER_AGENT = "DraftStudy/1.0 (https://github.com/killjoy00/mtg-ev-analyzer)"
+BAD_FRAME_EFFECTS = {"showcase", "extendedart", "inverted"}
+BAD_SET_TYPES = {"art_series", "memorabilia", "minigame", "token"}
 
 
-def image_url(card: dict) -> Optional[str]:
+def face_for_alias(card: dict, alias: str) -> Optional[dict]:
+    for face in card.get("card_faces") or []:
+        if face.get("name") == alias or face.get("flavor_name") == alias or face.get("printed_name") == alias:
+            return face
+    return None
+
+
+def image_url(card: dict, alias: Optional[str] = None) -> Optional[str]:
+    if alias:
+        face = face_for_alias(card, alias)
+        if face:
+            url = (face.get("image_uris") or {}).get("normal")
+            if url:
+                return url
     direct = card.get("image_uris") or {}
     if direct.get("normal"):
         return direct["normal"]
@@ -34,17 +50,100 @@ def image_url(card: dict) -> Optional[str]:
     return None
 
 
-def compact_card(card: dict) -> dict:
+def metadata_for_alias(card: dict, alias: Optional[str] = None) -> dict:
+    source = face_for_alias(card, alias) if alias else None
+    source = source or card
     result = {
-        "name": card.get("name"),
-        "mana_cost": card.get("mana_cost") or "",
+        "name": alias or card.get("name"),
+        "mana_cost": source.get("mana_cost") or card.get("mana_cost") or "",
         "rarity": card.get("rarity") or "",
-        "type_line": card.get("type_line") or "",
+        "type_line": source.get("type_line") or card.get("type_line") or "",
     }
-    url = image_url(card)
+    url = image_url(card, alias)
     if url:
         result["image_url"] = url
     return result
+
+
+def compact_card(card: dict) -> dict:
+    return metadata_for_alias(card)
+
+
+def special_flags(card: dict) -> list[str]:
+    flags: list[str] = []
+    if card.get("variation"):
+        flags.append("variation")
+    if card.get("textless"):
+        flags.append("textless")
+    if card.get("full_art"):
+        flags.append("full_art")
+    if card.get("promo"):
+        flags.append("promo")
+    if card.get("oversized"):
+        flags.append("oversized")
+    if card.get("border_color") == "borderless":
+        flags.append("borderless")
+    effects = set(card.get("frame_effects") or [])
+    for effect in sorted(effects & BAD_FRAME_EFFECTS):
+        flags.append(effect)
+    if card.get("set_type") in BAD_SET_TYPES:
+        flags.append(str(card.get("set_type")))
+    return flags
+
+
+def collector_number_rank(value: object) -> tuple[int, int, str]:
+    text = str(value or "")
+    match = re.fullmatch(r"(\d+)(.*)", text)
+    if match:
+        return (0, int(match.group(1)), match.group(2).lower())
+    return (1, 1_000_000_000, text.lower())
+
+
+def printing_rank(card: dict, alias: Optional[str] = None, preferred_set: Optional[str] = None) -> tuple:
+    """Lower is better: base readable art, then the intended set, then earliest printing."""
+    if not image_url(card, alias):
+        return (1_000_000, 1_000_000, 1, 1, 99_999_999, (9, 1_000_000_000, ""), "")
+    language_penalty = 0 if card.get("lang") in (None, "en") else 1_000_000
+    penalty = 0
+    if card.get("variation"):
+        penalty += 250_000
+    if card.get("textless"):
+        penalty += 200_000
+    if card.get("full_art"):
+        penalty += 100_000
+    if card.get("set_type") in BAD_SET_TYPES:
+        penalty += 80_000
+    if card.get("oversized"):
+        penalty += 60_000
+    if card.get("promo"):
+        penalty += 40_000
+    if card.get("border_color") == "borderless":
+        penalty += 20_000
+    if set(card.get("frame_effects") or []) & BAD_FRAME_EFFECTS:
+        penalty += 10_000
+    set_rank = 0 if not preferred_set or str(card.get("set") or "").lower() == preferred_set.lower() else 1
+    digital_rank = 1 if card.get("digital") else 0
+    released = str(card.get("released_at") or "9999-99-99").replace("-", "")
+    try:
+        release_rank = int(released)
+    except ValueError:
+        release_rank = 99_999_999
+    return (
+        language_penalty,
+        penalty,
+        set_rank,
+        digital_rank,
+        release_rank,
+        collector_number_rank(card.get("collector_number")),
+        str(card.get("id") or ""),
+    )
+
+
+def choose_main_printing(cards: Iterable[dict], alias: str, preferred_set: Optional[str] = None) -> Optional[dict]:
+    options = [card for card in cards if alias in set(aliases(card)) and image_url(card, alias)]
+    if not options:
+        return None
+    return min(options, key=lambda card: printing_rank(card, alias, preferred_set))
 
 
 def is_preparation_card(card: dict) -> bool:
@@ -114,16 +213,20 @@ def request_json(url: str, retries: int = 7) -> dict:
 def fetch_set(set_code: str) -> Dict[str, dict]:
     query = urllib.parse.quote(f"e:{set_code.lower()}")
     url = f"https://api.scryfall.com/cards/search?q={query}&unique=prints&order=set"
-    records: Dict[str, dict] = {}
+    candidates: Dict[str, list[dict]] = {}
     while url:
         page = request_json(url)
         for card in page.get("data", []):
-            metadata = compact_card(card)
             for name in aliases(card):
-                records.setdefault(name, metadata)
+                candidates.setdefault(name, []).append(card)
         url = page.get("next_page") if page.get("has_more") else None
         if url:
             time.sleep(0.2)
+    records: Dict[str, dict] = {}
+    for name, options in candidates.items():
+        chosen = choose_main_printing(options, name, set_code)
+        if chosen:
+            records[name] = metadata_for_alias(chosen, name)
     if not records:
         raise RuntimeError(f"Scryfall returned no cards for set {set_code}.")
     return records
@@ -157,31 +260,50 @@ def discover_draft_data(output: Path, set_code: str) -> Optional[Path]:
     return None
 
 
-def fetch_named(name: str) -> Optional[dict]:
-    url = "https://api.scryfall.com/cards/named?exact=" + urllib.parse.quote(name)
+def fetch_named(name: str, preferred_set: Optional[str] = None) -> Optional[dict]:
+    """Resolve a name, then choose its base readable printing rather than Scryfall's default printing."""
+    resolved = None
+    exact = "https://api.scryfall.com/cards/named?exact=" + urllib.parse.quote(name)
     try:
-        return request_json(url)
+        resolved = request_json(exact)
     except RuntimeError as exc:
-        # request_json wraps HTTP 404 along with transient failures. A fuzzy
-        # fallback handles display-name differences such as split/face aliases.
         fuzzy = "https://api.scryfall.com/cards/named?fuzzy=" + urllib.parse.quote(name)
         try:
-            return request_json(fuzzy)
+            resolved = request_json(fuzzy)
         except RuntimeError:
             print(f"warning: unresolved Scryfall card name {name!r}: {exc}")
             return None
+    resolved_aliases = set(aliases(resolved))
+    lookup_alias = name if name in resolved_aliases else str(resolved.get("name") or "")
+    prints_url = str(resolved.get("prints_search_uri") or "")
+    if lookup_alias and prints_url.startswith("https://api.scryfall.com/cards/search"):
+        # Use Scryfall's own printing-search URI for this card identity instead
+        # of reconstructing query syntax. Throttle between API requests.
+        time.sleep(0.1)
+        printings: list[dict] = []
+        url = prints_url
+        while url:
+            page = request_json(url)
+            printings.extend(page.get("data", []))
+            url = page.get("next_page") if page.get("has_more") else None
+            if url:
+                time.sleep(0.2)
+        chosen = choose_main_printing(printings, lookup_alias, preferred_set)
+        if chosen:
+            return chosen
+    return resolved if lookup_alias and image_url(resolved, lookup_alias) else None
 
 
-def enrich_for_draft_names(records: Dict[str, dict], names: Iterable[str]) -> tuple[Dict[str, dict], list[str]]:
+def enrich_for_draft_names(records: Dict[str, dict], names: Iterable[str], set_code: Optional[str] = None) -> tuple[Dict[str, dict], list[str]]:
     wanted = {str(name) for name in names if str(name).strip()}
     missing = sorted(wanted - records.keys())
     for name in missing:
-        card = fetch_named(name)
+        card = fetch_named(name, set_code)
         if card:
-            metadata = compact_card(card)
+            metadata = metadata_for_alias(card, name)
             records.setdefault(name, metadata)
             for alias in aliases(card):
-                records.setdefault(alias, metadata)
+                records.setdefault(alias, metadata_for_alias(card, alias))
         time.sleep(0.2)
     unresolved = sorted(wanted - records.keys())
     return records, unresolved
@@ -205,7 +327,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
     if draft_data and draft_data.exists():
         names = draft_candidate_names(draft_data)
         wanted_count = len(names)
-        records, unresolved = enrich_for_draft_names(records, names)
+        records, unresolved = enrich_for_draft_names(records, names, args.set_code)
 
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(records, indent=2) + "\n", encoding="utf-8")
