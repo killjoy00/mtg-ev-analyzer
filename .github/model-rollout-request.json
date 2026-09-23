@@ -1,7 +1,7 @@
 {
-  "operation": "deploy",
-  "request_id": "daily-pacific-deploy-dev-20260923",
-  "reason": "Deploy exact merged PR 411 release revision to development after migration 0035 passed schema verification.",
+  "operation": "daily-calendar-migration",
+  "request_id": "daily-pacific-migration-prod-20260923",
+  "reason": "Apply reviewed migration 0035 to production after development migration deploy and OIDC Daily generation verification all passed.",
   "commit": "75c3519eb262815acb8f8901603056cbe32dc7af",
-  "target": "development"
+  "target": "production"
 }
