@@ -42,6 +42,11 @@ class PoweredCubeImageRefreshTests(unittest.TestCase):
         self.assertIn("full_art", images.special_flags(special))
         self.assertIn("textless", images.special_flags(special))
 
+    def test_original_ordinary_printing_beats_newer_ordinary_reprint(self):
+        original = self.card(id="original", released_at="1993-08-05", image_uris={"normal":"https://cards.example/original.jpg"})
+        reprint = self.card(id="reprint", released_at="2026-01-01", image_uris={"normal":"https://cards.example/reprint.jpg"})
+        self.assertLess(images.printing_rank(original, "Black Lotus"), images.printing_rank(reprint, "Black Lotus"))
+
     def test_face_alias_uses_matching_face_image_and_text(self):
         card = self.card(
             name="Front // Back",
