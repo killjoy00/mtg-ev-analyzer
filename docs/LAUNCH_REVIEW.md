@@ -36,7 +36,7 @@ The earlier v5 reconciliation script and source matches document the superseded 
 
 ## Server and identity guarantees
 
-Daily schedules are stored per Eastern date and environment (mixed expansions or Powered Cube). Starting reserves the first attempt. Revisions prevent concurrent answers/rerolls from committing twice, and retrying the same answer is idempotent. Answers and model support stay server-side until a pick is locked. Final result, environment contributions, ranked score, and completion events commit together and can be recovered after a lost response.
+Daily schedules are stored per Pacific date and environment (mixed expansions or Powered Cube). Starting reserves the first attempt. Revisions prevent concurrent answers/rerolls from committing twice, and retrying the same answer is idempotent. Answers and model support stay server-side until a pick is locked. Final result, environment contributions, ranked score, and completion events commit together and can be recovered after a lost response.
 
 Account merges preserve the established account's identity and first Daily attempt, including an unfinished attempt, independently for each environment. Conflicting guest runs remain accessible as practice with their original date recorded. Environment progress and persistent achievements transfer. Public profiles require account claiming and explicit opt-in; private shares use the general site URL. Public responses exclude auth IDs, email, session tokens, and internal player IDs.
 
@@ -55,7 +55,7 @@ Client events are batched and properties allowlisted. A random session identifie
 | Question | Evidence |
 | --- | --- |
 | Visitor → start → first result → second game → claim → public profile | `analytics_player_career_funnel`, `analytics_retention_cohorts` |
-| Daily completion → next-day return | `analytics_daily_next_day_retention`; Eastern dates and observation-complete flag |
+| Daily completion → next-day return | `analytics_daily_next_day_retention`; Pacific dates and observation-complete flag |
 | Daily start/completion | `daily_started` or legacy `game_start` with daily=true; `daily_completed` |
 | Set / Cube discovery | `practice_set_selected`, `cube_started`, `cube_completed` |
 | Profile / board use | `profile_view`, `leaderboard_view` |
