@@ -23,6 +23,14 @@ const result=await query(`SELECT
   to_regclass('account_recovery_rate_limits') IS NOT NULL account_recovery_rate_limits,
   to_regclass('account_credential_rate_limits') IS NOT NULL account_credential_rate_limits,
   to_regclass('account_deletion_operations') IS NOT NULL account_deletion_operations,
+  to_regclass('account_deletion_verifications') IS NOT NULL account_deletion_verifications,
+  (SELECT count(*)=4 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='account_deletion_verifications'
+      AND column_name IN ('auth_user_id','code_hmac','created_at','expires_at')) account_deletion_verification_columns,
+  EXISTS(SELECT 1 FROM pg_constraint
+    WHERE conrelid='account_deletion_verifications'::regclass AND contype='p') account_deletion_verification_primary_key,
+  EXISTS(SELECT 1 FROM pg_indexes
+    WHERE schemaname='public' AND indexname='account_deletion_verifications_expiry_idx') account_deletion_verification_expiry_index,
   to_regprocedure('pack1_identity_attachment_allowed(uuid)') IS NOT NULL account_deletion_identity_guard,
   to_regprocedure('pack1_begin_account_deletion(uuid,uuid)') IS NOT NULL account_deletion_begin_function,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='account_deletion_player_tombstone_uq') account_deletion_player_tombstone,
@@ -46,6 +54,6 @@ const result=await query(`SELECT
   position('jsonb_array_length(s.puzzle_ids)' in pg_get_viewdef('draft_run_measurements'::regclass))>0 measurements`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0033 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0034 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');
