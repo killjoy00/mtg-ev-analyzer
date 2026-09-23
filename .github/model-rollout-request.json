@@ -1,8 +1,7 @@
 {
-  "operation": "production-browser",
-  "request_id": "daily-pacific-after-inactivity-20260923-v3",
-  "reason": "Collect two Neon-idle-confirmed after-inactivity startup samples for each Pack One Daily after the scheduler-aware production rollout.",
-  "first_environment": "all",
-  "measurement_mode": true,
-  "measurement_samples": 2
+  "operation": "neon-schedulers",
+  "request_id": "daily-pacific-enable-schedulers-20260923",
+  "reason": "Enable reviewed Neon Function Triggers only after Pacific Daily production proof and Neon-idle-confirmed startup measurements complete.",
+  "action": "enable",
+  "commit": "4029202c96bebe893419efa91dd0eeea3407d285"
 }
