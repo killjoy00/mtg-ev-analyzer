@@ -1,6 +1,6 @@
 import {ACCOUNT_SIGNAL_KEY,hasAccountSession,loadPatreonStatus} from './growth-api.mjs';
 import {onAppRender} from './render-lifecycle.mjs';
-import {tcgplayerAffiliateActive,tcgplayerMagicUrl} from './tcgplayer.mjs';
+import {tcgplayerHomeBannerActive,tcgplayerMagicUrl} from './tcgplayer.mjs';
 
 const SLOT_CONFIG_KEYS=Object.freeze({home:'home','article-top':'articleTop'});
 const sessionPresent=()=>{try{return hasAccountSession();}catch{return false;}};
@@ -54,7 +54,7 @@ export async function initializeAds({doc=document,location=globalThis.location,
   // The affiliate unit is a fallback, never a companion placement. Once the
   // reviewed Google gate is enabled, a broken/missing Google config fails closed
   // rather than silently restoring affiliate content.
-  const affiliateActive=cfg.enabled!==true&&tcgplayerAffiliateActive();
+  const affiliateActive=cfg.enabled!==true&&tcgplayerHomeBannerActive();
   if(!googleActive&&!affiliateActive)return;
 
   const googleRows=googleActive
@@ -217,7 +217,7 @@ export const adsReady=typeof document==='undefined'?Promise.resolve():(async()=>
   // without a membership request.
   const homeAffiliate=Boolean(document.querySelector('[data-ad-slot="home"]'))
     &&globalThis.PACKONE_ADSENSE?.enabled!==true
-    &&tcgplayerAffiliateActive();
+    &&tcgplayerHomeBannerActive();
   if((globalThis.PACKONE_ADSENSE?.enabled||homeAffiliate)&&!globalThis.PACK1_API)await import('./leaderboard-config.js');
   await initializeAds();
 })();
