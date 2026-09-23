@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Replace Powered Cube showcase/promo art with readable standard printings.
+"""Replace Powered Cube alternate art with deterministic main readable printings.
 
 This is display-only. It updates the static replay shards hydrated from R2, the
 checked-in verified Cube baseline corpus, and the supplemental card-image map.
@@ -19,27 +19,24 @@ import json
 from pathlib import Path
 import tempfile
 import time
-import urllib.error
 from typing import Iterable, Optional
 
 try:
     from import_powered_cube import (
         SCRYFALL_BULK_URL,
-        _named_card,
         iter_oracle_bulk,
         request,
         JSON_ACCEPT,
     )
-    from fetch_card_metadata import aliases
+    from fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags
 except ModuleNotFoundError:
     from scripts.import_powered_cube import (
         SCRYFALL_BULK_URL,
-        _named_card,
         iter_oracle_bulk,
         request,
         JSON_ACCEPT,
     )
-    from scripts.fetch_card_metadata import aliases
+    from scripts.fetch_card_metadata import aliases, fetch_named, image_url, metadata_for_alias, printing_rank, special_flags
 
 ROOT = Path(__file__).resolve().parents[1]
 CUBE_DIR = ROOT / "data" / "powered-cube"
@@ -49,99 +46,6 @@ CARD_IMAGES_PATH = ROOT / "corpus" / "draft-run" / "card-images.json"
 MAP_PATH = ROOT / "generated" / "powered-cube-standard-images.json"
 REPORT_PATH = ROOT / "generated" / "powered-cube-image-refresh-report.json"
 DISPLAY_FIELDS = ("image_url", "mana_cost", "rarity", "type_line")
-BAD_FRAME_EFFECTS = {"showcase", "extendedart", "inverted"}
-BAD_SET_TYPES = {"art_series", "memorabilia", "minigame", "token"}
-
-
-def face_for_alias(card: dict, alias: str) -> Optional[dict]:
-    for face in card.get("card_faces") or []:
-        if face.get("name") == alias:
-            return face
-    return None
-
-
-def image_url(card: dict, alias: str) -> Optional[str]:
-    face = face_for_alias(card, alias)
-    if face:
-        url = (face.get("image_uris") or {}).get("normal")
-        if url:
-            return url
-    url = (card.get("image_uris") or {}).get("normal")
-    if url:
-        return url
-    for item in card.get("card_faces") or []:
-        url = (item.get("image_uris") or {}).get("normal")
-        if url:
-            return url
-    return None
-
-
-def metadata_for_alias(card: dict, alias: str) -> Optional[dict]:
-    url = image_url(card, alias)
-    if not url:
-        return None
-    face = face_for_alias(card, alias)
-    source = face or card
-    return {
-        "image_url": url,
-        "mana_cost": source.get("mana_cost") or card.get("mana_cost") or "",
-        "rarity": card.get("rarity") or "",
-        "type_line": source.get("type_line") or card.get("type_line") or "",
-    }
-
-
-def special_flags(card: dict) -> list[str]:
-    flags: list[str] = []
-    if card.get("textless"):
-        flags.append("textless")
-    if card.get("full_art"):
-        flags.append("full_art")
-    if card.get("promo"):
-        flags.append("promo")
-    if card.get("oversized"):
-        flags.append("oversized")
-    if card.get("border_color") == "borderless":
-        flags.append("borderless")
-    effects = set(card.get("frame_effects") or [])
-    for effect in sorted(effects & BAD_FRAME_EFFECTS):
-        flags.append(effect)
-    if card.get("set_type") in BAD_SET_TYPES:
-        flags.append(str(card.get("set_type")))
-    return flags
-
-
-def printing_rank(card: dict, alias: str) -> tuple[int, int, int]:
-    """Lower is better; ordinary English text printings dominate cosmetics."""
-    if not image_url(card, alias):
-        return (1_000_000, 99, 0)
-    penalty = 0
-    if card.get("lang") not in (None, "en"):
-        penalty += 100_000
-    if card.get("textless"):
-        penalty += 50_000
-    if card.get("full_art"):
-        penalty += 25_000
-    if card.get("set_type") in BAD_SET_TYPES:
-        penalty += 20_000
-    if card.get("oversized"):
-        penalty += 15_000
-    if card.get("promo"):
-        penalty += 8_000
-    if card.get("border_color") == "borderless":
-        penalty += 4_000
-    effects = set(card.get("frame_effects") or [])
-    if effects & BAD_FRAME_EFFECTS:
-        penalty += 2_000
-    if card.get("digital"):
-        penalty += 250
-    frame = str(card.get("frame") or "")
-    frame_rank = {"2015": 0, "2003": 1, "1997": 2, "1993": 3, "future": 4}.get(frame, 5)
-    released = str(card.get("released_at") or "0000-00-00").replace("-", "")
-    try:
-        release_rank = -int(released)
-    except ValueError:
-        release_rank = 0
-    return (penalty, frame_rank, release_rank)
 
 
 def bulk_download_uri(payload: dict, bulk_type: str) -> str:
@@ -184,21 +88,9 @@ def all_printings() -> Iterable[dict]:
 
 
 def named_card_with_retry(name: str, attempts: int = 5) -> Optional[dict]:
-    """Small fallback only for aliases absent from the bulk printing export."""
-    for attempt in range(attempts):
-        try:
-            return _named_card(name)
-        except urllib.error.HTTPError as exc:
-            if exc.code != 429 or attempt + 1 >= attempts:
-                raise
-            retry_after = exc.headers.get("Retry-After") if exc.headers else None
-            try:
-                delay = max(1.0, float(retry_after)) if retry_after else 1.0 + attempt
-            except ValueError:
-                delay = 1.0 + attempt
-            time.sleep(delay)
-    return None
-
+    """Fallback through the shared deterministic main-art resolver."""
+    del attempts
+    return fetch_named(name)
 
 def resolve_standard_metadata(names: set[str]) -> tuple[dict[str, dict], list[str], dict[str, list[str]]]:
     candidates: dict[str, list[dict]] = {name: [] for name in names}
@@ -350,7 +242,7 @@ def main() -> int:
     mapping = [{"name": name, **records[name]} for name in sorted(records)]
     MAP_PATH.write_text(json.dumps(mapping, indent=2) + "\n", encoding="utf-8")
     report = {
-        "policy": "standard-readable-v2-bulk",
+        "policy": "main-readable-v3-bulk",
         "card_names": len(names),
         "resolved_names": len(records),
         "unresolved_names": unresolved,
