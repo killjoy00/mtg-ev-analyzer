@@ -56,9 +56,25 @@ async function internal(body,token=oidc(),status=200) {
   assert.equal(response.status,status,JSON.stringify({status:response.status,body:data}));
   return data;
 }
+async function neonTrigger(name,scheduledAt,{invocationId='qa-neon-trigger',status=200}={}) {
+  const body={
+    version:1,
+    invocation_id:invocationId,
+    trigger:{type:'schedule',id:'trigger-qa-daily',name},
+    data:{scheduled_at:scheduledAt},
+  };
+  const response=await api.fetch(new Request('https://origin.test/internal/daily-generation',{
+    method:'POST',
+    headers:{'content-type':'application/json','x-neon-trigger-invocation-id':invocationId},
+    body:JSON.stringify(body),
+  }));
+  const data=await response.json();
+  assert.equal(response.status,status,JSON.stringify({status:response.status,body:data}));
+  return data;
+}
 const sensitive=/(puzzle|seed|source_draft_hash|source|pack|card)/i;
 
-const first=await internal({day});
+const first=await neonTrigger('pack1-daily-primary','2041-06-15T07:07:00Z');
 assert.equal(first.ok,true);assert.equal(first.success,true);assert.equal(first.date,day);
 assert.deepEqual(first.results.map(row=>row.environment),environments);
 assert.ok(first.results.every(row=>row.status==='created'));
@@ -72,6 +88,9 @@ assert.equal(rows.length,3);assert.ok(rows.every(row=>Number(row.decisions)===8)
 const repeat=await internal({day});
 assert.ok(repeat.results.every(row=>row.status==='already_exists'));
 assert.doesNotMatch(JSON.stringify(repeat),sensitive);
+const skipped=await neonTrigger('pack1-daily-primary','2041-06-15T08:07:00Z',{invocationId:'qa-neon-trigger-skipped'});
+assert.deepEqual(skipped,{ok:true,skipped:true});
+await neonTrigger('wrong-trigger','2041-06-15T07:07:00Z',{invocationId:'qa-neon-trigger-wrong',status:403});
 await internal({day:'2041-06-14'},oidc(),409);
 await internal({day},'',403);
 await internal({day},oidc({...claims,aud:'wrong'}),403);
@@ -105,6 +124,7 @@ console.log(JSON.stringify({
   date:day,
   environments,
   first_status:'created',
+  neon_trigger:'passed',
   repeat_status:'already_exists',
   public_without_oidc:'rejected',
   wrong_identity:'rejected',

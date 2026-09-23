@@ -45,7 +45,7 @@ export async function verifyDailyGenerationToken(token,getKeys=keys,now=Math.flo
     branch:c.ref==='refs/heads/main',
     workflow:c.workflow_ref===DAILY_GENERATION_WORKFLOW,
     reusableWorkflow:!c.job_workflow_ref||c.job_workflow_ref===DAILY_GENERATION_WORKFLOW,
-    event:['schedule','workflow_dispatch'].includes(c.event_name),
+    event:c.event_name==='workflow_dispatch',
     time:Number.isFinite(c.exp)&&Number.isFinite(c.nbf)&&Number.isFinite(c.iat)&&c.exp>now&&c.nbf<=now+30&&c.iat<=now+30&&c.exp-c.iat<=900,
   };
   const rejected=Object.keys(checks).filter(k=>!checks[k]);
