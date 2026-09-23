@@ -1,4 +1,5 @@
 import {escapeHtml as esc} from './html.mjs';
+import {achievementMark} from './achievement-icons.mjs';
 import {environmentProgress,formatChallengeRecord,modeName,unlockedAchievements} from './profile-core.mjs';
 import {PATREON_POLICY} from './patreon-policy.mjs';
 
@@ -50,7 +51,7 @@ function achievementPreview(profile) {
   const rows=[...(profile.achievements||[])].sort((a,b)=>Number(b.unlocked)-Number(a.unlocked)).slice(0,6);
   if(!rows.length)return '<p class="my-pack-empty">Your achievements will appear here as you play.</p>';
   return '<div class="my-achievement-preview">'+rows.map(item=>
-    '<div class="my-achievement-badge '+(item.unlocked?'is-unlocked':'is-locked')+'"><span aria-hidden="true">'+(item.unlocked?'★':'○')+'</span><strong>'+esc(item.label)+'</strong><small>'+esc(item.progress_text||'')+'</small></div>'
+    '<div class="my-achievement-badge '+(item.unlocked?'is-unlocked':'is-locked')+'">'+achievementMark(item.id,{decorative:true,locked:!item.unlocked})+'<strong>'+esc(item.label)+'</strong><small>'+esc(item.progress_text||'')+'</small></div>'
   ).join('')+'</div>';
 }
 
@@ -61,7 +62,7 @@ function achievementDetails(profile) {
     const actions=item.unlocked
       ? '<div class="my-achievement-actions"><button type="button" class="text-button" data-showcase-achievement="'+esc(item.id)+'">Showcase</button><button type="button" class="text-button" data-share-achievement="'+esc(item.id)+'">Share</button></div>'
       : '';
-    return '<article class="my-achievement-row '+(item.unlocked?'is-unlocked':'is-locked')+'"><div><strong>'+esc(item.label)+'</strong><p>'+esc(item.description)+'</p></div><span>'+esc(item.progress_text||'')+'</span>'+actions+'</article>';
+    return '<article class="my-achievement-row '+(item.unlocked?'is-unlocked':'is-locked')+'">'+achievementMark(item.id,{decorative:true,locked:!item.unlocked})+'<div><strong>'+esc(item.label)+'</strong><p>'+esc(item.description)+'</p></div><span>'+esc(item.progress_text||'')+'</span>'+actions+'</article>';
   }).join('')+'</div></details>';
 }
 
@@ -100,8 +101,8 @@ function profileAside(profile,progress,account,patreon) {
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   const email=account?.user?.email||'';
   return '<section class="my-side-card my-profile-card" aria-labelledby="my-profile-card-title">'+
-    '<div class="my-profile-head"><div class="my-avatar" aria-hidden="true">'+esc(initials(profile.player.display_name))+'</div><div><h2 id="my-profile-card-title">'+esc(profile.player.display_name)+'</h2>'+(email?'<p>'+esc(email)+'</p>':'')+'</div></div>'+
-    '<ul class="my-profile-facts"><li><span>Membership</span><strong>'+(elite?'Elite':'Free')+'</strong></li><li><span>Public profile</span><strong>'+(profile.player.profile_public?'On':'Off')+'</strong></li>'+(favorite?'<li><span>Favorite environment</span><strong>'+esc(favorite.name)+'</strong></li>':'')+(showcased?'<li><span>Showcase</span><strong>'+esc(showcased.label)+'</strong></li>':'')+'</ul>'+
+    '<div class="my-profile-head"><div class="my-avatar" aria-hidden="true">'+esc(initials(profile.player.display_name))+'</div><div><h2 id="my-profile-card-title" class="profile-name-line">'+esc(profile.player.display_name)+(showcased?achievementMark(showcased.id,{compact:true}):'')+'</h2>'+(email?'<p>'+esc(email)+'</p>':'')+'</div></div>'+
+    '<ul class="my-profile-facts"><li><span>Membership</span><strong>'+(elite?'Elite':'Free')+'</strong></li><li><span>Public profile</span><strong>'+(profile.player.profile_public?'On':'Off')+'</strong></li>'+(favorite?'<li><span>Favorite environment</span><strong>'+esc(favorite.name)+'</strong></li>':'')+(showcased?'<li><span>Showcase</span><strong class="profile-showcase-label">'+achievementMark(showcased.id,{decorative:true,compact:true})+esc(showcased.label)+'</strong></li>':'')+'</ul>'+
   '</section>';
 }
 

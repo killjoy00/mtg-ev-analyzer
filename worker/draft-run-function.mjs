@@ -294,7 +294,7 @@ async function leaderboard(request) {
       )
       AND challenge_date BETWEEN $1::date AND $2::date
     GROUP BY player_id
-  ) SELECT rank() OVER(ORDER BY r.score DESC) rank,r.score,r.days,p.display_name,CASE WHEN p.profile_public AND p.username_owned AND
+  ) SELECT rank() OVER(ORDER BY r.score DESC) rank,r.score,r.days,p.display_name,p.showcase_achievement,CASE WHEN p.profile_public AND p.username_owned AND
       (SELECT count(*) FROM players x WHERE x.profile_public AND x.username_owned AND lower(x.display_name)=lower(p.display_name))=1 THEN p.profile_key END profile_key
     FROM results r JOIN players p ON p.id=r.player_id AND p.username_owned=true ORDER BY r.score DESC,r.days DESC,p.display_name LIMIT 100`,[start,today,environment]);
   return json({period,environment,start,today,rows:r.rows.map(r=>({...r,rank:Number(r.rank),score:Number(r.score),days:Number(r.days)}))});

@@ -1,4 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
+import {achievementMark} from './achievement-icons.mjs';
 import {
   loadMyProfile,
   getAuthSession,
@@ -50,7 +51,7 @@ function ensureProfileStyles() {
   if (document.querySelector('link[data-pack1-profile-css]')) return;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
-  link.href = new URL('./profile.css?v=6', import.meta.url).href;
+  link.href = new URL('./profile.css?v=7', import.meta.url).href;
   link.dataset.pack1ProfileCss = '1';
   document.head.appendChild(link);
 }
@@ -111,7 +112,7 @@ function achievementCard(achievement, { own = false, showcaseId = null } = {}) {
   const progress = Math.max(0, Math.min(100, (Number(achievement.current || 0) / Math.max(1, Number(achievement.target || 1))) * 100));
   return `<article class="achievement-card ${achievement.unlocked ? 'unlocked' : 'locked'} ${achievement.id === showcaseId ? 'showcase' : ''}" data-achievement-id="${esc(achievement.id)}">
     <div class="achievement-top"><span>${achievement.unlocked ? 'Unlocked' : 'In progress'}</span>${achievement.id === showcaseId ? '<b>Showcased</b>' : ''}</div>
-    <h3>${esc(achievement.label)}</h3>
+    <div class="achievement-card-title">${achievementMark(achievement.id,{decorative:true,locked:!achievement.unlocked})}<h3>${esc(achievement.label)}</h3></div>
     <p>${esc(achievement.description)}</p>
     <div class="achievement-progress"><i style="width:${progress.toFixed(1)}%"></i></div>
     <small>${esc(achievement.progress_text || '')}</small>
@@ -239,7 +240,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
 
   return `<section class="player-profile-page growth-page" data-profile-key="${esc(publicKey || profile.player.profile_key || '')}">
     <header class="profile-hero">
-      <div><p class="eyebrow">${own ? 'Account' : 'Player Profile'}</p><h1>${esc(profile.player.display_name)}</h1><p>${own ? 'Your Pack One career, achievements, and account in one place.' : 'A public Pack One career across the Limited archive.'}</p></div>
+      <div><p class="eyebrow">${own ? 'Account' : 'Player Profile'}</p><h1 class="profile-player-name">${esc(profile.player.display_name)}${showcased?achievementMark(showcased.id):''}</h1><p>${own ? 'Your Pack One career, achievements, and account in one place.' : 'A public Pack One career across the Limited archive.'}</p></div>
       <div class="profile-hero-actions">
         ${heroActions}
       </div>
@@ -260,7 +261,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
     ${showLeaderboardName || favorite || showcased || bestPct ? `<div class="profile-identity-strip">
       ${showLeaderboardName ? `<div><span>Leaderboard name</span><strong>${esc(profile.player.display_name)}</strong></div>` : ''}
       ${favorite ? `<div><span>Favorite environment</span><strong>${esc(favorite.name)}</strong></div>` : ''}
-      ${showcased ? `<div><span>Showcase</span><strong>${esc(showcased.label)}</strong></div>` : ''}
+      ${showcased ? `<div><span>Showcase</span><strong class="profile-showcase-label">${achievementMark(showcased.id,{decorative:true,compact:true})}${esc(showcased.label)}</strong></div>` : ''}
       ${bestPct ? `<div><span>Best Daily finish</span><strong>Top ${bestPct}%</strong></div>` : ''}
       ${form != null ? `<div><span>Last 10 average</span><strong>${form.toFixed(1)}</strong></div>` : ''}
     </div>` : ''}
@@ -578,6 +579,7 @@ async function enhanceLeaderboardProfiles() {
     anchor.title = `Open ${name}'s Pack One profile`;
     strong.replaceWith(anchor);
     anchor.appendChild(strong);
+    if(match.showcase_achievement)anchor.insertAdjacentHTML('beforeend',achievementMark(match.showcase_achievement,{compact:true}));
   }
   table.dataset.profileLookup = 'done';
 }

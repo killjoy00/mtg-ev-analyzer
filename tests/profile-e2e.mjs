@@ -140,6 +140,7 @@ try {
   await page.locator('.my-pack-one-page').waitFor({ timeout:10000 });
   assert.equal((await page.locator('.my-pack-one-heading h1').textContent())?.trim(), 'My Pack One');
   assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Profile Tester');
+  assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="explorer5"]').count(),1,'showcased badge sits beside the player name');
   assert.equal(await page.locator('#profile-stats-tab').getAttribute('aria-selected'),'true');
   assert.equal(await page.locator('#profile-account-panel').isHidden(),true);
 
@@ -196,6 +197,7 @@ try {
 
   await page.locator('#profile-stats-tab').click();
   assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Leaderboard Ace');
+  assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="top10"]').count(),1,'new showcase updates the name badge');
   await page.locator('#profile-share').click();
   await page.waitForFunction(() => (window.__pack1ShareCalls || 0) > 0, null, { timeout:5000 });
   shareCalls = await page.evaluate(() => window.__pack1ShareCalls || 0);
@@ -206,6 +208,7 @@ try {
   assert.equal(await page.locator('#profile-settings-form').count(), 0, 'public visitor must not see owner settings');
   assert.equal(await page.locator('#profile-share').isEnabled(), true);
   assert.match((await page.locator('.profile-hero').textContent()) || '', /public Pack One career/i);
+  assert.equal(await page.locator('.profile-hero h1 [data-achievement-mark="explorer5"]').count(),1,'public profile shows the showcased badge beside the name');
   await noOverflow();
   await page.screenshot({ path:'artifacts/ui-profile-public-mobile.png', fullPage:true });
 
