@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Part of #246: deploy the merged verification resend endpoint, fixed verification callback UX, WebKit-tested recovery flow, and final auth acceptance revision before enabling required email verification."}
+{"operation":"deploy-secure-auth","reason":"Part of #181: deploy server-authoritative elite_activated transition measurement and browser-forgery reservation; promote the exact merged revision through development and production smoke."}
