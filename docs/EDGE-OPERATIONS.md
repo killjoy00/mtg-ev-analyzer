@@ -95,6 +95,6 @@ The preview deliberately has no production mode. The next reviewed release must 
 
 HttpOnly reduces token theft through JavaScript; it does not cure XSS or CSRF. Production cookie work and revocation remain outstanding. Trophy picks still earn 100; game modes, eight-pick flow and Daily selection policy are unchanged.
 
-Related Auth operations: [production Auth hardening](AUTH-HARDENING.md), [recovery email delivery](AUTH-RECOVERY-DELIVERY.md).
+Related Auth operations: [production Auth hardening](AUTH-HARDENING.md), [email ownership verification](AUTH-EMAIL-VERIFICATION.md), [recovery email delivery](AUTH-RECOVERY-DELIVERY.md).
 
 References: [Durable Object transactions and alarms](https://developers.cloudflare.com/durable-objects/api/sqlite-storage-api/), [runtime testing](https://developers.cloudflare.com/workers/testing/miniflare/storage/durable-objects/), [Neon deployment environment variables](https://neon.com/docs/compute/functions/environment-variables), [request integrity](REQUEST-INTEGRITY.md), [release controls](BACKEND-RELIABILITY.md).
