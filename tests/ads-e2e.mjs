@@ -12,6 +12,11 @@ function dailyFixture(signed=false){
 
 async function installRoutes(page,{signed=false,config='enabled',status={ads_allowed:true},error=false,articleTop='article-fixture'}={}){
   const state={google:0,membership:0,blocked:[]};
+  await page.addInitScript(()=>{
+    window.__adTestDebug={accountChanges:0,storageSignals:0};
+    addEventListener('packone-account-changed',()=>window.__adTestDebug.accountChanges++);
+    addEventListener('storage',event=>{if(event.key==='pack1-account-signal-v1'||event.key==='pack1-auth-session-v1'||event.key===null)window.__adTestDebug.storageSignals++;});
+  });
   await page.route('**/ad-config.js',route=>{
     if(config==='real')return route.continue();
     const enabled=config==='enabled';
@@ -51,12 +56,28 @@ async function waitFor(state,key,value=1){
 }
 
 async function assertOneFill(page,state,slotId=HOME_SLOT){
-  await page.locator('ins.adsbygoogle').waitFor();
+  try {
+    await page.locator('ins.adsbygoogle').waitFor({timeout:5000});
+  } catch(error) {
+    const debug=await page.evaluate(()=>({
+      config:window.PACKONE_ADSENSE,
+      daily:Boolean(document.querySelector('#app [data-daily-home]')),
+      homeSlot:document.querySelector('[data-ad-slot="home"]')?.outerHTML||null,
+      accountChanges:window.__adTestDebug?.accountChanges??null,
+      storageSignals:window.__adTestDebug?.storageSignals??null,
+      authSession:localStorage.getItem('pack1-auth-session-v1'),
+      playerSession:Boolean(localStorage.getItem('pack1-api-session-v1')),
+      search:location.search,
+      bodyClass:document.body.className,
+    }));
+    throw new Error('Ad fill timed out: '+JSON.stringify(debug),{cause:error});
+  }
   assert.equal(state.google,1,'one Google script request');
   assert.equal(await page.locator('script[src*="googlesyndication"]').count(),1);
   assert.equal(await page.locator('ins.adsbygoogle').count(),1);
   assert.equal(await page.locator('ins.adsbygoogle').getAttribute('data-ad-slot'),slotId);
   assert.equal(await page.evaluate(()=>window.adsbygoogle?.length),1);
+  await page.locator('[data-test-creative]').waitFor();
   assert.deepEqual(state.blocked,[]);
 }
 
