@@ -224,7 +224,9 @@ async function showBoard(period='daily') {
 }
 async function launch(options={}) {
   app().innerHTML='<section class="message-card"><h1>Finding your packs…</h1></section>';
-  run=options.id?await api(`/v1/runs/${options.id}`):await api('/v1/runs',{daily:options.daily===true,challenge:options.challenge,environment,setIds:options.setIds});
+  const entrySource=!options.id&&options.daily===true&&window.PACK1_ENTRY_SOURCE==='result_share'?'result_share':null;
+  run=options.id?await api(`/v1/runs/${options.id}`):await api('/v1/runs',{daily:options.daily===true,challenge:options.challenge,environment,setIds:options.setIds,...(entrySource?{source:entrySource}:{})});
+  if(entrySource)delete window.PACK1_ENTRY_SOURCE;
   environment=run.environment||environment;
   const url=new URL(location.href);if(environment!=='mixed')url.searchParams.set('set',environment);else url.searchParams.delete('set');url.searchParams.delete('challenge');url.searchParams.delete('shared');url.searchParams.delete('custom');url.searchParams.set('run',run.id);history.replaceState({},'',url);
   selection=null;review=null;render();

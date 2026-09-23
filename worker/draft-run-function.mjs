@@ -109,6 +109,7 @@ async function responseFor(s) {
 
 async function start(request) {
   const owner=await player(request),body=await readJson(request),daily=body.daily===true;
+  const entrySource=daily&&body.source==='result_share'?'result_share':null;
   const account=daily?await linkedPlayerIdentity(query,owner):await accountIdentity(request,query,owner);
   const capabilities=daily?[]:await accountCapabilities(account,query);
   const source=body.challenge ? await share(String(body.challenge)) : null;
@@ -171,7 +172,7 @@ async function start(request) {
   let s=inserted.rows[0];
   if(!s && day) s=(await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3',[owner,day,environment,account?.auth_user_id||null])).rows[0];
   if(!s) fail('Could not start your run. Please retry.',409);
-  if(inserted.rows.length) await query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,value,$3::jsonb FROM jsonb_array_elements_text($2::jsonb)',[owner,JSON.stringify([day?'daily_started':'game_started',...(environment==='powered-cube'?['cube_started']:[])]),JSON.stringify({mode:'draft_run',set_id:environment,daily,challenge:Boolean(source),run_id:s.id})]);
+  if(inserted.rows.length) await query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,value,$3::jsonb FROM jsonb_array_elements_text($2::jsonb)',[owner,JSON.stringify([day?'daily_started':'game_started',...(environment==='powered-cube'?['cube_started']:[])]),JSON.stringify({mode:'draft_run',set_id:environment,daily,challenge:Boolean(source),run_id:s.id,...(entrySource?{source:entrySource}:{})})]);
   return json(await responseFor(decode(s)));
 }
 
