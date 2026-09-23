@@ -8,6 +8,12 @@ if (location.hostname === 'killjoy00.github.io') {
 } else {
 
 const params = new URLSearchParams(location.search);
+if (params.get('ref') === 'result_share' && params.get('game') === 'draft-run' && params.get('daily') === '1') {
+  params.delete('ref');
+  history.replaceState({}, '', `${location.pathname}${params.size ? '?' + params : ''}${location.hash}`);
+  const { trackEvent } = await import('./retention-events.mjs');
+  trackEvent('daily_share_arrival', { source: 'result_share', daily: true });
+}
 // Only previously published stored links load the historical game reader.
 const historicalShare = params.has('challenge') && params.get('game') !== 'draft-run';
 if (!historicalShare && (params.has('legacy-board') || params.has('mode') || params.has('seed') || (params.get('set') === 'powered-cube' && params.get('game') !== 'draft-run'))) {
