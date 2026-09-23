@@ -73,6 +73,20 @@ test('Patreon discovery is read-only and cannot activate memberships',()=>{
  assert.throws(()=>rolloutDispatch({...common,operation:'patreon-discovery',mode:'sync'}));
 });
 
+test('card-image release orchestrates only a reviewed full main commit',()=>{
+ const commit='b'.repeat(40);
+ const request={...common,operation:'card-image-release',commit};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'card-image-release.yml',body:{ref:'main',inputs:{commit}}});
+ for(const extra of [{target:'production'},{sets:'all'},{workflow:'other.yml'},{ref:'branch'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+ assert.throws(()=>rolloutDispatch({...request,commit:'main'}));
+});
+
+test('card-image maintenance dispatch is fixed and takes no arbitrary inputs',()=>{
+ const request={...common,operation:'card-images'};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'refresh-powered-cube-images.yml',body:{ref:'main',inputs:{}}});
+ for(const extra of [{target:'production'},{sets:'all'},{workflow:'other.yml'},{ref:'branch'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
 test('production browser verification accepts only fixed Daily measurement inputs',()=>{
  assert.equal(rolloutDispatch({...common,operation:'production-browser'}).workflow,'production-browser.yml');
  assert.deepEqual(rolloutDispatch({...common,operation:'production-browser',first_environment:'latest',measurement_mode:true}),{
