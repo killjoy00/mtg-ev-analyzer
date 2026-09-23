@@ -99,3 +99,11 @@ test('Patreon sync runs only the reviewed membership reconciliation workflow',()
  assert.deepEqual(rolloutDispatch(request),{workflow:'patreon-reconcile.yml',body:{ref:'main',inputs:{mode:'sync'}}});
  for(const extra of [{campaign:'other'},{account:'other'},{ref:'branch'},{mode:'discover'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
+
+
+test('Daily calendar migration is exact-revision and target-only',()=>{
+ const request={...common,operation:'daily-calendar-migration',target:'development',commit:'b'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'daily-calendar-migration.yml',body:{ref:'main',inputs:{commit:'b'.repeat(40),target:'development'}}});
+ assert.equal(rolloutDispatch({...request,target:'production'}).body.inputs.target,'production');
+ for(const extra of [{commit:'main'},{target:'other'},{migration:'0034'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
