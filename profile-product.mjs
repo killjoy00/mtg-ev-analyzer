@@ -6,6 +6,7 @@ import {
   connectPatreon,
   changeAccountPassword,
   deleteAccount,
+  startAccountDeletionVerification,
   disconnectPatreon,
   signOutAccount,
   loadProfileHistory,
@@ -130,6 +131,37 @@ function dailyRow(row, names, index) {
   return `<li><div><strong>${esc(setName)} · ${esc(modeName(row.mode, { cube: row.set_id === 'powered-cube' }))}</strong><span>${esc(row.date || '')}${row.final===false?' · Still open':''}</span></div><b>${Number(row.score || 0)}</b><em>${pct ? `Top ${pct}%${row.final===false?' so far':''} · #${Number(row.rank || 0)} of ${Number(row.total || 0)}` : `${Number(row.total || 0)} ranked players`}</em><button type="button" class="text-button" data-share-daily="${index}">Share</button></li>`;
 }
 
+function deletionControlMarkup(account) {
+  const deletion=account?.deletion||{};
+  const legacyPassword=deletion.method===undefined&&deletion.available===true&&!deletion.googleOnly;
+  if(deletion.method==='email') {
+    return `<form class="account-form" id="account-delete-email">
+      <label class="profile-toggle"><input required type="checkbox" name="confirm"><span><strong>I understand this permanently deletes my account and cannot be undone.</strong></span></label>
+      <button class="button secondary" type="button" id="account-delete-send">Send deletion code</button>
+      <div id="account-delete-code-step" hidden>
+        <p>Enter the 8-digit code sent to the verified email associated with this account. It expires in about 10 minutes.</p>
+        <label>Deletion code<input required type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{8}" minlength="8" maxlength="8"></label>
+        <button class="button secondary" type="submit">Verify and delete account</button>
+        <button class="text-button" type="button" id="account-delete-resend">Send a new code</button>
+      </div>
+      <span class="profile-settings-status" aria-live="polite"></span>
+    </form>`;
+  }
+  if(deletion.method==='password'||legacyPassword) {
+    return `<form class="account-form" id="account-delete">
+      <label>Current password<input required type="password" name="currentPassword" maxlength="256" autocomplete="current-password"></label>
+      <label class="profile-toggle"><input required type="checkbox" name="confirm"><span><strong>I understand this permanently deletes my account and cannot be undone.</strong></span></label>
+      <button class="button secondary" type="submit">Delete Account</button>
+      <span class="profile-settings-status" aria-live="polite"></span>
+    </form>`;
+  }
+  if(deletion.googleOnly) {
+    return `<p><strong>Deletion is temporarily unavailable for Google-only accounts.</strong><br><span>Pack One cannot yet safely verify deletion for this account. This control remains visible and disabled rather than weakening verification.</span></p>
+      <button class="button secondary" type="button" disabled>Delete account</button>`;
+  }
+  return `<p><strong>Account deletion is temporarily unavailable.</strong></p><button class="button secondary" type="button" disabled>Delete account</button>`;
+}
+
 function settingsMarkup(profile, progress, account, patreon) {
   if (!profile.player.claimed) {
     return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="text-button" id="profile-claim-account">Sign in</button></aside>`;
@@ -181,17 +213,7 @@ function settingsMarkup(profile, progress, account, patreon) {
     ${account?.user?`<section class="profile-credentials profile-danger" aria-labelledby="delete-account-title">
       <div><h3 class="profile-delete-title" id="delete-account-title">Delete Account</h3>
         <p>Permanently deletes your Pack One account and profile and signs you out everywhere. This cannot be undone.</p>
-        ${account?.deletion?.googleOnly
-          ? `<p><strong>Deletion is temporarily unavailable for Google-only accounts.</strong><br><span>Pack One cannot yet safely perform the required fresh same-account Google verification. This control remains visible and disabled rather than weakening verification.</span></p>
-             <button class="button secondary" type="button" disabled>Delete account</button>`
-          : account?.deletion?.enabled===false
-            ? `<p><strong>Account deletion is temporarily unavailable.</strong></p><button class="button secondary" type="button" disabled>Delete account</button>`
-            : `<form class="account-form" id="account-delete">
-                 <label>Current password<input required type="password" name="currentPassword" maxlength="256" autocomplete="current-password"></label>
-                 <label class="profile-toggle"><input required type="checkbox" name="confirm"><span><strong>I understand this permanently deletes my account and cannot be undone.</strong></span></label>
-                 <button class="button secondary" type="submit">Delete Account</button>
-                 <span class="profile-settings-status" aria-live="polite"></span>
-               </form>`}
+        ${deletionControlMarkup(account)}
       </div>
     </section>`:''}
   </section>`;
@@ -316,6 +338,62 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       form.reset();
     }
   });
+  const emailDeleteForm=document.querySelector('#account-delete-email');
+  if(emailDeleteForm) {
+    const status=emailDeleteForm.querySelector('.profile-settings-status');
+    const codeStep=emailDeleteForm.querySelector('#account-delete-code-step');
+    const codeInput=emailDeleteForm.querySelector('[name="code"]');
+    const sendButton=emailDeleteForm.querySelector('#account-delete-send');
+    const resendButton=emailDeleteForm.querySelector('#account-delete-resend');
+    const sendCode=async button=>{
+      if(!emailDeleteForm.querySelector('[name="confirm"]')?.checked) {
+        status.textContent='Confirm that you understand deletion is permanent.';
+        return;
+      }
+      button.disabled=true;
+      status.textContent='Sending deletion code…';
+      try {
+        await startAccountDeletionVerification();
+        codeInput.value='';
+        codeStep.hidden=false;
+        sendButton.hidden=true;
+        status.textContent='Deletion code sent. It expires in about 10 minutes.';
+        codeInput.focus();
+      } catch(error) {
+        status.textContent=error?.message||'Deletion code could not be sent.';
+      } finally {
+        button.disabled=false;
+      }
+    };
+    sendButton?.addEventListener('click',()=>void sendCode(sendButton));
+    resendButton?.addEventListener('click',()=>void sendCode(resendButton));
+    emailDeleteForm.addEventListener('submit',async e=>{
+      e.preventDefault();
+      if(!emailDeleteForm.querySelector('[name="confirm"]')?.checked) {
+        status.textContent='Confirm that you understand deletion is permanent.';
+        return;
+      }
+      const button=emailDeleteForm.querySelector('button[type="submit"]');
+      const code=String(codeInput.value||'').trim();
+      if(!/^[0-9]{8}$/.test(code)) {
+        status.textContent='Enter the 8-digit deletion code.';
+        return;
+      }
+      button.disabled=true;
+      if(resendButton)resendButton.disabled=true;
+      status.textContent='Verifying code and deleting account…';
+      try {
+        const result=await deleteAccount({code});
+        const next=result?.deletion==='complete'?'deleted':'deleting';
+        history.replaceState({},'',`/?account=${next}`);
+        renderDeletionState(next);
+      } catch(error) {
+        status.textContent=error?.message||'Account could not be deleted.';
+        button.disabled=false;
+        if(resendButton)resendButton.disabled=false;
+      }
+    });
+  }
   document.querySelector('#patreon-connect')?.addEventListener('click',async e=>{
     const button=e.currentTarget,status=document.querySelector('#patreon-status');button.disabled=true;if(status)status.textContent='Opening Patreon…';
     try{const result=await connectPatreon();if(!result?.url)throw Error('Patreon did not return a connection URL.');track('patreon_connect_started');location.href=result.url;}
