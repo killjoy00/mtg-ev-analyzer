@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 
 export function rolloutDispatch(request) {
-  const {operation,reason,request_id,corpus_version,commit,sets,target,action,source}=request||{};
+  const {operation,reason,request_id,corpus_version,commit,sets,target,action,source,first_environment,measurement_mode}=request||{};
   const common=['operation','reason','request_id'];
   if(typeof reason!=='string'||!reason.trim()||!/^[-a-zA-Z0-9]+$/.test(request_id||''))throw Error('A named rollout request and reason are required.');
   let workflow,inputs={},extra=[];
@@ -39,6 +39,13 @@ export function rolloutDispatch(request) {
     workflow='patreon-reconcile.yml';inputs={mode:'sync'};
   } else if(operation==='production-browser') {
     workflow='production-browser.yml';
+    if(first_environment!==undefined||measurement_mode!==undefined) {
+      if(!['mixed','powered-cube','latest'].includes(first_environment)||typeof measurement_mode!=='boolean')throw Error('Invalid production browser measurement request.');
+      inputs={first_environment,measurement_mode:measurement_mode?'true':'false'};extra=['first_environment','measurement_mode'];
+    }
+  } else if(operation==='daily-generation') {
+    if(!['development','production'].includes(target))throw Error('Invalid Daily generation target.');
+    workflow='daily-generation.yml';inputs={target};extra=['target'];
   } else if(operation==='browser') {
     workflow='e2e.yml';
   } else if(operation==='deploy') {
