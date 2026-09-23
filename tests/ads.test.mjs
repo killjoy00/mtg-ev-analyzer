@@ -4,7 +4,7 @@ import {advertisingAllowed,promotionalContentAllowed,slotIdForPlacement} from '.
 import {adFreePatreonMembership,premiumPatreonMembership,PATREON_POLICY} from '../patreon-policy.mjs';
 import {patreonAdvertisingStatus} from '../worker/patreon.mjs';
 import {ACCOUNT_SIGNAL_KEY,signalAccountChange} from '../growth-api.mjs';
-import {tcgplayerAffiliateUrl,tcgplayerMagicUrl} from '../tcgplayer.mjs';
+import {tcgplayerAffiliateUrl,tcgplayerHomeBannerActive,tcgplayerMagicUrl} from '../tcgplayer.mjs';
 
 test('ad placement names map explicitly and never fall back',()=>{
   const cfg={slots:{home:'home-id',articleTop:'article-id',articleInline:'inline-id'}};
@@ -93,12 +93,18 @@ test('affiliate promotion shares the conservative ad-free eligibility boundary',
 test('TCGplayer home destination uses the approved Impact deep-link template',()=>{
   const saved=globalThis.PACKONE_TCGPLAYER;
   globalThis.PACKONE_TCGPLAYER={
-    impactDeepLinkTemplate:'https://partner.tcgplayer.com/c/7742974/1780961/21018?u={url}'
+    impactDeepLinkTemplate:'https://partner.tcgplayer.com/c/7742974/1780961/21018?u={url}',
+    homeBannerEnabled:true,
+    homeDestination:'https://www.tcgplayer.com/categories/trading-and-collectible-card-games/magic-the-gathering'
   };
   try{
     const target='https://www.tcgplayer.com/categories/trading-and-collectible-card-games/magic-the-gathering';
     const magic=tcgplayerMagicUrl();
+    assert.equal(tcgplayerHomeBannerActive(),true);
     assert.equal(magic,tcgplayerAffiliateUrl(target));
+    globalThis.PACKONE_TCGPLAYER.homeBannerEnabled=false;
+    assert.equal(tcgplayerHomeBannerActive(),false);
+    globalThis.PACKONE_TCGPLAYER.homeBannerEnabled=true;
     const parsed=new URL(magic);
     assert.equal(parsed.hostname,'partner.tcgplayer.com');
     assert.equal(parsed.pathname,'/c/7742974/1780961/21018');
