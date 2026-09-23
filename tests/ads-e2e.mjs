@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 
 const base=process.env.PACK1_E2E_URL||'http://127.0.0.1:4173';
 const HOME_SLOT='1543495960';
-const googleStub=`(()=>{const q=window.adsbygoogle||[];const fill=()=>{const ad=document.querySelector("ins.adsbygoogle:not([data-test-filled])");if(ad){ad.dataset.testFilled="1";ad.innerHTML='<div data-test-creative style="min-height:90px;display:grid;place-items:center;width:100%">Advertisement</div>';}};q.forEach(fill);const push=Array.prototype.push;q.push=function(){const n=push.apply(q,arguments);fill();return n;};window.adsbygoogle=q;fill();})();`;
+const googleStub=`(()=>{const q=window.adsbygoogle||[];const fill=()=>{const ad=document.querySelector("ins.adsbygoogle:not([data-test-filled])");if(ad){ad.dataset.testPrefillWidth=String(ad.offsetWidth);ad.dataset.testFilled="1";ad.innerHTML='<div data-test-creative style="min-height:90px;display:grid;place-items:center;width:100%">Advertisement</div>';}};q.forEach(fill);const push=Array.prototype.push;q.push=function(){const n=push.apply(q,arguments);fill();return n;};window.adsbygoogle=q;fill();})();`;
 const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
 
 function dailyFixture(signed=false){
@@ -76,6 +76,9 @@ async function assertOneFill(page,state,slotId=HOME_SLOT){
   assert.equal(await page.locator('script[src*="googlesyndication"]').count(),1);
   assert.equal(await page.locator('ins.adsbygoogle').count(),1);
   assert.equal(await page.locator('ins.adsbygoogle').getAttribute('data-ad-slot'),slotId);
+  await page.locator('ins.adsbygoogle[data-test-prefill-width]').waitFor({state:'attached'});
+  const prefillWidth=Number(await page.locator('ins.adsbygoogle').getAttribute('data-test-prefill-width'));
+  assert.ok(prefillWidth>0,'responsive ad must have a measurable width before the fake creative is injected');
   assert.equal(await page.evaluate(()=>window.adsbygoogle?.length),1);
   await page.locator('[data-test-creative]').waitFor();
   assert.deepEqual(state.blocked,[]);
