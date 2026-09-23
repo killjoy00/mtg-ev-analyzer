@@ -28,7 +28,7 @@ from build_replays import (CountStore, OutOfFoldModel, DraftSkill, MODEL_VERSION
     select_strong_drafts, parse_example, candidate_columns, pool_columns,
     render_replay, parse_rate_bucket, parse_games_lower_bound, slugify)
 from backfill_legacy_sets import arena_rank_proxy, arena_rank_tier, _game_order
-from fetch_card_metadata import compact_card, aliases
+from fetch_card_metadata import aliases, fetch_named, metadata_for_alias
 from set_policy import corpus_version, supported_set, require_supported_set
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -317,23 +317,22 @@ def metadata(root):
 
 
 def resolve_images(names, known, cache_path):
-    import urllib.parse
     cache = {k:v for k,v in json.loads(cache_path.read_text()).items() if v} if cache_path.exists() else {}
     known = {**known, **{k:v for k,v in cache.items() if v}}
     for name in sorted(name for name in names if not (known.get(name, {}).get('image_url', '').startswith('https://') and known.get(name, {}).get('type_line'))):
-        # Exact identities only. A fuzzy card with a similar name is not a substitute.
+        # Resolve all printings for the exact card identity and pick deterministic
+        # main readable art; never accept Scryfall's arbitrary default printing.
         time.sleep(.15)
-        try:
-            with request('https://api.scryfall.com/cards/named?exact='+urllib.parse.quote(name)) as r: card = json.load(r)
-            value = compact_card(card) if name in set(aliases(card)) else None
-            if value and value.get('image_url','').startswith('https://'): known[name] = value; cache[name] = value
-            else: cache[name] = None
-        except urllib.error.HTTPError as e:
-            if e.code != 404: raise
+        card = fetch_named(name)
+        value = metadata_for_alias(card, name) if card else None
+        if value and value.get('image_url','').startswith('https://'):
+            value = {k:v for k,v in value.items() if k != 'name'}
+            known[name] = value
+            cache[name] = value
+        else:
             cache[name] = None
         atomic_json(cache_path, cache)
     return known
-
 
 def write_gzip_jsonl(path, values):
     temp = path.with_suffix(path.suffix+'.tmp')
