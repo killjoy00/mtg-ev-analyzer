@@ -1,6 +1,8 @@
 {
-  "operation": "card-image-release",
-  "request_id": "packone-main-art-20260923",
-  "reason": "Deploy the reviewed deterministic main-card-art release through development and production, then refresh all served Pack One card images.",
-  "commit": "bc1a0e9f956e23621e86a27ca0ac84aa5001c545"
+  "operation": "production-browser",
+  "request_id": "daily-pacific-after-inactivity-20260923-v2",
+  "reason": "Collect two Neon-idle-confirmed after-inactivity startup samples for each Pack One Daily after the Pacific pre-generation rollout.",
+  "first_environment": "all",
+  "measurement_mode": true,
+  "measurement_samples": 2
 }
