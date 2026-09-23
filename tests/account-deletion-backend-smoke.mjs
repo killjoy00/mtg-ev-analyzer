@@ -7,6 +7,12 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query}=await import('../worker/growth-function.js');
 const {beginDeletion,cleanupPackOne,sweepExpiredVerification}=await import('../worker/account-deletion.mjs');
 const {issueAccountSession}=await import('../worker/account-session.mjs');
+const {
+  consumeDeletionVerification,
+  deletionCodeHmac,
+  purgeExpiredDeletionVerifications,
+  storeDeletionVerification,
+}=await import('../worker/account-deletion-verification.mjs');
 
 const auth=crypto.randomUUID();
 const player=crypto.randomUUID();
@@ -16,6 +22,7 @@ const draftShare='qa-draft-'+crypto.randomUUID().replaceAll('-','').slice(0,20);
 const draftOwnerSession=crypto.randomUUID();
 const draftRetainedSession=crypto.randomUUID();
 const recovery='b'.repeat(64);
+const deletionEnv={PACK1_RATE_LIMIT_SECRET:'h'.repeat(64)};
 
 try {
   // Exercise the shared advisory lock with two independent runtime queries.
@@ -53,6 +60,36 @@ try {
   assert.equal(Number((await query('SELECT count(*)::int n FROM neon_auth.verification WHERE id=$1::uuid',[expiredVerification])).rows[0].n),0);
   assert.equal(Number((await query('SELECT count(*)::int n FROM neon_auth.verification WHERE id=$1::uuid',[freshVerification])).rows[0].n),1);
 
+
+  // Passwordless deletion verification state is one-row, replaceable, expiring,
+  // and consumed atomically by Auth UUID + HMAC.
+  const verificationAuth=crypto.randomUUID();
+  await query(`INSERT INTO account_deletion_verifications(auth_user_id,code_hmac,created_at,expires_at)
+    VALUES($1::uuid,$2,now()-interval '2 minutes',now()-interval '1 minute')`,[
+      verificationAuth,deletionCodeHmac(verificationAuth,'11111111',deletionEnv),
+    ]);
+  assert.ok(await purgeExpiredDeletionVerifications(query)>=1);
+  assert.equal(Number((await query('SELECT count(*)::int n FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[verificationAuth])).rows[0].n),0);
+
+  await storeDeletionVerification(query,{
+    authUserId:verificationAuth,
+    codeHmac:deletionCodeHmac(verificationAuth,'22222222',deletionEnv),
+  });
+  await storeDeletionVerification(query,{
+    authUserId:verificationAuth,
+    codeHmac:deletionCodeHmac(verificationAuth,'33333333',deletionEnv),
+  });
+  const replaced=(await query('SELECT code_hmac FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[verificationAuth])).rows[0];
+  assert.equal(replaced.code_hmac,deletionCodeHmac(verificationAuth,'33333333',deletionEnv),'resend must replace the prior code row');
+  assert.equal(await consumeDeletionVerification(query,{authUserId:verificationAuth,code:'22222222',env:deletionEnv}),false,'replaced code must fail');
+
+  const consumeResults=await Promise.all([
+    consumeDeletionVerification(query,{authUserId:verificationAuth,code:'33333333',env:deletionEnv}),
+    consumeDeletionVerification(query,{authUserId:verificationAuth,code:'33333333',env:deletionEnv}),
+  ]);
+  assert.equal(consumeResults.filter(Boolean).length,1,'concurrent code consumption must have exactly one winner');
+  assert.equal(Number((await query('SELECT count(*)::int n FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[verificationAuth])).rows[0].n),0);
+
   await query('INSERT INTO players(id,display_name) VALUES($1::uuid,$2),($3::uuid,$4)',[
     player,'QA Deleted Player',other,'QA Retained Player',
   ]);
@@ -82,6 +119,10 @@ try {
   await query(`INSERT INTO account_recovery_rate_limits(limit_key,attempts,expires_at)
     VALUES($1,1,now()+interval '15 minutes')`,[recovery]);
 
+  await storeDeletionVerification(query,{
+    authUserId:auth,
+    codeHmac:deletionCodeHmac(auth,'44444444',deletionEnv),
+  });
   const operation=await beginDeletion(query,{authUserId:auth,playerId:player});
   assert.equal(operation.auth_user_id,auth);
   assert.equal(operation.player_id,player);
@@ -94,6 +135,7 @@ try {
   assert.equal(await count('SELECT count(*)::int n FROM players WHERE id=$1::uuid',[player]),0);
   assert.equal(await count('SELECT count(*)::int n FROM corpus_status_events WHERE auth_user_id=$1::uuid',[auth]),0);
   assert.equal(await count('SELECT count(*)::int n FROM account_credential_rate_limits WHERE auth_user_id=$1::uuid',[auth]),0);
+  assert.equal(await count('SELECT count(*)::int n FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[auth]),0);
   assert.equal(await count('SELECT count(*)::int n FROM account_recovery_rate_limits WHERE limit_key=$1',[recovery]),0);
   const retainedRow=(await query('SELECT challenge_id,opponent_name,opponent_score,outcome FROM game_results WHERE id=$1',[retained.id])).rows[0];
   assert.equal(retainedRow.challenge_id,null);
@@ -114,6 +156,16 @@ try {
   assert.equal(tombstone.player_id,player);
   assert.equal(tombstone.state,'provider_delete_pending');
 
+  await assert.rejects(
+    storeDeletionVerification(query,{
+      authUserId:auth,
+      codeHmac:deletionCodeHmac(auth,'55555555',deletionEnv),
+    }),
+    error=>error?.code==='ACCOUNT_DELETING',
+    'guarded issuance must refuse to recreate verification state after deletion commits',
+  );
+  assert.equal(await count('SELECT count(*)::int n FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[auth]),0);
+
   const again=await cleanupPackOne(query,cleaned,{recoveryKey:recovery});
   assert.equal(again.state,'provider_delete_pending','cleanup is rerunnable while provider deletion is pending');
 
@@ -125,5 +177,6 @@ try {
   await query('DELETE FROM draft_run_sessions WHERE player_id=$1::uuid OR player_id=$2::uuid',[player,other]);
   await query('DELETE FROM game_results WHERE player_id=$1::uuid OR player_id=$2::uuid',[other,player]);
   await query('DELETE FROM share_challenges WHERE player_id=$1::uuid',[player]);
+  await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[verificationAuth]);
   await query('DELETE FROM players WHERE id=$1::uuid OR id=$2::uuid',[other,player]);
 }
