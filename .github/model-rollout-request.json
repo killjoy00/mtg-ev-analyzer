@@ -1,7 +1,7 @@
 {
-  "operation": "deploy",
-  "request_id": "username-attention-prod-20260922",
-  "reason": "Promote PR 341 username attention release after exact SHA 4a6d920 passed development deployment, revision coverage, and all three Daily acceptance flows.",
-  "commit": "4a6d920ec4c2f985fdd2b1749a55f57dac363305",
-  "target": "production"
+  "operation": "daily-calendar-migration",
+  "request_id": "daily-pacific-migration-dev-20260923",
+  "reason": "Apply reviewed migration 0035 to development for the Pacific Daily calendar cutover at exact merged revision 75c3519.",
+  "commit": "75c3519eb262815acb8f8901603056cbe32dc7af",
+  "target": "development"
 }
