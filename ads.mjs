@@ -122,7 +122,6 @@ export async function initializeAds({doc=document,location=globalThis.location,
       logo.alt='TCGplayer';
       logo.width=512;
       logo.height=227;
-      logo.loading='lazy';
       logo.decoding='async';
       logoWrap.appendChild(logo);
 
