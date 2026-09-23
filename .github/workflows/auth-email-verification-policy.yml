@@ -1,4 +1,4 @@
-name: enable optional production email verification
+name: enable required production email verification
 
 on:
   push:
@@ -30,7 +30,7 @@ jobs:
           node-version: 24
       - name: Install pinned Neon CLI
         run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@5.0.0
-      - name: Enable optional email verification with fixed production guards
+      - name: Enable required email verification with fixed production guards
         env:
           NEON_BIN: ${{ runner.temp }}/neon-tools/node_modules/.bin/neon
         run: node scripts/auth-email-verification-policy.mjs production
