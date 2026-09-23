@@ -8,6 +8,7 @@ import {handlePatreon} from './patreon.mjs';
 import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 import {accountRuntimeConfig} from './account-config.mjs';
 import {clearCredentialLimit,consumeCredentialLimit,trustedCredentialNetwork} from './account-credential-limits.mjs';
+import {consumeDeletionVerification,createDeletionVerification,deletionEmailConfigured,deletionEmailForAuth} from './account-deletion-verification.mjs';
 import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,deletionRecoveryKey,finishProviderPhase,loadDeletionOperation,maintenanceBatch,removeProviderUser,stuckDeletion,sweepExpiredVerification,verificationSweepEnabled} from './account-deletion.mjs';
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
@@ -1046,14 +1047,17 @@ async function credentialState(authUserId) {
 async function handleAccount(request) {
   const auth = await authSession(request);
   const credentials=await credentialState(auth.user_id);
+  const enabled=deletionEnabled();
+  const emailMethod=enabled&&!credentials.password&&deletionEmailConfigured()&&Boolean(await deletionEmailForAuth(query,auth.user_id));
   return json({
     user: { id: auth.user_id, email: auth.email, name: auth.name },
     session: { expiresAt: auth.expires_at },
     credentials,
     deletion:{
-      enabled:deletionEnabled(),
-      available:deletionEnabled()&&credentials.password,
+      enabled,
+      available:enabled&&credentials.password,
       googleOnly:credentials.google&&!credentials.password,
+      method:enabled?(credentials.password?'password':emailMethod?'email':null):null,
     },
   });
 }
@@ -1206,6 +1210,39 @@ async function resumeDeletionOperation(operation,{knownEmail=null}={}) {
   return current;
 }
 
+async function handleAccountDeleteVerificationStart(request) {
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const auth=await authSession(request,{required:true,allowLegacy:false,csrf:true});
+  if(!deletionEnabled())
+    throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'DELETION_DISABLED'});
+  const payload=await readJson(request);
+  if(payload.confirm!==true)
+    throw Object.assign(Error('Confirm permanent account deletion.'),{status:400,code:'DELETE_CONFIRMATION'});
+  const state=await credentialState(auth.user_id);
+  if(state.password)
+    throw Object.assign(Error('Use your current password to delete this account.'),{status:409,code:'PASSWORD_DELETE_REQUIRED'});
+  if(!deletionEmailConfigured())
+    throw Object.assign(Error('Account deletion verification is temporarily unavailable.'),{status:503,code:'DELETION_EMAIL_UNAVAILABLE'});
+  const email=await deletionEmailForAuth(query,auth.user_id);
+  if(!email)
+    throw Object.assign(Error('Account deletion requires a verified account email.'),{status:409,code:'DELETION_EMAIL_UNAVAILABLE'});
+
+  const initLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_init',
+    limit:DELETE_INIT_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(initLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',initLimit);
+  const network=trustedCredentialNetwork(request);
+  const networkLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_network',networkHash:network,
+    limit:DELETE_NETWORK_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(networkLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',networkLimit);
+
+  const verification=await createDeletionVerification(query,{authUserId:auth.user_id,email});
+  return json({ok:true,verification:'sent',expiresInSeconds:verification.expiresInSeconds});
+}
+
 async function handleAccountDelete(request) {
   requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const auth=await authSession(request,{required:true,allowLegacy:false,csrf:true});
@@ -1215,42 +1252,64 @@ async function handleAccountDelete(request) {
   if(payload.confirm!==true)
     throw Object.assign(Error('Confirm permanent account deletion.'),{status:400,code:'DELETE_CONFIRMATION'});
   const state=await credentialState(auth.user_id);
-  if(!state.password)
-    throw Object.assign(Error('Account deletion is temporarily unavailable for this sign-in method.'),{status:409,code:'GOOGLE_DELETE_UNAVAILABLE'});
-  const currentPassword=String(payload.currentPassword||'');
-  if(currentPassword.length<1||currentPassword.length>256)
-    throw Object.assign(Error('Enter your current password.'),{status:400,code:'CURRENT_PASSWORD'});
 
-  const initLimit=await consumeCredentialLimit(query,{
-    authUserId:auth.user_id,purpose:'account_delete_init',
-    limit:DELETE_INIT_LIMIT,seconds:DELETE_LIMIT_SECONDS,
-  });
-  if(initLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',initLimit);
-  const verifyLimit=await consumeCredentialLimit(query,{
-    authUserId:auth.user_id,purpose:'account_delete_verify',
-    limit:DELETE_VERIFY_LIMIT,seconds:DELETE_LIMIT_SECONDS,
-  });
-  if(verifyLimit.limited)return credentialThrottle('Too many verification attempts. Please try again later.',verifyLimit);
-  const network=trustedCredentialNetwork(request);
-  const networkLimit=await consumeCredentialLimit(query,{
-    authUserId:auth.user_id,purpose:'account_delete_network',networkHash:network,
-    limit:DELETE_NETWORK_LIMIT,seconds:DELETE_LIMIT_SECONDS,
-  });
-  if(networkLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',networkLimit);
+  if(state.password) {
+    const currentPassword=String(payload.currentPassword||'');
+    if(currentPassword.length<1||currentPassword.length>256)
+      throw Object.assign(Error('Enter your current password.'),{status:400,code:'CURRENT_PASSWORD'});
 
-  let providerSession='';
-  try {
-    providerSession=await providerPasswordSession(auth,currentPassword);
+    const initLimit=await consumeCredentialLimit(query,{
+      authUserId:auth.user_id,purpose:'account_delete_init',
+      limit:DELETE_INIT_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+    });
+    if(initLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',initLimit);
+    const verifyLimit=await consumeCredentialLimit(query,{
+      authUserId:auth.user_id,purpose:'account_delete_verify',
+      limit:DELETE_VERIFY_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+    });
+    if(verifyLimit.limited)return credentialThrottle('Too many verification attempts. Please try again later.',verifyLimit);
+    const network=trustedCredentialNetwork(request);
+    const networkLimit=await consumeCredentialLimit(query,{
+      authUserId:auth.user_id,purpose:'account_delete_network',networkHash:network,
+      limit:DELETE_NETWORK_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+    });
+    if(networkLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',networkLimit);
+
+    let providerSession='';
     try {
-      await neonAuthSession('/verify-password',{cookie:providerSession,body:{password:currentPassword}});
-    } catch(error) {
-      const status=Number(error?.status||500);
-      if(status>=500)throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'PROVIDER_FAILURE'});
-      throw Object.assign(Error('Current password was not accepted.'),{status:400,code:'CURRENT_PASSWORD'});
+      providerSession=await providerPasswordSession(auth,currentPassword);
+      try {
+        await neonAuthSession('/verify-password',{cookie:providerSession,body:{password:currentPassword}});
+      } catch(error) {
+        const status=Number(error?.status||500);
+        if(status>=500)throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'PROVIDER_FAILURE'});
+        throw Object.assign(Error('Current password was not accepted.'),{status:400,code:'CURRENT_PASSWORD'});
+      }
+      await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'account_delete_verify'});
+    } finally {
+      await closeProviderSession(providerSession);
     }
+  } else {
+    // Passwordless deletion still requires authenticated gateway network proof,
+    // but verification submissions spend only the account-scoped verify bucket.
+    trustedCredentialNetwork(request);
+    const verifyLimit=await consumeCredentialLimit(query,{
+      authUserId:auth.user_id,purpose:'account_delete_verify',
+      limit:DELETE_VERIFY_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+    });
+    if(verifyLimit.limited)return credentialThrottle('Too many verification attempts. Please try again later.',verifyLimit);
+    const code=String(payload.code||'').trim();
+    let verified=false;
+    try {
+      verified=await consumeDeletionVerification(query,{authUserId:auth.user_id,code});
+    } catch(error) {
+      if(error?.code==='DELETE_CODE_INVALID')
+        throw Object.assign(Error('Deletion code is invalid or expired.'),{status:400,code:'DELETE_CODE_INVALID'});
+      throw error;
+    }
+    if(!verified)
+      throw Object.assign(Error('Deletion code is invalid or expired.'),{status:400,code:'DELETE_CODE_INVALID'});
     await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'account_delete_verify'});
-  } finally {
-    await closeProviderSession(providerSession);
   }
 
   const operation=await beginDeletion(query,{authUserId:auth.user_id});
@@ -1444,7 +1503,7 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled() });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured() });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
@@ -1456,6 +1515,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/request-password-reset') return handlePasswordResetRequest(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/reset-password') return handlePasswordReset(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/password-change') return handlePasswordChange(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/delete/verification/start') return handleAccountDeleteVerificationStart(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/delete') return handleAccountDelete(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/link-browser') return handleLink(request,{browser:true});
