@@ -76,6 +76,10 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.match(source,/sign-in\/email/);
   assert.match(source,/request-password-reset/);
   assert.match(source,/delivered@resend\.dev/);
+  assert.match(source,/requireEmailVerification/);
+  assert.match(source,/signin\.status===403/);
+  assert.match(source,/beforeSnapshot\.emailPassword\?\.require_email_verification/);
+  assert.doesNotMatch(source,/pack1-auth-hardening-.*@example\.com/);
   assert.match(source,/removeProviderUser/);
   assert.match(source,/SELECT count\(\*\) FROM account_links WHERE auth_user_id=/);
   assert.doesNotMatch(source,/DATABASE_URL|DELETE\s+FROM|UPDATE\s+neon_auth|INSERT\s+INTO\s+neon_auth/i);

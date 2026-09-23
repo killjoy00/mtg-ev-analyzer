@@ -67,6 +67,23 @@ Measured final production results:
 
 The final production smoke, full test suite, and e2e suite also passed on the merged revision.
 
+Those signup/sign-in results are historical evidence from the localhost-hardening release before #246 enabled required email verification. The current production password policy is documented in [AUTH-EMAIL-VERIFICATION.md](AUTH-EMAIL-VERIFICATION.md).
+
+### Maintenance behavior after required verification
+
+The localhost-hardening workflow remains runnable under the final #246 production policy.
+
+Its disposable password smoke is now policy-aware:
+
+- it uses Resend's `delivered@resend.dev` test recipient because production signup now emits a verification email;
+- signup must still succeed and return a user id;
+- when production `require_email_verification=true`, sign-in for that still-unverified synthetic user must return HTTP 403;
+- when verification is not required, the legacy authenticated sign-in assertion remains available;
+- the same disposable account is used for the password-reset request;
+- cleanup removes that single disposable Auth identity through the existing reviewed Better Auth admin path.
+
+This keeps the localhost hardening check aligned with the current production policy instead of treating the expected unverified-user rejection as a regression.
+
 ## Rollback and failure behavior
 
 If the controller changes production from `allow_localhost:true` to false and a **core Auth verification** then fails, it attempts to restore production `allow_localhost:true` before surfacing the failure. A rollback failure is surfaced as a separate hard error.
@@ -77,7 +94,7 @@ Smoke-account cleanup is separate from the core hardening rollback decision: cle
 
 ## Smoke-user cleanup
 
-Production verification creates only disposable Auth users needed to prove email/password and recovery behavior.
+The localhost-hardening production check creates only the disposable Auth user needed to prove current email/password policy and recovery behavior. Under required verification the synthetic user is expected to remain unverified during the smoke, so HTTP 403 at password sign-in is the correct policy result.
 
 Cleanup reuses Pack One's existing reviewed Better Auth provider-deletion path from `worker/account-deletion.mjs`:
 

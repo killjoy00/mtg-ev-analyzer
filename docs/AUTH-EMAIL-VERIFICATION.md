@@ -1,22 +1,67 @@
 # Pack One email ownership verification
 
-Status: **delivery implementation merged; production verification remains disabled pending migration and final QA acceptance**.
+Status: **complete and active in production**.
 
-Issue: #246.
+Issue #246 was closed on 2026-09-23 after the production required-verification policy, user migration, delivery path, resend/expired-link UX, WebKit coverage, recovery checks and post-release regressions all passed.
 
 ## Current production state
 
-Production Managed Neon Auth remains unchanged:
+Production Managed Neon Auth:
 
 - email/password auth: enabled;
 - sign-up: enabled;
-- verification method configured: `otp`;
-- verify on sign-up: disabled;
-- require email verification: disabled;
+- verification method: `link`;
+- verify on sign-up: enabled;
+- require email verification: enabled;
+- auto sign-in after successful verification: enabled;
+- verify on sign-in: disabled;
+- `allow_localhost: false`;
 - custom email provider: Pack One / Resend;
 - Google OAuth: unchanged.
 
-No production verification flag is changed by the delivery implementation.
+Production trusted origins remain:
+
+- `https://magic.planitnow.us`
+- `https://packone.pro`
+- `https://api.packone.pro`
+
+The final secure Auth/backend release was verified at:
+
+`d7dbaf89f391fd82b4f344285533aaee31f0fb0f`
+
+The final production policy change merged as:
+
+`7255252097787b28250a7458a709ee61d28037fd`
+
+## Final Pack One policy
+
+For email/password accounts:
+
+- ownership verification is triggered immediately on sign-up;
+- verification uses a click-through email link;
+- an unverified password user cannot authenticate;
+- successful verification returns the user to `https://packone.pro/?auth=verify`;
+- verified users can then sign in normally;
+- resend is available through Pack One's first-party account API;
+- expired, invalid or already-consumed verification links have a Pack One recovery screen that can request a new link;
+- verification links are presented to users as expiring after 15 minutes;
+- password recovery remains a separate `forget-password` flow;
+- Google OAuth remains independent of password email verification.
+
+## Existing-account migration
+
+Before the production requirement was enabled, production had exactly four credential/password users and all four were unverified.
+
+Disposable production-child testing proved Managed Neon does **not** grandfather pre-existing unverified password accounts: an account that signed in with HTTP 200 before `require_email_verification=true` immediately received HTTP 403 afterward.
+
+The owner confirmed the four existing password users. Before the policy flip, Pack One performed a one-time, owner-approved migration with hard pre/postcondition checks and a short-lived production-child checkpoint. The resulting production state was verified as:
+
+- credential users: **4**;
+- verified: **4**;
+- unverified: **0**;
+- linked non-credential providers: **0**.
+
+This was an exceptional migration step for the existing population, not a reusable account-management interface. Normal product flows must not directly mutate Managed Neon Auth user/account/session rows.
 
 ## Measured Managed Neon behavior
 
@@ -30,61 +75,48 @@ With verification required and OTP selected:
 - the user was created unverified;
 - no authenticated session was returned;
 - sign-in before verification returned HTTP 403;
-- Neon persisted one verification record with identifier shape `email-verification-otp-<email>`;
+- Neon persisted an OTP-style verification credential;
 - the credential was unexpired;
-- no subscribed `send.otp` / `send.magic_link` webhook event was observed in that probe.
+- the subscribed verification webhook did not produce the useful delivery event needed for Pack One's desired UX.
+
+OTP therefore was not selected for production.
 
 ### Link mode
 
-Neon documents that verification links require a custom email provider. A disposable child of production inherited the Pack One custom Resend SMTP configuration and accepted link mode.
-
-Measured link behavior:
+With the Pack One custom email provider inherited by a disposable production child:
 
 - signup returned HTTP 200;
 - the user was created unverified;
-- no authenticated session was returned;
+- when verification was required, no authenticated session was returned;
 - sign-in before verification returned HTTP 403;
-- Neon emitted a signed `send.magic_link` event;
+- Neon emitted signed `send.magic_link`;
 - `event_data.link_type` was exactly `email-verification`;
-- the signed payload contained `link_url`, `token`, and `expires_at`;
+- the signed payload included `link_url`, `token` and `expires_at`;
 - detached Ed25519 signature verification succeeded against the branch JWKS;
-- the verification link host was the disposable branch's Managed Neon Auth host;
-- link mode did not create the OTP-style `neon_auth.verification` row;
-- the disposable branch's email/password and webhook settings were restored after the probe.
+- the verification URL belonged to the disposable branch's Managed Neon Auth base.
 
-Production itself was not targeted.
+### Independent flags
 
-## Existing-account impact
+The two verification controls were measured independently.
 
-A read-only production query on 2026-09-22 found:
+With link verification sent on sign-up but `require_email_verification=false`:
 
-- credential accounts: **4**;
-- verified credential users: **0**;
-- unverified credential users: **4**.
+- signup returned HTTP 200 with a session;
+- the account remained unverified;
+- password sign-in returned HTTP 200 with a session;
+- the signed verification event was still emitted.
 
-A disposable production-child acceptance test then created an unverified credential account while verification was disabled. That account signed in successfully with HTTP 200. After the same branch was switched to `require_email_verification=true`, the exact same account immediately received HTTP 403 at sign-in. Managed Neon therefore does **not** grandfather pre-existing unverified credential users when the requirement is enabled.
+That result supported the temporary Phase 1 rollout, which exercised real production delivery without locking out existing accounts.
 
-If production were flipped today, the four currently unverified credential accounts would be expected to be blocked on their next password sign-in. Production `require_email_verification` must remain disabled until those accounts are migrated/verified with an explicitly supported user flow.
-
-## Target policy
-
-Subject to the existing-account gate above, the intended Pack One policy is:
-
-- new email/password accounts prove ownership before they can authenticate;
-- verification is triggered immediately on password signup;
-- verification uses a click-through link, not an OTP entry screen;
-- the existing signup UI remains the verification-pending experience ("Check your email");
-- Google OAuth remains independent and unchanged;
-- existing password accounts are not retroactively locked out without an explicit, supported migration/grandfathering step;
-- password recovery remains a separate `forget-password` flow.
+After the four-user migration and full acceptance, Phase 2 changed only `require_email_verification: false -> true`.
 
 ## Delivery contract
 
-The Pack One Auth webhook keeps password recovery and verification as separate explicit contracts.
+The Pack One Auth webhook keeps password recovery and email verification as separate explicit contracts.
 
-For every request it still:
+For every signed event it:
 
-1. enforces the body-size and timestamp bounds;
+1. enforces body-size and timestamp bounds;
 2. verifies the detached Ed25519 Neon signature over the exact raw bytes;
 3. validates header/payload event IDs;
 4. rejects unrecognized signed event shapes.
@@ -102,43 +134,95 @@ Email verification accepts only:
 - an expiry timestamp;
 - an HTTPS `link_url` whose origin and path remain under the configured Neon Auth base.
 
-The verification delivery boundary receives the validated `link_url` but not the separate raw token field. The email is Pack One branded and delivered through the same dedicated Resend credential, with a separate verification subject and idempotency namespace.
+The verification delivery boundary receives the validated `link_url` but not the separate raw token field. Verification and recovery have separate copy and idempotency namespaces. Verification email copy says **verification link**; recovery copy continues to say **reset link**.
 
 Other signed event/link types remain rejected and observable without logging credentials.
 
-## Acceptance evidence boundaries
+## Resend and expired-link UX
 
-Pack One intentionally separates two kinds of verification evidence:
+Pack One exposes verification resend through the first-party account API rather than directly from the browser to Neon.
 
-- **Delivered-email evidence:** a real delivered Pack One verification email has already been inspected through Resend, including branding and the delivered Neon `/verify-email` link shape. This is the evidence that the email content itself contains the expected verification link.
-- **Automated CI evidence:** the disposable-branch acceptance should prove the signed Neon webhook is accepted, the already validated verification URL can be redeemed only after signup completes, `neon_auth.user.emailVerified` becomes true, and password sign-in succeeds afterward.
+The resend endpoint:
 
-Automated CI must not be described as proof of mailbox contents unless it actually reads the delivered message. Resend API keys currently expose only `sending_access` or `full_access`; there is no read-only key scope. Pack One will not broaden the production send credential or add a full-access QA credential solely to make CI read messages. The safer acceptance design is a QA-only one-shot redemption seam that never returns or logs the stored verification URL/token.
+- uses the fixed Pack One verification callback;
+- returns a generic public response so it does not disclose account existence;
+- uses a dedicated HMAC-hashed rate-limit namespace;
+- rejects hostile browser-supplied callback destinations;
+- preserves the same trusted-origin boundary as the account API.
 
-That seam is now implemented. On a signed `email-verification` event the temporary
-QA Worker stores the already validated Neon link in a Durable Object whose name is
-derived from a random per-run secret, so stale evidence from an earlier run cannot
-be read. The runner fetches it from `/qa/pending-verification` only after signup has
-returned, re-validates it against the disposable Auth base, clicks it without
-logging it, and then proves sign-in. That route exists only when
-`PACK1_AUTH_ENV=qa` and requires the per-run secret as a bearer token; production
-returns 404.
+The client supports:
 
-Reaching the send boundary is observed as `status: sent_or_duplicate` telemetry,
-which means Resend accepted the message — not that the rendered email contained the
-link. A green acceptance run is therefore not proof of delivered content.
+- resend from the verification-pending sign-up state;
+- resend after an expired/invalid verification return;
+- `?auth=verify` success and error handling;
+- removal of verification/error query parameters after handling the return.
 
-## Production gate
+The focused Chromium + WebKit mobile verification contract covers the pending state, resend, expired-link recovery and successful return.
 
-Before enabling production verification, QA must prove end-to-end:
+## Acceptance evidence
 
-- Pack One verification email is delivered and branded correctly;
-- the actual delivered link verifies a synthetic user;
-- sign-in is 403 before verification and succeeds after verification;
-- password recovery still sends and completes independently;
-- Google OAuth remains unchanged;
-- repeat/expired-link behavior is understood sufficiently for user-facing recovery/resend UX;
-- pre-existing unverified credential-account behavior is measured and the grandfathering decision is documented;
-- mobile Safari/WebKit signup state remains correct.
+Delivered-email evidence and automated acceptance are intentionally distinct.
 
-Until those gates pass, production stays on its current verification-disabled configuration.
+A real Pack One verification email was inspected independently through Resend. It used Pack One branding and contained the expected Managed Neon `/verify-email` link.
+
+Automated disposable acceptance proves the application/provider state transition without claiming that CI read mailbox contents. The QA Worker stores the already validated verification URL behind a per-run secret and exposes it only to the isolated acceptance runner; production has no such route.
+
+Final required-mode disposable acceptance was run in GitHub Actions run **35798972501** and proved:
+
+- the inherited Phase 1 baseline;
+- legacy-account sign-in 200 before `require=true` and 403 afterward;
+- required-mode signup creates a user with no session;
+- verification resend returns HTTP 200;
+- two signed `email-verification` deliveries are observed;
+- the resent link redirects cleanly to Pack One;
+- reusing the consumed link is rejected;
+- the verified user reaches `emailVerified=true`;
+- post-verification sign-in returns HTTP 200 with a session;
+- password-reset request returns HTTP 200;
+- the independent `forget-password` delivery remains functional;
+- original disposable Auth/webhook config is restored;
+- the temporary Worker and disposable branch are removed.
+
+## Production release and final checks
+
+The final secure release workflow was GitHub Actions run **35803802418**. It successfully:
+
+- deployed the exact reviewed backend revision to production;
+- deployed the dedicated production Auth webhook Worker;
+- deployed the fixed first-party gateway;
+- verified the live secure gateway;
+- verified Google OAuth start;
+- verified the Auth webhook production release marker at exact revision `d7dbaf89f391fd82b4f344285533aaee31f0fb0f`.
+
+The guarded Phase 2 policy workflow was run **35804229759**. Its logged delta was exactly:
+
+- before: link verification on sign-up, `require_email_verification=false`;
+- after: link verification on sign-up, `require_email_verification=true`.
+
+Independent production readback matched the target and confirmed the four credential users remained verified.
+
+Post-policy checks all passed:
+
+- production smoke: run **35804229852**;
+- full test: run **35804229822**;
+- e2e: run **35804229803**;
+- Pages deployment: run **35804229270**;
+- account deletion maintenance: run **35804312429**.
+
+## Operations after closeout
+
+Canonical implementation/operations paths:
+
+- delivery: `edge/auth-webhook.mjs`;
+- first-party account backend: `worker/growth-function.js`;
+- browser account UX: `growth.mjs`;
+- verification QA workflow: `.github/workflows/auth-verification-qa.yml`;
+- verification QA runner: `scripts/auth-verification-qa-acceptance-v2.mjs`;
+- production policy controller: `scripts/auth-email-verification-policy.mjs`;
+- policy workflow: `.github/workflows/auth-email-verification-policy.yml`.
+
+The verification QA workflow supports reviewed push requests and `workflow_dispatch`, so environmental retries do not require another code change. Temporary QA branches must be disposable children with expiry and must never target production or the serving development branch.
+
+The checked-in request JSON files are retained as records of the last reviewed operations; they are not declarations that those disposable branches still exist.
+
+Future verification-policy changes should be new reviewed changes with fresh production release markers and current population checks. Do not loosen required verification, change Google OAuth, alter the Resend sender, or reuse a stale production-policy request merely to work around a failed test.
