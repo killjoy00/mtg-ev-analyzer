@@ -152,6 +152,7 @@ jobs:
           node tests/daily-generation-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/corpus-admin-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/account-session-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/mobile-auth-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/username-uniqueness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/account-deletion-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/patreon-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures

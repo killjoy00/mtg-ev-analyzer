@@ -14,6 +14,18 @@ The Pacific Daily calendar cutover has an additional release-timing invariant be
 - One `game-date.mjs` implementation owns Pacific dates for frontend, Today, both backend modules and legacy aliases. Misnamed UTC callers are removed; DST and midnight regression cases cover every entry point.
 - Today refreshes on a completed result, return to the page and a date change. Old asynchronous results cannot overwrite newer state. Today and Profile subscribe to the common rendering lifecycle, now included in the architecture gate.
 
+## Native account integrity
+
+- Native player identity remains the existing signed Pack One player token. The mobile app stores it in the platform secure store and sends it only through the gateway's scoped `x-pack1-mobile-session` transport; the gateway converts it to the existing upstream player bearer only on explicitly allowed player/mobile routes.
+- Native account identity uses a separate random 256-bit Pack One token backed by the existing `account_sessions` table. Only its SHA-256 digest is stored server-side; expiry and revocation use the same seven-day account-session authority as web. Native clients store the opaque token in the platform secure store, never in repository config or a database URL.
+- The gateway accepts `x-pack1-mobile-account` only when it is correctly shaped and only on explicit native-account or account-aware Draft Run routes. Browser account routes do not accept it as a substitute for the reviewed first-party cookie/CSRF contract.
+- Every private native account read or mutation requires both a valid signed player token and a live native account session whose Auth user is currently linked to that exact player ID. A stolen account token paired with another player identity is rejected.
+- Email/password authentication continues to use Managed Neon Auth. Required email verification, provider password policy, account deletion guards, tombstones, credential throttles, and server-derived Auth identity remain authoritative.
+- Google native sign-in uses the system browser. Pack One stores only digests of the short-lived OAuth flow and final handoff tokens in `mobile_oauth_handoffs`; the handoff is bound to the initiating guest player, expires, and is consumed once. The provider session returned during callback exchange is consumed before the app receives the Pack One handoff.
+- Native sign-in links or merges the guest player through the existing guarded `account_links` path and can validate a just-completed Daily through the existing server-side Daily promotion path. Native code does not create scores, capabilities, ranking eligibility, or account links locally.
+- Native sign-out revokes the Pack One account-session row while retaining the current player identity locally as a guest. Account deletion reuses the current permanent/tombstoned deletion operation: password accounts freshly reauthenticate; passwordless accounts use the Pack One verified-email deletion code; accepted deletion clears the mobile credentials locally.
+- Sign in with Apple is not currently exposed. No separate Apple identity store or client-side entitlement path is introduced while the current Auth provider configuration lacks an approved Apple integration.
+
 ## Password recovery integrity
 
 - Password-reset requests are signed-out by design but still require the authoritative Pack One origin policy. Production recognizes `https://packone.pro`, `https://api.packone.pro`, and `https://magic.planitnow.us`; localhost is added only with explicit `PACK1_ALLOW_LOCALHOST=1`. `requireTrustedOrigin()` has no implicit fallback.

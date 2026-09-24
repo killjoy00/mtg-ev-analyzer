@@ -5,7 +5,7 @@ import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {handlePatreon} from './patreon.mjs';
-import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
+import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,digest,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 import {accountRuntimeConfig} from './account-config.mjs';
 import {clearCredentialLimit,consumeCredentialLimit,trustedCredentialNetwork} from './account-credential-limits.mjs';
 import {consumeDeletionVerification,createDeletionVerification,deletionEmailConfigured,deletionEmailForAuth} from './account-deletion-verification.mjs';
@@ -18,6 +18,8 @@ const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
 const TOKEN_PREFIX = 'p1_';
 const NEON_AUTH_BASE=ACCOUNT_CONFIG.authBase;
 const ACCOUNT_RETURN='https://packone.pro/';
+const MOBILE_GOOGLE_CALLBACK='https://api.packone.pro/growth/v1/mobile/account/google/callback';
+const MOBILE_GOOGLE_RETURN='packone://account';
 const STATIC_ORIGIN = 'https://packone.pro';
 const PROFILE_KEY_RE = /^[a-f0-9]{16}$/;
 const DAILY_RUN_ID_RE = /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/;
@@ -678,6 +680,175 @@ async function handleAccountSignin(request) {
   return accountJson(established.auth,established.session);
 }
 
+function mobileAccountJson(auth,session,linked,status=200) {
+  return json({
+    user:{id:auth.user_id,email:auth.email,name:auth.name},
+    session:{token:session.token,expiresAt:session.expiresAt},
+    linked,
+  },status);
+}
+
+function mobileLinkRequest(request,accountToken,validateDailyRunId=null) {
+  const headers=new Headers({
+    'content-type':'application/json',
+    authorization:String(request.headers.get('authorization')||''),
+    'x-pack1-mobile-account':accountToken,
+  });
+  return new Request(request.url,{
+    method:'POST',
+    headers,
+    body:JSON.stringify(validateDailyRunId?{validateDailyRunId}:{}),
+  });
+}
+
+async function finishMobileAccount(request,established,{status=200,validateDailyRunId=null}={}) {
+  if(!established?.auth||!established?.session?.token)
+    throw Object.assign(Error('Sign in did not create an account session.'),{status:502});
+  try {
+    const linkedResponse=await handleLink(
+      mobileLinkRequest(request,established.session.token,validateDailyRunId),
+      {mobile:true},
+    );
+    const linked=await linkedResponse.json();
+    return mobileAccountJson(established.auth,established.session,linked,status);
+  } catch(error) {
+    await query('UPDATE account_sessions SET revoked_at=COALESCE(revoked_at,now()) WHERE session_hash=$1',[
+      digest(established.session.token),
+    ]).catch(()=>{});
+    throw error;
+  }
+}
+
+async function handleMobileAccountSignup(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-account-auth',{limit:12,seconds:600});
+  const payload=await readJson(request);
+  const data=await neonAuth('/sign-up/email',{method:'POST',body:{
+    name:String(payload.name||'').trim().slice(0,80),
+    email:String(payload.email||'').trim(),
+    password:String(payload.password||''),
+    callbackURL:ACCOUNT_RETURN+'?auth=verify',
+  }});
+  const established=await establishAccount(data);
+  if(!established)return json({ok:true,verificationRequired:true,user:data?.user||null},202);
+  return finishMobileAccount(request,established,{
+    status:201,
+    validateDailyRunId:payload.validateDailyRunId==null?null:String(payload.validateDailyRunId),
+  });
+}
+
+async function handleMobileAccountSignin(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-account-auth',{limit:12,seconds:600});
+  const payload=await readJson(request);
+  const data=await neonAuth('/sign-in/email',{method:'POST',body:{
+    email:String(payload.email||'').trim(),
+    password:String(payload.password||''),
+    rememberMe:true,
+  }});
+  const established=await establishAccount(data);
+  return finishMobileAccount(request,established,{
+    validateDailyRunId:payload.validateDailyRunId==null?null:String(payload.validateDailyRunId),
+  });
+}
+
+function opaqueMobileToken() {
+  return base64Url(crypto.getRandomValues(new Uint8Array(32)));
+}
+
+function mobileGoogleReturn(params={}) {
+  const target=new URL(MOBILE_GOOGLE_RETURN);
+  for(const [key,value] of Object.entries(params))if(value!=null)target.searchParams.set(key,String(value));
+  return new Response(null,{status:302,headers:{
+    location:target.toString(),
+    'cache-control':'no-store',
+    'referrer-policy':'no-referrer',
+  }});
+}
+
+async function handleMobileGoogleStart(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-google-auth',{limit:10,seconds:600});
+  await query('DELETE FROM mobile_oauth_handoffs WHERE expires_at<=now()');
+  const flowToken=opaqueMobileToken();
+  const flowHash=digest(flowToken);
+  await query(`INSERT INTO mobile_oauth_handoffs(flow_hash,guest_player_id,provider,expires_at)
+    VALUES($1,$2::uuid,'google',now()+interval '10 minutes')`,[flowHash,owner]);
+  const callback=MOBILE_GOOGLE_CALLBACK+'?flow='+encodeURIComponent(flowToken);
+  const errorCallback=callback+'&oauth_error=1';
+  try {
+    const data=await neonAuth('/sign-in/social',{method:'POST',body:{
+      provider:'google',
+      callbackURL:callback,
+      newUserCallbackURL:callback,
+      errorCallbackURL:errorCallback,
+      disableRedirect:true,
+    }});
+    let target=null;
+    try {target=new URL(String(data?.url||''));} catch {}
+    if(!target||target.protocol!=='https:')
+      throw Object.assign(Error('Google sign in is temporarily unavailable.'),{status:502});
+    return json({url:target.toString()});
+  } catch(error) {
+    await query('DELETE FROM mobile_oauth_handoffs WHERE flow_hash=$1 AND authenticated_at IS NULL',[flowHash]).catch(()=>{});
+    throw error;
+  }
+}
+
+async function handleMobileGoogleCallback(request) {
+  const url=new URL(request.url);
+  const flowToken=String(url.searchParams.get('flow')||'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(flowToken))return mobileGoogleReturn({google:'error'});
+  if(url.searchParams.get('oauth_error')==='1'||url.searchParams.has('error')) {
+    await query('UPDATE mobile_oauth_handoffs SET consumed_at=COALESCE(consumed_at,now()) WHERE flow_hash=$1',[digest(flowToken)]).catch(()=>{});
+    return mobileGoogleReturn({google:'error'});
+  }
+  const verifier=String(url.searchParams.get('neon_auth_session_verifier')||'');
+  if(!/^[A-Za-z0-9._~-]{16,2048}$/.test(verifier))return mobileGoogleReturn({google:'error'});
+  let auth=null;
+  try {
+    const data=await neonAuth('/get-session?neon_auth_session_verifier='+encodeURIComponent(verifier));
+    auth=authIdentity(data);
+    if(!auth)throw Object.assign(Error('Google sign in did not create a session.'),{status:502});
+    const handoffToken=opaqueMobileToken();
+    const updated=await query(`UPDATE mobile_oauth_handoffs
+      SET handoff_hash=$2,auth_user_id=$3::uuid,authenticated_at=now()
+      WHERE flow_hash=$1 AND provider='google' AND consumed_at IS NULL
+        AND authenticated_at IS NULL AND expires_at>now()
+        AND pack1_identity_attachment_allowed($3::uuid)
+      RETURNING guest_player_id`,[digest(flowToken),digest(handoffToken),auth.user_id]);
+    if(!updated.rows[0])throw Object.assign(Error('Google sign in handoff expired.'),{status:409});
+    return mobileGoogleReturn({googleHandoff:handoffToken});
+  } catch(error) {
+    console.error('Mobile Google OAuth callback failed',Number(error?.status||500));
+    return mobileGoogleReturn({google:'error'});
+  } finally {
+    if(auth?.token)await consumeNeonSession(query,auth.token).catch(()=>{});
+  }
+}
+
+async function handleMobileGoogleFinish(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-google-auth',{limit:10,seconds:600});
+  const payload=await readJson(request);
+  const handoffToken=String(payload.handoffToken||'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(handoffToken))
+    throw Object.assign(Error('Invalid Google sign in handoff.'),{status:400});
+  const result=await query(`UPDATE mobile_oauth_handoffs h
+    SET consumed_at=now()
+    FROM neon_auth."user" u
+    WHERE h.handoff_hash=$1 AND h.guest_player_id=$2::uuid AND h.provider='google'
+      AND h.authenticated_at IS NOT NULL AND h.consumed_at IS NULL AND h.expires_at>now()
+      AND u.id=h.auth_user_id
+    RETURNING h.auth_user_id user_id,u.email,u.name`,[digest(handoffToken),owner]);
+  const auth=result.rows[0];
+  if(!auth)throw Object.assign(Error('This Google sign in handoff expired or was already used.'),{status:409});
+  const session=await issueAccountSession(query,auth);
+  return finishMobileAccount(request,{auth,session},{
+    validateDailyRunId:payload.validateDailyRunId==null?null:String(payload.validateDailyRunId),
+  });
+}
+
 const RESET_REQUEST_MESSAGE="If an account exists for that email, we've sent a password reset link.";
 const RESET_LIMIT_MAX=5;
 
@@ -958,14 +1129,15 @@ async function validateDailyRunScore(runId, playerId, authUserId) {
   return Number(result.rows[0]?.n || 0) > 0;
 }
 
-async function handleLink(request,{browser=false}={}) {
+async function handleLink(request,{browser=false,mobile=false}={}) {
   const payload = await readJson(request);
   const validateDailyRunId = payload.validateDailyRunId == null ? null : String(payload.validateDailyRunId);
   if (validateDailyRunId && !DAILY_RUN_ID_RE.test(validateDailyRunId)) {
     throw Object.assign(new Error('Invalid Daily run.'), { status: 400 });
   }
   const current = await player(request);
-  const auth = await authSession(request);
+  const auth = await authSession(request,mobile?{required:true,allowLegacy:false,csrf:false}:{});
+  if(mobile&&auth.source!=='mobile')throw Object.assign(Error('Native account session required.'),{status:401});
   const old = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid', [auth.user_id]);
   let id = old.rows[0]?.player_id || current;
   let merged = false;
@@ -1055,12 +1227,11 @@ async function credentialState(authUserId) {
   };
 }
 
-async function handleAccount(request) {
-  const auth = await authSession(request);
+async function accountState(auth) {
   const credentials=await credentialState(auth.user_id);
   const enabled=deletionEnabled();
   const emailMethod=enabled&&!credentials.password&&deletionEmailConfigured()&&Boolean(await deletionEmailForAuth(query,auth.user_id));
-  return json({
+  return {
     user: { id: auth.user_id, email: auth.email, name: auth.name },
     session: { expiresAt: auth.expires_at },
     credentials,
@@ -1070,7 +1241,39 @@ async function handleAccount(request) {
       googleOnly:credentials.google&&!credentials.password,
       method:enabled?(credentials.password?'password':emailMethod?'email':null):null,
     },
-  });
+  };
+}
+
+async function mobileAccountIdentity(request) {
+  const owner=await player(request);
+  const auth=await authSession(request,{required:true,allowLegacy:false,csrf:false});
+  if(auth.source!=='mobile')throw Object.assign(Error('Native account session required.'),{status:401});
+  const link=await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1',[auth.user_id]);
+  if(link.rows[0]?.player_id!==owner)
+    throw Object.assign(Error('Sign in again to continue with your account.'),{status:401});
+  return {owner,auth};
+}
+
+async function handleAccount(request) {
+  const auth = await authSession(request);
+  return json(await accountState(auth));
+}
+
+async function handleMobileAccount(request) {
+  const {auth}=await mobileAccountIdentity(request);
+  return json(await accountState(auth));
+}
+
+async function handleMobileSignout(request) {
+  const {auth}=await mobileAccountIdentity(request);
+  await revokeAccountSession(query,auth);
+  return json({ok:true});
+}
+
+async function accountMutationAuth(request,{mobile=false}={}) {
+  if(mobile)return (await mobileAccountIdentity(request)).auth;
+  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  return authSession(request,{required:true,allowLegacy:false,csrf:true});
 }
 
 const PASSWORD_FAILURE_LIMIT=8;
@@ -1221,9 +1424,8 @@ async function resumeDeletionOperation(operation,{knownEmail=null}={}) {
   return current;
 }
 
-async function handleAccountDeleteVerificationStart(request) {
-  requireTrustedOrigin(request,ALLOWED_ORIGINS);
-  const auth=await authSession(request,{required:true,allowLegacy:false,csrf:true});
+async function handleAccountDeleteVerificationStart(request,{mobile=false}={}) {
+  const auth=await accountMutationAuth(request,{mobile});
   if(!deletionEnabled())
     throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'DELETION_DISABLED'});
   const payload=await readJson(request);
@@ -1254,9 +1456,8 @@ async function handleAccountDeleteVerificationStart(request) {
   return json({ok:true,verification:'sent',expiresInSeconds:verification.expiresInSeconds});
 }
 
-async function handleAccountDelete(request) {
-  requireTrustedOrigin(request,ALLOWED_ORIGINS);
-  const auth=await authSession(request,{required:true,allowLegacy:false,csrf:true});
+async function handleAccountDelete(request,{mobile=false}={}) {
+  const auth=await accountMutationAuth(request,{mobile});
   if(!deletionEnabled())
     throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'DELETION_DISABLED'});
   const payload=await readJson(request);
@@ -1332,7 +1533,7 @@ async function handleAccountDelete(request) {
     deletion:complete?'complete':'accepted',
     operationId:final?.operation_id,
   },complete?200:202);
-  response=clearPlayerCookie(clearAccountCookies(response));
+  if(!mobile)response=clearPlayerCookie(clearAccountCookies(response));
   return response;
 }
 
@@ -1539,11 +1740,16 @@ async function route(request) {
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/account/google/callback') return handleMobileGoogleCallback(request);
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signup') return handleAccountSignup(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signin') return handleAccountSignin(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signup') return handleMobileAccountSignup(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signin') return handleMobileAccountSignin(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/start') return handleMobileGoogleStart(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/finish') return handleMobileGoogleFinish(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/send-verification-email') return handleVerificationEmailRequest(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/request-password-reset') return handlePasswordResetRequest(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/reset-password') return handlePasswordReset(request);
@@ -1559,6 +1765,10 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/link') return handleLink(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/session') return handleAccount(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signout') return handleSignout(request);
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccount(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signout') return handleMobileSignout(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete/verification/start') return handleAccountDeleteVerificationStart(request,{mobile:true});
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete') return handleAccountDelete(request,{mobile:true});
   if (request.method === 'GET' && url.pathname === '/v1/account/daily-dates') return handleDates(request);
   if (request.method === 'GET' && url.pathname === '/v1/profile/me') return handleMyProfile(request);
   if (request.method === 'PATCH' && url.pathname === '/v1/profile') return handleProfileUpdate(request);

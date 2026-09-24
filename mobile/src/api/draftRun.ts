@@ -1,4 +1,5 @@
 import { requestJson } from '@/src/api/client';
+import type { MobileSession } from '@/src/storage/session';
 
 export type DraftRunCard = {
   id: string;
@@ -63,18 +64,20 @@ export function loadDraftRunHealth() {
   return requestJson<DraftRunHealth>('/draft/health?quick=1', { timeoutMs: 10_000 });
 }
 
-export function startDailyDraftRun(mobileSessionToken: string, environment = 'mixed') {
+export function startDailyDraftRun(session: MobileSession, environment = 'mixed') {
   return requestJson<DraftRunState>('/draft/v1/runs', {
     method: 'POST',
-    mobileSessionToken,
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
     body: { daily: true, environment },
     timeoutMs: 30_000,
   });
 }
 
-export function loadDraftRun(id: string, mobileSessionToken: string) {
+export function loadDraftRun(id: string, session: MobileSession) {
   return requestJson<DraftRunState>(`/draft/v1/runs/${encodeURIComponent(id)}`, {
-    mobileSessionToken,
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
     timeoutMs: 30_000,
   });
 }
@@ -82,12 +85,13 @@ export function loadDraftRun(id: string, mobileSessionToken: string) {
 export function submitDraftRunPick(
   run: DraftRunState,
   cardId: string,
-  mobileSessionToken: string,
+  session: MobileSession,
 ) {
   if (!run.current) throw new Error('This run is already complete.');
   return requestJson<DraftRunState>(`/draft/v1/runs/${encodeURIComponent(run.id)}/pick`, {
     method: 'POST',
-    mobileSessionToken,
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
     body: {
       cardId,
       revision: run.revision,

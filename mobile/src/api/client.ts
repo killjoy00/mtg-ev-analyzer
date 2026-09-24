@@ -15,6 +15,7 @@ type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   mobileSessionToken?: string | null;
+  mobileAccountToken?: string | null;
   idempotencyKey?: string | null;
   timeoutMs?: number;
 };
@@ -38,6 +39,7 @@ export async function requestJson<T>(
 
   if (options.body !== undefined) headers.set('content-type', 'application/json');
   if (options.mobileSessionToken) headers.set('x-pack1-mobile-session', options.mobileSessionToken);
+  if (options.mobileAccountToken) headers.set('x-pack1-mobile-account', options.mobileAccountToken);
   if (options.idempotencyKey) headers.set('x-idempotency-key', options.idempotencyKey);
 
   try {

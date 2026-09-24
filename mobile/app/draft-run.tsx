@@ -1,5 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
+import { router } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -18,11 +19,12 @@ import {
   type DraftRunCard,
   type DraftRunState,
 } from '@/src/api/draftRun';
+import type { MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
 
 type LoadState =
   | { status: 'loading' }
-  | { status: 'ready'; run: DraftRunState; token: string }
+  | { status: 'ready'; run: DraftRunState; session: MobileSession }
   | { status: 'error'; message: string };
 
 type ViewMode = 'pick' | 'feedback' | 'result';
@@ -85,8 +87,8 @@ function CardTile({
 
 async function loadGuestDaily() {
   const session = await ensureGuestSession();
-  const run = await startDailyDraftRun(session.token);
-  return { run, token: session.token };
+  const run = await startDailyDraftRun(session);
+  return { run, session };
 }
 
 export default function DraftRunScreen() {
@@ -99,10 +101,10 @@ export default function DraftRunScreen() {
   useEffect(() => {
     let active = true;
     void loadGuestDaily()
-      .then(({ run, token }) => {
+      .then(({ run, session }) => {
         if (!active) return;
         setMode(run.complete ? 'result' : 'pick');
-        setState({ status: 'ready', run, token });
+        setState({ status: 'ready', run, session });
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -121,9 +123,9 @@ export default function DraftRunScreen() {
     setSelected(null);
     setMode('pick');
     try {
-      const { run, token } = await loadGuestDaily();
+      const { run, session } = await loadGuestDaily();
       setMode(run.complete ? 'result' : 'pick');
-      setState({ status: 'ready', run, token });
+      setState({ status: 'ready', run, session });
     } catch (error: unknown) {
       setState({
         status: 'error',
@@ -142,12 +144,12 @@ export default function DraftRunScreen() {
     if (state.status !== 'ready' || !selected || !state.run.current || busy) return;
     setBusy(true);
     try {
-      const run = await submitDraftRunPick(state.run, selected, state.token);
+      const run = await submitDraftRunPick(state.run, selected, state.session);
       if (run.current) {
         const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
         if (urls.length) void Image.prefetch(urls);
       }
-      setState({ status: 'ready', run, token: state.token });
+      setState({ status: 'ready', run, session: state.session });
       setMode('feedback');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       scroll.current?.scrollTo({ y: 0, animated: true });
@@ -222,10 +224,23 @@ export default function DraftRunScreen() {
             </Text>
           ) : null}
           <View style={styles.guestNote}>
-            <Text style={styles.guestNoteTitle}>Guest result</Text>
-            <Text style={styles.resultBody}>
-              This run is saved to this guest identity. Account sign-in and score claiming are the next mobile milestone.
+            <Text style={styles.guestNoteTitle}>
+              {state.session.accountToken ? 'Saved to your account' : 'Guest result'}
             </Text>
+            <Text style={styles.resultBody}>
+              {state.session.accountToken
+                ? 'This result used your signed-in Pack One identity and the same server eligibility rules as web.'
+                : 'Sign in or create your Pack One account to validate this Daily score and keep your career across devices.'}
+            </Text>
+            {!state.session.accountToken ? (
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => router.push({ pathname: '/account', params: { validateDailyRunId: run.id } })}
+                style={styles.secondaryButton}
+              >
+                <Text style={styles.secondaryButtonText}>Sign in to save this score</Text>
+              </Pressable>
+            ) : null}
           </View>
         </ScrollView>
       </SafeAreaView>
@@ -399,4 +414,14 @@ const styles = StyleSheet.create({
   resultBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   guestNote: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.xs },
   guestNoteTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  secondaryButton: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.sm,
+  },
+  secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
 });

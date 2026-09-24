@@ -17,6 +17,8 @@ export default function RootLayout() {
       >
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="draft-run" options={{ title: 'Draft Run' }} />
+        <Stack.Screen name="account" options={{ title: 'Account' }} />
+        <Stack.Screen name="account" options={{ title: 'Account' }} />
       </Stack>
     </>
   );
