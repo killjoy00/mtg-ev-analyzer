@@ -1,6 +1,7 @@
 {
-  "operation": "card-image-release",
-  "request_id": "packone-main-art-backend-pagination-20260923",
-  "reason": "Deploy the reviewed resumable card-image backend refresh and complete the all-card Pack One main-art rollout.",
-  "commit": "85637c0e7a6c0464cc419630e26aae8ccb9dda8d"
+  "operation": "deploy",
+  "request_id": "self-share-fix-development-20260923",
+  "reason": "Deploy the reviewed self-share protection and legacy cleanup-aware backend revision to development.",
+  "commit": "0649b3897a12e0d5ae98f3ecd693fccd768c0788",
+  "target": "development"
 }
