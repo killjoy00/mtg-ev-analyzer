@@ -1,13 +1,13 @@
 import { getAuthSession, loadPatreonStatus } from '/growth-api.mjs';
 
-function practiceCard({label,title,description,href,cta,locked=false,elite=false}) {
+function practiceCard({label,title,description,href,cta,badge=null,locked=false,elite=false}) {
   const action=locked
     ? '<button class="button secondary" type="button" data-practice-upgrade>Upgrade to Elite</button>'
     : `<a class="button ${elite?'secondary':'primary'}" href="${href}">${cta}</a>`;
   return `<article class="practice-card${elite?' is-elite':''}${locked?' is-locked':''}">
     <div class="practice-card-top">
       <p class="practice-label">${label}</p>
-      <span class="practice-badge">${elite?'Elite':'Included'}</span>
+      <span class="practice-badge">${badge|| (elite?'Elite':'Included')}</span>
     </div>
     <h2>${title}</h2>
     <p>${description}</p>
@@ -46,11 +46,12 @@ function practiceMarkup(patreon) {
     </header>
     <div class="practice-grid">
       ${practiceCard({
-        label:'Regular practice',
-        title:'Draft Run',
-        description:'Unlimited eight-decision runs from real trophy drafts. Included with your free account.',
+        label:'Free practice',
+        title:'Regular Draft Run',
+        description:'Eight-decision runs from real trophy drafts, included with your free account.',
         href:'/?game=draft-run',
         cta:'Start Draft Run',
+        badge:'Unlimited',
       })}
       ${practiceCard({
         label:'Powered practice',
