@@ -36,13 +36,13 @@ if(productionBootstrap){
   assert.equal(season.start_date,expectedStart);
   assert.equal(firstSet,season.set_id);
   const policy=(await query("SELECT set_id,set_name,release_date::text,regular_run,status FROM draft_run_environment_policy WHERE set_id=$1",[season.set_id])).rows[0];
-  const newest=(await query("SELECT set_id FROM draft_run_environment_policy WHERE regular_run=true AND status='Live' AND release_date<=$1::date ORDER BY release_date DESC,set_id LIMIT 1",[earliest])).rows[0]?.set_id||null;
+  const newest=(await query("SELECT set_id FROM draft_run_environment_policy WHERE regular_run=true AND status IN ('Live','Paused') AND release_date<=$1::date ORDER BY release_date DESC,set_id LIMIT 1",[earliest])).rows[0]?.set_id||null;
   assert.equal(policy.regular_run,'t');
   assert.ok(policy.release_date<=earliest);
   assert.equal(newest,season.set_id);
   assert.equal(season.set_id,'hob');
   assert.equal(season.name,'The Hobbit');
-  console.log('PACK_ONE_INAUGURAL_EVIDENCE '+JSON.stringify({season,earliest_ranked_date:earliest,first_latest_schedule_day:first.day,first_latest_set:firstSet,policy,newest_live_regular_set_on_ranked_launch:newest}));
+  console.log('PACK_ONE_INAUGURAL_EVIDENCE '+JSON.stringify({season,earliest_ranked_date:earliest,first_latest_schedule_day:first.day,first_latest_set:firstSet,policy,newest_published_regular_set_on_ranked_launch:newest}));
   process.exit(0);
 }
 
