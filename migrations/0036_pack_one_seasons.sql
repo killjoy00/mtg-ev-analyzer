@@ -111,7 +111,7 @@ BEGIN
         SELECT p.set_id INTO newest_live_set
         FROM draft_run_environment_policy p
         WHERE p.regular_run=true
-          AND p.status='Live'
+          AND p.status IN ('Live','Paused')
           AND p.release_date IS NOT NULL
           AND p.release_date <= first_ranked_date
         ORDER BY p.release_date DESC,p.set_id
