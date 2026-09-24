@@ -11,7 +11,7 @@ const devFixtures=process.argv.includes('--dev-fixtures');
 if(!connection||productionBootstrap===devFixtures)throw new Error('Pass a connection file and exactly one season smoke mode.');
 process.env.DATABASE_URL=fs.readFileSync(connection,'utf8').trim();
 
-const {query,gameDateKey}=await import('../worker/growth-function.js');
+const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const {ensureDailySchedule}=await import('../worker/draft-run-daily.mjs');
 const {currentSeasonForPlayer,reconcilePersistedSeasons,resolveCurrentSeason}=await import('../worker/draft-run-season.mjs');
@@ -21,6 +21,16 @@ async function board(period,environment='mixed'){
   const response=await runApi.fetch(new Request(`https://packone.pro/v1/leaderboard?period=${period}&environment=${environment}`));
   const data=await response.json();
   assert.equal(response.status,200,JSON.stringify(data));
+  return data;
+}
+async function growthCall(path,body,token,status=200,extra={}) {
+  const response=await growth.fetch(new Request('https://packone.pro'+path,{
+    method:extra.method||(body===undefined?'GET':'POST'),
+    headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...extra.headers},
+    body:body===undefined?undefined:JSON.stringify(body),
+  }));
+  const data=await response.json();
+  assert.equal(response.status,status,`${path}: ${JSON.stringify(data)}`);
   return data;
 }
 
@@ -59,6 +69,7 @@ assert.ok(source,'Need one valid schedule plan for season fixtures.');
 
 await query("DELETE FROM draft_run_seasons");
 await query("DELETE FROM draft_run_schedules WHERE environment='latest'");
+await query("UPDATE draft_run_season_reconciliation_state SET last_reconciled_day=NULL WHERE singleton=true");
 await query("DELETE FROM scores WHERE mode='draft_run'");
 await query("UPDATE draft_run_environment_policy SET status='Paused' WHERE regular_run=true AND status='Live'");
 
@@ -104,6 +115,7 @@ assert.equal(Number((await query("SELECT count(*) n FROM draft_run_seasons")).ro
 
 // Concurrency from an unreconciled state still yields one open season.
 await query("DELETE FROM draft_run_seasons");
+await query("UPDATE draft_run_season_reconciliation_state SET last_reconciled_day=NULL WHERE singleton=true");
 const concurrent=await Promise.all(Array.from({length:6},()=>reconcilePersistedSeasons(query)));
 assert.ok(concurrent.every(row=>row?.set_id==='hob'));
 const counts=(await query("SELECT count(*) n,count(*) FILTER(WHERE end_date IS NULL) open FROM draft_run_seasons")).rows[0];
@@ -111,6 +123,51 @@ assert.equal(Number(counts.n),2);assert.equal(Number(counts.open),1);
 const before=JSON.stringify((await query("SELECT set_id,set_name,set_release_date::text,start_date::text,end_date::text FROM draft_run_seasons ORDER BY start_date")).rows);
 await reconcilePersistedSeasons(query);await reconcilePersistedSeasons(query);
 assert.equal(JSON.stringify((await query("SELECT set_id,set_name,set_release_date::text,start_date::text,end_date::text FROM draft_run_seasons ORDER BY start_date")).rows),before);
+
+// A fallback set that never owned a season is validated once, then becomes
+// settled history. Later mutable-policy damage cannot poison reconciliation.
+const fallback=(await query(`SELECT p.set_id,p.set_name,p.release_date::text,p.regular_run
+  FROM draft_run_environment_policy p
+  WHERE p.regular_run=true
+    AND p.set_name IS NOT NULL AND btrim(p.set_name)<>''
+    AND p.release_date IS NOT NULL
+    AND p.release_date < (SELECT set_release_date FROM draft_run_seasons WHERE end_date IS NULL)
+    AND NOT EXISTS(SELECT 1 FROM draft_run_seasons s WHERE s.set_id=p.set_id)
+  ORDER BY p.release_date DESC,p.set_id
+  LIMIT 1`)).rows[0];
+assert.ok(fallback,'Need one older regular set that never owned a season.');
+await schedule('2026-09-04',fallback.set_id);
+season=await reconcilePersistedSeasons(query);
+assert.equal(season.set_id,'hob');
+assert.equal((await query("SELECT last_reconciled_day::text day FROM draft_run_season_reconciliation_state WHERE singleton=true")).rows[0].day,'2026-09-04');
+await query("UPDATE draft_run_environment_policy SET set_name=NULL,regular_run=false WHERE set_id=$1",[fallback.set_id]);
+await schedule('2026-09-05','hob');
+season=await reconcilePersistedSeasons(query);
+assert.equal(season.set_id,'hob');
+assert.equal((await query("SELECT last_reconciled_day::text day FROM draft_run_season_reconciliation_state WHERE singleton=true")).rows[0].day,'2026-09-05');
+
+// Profile season enrichment is non-critical. A brand-new invalid schedule still
+// makes direct season reconciliation fail, but must not block My Pack One,
+// public profiles, or profile privacy/settings changes.
+const profileOwner=await growthCall('/v1/session',{displayName:'Season fail-open owner'});
+const profileAuth=crypto.randomUUID(),profileAuthToken=crypto.randomUUID()+crypto.randomUUID();
+await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[profileAuth,'Season fail-open owner',`season-fail-open-${profileAuth}@example.invalid`]);
+await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[profileAuthToken,profileAuth]);
+await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[profileAuth,profileOwner.playerId]);
+await schedule('2026-09-06','qa-missing-season-policy');
+await assert.rejects(()=>reconcilePersistedSeasons(query),/unvalidated regular set/);
+const authHeaders={'x-pack1-auth-session':profileAuthToken};
+let failOpenProfile=await growthCall('/v1/profile/me',undefined,profileOwner.token,200);
+assert.equal(failOpenProfile.current_season,null);
+failOpenProfile=await growthCall('/v1/profile',{profilePublic:true},profileOwner.token,200,{method:'PATCH',headers:authHeaders});
+assert.equal(failOpenProfile.player.profile_public,true);assert.equal(failOpenProfile.current_season,null);
+const failOpenPublic=await growthCall('/v1/profile/'+failOpenProfile.player.profile_key,undefined,undefined,200);
+assert.equal(failOpenPublic.current_season,null);
+failOpenProfile=await growthCall('/v1/profile',{profilePublic:false},profileOwner.token,200,{method:'PATCH',headers:authHeaders});
+assert.equal(failOpenProfile.player.profile_public,false);assert.equal(failOpenProfile.current_season,null);
+await query("DELETE FROM draft_run_schedules WHERE environment='latest' AND day='2026-09-06'::date");
+await query('DELETE FROM neon_auth.session WHERE token=$1',[profileAuthToken]);
+await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[profileAuth]);
 
 // Expected unavailability leaves the established current season alone.
 season=await resolveCurrentSeason(query,{today:'2026-09-03',ensureSchedule:async()=>{throw Object.assign(new Error('expected'),{status:503});}});
@@ -157,4 +214,4 @@ await query("UPDATE draft_run_environment_policy SET release_date=$1::date,statu
 season=await reconcilePersistedSeasons(query);
 assert.equal(season.set_id,'tmt');assert.equal(season.set_release_date,'2026-09-14');
 
-console.log('Pack One season backend smoke passed: no-season 200, month alias, inaugural backfill, retry repair, idempotency, concurrency, A -> B -> A monotonicity, B -> C advancement, shared windows and profile rank >100.');
+console.log('Pack One season backend smoke passed: no-season 200, month alias, inaugural backfill, retry repair, idempotency, concurrency, settled fallback watermarking, profile fail-open, A -> B -> A monotonicity, B -> C advancement, shared windows and profile rank >100.');
