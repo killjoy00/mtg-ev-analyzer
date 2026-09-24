@@ -109,7 +109,7 @@ function rankingStateMarkup(value=run) {
     return value.complete
       ? '<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> Choose a unique username to add this score to the leaderboard.</p>'
       : '<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> Your account needs a unique username. Choose one in My Pack One; you can add the completed score afterward.</p>';
-  return '<p class="run-ranking-state" role="status">Playing as guest — sign in after the run to add this score to the leaderboard.</p>';
+  return '<p class="run-ranking-state" role="status">Playing as guest. Sign in after the run to add this score to the leaderboard.</p>';
 }
 function render() {
   const answer=review==null?null:run.answers[review];
@@ -120,7 +120,7 @@ function render() {
   document.body.classList.add('is-game');
   app().innerHTML=`<section class="draft-run-page"><header class="run-heading"><div><p class="eyebrow">${run.day?'Daily ':''}${title()} · ${run.day||'Practice'}</p><h1>${esc(setName(p.set_id))} <span>Round ${answer?review+1:run.round}/${runLength()} · Pack 1 · Pick ${p.pick_number}${answer?' · revealed':''}</span></h1></div><a class="text-button" href="./">Leave run</a></header>${steps()}
     ${rankingStateMarkup(run)}
-    ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed — this result counts as practice.'}</aside>`:''}
+    ${run.comparison?`<aside class="run-friend">${esc(run.comparison.name)} scored <strong>${run.comparison.score}</strong>. ${run.comparison.exact?`You’re playing the same ${runLength()} packs.`:'Packs changed. This result counts as practice.'}</aside>`:''}
     ${answer?'':pool(p)}
     ${answer?`<section class="run-feedback"><strong class="run-feedback-score">${answer.score}<small>/100</small></strong>${compactRevealCards(p,answer)}<div class="run-feedback-copy"><h2 id="run-feedback-result" tabindex="-1" aria-label="${esc(compactResultLabel(answer,compactSentence))}">${answer.historicalMatch?'You matched the trophy drafter.':'The trophy drafter took '+esc(answer.historicalName)+'.'}</h2>${compactSentence?`<p>${esc(compactSentence)}</p>`:''}</div><div class="run-next-dock"><button class="button primary" id="run-next">${run.complete?'See result':'Next pick'}</button></div></section>${revealAnalysis(p,answer)}`:
     ''}
