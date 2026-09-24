@@ -35,17 +35,19 @@ The keystore and password were not written to the repository or pasted into chat
 
 Because `pro.packone.app` is still a draft/unpublished Play app, the API creates Internal Testing releases with status `draft`.
 
-The first authenticated release completed successfully on 2026-09-24:
+The first authenticated release was uploaded successfully on 2026-09-24:
 
 - package: `pro.packone.app`
 - track: `internal`
 - version code: `100015`
 - release name: `Pack One internal 9f0b499`
-- release status: `draft`
+- initial API release status: `draft`
 - Google Play edit committed: `true`
 - AAB signer verified against the dedicated upload-key fingerprint above
 
-The workflow does not attempt a `completed` rollout for the unpublished app. The owner completes the first rollout in Google Play Console after required Play declarations/setup are satisfied.
+The owner then completed the first rollout in Google Play Console. A live Google Play API status probe confirmed the same release and version code on the `internal` track with status `completed`.
+
+The release workflow intentionally creates draft releases for the unpublished app. The reusable read-only status workflow `.github/workflows/android-internal-status.yml` can verify the current Internal Testing track without uploading a new bundle.
 
 ## Build numbering
 
