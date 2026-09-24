@@ -32,6 +32,9 @@ jobs:
           java-version: '17'
       - name: Install mobile dependencies
         run: npm install --no-audit --no-fund
+      - name: Set store version code
+        shell: bash
+        run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
         run: npm test
       - name: Generate production Android project
