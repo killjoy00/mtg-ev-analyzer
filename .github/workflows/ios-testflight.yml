@@ -34,7 +34,9 @@ jobs:
           node-version: 24
       - name: Install mobile dependencies
         run: npm install --no-audit --no-fund
-      - name: Set store build number
+      # PR smoke archives are never uploaded. The publishing job below allocates
+      # against App Store Connect so workflow renames/retries cannot reuse a number.
+      - name: Set smoke build number
         shell: bash
         run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
@@ -99,11 +101,19 @@ jobs:
           for name in ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY APPLE_TEAM_ID; do
             [[ -n "${!name}" ]] || { echo "Missing required GitHub secret binding: $name" >&2; exit 1; }
           done
-      - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+      - id: build-number
+        name: Allocate monotonic App Store build number
+        run: node ../.github/scripts/app-store-next-build-number.mjs
       - name: Set store build number
         shell: bash
-        run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+        run: |
+          set -euo pipefail
+          build_number="${{ steps.build-number.outputs.next_build_number }}"
+          [[ "$build_number" =~ ^[1-9][0-9]*$ ]]
+          echo "PACKONE_IOS_BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "Using App Store-safe iOS build number: $build_number"
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
       - name: Validate production mobile config
         run: npm test
       - name: Write App Store Connect API key
