@@ -96,8 +96,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          keystore_b64="$(gcloud secrets versions access latest --project=pack-one --secret=packone-android-upload-keystore-b64)"
-          upload_password="$(gcloud secrets versions access latest --project=pack-one --secret=packone-android-upload-password)"
+          keystore_b64="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-keystore-b64)"
+          upload_password="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-password)"
           echo "::add-mask::$upload_password"
 
           keystore="$RUNNER_TEMP/packone-upload.p12"
