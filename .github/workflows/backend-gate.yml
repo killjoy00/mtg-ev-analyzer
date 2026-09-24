@@ -93,7 +93,11 @@ jobs:
             sudo apt-get install -y postgresql-client
           fi
 
-          mapfile -t migration_changes < <(git diff --name-status "$BASE_SHA" "$HEAD_SHA" -- 'migrations/*.sql')
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          stack_base_sha="$(git rev-parse origin/main)"
+          echo "STACK_BASE_SHA=$stack_base_sha" >> "$GITHUB_ENV"
+
+          mapfile -t migration_changes < <(git diff --name-status "$stack_base_sha" "$HEAD_SHA" -- 'migrations/*.sql')
           for change in "${migration_changes[@]}"; do
             status="${change%%$'\t'*}"
             path="${change#*$'\t'}"
@@ -103,10 +107,11 @@ jobs:
             fi
           done
 
-          # Disposable CI branches are cloned from the current Neon default branch,
-          # which already carries the reviewed production schema through 0032.
-          # Replaying older migrations can replace current constraints with historical
-          # definitions, so only migrations newly added by this PR belong on the clone.
+          # Disposable CI branches are cloned from the current Neon default branch.
+          # For stacked PRs, the database still needs every unmerged migration in the
+          # stack, not only migrations introduced by the immediate PR base. Compare
+          # the checked-out head with current main so inherited stack migrations are
+          # applied in filename order while historical migrations remain immutable.
           mapfile -t pending < <(
             printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }' | sort -u
           )
@@ -133,7 +138,7 @@ jobs:
           # production corpus copied from Neon's default branch; reloading stale
           # checked-in display metadata can create a false failure after a
           # successful display-only maintenance refresh.
-          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
+          if git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
             echo 'No corpus or loader/import changes; using the cloned production corpus.'
           else
             node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
