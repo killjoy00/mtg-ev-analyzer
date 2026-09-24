@@ -1,6 +1,7 @@
 {
-  "operation": "self-share-cleanup",
-  "request_id": "self-share-cleanup-20260923",
-  "reason": "Remove legacy same-player shared-run challenge artifacts after the prevention fix is live in development and production.",
-  "commit": "0649b3897a12e0d5ae98f3ecd693fccd768c0788"
+  "operation": "season-migration",
+  "request_id": "season-migration-development-20260924",
+  "reason": "Apply reviewed Pack One competitive season migration 0037 to development before deploying exact merged revision.",
+  "commit": "fe9d666a094c0d18a13899a089a3ed49de67901a",
+  "target": "development"
 }
