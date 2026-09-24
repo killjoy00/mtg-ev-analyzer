@@ -1,4 +1,4 @@
-name: Pack One ASC age rating and screenshots
+name: Pack One ASC final safe verify
 on:
   push:
     branches: ["chatgpt/packone-play-credential-check"]
@@ -6,11 +6,11 @@ on:
 permissions:
   contents: read
 jobs:
-  apply:
+  verify:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
-      - name: Apply age rating and inspect screenshots
+      - name: Verify non-sensitive App Store state
         env:
           ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
           ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -20,69 +20,46 @@ jobs:
           set -euo pipefail
           python3 -m pip install --quiet pyjwt cryptography requests
           python3 - <<'PY'
-          import os,time,json,jwt,requests,sys
-          info_id="382f1166-fe38-45d0-a3dd-0edb6cc3c684"
-          loc_id="cc3dfd3b-b29c-4387-8f4b-a2df20f5c49a"
+          import os,time,json,jwt,requests
           kid=os.environ["ASC_KEY_ID"].strip(); iss=os.environ["ASC_ISSUER_ID"].strip()
           key=os.environ["ASC_KEY_P8"].replace("\\n","\n").strip(); now=int(time.time())
           tok=jwt.encode({"iss":iss,"iat":now-5,"exp":now+900,"aud":"appstoreconnect-v1"},key,algorithm="ES256",headers={"kid":kid,"typ":"JWT"})
-          H={"Authorization":f"Bearer {tok}","Content-Type":"application/json"}
-          B="https://api.appstoreconnect.apple.com/v1"
+          H={"Authorization":f"Bearer {tok}"}; B="https://api.appstoreconnect.apple.com/v1"
+          def g(path,params=None):
+              r=requests.get(B+path,headers=H,params=params,timeout=30)
+              print("GET",path,r.status_code)
+              return r.json() if r.status_code<300 else None
 
-          r=requests.get(f"{B}/appInfos/{info_id}/ageRatingDeclaration",headers=H,timeout=30)
-          r.raise_for_status()
-          rid=r.json()["data"]["id"]
-          attrs={
-            "advertising":False,
-            "alcoholTobaccoOrDrugUseOrReferences":"NONE",
-            "contests":"FREQUENT",
-            "gambling":False,
-            "gamblingSimulated":"NONE",
-            "gunsOrOtherWeapons":"INFREQUENT",
-            "healthOrWellnessTopics":False,
-            "lootBox":False,
-            "medicalOrTreatmentInformation":"NONE",
-            "messagingAndChat":False,
-            "parentalControls":False,
-            "profanityOrCrudeHumor":"NONE",
-            "ageAssurance":False,
-            "sexualContentGraphicAndNudity":"NONE",
-            "sexualContentOrNudity":"NONE",
-            "socialMedia":False,
-            "socialMediaAgeRestricted":False,
-            "horrorOrFearThemes":"INFREQUENT",
-            "matureOrSuggestiveThemes":"NONE",
-            "unrestrictedWebAccess":False,
-            "userGeneratedContent":True,
-            "violenceCartoonOrFantasy":"INFREQUENT",
-            "violenceRealisticProlongedGraphicOrSadistic":"NONE",
-            "violenceRealistic":"NONE",
-            "ageRatingOverrideV2":"NONE",
-            "koreaAgeRatingOverride":"NONE"
-          }
-          p=requests.patch(f"{B}/ageRatingDeclarations/{rid}",headers=H,json={
-            "data":{"type":"ageRatingDeclarations","id":rid,"attributes":attrs}
-          },timeout=30)
-          print("age_rating_patch_http="+str(p.status_code))
-          if p.status_code not in (200,204):
-              print(p.text[:1000]); sys.exit(1)
+          app=g("/apps/6814318676")
+          info=g("/appInfos/382f1166-fe38-45d0-a3dd-0edb6cc3c684")
+          al=g("/appInfoLocalizations/73302616-4346-4b3c-8540-140a431cb6a0")
+          v=g("/appStoreVersions/04b0ee74-7d94-41e4-8463-79524972fce6")
+          vl=g("/appStoreVersionLocalizations/cc3dfd3b-b29c-4387-8f4b-a2df20f5c49a")
+          ar=g("/appInfos/382f1166-fe38-45d0-a3dd-0edb6cc3c684/ageRatingDeclaration")
+          usage=g("/apps/6814318676/appDataUsages",{"limit":200})
+          pub=g("/apps/6814318676/appDataUsagesPublishState")
 
-          v=requests.get(f"{B}/appInfos/{info_id}/ageRatingDeclaration",headers=H,timeout=30)
-          v.raise_for_status()
-          va=v.json()["data"]["attributes"]
-          print("age_rating_nondefault="+json.dumps({k:va.get(k) for k in attrs if va.get(k) not in (False,None,"NONE")},sort_keys=True,separators=(",",":")))
-
-          ss=requests.get(f"{B}/appStoreVersionLocalizations/{loc_id}/appScreenshotSets",headers=H,params={"limit":50},timeout=30)
-          print("screenshot_sets_http="+str(ss.status_code))
-          if ss.status_code==200:
-              sets=ss.json().get("data",[])
-              print("screenshot_set_count="+str(len(sets)))
-              total=0
-              for s in sets:
-                  x=requests.get(f"{B}/appScreenshotSets/{s['id']}/appScreenshots",headers=H,params={"limit":50},timeout=30)
-                  count=len(x.json().get("data",[])) if x.status_code==200 else -1
-                  total += max(count,0)
-                  dtype=s.get("attributes",{}).get("screenshotDisplayType")
-                  print("screenshot_set="+str(dtype)+" count="+str(count))
-              print("screenshot_total="+str(total))
+          print("FINAL_SAFE_VERIFY_BEGIN")
+          print("content_rights="+str(app["data"]["attributes"].get("contentRightsDeclaration")))
+          ia=info["data"]["attributes"]
+          for k in ["appStoreAgeRating","australiaAgeRating","brazilAgeRating","brazilAgeRatingV2","franceAgeRating","koreaAgeRating"]:
+              print(k+"="+str(ia.get(k)))
+          aa=al["data"]["attributes"]
+          print("subtitle="+str(aa.get("subtitle")))
+          print("privacy_policy="+str(aa.get("privacyPolicyUrl")))
+          va=v["data"]["attributes"]
+          print("copyright="+str(va.get("copyright")))
+          la=vl["data"]["attributes"]
+          for k in ["description","keywords","marketingUrl","promotionalText","supportUrl","whatsNew"]:
+              val=la.get(k)
+              print(k+"="+(("SET" if val else "EMPTY") if k=="description" else str(val)))
+          ra=ar["data"]["attributes"]
+          nondefault={k:x for k,x in ra.items() if x not in (None,False,"NONE")}
+          print("age_rating_nondefault="+json.dumps(nondefault,sort_keys=True,separators=(",",":")))
+          print("privacy_usage_count="+str(len((usage or {}).get("data",[]))))
+          if pub and pub.get("data"):
+              print("privacy_published="+str(pub["data"]["attributes"].get("published")))
+          else:
+              print("privacy_published=unknown")
+          print("FINAL_SAFE_VERIFY_END")
           PY
