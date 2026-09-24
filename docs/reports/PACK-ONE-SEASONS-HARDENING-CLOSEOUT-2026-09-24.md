@@ -37,7 +37,7 @@ A fallback set that never owned a season is therefore consulted against mutable 
 
 The shared season resolver no longer imports or defaults to `ensureDailySchedule`.
 
-Profile/current-season reads reconcile only the schedules that already exist. `pack1growth` therefore cannot create the immutable Latest Set Daily.
+Profile/current-season reads reconcile only the schedules that already exist. `pack1growth` therefore cannot create the immutable Latest Set Daily. Profile reads may still run the season reconciler, which can persist a season transition and advance the reconciliation watermark from those existing schedules.
 
 The Draft Run API explicitly supplies the Daily writer when season-board resolution needs to ensure today's Latest Set schedule. Scheduled Daily generation and Draft Run remain the owners of Daily creation.
 
