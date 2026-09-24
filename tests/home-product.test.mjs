@@ -18,15 +18,16 @@ test('either unfinished Daily precedes the compact result',()=>{
   assert.match(html,/View result/);assert.doesNotMatch(html,/Keep drafting/);
  }
 });
-test('all three complete reveals account practice or account creation',()=>{
+test('all three complete hands signed-in players to Practice or guests to account creation',()=>{
  const p={daily_history:[row('mixed'),row('powered-cube'),row('latest')],player:{claimed:true},capabilities:['account']};
  const freeHtml=dailyHomeMarkup(p,day);
- assert.match(freeHtml,/Start Another Draft Run/);
- assert.equal((freeHtml.match(/Become Elite/g)||[]).length,1);
- assert.doesNotMatch(freeHtml,/Elite adds unlimited Powered Cube and custom-set drafts/);
+ assert.match(freeHtml,/Dailies complete/);
+ assert.match(freeHtml,/Your practice options are all in one place/);
+ assert.match(freeHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
+ assert.doesNotMatch(freeHtml,/Start Another Draft Run|Powered Cube Practice|Choose your sets|Become Elite|Upgrade to Elite/);
  p.player.claimed=false;const guestHtml=dailyHomeMarkup(p,day);
  assert.match(guestHtml,/Create a free account/);
- assert.doesNotMatch(guestHtml,/Start Another Draft Run/);
+ assert.doesNotMatch(guestHtml,/Go to Practice|Start Another Draft Run/);
  assert.doesNotMatch(guestHtml,/Elite adds unlimited Powered Cube and custom-set drafts/);
 });
 
@@ -75,8 +76,8 @@ test('Daily home differentiates free and Elite practice',()=>{
 
  p.daily_history=['mixed','powered-cube','latest'].map(row);
  const completedEliteHtml=dailyHomeMarkup(p,day);
- assert.match(completedEliteHtml,/Powered Cube Practice/);
- assert.doesNotMatch(completedEliteHtml,/Elite adds unlimited Powered Cube and custom-set drafts/);
+ assert.match(completedEliteHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
+ assert.doesNotMatch(completedEliteHtml,/Powered Cube Practice|Choose your sets|Elite practice|Elite adds unlimited Powered Cube and custom-set drafts/);
 });
 
 test('Method has no secondary link directory',()=>{
@@ -115,11 +116,11 @@ test('a connected member is asked to upgrade, not to become',()=>{
  const unconnected=dailyHomeMarkup({...base,membership:{connected:false}},day);
  assert.match(unconnected,/Become Elite/);assert.doesNotMatch(unconnected,/Upgrade to Elite/);
 
- // The dedicated Elite row is the only paid ask once the Dailies are done.
+ // Once the Dailies are done, the home hands signed-in players to the Practice hub instead of repeating paid options.
  const done={...base,membership:{connected:true},daily_history:['mixed','powered-cube','latest'].map(row)};
  const doneHtml=dailyHomeMarkup(done,day);
- assert.equal((doneHtml.match(/Upgrade to Elite/g)||[]).length,1);
- assert.doesNotMatch(doneHtml,/Become Elite/);
+ assert.match(doneHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
+ assert.doesNotMatch(doneHtml,/Become Elite|Upgrade to Elite|Elite practice/);
 
  // An Elite member is never asked for either.
  const eliteHtml=dailyHomeMarkup({...base,capabilities:[...base.capabilities,'custom_corpus','unlimited_cube_practice'],membership:{connected:true}},day);
