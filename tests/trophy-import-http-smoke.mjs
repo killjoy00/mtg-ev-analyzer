@@ -16,6 +16,7 @@ function assertPrivatePuzzle(p){
 }
 const health=await call('/health');assert.equal(health.sets,catalog.sets.length);assert.equal(health.expansion_sets,catalog.sets.filter(s=>s.id!=='powered-cube').length);assert.ok(health.puzzles>20000);
 const guest=await call('/v1/session',{displayName:'Import check'});
+const friendGuest=await call('/v1/session',{displayName:'Import check peer'});
 for(const environment of ['mixed','powered-cube']) {
   let s=await call('/v1/runs',{environment,qa:true},guest.token);
   assert.equal(s.difficulty_version,DRAFT_RUN_DIFFICULTY_VERSION);
@@ -45,7 +46,7 @@ for(const environment of ['mixed','powered-cube']) {
   assert.equal(s.score,Math.round(s.answers.reduce((sum,a)=>sum+a.score,0)/DRAFT_RUN_LENGTH));
   assert.ok(s.answers.every(a=>a.puzzle.difficulty===undefined));
   const invitation=await call(`/v1/runs/${s.id}/share`,{},guest.token);
-  const friend=await call('/v1/runs',{challenge:invitation.id,qa:true},guest.token);
+  const friend=await call('/v1/runs',{challenge:invitation.id,qa:true},friendGuest.token);
   assert.equal(friend.run_length,DRAFT_RUN_LENGTH);
   assert.equal(friend.difficulty_version,s.difficulty_version);
   assert.equal(friend.current.puzzle_id,s.answers[0].puzzle.puzzle_id);
