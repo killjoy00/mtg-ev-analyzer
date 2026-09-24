@@ -13,6 +13,8 @@ on:
       - 'game-date.mjs'
       - 'tests/*backend-smoke.mjs'
       - 'scripts/verify-neon-schema.mjs'
+      - 'scripts/load_verified_draft_run.mjs'
+      - 'scripts/corpus-puzzle-equivalence.mjs'
       - 'scripts/*corpus*manifest.mjs'
       - 'scripts/load*tro*.mjs'
       - '.github/workflows/prepare-rebuild.yml'
