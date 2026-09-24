@@ -58,7 +58,7 @@ BEGIN
     WHERE environment='latest'
     ORDER BY day
   LOOP
-    IF jsonb_typeof(scheduled.daily_featured_sets) <> 'array'
+    IF jsonb_typeof(scheduled.daily_featured_sets) IS DISTINCT FROM 'array'
       OR jsonb_array_length(scheduled.daily_featured_sets) <> 1
       OR jsonb_typeof(scheduled.daily_featured_sets->0) <> 'string'
     THEN
