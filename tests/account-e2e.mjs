@@ -92,7 +92,8 @@ try {
     assert.match(await page.locator('#profile-account').textContent(),/qa@example.invalid/);
     assert.equal(await page.locator('#patreon-connect').count(),1);
     assert.match(await page.locator('.profile-membership').textContent(),/Unlock Elite practice/);
-    assert.match(await page.locator('.profile-membership').textContent(),/Become Elite on Patreon/);
+    assert.match(await page.locator('.profile-membership').textContent(),/Become Elite/);
+    assert.equal(await page.locator('.profile-membership-actions a').getAttribute('href'),'/patreon/');
     assert.match(await page.locator('.profile-membership').textContent(),/Already a member\? Connect Patreon/);
     assert.equal(await page.evaluate(()=>localStorage.getItem('pack1-api-session-v1')),'claimed-fixture');
 
@@ -126,10 +127,12 @@ try {
   await page.locator('#account-signup').waitFor();
   assert.equal(await page.locator('#account-signin').count(),0);
   assert.match(await page.locator('.account-page').textContent(),/Unlock Elite practice/);
-  assert.match(await page.locator('.account-page').textContent(),/send you to Patreon/);
+  assert.match(await page.locator('.account-page').textContent(),/Elite benefits and Patreon connection steps/);
   await fillAuth('signin');
-  await page.waitForURL('https://www.patreon.com/c/PackOne');
-  assert.equal(page.url(),'https://www.patreon.com/c/PackOne');
+  await page.waitForURL(base+'/patreon/');
+  assert.equal(page.url(),base+'/patreon/');
+  await page.getByRole('heading',{name:'Pack One Elite',exact:true}).waitFor();
+  assert.equal(await page.locator('[data-patreon-offsite]').first().getAttribute('href'),'https://www.patreon.com/c/PackOne');
 
   // A signed-in free member keeps the Daily home focused and upgrades from Practice.
   await page.goto(base);
@@ -138,8 +141,8 @@ try {
   await page.goto(base+'/practice/');
   await page.getByRole('button',{name:'Upgrade to Elite',exact:true}).first().waitFor();
   await page.getByRole('button',{name:'Upgrade to Elite',exact:true}).first().click();
-  await page.waitForURL('https://www.patreon.com/c/PackOne');
-  assert.equal(page.url(),'https://www.patreon.com/c/PackOne');
+  await page.waitForURL(base+'/patreon/');
+  assert.equal(page.url(),base+'/patreon/');
 
   // Signed-in navigation returns to My Pack One; Account remains a dedicated tab.
   await page.goto(base);
@@ -154,5 +157,5 @@ try {
 
   assert.deepEqual(errors,[]);
   assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=document.documentElement.clientWidth+1));
-  console.log('Account browser contract passed: guest sign-in, signed-in My Pack One tabs, linking, Patreon Elite handoff, membership connection and sign-out identity separation.');
+  console.log('Account browser contract passed: guest sign-in, signed-in My Pack One tabs, Elite landing handoff, Patreon linking and sign-out identity separation.');
 }finally{await browser.close();}
