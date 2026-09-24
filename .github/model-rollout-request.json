@@ -1,7 +1,7 @@
 {
-  "operation": "season-hardening-migration",
-  "request_id": "season-hardening-migration-production-20260924",
-  "reason": "Apply reviewed Pack One season hardening migration 0038 to production after green development migration and exact-revision acceptance.",
+  "operation": "deploy",
+  "request_id": "season-hardening-deploy-production-20260924",
+  "reason": "Deploy reviewed Pack One season hardening revision to production after successful development acceptance and production migration 0038 verification.",
   "commit": "9763e7caf87f20ca4bc77d82b8513a3d365db5c9",
   "target": "production"
 }
