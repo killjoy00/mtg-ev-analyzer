@@ -17,7 +17,7 @@ The homepage starts with **Daily Draft Run**, **Daily Powered Cube** and **Daily
 
 ## Architecture and development
 
-GitHub Pages serves the browser. Three Neon Functions own the historical API, accounts/admin, and Draft Run API. Neon Postgres stores immutable puzzles, versioned schedules, sessions, results, corpus manifests, lifecycle policy and account capabilities. Recurring Daily pre-generation and account-deletion maintenance are owned by reviewed Neon Function Triggers; the corresponding GitHub workflows are recovery/verification or read-only operator checks. See [Neon scheduled maintenance](docs/NEON-SCHEDULERS.md). Existing decision measurements remain at `/admin/`; Corpus Operations is a separate area.
+GitHub Pages serves the browser. Three Neon Functions own the historical API, accounts/admin, and Draft Run API. Neon Postgres stores immutable puzzles, versioned schedules, sessions, results, corpus manifests, lifecycle policy and account capabilities. Recurring Daily pre-generation and account-deletion maintenance are owned by reviewed Neon Function Triggers; the corresponding GitHub workflows are manual recovery/verification only. See [Neon scheduled maintenance](docs/NEON-SCHEDULERS.md). Existing decision measurements remain at `/admin/`; Corpus Operations is a separate area.
 
 Run `npm test` for syntax, JavaScript and Python checks. Pull requests also run browser coverage; backend changes run SQL tests on disposable Neon branches. Deploy reviewed main revisions to development, verify the complete corpus and gameplay, then promote the same revision to production. A Pages deployment alone does not deploy backend code.
 
