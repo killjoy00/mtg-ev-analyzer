@@ -66,7 +66,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     topActions.classList.toggle('is-signed-nav',signed);
     if(!signed)return;
     const items=[
-      ['practice-nav','?game=draft-run','Practice'],
+      ['practice-nav','/practice/','Practice'],
       ['leaderboard-nav','?game=draft-run&board=daily','Leaders'],
       ['learn-nav','/learn/','Learn'],
     ];
