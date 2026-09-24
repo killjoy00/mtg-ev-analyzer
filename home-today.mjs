@@ -40,7 +40,7 @@ function gameCard({ label, description, status, playHref, boardHref }) {
   return `<article class="today-game ${status.complete ? 'complete' : ''}">
     <span class="today-game-state" aria-hidden="true">${status.complete ? '✓' : ''}</span>
     <div class="today-game-name"><span>${label}</span><small>${description}</small></div>
-    <div class="today-game-score"><strong>${status.complete ? status.score : '—'}</strong><small>${standing(status)}</small></div>
+    <div class="today-game-score"><strong>${status.complete ? status.score : 'N/A'}</strong><small>${standing(status)}</small></div>
     <a class="button ${status.complete ? 'secondary' : 'primary'}" href="${actionHref}">${actionLabel}<span aria-hidden="true">›</span></a>
   </article>`;
 }

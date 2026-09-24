@@ -19,7 +19,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
   id-token: write
 
 concurrency:
@@ -115,10 +114,8 @@ jobs:
           commit=$(curl -fsS --max-time 30 "$PROD_IMPORT_API/health?quick=1" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>console.log(JSON.parse(s).release_commit))")
           node tests/release-functions-smoke.mjs br-orange-feather-ayps8kep "$commit" --daily
 
-      - name: Publish refreshed card-image source pull request
+      - name: Publish refreshed card-image source branch
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git config user.name 'github-actions[bot]'
@@ -138,4 +135,5 @@ jobs:
 
           branch="automation/card-image-refresh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
           git -C "$publish_dir" push origin "HEAD:$branch"
-          gh pr create             --base main             --head "$branch"             --title 'Refresh Pack One to main card art'             --body 'Automated source-of-truth publication after the guarded Pack One card-image release completed development and production refresh plus gameplay verification.'
+          echo "Generated card-image source branch: $branch" >> "$GITHUB_STEP_SUMMARY"
+          echo "Open that branch as a pull request to main with the normal required checks." >> "$GITHUB_STEP_SUMMARY"
