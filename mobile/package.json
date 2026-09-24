@@ -9,8 +9,9 @@
     "ios": "expo run:ios",
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
-    "config:check": "expo config --type public > /dev/null",
-    "test": "npm run lint && npm run typecheck && npm run config:check"
+    "config:check": "node ./scripts/check-config.mjs",
+    "test": "npm run lint && npm run typecheck && npm run config:check",
+    "release:check": "node ./scripts/release-preflight.mjs"
   },
   "dependencies": {
     "expo": "~57.0.24",
