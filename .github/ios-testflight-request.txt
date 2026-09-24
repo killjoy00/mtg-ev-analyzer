@@ -1,4 +1,4 @@
 2026-09-24
-Purpose: retry Pack One TestFlight Internal Only upload after YAML-safe PackOne scheme validation.
-Base stack: #481
+Purpose: validate monotonic Pack One TestFlight build numbering and corrected workflow summary on TestFlight Internal Only.
+Build number policy: 100000 + GITHUB_RUN_NUMBER.
 Distribution boundary: internal TestFlight only; no external testing or App Store release.
