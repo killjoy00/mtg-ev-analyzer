@@ -64,6 +64,14 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     ios: {
       ...config.ios,
       bundleIdentifier: identifier,
+      ...(production
+        ? {
+            config: {
+              ...config.ios?.config,
+              usesNonExemptEncryption: false,
+            },
+          }
+        : {}),
       ...(iosBuildNumber ? { buildNumber: iosBuildNumber } : {}),
     },
     android: {
