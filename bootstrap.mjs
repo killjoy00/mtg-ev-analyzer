@@ -114,6 +114,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   } else {
     const game = await import('./draft-run-product.mjs?v=6');
     await identityReady;
+    await refreshPrimaryNav();
     await game.installDraftRunPage();
   }
 }
