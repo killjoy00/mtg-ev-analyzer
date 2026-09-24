@@ -1,4 +1,4 @@
 2026-09-24
-Purpose: retry Pack One production upload to TestFlight Internal Only after compatible export-method fix.
+Purpose: retry Pack One TestFlight Internal Only upload after correcting the archive scheme to PackOne.
 Base stack: #481
 Distribution boundary: internal TestFlight only; no external testing or App Store release.
