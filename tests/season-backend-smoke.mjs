@@ -139,12 +139,12 @@ assert.ok(fallback,'Need one older regular set that never owned a season.');
 await schedule('2026-09-04',fallback.set_id);
 season=await reconcilePersistedSeasons(query);
 assert.equal(season.set_id,'hob');
-assert.equal((await query("SELECT last_reconciled_day::text day FROM draft_run_season_reconciliation_state WHERE singleton=true")).rows[0].day,'2026-09-04');
+assert.equal((await query("SELECT last_reconciled_day::text reconciled_day FROM draft_run_season_reconciliation_state WHERE singleton=true")).rows[0].reconciled_day,'2026-09-04');
 await query("UPDATE draft_run_environment_policy SET set_name=NULL,regular_run=false WHERE set_id=$1",[fallback.set_id]);
 await schedule('2026-09-05','hob');
 season=await reconcilePersistedSeasons(query);
 assert.equal(season.set_id,'hob');
-assert.equal((await query("SELECT last_reconciled_day::text day FROM draft_run_season_reconciliation_state WHERE singleton=true")).rows[0].day,'2026-09-05');
+assert.equal((await query("SELECT last_reconciled_day::text reconciled_day FROM draft_run_season_reconciliation_state WHERE singleton=true")).rows[0].reconciled_day,'2026-09-05');
 
 // Profile season enrichment is non-critical. A brand-new invalid schedule still
 // makes direct season reconciliation fail, but must not block My Pack One,
