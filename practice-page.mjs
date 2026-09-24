@@ -48,7 +48,7 @@ function practiceMarkup(patreon) {
       ${practiceCard({
         label:'Free practice',
         title:'Regular Draft Run',
-        description:'Eight-decision runs from real trophy drafts, included with your free account.',
+        description:'Eight-decision runs from real trophy drafts.',
         href:'/?game=draft-run',
         cta:'Start Draft Run',
         badge:'Unlimited',
