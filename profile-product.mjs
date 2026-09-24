@@ -170,6 +170,7 @@ function settingsMarkup(profile, progress, account, patreon) {
   const unlocked = unlockedAchievements(profile);
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
+  const membershipUrl=elite?supportUrl:'/patreon/';
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
     <header><div><p class="eyebrow">Profile</p><h2 id="profile-account-title">Profile settings</h2><p>${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     ${account?.user?`<form id="profile-settings-form">
@@ -186,7 +187,7 @@ function settingsMarkup(profile, progress, account, patreon) {
       </div>
       ${new URLSearchParams(location.search).has('patreon')?`<p role="status">${esc(({connected:'Patreon connected.',expired:'The connection expired. Please try again.',unavailable:'Patreon linking is not available yet.',conflict:'This Patreon account is already connected to another Pack One account.','identity-mismatch':'This Pack One account is already connected to a different Patreon account. Disconnect Patreon before switching accounts.',error:'Patreon could not be connected. Please try again.'})[new URLSearchParams(location.search).get('patreon')]||'Patreon connection returned.')}</p>`:''}
       <div class="profile-membership-actions">
-        <a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${supportUrl}" rel="noopener noreferrer">${patreon?.configured!==true?'Open Patreon':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite on Patreon':'Become Elite on Patreon'}</a>
+        <a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${membershipUrl}"${elite?' rel="noopener noreferrer"':''}>${patreon?.configured!==true?'Learn about Elite':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite':'Become Elite'}</a>
         ${patreon?.configured===true?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
         ${patreon?.connected?'<button type="button" class="text-button" id="patreon-disconnect">Disconnect Patreon</button>':''}
         <span id="patreon-status" aria-live="polite"></span>
