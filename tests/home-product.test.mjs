@@ -10,6 +10,15 @@ test('three direct Dailies dominate before completion, without practice or check
  assert.match(html,/September 18’s Daily Runs/);assert.doesNotMatch(html,/100 = you matched/);
  assert.doesNotMatch(html,/progressbar|Daily board|More modes|Full Pack|Top 3|Keep drafting/);
 });
+test('fresh guests get a larger Start here label instead of the generic first-row label',()=>{
+ const guest=dailyHomeMarkup(null,day);
+ assert.match(guest,/daily-home-start">Start here<\/span>/);
+ assert.doesNotMatch(guest,/The daily challenge/);
+ const signed=dailyHomeMarkup({player:{claimed:true},capabilities:['account'],daily_history:[]},day);
+ assert.doesNotMatch(signed,/daily-home-start">Start here<\/span>/);
+ assert.match(signed,/The daily challenge/);
+});
+
 test('either unfinished Daily precedes the compact result',()=>{
  for(const done of ['mixed','powered-cube']){
   const html=dailyHomeMarkup({daily_history:[row(done)]},day);
