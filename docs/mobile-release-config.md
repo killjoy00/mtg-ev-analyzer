@@ -65,8 +65,6 @@ These values are not committed to Git:
 
 - Apple Developer signing certificates/profiles and Team access
 - Android upload/signing key material
-- Apple Developer signing certificates/profiles and Team access
-- Android upload/signing key material
 
 The verified Apple application record already exists.
 
@@ -101,3 +99,64 @@ The workflow uses:
 It expects the non-secret repository variable `PACKONE_GOOGLE_WIF_PROVIDER` to contain the full Workload Identity Provider resource name.
 
 The Workload Identity provider must restrict admission to exactly `killjoy00/mtg-ev-analyzer`, and that repository identity must receive only `roles/iam.workloadIdentityUser` on the Pack One service account. Long-lived service-account JSON keys are intentionally not used.
+
+
+### One-time Google Cloud trust setup
+
+Run the following in Google Cloud Shell while signed into the `pack-one` project owner/admin account:
+
+```bash
+set -euo pipefail
+
+PROJECT_ID="pack-one"
+REPO="killjoy00/mtg-ev-analyzer"
+POOL_ID="github"
+PROVIDER_ID="mtg-ev-analyzer"
+SERVICE_ACCOUNT="packone-play-ci@pack-one.iam.gserviceaccount.com"
+
+gcloud config set project "$PROJECT_ID"
+
+gcloud services enable \
+  iam.googleapis.com \
+  iamcredentials.googleapis.com \
+  sts.googleapis.com \
+  androidpublisher.googleapis.com \
+  --project="$PROJECT_ID"
+
+if ! gcloud iam workload-identity-pools describe "$POOL_ID" \
+  --project="$PROJECT_ID" --location="global" >/dev/null 2>&1; then
+  gcloud iam workload-identity-pools create "$POOL_ID" \
+    --project="$PROJECT_ID" \
+    --location="global" \
+    --display-name="GitHub Actions"
+fi
+
+if ! gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
+  --project="$PROJECT_ID" --location="global" \
+  --workload-identity-pool="$POOL_ID" >/dev/null 2>&1; then
+  gcloud iam workload-identity-pools providers create-oidc "$PROVIDER_ID" \
+    --project="$PROJECT_ID" \
+    --location="global" \
+    --workload-identity-pool="$POOL_ID" \
+    --display-name="mtg-ev-analyzer GitHub Actions" \
+    --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
+    --attribute-condition="assertion.repository == '$REPO'" \
+    --issuer-uri="https://token.actions.githubusercontent.com"
+fi
+
+POOL_NAME="$(gcloud iam workload-identity-pools describe "$POOL_ID" \
+  --project="$PROJECT_ID" --location="global" --format="value(name)")"
+
+gcloud iam service-accounts add-iam-policy-binding "$SERVICE_ACCOUNT" \
+  --project="$PROJECT_ID" \
+  --role="roles/iam.workloadIdentityUser" \
+  --member="principalSet://iam.googleapis.com/$POOL_NAME/attribute.repository/$REPO"
+
+gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
+  --project="$PROJECT_ID" \
+  --location="global" \
+  --workload-identity-pool="$POOL_ID" \
+  --format="value(name)"
+```
+
+The final command prints the non-secret provider resource name. That value is the only remaining input needed by the GitHub workflow.
