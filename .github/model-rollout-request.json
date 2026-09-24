@@ -1,6 +1,6 @@
 {
   "operation": "card-image-release",
-  "request_id": "packone-main-art-terminal-edgecases-20260923",
-  "reason": "Deploy the reviewed terminal card-image edge-case fixes and refresh all served Pack One card images.",
-  "commit": "5e101c26afb95f77e4c5539a06db42ea72cea8ce"
+  "request_id": "packone-main-art-backend-pagination-20260923",
+  "reason": "Deploy the reviewed resumable card-image backend refresh and complete the all-card Pack One main-art rollout.",
+  "commit": "85637c0e7a6c0464cc419630e26aae8ccb9dda8d"
 }
