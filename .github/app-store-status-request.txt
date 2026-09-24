@@ -1,0 +1,2 @@
+2026-09-24
+Purpose: read current Pack One TestFlight processing and export-compliance metadata from App Store Connect.
