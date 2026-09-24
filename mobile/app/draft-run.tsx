@@ -1,6 +1,6 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -14,8 +14,11 @@ import {
 
 import { ensureGuestSession } from '@/src/api/guest';
 import {
+  DAILY_ENVIRONMENT_META,
+  isDailyEnvironment,
   startDailyDraftRun,
   submitDraftRunPick,
+  type DailyEnvironment,
   type DraftRunCard,
   type DraftRunState,
 } from '@/src/api/draftRun';
@@ -85,13 +88,17 @@ function CardTile({
   );
 }
 
-async function loadGuestDaily() {
+async function loadGuestDaily(environment: DailyEnvironment) {
   const session = await ensureGuestSession();
-  const run = await startDailyDraftRun(session);
+  const run = await startDailyDraftRun(session, environment);
   return { run, session };
 }
 
 export default function DraftRunScreen() {
+  const params = useLocalSearchParams<{ environment?: string }>();
+  const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
+  const environment: DailyEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
+  const dailyMeta = DAILY_ENVIRONMENT_META[environment];
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [mode, setMode] = useState<ViewMode>('pick');
   const [selected, setSelected] = useState<string | null>(null);
@@ -100,7 +107,7 @@ export default function DraftRunScreen() {
 
   useEffect(() => {
     let active = true;
-    void loadGuestDaily()
+    void loadGuestDaily(environment)
       .then(({ run, session }) => {
         if (!active) return;
         setMode(run.complete ? 'result' : 'pick');
@@ -116,14 +123,14 @@ export default function DraftRunScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [environment]);
 
   const retry = async () => {
     setState({ status: 'loading' });
     setSelected(null);
     setMode('pick');
     try {
-      const { run, session } = await loadGuestDaily();
+      const { run, session } = await loadGuestDaily(environment);
       setMode(run.complete ? 'result' : 'pick');
       setState({ status: 'ready', run, session });
     } catch (error: unknown) {
@@ -211,8 +218,8 @@ export default function DraftRunScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.resultPage}>
-          <Text style={styles.eyebrow}>DAILY DRAFT RUN COMPLETE</Text>
-          <Text style={styles.title}>Your Draft Run.</Text>
+          <Text style={styles.eyebrow}>{dailyMeta.eyebrow} COMPLETE</Text>
+          <Text style={styles.title}>{dailyMeta.resultTitle}</Text>
           <View style={styles.scoreBlock}>
             <Text style={styles.score}>{run.score ?? 0}</Text>
             <Text style={styles.scoreMeta}>/100 · {matches} trophy picks matched</Text>
@@ -235,7 +242,10 @@ export default function DraftRunScreen() {
             {!state.session.accountToken ? (
               <Pressable
                 accessibilityRole="button"
-                onPress={() => router.push({ pathname: '/account', params: { validateDailyRunId: run.id } })}
+                onPress={() => router.push({
+                  pathname: '/account',
+                  params: { validateDailyRunId: run.id, environment },
+                })}
                 style={styles.secondaryButton}
               >
                 <Text style={styles.secondaryButtonText}>Sign in to save this score</Text>
@@ -254,7 +264,7 @@ export default function DraftRunScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.shell}>
         <ScrollView ref={scroll} contentContainerStyle={styles.page}>
-          <Text style={styles.eyebrow}>DAILY DRAFT RUN · {run.day ?? 'TODAY'}</Text>
+          <Text style={styles.eyebrow}>{dailyMeta.eyebrow} · {run.day ?? 'TODAY'}</Text>
           <Text style={styles.title}>
             {puzzle.set_id.toUpperCase()} <Text style={styles.titleMeta}>· Pack 1 · Pick {puzzle.pick_number}</Text>
           </Text>
