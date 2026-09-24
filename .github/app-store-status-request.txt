@@ -1,2 +1,1 @@
-2026-09-24
-Purpose: read App Store Connect status after successful TestFlight upload run 36035617029 and verify uploaded build number.
+Verify monotonic iOS build-number allocation against App Store Connect.
