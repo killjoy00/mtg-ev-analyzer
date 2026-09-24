@@ -114,9 +114,8 @@ Archived pre-rebuild documents that mention monthly leaderboards were left uncha
 ## Follow-ups / non-blockers
 
 1. **Mobile migration numbering:** draft mobile-auth PR #448 was created before seasons landed and currently proposes its own migration 0037 on a stacked mobile branch. That stack must be renumbered/rebased before it can merge onto current `main`.
-2. **Direct Neon connector:** the ChatGPT Neon MCP connection continued to reject scoped calls because its server required a `project_id` even though the installed connection contract says not to send one. No release verification depended on that connector; authoritative database evidence came from the repository's protected Actions workflows and disposable production clone.
-3. **Legacy monthly compatibility:** the old worker/core monthly implementation is intentionally preserved. Only current Draft Run `month` requests canonicalize to competitive season.
-4. **Future rollover:** no manual action should be required when a newer released regular set first becomes the immutable Latest Set Daily. The persisted resolver is the authority; fallback to an older set must not reopen an old season.
+2. **Legacy monthly compatibility:** the old worker/core monthly implementation is intentionally preserved. Only current Draft Run `month` requests canonicalize to competitive season.
+3. **Future rollover:** no manual action should be required when a newer released regular set first becomes the immutable Latest Set Daily. The persisted resolver is the authority; fallback to an older set must not reopen an old season.
 
 ## Final state
 
