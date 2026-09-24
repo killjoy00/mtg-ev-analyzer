@@ -1,7 +1,7 @@
 {
-  "operation": "season-migration",
-  "request_id": "pack-one-season-migration-development-20260924",
-  "reason": "Apply reviewed Pack One competitive season migration 0037 to development before deploying the exact merged revision.",
+  "operation": "deploy",
+  "request_id": "pack-one-season-development-20260924",
+  "reason": "Deploy the reviewed Pack One competitive season revision after successful development migration verification.",
   "commit": "fe9d666a094c0d18a13899a089a3ed49de67901a",
   "target": "development"
 }
