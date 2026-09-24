@@ -4,6 +4,14 @@ import fs from 'node:fs';
 import {dailyHomeMarkup} from '../daily-home.mjs';
 const day='2026-09-18';
 const row=set_id=>({date:day,mode:'draft_run',set_id,score:91});
+test('Daily descriptions reinforce trophy-draft provenance',()=>{
+ const html=dailyHomeMarkup(null,day);
+ assert.match(html,/Eight decisions from real trophy drafts\./);
+ assert.match(html,/Eight decisions from Powered Cube trophy drafts\./);
+ assert.match(html,/Eight decisions from trophy drafts in the latest set\./);
+ assert.doesNotMatch(html,/Magic’s most powerful cards|Only the latest set/);
+});
+
 test('three direct Dailies dominate before completion, without practice or checklist',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.equal((html.match(/>Play now</g)||[]).length,3);
@@ -57,36 +65,24 @@ test('home runtime isolates historical code and lazily loads profiles',()=>{
  assert.match(source,/historical-share\.mjs/);
  assert.match(source,/daily-home\.mjs/);
  assert.match(source,/renderAccount\(\{source:'nav'\}\)/,'Account navigation routes guests to sign in and members to My Pack One');
- assert.match(home,/beginEliteUpgrade\(\{source:'home'\}\)/,'Elite CTA uses the Patreon handoff flow');
+ assert.doesNotMatch(home,/data-home-elite|beginEliteUpgrade/,'Daily home must not duplicate Elite upsells now that Practice is a dedicated hub');
 });
 
-test('Daily home differentiates free and Elite practice',()=>{
- const p={player:{claimed:true},capabilities:['account'],daily_history:[]};
- const freeHtml=dailyHomeMarkup(p,day);
- assert.match(freeHtml,/<h2 class="eyebrow">Free practice<\/h2>/);
- assert.match(freeHtml,/Practice a Draft Run/);
- assert.ok(freeHtml.indexOf('Practice a Draft Run')<freeHtml.indexOf('Elite practice'),'regular practice appears before the Elite upsell');
- assert.match(freeHtml,/Elite practice/);
- assert.match(freeHtml,/Draft beyond the Dailies/);
- assert.match(freeHtml,/Become Elite/);
- assert.doesNotMatch(freeHtml,/Choose your sets/);
- assert.doesNotMatch(freeHtml,/Powered Cube Practice/);
-
- p.capabilities.push('custom_corpus','unlimited_cube_practice');
- const eliteHtml=dailyHomeMarkup(p,day);
- assert.match(eliteHtml,/Choose your sets/);
- assert.match(eliteHtml,/favorite sets/);
- assert.doesNotMatch(eliteHtml,/favourite/);
- assert.doesNotMatch(eliteHtml,/Become Elite/);
-
- const guestWithCapability=dailyHomeMarkup({player:{claimed:false},capabilities:['custom_corpus','unlimited_cube_practice'],daily_history:[]},day);
- assert.doesNotMatch(guestWithCapability,/Choose your sets/);
- assert.doesNotMatch(guestWithCapability,/Build a random run/);
-
- p.daily_history=['mixed','powered-cube','latest'].map(row);
- const completedEliteHtml=dailyHomeMarkup(p,day);
- assert.match(completedEliteHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
- assert.doesNotMatch(completedEliteHtml,/Powered Cube Practice|Choose your sets|Elite practice|Elite adds unlimited Powered Cube and custom-set drafts/);
+test('signed-in Daily home stays Daily-first until completion',()=>{
+ const profiles=[
+  {player:{claimed:true},capabilities:['account'],daily_history:[]},
+  {player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice'],daily_history:[]},
+  {player:{claimed:true},capabilities:['account'],membership:{connected:true},daily_history:[row('mixed')]},
+ ];
+ for(const profile of profiles){
+  const html=dailyHomeMarkup(profile,day);
+  assert.doesNotMatch(html,/Free practice|Practice a Draft Run|Elite practice|Become Elite|Upgrade to Elite|Choose your sets|data-home-elite/);
+  assert.doesNotMatch(html,/href="\/practice\/"/,'Practice handoff waits until all three Dailies are complete');
+ }
+ const completed={player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice'],daily_history:['mixed','powered-cube','latest'].map(row)};
+ const completedHtml=dailyHomeMarkup(completed,day);
+ assert.match(completedHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
+ assert.doesNotMatch(completedHtml,/Free practice|Practice a Draft Run|Elite practice|Become Elite|Upgrade to Elite|Choose your sets/);
 });
 
 test('Method has no secondary link directory',()=>{
@@ -108,31 +104,14 @@ test('a guest is not asked to pay on the Daily home',()=>{
  assert.doesNotMatch(done,/Practice a Draft Run/);
 });
 
-// A Supporter holds no paid capability, so before membership was surfaced they
-// were indistinguishable from a free account and told to "become" a paying
-// member. Covers a lapsed Elite for the same reason.
-test('a connected member is asked to upgrade, not to become',()=>{
+test('membership level does not change the unfinished Daily home',()=>{
  const base={player:{claimed:true},capabilities:['account','unlimited_regular_practice'],daily_history:[]};
-
- const free=dailyHomeMarkup(base,day);
- assert.match(free,/Become Elite/);assert.doesNotMatch(free,/Upgrade to Elite/);
-
- const supporter=dailyHomeMarkup({...base,membership:{connected:true}},day);
- assert.match(supporter,/Upgrade to Elite/);assert.doesNotMatch(supporter,/Become Elite/);
- assert.match(supporter,/data-home-elite/,'the upgrade still uses the Patreon handoff');
-
- // Explicitly unconnected must read the same as absent.
- const unconnected=dailyHomeMarkup({...base,membership:{connected:false}},day);
- assert.match(unconnected,/Become Elite/);assert.doesNotMatch(unconnected,/Upgrade to Elite/);
-
- // Once the Dailies are done, the home hands signed-in players to the Practice hub instead of repeating paid options.
- const done={...base,membership:{connected:true},daily_history:['mixed','powered-cube','latest'].map(row)};
- const doneHtml=dailyHomeMarkup(done,day);
- assert.match(doneHtml,/href="\/practice\/"[^>]*>Go to Practice<\/a>/);
- assert.doesNotMatch(doneHtml,/Become Elite|Upgrade to Elite|Elite practice/);
-
- // An Elite member is never asked for either.
- const eliteHtml=dailyHomeMarkup({...base,capabilities:[...base.capabilities,'custom_corpus','unlimited_cube_practice'],membership:{connected:true}},day);
- assert.match(eliteHtml,/Choose your sets/);
- assert.doesNotMatch(eliteHtml,/Become Elite|Upgrade to Elite/);
+ for(const profile of [
+  base,
+  {...base,membership:{connected:true}},
+  {...base,capabilities:[...base.capabilities,'custom_corpus','unlimited_cube_practice'],membership:{connected:true}},
+ ]){
+  const html=dailyHomeMarkup(profile,day);
+  assert.doesNotMatch(html,/Free practice|Elite practice|Become Elite|Upgrade to Elite|Choose your sets|Practice a Draft Run/);
+ }
 });
