@@ -72,6 +72,8 @@ jobs:
             exit 1
           }
           echo "Verified Pack One archive build number: $archived_build_number"
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
+          echo "Verified Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
 
   testflight:
     name: sign and upload TestFlight internal build
@@ -149,6 +151,8 @@ jobs:
             exit 1
           }
           echo "Verified signed Pack One archive build number: $archived_build_number"
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
+          echo "Verified signed Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
           echo "PACKONE_ARCHIVED_BUILD_NUMBER=$archived_build_number" >> "$GITHUB_ENV"
       - name: Upload to TestFlight Internal Only
         shell: bash
