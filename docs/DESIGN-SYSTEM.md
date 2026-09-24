@@ -19,8 +19,9 @@ The three Dailies occupy numbered scorecard rows, with a muted rust accent for
 Latest Set. On a zero-completion home state, Daily Draft Run may receive a restrained
 "Start here" treatment and a small P¹ card motif; the other Dailies remain immediately
 visible and equivalent product choices. Completed rows become compact; general
-practice appears after all three are complete. A compact Elite set-picker entry
-remains visible throughout. Mobile play controls remain at least 44 pixels high,
+practice appears after all three are complete as a single handoff to the dedicated
+Practice hub. Practice and Elite options are not duplicated below unfinished Dailies.
+Mobile play controls remain at least 44 pixels high,
 keyboard focus is visible, and prior cards retain the established 85% size relationship
 to pack cards.
 
