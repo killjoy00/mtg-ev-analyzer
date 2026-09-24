@@ -168,7 +168,7 @@ assert.match(tcg, /categories\/trading-and-collectible-card-games\/magic-the-gat
 const adLoader = await readFile('ads.mjs','utf8');
 assert.match(adLoader, /dataset\.tcgplayerSurface='daily_home_banner'/);
 assert.match(adLoader, /\/assets\/tcgplayer-logo-primary-stroke\.webp/);
-assert.match(adLoader, /Affiliate link — Pack One may earn a commission from purchases\./);
+assert.match(adLoader, /Affiliate link\. Pack One may earn a commission from purchases\./);
 const tcgConfig = await readFile('tcgplayer-config.js','utf8');
 assert.match(tcgConfig, /partner\.tcgplayer\.com\/c\/7742974\/1780961\/21018\?u=\{url\}/);
 assert.match(tcgConfig, /homeBannerEnabled:\s*true/);
