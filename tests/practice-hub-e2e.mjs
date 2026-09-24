@@ -36,7 +36,7 @@ try {
   await page.goto(base+'/practice/',{waitUntil:'domcontentloaded'});
   await page.locator('[data-practice-hub]').waitFor();
   assert.equal(await page.locator('.practice-card').count(),3);
-  assert.equal(await page.getByRole('heading',{name:'Draft Run',exact:true}).count(),1);
+  assert.equal(await page.getByRole('heading',{name:'Regular Draft Run',exact:true}).count(),1);
   assert.equal(await page.getByRole('heading',{name:'Powered Cube',exact:true}).count(),1);
   assert.equal(await page.getByRole('heading',{name:'Choose your sets',exact:true}).count(),1);
   assert.equal(await page.getByRole('link',{name:'Start Draft Run',exact:true}).getAttribute('href'),'/?game=draft-run');
