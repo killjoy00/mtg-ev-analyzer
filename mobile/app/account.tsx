@@ -27,6 +27,7 @@ import {
   type AccountState,
   type MobileAuthResponse,
 } from '@/src/api/account';
+import { isDailyEnvironment } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
 import { type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
@@ -45,10 +46,12 @@ function authResult(value: unknown): value is MobileAuthResponse {
 }
 
 export default function AccountScreen() {
-  const params = useLocalSearchParams<{ validateDailyRunId?: string }>();
+  const params = useLocalSearchParams<{ validateDailyRunId?: string; environment?: string }>();
   const validateDailyRunId = typeof params.validateDailyRunId === 'string'
     ? params.validateDailyRunId
     : undefined;
+  const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
+  const returnEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const [session, setSession] = useState<MobileSession | null>(null);
   const [account, setAccount] = useState<AccountState | null>(null);
   const [mode, setMode] = useState<Mode>('signin');
@@ -104,6 +107,12 @@ export default function AccountScreen() {
           ? 'Signed in. Choose a unique player name on Pack One before using ranked public identity.'
           : 'Signed in to your Pack One account.',
     );
+    if (result.linked.validatedDailyScore) {
+      setTimeout(() => router.replace({
+        pathname: '/draft-run',
+        params: { environment: returnEnvironment },
+      }), 600);
+    }
   };
 
   const submitEmail = async () => {

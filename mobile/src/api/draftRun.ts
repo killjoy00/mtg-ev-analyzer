@@ -1,6 +1,40 @@
 import { requestJson } from '@/src/api/client';
 import type { MobileSession } from '@/src/storage/session';
 
+export type DailyEnvironment = 'mixed' | 'powered-cube' | 'latest';
+
+export const DAILY_ENVIRONMENTS: readonly DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
+
+export const DAILY_ENVIRONMENT_META: Record<DailyEnvironment, {
+  title: string;
+  eyebrow: string;
+  description: string;
+  resultTitle: string;
+}> = {
+  mixed: {
+    title: 'Draft Run',
+    eyebrow: 'DAILY DRAFT RUN',
+    description: 'Eight decisions drawn across Pack One’s current draft environments.',
+    resultTitle: 'Your Draft Run.',
+  },
+  'powered-cube': {
+    title: 'Powered Cube',
+    eyebrow: 'POWERED CUBE DAILY',
+    description: 'Eight decisions from the live Powered Cube environment.',
+    resultTitle: 'Your Powered Cube.',
+  },
+  latest: {
+    title: 'Latest Set',
+    eyebrow: 'LATEST SET DAILY',
+    description: 'Eight decisions from Pack One’s newest live regular set.',
+    resultTitle: 'Your Latest Set run.',
+  },
+};
+
+export function isDailyEnvironment(value: unknown): value is DailyEnvironment {
+  return typeof value === 'string' && DAILY_ENVIRONMENTS.includes(value as DailyEnvironment);
+}
+
 export type DraftRunCard = {
   id: string;
   name: string;
@@ -64,7 +98,10 @@ export function loadDraftRunHealth() {
   return requestJson<DraftRunHealth>('/draft/health?quick=1', { timeoutMs: 10_000 });
 }
 
-export function startDailyDraftRun(session: MobileSession, environment = 'mixed') {
+export function startDailyDraftRun(
+  session: MobileSession,
+  environment: DailyEnvironment = 'mixed',
+) {
   return requestJson<DraftRunState>('/draft/v1/runs', {
     method: 'POST',
     mobileSessionToken: session.playerToken,
