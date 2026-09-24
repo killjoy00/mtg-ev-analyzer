@@ -68,10 +68,10 @@ jobs:
       run:
         working-directory: mobile
     env:
-      ASC_KEY_ID: ${{ secrets.PACKONE_ASC_KEY_ID }}
-      ASC_ISSUER_ID: ${{ secrets.PACKONE_ASC_ISSUER_ID }}
-      ASC_PRIVATE_KEY: ${{ secrets.PACKONE_ASC_PRIVATE_KEY }}
-      APPLE_TEAM_ID: ${{ secrets.PACKONE_APPLE_TEAM_ID }}
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -82,7 +82,7 @@ jobs:
         run: |
           set -euo pipefail
           for name in ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY APPLE_TEAM_ID; do
-            [[ -n "${!name}" ]] || { echo "Missing required GitHub secret: $name" >&2; exit 1; }
+            [[ -n "${!name}" ]] || { echo "Missing required GitHub secret binding: $name" >&2; exit 1; }
           done
       - name: Install mobile dependencies
         run: npm install --no-audit --no-fund
