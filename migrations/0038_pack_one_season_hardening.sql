@@ -16,16 +16,16 @@ ON CONFLICT(singleton) DO NOTHING;
 -- statement
 DO $$
 BEGIN
-  PERFORM * FROM pack1_reconcile_draft_run_seasons();
+  PERFORM 1 FROM pack1_reconcile_draft_run_seasons();
 END
 $$;
 -- statement
 UPDATE draft_run_season_reconciliation_state
-SET last_reconciled_day=(
+SET last_reconciled_day=coalesce((
   SELECT max(day)::date
   FROM draft_run_schedules
   WHERE environment='latest'
-)
+),last_reconciled_day)
 WHERE singleton=true;
 -- statement
 
