@@ -8,6 +8,8 @@ import {guardIngress} from './ingress-auth.mjs';
 import {verifyDailyGenerationToken} from './daily-generation-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger,zonedDateTime} from './neon-trigger.mjs';
 import {DAILY_ENVIRONMENTS,generateDailyEnvironmentResults} from './daily-generation-results.mjs';
+import {ensureDailySchedule as ensureDailyScheduleForQuery} from './draft-run-daily.mjs';
+import {draftRunLeaderboardRows,normalizeLeaderboardPeriod,resolveCurrentSeason} from './draft-run-season.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {digest} from './account-session.mjs';
 import corpusCatalog from '../corpus/draft-run/catalog.json' with {type:'json'};
@@ -32,7 +34,6 @@ const fail = (message,status=400) => { throw Object.assign(new Error(message),{s
 const DAILY_GENERATION_PATH='/internal/daily-generation';
 const DAILY_TRIGGER_NAMES=new Set(['pack1-daily-primary','pack1-daily-retry']);
 const DAILY_TRIGGER_MINUTES=new Map([['pack1-daily-primary',7],['pack1-daily-retry',37]]);
-const DAILY_SCHEDULE_SELECT='SELECT puzzle_ids,corpus_version,scoring_version,difficulty_version,selection_version,daily_featured_sets,serving_policy_version FROM draft_run_schedules WHERE day=$1::date AND environment=$2';
 const bearer=request=>{
   const value=String(request.headers.get('authorization')||'');
   return value.startsWith('Bearer ')?value.slice(7):'';
@@ -122,28 +123,7 @@ async function responseFor(s) {
   return {ranked_name:rankedName,ranking_identity:identityStatus?{eligible:identityStatus.eligible,reason:identityStatus.reason}:null,id:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,run_length:runLength(s),daily_featured_sets:s.daily_featured_sets,set_reroll_allowed:!s.day&&!s.challenge_id&&!s.custom_set_ids.length,custom_set_ids:s.custom_set_ids,leaderboard_eligible:Boolean(s.leaderboard_eligible&&rankedIdentity),environment:environmentOf(s),day:s.day,revision:s.revision,round:s.answers.length+1,complete,score:s.score,answers:s.answers,rerolls:s.day?{set:0,pack:0}:s.rerolls,current,comparison,standing,scoring_version:s.scoring_version,difficulty_version:s.difficulty_version,selection_version:s.selection_version};
 }
 
-async function ensureDailySchedule(day,environment) {
-  let schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
-  if(schedule)return {schedule,created:false};
-  let featuredSets=environment!=='powered-cube'
-    ?(await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION))
-      .filter(p=>p.regular_run&&p.release_date&&p.release_date<=day)
-      .sort((a,b)=>b.release_date.localeCompare(a.release_date)||a.set_id.localeCompare(b.set_id))
-      .slice(0,environment==='latest'?1:4).map(p=>p.set_id)
-    :[];
-  const seed=`daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`;
-  const selected=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{daily:true,day});
-  const plan=selected.map(p=>p.puzzle_id);
-  if(environment==='latest')featuredSets=[selected[0].set_id];
-  const inserted=await query(
-    'INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids,difficulty_version,selection_version,daily_featured_sets,scoring_version,serving_policy_version) VALUES($1::date,$2,$3,$4::jsonb,$5,$6,$7::jsonb,$8,$9) ON CONFLICT(day,environment) DO NOTHING RETURNING day',
-    [day,environment,DRAFT_RUN_CORPUS_VERSION,JSON.stringify(plan),DRAFT_RUN_DIFFICULTY_VERSION,DRAFT_RUN_SELECTION_VERSION,JSON.stringify(featuredSets),DRAFT_RUN_SCORING_VERSION,SERVING_POLICY_VERSION],
-  );
-  schedule=(await query(DAILY_SCHEDULE_SELECT,[day,environment])).rows[0];
-  if(!schedule)fail('Daily schedule unavailable.',503);
-  return {schedule,created:Boolean(inserted.rows.length)};
-}
-
+const ensureDailySchedule=(day,environment)=>ensureDailyScheduleForQuery(query,day,environment);
 async function generateDailySchedules(request) {
   if(request.method!=='POST')fail('Not found.',404);
   const body=await readJson(request);
@@ -330,26 +310,16 @@ async function dailyStatus(request) {
 }
 
 async function leaderboard(request) {
-  const url=new URL(request.url),period=url.searchParams.get('period')||'daily';
-  if(!['daily','week','month','all'].includes(period)) fail('Invalid leaderboard period.');
+  const url=new URL(request.url),period=normalizeLeaderboardPeriod(url.searchParams.get('period')||'daily');
+  if(!['daily','week','season','all'].includes(period)) fail('Invalid leaderboard period.');
   let environment;try{environment=draftRunEnvironment(url.searchParams.get('environment')||'mixed');}catch{fail('Invalid Draft Run environment.');}
   const today=gameDateKey();
-  const start=period==='daily'?today:period==='month'?today.slice(0,8)+'01':period==='week'?(()=>{const d=new Date(today+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);})():'2000-01-01';
-  const r=await query(`WITH results AS (
-    SELECT player_id,round(avg(score),1) score,count(*) days FROM scores
-    WHERE mode='draft_run' AND set_id=$3
-      AND EXISTS (
-        SELECT 1 FROM account_links a JOIN players owned ON owned.id=a.player_id
-        WHERE a.player_id=scores.player_id AND owned.username_owned=true
-      )
-      AND challenge_date BETWEEN $1::date AND $2::date
-    GROUP BY player_id
-  ) SELECT rank() OVER(ORDER BY r.score DESC) rank,r.score,r.days,p.display_name,p.showcase_achievement,CASE WHEN p.profile_public AND p.username_owned AND
-      (SELECT count(*) FROM players x WHERE x.profile_public AND x.username_owned AND lower(x.display_name)=lower(p.display_name))=1 THEN p.profile_key END profile_key
-    FROM results r JOIN players p ON p.id=r.player_id AND p.username_owned=true ORDER BY r.score DESC,r.days DESC,p.display_name LIMIT 100`,[start,today,environment]);
-  return json({period,environment,start,today,rows:r.rows.map(r=>({...r,rank:Number(r.rank),score:Number(r.score),days:Number(r.days)}))});
+  const season=period==='season'?await resolveCurrentSeason(query,{today,ensureSchedule:ensureDailyScheduleForQuery}):null;
+  if(period==='season'&&!season)return json({period:'season',environment,start:null,today,season:null,rows:[]});
+  const start=period==='daily'?today:period==='season'?season.start_date:period==='week'?(()=>{const d=new Date(today+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);})():'2000-01-01';
+  const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,limit:100});
+  return json({period,environment,start,today,season:period==='season'?season:null,rows});
 }
-
 async function route(request) {
   const url=new URL(request.url),path=url.pathname;
   if(path===DAILY_GENERATION_PATH) return generateDailySchedules(request);

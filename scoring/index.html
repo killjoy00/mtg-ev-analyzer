@@ -11,7 +11,7 @@
   <meta property="og:description" content="100 means you matched the trophy drafter. Model support gives partial credit for alternatives." />
   <meta property="og:url" content="https://packone.pro/scoring/" />
   <link rel="canonical" href="https://packone.pro/scoring/" />
-  <link rel="stylesheet" href="/visual-c.css?v=3" />
+  <link rel="stylesheet" href="/visual-c.css?v=4" />
   <link rel="stylesheet" href="/editorial.css?v=3" />
   <title>How Pack One scoring works</title>
 </head>
@@ -21,10 +21,9 @@
     <span class="brand-mark" aria-hidden="true"><span>P</span><sup>1</sup></span>
     <span class="brand-copy"><strong>Pack One</strong></span>
   </a>
-  <div class="top-actions" aria-label="Primary">
+  <div class="top-actions" aria-label="Primary" data-site-nav>
     <a class="top-nav-button" href="/?game=draft-run&daily=1">Daily Run</a>
-    <a class="top-nav-button" href="/?game=draft-run&board=daily">Leaders</a>
-    <a class="top-nav-button" href="/how-it-works/">How To Play?</a>
+    <a class="top-nav-button" href="/how-it-works/">How To Play</a>
     <a class="top-nav-button" id="account-nav" href="/?account=1">Sign in</a>
   </div>
 </header>
@@ -32,13 +31,13 @@
   <article class="article-shell">
     <header class="article-header"><p class="kicker">Scoring</p><h1>How Pack One scoring works</h1><p class="article-deck">100 means you matched the trophy drafter. Model support gives partial credit for alternatives.</p></header>
     <aside hidden class="ad-slot ad-slot-wide" data-ad-slot="article-top" aria-label="Advertisement"><span>Advertisement</span></aside>
-    <div class="prose"><h2>The trophy drafter is the answer key.</h2><p>An exact match earns <strong>100 points, always</strong>. The target is a real choice made by a qualified drafter in a draft that trophied. The model grades alternatives; it does not replace that target.</p><h2>Excellent alternatives can earn 95.</h2><p>Other choices earn up to 95 based on raw model support relative to the strongest available choice. Partial-credit calibration is separate from probability calibration. Displayed support is not a direct points conversion.</p><div class="callout"><strong>Trophy drafter: Card B — 100.</strong><br>Model’s strongest alternative: Card A — 95.<p>Card A can be an excellent alternative according to broader evidence. Card B is the choice that occurred in the successful trophy trajectory.</p></div><h2>A partial-credit example.</h2><p>With the current linear curve, an alternative supported half as strongly as the model leader earns 48 after rounding. An alternative at 90% of the leader’s raw support earns 86. These examples apply to alternatives only: an exact trophy match still earns 100, however much support the model assigns it.</p><h2>Eight picks count equally.</h2><p>The final score is the rounded average of eight decision scores. Difficulty and depth add no hidden bonuses or penalties. Trophy matches are also counted separately. Historical results retain their original version and length.</p><h2>Fixed Dailies make scores comparable.</h2><p>Everyone plays the same Daily with no rerolls. Durable leaderboard participation requires an authenticated account when starting. Guests still receive and can share their score.</p><h2>Use disagreement to learn.</h2><p>Model support estimates drafting preferences in context. It cannot prove every historical choice optimal. An unusual trophy pick may reflect a blind spot or considerations missing from the data. It still earns 100.</p></div>
+    <div class="prose"><h2>The trophy drafter is the answer key.</h2><p>An exact match earns <strong>100 points, always</strong>. The target is a real choice made by a qualified drafter in a draft that trophied. The model grades alternatives; it does not replace that target.</p><h2>Excellent alternatives can earn 95.</h2><p>Other choices earn up to 95 based on raw model support relative to the strongest available choice. Partial-credit calibration is separate from probability calibration. Displayed support is not a direct points conversion.</p><div class="callout"><strong>Trophy drafter: Card B: 100.</strong><br>Model’s strongest alternative: Card A: 95.<p>Card A can be an excellent alternative according to broader evidence. Card B is the choice that occurred in the successful trophy trajectory.</p></div><h2>A partial-credit example.</h2><p>With the current linear curve, an alternative supported half as strongly as the model leader earns 48 after rounding. An alternative at 90% of the leader’s raw support earns 86. These examples apply to alternatives only: an exact trophy match still earns 100, however much support the model assigns it.</p><h2>Eight picks count equally.</h2><p>The final score is the rounded average of eight decision scores. Difficulty and depth add no hidden bonuses or penalties. Trophy matches are also counted separately. Historical results retain their original version and length.</p><h2>Fixed Dailies make scores comparable.</h2><p>Everyone plays the same Daily with no rerolls. Durable leaderboard participation requires an authenticated account when starting. Guests still receive and can share their score.</p><h2>Use disagreement to learn.</h2><p>Model support estimates drafting preferences in context. It cannot prove every historical choice optimal. An unusual trophy pick may reflect a blind spot or considerations missing from the data. It still earns 100.</p></div>
     <section class="landing-grid article-links" aria-label="Learn more about Pack One">
       <article class="content-card"><p class="kicker">Points</p><h2>Scoring</h2><p>See exactly how trophy matches, model-supported alternatives, and the eight-pick average become your final score.</p><a href="/scoring/">View scoring</a></article>
       <article class="content-card"><p class="kicker">Behind the model</p><h2>Method</h2><p>See how Pack One selects trophy decisions, qualifies draft evidence, and builds the model used for partial credit.</p><a href="/methodology/">View method</a></article>
       <article class="content-card"><p class="kicker">Coverage</p><h2>Sets</h2><p>Browse the sets currently supported by Pack One and see the available Draft Run coverage.</p><a href="/sets/">View sets</a></article>
     </section>
-    <aside class="article-cta"><p class="kicker">Put it into practice</p><h2>Make the decision before you read the answer.</h2><p>Pack One is most useful when you commit first, then use the consensus as a comparison point—not an instruction sheet.</p><a class="button-link" href="/">Play Pack One</a></aside>
+    <aside class="article-cta"><p class="kicker">Put it into practice</p><h2>Make the decision before you read the answer.</h2><p>Pack One is most useful when you commit first, then use the consensus as a comparison point, not an instruction sheet.</p><a class="button-link" href="/">Play Pack One</a></aside>
   </article>
 </main>
 <footer class="site-footer">
@@ -49,5 +48,6 @@
 <script src="/tcgplayer-config.js"></script>
 <script type="module" src="/ads.mjs"></script>
 <script type="module" src="/tcgplayer.mjs"></script>
+<script type="module" src="/site-nav.mjs"></script>
 </body>
 </html>
