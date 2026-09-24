@@ -42,6 +42,15 @@ jobs:
           CI: '1'
           PACKONE_BUILD_PROFILE: production
         run: npx expo prebuild --platform android --clean
+      - name: Verify native Android version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle || {
+            echo "Generated Android project does not contain versionCode $PACKONE_ANDROID_VERSION_CODE." >&2
+            grep -n "versionCode" android/app/build.gradle >&2 || true
+            exit 1
+          }
       - name: Build release app bundle
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon
