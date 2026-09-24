@@ -17,6 +17,7 @@ permissions:
 
 jobs:
   check:
+    environment: production
     runs-on: ubuntu-latest
     env:
       APP_ID: '6814318676'
