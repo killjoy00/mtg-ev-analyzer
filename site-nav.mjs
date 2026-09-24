@@ -17,6 +17,7 @@ function link(href,label,key,current=false){
 function currentFor(key){
   const path=location.pathname;
   if(key==='how')return path==='/how-it-works/'||path==='/how-it-works';
+  if(key==='practice')return path==='/practice/'||path==='/practice';
   if(key==='learn')return path==='/how-it-works/'||path==='/how-it-works'||path==='/scoring/'||path==='/methodology/'||path==='/sets/'||path.startsWith('/sets/')||path==='/learn/'||path.startsWith('/learn/');
   return false;
 }
@@ -29,7 +30,7 @@ export function syncSiteNavigation({doc=document}={}){
   const items=signed
     ? [
         link('/?game=draft-run&daily=1','Daily Run','daily'),
-        link('/?game=draft-run','Practice','practice'),
+        link('/practice/','Practice','practice',currentFor('practice')),
         link('/?game=draft-run&board=daily','Leaders','leaders'),
         link('/learn/','Learn','learn',currentFor('learn')),
         link('/?account=1','My Pack One','account'),

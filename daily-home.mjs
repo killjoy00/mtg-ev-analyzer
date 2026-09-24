@@ -27,7 +27,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = fals
   const usernameAttention=rankingReason==='username_taken'||rankingReason==='username_required';
   const ordered = [...games].sort((a, b) => Number(status[a.key].complete) - Number(status[b.key].complete));
   return `<section class="daily-home" data-daily-home data-completed="${status.completed}">
-    <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Make your pick, then see what the trophy drafter chose — and how strong your pick was.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
+    <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Make your pick, then see what the trophy drafter chose and how strong your pick was.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
     ${usernameAttention?'<aside class="daily-home-identity-warning" role="alert"><div><strong>Choose a unique username before playing a Daily.</strong><p>Your account still needs a unique username. Until you choose one, Daily results will not appear on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change username</button></aside>':''}
     <div class="daily-home-games">${ordered.map(game => {
       const result = status[game.key];
