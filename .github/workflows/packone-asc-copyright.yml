@@ -1,0 +1,58 @@
+name: Pack One ASC copyright
+on:
+  push:
+    branches: ["chatgpt/packone-play-credential-check"]
+    paths: [".github/workflows/packone-asc-copyright.yml"]
+permissions:
+  contents: read
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Set and verify copyright
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyjwt cryptography requests
+          python3 - <<'PY'
+          import os,time,jwt,requests,sys
+          version_id="04b0ee74-7d94-41e4-8463-79524972fce6"
+          value="2026 Ryan Mindell"
+          kid=os.environ["ASC_KEY_ID"].strip()
+          iss=os.environ["ASC_ISSUER_ID"].strip()
+          key=os.environ["ASC_KEY_P8"].replace("\\n","\n").strip()
+          now=int(time.time())
+          tok=jwt.encode(
+            {"iss":iss,"iat":now-5,"exp":now+900,"aud":"appstoreconnect-v1"},
+            key,algorithm="ES256",headers={"kid":kid,"typ":"JWT"}
+          )
+          h={"Authorization":f"Bearer {tok}","Content-Type":"application/json"}
+          base="https://api.appstoreconnect.apple.com/v1"
+
+          p=requests.patch(
+            f"{base}/appStoreVersions/{version_id}",
+            headers=h,
+            json={"data":{"type":"appStoreVersions","id":version_id,"attributes":{"copyright":value}}},
+            timeout=30
+          )
+          print("copyright_patch_http="+str(p.status_code))
+          if p.status_code not in (200,204):
+            try:
+              for e in p.json().get("errors",[])[:3]:
+                print("ASC_ERROR",e.get("status"),e.get("code"),e.get("title"),e.get("detail"))
+            except Exception:
+              pass
+            sys.exit(1)
+
+          g=requests.get(f"{base}/appStoreVersions/{version_id}",headers=h,timeout=30)
+          g.raise_for_status()
+          actual=g.json()["data"]["attributes"].get("copyright")
+          print("copyright_verified="+("yes" if actual==value else "no"))
+          if actual != value:
+            sys.exit(1)
+          PY
