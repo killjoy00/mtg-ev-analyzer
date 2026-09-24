@@ -1,12 +1,12 @@
 const esc=value=>String(value??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'","&#39;");
-const fmt=value=>value==null?'—':Number(value).toLocaleString(undefined,{maximumFractionDigits:1});
-const dateTime=value=>value?new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value)):'—';
-const dateOnly=value=>value?new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric'}).format(new Date(value)):'—';
+const fmt=value=>value==null?'N/A':Number(value).toLocaleString(undefined,{maximumFractionDigits:1});
+const dateTime=value=>value?new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric',hour:'numeric',minute:'2-digit'}).format(new Date(value)):'N/A';
+const dateOnly=value=>value?new Intl.DateTimeFormat(undefined,{year:'numeric',month:'short',day:'numeric'}).format(new Date(value)):'N/A';
 const capabilityLabel=value=>({unlimited_cube_practice:'Cube practice',custom_corpus:'Custom sets'})[value]||value;
 const badge=(label,kind='')=>`<span class="user-badge ${esc(kind)}">${esc(label)}</span>`;
 const props=value=>{
   const entries=Object.entries(value||{}).slice(0,4);
-  return entries.length?entries.map(([key,item])=>`${esc(key)}=${esc(typeof item==='object'?JSON.stringify(item):item)}`).join(' · '):'—';
+  return entries.length?entries.map(([key,item])=>`${esc(key)}=${esc(typeof item==='object'?JSON.stringify(item):item)}`).join(' · '):'N/A';
 };
 
 export async function renderUsers(root,request) {
@@ -45,7 +45,7 @@ export async function renderUsers(root,request) {
         ${data.users.map(user=>`<tr>
           <th><button type="button" class="user-open" data-user="${esc(user.id)}">${esc(user.name||'Unnamed account')}<small>${esc(user.email||'No email')}</small></button></th>
           <td>${esc(dateOnly(user.created_at))}</td><td>${esc(dateTime(user.last_active))}</td><td class="corpus-number">${fmt(user.runs)}</td><td class="corpus-number">${fmt(user.average_score)}</td>
-          <td class="user-access">${access(user)}</td><td>${user.is_admin?badge('Admin','candidate'):'—'}</td>
+          <td class="user-access">${access(user)}</td><td>${user.is_admin?badge('Admin','candidate'):'N/A'}</td>
         </tr>`).join('')||'<tr><td colspan="7">No authenticated accounts match these filters.</td></tr>'}
       </tbody></table></div>
       <dialog id="user-detail" aria-label="User details"><div id="user-detail-body"></div></dialog>
@@ -69,7 +69,7 @@ export async function renderUsers(root,request) {
           <dt>Created</dt><dd>${esc(dateTime(u.created_at))}</dd>
           <dt>Last active</dt><dd>${esc(dateTime(u.last_active))}</dd>
           <dt>Gameplay history</dt><dd>${u.linked?'Linked to this account':'Not linked yet'}</dd>
-          <dt>Profile</dt><dd>${esc(u.profile_name||'—')}${u.profile_public?' · public':''}${u.linked&&!u.username_owned?' · username needs attention':''}</dd>
+          <dt>Profile</dt><dd>${esc(u.profile_name||'N/A')}${u.profile_public?' · public':''}${u.linked&&!u.username_owned?' · username needs attention':''}</dd>
           <dt>Admin access</dt><dd>${u.is_admin?'Yes':'No'}</dd>
           ${u.banned?`<dt>Account status</dt><dd>${badge('Banned','blocked')} ${esc(u.ban_reason||'')}</dd>`:''}
         </dl>

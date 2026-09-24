@@ -28,7 +28,7 @@ test('guest Daily results offer score validation instead of a career action', as
   assert.match(result, /Choose username to add score/);
   assert.match(result, /validateDailyRunId:run\.id/);
   assert.match(result, /source:'daily_result'/);
-  assert.match(source, /sign in after the run to add this score to the leaderboard/);
+  assert.match(source, /Sign in after the run to add this score to the leaderboard/);
   assert.match(source, /This Daily isn’t ranked yet/);
   assert.match(source, /username_taken/);
 });
