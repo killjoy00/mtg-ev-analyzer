@@ -27,3 +27,5 @@ jobs:
           node-version: 24
       - name: Read latest Pack One TestFlight builds
         run: node .github/scripts/app-store-build-status.mjs
+      - name: Verify next monotonic build allocation
+        run: node .github/scripts/app-store-next-build-number.mjs
