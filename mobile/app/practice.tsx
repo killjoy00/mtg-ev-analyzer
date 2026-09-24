@@ -17,6 +17,7 @@ import {
   type PracticeSet,
 } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
+import { useAppResume } from '@/src/hooks/useAppResume';
 import { colors, spacing } from '@/src/theme';
 
 type PracticeState =
@@ -40,6 +41,11 @@ async function loadPracticeHub(): Promise<PracticeState> {
 export default function PracticeScreen() {
   const [state, setState] = useState<PracticeState>({ status: 'loading' });
   const [selectedSets, setSelectedSets] = useState<string[]>([]);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  useAppResume(() => {
+    setReloadKey((value) => value + 1);
+  });
 
   useEffect(() => {
     let active = true;
@@ -57,7 +63,7 @@ export default function PracticeScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [reloadKey]);
 
   const retry = async () => {
     setState({ status: 'loading' });
