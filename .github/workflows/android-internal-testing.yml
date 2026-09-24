@@ -39,6 +39,9 @@ jobs:
           java-version: '17'
       - name: Install mobile dependencies
         run: npm install --no-audit --no-fund
+      - name: Set store version code
+        shell: bash
+        run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
         run: npm test
       - name: Generate production Android project
@@ -121,6 +124,9 @@ jobs:
 
       - name: Install mobile dependencies
         run: npm install --no-audit --no-fund
+      - name: Set store version code
+        shell: bash
+        run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
         run: npm test
       - name: Generate production Android project
@@ -168,10 +174,12 @@ jobs:
           echo "$result"
           version_code="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.versionCode))' "$result")"
           {
-            echo "## Pack One Android Internal Testing release"
+            echo "## Pack One Android Internal Testing draft"
             echo
-            echo "- Package: `pro.packone.app`"
-            echo "- Track: `internal`"
-            echo "- Version code: `$version_code`"
+            echo '- Package: `pro.packone.app`'
+            echo '- Track: `internal`'
+            printf -- '- Version code: `%s`\n' "$version_code"
+            echo '- Release status: `draft`'
             echo "- Signed with the dedicated Pack One upload key from Google Secret Manager."
+            echo "- First rollout must be completed in Google Play Console after required setup declarations are satisfied."
           } >> "$GITHUB_STEP_SUMMARY"
