@@ -31,3 +31,22 @@ The fixed key alias is `packone-upload`. CI reads version `1` of both secrets ex
 10. deletes an abandoned edit if any pre-commit step fails
 
 No production-track release is created by this workflow.
+
+
+## First-release behavior
+
+Because `pro.packone.app` is still a draft/unpublished Play app, the API creates the first Internal Testing release with status `draft`. The edit is committed so the owner can inspect the release and complete the first rollout in Google Play Console after any required declarations/setup are satisfied.
+
+The workflow does not attempt a `completed` rollout for the unpublished app.
+
+## Build numbering
+
+Store version codes are assigned as:
+
+`100000 + GITHUB_RUN_NUMBER`
+
+for the Android Internal Testing workflow. Expo receives the value through `PACKONE_ANDROID_VERSION_CODE` before Prebuild, and config validation asserts that the override reaches `android.versionCode`.
+
+## Credential cleanup
+
+The intended active Android upload key lives only in Google Secret Manager. Older GitHub repository secrets named `ANDROID_UPLOAD_KEYSTORE_BASE64` and `ANDROID_UPLOAD_KEY_PASSWORD`, if still present, are obsolete and should be deleted. Any pre-WIF `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` secret and its corresponding Google Cloud service-account key should also be deleted.
