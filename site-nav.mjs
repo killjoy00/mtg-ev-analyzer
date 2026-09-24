@@ -17,7 +17,7 @@ function link(href,label,key,current=false){
 function currentFor(key){
   const path=location.pathname;
   if(key==='how')return path==='/how-it-works/'||path==='/how-it-works';
-  if(key==='learn')return path==='/learn/'||path.startsWith('/learn/');
+  if(key==='learn')return path==='/how-it-works/'||path==='/how-it-works'||path==='/scoring/'||path==='/methodology/'||path==='/sets/'||path.startsWith('/sets/')||path==='/learn/'||path.startsWith('/learn/');
   return false;
 }
 
