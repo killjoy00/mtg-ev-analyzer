@@ -10,7 +10,7 @@ const corpus=fs.readdirSync('corpus/draft-run').filter(f=>f.endsWith('.gz')).fla
 const environment=process.env.PACK1_TEST_ENVIRONMENT||'mixed',cube=environment==='powered-cube';
 const selectionVersion=process.env.PACK1_TEST_SELECTION_VERSION||'eight-pick-v3';
 const daily=process.env.PACK1_TEST_DAILY==='1';
-let shareCalls=0,eliteAccess=false,adGoogle=0,adMembership=0,runStarts=[];
+let shareCalls=0,eliteAccess=false,seasonAvailable=true,adGoogle=0,adMembership=0,runStarts=[];
 let puzzles=selectDraftRun(corpus,'browser-contract',environment,{selectionVersion}),answers=[],revision=0,rerolls=cube?{set:0,pack:2}:{set:1,pack:1};
 const sources=puzzles.map(p=>p.source_draft_hash),errors=[],events=[],views=[];
 const id='11111111-1111-4111-8111-111111111111',shareId='1234567890abcdef12345678';
@@ -28,7 +28,7 @@ await page.route('**/*-pack1growth.compute.c-5.us-east-2.aws.neon.tech/**',async
   await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
 });
 await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async route=>{
-  const path=new URL(route.request().url()).pathname;let body;
+  const requestUrl=new URL(route.request().url()),path=requestUrl.pathname;let body;
   if(path==='/v1/runs'&&route.request().method()==='POST'){runStarts.push(route.request().postDataJSON());body=snapshot();}
   else if(path.endsWith('/share')){shareCalls++;body={id:shareId};}
   else if(path.endsWith('/view')){const req=route.request().postDataJSON();assert.equal(req.revision,revision);assert.equal(req.puzzleId,puzzles[answers.length].puzzle_id);views.push(req);body={ok:true};}
@@ -44,7 +44,10 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
     grade.modelTargetDisagreement=evidence.modelTargetDisagreement;
     answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:[...p.candidates].sort((a,b)=>b.model_probability-a.model_probability).map(c=>({id:c.id,name:c.name,support:calibrated.get(c.id),score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
   }else if(path==='/v1/daily-status')body=eliteAccess?{player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice']}:{player:{claimed:false},capabilities:[]};
-  else if(path==='/v1/leaderboard')body={rows:[],period:'daily'};
+  else if(path==='/v1/leaderboard'){
+    const requested=requestUrl.searchParams.get('period')||'daily',period=requested==='month'?'season':requested;
+    body={rows:[],period,season:period==='season'&&seasonAvailable?{id:'hob',set_id:'hob',name:'The Hobbit',set_release_date:'2026-08-14',start_date:'2026-09-10',end_date:null,established_by_day:'2026-09-19'}:null};
+  }
   else body=snapshot();
   await route.fulfill({contentType:'application/json',body:JSON.stringify(body)});
 });
@@ -160,7 +163,7 @@ try{
     assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
     assert.equal(await page.locator('.run-consensus-leaders li').first().locator('[data-zoom]').getAttribute('data-zoom'),p.historical_pick_id);
     assert.doesNotMatch(await page.locator('.run-consensus-leaders li').first().innerText(),/%/);
-    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),'—');
+    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),'N/A');
     assert.equal(await page.locator('.run-consensus details').count(),0,'analysis does not retain a nested comparison disclosure');
     const shops=page.locator('.run-analysis .run-card-shop');
     assert.ok(await shops.count()>=1,'revealed-card commerce links remain in analysis');
@@ -215,6 +218,31 @@ try{
   assert.equal(await page.getByRole('link',{name:'Top 3 practice',exact:true}).count(),0);
   assert.doesNotMatch(await page.locator('.run-board').innerText(),/Full Pack|Top 3, Full Pack|Cube boards/i);
   await noOverflow();
+
+  await page.goto(base+'/?game=draft-run&board=month'+(cube?'&set=powered-cube':''));await page.locator('.run-board').waitFor();
+  assert.equal(new URL(page.url()).searchParams.get('board'),'season','old board=month URLs canonicalize immediately');
+  assert.equal((await page.locator('.run-board-periods a.active').innerText()).trim(),'This season');
+  assert.equal(await page.getByRole('link',{name:'This month',exact:true}).count(),0);
+  assert.match((await page.locator('.run-board-season').innerText()).trim(),/The Hobbit Season · Sep 10–present/);
+  for(const link of await page.locator('.run-board-games a').evaluateAll(nodes=>nodes.map(node=>node.getAttribute('href'))))assert.match(link,/board=season/);
+  await noOverflow();
+  await page.screenshot({path:`artifacts/ui-${cube?'cube':'draft-run'}-season-board-mobile.png`,fullPage:true});
+  await page.setViewportSize({width:1440,height:1000});await noOverflow();
+  await page.screenshot({path:`artifacts/ui-${cube?'cube':'draft-run'}-season-board-desktop.png`,fullPage:true});
+  await page.setViewportSize({width:390,height:844});
+
+  for(const target of ['mixed','powered-cube','latest']){
+    const set=target==='mixed'?'':'&set='+target;
+    await page.goto(base+'/?game=draft-run&board=season'+set);await page.locator('.run-board').waitFor();
+    assert.match((await page.locator('.run-board-season').innerText()).trim(),/The Hobbit Season · Sep 10–present/);
+    assert.equal((await page.locator('.run-board-periods a.active').innerText()).trim(),'This season');
+    await noOverflow();
+  }
+  seasonAvailable=false;
+  await page.goto(base+'/?game=draft-run&set=latest&board=season');await page.locator('.run-board').waitFor();
+  assert.equal(await page.locator('.run-board-season').count(),0);
+  assert.match(await page.locator('.run-empty').innerText(),/Season standings aren't available yet/);
+  seasonAvailable=true;
 
   eliteAccess=false;
   await page.goto(base+'/?game=draft-run&set=latest&board=daily');await page.locator('.run-board').waitFor();
