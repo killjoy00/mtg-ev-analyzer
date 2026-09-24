@@ -26,8 +26,9 @@ to pack cards.
 
 Guest primary navigation stays intentionally narrow: Daily Run, How To Play, and
 Sign in. Signed-in navigation may add Practice, Leaders, Learn, and My Pack One.
-How To Play is the beginner manual; Learn is the broader hub for scoring, method,
-set coverage, and drafting guides.
+Practice is a dedicated hub with unlimited regular Draft Run practice plus Elite
+Powered Cube and custom-set practice. How To Play is the beginner manual; Learn is
+the broader hub for scoring, method, set coverage, and drafting guides.
 
 Fonts are self-hosted WOFF2 files with their SIL Open Font Licenses. The same
 typography is used in gameplay, editorial pages, profile settings, and admin.
