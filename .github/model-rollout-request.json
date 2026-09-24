@@ -1,7 +1,7 @@
 {
   "operation": "deploy",
-  "request_id": "self-share-fix-development-20260923",
-  "reason": "Deploy the reviewed self-share protection and legacy cleanup-aware backend revision to development.",
+  "request_id": "self-share-fix-production-20260923",
+  "reason": "Promote the reviewed shared-run self-challenge fix after successful development acceptance.",
   "commit": "0649b3897a12e0d5ae98f3ecd693fccd768c0788",
-  "target": "development"
+  "target": "production"
 }
