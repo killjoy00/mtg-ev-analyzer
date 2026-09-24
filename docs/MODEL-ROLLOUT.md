@@ -81,7 +81,7 @@ for both official source objects. It never relies on a green workflow badge.
 regeneration, import, browser, and deployment workflows, all on main. It uses
 the repository's short-lived Actions token; no token or arbitrary command is
 accepted in the request. Each request has `request_id`, `reason`, `operation`,
-and the operation's explicit inputs. Production deployment still requires
+and the operation's explicit inputs. The bridge rejects a semantically identical prior request even when only `request_id` or `reason` changes; an intentional retry must set `replay_of` to the matching earlier request ID. Production deployment still requires
 the identical revision to pass the existing development release check.
 
 ## Remaining product decision

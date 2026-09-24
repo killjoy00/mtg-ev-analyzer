@@ -53,6 +53,8 @@ jobs:
         run: node tests/sets-e2e.mjs
       - name: Run Daily / Set Practice regression
         run: node tests/practice-e2e.mjs
+      - name: Run dedicated Practice hub regression
+        run: node tests/practice-hub-e2e.mjs
       - name: Run account practice and custom corpus regression
         run: node tests/practice-access-e2e.mjs
       - name: Run Player Profile / Progression regression

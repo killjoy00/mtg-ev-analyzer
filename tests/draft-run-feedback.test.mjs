@@ -9,10 +9,10 @@ test('locked feedback separates the trophy bonus from relative model support',()
  const text=consensusFeedback(answer);
  assert.doesNotMatch(text,/10%/);assert.match(text,/earn 100 regardless/);
  assert.ok(text.indexOf('data-zoom="trophy"')<text.indexOf('data-zoom="leader"'));
- assert.match(text,/<td>—<\/td><td>100<\/td>/);
+ assert.match(text,/<td>N\/A<\/td><td>100<\/td>/);
  assert.match(text,/does not establish a correct pick/);
- assert.match(text,/Trophy drafter: Trophy — 100/);
- assert.match(text,/Model’s strongest alternative: Leader — 95/);
+ assert.match(text,/Trophy drafter: Trophy: 100/);
+ assert.match(text,/Model’s strongest alternative: Leader: 95/);
  assert.match(text,/Compare all 2 choices/);
  assert.doesNotMatch(text,/<details/);
  assert.doesNotMatch(text,/95 ×/);
@@ -21,13 +21,13 @@ test('locked feedback separates the trophy bonus from relative model support',()
 
 test('compact feedback reserves target disagreement for the rare server flag',()=>{
  const rare={score:95,historicalMatch:false,modelTargetDisagreement:true,selectedName:'Player'};
- assert.equal(compactDraftRunFeedback(rare),'You chose Player — the trophy drafter made an unusual choice relative to the model.');
+ assert.equal(compactDraftRunFeedback(rare),'You chose Player. The trophy drafter made an unusual choice relative to the model.');
  const ordinary={score:95,historicalMatch:false,modelTargetDisagreement:false,consensusName:'Leader',consensusId:'leader',consensusSupport:.6,selectedSupport:.5,selectedId:'player',selectedName:'Player',historicalId:'trophy',historicalName:'Trophy',ranking:[{id:'leader',name:'Leader',support:.6,score:95},{id:'trophy',name:'Trophy',support:.1,score:100},{id:'player',name:'Player',support:.5,score:80}]};
- assert.equal(compactDraftRunFeedback(ordinary),'You chose Player — a strongly supported alternative.');
+ assert.equal(compactDraftRunFeedback(ordinary),'You chose Player. A strongly supported alternative.');
  assert.doesNotMatch(compactDraftRunFeedback(ordinary),/strongest|model leader|Trophy drafter: Trophy/i);
- assert.match(consensusFeedback(ordinary),/Model’s strongest alternative: Leader — 95/);
- assert.equal(compactDraftRunFeedback({...ordinary,score:70}),'You chose Player — a plausible alternative.');
- assert.equal(compactDraftRunFeedback({...ordinary,score:40}),'You chose Player — the model found less support for this choice.');
+ assert.match(consensusFeedback(ordinary),/Model’s strongest alternative: Leader: 95/);
+ assert.equal(compactDraftRunFeedback({...ordinary,score:70}),'You chose Player. A plausible alternative.');
+ assert.equal(compactDraftRunFeedback({...ordinary,score:40}),'You chose Player. The model found less support for this choice.');
  assert.equal(compactDraftRunFeedback({...ordinary,historicalMatch:true}),'');
  assert.equal(compactDraftRunFeedback({score:95,historicalMatch:false}),'A strongly supported alternative.');
 });
