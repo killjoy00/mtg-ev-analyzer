@@ -94,7 +94,7 @@ jobs:
           fi
 
           git fetch --no-tags origin main:refs/remotes/origin/main
-          stack_base_sha="$(git rev-parse origin/main)"
+          stack_base_sha="$(git merge-base origin/main "$HEAD_SHA")"
           echo "STACK_BASE_SHA=$stack_base_sha" >> "$GITHUB_ENV"
 
           mapfile -t migration_changes < <(git diff --name-status "$stack_base_sha" "$HEAD_SHA" -- 'migrations/*.sql')
@@ -110,7 +110,7 @@ jobs:
           # Disposable CI branches are cloned from the current Neon default branch.
           # For stacked PRs, the database still needs every unmerged migration in the
           # stack, not only migrations introduced by the immediate PR base. Compare
-          # the checked-out head with current main so inherited stack migrations are
+          # the checked-out head with its current-main merge base so inherited stack migrations are
           # applied in filename order while historical migrations remain immutable.
           mapfile -t pending < <(
             printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }' | sort -u
