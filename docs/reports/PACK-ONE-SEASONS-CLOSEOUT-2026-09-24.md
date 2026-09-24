@@ -123,6 +123,8 @@ The original statement that established season metadata survives later policy ed
 
 The follow-up hardening adds migration 0038 with a durable reconciliation watermark, makes profile season enrichment fail open, removes Daily creation from profile/growth reads, strengthens Live metadata admission, and adds semantic rollout replay protection. That hardening is now fully promoted: PR #476 merged exact application revision `9763e7caf87f20ca4bc77d82b8513a3d365db5c9`; migration 0038 passed development run 36020410138 and production run 36022058215; the same exact revision passed development deploy/acceptance 36021141621 and production deploy/acceptance 36023616589. The three post-release failure-domain risks identified above are therefore remediated in the live production runtime.
 
+See [the dedicated season hardening closeout](PACK-ONE-SEASONS-HARDENING-CLOSEOUT-2026-09-24.md) for the remediation and release evidence.
+
 ## Follow-ups / non-blockers
 
 1. **Mobile migration numbering:** the stacked mobile work was created before the season migrations stabilized: PR #448 still carries a historical 0037 migration and PR #461 carries a historical 0038 migration on later stack layers. Current `main` now owns 0037 and 0038, so the mobile migration chain must be rebased and renumbered before merge.
