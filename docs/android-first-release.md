@@ -13,7 +13,7 @@ The release workflow reads two secrets from Google Secret Manager through the al
 - `packone-android-upload-keystore-b64`
 - `packone-android-upload-password`
 
-The fixed key alias is `packone-upload`.
+The fixed key alias is `packone-upload`. CI reads version `1` of both secrets explicitly; rotating the upload key therefore requires a deliberate workflow change rather than silently following `latest`.
 
 ## Release workflow
 
