@@ -104,7 +104,7 @@ jobs:
           done
 
           # Disposable CI branches are cloned from the current Neon default branch,
-          # which already carries the reviewed production schema through 0037.
+          # which already carries the reviewed production schema through 0038.
           # Replaying older migrations can replace current constraints with historical
           # definitions, so only migrations newly added by this PR belong on the clone.
           mapfile -t pending < <(
