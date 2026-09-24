@@ -17,6 +17,22 @@ function environmentName(names,id) {
   return names.get(String(id||'').toLowerCase())||String(id||'').toUpperCase();
 }
 
+function seasonEnvironmentName(id) {
+  if(id==='mixed')return 'Draft Run';
+  if(id==='powered-cube')return 'Cube';
+  if(id==='latest')return 'Latest Set';
+  return String(id||'').toUpperCase();
+}
+
+export function currentSeasonMarkup(profile,{surface='my-pack'}={}) {
+  const season=profile?.current_season,rows=season?.standings||[];
+  if(!season||!rows.length)return '';
+  const cls=surface==='public'?'profile-section profile-current-season':'my-pack-card profile-current-season';
+  return '<section class="'+cls+'" aria-labelledby="current-season-title"><div class="current-season-heading"><p class="eyebrow">Current season</p><h2 id="current-season-title">'+esc(season.name)+' Season <span>· Current</span></h2></div><ol class="current-season-standings">'+rows.map(row=>
+    '<li><strong>'+esc(seasonEnvironmentName(row.environment))+'</strong><span>#'+num(row.rank)+' · '+num(row.average).toFixed(1)+' · '+num(row.days)+' '+(num(row.days)===1?'day':'days')+'</span></li>'
+  ).join('')+'</ol></section>';
+}
+
 function shortDate(value) {
   if(!value)return '';
   const date=new Date(value);
@@ -146,7 +162,7 @@ function statsMarkup(profile,catalog,account,patreon) {
   const recentPreview=recent.slice(0,5).map(row=>gamePreviewRow(row,names)).join('');
   const dailyPreview=daily.slice(0,5).map(row=>dailyPreviewRow(row,names)).join('');
   return '<div class="my-pack-one-grid"><main class="my-pack-one-main">'+
-    '<section class="my-pack-card my-career-card"><div class="my-card-heading"><h2>Career Snapshot</h2></div><div class="my-career-metrics">'+metricHtml+'</div></section>'+
+    '<section class="my-pack-card my-career-card"><div class="my-card-heading"><h2>Career Snapshot</h2></div><div class="my-career-metrics">'+metricHtml+'</div></section>'+currentSeasonMarkup(profile)+
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Recent Performance</h2><span>Last '+Math.min(10,(profile.trend||[]).length)+' games</span></div>'+performanceBars(profile)+'</section>'+
     '<div class="my-two-up"><section class="my-pack-card"><div class="my-card-heading"><h2>Best Environments</h2></div>'+bestEnvironmentRows(profile,names)+'</section>'+
     '<section class="my-pack-card"><div class="my-card-heading"><h2>Achievements</h2><span>'+unlocked+' / '+totalAchievements+' unlocked</span></div>'+achievementPreview(profile)+achievementDetails(profile)+'</section></div>'+

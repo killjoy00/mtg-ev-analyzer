@@ -4,6 +4,7 @@ import {guardIngress} from './ingress-auth.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
+import {currentSeasonForPlayer} from './draft-run-season.mjs';
 import {handlePatreon} from './patreon.mjs';
 import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,digest,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 import {accountRuntimeConfig} from './account-config.mjs';
@@ -445,8 +446,22 @@ async function profileMetaByKey(profileKey) {
   return result.rows[0] || null;
 }
 
+async function currentSeasonForProfile(playerId) {
+  try {
+    return await currentSeasonForPlayer(query,playerId);
+  } catch(error) {
+    console.error(JSON.stringify({
+      event:'profile_current_season_unavailable',
+      error_code:String(error?.code||error?.pgCode||'SEASON_RESOLUTION_FAILED'),
+      status:Number(error?.status||500),
+      release_commit:releaseMetadata().release_commit,
+    }));
+    return null;
+  }
+}
+
 async function buildProfile(playerId, meta, { own = false } = {}) {
-  const [summaryResult, bySetResult, byModeResult, recentResult, dailyHistory, catalog, streakDates] = await Promise.all([
+  const [summaryResult, bySetResult, byModeResult, recentResult, dailyHistory, catalog, streakDates, currentSeason] = await Promise.all([
     query(
       `SELECT count(*) games,round(avg(score),1) average_score,max(score) best_score,
               count(*) FILTER (WHERE outcome='win') challenge_wins,
@@ -578,6 +593,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     best_environments: bestEnvironments,
     cube,
     best_final_percentile: finalPercentiles.length?Math.min(...finalPercentiles):null,
+    current_season: currentSeason,
     daily_history: dailyHistory.slice(0,120),
     recent,
     trend: [...recent].slice(0, 40).reverse().map((row) => ({
@@ -1012,7 +1028,9 @@ async function handleEvents(request) {
   for (const event of events) {
     const name = String(event?.name || '').trim().slice(0, 64);
     if (!/^[a-z0-9_.-]{2,64}$/i.test(name) || SERVER_EVENTS.has(name.toLowerCase())) continue;
-    clean.push({name,props:props(event.props)});
+    const eventProps=props(event.props);
+    if(name.toLowerCase()==='leaderboard_view'&&eventProps.mode==='draft_run'&&eventProps.period==='month')eventProps.period='season';
+    clean.push({name,props:eventProps});
   }
   if(clean.length)await consumePlayerLimit(query,id,'events',{limit:300,seconds:60,cost:clean.length});
   if(clean.length)await query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,e.name,e.props FROM jsonb_to_recordset($2::jsonb) e(name text,props jsonb)',[id,JSON.stringify(clean)]);

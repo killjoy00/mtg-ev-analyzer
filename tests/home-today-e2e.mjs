@@ -31,7 +31,7 @@ try{
  complete=true;await page.evaluate(()=>document.dispatchEvent(new CustomEvent('pack1:result-completed')));await progress('1');
  held();await page.waitForTimeout(100);await progress('1');
  both=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await progress('3');
- assert.ok(await page.getByRole('link',{name:'Start Another Draft Run',exact:true}).isVisible());
+ assert.ok(await page.getByRole('link',{name:'Go to Practice',exact:true}).isVisible());
  for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-dailies-complete-${width}.png`,fullPage:true});}
  both=false;
  await page.evaluate(()=>{window.__todayNow=Date.parse('2026-09-15T07:00:00Z');window.dispatchEvent(new Event('focus'));});await progress('0');
