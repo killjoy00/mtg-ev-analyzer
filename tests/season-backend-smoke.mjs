@@ -123,7 +123,7 @@ await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade
 // More than 100 eligible peers prove profile rank is calculated before the
 // public board's LIMIT 100.
 const peers=Array.from({length:105},(_,i)=>({id:crypto.randomUUID(),auth_id:crypto.randomUUID(),name:`Season Peer ${String(i).padStart(3,'0')}`,email:`season-peer-${i}-${targetPlayer}@example.invalid`}));
-await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") SELECT id::uuid,name,email,false FROM jsonb_to_recordset($1::jsonb) AS x(id text,name text,email text)',[JSON.stringify(peers)]);
+await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") SELECT auth_id::uuid,name,email,false FROM jsonb_to_recordset($1::jsonb) AS x(auth_id text,name text,email text)',[JSON.stringify(peers)]);
 await query('INSERT INTO players(id,display_name,username_owned) SELECT id::uuid,name,true FROM jsonb_to_recordset($1::jsonb) AS x(id text,name text)',[JSON.stringify(peers)]);
 await query('INSERT INTO account_links(auth_user_id,player_id) SELECT auth_id::uuid,id::uuid FROM jsonb_to_recordset($1::jsonb) AS x(id text,auth_id text)',[JSON.stringify(peers)]);
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT id::uuid,'2026-09-01','mixed','draft_run',20,'F','[]'::jsonb FROM jsonb_to_recordset($1::jsonb) AS x(id text)",[JSON.stringify(peers)]);
