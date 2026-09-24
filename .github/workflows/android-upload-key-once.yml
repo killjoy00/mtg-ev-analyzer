@@ -1,0 +1,95 @@
+name: Generate Android upload key (one-time)
+
+# One-time setup: creates the Pack One Android upload keystore on the runner
+# and writes it straight into repository secrets. Same format as EZ Trivia:
+# PKCS12, alias `upload`, one password for store and key.
+#
+#   ANDROID_UPLOAD_KEYSTORE_BASE64  base64 of the .p12
+#   ANDROID_UPLOAD_KEY_PASSWORD     random password, never seen by anyone
+#
+# The keystore and password are never printed, committed or uploaded as an
+# artifact. Writing secrets needs PACKONE_SECRETS_TOKEN, a short-lived
+# fine-grained token with Secrets read/write on this repository only.
+#
+# Refuses to run if ANDROID_UPLOAD_KEYSTORE_BASE64 already exists, so it can
+# never replace a key Google Play has already registered.
+
+on:
+  push:
+    branches: [claude/pack-one-mobile-native-dwka2m]
+    paths: [.github/workflows/android-upload-key-once.yml]
+
+permissions:
+  contents: read
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Refuse to overwrite an existing key
+        env:
+          EXISTING_KEYSTORE: ${{ secrets.ANDROID_UPLOAD_KEYSTORE_BASE64 }}
+          SECRETS_TOKEN: ${{ secrets.PACKONE_SECRETS_TOKEN }}
+        run: |
+          if [ -n "$EXISTING_KEYSTORE" ]; then
+            echo "::error::ANDROID_UPLOAD_KEYSTORE_BASE64 already exists. Refusing to replace it."
+            exit 1
+          fi
+          if [ -z "$SECRETS_TOKEN" ]; then
+            echo "::error::PACKONE_SECRETS_TOKEN is not set, so the secrets cannot be written."
+            exit 1
+          fi
+          echo "No existing upload key, and the secrets token is present."
+
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Generate keystore and store it as secrets
+        env:
+          GH_TOKEN: ${{ secrets.PACKONE_SECRETS_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          umask 077
+          dir="$RUNNER_TEMP/upload-key"
+          mkdir -p "$dir"
+          trap 'rm -rf "$dir"' EXIT
+
+          KS_PASS="$(openssl rand -base64 48 | tr -d '/+=\n' | cut -c1-40)"
+          echo "::add-mask::$KS_PASS"
+          export KS_PASS
+
+          keytool -genkeypair \
+            -storetype PKCS12 \
+            -keystore "$dir/packone-upload.p12" \
+            -alias upload \
+            -keyalg RSA -keysize 4096 -validity 10000 \
+            -dname "CN=Pack One" \
+            -storepass:env KS_PASS -keypass:env KS_PASS >/dev/null 2>&1
+
+          # Prove the keystore opens with the password before storing anything.
+          keytool -list -storetype PKCS12 -keystore "$dir/packone-upload.p12" \
+            -storepass:env KS_PASS -alias upload >/dev/null
+
+          base64 -w0 "$dir/packone-upload.p12" | gh secret set ANDROID_UPLOAD_KEYSTORE_BASE64 --repo "$REPO"
+          printf '%s' "$KS_PASS" | gh secret set ANDROID_UPLOAD_KEY_PASSWORD --repo "$REPO"
+
+          # The certificate fingerprint is public, not secret. Recorded so the
+          # key Play registers on the first upload can be checked against it.
+          echo "Upload certificate SHA-256:"
+          keytool -list -v -storetype PKCS12 -keystore "$dir/packone-upload.p12" \
+            -storepass:env KS_PASS -alias upload | grep -E '^\s*SHA256:'
+
+      - name: Confirm both secrets exist
+        env:
+          GH_TOKEN: ${{ secrets.PACKONE_SECRETS_TOKEN }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          names="$(gh secret list --repo "$REPO" --json name,updatedAt \
+            --jq '.[] | select(.name == "ANDROID_UPLOAD_KEYSTORE_BASE64" or .name == "ANDROID_UPLOAD_KEY_PASSWORD") | "\(.name) updated \(.updatedAt)"')"
+          echo "$names"
+          [ "$(printf '%s\n' "$names" | grep -c .)" -eq 2 ] || { echo "::error::Expected both secrets to exist."; exit 1; }
+          echo "Both upload key secrets are stored."
