@@ -28,7 +28,7 @@ test('Google errors have an independent surface and account analytics keep sourc
 });
 
 test('verification-required signup offers resend and expired-link recovery',()=>{
-  assert.match(growth,/Check your email — we sent a verification link to/);
+  assert.match(growth,/Check your email. We sent a verification link to/);
   assert.match(growth,/Verification links expire after 15 minutes/);
   assert.match(growth,/account-verification-success/);
   assert.match(growth,/account-verification-resend/);

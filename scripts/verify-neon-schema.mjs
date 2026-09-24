@@ -48,6 +48,12 @@ const result=await query(`SELECT
   to_regclass('provider_webhook_receipts') IS NOT NULL provider_webhook_receipts,
   to_regclass('corpus_status_events') IS NOT NULL corpus_lifecycle,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='draft_run_account_daily_unique') account_daily,
+  to_regclass('draft_run_seasons') IS NOT NULL draft_run_seasons,
+  EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='draft_run_seasons_current_uq') single_current_season,
+  to_regclass('draft_run_season_reconciliation_state') IS NOT NULL season_reconcile_state,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='draft_run_season_reconciliation_state' AND column_name='last_reconciled_day') season_reconcile_watermark,
+  to_regprocedure('pack1_reconcile_draft_run_seasons()') IS NOT NULL season_reconcile,
+  position('last_reconciled_day' in pg_get_functiondef('pack1_reconcile_draft_run_seasons()'::regprocedure))>0 season_reconcile_incremental,
   (SELECT count(*)=3 FROM pg_indexes WHERE indexname IN ('draft_run_serving_window_idx','draft_run_serving_source_idx','draft_run_rating_band_idx')) indexes,
   (SELECT count(*)=3 FROM information_schema.columns WHERE table_schema='public' AND
     ((table_name='draft_run_sessions' AND column_name IN ('result_persisted_at','daily_featured_sets')) OR (table_name='draft_run_schedules' AND column_name='daily_featured_sets'))) columns,
@@ -60,6 +66,6 @@ const result=await query(`SELECT
   position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0037 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0038 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');
