@@ -69,7 +69,7 @@ try {
         releases: [
           {
             name: releaseName,
-            status: 'completed',
+            status: 'draft',
             versionCodes: [versionCode],
           },
         ],
@@ -89,6 +89,7 @@ try {
       track: 'internal',
       versionCode,
       releaseName,
+      releaseStatus: 'draft',
       committed: true,
     }),
   );
