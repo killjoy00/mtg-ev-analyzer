@@ -35,6 +35,9 @@ jobs:
         with:
           project_id: pack-one
 
+      - name: Enable Secret Manager API
+        run: gcloud services enable secretmanager.googleapis.com --project=pack-one
+
       - name: Create dedicated upload key and version-1 secrets
         shell: bash
         run: |
