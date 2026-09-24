@@ -40,6 +40,10 @@ jobs:
           cleanup() { curl --silent --show-error -X DELETE -H "$auth_header" "$base/edits/$edit_id" >/dev/null || true; }
           trap cleanup EXIT
           track_json="$(curl --fail-with-body --silent --show-error -H "$auth_header" "$base/edits/$edit_id/tracks/internal")"
+          testers_json="$(curl --fail-with-body --silent --show-error -H "$auth_header" "$base/edits/$edit_id/testers/internal")"
           echo "$track_json"
+          echo "$testers_json"
           echo "## Google Play Internal Testing status" >> "$GITHUB_STEP_SUMMARY"
           echo "$track_json" >> "$GITHUB_STEP_SUMMARY"
+          echo "## Google Play Internal Testing testers" >> "$GITHUB_STEP_SUMMARY"
+          echo "$testers_json" >> "$GITHUB_STEP_SUMMARY"
