@@ -505,6 +505,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     dailyHistoryFor(playerId),
     loadCatalog(),
     query('SELECT DISTINCT challenge_date::text date FROM scores WHERE player_id=$1::uuid ORDER BY date',[playerId]),
+    currentSeasonForProfile(playerId),
   ]);
 
   const summary = summaryResult.rows[0] || {};
