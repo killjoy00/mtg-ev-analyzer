@@ -1,5 +1,9 @@
 import { ACCOUNT_SIGNAL_KEY, hasAccountSession } from '/growth-api.mjs';
 
+if(!globalThis.PACK1_API){
+  try { await import('/leaderboard-config.js'); } catch {}
+}
+
 function link(href,label,key,current=false){
   const a=document.createElement('a');
   a.className='top-nav-button';
