@@ -61,6 +61,7 @@ test('expected Latest Set unavailability retains persisted season, unexpected fa
 test('profiles and leaderboard use the same current season implementation',()=>{
   assert.match(growth,/currentSeasonForPlayer\(query,playerId\)/);
   assert.match(myPack,/current_season/);
+  assert.match(myPack,/if\(!season\|\|!rows\.length\)return ''/);
   assert.match(myPack,/Current season/);
   assert.match(myPack,/#'\+num\(row\.rank\)/);
   assert.match(client,/run-board-season/);
