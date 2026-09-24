@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import zlib from 'node:zlib';
 import {generateKeyPairSync,sign} from 'node:crypto';
 import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from '../worker/trophy-import-auth.mjs';
-import {insertTrophyBatch,handleTrophyImport,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
+import {insertTrophyBatch,handleTrophyImport,refreshTrophyImagePage,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
 import {SERVING_ANALYZE_SQL,SOURCE_ANALYZE_SQL,SERVING_STATISTICS_COLUMNS,SERVING_STATISTICS_READY_SQL} from '../worker/serving-statistics.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 
@@ -117,6 +117,13 @@ test('card image refresh changes display metadata only for registered environmen
     rarity:target.rarity||'',
     type_line:target.type_line||'',
   }];
+  const page=await refreshTrophyImagePage(query,'powered-cube',mapping);
+  assert.equal(page.puzzles,1);
+  assert.equal(page.updated_puzzles,1);
+  assert.equal(page.done,true);
+  assert.equal(page.next_after,null);
+  stored=structuredClone(original);
+
   const result=await refreshTrophyImages(query,'powered-cube',mapping);
   assert.equal(result.puzzles,1);
   assert.equal(result.updated_puzzles,1);

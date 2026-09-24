@@ -57,53 +57,84 @@ function patchCards(cards,mapping,counters) {
   });
 }
 
-export async function refreshTrophyImages(query,setId,rawMapping) {
+const IMAGE_REFRESH_PAGE_SIZE=250;
+
+export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='') {
   if(!allowed.has(setId))throw error('Image refresh requires a registered environment');
   const mapping=normalizeImageMapping(rawMapping);
-  let after='',seen=0,updatedPuzzles=0,updatedCards=0;
-  for(;;) {
-    const page=await query(
-      'SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND puzzle_id>$3 ORDER BY puzzle_id LIMIT 250',
-      [setId,VERSION,after],
+  const after=String(rawAfter||'');
+  const page=await query(
+    'SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND puzzle_id>$3 ORDER BY puzzle_id LIMIT $4',
+    [setId,VERSION,after,IMAGE_REFRESH_PAGE_SIZE],
+  );
+  if(!page.rows.length)return {
+    set_id:setId,
+    mapping_entries:mapping.size,
+    puzzles:0,
+    updated_puzzles:0,
+    updated_cards:0,
+    next_after:null,
+    done:true,
+  };
+
+  const updates=[];
+  let updatedCards=0;
+  for(const row of page.rows) {
+    const current=parse(row.payload);
+    if(!validateDraftRunPuzzle(current)||current.set_id!==setId||current.puzzle_id!==row.puzzle_id)throw error('Stored puzzle failed image-refresh verification',409);
+    const counters={cards:0};
+    const next={
+      ...current,
+      candidates:patchCards(current.candidates,mapping,counters),
+      prior_picks:patchCards(current.prior_picks,mapping,counters),
+    };
+    if(counters.cards) {
+      if(!validateDraftRunPuzzle(next)||!isDeepStrictEqual(scrubPuzzle(current),scrubPuzzle(next)))throw error('Image refresh attempted to change gameplay data',409);
+      updates.push({puzzle_id:row.puzzle_id,payload:next});
+      updatedCards+=counters.cards;
+    }
+  }
+  if(updates.length) {
+    const result=await query(
+      `WITH incoming AS (
+        SELECT * FROM jsonb_to_recordset($1::jsonb) AS i(puzzle_id text,payload jsonb)
+      )
+      UPDATE draft_run_verified_puzzles p
+      SET payload=i.payload
+      FROM incoming i
+      WHERE p.puzzle_id=i.puzzle_id AND p.set_id=$2 AND p.corpus_version=$3
+      RETURNING p.puzzle_id`,
+      [JSON.stringify(updates),setId,VERSION],
     );
-    if(!page.rows.length)break;
-    const updates=[];
-    for(const row of page.rows) {
-      const current=parse(row.payload);
-      if(!validateDraftRunPuzzle(current)||current.set_id!==setId||current.puzzle_id!==row.puzzle_id)throw error('Stored puzzle failed image-refresh verification',409);
-      const counters={cards:0};
-      const next={
-        ...current,
-        candidates:patchCards(current.candidates,mapping,counters),
-        prior_picks:patchCards(current.prior_picks,mapping,counters),
-      };
-      if(counters.cards) {
-        if(!validateDraftRunPuzzle(next)||!isDeepStrictEqual(scrubPuzzle(current),scrubPuzzle(next)))throw error('Image refresh attempted to change gameplay data',409);
-        updates.push({puzzle_id:row.puzzle_id,payload:next});
-        updatedCards+=counters.cards;
-      }
-      seen++;
-      after=row.puzzle_id;
-    }
-    if(updates.length) {
-      const result=await query(
-        `WITH incoming AS (
-          SELECT * FROM jsonb_to_recordset($1::jsonb) AS i(puzzle_id text,payload jsonb)
-        )
-        UPDATE draft_run_verified_puzzles p
-        SET payload=i.payload
-        FROM incoming i
-        WHERE p.puzzle_id=i.puzzle_id AND p.set_id=$2 AND p.corpus_version=$3
-        RETURNING p.puzzle_id`,
-        [JSON.stringify(updates),setId,VERSION],
-      );
-      if(result.rows.length!==updates.length)throw error('Image refresh update count mismatch',409);
-      updatedPuzzles+=updates.length;
-    }
-    if(page.rows.length<250)break;
+    if(result.rows.length!==updates.length)throw error('Image refresh update count mismatch',409);
+  }
+
+  const nextAfter=page.rows.at(-1).puzzle_id;
+  return {
+    set_id:setId,
+    mapping_entries:mapping.size,
+    puzzles:page.rows.length,
+    updated_puzzles:updates.length,
+    updated_cards:updatedCards,
+    next_after:page.rows.length===IMAGE_REFRESH_PAGE_SIZE?nextAfter:null,
+    done:page.rows.length<IMAGE_REFRESH_PAGE_SIZE,
+  };
+}
+
+export async function refreshTrophyImages(query,setId,rawMapping) {
+  let after='',seen=0,updatedPuzzles=0,updatedCards=0,mappingEntries=null;
+  for(;;) {
+    const page=await refreshTrophyImagePage(query,setId,rawMapping,after);
+    mappingEntries??=page.mapping_entries;
+    seen+=page.puzzles;
+    updatedPuzzles+=page.updated_puzzles;
+    updatedCards+=page.updated_cards;
+    if(page.done)break;
+    if(!page.next_after||page.next_after===after)throw error('Image refresh cursor did not advance',409);
+    after=page.next_after;
   }
   if(!seen)throw error('No verified puzzles are available for image refresh',409);
-  return {set_id:setId,mapping_entries:mapping.size,puzzles:seen,updated_puzzles:updatedPuzzles,updated_cards:updatedCards};
+  return {set_id:setId,mapping_entries:mappingEntries,puzzles:seen,updated_puzzles:updatedPuzzles,updated_cards:updatedCards};
 }
 
 export async function normalizeResolvedImageMarkers(query,rawSetIds) {
@@ -177,9 +208,10 @@ export async function handleTrophyImport(request,query) {
   let body;
   try{body=JSON.parse(Buffer.concat(chunks));}catch{throw error('Invalid JSON');}
 
-  if(body.action==='refresh-images'||body.action==='normalize-image-markers') {
+  if(body.action==='refresh-images'||body.action==='refresh-image-page'||body.action==='normalize-image-markers') {
     if(identity.workflow_ref!==IMAGE_REFRESH_WORKFLOW)throw error('Image refresh identity denied',403);
     if(body.action==='refresh-images')return refreshTrophyImages(query,body.setId,body.mapping);
+    if(body.action==='refresh-image-page')return refreshTrophyImagePage(query,body.setId,body.mapping,body.after);
     return normalizeResolvedImageMarkers(query,body.setIds);
   }
   if(identity.workflow_ref!==IMPORT_WORKFLOW)throw error('Trophy import identity denied',403);
