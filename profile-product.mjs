@@ -35,7 +35,7 @@ import {
   shareProfileCard,
   shareResultCard,
 } from './share-cards.mjs';
-import {bindMyPackOneTabs,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs';
+import {bindMyPackOneTabs,currentSeasonMarkup,myPackOneMarkup,resetMyPackOneTab} from './my-pack-one.mjs';
 
 let catalogPromise = null;
 let profileRendering = false;
@@ -255,6 +255,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
       <div><span>Environments</span><strong>${progress.played}/${progress.total}</strong></div>
     </div>
 
+    ${currentSeasonMarkup(profile,{surface:'public'})}
     ${Number(summary.games||0)===0?'<section class="profile-welcome"><h2>Your first eight picks start here.</h2><p>Play a Daily to begin your record.</p><a class="button primary" href="?game=draft-run&daily=1">Play Daily Draft Run</a></section>':''}
     ${own&&next.length?`<section class="profile-next"><h2>Within reach</h2>${next.map(a=>`<div><strong>${esc(a.label)}</strong><span>${esc(a.progress_text)}</span><p>${esc(a.description)}</p><progress value="${Number(a.current)}" max="${Number(a.target)}" aria-label="${esc(a.label)} progress"></progress></div>`).join('')}</section>`:''}
 
