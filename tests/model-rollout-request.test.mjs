@@ -129,6 +129,12 @@ test('Daily calendar migration is exact-revision and target-only',()=>{
  for(const extra of [{commit:'main'},{target:'other'},{migration:'0034'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
 
+test('self-share cleanup is exact-revision and fixed to the reviewed dev-to-prod workflow',()=>{
+ const request={...common,operation:'self-share-cleanup',commit:'d'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'self-share-cleanup.yml',body:{ref:'main',inputs:{commit:'d'.repeat(40)}}});
+ for(const extra of [{commit:'main'},{target:'production'},{migration:'0036'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
 test('Neon scheduler release is fixed, reviewed, and exact-revision on enable',()=>{
  const enable={...common,operation:'neon-schedulers',action:'enable',commit:'c'.repeat(40)};
  assert.deepEqual(rolloutDispatch(enable),{

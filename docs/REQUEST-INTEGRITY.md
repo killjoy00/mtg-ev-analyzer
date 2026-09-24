@@ -4,6 +4,12 @@ Reviewed 2026-09-23. Backend changes that depend on schema changes require the m
 
 The Pacific Daily calendar cutover has an additional release-timing invariant because the website changes calendar semantics as soon as the merge publishes while the backend remains on the old function revision until migration and deployment complete. Merge this cutover only from 03:00 through 23:59 Eastern. Then apply migration 0035 to development, deploy and verify the exact merged revision there, apply migration 0035 to production, and deploy the same revision to production. The production deploy must finish before midnight Eastern; if it cannot, revert the merge before midnight rather than carrying a website/backend calendar mismatch into the 00:00-03:00 Eastern interval. The fixed `daily-calendar-migration.yml` workflow is callable through the reviewed rollout-request bridge and rejects starts outside the 03:00-23:59 Eastern window.
 
+## Shared-run ownership integrity
+
+Practice shares are invitations to another player, not replay tokens for the creator. The Draft Run API resolves the share's original session owner before creating a challenge. When the current player owns the share, starting from that link returns the original completed session instead of inserting a new challenge session. Response and persistence paths also suppress a self-comparison defensively for legacy/in-flight rows, and shared score lists keep the creator's original score while excluding same-player replay duplicates.
+
+Migration `0036_self_shared_run_cleanup.sql` removes legacy self-challenge sessions plus their derived career result/event artifacts, then revalidates affected game/challenge achievements and clears an invalid showcase selection if necessary. Apply it only through the fixed `self-share-cleanup.yml` workflow against an exact reviewed main revision. The workflow runs development first and production second, reports each pre-cleanup count, and requires zero remaining self-share sessions after each transaction. New runtime code should be deployed before cleanup so another bad self-challenge cannot be recreated after old rows are removed.
+
 ## Implemented protections
 
 - Both legacy and growth APIs use `worker/request-json.mjs`: JSON objects only, valid UTF-8, at most 128 KiB measured while streaming, with explicit 400/413/415 responses. Session creation validates before token/identity work; invalid bodies no longer silently create guests.

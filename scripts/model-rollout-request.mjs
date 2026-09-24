@@ -52,6 +52,9 @@ export function rolloutDispatch(request) {
   } else if(operation==='daily-calendar-migration') {
     if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid Daily calendar migration request.');
     workflow='daily-calendar-migration.yml';inputs={commit,target};extra=['commit','target'];
+  } else if(operation==='self-share-cleanup') {
+    if(!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Invalid self-share cleanup request.');
+    workflow='self-share-cleanup.yml';inputs={commit};extra=['commit'];
   } else if(operation==='card-images') {
     workflow='refresh-powered-cube-images.yml';
   } else if(operation==='card-image-release') {
