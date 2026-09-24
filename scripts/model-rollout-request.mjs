@@ -54,6 +54,9 @@ export function rolloutDispatch(request) {
   } else if(operation==='season-migration') {
     if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid Pack One season migration request.');
     workflow='pack-one-season-migration.yml';inputs={commit,target};extra=['commit','target'];
+  } else if(operation==='season-hardening-migration') {
+    if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid Pack One season hardening migration request.');
+    workflow='pack-one-season-hardening-migration.yml';inputs={commit,target};extra=['commit','target'];
   } else if(operation==='daily-calendar-migration') {
     if(!/^[a-f0-9]{40}$/.test(commit||'')||!['development','production'].includes(target))throw Error('Invalid Daily calendar migration request.');
     workflow='daily-calendar-migration.yml';inputs={commit,target};extra=['commit','target'];
