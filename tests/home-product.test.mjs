@@ -89,9 +89,8 @@ test('Method has no secondary link directory',()=>{
  const html=fs.readFileSync('methodology/index.html','utf8');assert.equal((html.match(/class="method-directory"/g)||[]).length,0);
 });
 
-// Guests should see the free-account rung before any paid ask. The guest
-// Elite handoff still exists for an explicit premium action, but it is not
-// advertised on the landing page.
+// Guests should see the free-account rung after completing all three Dailies,
+// while paid Practice options stay off the Daily home entirely.
 test('a guest is not asked to pay on the Daily home',()=>{
  const complete=['mixed','powered-cube','latest'].map(row);
  for(const profile of [null,{player:{claimed:false},capabilities:[],daily_history:[]},
