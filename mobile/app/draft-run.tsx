@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -133,7 +133,7 @@ export default function DraftRunScreen() {
     ? practiceEnvironment
     : isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const setIdsParam = practice && typeof params.setIds === 'string' ? params.setIds : '';
-  const setIds = parsePracticeSets(setIdsParam);
+  const setIds = useMemo(() => parsePracticeSets(setIdsParam), [setIdsParam]);
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
   const surfaceMeta = practice
     ? {
@@ -174,7 +174,7 @@ export default function DraftRunScreen() {
     return () => {
       active = false;
     };
-  }, [environment, practice, setIdsParam]);
+  }, [environment, practice, setIds]);
 
   const retry = async () => {
     setState({ status: 'loading' });
