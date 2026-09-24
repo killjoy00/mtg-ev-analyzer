@@ -83,7 +83,7 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
      SELECT * FROM corpus_health_checks c WHERE c.set_id=v.set_id AND c.corpus_version=v.corpus_version ORDER BY checked_at DESC,id DESC LIMIT 1
     ) h ON true WHERE v.set_id=p.set_id AND v.corpus_version=$4 AND h.ready AND h.gate_version=$7
       AND h.manifest_hash=md5(v.manifest::text) AND h.checked_at>now()-interval '7 days'
-      AND p.source_event_type='PremierDraft' AND (p.set_id='powered-cube' OR p.release_date IS NOT NULL)))
+      AND p.source_event_type='PremierDraft' AND (p.set_id='powered-cube' OR (p.release_date IS NOT NULL AND p.set_name IS NOT NULL AND btrim(p.set_name)<>''))))
    RETURNING p.set_id,p.status
   ), audit AS (INSERT INTO corpus_status_events(set_id,auth_user_id,old_status,new_status,reason)
    SELECT set_id,$5::uuid,$2,status,$6 FROM changed RETURNING id)

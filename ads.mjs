@@ -141,7 +141,7 @@ export async function initializeAds({doc=document,location=globalThis.location,
 
       const disclosure=doc.createElement('p');
       disclosure.className='tcg-affiliate-disclosure';
-      disclosure.textContent='Affiliate link — Pack One may earn a commission from purchases.';
+      disclosure.textContent='Affiliate link. Pack One may earn a commission from purchases.';
 
       promo.append(link,disclosure);
       slot.dataset.slotContent='affiliate';
