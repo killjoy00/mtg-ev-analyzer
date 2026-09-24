@@ -74,7 +74,7 @@ async function cardBlob({ eyebrow, title, bigValue, subtitle, pills = [], rows =
   ctx.lineWidth = 2;
   ctx.stroke();
   ctx.fillStyle = '#171918';
-  const big = String(bigValue || '—');
+  const big = String(bigValue || 'N/A');
   const bigSize = fitText(ctx, big, 340, 88, 52, 800);
   ctx.font = `800 ${bigSize}px system-ui, -apple-system, sans-serif`;
   ctx.fillText(big, 104, 340);
@@ -100,7 +100,7 @@ async function cardBlob({ eyebrow, title, bigValue, subtitle, pills = [], rows =
     ctx.fillText(String(row.label || '').toUpperCase(), 540, rowY);
     ctx.fillStyle = '#171918';
     ctx.font = '740 30px system-ui, -apple-system, sans-serif';
-    ctx.fillText(String(row.value ?? '—'), 540, rowY + 38);
+    ctx.fillText(String(row.value ?? 'N/A'), 540, rowY + 38);
     rowY += 74;
   }
 
