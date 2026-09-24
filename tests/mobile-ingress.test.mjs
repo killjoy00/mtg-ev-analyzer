@@ -89,6 +89,48 @@ test('native player surfaces are limited to linked mobile profile aliases',async
   assert.equal(blocked.status,403);
 });
 
+test('practice idempotency is only forwarded to Draft Run creation',async()=>{
+  const key='practice_'+('k'.repeat(32));
+  let forwarded=null;
+  const start=new Request('https://api.packone.pro/draft/v1/runs',{
+    method:'POST',
+    headers:headers({
+      'content-type':'application/json',
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+      'x-idempotency-key':key,
+    }),
+    body:'{}',
+  });
+  const response=await gateway(start,env(),async(_url,options)=>{
+    forwarded=new Headers(options.headers).get('x-idempotency-key');
+    return Response.json({ok:true});
+  });
+  assert.equal(response.status,200);
+  assert.equal(forwarded,key);
+
+  const invalid=new Request('https://api.packone.pro/draft/v1/runs',{
+    method:'POST',
+    headers:headers({
+      'content-type':'application/json',
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+      'x-idempotency-key':'bad key',
+    }),
+    body:'{}',
+  });
+  assert.equal((await gateway(invalid,env(),async()=>{throw Error('must not reach upstream')})).status,400);
+
+  const wrongRoute=new Request('https://api.packone.pro/draft/v1/capabilities',{
+    headers:headers({
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+      'x-idempotency-key':key,
+    }),
+  });
+  assert.equal((await gateway(wrongRoute,env(),async()=>{throw Error('must not reach upstream')})).status,403);
+});
+
 test('native Google callback only permits the Pack One account deep link',async()=>{
   const callback=new Request('https://api.packone.pro/growth/v1/mobile/account/google/callback?flow='+'f'.repeat(43),{
     headers:headers({}),
