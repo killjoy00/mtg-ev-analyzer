@@ -93,7 +93,11 @@ jobs:
             sudo apt-get install -y postgresql-client
           fi
 
-          mapfile -t migration_changes < <(git diff --name-status "$BASE_SHA" "$HEAD_SHA" -- 'migrations/*.sql')
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          stack_base_sha="$(git merge-base origin/main "$HEAD_SHA")"
+          echo "STACK_BASE_SHA=$stack_base_sha" >> "$GITHUB_ENV"
+
+          mapfile -t migration_changes < <(git diff --name-status "$stack_base_sha" "$HEAD_SHA" -- 'migrations/*.sql')
           for change in "${migration_changes[@]}"; do
             status="${change%%$'\t'*}"
             path="${change#*$'\t'}"
@@ -103,12 +107,19 @@ jobs:
             fi
           done
 
-          # Disposable CI branches are cloned from the current Neon default branch,
-          # which already carries the reviewed production schema through 0038.
-          # Replaying older migrations can replace current constraints with historical
-          # definitions, so only migrations newly added by this PR belong on the clone.
+          # Disposable CI branches are cloned from the deployed Neon default branch,
+          # which can lag Git main. Replay the known additive/repeatable mobile release
+          # backlog until those migrations are promoted, then add migrations introduced
+          # by this PR. This keeps merged-but-not-deployed schema prerequisites available
+          # without blindly replaying historical migrations.
+          release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql)
           mapfile -t pending < <(
-            printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }' | sort -u
+            {
+              for migration in "${release_backlog[@]}"; do
+                [[ -f "$migration" ]] && printf '%s\n' "$migration"
+              done
+              printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
+            } | sort -u
           )
           if (( ${#pending[@]} == 0 )); then
             echo 'No pending migrations in this PR.'
@@ -134,7 +145,7 @@ jobs:
           # production corpus copied from Neon's default branch; reloading stale
           # checked-in display metadata can create a false failure after a
           # successful display-only maintenance refresh.
-          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
+          if git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
             echo 'No corpus or loader/import changes; using the cloned production corpus.'
           else
             node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"

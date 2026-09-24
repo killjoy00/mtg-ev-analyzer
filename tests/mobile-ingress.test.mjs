@@ -64,6 +64,31 @@ test('native account bridge requires shaped account tokens and exact mobile rout
   assert.equal(forwarded.account,account);
 });
 
+test('native player surfaces are limited to linked mobile profile aliases',async()=>{
+  let forwarded=null;
+  const mobileProfile=new Request('https://api.packone.pro/growth/v1/mobile/profile/me',{
+    headers:headers({'x-pack1-mobile-session':token,'x-pack1-mobile-account':account}),
+  });
+  const response=await gateway(mobileProfile,env(),async(url,options)=>{
+    forwarded={
+      url,
+      authorization:new Headers(options.headers).get('authorization'),
+      account:new Headers(options.headers).get('x-pack1-mobile-account'),
+    };
+    return Response.json({ok:true});
+  });
+  assert.equal(response.status,200);
+  assert.match(forwarded.url,/pack1growth.*\/v1\/mobile\/profile\/me$/);
+  assert.equal(forwarded.authorization,'Bearer '+token);
+  assert.equal(forwarded.account,account);
+
+  const browserProfile=new Request('https://api.packone.pro/growth/v1/profile/me',{
+    headers:headers({'x-pack1-mobile-session':token,'x-pack1-mobile-account':account}),
+  });
+  const blocked=await gateway(browserProfile,env(),async()=>{throw Error('must not reach upstream')});
+  assert.equal(blocked.status,403);
+});
+
 test('native Google callback only permits the Pack One account deep link',async()=>{
   const callback=new Request('https://api.packone.pro/growth/v1/mobile/account/google/callback?flow='+'f'.repeat(43),{
     headers:headers({}),

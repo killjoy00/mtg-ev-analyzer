@@ -63,22 +63,35 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
-          onPress={() => router.push('/account')}
-          style={({ pressed }) => [styles.accountCard, pressed && styles.pressed]}
+          accessibilityLabel="Open leaderboard"
+          onPress={() => router.push('/leaderboard')}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >
-          <Text style={styles.cardKicker}>PACK ONE ACCOUNT</Text>
-          <Text style={styles.accountTitle}>Sign in across devices</Text>
-          <Text style={styles.cardBody}>Email/password and Google use the same Pack One account authority as the website.</Text>
-          <Text style={styles.cardAction}>Account →</Text>
+          <Text style={styles.cardKicker}>RANKINGS</Text>
+          <Text style={styles.utilityTitle}>Leaderboard</Text>
+          <Text style={styles.cardBody}>Compare ranked Daily scores across Draft Run, Powered Cube, and Latest Set.</Text>
+          <Text style={styles.cardAction}>View rankings →</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open career"
+          onPress={() => router.push('/career')}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>YOUR RESULTS</Text>
+          <Text style={styles.utilityTitle}>Career</Text>
+          <Text style={styles.cardBody}>Review your Pack One scores, streaks, and completed game history.</Text>
+          <Text style={styles.cardAction}>Open career →</Text>
         </Pressable>
 
         <Pressable
           accessibilityRole="button"
           onPress={() => router.push('/account')}
-          style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressed]}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >
           <Text style={styles.cardKicker}>PACK ONE ACCOUNT</Text>
-          <Text style={styles.cardTitle}>Sign in or manage your account</Text>
+          <Text style={styles.utilityTitle}>Sign in or manage your account</Text>
           <Text style={styles.cardBody}>
             Use email or Google, keep your player identity across devices, and manage account deletion from the app.
           </Text>
@@ -134,22 +147,15 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  secondaryCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
   pressed: { opacity: 0.78 },
-  accountCard: {
+  utilityCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.line,
     padding: spacing.lg,
     gap: spacing.sm,
   },
-  accountTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
+  utilityTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   cardKicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
   cardTitle: { color: colors.ink, fontSize: 28, fontWeight: '800' },
   dailyTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },

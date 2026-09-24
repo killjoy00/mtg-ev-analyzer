@@ -1283,6 +1283,19 @@ async function handleMobileAccount(request) {
   return json(await accountState(auth));
 }
 
+async function handleMobileMyProfile(request) {
+  const {owner}=await mobileAccountIdentity(request);
+  const meta=await profileMetaByPlayer(owner);
+  if(!meta)throw Object.assign(Error('Player profile not found.'),{status:404});
+  return json(await buildProfile(owner,meta,{own:true}));
+}
+
+async function handleMobileMyHistory(request) {
+  const {owner}=await mobileAccountIdentity(request);
+  const url=new URL(request.url);
+  return json(await historyPage(owner,url.searchParams.get('cursor'),url.searchParams.get('limit')));
+}
+
 async function handleMobileSignout(request) {
   const {auth}=await mobileAccountIdentity(request);
   await revokeAccountSession(query,auth);
@@ -1785,6 +1798,8 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/account/session') return handleAccount(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signout') return handleSignout(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccount(request);
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/me') return handleMobileMyProfile(request);
+  if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/history') return handleMobileMyHistory(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signout') return handleMobileSignout(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete/verification/start') return handleAccountDeleteVerificationStart(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete') return handleAccountDelete(request,{mobile:true});
