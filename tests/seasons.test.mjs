@@ -4,7 +4,7 @@ import {readFile} from 'node:fs/promises';
 import {normalizeLeaderboardPeriod,resolveCurrentSeason} from '../worker/draft-run-season.mjs';
 
 const [migration,backend,client,legacyWorker,legacyCore,growth,myPack]=await Promise.all([
-  readFile(new URL('../migrations/0036_pack_one_seasons.sql',import.meta.url),'utf8'),
+  readFile(new URL('../migrations/0037_pack_one_seasons.sql',import.meta.url),'utf8'),
   readFile(new URL('../worker/draft-run-function.mjs',import.meta.url),'utf8'),
   readFile(new URL('../draft-run-product.mjs',import.meta.url),'utf8'),
   readFile(new URL('../worker/index.js',import.meta.url),'utf8'),
