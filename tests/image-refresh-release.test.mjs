@@ -38,15 +38,17 @@ test('image maintenance cannot deploy functions and checks revisions before remo
   assert.match(workflow,/name: Normalize all served cards to deterministic main art\s+run: python scripts\/refresh_card_images.py/);
   assert.match(workflow,/name: Publish normalized replay shards to R2\s+run: bash scripts\/r2_replay_shards.sh upload/);
   assert.match(workflow,/name: Refresh production Draft Run image metadata\s+run: \|\s+node scripts\/verify-image-refresh-release.mjs "\$\{\{ inputs\.code_commit \}\}"\s+node scripts\/refresh_card_backend_images.mjs/);
-  assert.match(workflow,/pull-requests: write/);
-  assert.match(workflow,/gh pr create/);
+  assert.doesNotMatch(workflow,/pull-requests: write/);
+  assert.match(workflow,/push origin "HEAD:\$branch"/);
+  assert.doesNotMatch(workflow,/gh pr create/);
   assert.doesNotMatch(workflow,/push origin HEAD:main/);
   const publication=fs.readFileSync(new URL('../.github/workflows/publish-card-image-source.yml',import.meta.url),'utf8');
   assert.match(publication,/\[publish-card-image-source\]/);
   assert.match(publication,/bash scripts\/r2_replay_shards.sh hydrate/);
   assert.match(publication,/python scripts\/refresh_card_images.py/);
   assert.match(publication,/npm test/);
-  assert.match(publication,/gh pr create/);
+  assert.match(publication,/git push origin "HEAD:\$branch"/);
+  assert.doesNotMatch(publication,/gh pr create/);
   const acceptance=fs.readFileSync(new URL('./release-functions-smoke.mjs',import.meta.url),'utf8');
   assert.equal((acceptance.match(/await verifyMarkers\(/g)||[]).length,2,'Release acceptance checks markers before and after gameplay');
   // The closing check is the one that catches a redeploy landing underneath an
