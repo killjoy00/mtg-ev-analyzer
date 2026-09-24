@@ -26,6 +26,14 @@ const result=await query(`SELECT
   to_regclass('account_deletion_verifications') IS NOT NULL account_deletion_verifications,
   to_regclass('mobile_oauth_handoffs') IS NOT NULL mobile_oauth_handoffs,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='mobile_oauth_handoffs_expiry_idx') mobile_oauth_handoffs_expiry_index,
+  (SELECT count(*)=2 FROM information_schema.columns
+    WHERE table_schema='public' AND table_name='draft_run_sessions'
+      AND column_name IN ('start_idempotency_hash','start_request_hash')) practice_idempotency_columns,
+  EXISTS(SELECT 1 FROM pg_constraint
+    WHERE conname='draft_run_practice_start_idempotency_shape'
+      AND conrelid='draft_run_sessions'::regclass) practice_idempotency_shape,
+  EXISTS(SELECT 1 FROM pg_indexes
+    WHERE schemaname='public' AND indexname='draft_run_practice_start_idempotency_idx') practice_idempotency_index,
   (SELECT count(*)=4 FROM information_schema.columns
     WHERE table_schema='public' AND table_name='account_deletion_verifications'
       AND column_name IN ('auth_user_id','code_hmac','created_at','expires_at')) account_deletion_verification_columns,
@@ -60,6 +68,6 @@ const result=await query(`SELECT
   position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0037 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0038 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');
