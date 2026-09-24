@@ -65,9 +65,12 @@ These values are not committed to Git:
 
 - Apple Developer signing certificates/profiles and Team access
 - Android upload/signing key material
-- Google Play Console application/service-account permissions
+- Apple Developer signing certificates/profiles and Team access
+- Android upload/signing key material
 
-The verified Apple application record already exists. Google Play API access remains blocked until the existing service account is granted access to the Pack One application.
+The verified Apple application record already exists.
+
+Google Play Console now grants app-scoped testing access for `pro.packone.app` to `packone-play-ci@pack-one.iam.gserviceaccount.com`. The remaining Google-side setup is keyless GitHub Actions authentication through Workload Identity Federation. No JSON service-account key should be created or stored in GitHub.
 
 ## Store listing URLs
 
@@ -82,3 +85,19 @@ The verified Apple application record already exists. Google Play API access rem
 - store billing/purchase/restore architecture
 - verified Universal Links / Android App Links
 - remote crash telemetry
+
+
+## Google Play CI authentication
+
+The repository contains `.github/workflows/google-play-access.yml`. It is intentionally non-publishing: it authenticates with short-lived GitHub OIDC credentials, creates a temporary Google Play edit for `pro.packone.app`, reads its tracks, and deletes the edit without committing any change.
+
+The workflow uses:
+
+- Google Cloud project: `pack-one`
+- service account: `packone-play-ci@pack-one.iam.gserviceaccount.com`
+- GitHub repository: `killjoy00/mtg-ev-analyzer`
+- OAuth scope: `https://www.googleapis.com/auth/androidpublisher`
+
+It expects the non-secret repository variable `PACKONE_GOOGLE_WIF_PROVIDER` to contain the full Workload Identity Provider resource name.
+
+The Workload Identity provider must restrict admission to exactly `killjoy00/mtg-ev-analyzer`, and that repository identity must receive only `roles/iam.workloadIdentityUser` on the Pack One service account. Long-lived service-account JSON keys are intentionally not used.
