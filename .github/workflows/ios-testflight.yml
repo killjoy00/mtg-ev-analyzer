@@ -47,8 +47,19 @@ jobs:
           set -euo pipefail
           workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
           test -n "$workspace"
-          scheme="$(xcodebuild -workspace "$workspace" -list -json | python3 -c 'import json,sys; data=json.load(sys.stdin); schemes=data.get("workspace",{}).get("schemes",[]); print(schemes[0] if schemes else "")')"
-          test -n "$scheme"
+          scheme="PackOne"
+          xcodebuild -workspace "$workspace" -list -json > "$RUNNER_TEMP/xcode-workspace.json"
+          python3 - "$RUNNER_TEMP/xcode-workspace.json" "$scheme" <<'PY'
+import json
+import sys
+
+path, expected = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as handle:
+    data = json.load(handle)
+schemes = data.get("workspace", {}).get("schemes", [])
+if expected not in schemes:
+    raise SystemExit(f"Expected app scheme {expected!r} not found. Available schemes: {schemes}")
+PY
           xcodebuild \
             -workspace "$workspace" \
             -scheme "$scheme" \
@@ -107,8 +118,19 @@ jobs:
           set -euo pipefail
           workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
           test -n "$workspace"
-          scheme="$(xcodebuild -workspace "$workspace" -list -json | python3 -c 'import json,sys; data=json.load(sys.stdin); schemes=data.get("workspace",{}).get("schemes",[]); print(schemes[0] if schemes else "")')"
-          test -n "$scheme"
+          scheme="PackOne"
+          xcodebuild -workspace "$workspace" -list -json > "$RUNNER_TEMP/xcode-workspace.json"
+          python3 - "$RUNNER_TEMP/xcode-workspace.json" "$scheme" <<'PY'
+import json
+import sys
+
+path, expected = sys.argv[1], sys.argv[2]
+with open(path, encoding="utf-8") as handle:
+    data = json.load(handle)
+schemes = data.get("workspace", {}).get("schemes", [])
+if expected not in schemes:
+    raise SystemExit(f"Expected app scheme {expected!r} not found. Available schemes: {schemes}")
+PY
           xcodebuild \
             -workspace "$workspace" \
             -scheme "$scheme" \
@@ -132,7 +154,7 @@ jobs:
           <plist version="1.0">
           <dict>
             <key>method</key>
-            <string>app-store</string>
+            <string>app-store-connect</string>
             <key>destination</key>
             <string>upload</string>
             <key>signingStyle</key>
