@@ -131,10 +131,13 @@ try {
   await page.waitForURL('https://www.patreon.com/c/PackOne');
   assert.equal(page.url(),'https://www.patreon.com/c/PackOne');
 
-  // A signed-in free member gets the Elite CTA and goes straight to Patreon.
+  // A signed-in free member keeps the Daily home focused and upgrades from Practice.
   await page.goto(base);
-  await page.locator('[data-home-elite]').first().waitFor();
-  await page.locator('[data-home-elite]').first().click();
+  await page.locator('[data-daily-home]').waitFor();
+  assert.equal(await page.locator('[data-home-elite]').count(),0);
+  await page.goto(base+'/practice/');
+  await page.getByRole('button',{name:'Upgrade to Elite',exact:true}).first().waitFor();
+  await page.getByRole('button',{name:'Upgrade to Elite',exact:true}).first().click();
   await page.waitForURL('https://www.patreon.com/c/PackOne');
   assert.equal(page.url(),'https://www.patreon.com/c/PackOne');
 
