@@ -27,6 +27,11 @@ jobs:
           service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
           token_format: access_token
           access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Verify next monotonic version-code allocation
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKONE_ANDROID_PACKAGE: pro.packone.app
+        run: node mobile/scripts/play-next-version-code.mjs
       - name: Read Internal Testing status
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
