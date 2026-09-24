@@ -1,0 +1,107 @@
+name: Android upload key bootstrap
+
+on:
+  push:
+    branches:
+      - 'chatgpt/pack-one-mobile-v2-android-internal-testing'
+    paths:
+      - '.github/workflows/android-upload-key-bootstrap.yml'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  bootstrap:
+    name: create Pack One upload key in Secret Manager
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/cloud-platform
+
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: pack-one
+
+      - name: Create dedicated upload key and version-1 secrets
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+
+          PROJECT_ID="pack-one"
+          SERVICE_ACCOUNT="packone-play-ci@pack-one.iam.gserviceaccount.com"
+          KEYSTORE_SECRET="packone-android-upload-keystore-b64"
+          PASSWORD_SECRET="packone-android-upload-password"
+          KEY_ALIAS="packone-upload"
+
+          existing=0
+          for secret in "$KEYSTORE_SECRET" "$PASSWORD_SECRET"; do
+            if gcloud secrets describe "$secret" --project="$PROJECT_ID" >/dev/null 2>&1; then
+              echo "Secret already exists: $secret"
+              existing=$((existing + 1))
+            fi
+          done
+          if [[ "$existing" -ne 0 ]]; then
+            echo "Refusing to create or rotate upload-key secrets because at least one target secret already exists." >&2
+            exit 1
+          fi
+
+          workdir="$(mktemp -d)"
+          created_keystore=0
+          created_password=0
+          complete=0
+          cleanup() {
+            rm -rf "$workdir"
+            if [[ "$complete" != "1" ]]; then
+              [[ "$created_keystore" == "0" ]] || gcloud secrets delete "$KEYSTORE_SECRET" --project="$PROJECT_ID" --quiet >/dev/null 2>&1 || true
+              [[ "$created_password" == "0" ]] || gcloud secrets delete "$PASSWORD_SECRET" --project="$PROJECT_ID" --quiet >/dev/null 2>&1 || true
+            fi
+          }
+          trap cleanup EXIT
+
+          openssl rand -hex 32 > "$workdir/password"
+
+          keytool -genkeypair             -keystore "$workdir/packone-upload.p12"             -storetype PKCS12             -alias "$KEY_ALIAS"             -keyalg RSA             -keysize 4096             -validity 10000             -storepass:file "$workdir/password"             -keypass:file "$workdir/password"             -dname "CN=Pack One Android Upload,O=Gaming Forward LLC,C=US"
+
+          fingerprint="$(
+            keytool -list -v               -keystore "$workdir/packone-upload.p12"               -storepass:file "$workdir/password"               -alias "$KEY_ALIAS"             | awk -F': ' '/SHA256:/{print $2; exit}'
+          )"
+          [[ -n "$fingerprint" ]] || { echo "Could not determine upload certificate fingerprint." >&2; exit 1; }
+
+          base64 "$workdir/packone-upload.p12" | tr -d '\n' > "$workdir/keystore.b64"
+
+          gcloud secrets create "$KEYSTORE_SECRET"             --project="$PROJECT_ID"             --replication-policy=automatic             --data-file="$workdir/keystore.b64"
+          created_keystore=1
+
+          gcloud secrets create "$PASSWORD_SECRET"             --project="$PROJECT_ID"             --replication-policy=automatic             --data-file="$workdir/password"
+          created_password=1
+
+          for secret in "$KEYSTORE_SECRET" "$PASSWORD_SECRET"; do
+            gcloud secrets add-iam-policy-binding "$secret"               --project="$PROJECT_ID"               --member="serviceAccount:$SERVICE_ACCOUNT"               --role="roles/secretmanager.secretAccessor" >/dev/null
+          done
+
+          complete=1
+          {
+            echo "## Android upload key bootstrap"
+            echo
+            echo "ANDROID UPLOAD KEY SETUP COMPLETE"
+            printf -- '- SHA-256: `%s`\n' "$fingerprint"
+            echo '- Keystore/password stored only in Google Secret Manager version 1.'
+            echo '- Alias: `packone-upload`'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          echo "ANDROID UPLOAD KEY SETUP COMPLETE"
+          echo "SHA-256: $fingerprint"
