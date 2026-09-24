@@ -198,7 +198,9 @@ const noEmDashCopyFiles = [
   'how-it-works/index.html','learn/index.html','learn/first-pick-discipline/index.html',
   'learn/reading-consensus/index.html','learn/staying-open/index.html','scoring/index.html',
   'methodology/index.html','sets/index.html','sets/msh/index.html','sets/sos/index.html',
-  'sets/tmt/index.html','sets/ecl/index.html','disclosure/index.html','reset-password/index.html',
+  'sets/tmt/index.html','sets/ecl/index.html','about/index.html','contact/index.html',
+  'privacy/index.html','terms/index.html','disclosure/index.html','reset-password/index.html',
+  'patreon-activation.mjs','site-nav.mjs','bootstrap.mjs',
   'admin/users.mjs','admin/admin.mjs','admin/corpus.mjs'
 ];
 for (const path of noEmDashCopyFiles) {
