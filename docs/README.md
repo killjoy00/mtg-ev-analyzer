@@ -2,7 +2,7 @@
 
 Start with [CURRENT-STATE](CURRENT-STATE.md) for verified deployment boundaries and [CHARTER](CHARTER.md) for the product.
 
-- [Corpus/selection](DATA-MANAGEMENT.md), [Corpus Operations](CORPUS-OPERATIONS.md), [Traditional admission/publication](TRADITIONAL-PUZZLE-ADMISSION.md)
+- [Corpus/selection](DATA-MANAGEMENT.md), [Corpus Operations](CORPUS-OPERATIONS.md), [card-image maintenance](CARD-IMAGE-MAINTENANCE.md), [Traditional admission/publication](TRADITIONAL-PUZZLE-ADMISSION.md)
 - [Scoring](SCORING-AND-DIFFICULTY.md), [decision measurements](DECISION-MEASUREMENTS.md)
 - [17Lands policy](17LANDS-DATA-REVIEW-2026-09-18.md)
 - [Rebuild audit](REBUILD-2026-09-18.md), [rebuild release/runbook](REBUILD-RELEASE.md), [Traditional results](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md), [scoring results](../results/rebuild-2026-09-18/SCORING-RESULTS.md), [Daily distribution](../results/rebuild-2026-09-18/DAILY-DISTRIBUTION.md)
