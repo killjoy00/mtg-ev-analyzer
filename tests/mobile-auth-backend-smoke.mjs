@@ -67,6 +67,22 @@ await call('/v1/mobile/account/session',undefined,{
   playerToken:wrong.token,accountToken:signed.session.token,status:401,
 });
 
+const profile=await call('/v1/mobile/profile/me',undefined,{
+  playerToken:signed.linked.token,accountToken:signed.session.token,
+});
+assert.equal(profile.player.claimed,true);
+assert.equal(typeof profile.player.display_name,'string');
+
+const history=await call('/v1/mobile/profile/history?limit=5',undefined,{
+  playerToken:signed.linked.token,accountToken:signed.session.token,
+});
+assert.ok(Array.isArray(history.rows));
+assert.ok(history.rows.length<=5);
+
+await call('/v1/mobile/profile/me',undefined,{
+  playerToken:wrong.token,accountToken:signed.session.token,status:401,
+});
+
 await call('/v1/mobile/account/signout',{},{
   playerToken:signed.linked.token,accountToken:signed.session.token,
 });
@@ -74,4 +90,4 @@ await call('/v1/mobile/account/session',undefined,{
   playerToken:signed.linked.token,accountToken:signed.session.token,status:401,
 });
 
-console.log('Mobile auth passed: guest-bound one-use OAuth handoff, linked native session, exact player/account binding, and revocation.');
+console.log('Mobile auth passed: guest-bound one-use OAuth handoff, linked native session, exact player/account binding, private career reads, and revocation.');
