@@ -29,6 +29,7 @@ assert.equal(preview.android.package, 'pro.packone.preview');
 const production = loadConfig('production');
 assert.equal(production.name, 'Pack One');
 assert.equal(production.ios.bundleIdentifier, 'pro.packone.app');
+assert.equal(production.ios.config?.usesNonExemptEncryption, false);
 assert.equal(production.android.package, 'pro.packone.app');
 assert.equal(production.icon, './assets/images/icon.png');
 assert.equal(production.extra.buildProfile, 'production');
