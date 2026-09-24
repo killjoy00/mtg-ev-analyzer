@@ -285,7 +285,7 @@ async function leaderboard(request) {
   if(!['daily','week','season','all'].includes(period)) fail('Invalid leaderboard period.');
   let environment;try{environment=draftRunEnvironment(url.searchParams.get('environment')||'mixed');}catch{fail('Invalid Draft Run environment.');}
   const today=gameDateKey();
-  const season=period==='season'?await resolveCurrentSeason(query,{today}):null;
+  const season=period==='season'?await resolveCurrentSeason(query,{today,ensureSchedule:ensureDailyScheduleForQuery}):null;
   if(period==='season'&&!season)return json({period:'season',environment,start:null,today,season:null,rows:[]});
   const start=period==='daily'?today:period==='season'?season.start_date:period==='week'?(()=>{const d=new Date(today+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);})():'2000-01-01';
   const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,limit:100});
