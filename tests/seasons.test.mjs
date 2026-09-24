@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 import {normalizeLeaderboardPeriod,resolveCurrentSeason} from '../worker/draft-run-season.mjs';
 
-const [migration,backend,client,legacyWorker,legacyCore,growth,myPack]=await Promise.all([
+const [migration,backend,client,legacyWorker,legacyCore,growth,myPack,migrationWorkflow,releaseSmoke]=await Promise.all([
   readFile(new URL('../migrations/0037_pack_one_seasons.sql',import.meta.url),'utf8'),
   readFile(new URL('../worker/draft-run-function.mjs',import.meta.url),'utf8'),
   readFile(new URL('../draft-run-product.mjs',import.meta.url),'utf8'),
@@ -11,6 +11,8 @@ const [migration,backend,client,legacyWorker,legacyCore,growth,myPack]=await Pro
   readFile(new URL('../worker/core.mjs',import.meta.url),'utf8'),
   readFile(new URL('../worker/growth-function.js',import.meta.url),'utf8'),
   readFile(new URL('../my-pack-one.mjs',import.meta.url),'utf8'),
+  readFile(new URL('../.github/workflows/pack-one-season-migration.yml',import.meta.url),'utf8'),
+  readFile(new URL('./release-functions-smoke.mjs',import.meta.url),'utf8'),
 ]);
 
 test('current leaderboard canonicalizes old month clients to season',()=>{
@@ -68,4 +70,15 @@ test('profiles and leaderboard use the same current season implementation',()=>{
   assert.match(client,/Season ·/);
   assert.match(growth,/eventProps\.mode==='draft_run'&&eventProps\.period==='month'/);
   assert.match(growth,/eventProps\.period='season'/);
+});
+
+
+test('season release uses the reviewed exact-revision migration and acceptance path',()=>{
+  assert.match(migrationWorkflow,/git merge-base --is-ancestor/);
+  assert.match(migrationWorkflow,/migrations\/0037_pack_one_seasons\.sql/);
+  assert.match(migrationWorkflow,/development\) branch=br-twilight-hill-ayffyd2b/);
+  assert.match(migrationWorkflow,/production\) branch=br-orange-feather-ayps8kep/);
+  assert.match(releaseSmoke,/leaderboard\?period=season/);
+  assert.match(releaseSmoke,/\['mixed','powered-cube','latest'\]/);
+  assert.match(releaseSmoke,/All three boards must share one season/);
 });
