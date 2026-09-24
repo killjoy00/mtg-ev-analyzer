@@ -35,7 +35,7 @@ function shell(body,actions='') {
   document.querySelectorAll('[data-patreon-activation-exit]').forEach(link=>link.addEventListener('click',clearPatreonActivation));
 }
 
-async function startOAuth(source) {
+export async function startPatreonOAuth(source) {
   rememberPatreonActivation(source);
   event('patreon_activation_oauth_started',{source:activationSource(source)});
   const result=await connectPatreon();
@@ -50,7 +50,7 @@ function bindOAuth(source) {
   document.querySelector('#patreon-activation-oauth')?.addEventListener('click',async e=>{
     const button=e.currentTarget,status=document.querySelector('#patreon-activation-status');
     button.disabled=true;if(status)status.textContent='Opening Patreon…';
-    try {await startOAuth(source);}
+    try {await startPatreonOAuth(source);}
     catch(error){button.disabled=false;if(status)status.textContent=error?.message||'Patreon could not be opened. Please try again.';}
   });
 }
@@ -120,7 +120,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
     shell('<h2>Authorize Patreon to activate Elite.</h2><p>You are signed in to Pack One. Patreon authorization is the remaining step.</p><p id="patreon-activation-status" aria-live="polite">Opening Patreon…</p>',
       '<button class="button primary" id="patreon-activation-oauth" type="button">Activate Elite</button><a class="button secondary" data-patreon-activation-exit href="./">Not now</a>');
     bindOAuth(source);
-    try {await startOAuth(source);} catch(error) {
+    try {await startPatreonOAuth(source);} catch(error) {
       const status=document.querySelector('#patreon-activation-status');if(status)status.textContent=error?.message||'Use Activate Elite to try again.';
       const button=document.querySelector('#patreon-activation-oauth');if(button)button.disabled=false;
     }
@@ -134,7 +134,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
   }
   if(state==='active_non_elite') {
     shell('<h2>Patreon is connected, but Elite is not active.</h2><p>Pack One currently sees a non-Elite Patreon membership. If you just upgraded, check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',
-      retry+`<a class="button secondary" href="${esc(patreon?.support_url||PATREON_POLICY.supportUrl)}" rel="noopener noreferrer">Upgrade to Elite on Patreon</a>`);
+      retry+`<a class="button secondary" href="${esc(patreon?.support_url||PATREON_POLICY.supportUrl)}" rel="noopener noreferrer">Open Patreon membership</a>`);
     bindOAuth(source);return;
   }
   if(state==='not_entitled') {
