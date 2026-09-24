@@ -81,4 +81,5 @@ test('season release uses the reviewed exact-revision migration and acceptance p
   assert.match(releaseSmoke,/leaderboard\?period=season/);
   assert.match(releaseSmoke,/\['mixed','powered-cube','latest'\]/);
   assert.match(releaseSmoke,/All three boards must share one season/);
+  assert.ok(releaseSmoke.indexOf('await waitForStableMarkers();') < releaseSmoke.indexOf('const seasonBoards=[]'));
 });
