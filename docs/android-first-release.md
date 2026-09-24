@@ -51,11 +51,15 @@ The release workflow intentionally creates draft releases for the unpublished ap
 
 ## Build numbering
 
-Store version codes are assigned as:
+The Android publishing job queries Google Play before every build. It creates a temporary edit, lists all current AAB version codes, deletes the probe edit, and assigns:
 
-`100000 + GITHUB_RUN_NUMBER`
+`max(highest Play versionCode + 1, 100000 + GITHUB_RUN_NUMBER)`
 
-for the Android Internal Testing workflow. Expo receives the value through `PACKONE_ANDROID_VERSION_CODE` before Prebuild, and config validation asserts that the override reaches `android.versionCode`.
+Expo receives that value through `PACKONE_ANDROID_VERSION_CODE` before Prebuild, and config validation asserts that the override reaches `android.versionCode`.
+
+The GitHub run count is therefore only a floor. Renaming/replacing the workflow (which resets its run count) cannot move the published version code backward, and rerunning a job after an earlier attempt uploaded successfully advances past the already-used store number.
+
+A live non-publishing probe after version code `100015` confirmed the allocator chose `100016`.
 
 ## Release workflow
 
