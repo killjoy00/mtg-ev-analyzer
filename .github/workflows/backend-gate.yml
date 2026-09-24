@@ -104,7 +104,7 @@ jobs:
           done
 
           # Disposable CI branches are cloned from the current Neon default branch,
-          # which already carries the reviewed production schema through 0032.
+          # which already carries the reviewed production schema through 0035.
           # Replaying older migrations can replace current constraints with historical
           # definitions, so only migrations newly added by this PR belong on the clone.
           mapfile -t pending < <(
@@ -124,6 +124,7 @@ jobs:
         run: |
           set -euo pipefail
           DATABASE_URL="$(cat "$PACK1_CI_CONNECTION")" node scripts/verify-neon-schema.mjs
+          node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --production-bootstrap
           # A corpus bump can be tested before production serves that version.
           # This loader is additive and verifies existing payload equality.
           node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
@@ -148,6 +149,8 @@ jobs:
           node tests/capabilities-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/eight-pick-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/request-integrity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          # Destructive season edge cases run last because this isolated branch is deleted next.
+          node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
 
       - name: Delete isolated Neon branch
         if: always() && steps.neon.outputs.branch_id != ''
