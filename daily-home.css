@@ -41,6 +41,10 @@
 .daily-home-practice h2{font-family:var(--display);font-size:40px;line-height:1.1;letter-spacing:0;margin:0 0 22px}
 .daily-home-practice .button{min-height:48px;text-decoration:none;margin:0 8px 8px 0}
 .daily-home-practice p{font-size:16px}
+.daily-home-practice.is-practice-handoff{display:flex;align-items:end;justify-content:space-between;gap:28px}
+.daily-home-practice.is-practice-handoff h2{margin-bottom:8px}
+.daily-home-practice.is-practice-handoff p:not(.eyebrow){margin:0;color:var(--muted)}
+.daily-home-practice.is-practice-handoff .button{flex:0 0 auto;min-width:150px;margin:0}
 @media(max-width:600px){
  .daily-home{margin-bottom:24px}.daily-home-heading{padding-top:4px}
  .daily-home-heading>p:not(.eyebrow){font-size:16px;margin-bottom:24px;max-width:30ch}
@@ -55,6 +59,8 @@
  .daily-home-game.is-complete{grid-template-columns:36px minmax(0,1fr);padding:16px}.daily-home-game.is-complete h2{font-size:25px}
  .daily-home-game.is-complete .button{min-width:0}
  .daily-home-practice .button{display:flex;width:100%;justify-content:center;margin:0 0 10px}
+ .daily-home-practice.is-practice-handoff{align-items:flex-start;flex-direction:column;gap:18px}
+ .daily-home-practice.is-practice-handoff .button{margin:0}
 }
 
 .daily-home-game[data-environment="latest"]{border-left-color:#8c4b36}.daily-home-game[data-environment="latest"] .daily-home-number{color:#b79b91}
