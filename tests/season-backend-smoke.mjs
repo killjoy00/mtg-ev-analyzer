@@ -167,6 +167,7 @@ failOpenProfile=await growthCall('/v1/profile',{profilePublic:false},profileOwne
 assert.equal(failOpenProfile.player.profile_public,false);assert.equal(failOpenProfile.current_season,null);
 await query("DELETE FROM draft_run_schedules WHERE environment='latest' AND day='2026-09-06'::date");
 await query('DELETE FROM neon_auth.session WHERE token=$1',[profileAuthToken]);
+await query('DELETE FROM account_links WHERE auth_user_id=$1::uuid',[profileAuth]);
 await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[profileAuth]);
 
 // Expected unavailability leaves the established current season alone.
@@ -205,13 +206,15 @@ assert.deepEqual(oldClient.rows,seasonBoards[0].rows);
 // A genuinely later persisted release advances B -> C; editing mutable policy
 // afterward cannot move the stored season release or reopen B.
 const tmtOriginal=(await query("SELECT release_date::text,status,set_name FROM draft_run_environment_policy WHERE set_id='tmt'")).rows[0];
-await query("UPDATE draft_run_environment_policy SET release_date='2026-09-14',status='Live' WHERE set_id='tmt'");
-await schedule('2026-09-15','tmt');
+const laterDate=new Date(gameDateKey()+'T12:00:00Z');laterDate.setUTCDate(laterDate.getUTCDate()+1);
+const laterDay=laterDate.toISOString().slice(0,10);
+await query("UPDATE draft_run_environment_policy SET release_date=$1::date,status='Live' WHERE set_id='tmt'",[laterDay]);
+await schedule(laterDay,'tmt');
 season=await reconcilePersistedSeasons(query);
-assert.equal(season.set_id,'tmt');assert.equal(season.start_date,'2026-09-15');assert.equal(season.set_release_date,'2026-09-14');
-assert.equal((await query("SELECT end_date::text FROM draft_run_seasons WHERE set_id='hob'")).rows[0].end_date,'2026-09-14');
+assert.equal(season.set_id,'tmt');assert.equal(season.start_date,laterDay);assert.equal(season.set_release_date,laterDay);
+assert.equal((await query("SELECT end_date::text FROM draft_run_seasons WHERE set_id='hob'")).rows[0].end_date,gameDateKey());
 await query("UPDATE draft_run_environment_policy SET release_date=$1::date,status=$2 WHERE set_id='tmt'",[tmtOriginal.release_date,tmtOriginal.status]);
 season=await reconcilePersistedSeasons(query);
-assert.equal(season.set_id,'tmt');assert.equal(season.set_release_date,'2026-09-14');
+assert.equal(season.set_id,'tmt');assert.equal(season.set_release_date,laterDay);
 
 console.log('Pack One season backend smoke passed: no-season 200, month alias, inaugural backfill, retry repair, idempotency, concurrency, settled fallback watermarking, profile fail-open, A -> B -> A monotonicity, B -> C advancement, shared windows and profile rank >100.');
