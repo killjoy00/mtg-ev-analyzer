@@ -10,7 +10,6 @@ on:
 
 permissions:
   contents: write
-  pull-requests: write
 
 concurrency:
   group: packone-card-image-source-publication
@@ -54,7 +53,7 @@ jobs:
           npm test
           python scripts/audit_datasets.py --fail-on-error
 
-      - name: Publish source-of-truth pull request
+      - name: Publish source-of-truth branch
         shell: bash
         run: |
           set -euo pipefail
@@ -68,8 +67,5 @@ jobs:
           git commit -m 'Refresh Pack One to main card art [card-images-refreshed]'
           branch="automation/card-image-source-${GITHUB_RUN_ID}"
           git push origin "HEAD:$branch"
-          gh pr create \
-            --base main \
-            --head "$branch" \
-            --title 'Refresh Pack One to main card art' \
-            --body 'Recovery publication of the deterministic card-image source of truth after development and production backend refreshes and gameplay verification completed successfully.'
+          echo "Generated card-image recovery branch: $branch" >> "$GITHUB_STEP_SUMMARY"
+          echo "Open that branch as a pull request to main with the normal required checks." >> "$GITHUB_STEP_SUMMARY"
