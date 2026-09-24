@@ -63,6 +63,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   function syncPrimaryNav(signed) {
     for(const id of dynamicNavIds)document.querySelector('#'+id)?.remove();
     if(howNav)howNav.hidden=signed;
+    topActions.classList.toggle('is-signed-nav',signed);
     if(!signed)return;
     const items=[
       ['practice-nav','?game=draft-run','Practice'],
