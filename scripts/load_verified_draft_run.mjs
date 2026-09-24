@@ -5,6 +5,7 @@ import zlib from 'node:zlib';
 import { createHash } from 'node:crypto';
 import { validateDraftRunPuzzle } from '../draft-run.mjs';
 import {insertTrophyBatch} from '../worker/trophy-import.mjs';
+import {sameGameplayPuzzle} from './corpus-puzzle-equivalence.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 
 import {stageCorpusManifest} from './stage-corpus-manifest.mjs';
@@ -27,9 +28,28 @@ const prepared=catalog.sets.map(set=>{
 async function loadSet({set,rows}) {
   await stageCorpusManifest(query,set.id,catalog.corpus_version,{...set,model_version:catalog.model_version},{preserveServing:process.argv.includes('--stage-only')});
   for(let i=0;i<rows.length;i+=250) {
-    // The same immutable insert is used for baselines and supplements. A
-    // conflicting payload is an error, not an apparently successful no-op.
-    await insertTrophyBatch(query,rows.slice(i,i+250));
+    const batch=rows.slice(i,i+250);
+    const ids=batch.map(row=>row.puzzle_id);
+    const existing=await query(
+      `SELECT puzzle_id,payload FROM draft_run_verified_puzzles
+       WHERE puzzle_id IN (SELECT jsonb_array_elements_text($1::jsonb))`,
+      [JSON.stringify(ids)],
+    );
+    const byId=new Map(existing.rows.map(row=>[
+      row.puzzle_id,
+      typeof row.payload==='string'?JSON.parse(row.payload):row.payload,
+    ]));
+    const missing=[];
+    for(const puzzle of batch) {
+      const stored=byId.get(puzzle.puzzle_id);
+      if(!stored)missing.push(puzzle);
+      else if(!sameGameplayPuzzle(stored,puzzle))
+        throw new Error('Existing puzzle gameplay differs; no payload overwritten');
+    }
+    // Card display metadata is intentionally mutable through the reviewed image
+    // refresh workflow. Preserve refreshed display fields already in Neon while
+    // keeping gameplay payloads immutable.
+    if(missing.length)await insertTrophyBatch(query,missing);
   }
   console.log(set.id,rows.length,'verified puzzles');
 }
