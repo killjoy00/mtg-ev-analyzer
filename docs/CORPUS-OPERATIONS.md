@@ -49,6 +49,15 @@ Premier trophies include 7–0, 7–1 and 7–2 with the existing experience/ski
 
 Custom-set practice requires complete P1P1–P1P8 coverage with at least 16 independent medium/hard sources at each position. Live sets with incomplete opening-pack archives can still contribute valid later decisions to mixed runs; they are not offered as self-contained custom-set runs. The full historical inventory is retained.
 
+
+## Card-image maintenance
+
+Card-image repair is a separate explicit corpus mutation, not part of ingestion or lifecycle promotion. It is display-only, fail-closed, and serialized with other corpus writers. Regular environments prefer ordinary/base art from the intended set; Powered Cube uses the earliest ordinary/base printing globally. An original/only special-frame printing is allowed only when no ordinary alternative exists, while avoidable cosmetic selections remain publication blockers.
+
+The guarded release deploys the same reviewed code revision to development and production before running the all-Pack-One image refresh. A successful code deploy does not by itself change live image data. The refresh must pass normalization, tests, dataset audit, exact backend-revision verification, R2 publication, development/production backend refreshes, gameplay verification, and the checked-in corpus update.
+
+See [Card image maintenance](CARD-IMAGE-MAINTENANCE.md) for the resolver policy, display-only mutation boundary, diagnostics, failure interpretation, and recovery/release sequence.
+
 ## Supplemental Traditional components
 
 Current v4 supplemental identities are `traditional-premier-v4-phase2-v1` for regular environments and `traditional-cube-p2p7-v4-v1` for Powered Cube. They are pinned to parent `elite-trophy-colour-stage-v8` and model `strong-player-colour-stage-v4`.
