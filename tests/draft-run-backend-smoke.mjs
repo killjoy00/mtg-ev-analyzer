@@ -3,6 +3,7 @@ import {withPracticeAccess} from './practice-access-fixture.mjs';
 // Usage: node tests/draft-run-backend-smoke.mjs /path/to/dev.connection --dev-fixtures
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import {digest} from '../worker/account-session.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw new Error('Use an isolated development database and --dev-fixtures.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
@@ -23,7 +24,33 @@ const owner=await call(growth,'/v1/session',{displayName:'QA owner '+tag});
 console.log('Created isolated guest and owner fixtures',tag);
 let original=await call(runApi,'/v1/runs',{daily:true},owner.token);
 let duplicate=await call(runApi,'/v1/runs',{daily:true},guest.token);
-let s=await call(runApi,'/v1/runs',{},guest.token);
+const practiceKey=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+const practiceHeaders={'x-idempotency-key':practiceKey};
+let s=await call(runApi,'/v1/runs',{},guest.token,200,{headers:practiceHeaders});
+const practiceRetry=await call(runApi,'/v1/runs',{},guest.token,200,{headers:practiceHeaders});
+assert.equal(practiceRetry.id,s.id,'A retried practice start must return the original run');
+assert.equal((await query('SELECT count(*) n FROM draft_run_sessions WHERE player_id=$1::uuid AND start_idempotency_hash=$2',[guest.playerId,digest(practiceKey)])).rows[0].n,'1');
+assert.equal((await query("SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='game_started' AND event_props->>'run_id'=$2",[guest.playerId,s.id])).rows[0].n,'1');
+await call(runApi,'/v1/runs',{environment:'powered-cube'},guest.token,409,{headers:practiceHeaders});
+await call(runApi,'/v1/runs',{daily:true},guest.token,400,{headers:{'x-idempotency-key':Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url')}});
+
+const idemOwner=await call(growth,'/v1/session',{displayName:'QA idempotency '+tag});
+const idemAuth=crypto.randomUUID();
+await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[
+  idemAuth,'QA idempotency',`qa-idempotency-${idemAuth}@example.invalid`,
+]);
+await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[idemAuth,idemOwner.playerId]);
+const concurrentKey=Buffer.from(crypto.getRandomValues(new Uint8Array(32))).toString('base64url');
+const concurrentHeaders={'x-idempotency-key':concurrentKey};
+const concurrentStarts=await Promise.all([
+  call(runApi,'/v1/runs',{},idemOwner.token,200,{headers:concurrentHeaders}),
+  call(runApi,'/v1/runs',{},idemOwner.token,200,{headers:concurrentHeaders}),
+]);
+assert.equal(concurrentStarts[0].id,concurrentStarts[1].id,'Concurrent practice starts must converge on one run');
+assert.equal((await query('SELECT count(*) n FROM draft_run_sessions WHERE player_id=$1::uuid AND start_idempotency_hash=$2',[idemOwner.playerId,digest(concurrentKey)])).rows[0].n,'1');
+await query('DELETE FROM account_links WHERE auth_user_id=$1::uuid',[idemAuth]);
+await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[idemAuth]);
+
 const initial=s.current.puzzle_id;
 const req={revision:s.revision,round:0,puzzleId:initial,type:'pack'};
 const concurrent=await Promise.all([call(runApi,`/v1/runs/${s.id}/reroll`,req,guest.token).catch(e=>e),call(runApi,`/v1/runs/${s.id}/reroll`,req,guest.token).catch(e=>e)]);
@@ -116,4 +143,4 @@ assert.ok(analytics.every(r=>Number(r.n)===1));assert.equal(analytics.length,3);
 await query('SELECT * FROM analytics_retention_cohorts LIMIT 1');await query('SELECT * FROM analytics_daily_next_day_retention LIMIT 1');
 fs.mkdirSync('generated/review',{recursive:true});fs.writeFileSync('generated/review/backend-timings.json',JSON.stringify(timings,null,2));
 console.log('Run request timings (isolated database, ms):',JSON.stringify(timings.filter(t=>t.path==='/v1/runs')));
-console.log('Passed real database: concurrent writes, versioned locked picks, retries, forged score rejection, guest privacy, account claim, merge, Daily conflicts, environment transfer, public opt-in, percentile ties, old milestones, event idempotency and funnel queries.');
+console.log('Passed real database: idempotent practice creation, concurrent writes, versioned locked picks, retries, forged score rejection, guest privacy, account claim, merge, Daily conflicts, environment transfer, public opt-in, percentile ties, old milestones, event idempotency and funnel queries.');
