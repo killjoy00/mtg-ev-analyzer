@@ -1,0 +1,270 @@
+name: App Store Connect check
+
+# Read-only diagnostic for the Pack One iOS app record. Confirms the App Store
+# Connect API key in repository secrets works and points at Pack One, then
+# reports what App Store Connect currently holds: bundle ID capabilities,
+# builds, versions, listing fields, TestFlight groups and subscription groups.
+#
+# Runs on ubuntu-latest: it only needs the API key, not a macOS toolchain.
+# Never prints secret contents. This repository is public, so its Actions logs
+# are public too: tester identities are reported as counts, never emails.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    env:
+      APP_ID: '6814318676'
+      BUNDLE_ID: pro.packone.app
+      SKU: packone-ios-001
+    steps:
+      - name: Check secrets are present
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          missing=""
+          [ -n "$ASC_KEY_ID" ]    || missing="$missing ASC_KEY_ID"
+          [ -n "$ASC_ISSUER_ID" ] || missing="$missing ASC_ISSUER_ID"
+          [ -n "$ASC_KEY_P8" ]    || missing="$missing ASC_KEY_P8"
+          if [ -n "$missing" ]; then
+            echo "::error::Missing repository secrets:$missing"
+            exit 1
+          fi
+          # Not needed to read App Store Connect, but the TestFlight upload
+          # signs with it, so report it here rather than at upload time.
+          if [ -z "$APPLE_TEAM_ID" ]; then
+            echo "::warning::APPLE_TEAM_ID is not set. This check can run without it; the TestFlight upload cannot."
+          fi
+          echo "All App Store Connect secrets are present."
+
+      # Same normalisation as the GoldRush and EZ Trivia workflows, since .p8
+      # secrets get pasted in every possible shape.
+      - name: Normalise the API key
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        run: |
+          set -u
+          mkdir -p ~/private_keys
+          key=~/private_keys/AuthKey_${ASC_KEY_ID}.p8
+
+          printf '%s' "$ASC_KEY_P8" | tr -d '\r' > "$key"
+          if ! grep -q 'BEGIN' "$key" && grep -q '\\n' "$key"; then
+            printf '%b' "$(cat "$key")" > "$key.tmp" && mv "$key.tmp" "$key"
+          fi
+          if ! grep -q 'BEGIN' "$key" && base64 -d < "$key" > "$key.tmp" 2>/dev/null; then
+            if grep -q 'BEGIN' "$key.tmp"; then mv "$key.tmp" "$key"; else rm -f "$key.tmp"; fi
+          fi
+          if ! grep -q 'BEGIN' "$key"; then
+            body=$(tr -d '\n\r ' < "$key")
+            { echo "-----BEGIN PRIVATE KEY-----"
+              echo "$body" | fold -w 64
+              echo "-----END PRIVATE KEY-----"; } > "$key.tmp" && mv "$key.tmp" "$key"
+          fi
+          chmod 600 "$key"
+
+          if ! openssl pkey -in "$key" -noout 2>/dev/null; then
+            echo "::error::ASC_KEY_P8 does not parse as a private key."
+            exit 1
+          fi
+          echo "API key parses."
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install dependencies
+        run: pip install --quiet "pyjwt[crypto]" requests
+
+      - name: Query App Store Connect
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+        run: |
+          python3 <<'PYEOF'
+          import os, sys, time
+          import jwt
+          import requests
+
+          key_id = os.environ["ASC_KEY_ID"]
+          issuer_id = os.environ["ASC_ISSUER_ID"]
+          app_id = os.environ["APP_ID"]
+          bundle_id = os.environ["BUNDLE_ID"]
+          sku = os.environ["SKU"]
+          key_path = os.path.expanduser(f"~/private_keys/AuthKey_{key_id}.p8")
+
+          with open(key_path) as f:
+              private_key = f.read()
+
+          now = int(time.time())
+          token = jwt.encode(
+              {"iss": issuer_id, "iat": now, "exp": now + 1200, "aud": "appstoreconnect-v1"},
+              private_key,
+              algorithm="ES256",
+              headers={"kid": key_id},
+          )
+          headers = {"Authorization": f"Bearer {token}"}
+          base = "https://api.appstoreconnect.apple.com/v1"
+          problems = []
+
+          def request(path, **params):
+              return requests.get(f"{base}{path}", headers=headers, params=params, timeout=30)
+
+          def get(path, **params):
+              r = request(path, **params)
+              if r.status_code >= 300:
+                  print(f"::error::{path} -> HTTP {r.status_code}: {r.text[:500]}")
+                  sys.exit(1)
+              return r.json()
+
+          # For sections that are informational: report and carry on.
+          def soft_get(path, **params):
+              r = request(path, **params)
+              if r.status_code >= 300:
+                  print(f"  (could not read {path}: HTTP {r.status_code})")
+                  return None
+              return r.json()
+
+          # --- Key and app record ---------------------------------------------
+          # Distinguish the three ways this first call fails, since each one
+          # has a different fix.
+          r = request(f"/apps/{app_id}", **{"fields[apps]": "name,bundleId,sku,primaryLocale"})
+          if r.status_code == 401:
+              print("::error::App Store Connect rejected the key (HTTP 401). ASC_KEY_ID and "
+                    "ASC_ISSUER_ID must match the key, and ASC_KEY_P8 must be that key's .p8.")
+              sys.exit(1)
+          if r.status_code == 403:
+              print("::error::The key authenticated but has no access to this app (HTTP 403). "
+                    "Its role is probably narrower than App Manager.")
+              sys.exit(1)
+          if r.status_code == 404:
+              print(f"::error::App {app_id} is not visible to this key (HTTP 404). "
+                    "The key may belong to a different team than the app.")
+              sys.exit(1)
+          if r.status_code >= 300:
+              print(f"::error::/apps/{app_id} -> HTTP {r.status_code}: {r.text[:500]}")
+              sys.exit(1)
+
+          a = r.json()["data"]["attributes"]
+          print("=== App record ===")
+          print(f"  name:           {a.get('name')}")
+          print(f"  bundle ID:      {a.get('bundleId')}")
+          print(f"  SKU:            {a.get('sku')}")
+          print(f"  primary locale: {a.get('primaryLocale')}")
+          if a.get("bundleId") != bundle_id:
+              problems.append(f"bundle ID is {a.get('bundleId')!r}, expected {bundle_id!r}")
+          if a.get("sku") != sku:
+              problems.append(f"SKU is {a.get('sku')!r}, expected {sku!r}")
+          print()
+
+          # --- Bundle ID capabilities -------------------------------------------
+          # Sign in with Apple, in-app purchase and associated domains all show
+          # up here once enabled. Print the raw list rather than guessing names.
+          print("=== Bundle ID capabilities ===")
+          bundles = soft_get("/bundleIds", **{"filter[identifier]": bundle_id,
+                                              "fields[bundleIds]": "identifier,name,platform"})
+          if bundles and bundles.get("data"):
+              ref = bundles["data"][0]
+              print(f"  registered as: {ref['attributes'].get('name')} "
+                    f"({ref['attributes'].get('platform')})")
+              caps = soft_get(f"/bundleIds/{ref['id']}/bundleIdCapabilities",
+                              **{"fields[bundleIdCapabilities]": "capabilityType"})
+              if caps is not None:
+                  types = sorted(c["attributes"].get("capabilityType") or "(unnamed)"
+                                 for c in caps.get("data", []))
+                  print(f"  capabilities ({len(types)}): {', '.join(types) or '(none)'}")
+          elif bundles is not None:
+              print(f"  {bundle_id} is not visible to this key "
+                    "(the key may lack Certificates, Identifiers & Profiles access).")
+          print()
+
+          # --- Builds -----------------------------------------------------------
+          # The nested /apps/{id}/builds endpoint rejects `sort`; the top-level
+          # collection with a filter supports it.
+          builds = get("/builds", **{
+              "filter[app]": app_id,
+              "sort": "-uploadedDate",
+              "limit": 5,
+              "fields[builds]": "version,processingState,uploadedDate,expired,minOsVersion",
+          })
+          print(f"=== Builds (newest {len(builds.get('data', []))}) ===")
+          if not builds.get("data"):
+              print("  (none uploaded yet)")
+          for b in builds.get("data", []):
+              ba = b["attributes"]
+              print(f"  build {ba.get('version')}: state={ba.get('processingState')}"
+                    f" uploaded={ba.get('uploadedDate')} expired={ba.get('expired')}"
+                    f" minOS={ba.get('minOsVersion')}")
+          print()
+
+          # --- Versions and listing ---------------------------------------------
+          versions = get(f"/apps/{app_id}/appStoreVersions", **{
+              "limit": 5,
+              "fields[appStoreVersions]": "versionString,appStoreState,platform",
+          })
+          print(f"=== App Store versions ({len(versions.get('data', []))}) ===")
+          for v in versions.get("data", []):
+              va = v["attributes"]
+              print(f"  {va.get('versionString')} [{va.get('appStoreState')}] {va.get('platform')}")
+          print()
+
+          print("=== Listing ===")
+          infos = soft_get(f"/apps/{app_id}/appInfos", **{"limit": 5})
+          for info in (infos or {}).get("data", []):
+              locs = soft_get(f"/appInfos/{info['id']}/appInfoLocalizations",
+                              **{"fields[appInfoLocalizations]": "locale,name,subtitle,privacyPolicyUrl"})
+              for loc in (locs or {}).get("data", []):
+                  la = loc["attributes"]
+                  print(f"  [{la.get('locale')}] name={la.get('name') or '(EMPTY)'}"
+                        f" subtitle={la.get('subtitle') or '(EMPTY)'}"
+                        f" privacy={la.get('privacyPolicyUrl') or '(EMPTY)'}")
+          print()
+
+          # --- TestFlight -------------------------------------------------------
+          # Counts only: tester emails would land in public logs.
+          groups = get(f"/apps/{app_id}/betaGroups",
+                       **{"fields[betaGroups]": "name,isInternalGroup,publicLinkEnabled"})
+          print(f"=== TestFlight groups ({len(groups.get('data', []))}) ===")
+          if not groups.get("data"):
+              print("  (none yet: a processed build stays invisible to testers until it is")
+              print("   added to a group that includes them)")
+          for g in groups.get("data", []):
+              ga = g["attributes"]
+              kind = "internal" if ga.get("isInternalGroup") else "external"
+              testers = soft_get(f"/betaGroups/{g['id']}/betaTesters",
+                                 **{"fields[betaTesters]": "state", "limit": 200})
+              count = len((testers or {}).get("data", []))
+              print(f"  '{ga.get('name')}' ({kind}), {count} tester(s)")
+          print()
+
+          # --- Subscriptions ----------------------------------------------------
+          # Elite will live here. Empty is expected until that work starts.
+          print("=== Subscription groups ===")
+          subs = soft_get(f"/apps/{app_id}/subscriptionGroups",
+                          **{"fields[subscriptionGroups]": "referenceName"})
+          if subs is not None:
+              if not subs.get("data"):
+                  print("  (none yet)")
+              for sg in subs.get("data", []):
+                  print(f"  {sg['attributes'].get('referenceName')}")
+                  items = soft_get(f"/subscriptionGroups/{sg['id']}/subscriptions",
+                                   **{"fields[subscriptions]": "productId,name,state"})
+                  for s in (items or {}).get("data", []):
+                      sa = s["attributes"]
+                      print(f"    {sa.get('productId')}: {sa.get('name')} [{sa.get('state')}]")
+          print()
+
+          if problems:
+              for p in problems:
+                  print(f"::error::{p}")
+              sys.exit(1)
+          print("The key works and points at the Pack One app record.")
+          PYEOF
