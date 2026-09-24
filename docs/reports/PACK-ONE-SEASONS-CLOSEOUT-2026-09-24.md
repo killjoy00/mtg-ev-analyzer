@@ -4,7 +4,7 @@
 
 Pack One competitive seasons are implemented, merged, migrated, deployed and live in production.
 
-The shipped application revision is `fe9d666a094c0d18a13899a089a3ed49de67901a` from PR #460. Production Neon Postgres carries reviewed migrations through `0037_pack_one_seasons.sql`. Development and production Functions both serve the same exact season revision.
+The original season feature shipped as `fe9d666a094c0d18a13899a089a3ed49de67901a` from PR #460. The reviewed post-release hardening is application revision `9763e7caf87f20ca4bc77d82b8513a3d365db5c9` from PR #476. Production Neon Postgres now carries reviewed migrations through `0038_pack_one_season_hardening.sql`, and development and production Functions both serve the same exact hardened application revision.
 
 The current competitive leaderboard periods are **Today**, **This week**, **This season** and **All time**. Legacy Draft Run clients and URLs that request `month` canonicalize to the current season; the unrelated legacy monthly worker/core path remains intact.
 
@@ -103,10 +103,10 @@ The migration path accepts only a full reviewed main SHA and fixed development/p
 
 The September 24 documentation pass corrected these stale boundaries:
 
-- `docs/CURRENT-STATE.md` now records the live season browser revision, production Function revision, schema through 0037, inaugural HOB evidence and release runs.
-- `docs/REQUEST-INTEGRITY.md` now records the completed development → production season release chain and the stable-marker hardening.
-- `README.md` now describes the season leaderboard periods, monotonic season behavior, legacy month compatibility and profile standings.
-- `.github/workflows/backend-gate.yml` now documents production-clone schema baseline through 0037.
+- `docs/CURRENT-STATE.md` records the live hardened Function revision, schema through 0038, inaugural HOB evidence and both release chains.
+- `docs/REQUEST-INTEGRITY.md` records the completed 0037 feature rollout, the 0038 hardening rollout, stable-marker acceptance, and rollout replay protection.
+- `README.md` describes the season leaderboard periods, monotonic season behavior, legacy month compatibility and profile standings.
+- `.github/workflows/backend-gate.yml` documents the production-clone schema baseline through 0038.
 - `docs/CHARTER.md` already contained the correct product contract: seasons advance from immutable Latest Set Daily history and temporary fallback never rolls the season backward.
 
 Archived pre-rebuild documents that mention monthly leaderboards were left unchanged because they are explicitly historical.
@@ -121,21 +121,22 @@ A subsequent code review identified three production-hardening gaps that were no
 
 The original statement that established season metadata survives later policy edits remains true for sets already persisted in `draft_run_seasons`, but it was too broad as a statement about the safety of reconciliation as a whole. Likewise, describing the first natural rollover as merely worth observing understated the risk while these failure domains remained coupled.
 
-The follow-up hardening adds migration 0038 with a durable reconciliation watermark, makes profile season enrichment fail open, removes Daily creation from profile/growth reads, strengthens Live metadata admission, and adds semantic rollout replay protection. Until that hardening is promoted through development and production, the initial release evidence should not be read as proof that these three post-release risks are absent.
+The follow-up hardening adds migration 0038 with a durable reconciliation watermark, makes profile season enrichment fail open, removes Daily creation from profile/growth reads, strengthens Live metadata admission, and adds semantic rollout replay protection. That hardening is now fully promoted: PR #476 merged exact application revision `9763e7caf87f20ca4bc77d82b8513a3d365db5c9`; migration 0038 passed development run 36020410138 and production run 36022058215; the same exact revision passed development deploy/acceptance 36021141621 and production deploy/acceptance 36023616589. The three post-release failure-domain risks identified above are therefore remediated in the live production runtime.
 
 ## Follow-ups / non-blockers
 
-1. **Mobile migration numbering:** draft mobile-auth PR #448 was created before seasons landed and currently proposes its own migration 0037 on a stacked mobile branch. That stack must be renumbered/rebased before it can merge onto current `main`.
+1. **Mobile migration numbering:** the stacked mobile work was created before the season migrations stabilized: PR #448 still carries a historical 0037 migration and PR #461 carries a historical 0038 migration on later stack layers. Current `main` now owns 0037 and 0038, so the mobile migration chain must be rebased and renumbered before merge.
 2. **Legacy monthly compatibility:** the old worker/core monthly implementation is intentionally preserved. Only current Draft Run `month` requests canonicalize to competitive season.
-3. **Future rollover:** no manual action should be required when a newer released regular set first becomes the immutable Latest Set Daily. The persisted resolver is the authority; fallback to an older set must not reopen an old season.
+3. **Future rollover observation:** the first natural rollover remains useful operational confirmation of the season-advance path against newly promoted corpus policy. It is no longer a release blocker: profile enrichment fails open, settled history is protected by the reconciliation watermark, profile reads cannot create Dailies, and incomplete new-set metadata is rejected before Latest Set use.
 
 ## Final state
 
 As of the closeout:
 
 - browser season UI is published on GitHub Pages;
-- development and production schema include migration 0037;
-- development and production Functions serve exact revision `fe9d666a094c0d18a13899a089a3ed49de67901a`;
-- production release acceptance is green;
+- development and production schema include migrations 0037 and 0038;
+- development and production Functions serve exact hardened revision `9763e7caf87f20ca4bc77d82b8513a3d365db5c9`;
+- production hardening acceptance run 36023616589 is green;
 - The Hobbit is the persisted inaugural competitive season with start date 2026-09-16;
-- the initial production release acceptance is green; the post-closeout hardening risks above require their own reviewed migration/deployment before this closeout can be treated as fully final.
+- the post-closeout failure-domain findings are remediated in production;
+- the remaining season-specific follow-up is operational observation of the first natural future rollover, not a known unresolved outage path.
