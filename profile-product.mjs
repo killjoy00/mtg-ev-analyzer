@@ -104,7 +104,7 @@ function modeCards(profile) {
   const wanted = ['draft_run'];
   return wanted.map((mode) => {
     const row = rows.find((item) => item.mode === mode) || { games: 0, average_score: 0, best_score: 0 };
-    return `<article class="profile-mode-card"><span>${modeName(mode)}</span><strong>${row.games?Number(row.average_score || 0).toFixed(1) :'N/A'}</strong><small>${Number(row.games || 0)} games${row.games?` · ${Number(row.best_score || 0)} best`:''}</small></article>`;
+    return `<article class="profile-mode-card"><span>${modeName(mode)}</span><strong>${row.games?Number(row.average_score || 0).toFixed(1):'N/A'}</strong><small>${Number(row.games || 0)} games${row.games?` · ${Number(row.best_score || 0)} best`:''}</small></article>`;
   }).join('');
 }
 
