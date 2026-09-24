@@ -1,0 +1,117 @@
+name: clean legacy self-shared runs
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Neon branch to clean'
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+      commit:
+        description: 'Full 40-character reviewed main commit SHA containing migration 0036'
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack1-self-share-cleanup-${{ inputs.target }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      PROJECT_ID: patient-shadow-91417882
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      RELEASE_COMMIT: ${{ inputs.commit }}
+      RELEASE_TARGET: ${{ inputs.target }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Resolve reviewed commit and target
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || { echo '::error::NEON_API_KEY is missing.'; exit 1; }
+          [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::Use a full commit SHA.'; exit 1; }
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
+          git checkout --detach "$RELEASE_COMMIT"
+          test -f migrations/0036_self_shared_run_cleanup.sql
+          case "$RELEASE_TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          echo "TARGET_BRANCH=$branch" >> "$GITHUB_ENV"
+
+      - name: Install pinned Neon CLI
+        run: npm install --prefix "$RUNNER_TEMP/neon-tools" --no-audit --no-fund neon@4.17.4
+
+      - name: Ensure PostgreSQL client is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+      - name: Inspect legacy self-share artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/neon-tools/node_modules/.bin/neon"
+          connection=$("$neon" connection-string "$TARGET_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          before=$(psql "$connection" -Atc "
+            SELECT count(*)
+            FROM draft_run_sessions replay
+            JOIN draft_run_shares sh ON sh.id=replay.challenge_id
+            JOIN draft_run_sessions owner ON owner.id=sh.session_id
+            WHERE replay.id<>owner.id AND replay.player_id=owner.player_id")
+          echo "Legacy self-share sessions before cleanup: $before"
+          echo "SELF_SHARE_BEFORE=$before" >> "$GITHUB_ENV"
+
+      - name: Apply reviewed cleanup migration
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/neon-tools/node_modules/.bin/neon"
+          connection=$("$neon" connection-string "$TARGET_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f migrations/0036_self_shared_run_cleanup.sql
+
+      - name: Verify cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/neon-tools/node_modules/.bin/neon"
+          connection=$("$neon" connection-string "$TARGET_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          after=$(psql "$connection" -Atc "
+            SELECT count(*)
+            FROM draft_run_sessions replay
+            JOIN draft_run_shares sh ON sh.id=replay.challenge_id
+            JOIN draft_run_sessions owner ON owner.id=sh.session_id
+            WHERE replay.id<>owner.id AND replay.player_id=owner.player_id")
+          test "$after" = "0" || { echo "::error::Legacy self-share sessions remain after cleanup: $after"; exit 1; }
+          {
+            echo '### Shared-run self-challenge cleanup'
+            echo
+            echo "- Target: $RELEASE_TARGET"
+            echo "- Reviewed application revision: `$RELEASE_COMMIT`"
+            echo "- Legacy self-share sessions removed: $SELF_SHARE_BEFORE"
+            echo '- Remaining self-share sessions: 0'
+          } >> "$GITHUB_STEP_SUMMARY"
