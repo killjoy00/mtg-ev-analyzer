@@ -27,13 +27,16 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = fals
   const usernameAttention=rankingReason==='username_taken'||rankingReason==='username_required';
   const ordered = [...games].sort((a, b) => Number(status[a.key].complete) - Number(status[b.key].complete));
   return `<section class="daily-home" data-daily-home data-completed="${status.completed}">
-    <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Match a trophy drafter. See how your choices compare.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
+    <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Make your pick, then see what the trophy drafter chose — and how strong your pick was.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
     ${usernameAttention?'<aside class="daily-home-identity-warning" role="alert"><div><strong>Choose a unique username before playing a Daily.</strong><p>Your account still needs a unique username. Until you choose one, Daily results will not appear on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change username</button></aside>':''}
     <div class="daily-home-games">${ordered.map(game => {
       const result = status[game.key];
-      return `<article class="daily-home-game ${result.complete ? 'is-complete' : 'is-unplayed'}" data-environment="${game.environment}">
-        <span class="daily-home-number" aria-hidden="true">${game.number}</span><div class="daily-home-game-copy"><p class="daily-home-label">${game.label}</p><h2>${game.title}</h2><p>${result.complete ? `Complete · <strong>${result.score}/100</strong>` : game.description}</p></div>
-        <a class="button ${result.complete ? 'secondary' : 'primary'}" href="${game.href}">${result.complete ? 'View result' : 'Play now'}</a>
+      const startHere=status.completed===0&&game.key==='draftRun';
+      return `<article class="daily-home-game ${result.complete ? 'is-complete' : 'is-unplayed'}${startHere ? ' is-start-here' : ''}" data-environment="${game.environment}">
+        <span class="daily-home-number" aria-hidden="true">${game.number}</span>
+        <div class="daily-home-game-copy"><p class="daily-home-label">${startHere?'<span class="daily-home-start">Start here</span>':''}${game.label}</p><h2>${game.title}</h2><p>${result.complete ? `Complete · <strong>${result.score}/100</strong>` : game.description}</p></div>
+        <div class="daily-home-mark" aria-hidden="true"><span class="p1-card p1-card-back"><span>P<sup>1</sup></span></span><span class="p1-card p1-card-mid"><span>P<sup>1</sup></span></span><span class="p1-card p1-card-front"><span>P<sup>1</sup></span></span></div>
+        <div class="daily-home-action"><a class="button ${result.complete ? 'secondary' : 'primary'}" href="${game.href}">${result.complete ? 'View result' : 'Play now'}</a>${startHere?'<small>No account required</small>':''}</div>
       </article>`;
     }).join('')}</div>
     ${claimed && !elite && status.completed < 3 ? '<section class="daily-home-regular"><div><h2 class="eyebrow">Free practice</h2><p>Keep drafting with unlimited regular Draft Runs.</p></div><a class="button primary" href="?game=draft-run">Practice a Draft Run</a></section>' : ''}
@@ -52,7 +55,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = fals
 export function renderDailyHome(profile = null, unavailable = false) {
   if (!document.querySelector('[data-daily-home-style]')) {
     const link = document.createElement('link'); link.rel = 'stylesheet';
-    link.href = './daily-home.css?v=4'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
+    link.href = './daily-home.css?v=5'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
   }
   lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, unavailable);

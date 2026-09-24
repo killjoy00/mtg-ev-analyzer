@@ -297,7 +297,8 @@ function renderLoadFailure(error,isBoard) {
 export async function installDraftRunPage() {
   styles();void loadSetNames().then(()=>{if(run&&app().querySelector('.draft-run-page'))render();});document.querySelector('#brand-home').onclick=()=>location.href='./';
   document.querySelector('#daily-nav').onclick=()=>location.href=gameUrl('daily=1');
-  document.querySelector('#leaderboard-nav').onclick=()=>location.href=gameUrl('board=daily');
+  const leaderboardNav=document.querySelector('#leaderboard-nav');
+  if(leaderboardNav)leaderboardNav.onclick=()=>location.href=gameUrl('board=daily');
   const params=new URLSearchParams(location.search);
   try {
     if(params.has('board')) {const period=canonicalBoardPeriod(params.get('board'));if(period!==params.get('board')){const url=new URL(location.href);url.searchParams.set('board',period);history.replaceState({},'',url);}await showBoard(period);return;}
