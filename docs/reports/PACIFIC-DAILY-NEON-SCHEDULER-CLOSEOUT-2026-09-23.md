@@ -57,7 +57,7 @@ Artifact: `production-browser-verification`, artifact ID 10780303326, SHA-256 `d
 
 The five measured browser runs all passed. The requested sixth sample never crossed the idle precondition: after Latest sample 1, the control-plane state remained `active` for the full 12-minute wait and the workflow exited with `Production Draft Run compute did not become idle before the measurement deadline (last state: active)`.
 
-Production scheduler activation completed at approximately 22:12 UTC while this measurement suite was still running. The enabled account-deletion maintenance cadence includes 22:39 and 22:49 UTC, which is consistent with the branch remaining active during the final Latest idle window. This is an operational explanation, not a latency failure: the workflow did not count a warm/active run as a cold-start sample.
+Production scheduler activation completed at approximately 22:12 UTC while this measurement suite was still running. The enabled Neon account-deletion cadence includes 22:39 and 22:49 UTC. At the time of this measurement, the GitHub deletion workflow was also configured for a read-only attention check every ten minutes, offset five minutes from Neon, so it was eligible to query production around 22:44 UTC as well. The report therefore does not attribute the sustained active state to one specific invocation; recurring maintenance activity is consistent with the branch remaining active during the final Latest idle window. This is an operational explanation, not a latency failure: the workflow did not count a warm/active run as a cold-start sample. The recurring GitHub attention check was removed after rollout so Neon alone owns scheduled deletion maintenance; GitHub remains manual recovery only.
 
 These timings are observations from the production browser verifier, not an SLO or latency guarantee.
 
@@ -67,6 +67,7 @@ These timings are observations from the production browser verifier, not an SLO 
 - Existing Daily schedules remain immutable; pre-generation cannot reroll them.
 - Neon Function Triggers own recurring Daily pre-generation.
 - GitHub Daily generation is manual-only recovery/verification.
+- GitHub account-deletion maintenance is manual-only break-glass recovery; it has no recurring schedule.
 - Player-triggered creation remains the fallback if pre-generation is unavailable.
 - Trigger requests require Neon edge-attested invocation identity and exact reviewed trigger names.
 - Scheduler rollback is the reviewed `neon-schedulers` disable operation; it leaves definitions in place and stops future scheduled runs.
