@@ -191,6 +191,21 @@ assert.match(privacy, /Google advertising is currently disabled, so Pack One doe
 assert.match(privacy, /TCGplayer links are routed through Impact/i);
 assert.match(privacy, /records outbound TCGplayer clicks/i);
 assert.doesNotMatch(privacy, /may earn a commission|Supporter or Elite membership|membership cannot be verified/i);
+
+const noEmDashCopyFiles = [
+  'index.html','ads.mjs','growth.mjs','draft-run-feedback.mjs','draft-run-product.mjs',
+  'daily-home.mjs','practice-page.mjs','profile-product.mjs','home-today.mjs','share-cards.mjs',
+  'how-it-works/index.html','learn/index.html','learn/first-pick-discipline/index.html',
+  'learn/reading-consensus/index.html','learn/staying-open/index.html','scoring/index.html',
+  'methodology/index.html','sets/index.html','sets/msh/index.html','sets/sos/index.html',
+  'sets/tmt/index.html','sets/ecl/index.html','disclosure/index.html','reset-password/index.html',
+  'admin/users.mjs','admin/admin.mjs','admin/corpus.mjs'
+];
+for (const path of noEmDashCopyFiles) {
+  const source = await readFile(path,'utf8');
+  assert.doesNotMatch(source,/—/, `${path} must not use em dashes in user-facing copy`);
+}
+
 const sitemap = await readFile('sitemap.xml','utf8');
 assert.match(sitemap, /\/sets\/msh\//);
 assert.match(sitemap, /\/learn\/first-pick-discipline\//);
