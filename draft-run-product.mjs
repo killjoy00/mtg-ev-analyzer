@@ -23,7 +23,9 @@ const runLength=()=>draftRunLength(run);
 const cube=()=> (run?.environment||environment)==='powered-cube';
 const title=()=>cube()?'Powered Cube Run':environment==='latest'?'Latest Set Run':'Draft Run';
 const gameUrl=(params='')=>`?game=draft-run${environment!=='mixed'?'&set='+environment:''}${params?'&'+params:''}`;
-const boardUrl=(target,period='daily')=>`?game=draft-run${target!=='mixed'?'&set='+target:''}&board=${period}`;
+const canonicalBoardPeriod=value=>value==='month'?'season':value;
+const boardUrl=(target,period='daily')=>`?game=draft-run${target!=='mixed'?'&set='+target:''}&board=${canonicalBoardPeriod(period)}`;
+const seasonDate=value=>{const date=new Date(String(value||'')+'T12:00:00Z');return Number.isNaN(date.getTime())?String(value||''):date.toLocaleDateString(undefined,{month:'short',day:'numeric'});};
 let catalogNames = new Map();
 const setName=id=>catalogNames.get(id) || (id==='powered-cube'?'Powered Cube':id.toUpperCase());
 async function loadSetNames() {
@@ -231,11 +233,13 @@ async function shareResult() {
   finally {button.disabled=false;}
 }
 async function showBoard(period='daily') {
+  period=canonicalBoardPeriod(period);
   app().innerHTML='<section class="message-card"><h1>Loading the board…</h1></section>';
   const [data,access]=await Promise.all([
     api(`/v1/leaderboard?period=${encodeURIComponent(period)}&environment=${environment}`,undefined,false),
     loadDailyStatus().catch(()=>null),
   ]);
+  period=canonicalBoardPeriod(data.period||period);
   document.body.classList.remove('is-game');
   const claimed=Boolean(access?.player?.claimed),capabilities=access?.capabilities||[];
   const customPractice=claimed&&capabilities.includes('custom_corpus');
@@ -245,8 +249,14 @@ async function showBoard(period='daily') {
     : cube()
       ? (cubePractice?`<a class="button secondary" href="${gameUrl()}">Practice a Powered Cube Run</a>`:'<a class="button secondary" href="?game=draft-run">Practice a Draft Run</a>')
       : `<a class="button secondary" href="${gameUrl()}">Practice a Draft Run</a>`;
-  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['month','This month'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav><p>${period==='daily'?'First attempts on today’s shared starting packs.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b><span class="run-board-player">${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}${achievementMark(r.showcase_achievement,{compact:true})}</span><small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:`<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
-  trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period});
+  const seasonContext=period==='season'&&data.season
+    ? `<p class="run-board-season">${esc(data.season.name)} Season · ${esc(seasonDate(data.season.start_date))}–${data.season.end_date?esc(seasonDate(data.season.end_date)):'present'}</p>`
+    : '';
+  const empty=period==='season'&&!data.season
+    ? '<p class="run-empty">Season standings aren\'t available yet.</p>'
+    : `<p class="run-empty">A fresh board. Finish today’s ${title()} to set the score to beat.</p>`;
+  app().innerHTML=`<section class="run-board"><p class="eyebrow">Leaderboards</p><h1>${environment==='latest'?'Latest Set':cube()?'Cube':'Draft Run'}</h1><nav class="run-board-games" aria-label="Leaderboard game"><a class="${environment==='mixed'?'active':''}" href="${boardUrl('mixed',period)}">Draft Run</a><a class="${cube()?'active':''}" href="${boardUrl('powered-cube',period)}">Cube</a><a class="${environment==='latest'?'active':''}" href="${boardUrl('latest',period)}">Latest Set</a></nav><nav class="run-board-periods" aria-label="Leaderboard period">${[['daily','Today'],['week','This week'],['season','This season'],['all','All time']].map(([id,name])=>`<a class="${period===id?'active':''}" href="${gameUrl('board='+id)}">${name}</a>`).join('')}</nav>${seasonContext}<p>${period==='daily'?'First attempts on today’s shared starting packs.':'Average of first-attempt Daily scores, with days played shown alongside.'}</p>${data.rows.length?`<ol>${data.rows.map(r=>`<li><b>${r.rank}</b><span class="run-board-player">${r.profile_key?`<a href="?profile=${esc(r.profile_key)}">${esc(r.display_name)}</a>`:`<span>${esc(r.display_name)}</span>`}${achievementMark(r.showcase_achievement,{compact:true})}</span><small>${r.days} ${r.days===1?'day':'days'}</small><strong>${r.score}</strong></li>`).join('')}</ol>`:empty}<div class="run-board-actions"><a class="button primary" href="${gameUrl('daily=1')}">Play today’s ${title()}</a>${practiceAction}</div></section>`;
+  trackEvent('leaderboard_view',{mode:'draft_run',set_id:environment,period,season_id:data.season?.id,season_set_id:data.season?.set_id});
 }
 async function launch(options={}) {
   app().innerHTML='<section class="message-card"><h1>Finding your packs…</h1></section>';
@@ -290,7 +300,7 @@ export async function installDraftRunPage() {
   document.querySelector('#leaderboard-nav').onclick=()=>location.href=gameUrl('board=daily');
   const params=new URLSearchParams(location.search);
   try {
-    if(params.has('board')) {await showBoard(params.get('board'));return;}
+    if(params.has('board')) {const period=canonicalBoardPeriod(params.get('board'));if(period!==params.get('board')){const url=new URL(location.href);url.searchParams.set('board',period);history.replaceState({},'',url);}await showBoard(period);return;}
     if(params.has('custom')&&!params.has('run')){await customPractice();return;}
     if((params.has('shared')||params.has('challenge'))&&!params.has('run')) {
       const info=await api('/v1/shared-runs/'+encodeURIComponent(params.get('shared')||params.get('challenge')),undefined,false);
