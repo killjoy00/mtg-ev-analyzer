@@ -1,8 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {rolloutDispatch} from '../scripts/model-rollout-request.mjs';
+import {assertRolloutReplayPolicy,rolloutDispatch,rolloutFingerprint} from '../scripts/model-rollout-request.mjs';
 
 const common={request_id:'test-request',reason:'Exercise the reviewed rollout path'};
+
+test('equivalent rollout requests require an explicit replay reference',()=>{
+  const prior={operation:'season-migration',request_id:'season-prod-1',reason:'First reviewed request',target:'production',commit:'a'.repeat(40)};
+  const duplicate={...prior,request_id:'season-prod-2',reason:'Same action with different prose'};
+  assert.equal(rolloutFingerprint(prior),rolloutFingerprint(duplicate));
+  assert.throws(()=>assertRolloutReplayPolicy(duplicate,[prior]),/Equivalent rollout already requested/);
+  assert.doesNotThrow(()=>assertRolloutReplayPolicy({...duplicate,replay_of:'season-prod-1'},[prior]));
+  assert.throws(()=>assertRolloutReplayPolicy({...duplicate,replay_of:'other-request'},[prior]),/does not name an equivalent/);
+  assert.throws(()=>assertRolloutReplayPolicy({...common,operation:'browser',replay_of:'season-prod-1'},[prior]),/does not name an equivalent/);
+});
 test('rollout requests can target only fixed workflows on main',()=>{
   assert.deepEqual(rolloutDispatch({...common,operation:'deploy',target:'development',commit:'a'.repeat(40)}),{
     workflow:'deploy-functions.yml',body:{ref:'main',inputs:{target:'development',commit:'a'.repeat(40)}},
