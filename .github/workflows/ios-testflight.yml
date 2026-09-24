@@ -34,6 +34,9 @@ jobs:
           node-version: 24
       - name: Install mobile dependencies
         run: npm install --no-audit --no-fund
+      - name: Set store build number
+        shell: bash
+        run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
         run: npm test
       - name: Generate production iOS project
@@ -87,6 +90,9 @@ jobs:
           done
       - name: Install mobile dependencies
         run: npm install --no-audit --no-fund
+      - name: Set store build number
+        shell: bash
+        run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
         run: npm test
       - name: Write App Store Connect API key
@@ -164,8 +170,8 @@ jobs:
           {
             echo "## Pack One iOS TestFlight upload"
             echo
-            echo "- Bundle ID: `pro.packone.app`"
-            echo "- App Store Connect app ID: `6814318676`"
+            echo '- Bundle ID: `pro.packone.app`'
+            echo '- App Store Connect app ID: `6814318676`'
             echo "- Distribution: TestFlight Internal Only"
             echo "- Upload completed through authenticated Xcode distribution."
           } >> "$GITHUB_STEP_SUMMARY"
