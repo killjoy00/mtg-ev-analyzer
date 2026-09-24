@@ -21,12 +21,12 @@ assert.doesNotMatch(home, /id="home-editorial"/);
 assert.equal((home.match(/data-ad-slot="home"/g)||[]).length,1,'home has exactly one dormant ad slot');
 assert.match(home, /<main id="app" class="app"><\/main>\s*<aside class="ad-slot" data-ad-slot="home" hidden aria-label="Advertisement"><\/aside>\s*<\/div>\s*<footer class="site-footer app-footer">/,'home ad slot stays directly after main inside app-shell');
 assert.doesNotMatch(home, /googlesyndication/i,'Google loader stays out of index.html');
-assert.match(home, /href="visual-c\.css\?v=6"/,'home must bust the CSS cache for the affiliate-banner styles');
-assert.match(home, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/);
+assert.match(home, /href="visual-c\.css\?v=7"/,'home must bust the CSS cache for the affiliate-banner styles');
+assert.match(home, /id="how-nav"[^>]*href="\/how-it-works\/"[^>]*>How To Play<\/a>/);
 assert.doesNotMatch(home, /href="\/methodology\/"[^>]*>Method<\/a>/);
 assert.match(home, /class="topbar"/);
 assert.match(home, /id="daily-nav"[^>]*>Daily Run<\/button>/);
-assert.match(home, /id="leaderboard-nav"[^>]*>Leaders<\/button>/);
+assert.doesNotMatch(home, /id="leaderboard-nav"[^>]*>Leaders<\/button>/, 'guest home must not expose Leaders before identity resolves');
 assert.match(home, /<main id="app" class="app"><\/main>/, 'the app shell should not announce every full-page rerender as a live region');
 assert.match(home, /Impact-Site-Verification: 3e227a68-dfc4-4be8-a619-b13df4f67e25/);
 assert.doesNotMatch(home, /impact-site-verification'\s+value=/i);
@@ -38,16 +38,19 @@ const howTo = await readFile('how-it-works/index.html','utf8');
 assert.match(howTo, /<h1>How to Play Pack One<\/h1>/);
 assert.match(howTo, /class="topbar"/);
 assert.match(howTo, />Daily Run<\/a>/);
-assert.match(howTo, />Leaders<\/a>/);
-assert.match(howTo, />How To Play\?<\/a>/);
+assert.doesNotMatch(howTo, />Leaders<\/a>/, 'guest How To Play nav should stay focused');
+assert.match(howTo, />How To Play<\/a>/);
 assert.match(howTo, /id="account-nav" href="\/\?account=1">Sign in<\/a>/);
+assert.match(howTo, /class="quick-start"/);
+assert.match(howTo, /No account required/);
+assert.match(howTo, /src="\/site-nav\.mjs"/);
 assert.match(howTo, /<h2>Scoring<\/h2>/);
 assert.match(howTo, /href="\/scoring\/">View scoring<\/a>/);
 assert.match(howTo, /<h2>Method<\/h2>/);
 assert.match(howTo, /href="\/methodology\/">View method<\/a>/);
 assert.match(howTo, /<h2>Sets<\/h2>/);
 assert.match(howTo, /href="\/sets\/">View sets<\/a>/);
-const staticTopbarPages = [
+const publicStaticTopbarPages = [
   'how-it-works/index.html',
   'scoring/index.html',
   'methodology/index.html',
@@ -63,25 +66,61 @@ const staticTopbarPages = [
   'about/index.html',
   'contact/index.html',
   'privacy/index.html',
-  'terms/index.html',
-  'admin/index.html'
+  'terms/index.html'
 ];
-for (const path of staticTopbarPages) {
+for (const path of publicStaticTopbarPages) {
   const html = await readFile(path, 'utf8');
-  assert.match(html, /href="\/visual-c\.css\?v=3"/, `${path} needs the app header styles`);
+  assert.match(html, /href="\/visual-c\.css\?v=4"/, `${path} needs the app header styles`);
   assert.match(html, /class="topbar"/, `${path} needs the standard app topbar`);
+  assert.match(html, /data-site-nav/, `${path} needs account-aware navigation`);
   assert.match(html, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/, `${path} needs Daily Run navigation`);
-  assert.match(html, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, `${path} needs Leaders navigation`);
-  assert.match(html, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/, `${path} needs How To Play navigation`);
+  assert.doesNotMatch(html, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, `${path} guest markup must not expose Leaders`);
+  assert.match(html, /href="\/how-it-works\/"[^>]*>How To Play<\/a>/, `${path} needs How To Play navigation`);
   assert.match(html, /id="account-nav" href="\/\?account=1">Sign in<\/a>/, `${path} needs Sign in navigation`);
+  assert.match(html, /src="\/site-nav\.mjs"/, `${path} needs signed-in navigation enhancement`);
   assert.doesNotMatch(html, /class="site-header"|class="admin-brand"/, `${path} must not use a legacy top-level header`);
 }
+const adminTopbar = await readFile('admin/index.html','utf8');
+assert.match(adminTopbar, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/);
+assert.match(adminTopbar, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/);
 for (const path of ['about/index.html','contact/index.html','privacy/index.html','terms/index.html']) {
   const html = await readFile(path, 'utf8');
   assert.doesNotMatch(html, /Make the decision before you read the answer\./, `${path} should not use the coaching CTA`);
   assert.match(html, /class="article-return"[^>]*>[\s\S]*Back to Pack One/, `${path} needs a quiet return to the product`);
 }
+const siteNav = await readFile('site-nav.mjs','utf8');
+assert.match(siteNav, /link\('\/practice\/'\s*,\s*'Practice'/);
+assert.match(siteNav, /'Leaders'/);
+assert.match(siteNav, /'Learn'/);
+assert.match(siteNav, /'My Pack One'/);
+assert.match(siteNav, /'How To Play'/);
+const dailyHome = await readFile('daily-home.mjs','utf8');
+assert.match(dailyHome, /Make your pick, then see what the trophy drafter chose and how strong your pick was\./);
+assert.doesNotMatch(dailyHome, /trophy drafter chose —/);
+assert.match(dailyHome, /Start here/);
+assert.match(dailyHome, /No account required/);
+assert.match(dailyHome, /p1-card/);
+const learnHub = await readFile('learn/index.html','utf8');
+assert.match(learnHub, /<h1>Go deeper on Pack One\.<\/h1>/);
+assert.match(learnHub, /<h2>How to Play<\/h2>/);
+assert.match(learnHub, /<h2>Scoring<\/h2>/);
+assert.match(learnHub, /<h2>Method<\/h2>/);
+assert.match(learnHub, /<h2>Sets<\/h2>/);
+const practiceHub = await readFile('practice/index.html','utf8');
+assert.match(practiceHub, /<title>Practice · Pack One<\/title>/);
+assert.match(practiceHub, /src="\/practice-page\.mjs"/);
+assert.match(practiceHub, /href="\/practice\.css\?v=1"/);
+const practicePage = await readFile('practice-page.mjs','utf8');
+assert.match(practicePage, /title:'Regular Draft Run'/);
+assert.match(practicePage, /title:'Powered Cube'/);
+assert.match(practicePage, /title:'Choose your sets'/);
+assert.match(practicePage, /unlimited_cube_practice/);
+assert.match(practicePage, /custom_corpus/);
+assert.doesNotMatch(practicePage, /—/);
+assert.doesNotMatch(howTo, /—/);
+assert.doesNotMatch(learnHub, /—/);
 const bootstrap = await readFile('bootstrap.mjs','utf8');
+assert.match(bootstrap, /\['practice-nav','\/practice\/','Practice'\]/);
 assert.match(bootstrap, /else if \(params\.has\('account'\)\)[\s\S]*?renderAccount\(\{source:'route'\}\)/);
 const about = await readFile('about/index.html','utf8');
 assert.match(about, /Three Dailies, ready to play/);
@@ -129,7 +168,7 @@ assert.match(tcg, /categories\/trading-and-collectible-card-games\/magic-the-gat
 const adLoader = await readFile('ads.mjs','utf8');
 assert.match(adLoader, /dataset\.tcgplayerSurface='daily_home_banner'/);
 assert.match(adLoader, /\/assets\/tcgplayer-logo-primary-stroke\.webp/);
-assert.match(adLoader, /Affiliate link — Pack One may earn a commission from purchases\./);
+assert.match(adLoader, /Affiliate link\. Pack One may earn a commission from purchases\./);
 const tcgConfig = await readFile('tcgplayer-config.js','utf8');
 assert.match(tcgConfig, /partner\.tcgplayer\.com\/c\/7742974\/1780961\/21018\?u=\{url\}/);
 assert.match(tcgConfig, /homeBannerEnabled:\s*true/);
@@ -152,6 +191,23 @@ assert.match(privacy, /Google advertising is currently disabled, so Pack One doe
 assert.match(privacy, /TCGplayer links are routed through Impact/i);
 assert.match(privacy, /records outbound TCGplayer clicks/i);
 assert.doesNotMatch(privacy, /may earn a commission|Supporter or Elite membership|membership cannot be verified/i);
+
+const noEmDashCopyFiles = [
+  'index.html','ads.mjs','growth.mjs','draft-run-feedback.mjs','draft-run-product.mjs',
+  'daily-home.mjs','practice-page.mjs','profile-product.mjs','home-today.mjs','share-cards.mjs',
+  'how-it-works/index.html','learn/index.html','learn/first-pick-discipline/index.html',
+  'learn/reading-consensus/index.html','learn/staying-open/index.html','scoring/index.html',
+  'methodology/index.html','sets/index.html','sets/msh/index.html','sets/sos/index.html',
+  'sets/tmt/index.html','sets/ecl/index.html','about/index.html','contact/index.html',
+  'privacy/index.html','terms/index.html','disclosure/index.html','reset-password/index.html',
+  'patreon-activation.mjs','site-nav.mjs','bootstrap.mjs',
+  'admin/users.mjs','admin/admin.mjs','admin/corpus.mjs'
+];
+for (const path of noEmDashCopyFiles) {
+  const source = await readFile(path,'utf8');
+  assert.doesNotMatch(source,/—/, `${path} must not use em dashes in user-facing copy`);
+}
+
 const sitemap = await readFile('sitemap.xml','utf8');
 assert.match(sitemap, /\/sets\/msh\//);
 assert.match(sitemap, /\/learn\/first-pick-discipline\//);

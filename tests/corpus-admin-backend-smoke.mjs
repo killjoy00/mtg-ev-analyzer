@@ -25,6 +25,11 @@ try {
  await query("INSERT INTO corpus_health_checks(set_id,corpus_version,manifest_hash,gate_version,ready,report) VALUES($1,$2,$3,$4,true,'{}')",[discovered,DRAFT_RUN_CORPUS_VERSION,manifestHash,CORPUS_GATE_VERSION]);
  assert.equal((await registerHealthyCandidate(query,discovered,'stale')).rows.length,0);
  assert.equal((await registerHealthyCandidate(query,discovered,manifestHash)).rows[0].status,'Candidate');
+ // A regular set cannot become Live without the metadata season reconciliation
+ // needs if it later becomes the immutable Latest Set Daily.
+ await query("UPDATE draft_run_environment_policy SET set_name=NULL WHERE set_id=$1",[discovered]);
+ await call('/'+discovered+'/status',{oldStatus:'Candidate',status:'Live',corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason:'QA missing season metadata'},409);
+ await query("UPDATE draft_run_environment_policy SET set_name='QA Candidate' WHERE set_id=$1",[discovered]);
  await query("UPDATE draft_run_environment_policy SET status='Retired' WHERE set_id=$1",[discovered]);
  assert.equal((await registerHealthyCandidate(query,discovered,manifestHash)).rows.length,0);
  const report=await call('');assert.ok(report.sets.some(s=>s.set_id==='hob'));assert.equal(report.corpus_version,DRAFT_RUN_CORPUS_VERSION);
