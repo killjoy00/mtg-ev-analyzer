@@ -121,8 +121,10 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
 
     global_best: dict[str, dict] = {}
     global_rank: dict[str, tuple] = {}
+    global_has_ordinary: set[str] = set()
     set_best: dict[tuple[str, str], dict] = {}
     set_rank: dict[tuple[str, str], tuple] = {}
+    set_has_ordinary: set[tuple[str, str]] = set()
 
     wanted = set(sets_by_name)
     for card in all_printings():
@@ -132,6 +134,8 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
         for alias in matched:
             if not image_url(card, alias):
                 continue
+            if not special_flags(card):
+                global_has_ordinary.add(alias)
             rank = printing_rank(card, alias)
             if alias not in global_rank or rank < global_rank[alias]:
                 global_rank[alias] = rank
@@ -139,6 +143,8 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
             for sid in sets_by_name[alias]:
                 preferred = None if sid == "powered-cube" else sid
                 key = (sid, alias)
+                if not special_flags(card):
+                    set_has_ordinary.add(key)
                 rank = printing_rank(card, alias, preferred)
                 if key not in set_rank or rank < set_rank[key]:
                     set_rank[key] = rank
@@ -154,6 +160,8 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
         if global_card and image_url(global_card, name):
             global_best[name] = global_card
             global_rank[name] = printing_rank(global_card, name)
+            if not special_flags(global_card):
+                global_has_ordinary.add(name)
         for sid in sorted(sets_by_name.get(name) or []):
             preferred = None if sid == "powered-cube" else sid
             chosen = global_card if preferred is None else fetch_named(name, preferred)
@@ -161,6 +169,8 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
                 key = (sid, name)
                 set_best[key] = chosen
                 set_rank[key] = printing_rank(chosen, name, preferred)
+                if not special_flags(chosen):
+                    set_has_ordinary.add(key)
             time.sleep(0.15)
 
     records_by_set: dict[str, dict[str, dict]] = {}
@@ -184,6 +194,7 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
                     "released_at": card.get("released_at"),
                     "collector_number": card.get("collector_number"),
                     "special_flags": flags,
+                    "special_unavoidable": bool(flags) and (sid, name) not in set_has_ordinary,
                 }
         records_by_set[sid] = records
         selection_details[sid] = details
@@ -265,7 +276,12 @@ def main() -> int:
         special = {
             name: detail
             for name, detail in selection_details.get(sid, {}).items()
-            if detail.get("special_flags")
+            if detail.get("special_flags") and not detail.get("special_unavoidable")
+        }
+        unavoidable_special = {
+            name: detail
+            for name, detail in selection_details.get(sid, {}).items()
+            if detail.get("special_flags") and detail.get("special_unavoidable")
         }
         cross_set = {
             name: detail
@@ -280,6 +296,7 @@ def main() -> int:
             "unresolved_names": unresolved,
             "mapping_entries": len(mapping),
             "remaining_special_printings": special,
+            "unavoidable_special_printings": unavoidable_special,
             "cross_set_fallbacks": cross_set,
             "shards": shard_files,
             "shard_card_changes": shard_changes,
@@ -308,12 +325,14 @@ def main() -> int:
     REPORT_PATH.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     unresolved_total = sum(len(item["unresolved_names"]) for item in report["sets"].values())
     special_total = sum(len(item["remaining_special_printings"]) for item in report["sets"].values())
+    unavoidable_special_total = sum(len(item["unavoidable_special_printings"]) for item in report["sets"].values())
     cross_set_total = sum(len(item["cross_set_fallbacks"]) for item in report["sets"].values())
     summary = {
         "sets": len(report["sets"]),
         "unique_card_names": report["unique_card_names"],
         "unresolved_names": unresolved_total,
         "remaining_special_printings": special_total,
+        "unavoidable_special_printings": unavoidable_special_total,
         "cross_set_fallbacks": cross_set_total,
         "card_id_name_collisions": len(report["card_id_name_collisions"]),
     }

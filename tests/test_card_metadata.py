@@ -58,6 +58,41 @@ class CardMetadataTests(unittest.TestCase):
         self.assertEqual(request.call_count, 2)
         self.assertEqual(request.call_args_list[1].args[0], prints)
 
+    def test_named_lookup_canonicalizes_hbg_rebalanced_adventure(self):
+        prints = "https://api.scryfall.com/cards/search?q=oracleid%3Aoracle-monster&unique=prints"
+        resolved = {
+            "id": "arena-rebalanced",
+            "oracle_id": "oracle-monster",
+            "prints_search_uri": prints,
+            "name": "A-Monster Manual // A-Zoological Study",
+            "set": "hbg",
+            "lang": "en",
+            "released_at": "2022-07-07",
+            "collector_number": "217",
+            "digital": True,
+            "card_faces": [
+                {
+                    "name": "A-Monster Manual",
+                    "mana_cost": "{3}{G}",
+                    "type_line": "Artifact — Book",
+                    "image_uris": {"normal": "https://img/a-monster-manual.jpg"},
+                },
+                {
+                    "name": "A-Zoological Study",
+                    "mana_cost": "{2}{G}",
+                    "type_line": "Sorcery — Adventure",
+                    "image_uris": {"normal": "https://img/a-zoological-study.jpg"},
+                },
+            ],
+        }
+        with mock.patch(
+            "scripts.fetch_card_metadata.request_json",
+            side_effect=[resolved, {"data": [resolved], "has_more": False}],
+        ) as request, mock.patch("scripts.fetch_card_metadata.time.sleep"):
+            chosen = fetch_named("A-Monster Manual", "hbg")
+        self.assertEqual(chosen["id"], "arena-rebalanced")
+        self.assertIn("A-Monster%20Manual%20//%20A-Zoological%20Study", request.call_args_list[0].args[0])
+
     def test_fuzzy_lookup_keeps_original_draft_name_coverage(self):
         prints = "https://api.scryfall.com/cards/search?q=oracleid%3Aoracle-alpha&unique=prints"
         resolved = {"id":"canonical","name":"Alpha Prime","oracle_id":"oracle-alpha","prints_search_uri":prints,"image_uris":{"normal":"https://img/canonical.jpg"}}

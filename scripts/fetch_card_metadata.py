@@ -24,6 +24,11 @@ from typing import Dict, Iterable, Optional, Sequence
 USER_AGENT = "DraftStudy/1.0 (https://github.com/killjoy00/mtg-ev-analyzer)"
 BAD_FRAME_EFFECTS = {"showcase", "extendedart", "inverted"}
 BAD_SET_TYPES = {"art_series", "memorabilia", "minigame", "token"}
+NAMED_LOOKUP_ALIASES = {
+    # 17Lands records this Arena-rebalanced Adventure by its front-face name,
+    # while Scryfall named lookup resolves the full Adventure identity.
+    "A-Monster Manual": "A-Monster Manual // A-Zoological Study",
+}
 
 
 def face_for_alias(card: dict, alias: str) -> Optional[dict]:
@@ -263,11 +268,12 @@ def discover_draft_data(output: Path, set_code: str) -> Optional[Path]:
 def fetch_named(name: str, preferred_set: Optional[str] = None) -> Optional[dict]:
     """Resolve a name, then choose its base readable printing rather than Scryfall's default printing."""
     resolved = None
-    exact = "https://api.scryfall.com/cards/named?exact=" + urllib.parse.quote(name)
+    query_name = NAMED_LOOKUP_ALIASES.get(name, name)
+    exact = "https://api.scryfall.com/cards/named?exact=" + urllib.parse.quote(query_name)
     try:
         resolved = request_json(exact)
     except RuntimeError as exc:
-        fuzzy = "https://api.scryfall.com/cards/named?fuzzy=" + urllib.parse.quote(name)
+        fuzzy = "https://api.scryfall.com/cards/named?fuzzy=" + urllib.parse.quote(query_name)
         try:
             resolved = request_json(fuzzy)
         except RuntimeError:
