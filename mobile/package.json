@@ -10,7 +10,7 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "config:check": "node ./scripts/check-config.mjs",
-    "test": "npm run lint && npm run typecheck && npm run config:check",
+    "test": "npm run lint && npm run typecheck && npm run config:check && npm run release:check",
     "release:check": "node ./scripts/release-preflight.mjs"
   },
   "dependencies": {
