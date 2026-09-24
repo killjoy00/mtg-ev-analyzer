@@ -79,7 +79,7 @@ The release followed the repository's reviewed exact-revision handoff rather tha
 | Production exact-revision deploy + acceptance | run **36004516512** |
 | Post-release acceptance hardening | PR #472 → `6802db2a16627b579138e4466e05fad795356b33` |
 
-The second production migration request was created during concurrent release work. Because migration 0037 is additive/repeatable, both production migration workflows completed successfully against the same exact reviewed application revision; there was no divergent schema or application target.
+PR #470 repeated the same production migration requested by #469; it changed only `request_id` and `reason` while keeping the same operation, exact commit and production target. The rollout bridge serialized the dispatches but had no semantic replay guard at the time. The second execution was harmless only because migration 0037 is additive/repeatable; a non-repeatable migration would not have had that safety property.
 
 Production deployment 36004516512:
 
@@ -111,6 +111,18 @@ The September 24 documentation pass corrected these stale boundaries:
 
 Archived pre-rebuild documents that mention monthly leaderboards were left unchanged because they are explicitly historical.
 
+## Post-closeout review correction
+
+A subsequent code review identified three production-hardening gaps that were not captured in the original closeout:
+
+- Profile assembly treated current-season enrichment as required, so a reconciliation failure could fail My Pack One, public profiles and profile-setting saves.
+- Reconciliation rescanned all historical Latest Set schedules on every call. A fallback set that never owned a season therefore remained dependent on its mutable policy row indefinitely; later policy deletion or metadata damage could poison future reconciliation.
+- The shared season resolver could call Daily creation, which meant a profile request through `pack1growth` could create the immutable Latest Set Daily during a mixed-revision deployment.
+
+The original statement that established season metadata survives later policy edits remains true for sets already persisted in `draft_run_seasons`, but it was too broad as a statement about the safety of reconciliation as a whole. Likewise, describing the first natural rollover as merely worth observing understated the risk while these failure domains remained coupled.
+
+The follow-up hardening adds migration 0038 with a durable reconciliation watermark, makes profile season enrichment fail open, removes Daily creation from profile/growth reads, strengthens Live metadata admission, and adds semantic rollout replay protection. Until that hardening is promoted through development and production, the initial release evidence should not be read as proof that these three post-release risks are absent.
+
 ## Follow-ups / non-blockers
 
 1. **Mobile migration numbering:** draft mobile-auth PR #448 was created before seasons landed and currently proposes its own migration 0037 on a stacked mobile branch. That stack must be renumbered/rebased before it can merge onto current `main`.
@@ -126,4 +138,4 @@ As of the closeout:
 - development and production Functions serve exact revision `fe9d666a094c0d18a13899a089a3ed49de67901a`;
 - production release acceptance is green;
 - The Hobbit is the persisted inaugural competitive season with start date 2026-09-16;
-- no unresolved season-specific test, migration or deployment failure remains.
+- the initial production release acceptance is green; the post-closeout hardening risks above require their own reviewed migration/deployment before this closeout can be treated as fully final.

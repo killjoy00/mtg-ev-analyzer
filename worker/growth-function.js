@@ -444,6 +444,20 @@ async function profileMetaByKey(profileKey) {
   return result.rows[0] || null;
 }
 
+async function currentSeasonForProfile(playerId) {
+  try {
+    return await currentSeasonForPlayer(query,playerId);
+  } catch(error) {
+    console.error(JSON.stringify({
+      event:'profile_current_season_unavailable',
+      error_code:String(error?.code||error?.pgCode||'SEASON_RESOLUTION_FAILED'),
+      status:Number(error?.status||500),
+      release_commit:releaseMetadata().release_commit,
+    }));
+    return null;
+  }
+}
+
 async function buildProfile(playerId, meta, { own = false } = {}) {
   const [summaryResult, bySetResult, byModeResult, recentResult, dailyHistory, catalog, streakDates, currentSeason] = await Promise.all([
     query(
@@ -489,7 +503,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     dailyHistoryFor(playerId),
     loadCatalog(),
     query('SELECT DISTINCT challenge_date::text date FROM scores WHERE player_id=$1::uuid ORDER BY date',[playerId]),
-    currentSeasonForPlayer(query,playerId),
+    currentSeasonForProfile(playerId),
   ]);
 
   const summary = summaryResult.rows[0] || {};

@@ -1,8 +1,18 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {rolloutDispatch} from '../scripts/model-rollout-request.mjs';
+import {assertRolloutReplayPolicy,rolloutDispatch,rolloutFingerprint} from '../scripts/model-rollout-request.mjs';
 
 const common={request_id:'test-request',reason:'Exercise the reviewed rollout path'};
+
+test('equivalent rollout requests require an explicit replay reference',()=>{
+  const prior={operation:'season-migration',request_id:'season-prod-1',reason:'First reviewed request',target:'production',commit:'a'.repeat(40)};
+  const duplicate={...prior,request_id:'season-prod-2',reason:'Same action with different prose'};
+  assert.equal(rolloutFingerprint(prior),rolloutFingerprint(duplicate));
+  assert.throws(()=>assertRolloutReplayPolicy(duplicate,[prior]),/Equivalent rollout already requested/);
+  assert.doesNotThrow(()=>assertRolloutReplayPolicy({...duplicate,replay_of:'season-prod-1'},[prior]));
+  assert.throws(()=>assertRolloutReplayPolicy({...duplicate,replay_of:'other-request'},[prior]),/does not name an equivalent/);
+  assert.throws(()=>assertRolloutReplayPolicy({...common,operation:'browser',replay_of:'season-prod-1'},[prior]),/does not name an equivalent/);
+});
 test('rollout requests can target only fixed workflows on main',()=>{
   assert.deepEqual(rolloutDispatch({...common,operation:'deploy',target:'development',commit:'a'.repeat(40)}),{
     workflow:'deploy-functions.yml',body:{ref:'main',inputs:{target:'development',commit:'a'.repeat(40)}},
@@ -127,6 +137,13 @@ test('Pack One season migration is exact-revision and target-only',()=>{
  assert.deepEqual(rolloutDispatch(request),{workflow:'pack-one-season-migration.yml',body:{ref:'main',inputs:{commit:'e'.repeat(40),target:'development'}}});
  assert.equal(rolloutDispatch({...request,target:'production'}).body.inputs.target,'production');
  for(const extra of [{commit:'main'},{target:'other'},{migration:'0037'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
+test('Pack One season hardening migration is exact-revision and target-only',()=>{
+ const request={...common,operation:'season-hardening-migration',target:'development',commit:'f'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'pack-one-season-hardening-migration.yml',body:{ref:'main',inputs:{commit:'f'.repeat(40),target:'development'}}});
+ assert.equal(rolloutDispatch({...request,target:'production'}).body.inputs.target,'production');
+ for(const extra of [{commit:'main'},{target:'other'},{migration:'0038'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
 
 test('Daily calendar migration is exact-revision and target-only',()=>{

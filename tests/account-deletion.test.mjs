@@ -308,7 +308,7 @@ test('schema and release bookkeeping include deletion migrations in both secure 
   const verify=fs.readFileSync('scripts/verify-neon-schema.mjs','utf8');
   assert.match(verify,/account_deletion_operations/);
   assert.match(verify,/account_deletion_verifications/);
-  assert.match(verify,/through 0037/);
+  assert.match(verify,/through 0038/);
   const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   assert.equal((release.match(/migrations\/0031_account_deletion\.sql/g)||[]).length,2);
   assert.equal((release.match(/migrations\/0034_account_deletion_verification\.sql/g)||[]).length,2);

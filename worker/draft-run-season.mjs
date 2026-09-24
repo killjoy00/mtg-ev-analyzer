@@ -1,5 +1,4 @@
 import {gameDateKey} from '../game-date.mjs';
-import {ensureDailySchedule} from './draft-run-daily.mjs';
 
 const num=value=>Number(value||0);
 const textDate=value=>value==null?null:String(value).slice(0,10);
@@ -29,11 +28,13 @@ export async function reconcilePersistedSeasons(query) {
   return normalizeSeason(result.rows[0]);
 }
 
-export async function resolveCurrentSeason(query,{today=gameDateKey(),ensureSchedule=ensureDailySchedule}={}) {
-  try {
-    await ensureSchedule(query,today,'latest');
-  } catch(error) {
-    if(Number(error?.status)!==503)throw error;
+export async function resolveCurrentSeason(query,{today=gameDateKey(),ensureSchedule=null}={}) {
+  if(ensureSchedule) {
+    try {
+      await ensureSchedule(query,today,'latest');
+    } catch(error) {
+      if(Number(error?.status)!==503)throw error;
+    }
   }
   return reconcilePersistedSeasons(query);
 }
@@ -70,7 +71,7 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
   }));
 }
 
-export async function currentSeasonForPlayer(query,playerId,{today=gameDateKey(),ensureSchedule=ensureDailySchedule}={}) {
+export async function currentSeasonForPlayer(query,playerId,{today=gameDateKey(),ensureSchedule=null}={}) {
   const season=await resolveCurrentSeason(query,{today,ensureSchedule});
   if(!season)return null;
   const standings=[];

@@ -24,6 +24,7 @@ export function dailySetPlan(metadata, day, random) {
 export function latestSetPlan(metadata, day) {
   const newest=liveRegularSets(metadata,day)[0];
   if(!newest)throw Object.assign(Error('The latest-set Daily is not available yet.'),{status:503});
+  if(!String(newest.set_name||'').trim())throw Object.assign(Error('The latest-set Daily metadata is incomplete.'),{status:503});
   return Array(8).fill(newest.set_id);
 }
 // Balance custom practice by selected set, never by archive size. Used by the
