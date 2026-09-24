@@ -40,6 +40,20 @@ const fixture = {
     current_streak:5,
   },
   environment_total:32,
+  current_season:{
+    id:'hob',
+    set_id:'hob',
+    name:'The Hobbit',
+    set_release_date:'2026-08-14',
+    start_date:'2026-09-10',
+    end_date:null,
+    established_by_day:'2026-09-19',
+    standings:[
+      {environment:'mixed',rank:312,average:88.4,days:17},
+      {environment:'powered-cube',rank:7,average:91.1,days:11},
+      {environment:'latest',rank:18,average:86.9,days:8},
+    ],
+  },
   by_set:[
     { set_id:'neo', games:8, average_score:86.2, best_score:100, daily_games:3, last_played_at:'2026-09-09T12:00:00Z' },
     { set_id:'ktk', games:6, average_score:82.1, best_score:95, daily_games:2, last_played_at:'2026-09-08T12:00:00Z' },
@@ -154,6 +168,8 @@ try {
   assert.equal(await page.locator('[data-environment-id="powered-cube"].is-played').count(), 1, 'Powered Cube must be part of archive progression');
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /Top 7%/i);
   assert.match((await page.locator('.my-daily-preview li').first().textContent()) || '', /NEO/i);
+  assert.match((await page.locator('.profile-current-season').textContent()) || '', /The Hobbit Season.*Current/i);
+  assert.match((await page.locator('.profile-current-season').textContent()) || '', /Draft Run.*#312.*88\.4.*17 days/i);
   assert.equal(await page.locator('#profile-edit').count(),0,'Stats sidebar does not duplicate the Account-tab edit action');
   assert.equal(await page.locator('.my-achievement-badge').count(), fixture.achievements.length);
   assert.equal(await page.locator('.my-achievement-badge.is-locked').count(), 1);
@@ -209,6 +225,8 @@ try {
   assert.equal(await page.locator('#profile-share').isEnabled(), true);
   assert.match((await page.locator('.profile-hero').textContent()) || '', /public Pack One career/i);
   assert.equal(await page.locator('.profile-hero h1 [data-achievement-mark="explorer5"]').count(),1,'public profile shows the showcased badge beside the name');
+  assert.match((await page.locator('.profile-current-season').textContent()) || '', /The Hobbit Season.*Current/i);
+  assert.match((await page.locator('.profile-current-season').textContent()) || '', /Draft Run.*#312/i);
   await noOverflow();
   await page.screenshot({ path:'artifacts/ui-profile-public-mobile.png', fullPage:true });
 
