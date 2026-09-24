@@ -1,0 +1,75 @@
+name: publish Pack One card-image source
+run-name: publish Pack One card-image source / ${{ github.run_id }}
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/publish-card-image-source.yml
+
+permissions:
+  contents: write
+  pull-requests: write
+
+concurrency:
+  group: packone-card-image-source-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'push' && contains(github.event.head_commit.message, '[publish-card-image-source]'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Hydrate the normalized replay shards from R2
+        run: bash scripts/r2_replay_shards.sh hydrate
+
+      - name: Regenerate deterministic card-image source of truth
+        run: python scripts/refresh_card_images.py
+
+      - name: Validate regenerated corpus
+        run: |
+          npm test
+          python scripts/audit_datasets.py --fail-on-error
+
+      - name: Publish source-of-truth pull request
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add corpus/draft-run/*.json.gz corpus/draft-run/catalog.json corpus/draft-run/card-images.json
+          if git diff --cached --quiet; then
+            echo 'Pack One card-image source of truth is already current.'
+            exit 0
+          fi
+          git commit -m 'Refresh Pack One to main card art [card-images-refreshed]'
+          branch="automation/card-image-source-${GITHUB_RUN_ID}"
+          git push origin "HEAD:$branch"
+          gh pr create \
+            --base main \
+            --head "$branch" \
+            --title 'Refresh Pack One to main card art' \
+            --body 'Recovery publication of the deterministic card-image source of truth after development and production backend refreshes and gameplay verification completed successfully.'
