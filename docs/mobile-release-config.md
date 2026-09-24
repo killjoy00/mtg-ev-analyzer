@@ -96,7 +96,7 @@ The workflow uses:
 - GitHub repository: `killjoy00/mtg-ev-analyzer`
 - OAuth scope: `https://www.googleapis.com/auth/androidpublisher`
 
-It expects the non-secret repository variable `PACKONE_GOOGLE_WIF_PROVIDER` to contain the full Workload Identity Provider resource name.
+The verified Workload Identity Provider is source-controlled as the non-secret resource name `projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer`; no GitHub repository variable or JSON key is required.
 
 The Workload Identity provider must restrict admission to exactly `killjoy00/mtg-ev-analyzer`, and that repository identity must receive only `roles/iam.workloadIdentityUser` on the Pack One service account. Long-lived service-account JSON keys are intentionally not used.
 
@@ -159,4 +159,4 @@ gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
   --format="value(name)"
 ```
 
-The final command prints the non-secret provider resource name. That value is the only remaining input needed by the GitHub workflow.
+The verified provider resource is `projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer`. The GitHub workflow now uses it directly.
