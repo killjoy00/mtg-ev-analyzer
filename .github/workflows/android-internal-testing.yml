@@ -39,7 +39,9 @@ jobs:
           java-version: '17'
       - name: Install mobile dependencies
         run: npm install --no-audit --no-fund
-      - name: Set store version code
+      # PR smoke builds are never uploaded. The publishing job below allocates
+      # against Google Play so workflow renames/retries cannot reuse a versionCode.
+      - name: Set smoke version code
         shell: bash
         run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
@@ -135,11 +137,22 @@ jobs:
           echo "Pack One Android upload certificate SHA-256: $upload_fingerprint"
           echo "PACKONE_ANDROID_UPLOAD_CERT_SHA256=$upload_fingerprint" >> "$GITHUB_ENV"
 
-      - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+      - id: version-code
+        name: Allocate monotonic Google Play version code
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKONE_ANDROID_PACKAGE: pro.packone.app
+        run: node ./scripts/play-next-version-code.mjs
       - name: Set store version code
         shell: bash
-        run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+        run: |
+          set -euo pipefail
+          version_code="${{ steps.version-code.outputs.next_version_code }}"
+          [[ "$version_code" =~ ^[1-9][0-9]*$ ]]
+          echo "PACKONE_ANDROID_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+          echo "Using Google Play-safe Android version code: $version_code"
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
       - name: Validate production mobile config
         run: npm test
       - name: Generate production Android project
