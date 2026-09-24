@@ -1,4 +1,4 @@
 2026-09-24
-Purpose: validate monotonic Pack One TestFlight build numbering and corrected workflow summary on TestFlight Internal Only.
+Purpose: validate native archive CFBundleVersion enforcement before TestFlight Internal Only upload.
 Build number policy: 100000 + GITHUB_RUN_NUMBER.
 Distribution boundary: internal TestFlight only; no external testing or App Store release.
