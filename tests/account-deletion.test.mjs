@@ -464,7 +464,10 @@ test('production code contains no deletion-code exposure switch or response fiel
   ].map(path=>fs.readFileSync(path,'utf8')).join('\n');
   assert.doesNotMatch(files,/PACK1_[A-Z0-9_]*(?:EXPOSE|DEBUG|TEST)[A-Z0-9_]*DELETE[A-Z0-9_]*CODE|DELETE[A-Z0-9_]*CODE[A-Z0-9_]*(?:EXPOSE|DEBUG|TEST)/);
   const startSource=fs.readFileSync('worker/growth-function.js','utf8');
-  const start=startSource.slice(startSource.indexOf('async function handleAccountDeleteVerificationStart'),startSource.indexOf('async function handleAccountDelete(request)'));
+  const startIndex=startSource.indexOf('async function handleAccountDeleteVerificationStart');
+  const endIndex=startSource.indexOf('\nasync function handleAccountDelete(',startIndex);
+  assert.ok(startIndex>=0&&endIndex>startIndex,'account deletion handler boundaries not found');
+  const start=startSource.slice(startIndex,endIndex);
   assert.doesNotMatch(start,/json\([^\n]*\bcode\b/);
 });
 
