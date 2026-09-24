@@ -9,7 +9,7 @@ test('locked feedback separates the trophy bonus from relative model support',()
  const text=consensusFeedback(answer);
  assert.doesNotMatch(text,/10%/);assert.match(text,/earn 100 regardless/);
  assert.ok(text.indexOf('data-zoom="trophy"')<text.indexOf('data-zoom="leader"'));
- assert.match(text,/<td>—<\/td><td>100<\/td>/);
+ assert.match(text,/<td>N\/A<\/td><td>100<\/td>/);
  assert.match(text,/does not establish a correct pick/);
  assert.match(text,/Trophy drafter: Trophy: 100/);
  assert.match(text,/Model’s strongest alternative: Leader: 95/);
