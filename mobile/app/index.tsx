@@ -63,6 +63,18 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Open practice"
+          onPress={() => router.push('/practice')}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>PRACTICE</Text>
+          <Text style={styles.utilityTitle}>Keep drafting</Text>
+          <Text style={styles.cardBody}>Regular practice is included with a free account. Existing Elite access unlocks Cube and custom-set practice.</Text>
+          <Text style={styles.cardAction}>Choose practice →</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
           accessibilityLabel="Open leaderboard"
           onPress={() => router.push('/leaderboard')}
           style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
