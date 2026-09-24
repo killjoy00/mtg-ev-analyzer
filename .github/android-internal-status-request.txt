@@ -1,1 +1,1 @@
-Verify first Internal Testing rollout after owner started rollout.
+Verify completed Internal Testing rollout and tester audience.
