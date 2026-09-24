@@ -111,7 +111,7 @@ assert.match(practiceHub, /<title>Practice · Pack One<\/title>/);
 assert.match(practiceHub, /src="\/practice-page\.mjs"/);
 assert.match(practiceHub, /href="\/practice\.css\?v=1"/);
 const practicePage = await readFile('practice-page.mjs','utf8');
-assert.match(practicePage, /title:'Draft Run'/);
+assert.match(practicePage, /title:'Regular Draft Run'/);
 assert.match(practicePage, /title:'Powered Cube'/);
 assert.match(practicePage, /title:'Choose your sets'/);
 assert.match(practicePage, /unlimited_cube_practice/);
