@@ -1,0 +1,61 @@
+name: Pack One ASC metadata inspect
+on:
+  push:
+    branches: ["chatgpt/packone-play-credential-check"]
+    paths: [".github/workflows/packone-asc-metadata-inspect.yml"]
+permissions:
+  contents: read
+jobs:
+  inspect:
+    environment: production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Inspect metadata
+        env:
+          ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+          ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+          ASC_KEY_P8: ${{ secrets.ASC_KEY_P8 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m pip install --quiet pyjwt cryptography requests
+          python3 - <<'PY'
+          import os,time,json,jwt,requests
+          kid=os.environ["ASC_KEY_ID"].strip(); iss=os.environ["ASC_ISSUER_ID"].strip()
+          key=os.environ["ASC_KEY_P8"].replace("\\n","\n").strip(); now=int(time.time())
+          tok=jwt.encode({"iss":iss,"iat":now-5,"exp":now+900,"aud":"appstoreconnect-v1"},key,algorithm="ES256",headers={"kid":kid,"typ":"JWT"})
+          H={"Authorization":f"Bearer {tok}"}; B="https://api.appstoreconnect.apple.com/v1"; app="6814318676"
+          def g(path,params=None):
+            r=requests.get(B+path,headers=H,params=params,timeout=30); print("HTTP",path,r.status_code)
+            if r.status_code>=400:
+              print(json.dumps(r.json(),separators=(",",":"))); return None
+            return r.json()
+          a=g(f"/apps/{app}")
+          print("APP",json.dumps(a["data"]["attributes"],separators=(",",":")) if a else "null")
+          infos=g(f"/apps/{app}/appInfos",{"limit":"10"})
+          if infos:
+            for x in infos["data"]:
+              print("APPINFO",x["id"],json.dumps(x["attributes"],separators=(",",":")))
+              locs=g(f"/appInfos/{x['id']}/appInfoLocalizations",{"limit":"50"})
+              if locs:
+                for l in locs["data"]: print("APPINFOLOC",l["id"],json.dumps(l["attributes"],separators=(",",":")))
+              ar=g(f"/appInfos/{x['id']}/ageRatingDeclaration")
+              if ar: print("AGERATING",ar["data"]["id"],json.dumps(ar["data"]["attributes"],separators=(",",":")))
+              for rel in ["primaryCategory","primarySubcategoryOne","primarySubcategoryTwo","secondaryCategory","secondarySubcategoryOne","secondarySubcategoryTwo"]:
+                z=g(f"/appInfos/{x['id']}/relationships/{rel}")
+                if z: print("CATEGORYREL",rel,json.dumps(z["data"],separators=(",",":")))
+          vers=g(f"/apps/{app}/appStoreVersions",{"filter[versionString]":"1.0","limit":"10"})
+          if vers:
+            for v in vers["data"]:
+              print("VERSION",v["id"],json.dumps(v["attributes"],separators=(",",":")))
+              locs=g(f"/appStoreVersions/{v['id']}/appStoreVersionLocalizations",{"limit":"50"})
+              if locs:
+                for l in locs["data"]: print("VERSIONLOC",l["id"],json.dumps(l["attributes"],separators=(",",":")))
+              rd=g(f"/appStoreVersions/{v['id']}/appStoreReviewDetail")
+              if rd: print("REVIEW",rd["data"]["id"],json.dumps(rd["data"]["attributes"],separators=(",",":")))
+          cats=g("/appCategories",{"limit":"200"})
+          if cats:
+            for c in cats["data"]:
+              print("CAT",c["id"],json.dumps(c["attributes"],separators=(",",":")))
+          PY
