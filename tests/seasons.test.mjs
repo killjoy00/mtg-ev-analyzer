@@ -66,4 +66,6 @@ test('profiles and leaderboard use the same current season implementation',()=>{
   assert.match(myPack,/#'\+num\(row\.rank\)/);
   assert.match(client,/run-board-season/);
   assert.match(client,/Season ·/);
+  assert.match(growth,/eventProps\.mode==='draft_run'&&eventProps\.period==='month'/);
+  assert.match(growth,/eventProps\.period='season'/);
 });
