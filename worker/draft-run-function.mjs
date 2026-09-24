@@ -56,7 +56,7 @@ async function session(id,owner) {
 
 async function share(id) {
   if(!/^[a-f0-9]{24}$/.test(id||'')) fail('Invalid shared run.');
-  const r=await query('SELECT sh.id,sh.display_name,sh.score,sh.puzzle_ids,s.environment,s.corpus_version,s.scoring_version,s.difficulty_version,s.selection_version,s.serving_policy_version FROM draft_run_shares sh JOIN draft_run_sessions s ON s.id=sh.session_id WHERE sh.id=$1',[id]);
+  const r=await query('SELECT sh.id,sh.session_id,sh.display_name,sh.score,sh.puzzle_ids,s.player_id owner_player_id,s.environment,s.corpus_version,s.scoring_version,s.difficulty_version,s.selection_version,s.serving_policy_version FROM draft_run_shares sh JOIN draft_run_sessions s ON s.id=sh.session_id WHERE sh.id=$1',[id]);
   if(!r.rows[0]) fail('Shared run not found.',404);
   return {...r.rows[0],score:Number(r.rows[0].score),puzzle_ids:parse(r.rows[0].puzzle_ids)};
 }
@@ -65,7 +65,8 @@ async function persistResult(s) {
   if(s.answers.length!==runLength(s) || s.result_persisted_at) return;
   const score=Math.round(s.answers.reduce((n,a)=>n+a.score,0)/runLength(s));
   const grade=score>=90?'A':score>=80?'B':score>=65?'C':score>=50?'D':'F';
-  const other=s.challenge_id ? await share(s.challenge_id) : null;
+  const shared=s.challenge_id ? await share(s.challenge_id) : null;
+  const other=shared?.owner_player_id===s.player_id ? null : shared;
   const exact=other && JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids);
   const outcome=exact ? score>other.score?'win':score<other.score?'loss':'tie' : null;
   const sets=[...new Set(s.answers.map(a=>a.puzzle.set_id))].map(id=>({set_id:id,score:Math.round(s.answers.filter(a=>a.puzzle.set_id===id).reduce((n,a)=>n+a.score,0)/s.answers.filter(a=>a.puzzle.set_id===id).length)}));
@@ -91,14 +92,15 @@ async function persistResult(s) {
   ), events AS (INSERT INTO analytics_events(player_id,event_name,event_props)
     SELECT $1::uuid,event_name,$14::jsonb FROM result CROSS JOIN jsonb_array_elements_text($15::jsonb) n(event_name)
   ) UPDATE draft_run_sessions SET result_persisted_at=now() WHERE id=$17::uuid AND player_id=$1::uuid`,
-  [s.player_id,s.day,score,grade,JSON.stringify(s.answers.map(a=>a.selectedId)),JSON.stringify({run:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,scoring_version:s.scoring_version,historical_matches:s.answers.filter(a=>a.historicalMatch).length,run_length:runLength(s),selection_version:s.selection_version}),s.seed,s.challenge_id,exact?other.display_name:null,exact?other.score:null,outcome,`draft-run:${s.id}`,JSON.stringify(sets),JSON.stringify({mode:'draft_run',set_id:environmentOf(s),daily:Boolean(s.day),score,run_id:s.id,challenge:Boolean(other),outcome}),JSON.stringify(['game_completed',...(environmentOf(s)==='powered-cube'?['cube_completed']:[]),...(s.day?['daily_completed']:[]),...(exact?['challenge_complete']:[])]) ,environmentOf(s),s.id,s.leaderboard_eligible]);
+  [s.player_id,s.day,score,grade,JSON.stringify(s.answers.map(a=>a.selectedId)),JSON.stringify({run:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,scoring_version:s.scoring_version,historical_matches:s.answers.filter(a=>a.historicalMatch).length,run_length:runLength(s),selection_version:s.selection_version}),s.seed,other?s.challenge_id:null,exact?other.display_name:null,exact?other.score:null,outcome,`draft-run:${s.id}`,JSON.stringify(sets),JSON.stringify({mode:'draft_run',set_id:environmentOf(s),daily:Boolean(s.day),score,run_id:s.id,challenge:Boolean(other),outcome}),JSON.stringify(['game_completed',...(environmentOf(s)==='powered-cube'?['cube_completed']:[]),...(s.day?['daily_completed']:[]),...(exact?['challenge_complete']:[])]) ,environmentOf(s),s.id,s.leaderboard_eligible]);
 }
 
 async function responseFor(s) {
   const complete=s.answers.length===runLength(s);
   if(complete && !s.result_persisted_at) await persistResult(s);
   const current=complete ? null : publicDraftRunPuzzle(await puzzle(s.puzzle_ids[s.answers.length],s.corpus_version));
-  const other=s.challenge_id ? await share(s.challenge_id) : null;
+  const shared=s.challenge_id ? await share(s.challenge_id) : null;
+  const other=shared?.owner_player_id===s.player_id ? null : shared;
   const comparison=other ? {name:other.display_name,score:other.score,exact:JSON.stringify(other.puzzle_ids)===JSON.stringify(s.puzzle_ids)} : null;
   const identityStatus=s.day?await rankingIdentityStatus(query,s.player_id):null;
   const rankedIdentity=s.day&&s.leaderboard_eligible&&identityStatus?.eligible?identityStatus:null;
@@ -174,10 +176,14 @@ async function generateDailySchedules(request) {
 async function start(request) {
   const owner=await player(request),body=await readJson(request),daily=body.daily===true;
   const entrySource=daily&&body.source==='result_share'?'result_share':null;
-  const account=daily?await linkedPlayerIdentity(query,owner):await accountIdentity(request,query,owner);
-  const capabilities=daily?[]:await accountCapabilities(account,query);
   const source=body.challenge ? await share(String(body.challenge)) : null;
   if(source && daily) fail('A shared run is separate from the Daily.');
+  // A share is an invitation to another player, not a second attempt for its
+  // creator. Reopening your own link should recover the authoritative original
+  // result instead of creating a self-challenge with a fake opponent record.
+  if(source?.owner_player_id===owner)return json(await responseFor(await session(source.session_id,owner)));
+  const account=daily?await linkedPlayerIdentity(query,owner):await accountIdentity(request,query,owner);
+  const capabilities=daily?[]:await accountCapabilities(account,query);
   let environment;
   try { environment=draftRunEnvironment(source?.environment || body.environment || 'mixed'); }
   catch { fail('Invalid Draft Run environment.'); }
@@ -376,7 +382,7 @@ async function route(request) {
     if(request.method==='POST'&&['pick','reroll'].includes(match[2])) return change(request,match[1],match[2]);
   }
   const shared=path.match(/^\/v1\/(?:challenges|shared-runs)\/([a-f0-9]+)$/);
-  if(request.method==='GET'&&shared) { const s=await share(shared[1]);const scores=await query(`SELECT p.display_name name,r.score FROM draft_run_sessions r JOIN players p ON p.id=r.player_id WHERE r.score IS NOT NULL AND r.puzzle_ids=$2::jsonb AND (r.challenge_id=$1 OR r.id=(SELECT session_id FROM draft_run_shares WHERE id=$1)) ORDER BY r.score DESC,r.created_at LIMIT 100`,[s.id,JSON.stringify(s.puzzle_ids)]);return json({id:s.id,name:s.display_name,score:s.score,scores:scores.rows,environment:s.environment,run_length:s.puzzle_ids.length}); }
+  if(request.method==='GET'&&shared) { const s=await share(shared[1]);const scores=await query(`SELECT p.display_name name,r.score FROM draft_run_sessions r JOIN players p ON p.id=r.player_id WHERE r.score IS NOT NULL AND r.puzzle_ids=$2::jsonb AND (r.id=$3::uuid OR (r.challenge_id=$1 AND r.player_id<>$4::uuid)) ORDER BY r.score DESC,r.created_at LIMIT 100`,[s.id,JSON.stringify(s.puzzle_ids),s.session_id,s.owner_player_id]);return json({id:s.id,name:s.display_name,score:s.score,scores:scores.rows,environment:s.environment,run_length:s.puzzle_ids.length}); }
   return json({error:'Not found.'},404);
 }
 

@@ -44,12 +44,13 @@ for(let i=0;i<8;i++) {
   assert.equal(run.answers[i].score,expected,'Release must preserve the original score evidence');
 }
 const shared=await call(`/v1/runs/${run.id}/share`,{},player.token);
-const challenge=await call('/v1/runs',{challenge:shared.id,qa:true},player.token);
+const peer=await call('/v1/session',{displayName:`QA versions peer ${tag.slice(0,8)}`});
+const challenge=await call('/v1/runs',{challenge:shared.id,qa:true},peer.token);
 assert.equal(challenge.current.puzzle_id,oldIds[0],'Shared runs must retain their corpus');
 assert.equal((await query('SELECT corpus_version FROM draft_run_sessions WHERE id=$1::uuid',[challenge.id])).rows[0].corpus_version,version);
 // This old version contains only the original eight sources. A reroll cannot
 // find another old source and must not silently cross into the new corpus.
-const unavailable=await call(`/v1/runs/${challenge.id}/reroll`,{revision:challenge.revision,round:0,puzzleId:challenge.current.puzzle_id,type:'pack'},player.token,409);
+const unavailable=await call(`/v1/runs/${challenge.id}/reroll`,{revision:challenge.revision,round:0,puzzleId:challenge.current.puzzle_id,type:'pack'},peer.token,409);
 assert.match(unavailable.error,/already been used/);
 
 const dailyPlayer=await call('/v1/session',{displayName:`QA daily ${tag.slice(0,8)}`});

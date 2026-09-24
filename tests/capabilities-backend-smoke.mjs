@@ -62,8 +62,13 @@ async function finish(s,owner){
   }return s;
 }
 run=await finish(run,user);
-const shared=await call(`/v1/runs/${run.id}/share`,{},user),peer=await account();
+const shared=await call(`/v1/runs/${run.id}/share`,{},user);
 assert.equal((await call(`/v1/runs/${run.id}/share`,{},user)).id,shared.id);
+const self=await call('/v1/runs',{challenge:shared.id},user);
+assert.equal(self.id,run.id,'Opening your own shared link returns the original run');
+assert.equal(self.complete,true);assert.equal(self.comparison,null);
+assert.equal((await query('SELECT count(*) n FROM draft_run_sessions WHERE player_id=$1::uuid AND challenge_id=$2',[user.playerId,shared.id])).rows[0].n,'0','Self-sharing must not create a challenge session');
+const peer=await account();
 let replay=await call('/v1/runs',{challenge:shared.id},peer);
 assert.equal(replay.serving_policy_version,run.serving_policy_version);assert.deepEqual(replay.rerolls,{set:0,pack:0});assert.equal(replay.comparison.exact,true);
 assert.equal(replay.current.puzzle_id,run.answers[0].puzzle.puzzle_id);
@@ -71,4 +76,4 @@ await call(`/v1/runs/${replay.id}/reroll`,{revision:replay.revision,round:0,puzz
 replay=await finish(replay,peer);
 assert.equal((await call(`/v1/runs/${replay.id}/share`,{},peer)).id,shared.id,'Sharing a replay preserves the original run identity');
 assert.equal((await call('/v1/shared-runs/'+shared.id)).scores.length,2);
-console.log('Capabilities passed: authoritative identity, unlimited regular practice, future grants, revocation, balanced custom sets and stable shared decisions/scores.');
+console.log('Capabilities passed: authoritative identity, unlimited regular practice, future grants, revocation, balanced custom sets, self-share protection and stable shared decisions/scores.');

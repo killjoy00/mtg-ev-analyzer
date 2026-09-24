@@ -121,12 +121,23 @@ jobs:
 
       - name: Run SQL-backed integration suites
         shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           DATABASE_URL="$(cat "$PACK1_CI_CONNECTION")" node scripts/verify-neon-schema.mjs
-          # A corpus bump can be tested before production serves that version.
-          # This loader is additive and verifies existing payload equality.
-          node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
+          # A corpus bump (or loader/import change) must still prove that the
+          # checked-in corpus can be loaded before production serves it. For
+          # unrelated backend PRs, the disposable branch already contains the
+          # production corpus copied from Neon's default branch; reloading stale
+          # checked-in display metadata can create a false failure after a
+          # successful display-only maintenance refresh.
+          if git diff --quiet "$BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
+            echo 'No corpus or loader/import changes; using the cloned production corpus.'
+          else
+            node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
+          fi
           node tests/staged-manifest-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/source-eligibility-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/corpus-components-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures

@@ -38,6 +38,7 @@ const publicAttempt=await fetch(base+'/growth/health?quick=1',{redirect:'error'}
 const h=await fetch(`https://${branch}-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/health`,{headers:{'x-pack1-ingress-secret':origin},redirect:'error',signal:AbortSignal.timeout(120000)});
 assert.equal(h.status,200);const health=await h.json();assert.equal(health.unrated_puzzles,0);assert.deepEqual(health.missing_sets,[]);
 const guest=await call('growth','/v1/session',{displayName:'QA gateway '+commit.slice(0,7)});
+const friendGuest=await call('growth','/v1/session',{displayName:'QA gateway peer '+commit.slice(0,7)});
 for(const environment of ['mixed','powered-cube']) {
   let run=await call('draft','/v1/runs',{environment,qa:true},guest.token);
   assert.equal(run.day,null);assert.equal(run.run_length,8);
@@ -50,7 +51,7 @@ for(const environment of ['mixed','powered-cube']) {
   }
   assert.equal(run.score,Math.round(run.answers.reduce((sum,a)=>sum+a.score,0)/8));
   const shared=await call('draft',`/v1/runs/${run.id}/share`,{},guest.token);
-  const friend=await call('draft','/v1/runs',{challenge:shared.id,qa:true},guest.token);
+  const friend=await call('draft','/v1/runs',{challenge:shared.id,qa:true},friendGuest.token);
   assert.equal(friend.current.puzzle_id,run.answers[0].puzzle.puzzle_id);
 }
 await verify();
