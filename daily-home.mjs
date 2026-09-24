@@ -6,23 +6,14 @@ let installed = false;
 let lastDay;
 const games = [
   { key: 'draftRun', number: '01', label: 'The daily challenge', environment: 'mixed', title: 'Daily Draft Run', description: 'Eight decisions from real trophy drafts.', href: '?game=draft-run&daily=1' },
-  { key: 'cube', number: '02', label: 'The powered table', environment: 'powered-cube', title: 'Daily Powered Cube', description: 'Eight decisions. Magic’s most powerful cards.', href: '?game=draft-run&set=powered-cube&daily=1' },
-  { key: 'latest', number: '03', label: 'The newest release', environment: 'latest', title: 'Daily Latest Set', description: 'Eight decisions. Only the latest set.', href: '?game=draft-run&set=latest&daily=1' },
+  { key: 'cube', number: '02', label: 'The powered table', environment: 'powered-cube', title: 'Daily Powered Cube', description: 'Eight decisions from Powered Cube trophy drafts.', href: '?game=draft-run&set=powered-cube&daily=1' },
+  { key: 'latest', number: '03', label: 'The newest release', environment: 'latest', title: 'Daily Latest Set', description: 'Eight decisions from trophy drafts in the latest set.', href: '?game=draft-run&set=latest&daily=1' },
 ];
 
 export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = false) {
   const status = todayStatus(profile, day);
   const dailyDate=new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));
-  const capabilities=profile?.capabilities||[];
   const claimed=Boolean(profile?.player?.claimed);
-  // Claimed is part of the test, not redundant: a capability list arriving
-  // without an account is not trusted to unlock Elite surfaces.
-  const elite=claimed&&capabilities.includes('custom_corpus');
-  // A connected member without Elite is already paying, so "Become" reads as
-  // if their support does not count. Covers a lapsed Elite too, where "Become"
-  // would be equally wrong.
-  const eliteLabel=profile?.membership?.connected?'Upgrade to Elite':'Become Elite';
-  const eliteCta=`<button class="button secondary" data-home-elite>${eliteLabel}</button>`;
   const rankingReason=profile?.ranking_identity?.reason;
   const usernameAttention=rankingReason==='username_taken'||rankingReason==='username_required';
   const ordered = [...games].sort((a, b) => Number(status[a.key].complete) - Number(status[b.key].complete));
@@ -39,15 +30,9 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = fals
         <div class="daily-home-action"><a class="button ${result.complete ? 'secondary' : 'primary'}" href="${game.href}">${result.complete ? 'View result' : 'Play now'}</a>${startHere?'<small>No account required</small>':''}</div>
       </article>`;
     }).join('')}</div>
-    ${claimed && !elite && status.completed < 3 ? '<section class="daily-home-regular"><div><h2 class="eyebrow">Free practice</h2><p>Keep drafting with unlimited regular Draft Runs.</p></div><a class="button primary" href="?game=draft-run">Practice a Draft Run</a></section>' : ''}
     ${status.completed === 3 ? `<section class="daily-home-practice${claimed?' is-practice-handoff':''}">${claimed
       ? '<div><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>Your practice options are all in one place.</p></div><a class="button primary" href="/practice/">Go to Practice</a>'
       : '<p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>'}</section>` : ''}
-    ${status.completed < 3 ? (elite
-      ? '<section class="daily-home-custom"><div><h2 class="eyebrow">Elite practice</h2><p>Build a random run from your favorite sets.</p></div><a class="button secondary" href="?game=draft-run&custom=1">Choose your sets</a></section>'
-      : claimed
-        ? `<section class="daily-home-custom"><div><h2 class="eyebrow">Elite practice</h2><p>Draft beyond the Dailies. Unlock unlimited Powered Cube and custom-set drafts.</p></div>${eliteCta}</section>`
-        : '') : ''}
     ${unavailable ? '<p role="status">Daily progress is unavailable. Play now still resumes your saved attempt.</p>' : ''}
   </section>`;
 }
@@ -67,7 +52,6 @@ export function renderDailyHome(profile = null, unavailable = false) {
     document.querySelector('#profile-account-tab')?.click();
     document.querySelector('#profile-account input[name="displayName"]')?.focus();
   });
-  document.querySelectorAll('[data-home-elite]').forEach(button => button.addEventListener('click', async () => (await import('./growth.mjs?v=6')).beginEliteUpgrade({source:'home'})));
 }
 
 export function installDailyHome(identityReady = Promise.resolve()) {
