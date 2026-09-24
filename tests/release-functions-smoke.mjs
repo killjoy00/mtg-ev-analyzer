@@ -78,6 +78,16 @@ assert.equal(health.ok,true);assert.equal(health.run_length,8);assert.equal(heal
 assert.equal(health.unrated_puzzles,0);assert.deepEqual(health.missing_sets,[]);assert.equal(health.daily_featured_sets.length,4);
 await call('pack1growth','/v1/events',{events:[{event:'page_view',props:{}}]},null,401);
 if(process.argv.includes('--daily')||process.argv.includes('--practice')) {
+  const seasonBoards=[];
+  for(const environment of ['mixed','powered-cube','latest']) {
+    const board=await call('draftrunapi',`/v1/leaderboard?period=season&environment=${environment}`);
+    assert.equal(board.period,'season');assert.equal(board.environment,environment);
+    assert.ok(board.season?.id,'Current Pack One season must resolve after release.');
+    assert.equal(board.start,board.season.start_date);
+    seasonBoards.push(board);
+  }
+  assert.equal(new Set(seasonBoards.map(board=>board.season.id)).size,1,'All three boards must share one season.');
+  assert.equal(new Set(seasonBoards.map(board=>board.start)).size,1,'All three boards must share one season start.');
   const guest=await call('pack1growth','/v1/session',{displayName:'QA release '+commit.slice(0,7)});
   const friend=await call('pack1growth','/v1/session',{displayName:'QA universal '+commit.slice(0,7)});
   for(const environment of ['mixed','powered-cube','latest']) {
