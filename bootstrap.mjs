@@ -31,7 +31,6 @@ if (!historicalShare && (params.has('legacy-board') || params.has('mode') || par
 installRenderLifecycle();
 document.querySelector('#brand-home').onclick = () => location.href = './';
 document.querySelector('#daily-nav').onclick = () => location.href = '?game=draft-run&daily=1';
-document.querySelector('#leaderboard-nav').onclick = () => location.href = '?game=draft-run&board=daily';
 
 const deletionState=params.get('account');
 if (deletionState==='deleted'||deletionState==='deleting') {
@@ -50,6 +49,8 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   home?.renderDailyHome();
   const growthReady = import('./growth.mjs?v=6');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
+  const topActions=document.querySelector('.top-actions');
+  const howNav=document.querySelector('#how-nav');
   const account = document.createElement('button');
   account.id = 'account-nav'; account.type = 'button';
   account.className = 'top-nav-button'; account.textContent = 'Sign in';
@@ -57,8 +58,31 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     await (await growthReady).renderAccount({source:'nav'});
   };
-  document.querySelector('.top-actions').append(account);
-  identityReady.then(async()=>{account.textContent=(await growthReady).accountSignedIn()?'My Pack One':'Sign in';});
+  topActions.append(account);
+  const dynamicNavIds=['practice-nav','leaderboard-nav','learn-nav'];
+  function syncPrimaryNav(signed) {
+    for(const id of dynamicNavIds)document.querySelector('#'+id)?.remove();
+    if(howNav)howNav.hidden=signed;
+    if(!signed)return;
+    const items=[
+      ['practice-nav','?game=draft-run','Practice'],
+      ['leaderboard-nav','?game=draft-run&board=daily','Leaders'],
+      ['learn-nav','/learn/','Learn'],
+    ];
+    for(const [id,href,label] of items){
+      const link=document.createElement('a');
+      link.id=id;link.className='top-nav-button';link.href=href;link.textContent=label;
+      topActions.insertBefore(link,account);
+    }
+  }
+  async function refreshPrimaryNav(){
+    await identityReady;
+    const signed=(await growthReady).accountSignedIn();
+    account.textContent=signed?'My Pack One':'Sign in';
+    syncPrimaryNav(signed);
+  }
+  void refreshPrimaryNav();
+  window.addEventListener('packone-account-changed',()=>void refreshPrimaryNav());
   if (params.has('auth')) {
     await identityReady;
     await (await growthReady).resumeAccountAuth(params.get('auth'));
