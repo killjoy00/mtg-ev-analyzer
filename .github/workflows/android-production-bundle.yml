@@ -1,0 +1,72 @@
+name: Android production bundle
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/android-production-bundle.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-production-bundle-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  bundle:
+    name: build production Android bundle
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      - name: Set store version code
+        shell: bash
+        run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Validate production mobile config
+        run: npm test
+      - name: Generate production Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform android --clean
+      - name: Verify native Android version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle || {
+            echo "Generated Android project does not contain versionCode $PACKONE_ANDROID_VERSION_CODE." >&2
+            grep -n "versionCode" android/app/build.gradle >&2 || true
+            exit 1
+          }
+      - name: Build release app bundle
+        working-directory: mobile/android
+        run: ./gradlew :app:bundleRelease --no-daemon
+      - name: Verify bundle is signed
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="app/build/outputs/bundle/release/app-release.aab"
+          test -s "$bundle"
+          jarsigner -verify -verbose -certs "$bundle" | tee /tmp/jarsigner.txt
+          grep -q "jar verified" /tmp/jarsigner.txt
+      - name: Upload bundle artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-production-aab
+          path: mobile/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 7
