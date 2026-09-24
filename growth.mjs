@@ -261,7 +261,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       const claimed=await claimCurrentSession();
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
       if(activatingPatreon){await renderPatreonActivation({source});return;}
-      if(upgradingElite){await handoffToPatreon(source);return;}
+      if(upgradingElite){await openEliteLanding(source);return;}
       await renderAccount({intent,source});
     } catch(error) {
       err.textContent=error?.message||'Account creation failed.';
@@ -283,7 +283,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       event('auth_sign_in',{source});
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
       if(activatingPatreon){await renderPatreonActivation({source});return;}
-      if(upgradingElite){await handoffToPatreon(source);return;}
+      if(upgradingElite){await openEliteLanding(source);return;}
       await renderAccount({intent,source});
     } catch(error) {
       err.textContent=error?.message||'Sign in failed.';
