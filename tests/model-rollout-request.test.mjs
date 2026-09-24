@@ -139,6 +139,13 @@ test('Pack One season migration is exact-revision and target-only',()=>{
  for(const extra of [{commit:'main'},{target:'other'},{migration:'0037'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
 
+test('Pack One season hardening migration is exact-revision and target-only',()=>{
+ const request={...common,operation:'season-hardening-migration',target:'development',commit:'f'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(request),{workflow:'pack-one-season-hardening-migration.yml',body:{ref:'main',inputs:{commit:'f'.repeat(40),target:'development'}}});
+ assert.equal(rolloutDispatch({...request,target:'production'}).body.inputs.target,'production');
+ for(const extra of [{commit:'main'},{target:'other'},{migration:'0038'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+
 test('Daily calendar migration is exact-revision and target-only',()=>{
  const request={...common,operation:'daily-calendar-migration',target:'development',commit:'b'.repeat(40)};
  assert.deepEqual(rolloutDispatch(request),{workflow:'daily-calendar-migration.yml',body:{ref:'main',inputs:{commit:'b'.repeat(40),target:'development'}}});
