@@ -1,6 +1,6 @@
 {
   "operation": "card-image-release",
-  "request_id": "packone-main-art-fallback-20260923",
-  "reason": "Deploy the reviewed bulk-miss fallback fix and refresh all served Pack One card images, including Powered Cube regressions for Enduring Innocence and Abhorrent Oculus.",
-  "commit": "66e2537e6e0ce913b8c9277c93b2646ea8a77109"
+  "request_id": "packone-main-art-terminal-edgecases-20260923",
+  "reason": "Deploy the reviewed terminal card-image edge-case fixes and refresh all served Pack One card images.",
+  "commit": "5e101c26afb95f77e4c5539a06db42ea72cea8ce"
 }
