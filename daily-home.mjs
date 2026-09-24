@@ -31,10 +31,10 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = fals
     ${usernameAttention?'<aside class="daily-home-identity-warning" role="alert"><div><strong>Choose a unique username before playing a Daily.</strong><p>Your account still needs a unique username. Until you choose one, Daily results will not appear on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change username</button></aside>':''}
     <div class="daily-home-games">${ordered.map(game => {
       const result = status[game.key];
-      const startHere=status.completed===0&&game.key==='draftRun';
+      const startHere=status.completed===0&&game.key==='draftRun'&&!claimed;
       return `<article class="daily-home-game ${result.complete ? 'is-complete' : 'is-unplayed'}${startHere ? ' is-start-here' : ''}" data-environment="${game.environment}">
         <span class="daily-home-number" aria-hidden="true">${game.number}</span>
-        <div class="daily-home-game-copy"><p class="daily-home-label">${startHere?'<span class="daily-home-start">Start here</span>':''}${game.label}</p><h2>${game.title}</h2><p>${result.complete ? `Complete · <strong>${result.score}/100</strong>` : game.description}</p></div>
+        <div class="daily-home-game-copy"><p class="daily-home-label">${startHere?'<span class="daily-home-start">Start here</span>':game.label}</p><h2>${game.title}</h2><p>${result.complete ? `Complete · <strong>${result.score}/100</strong>` : game.description}</p></div>
         <div class="daily-home-mark" aria-hidden="true"><span class="p1-card p1-card-back"><span>P<sup>1</sup></span></span><span class="p1-card p1-card-mid"><span>P<sup>1</sup></span></span><span class="p1-card p1-card-front"><span>P<sup>1</sup></span></span></div>
         <div class="daily-home-action"><a class="button ${result.complete ? 'secondary' : 'primary'}" href="${game.href}">${result.complete ? 'View result' : 'Play now'}</a>${startHere?'<small>No account required</small>':''}</div>
       </article>`;
@@ -55,7 +55,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = fals
 export function renderDailyHome(profile = null, unavailable = false) {
   if (!document.querySelector('[data-daily-home-style]')) {
     const link = document.createElement('link'); link.rel = 'stylesheet';
-    link.href = './daily-home.css?v=6'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
+    link.href = './daily-home.css?v=7'; link.dataset.dailyHomeStyle = '1'; document.head.append(link);
   }
   lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, unavailable);
