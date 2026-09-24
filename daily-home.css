@@ -1,5 +1,5 @@
 /* Daily tournament sheet. */
-.daily-home{max-width:900px;margin:0 auto 56px}
+.daily-home{max-width:900px;margin:0 auto 12px}
 .daily-home-heading{padding:14px 0 0;margin-bottom:0}
 .daily-home-heading .eyebrow{font-size:13px;letter-spacing:.14em;margin:0 0 14px}
 .daily-home-heading h1{font-family:var(--display);font-size:clamp(44px,6vw,72px);font-weight:600;line-height:1.03;letter-spacing:-.01em;margin:0 0 14px}
@@ -15,7 +15,7 @@
 .daily-home-number{align-self:start;font-family:var(--display);font-size:50px;font-weight:600;line-height:1;color:#a4b2c0;font-variant-numeric:tabular-nums}
 .daily-home-game[data-environment="powered-cube"] .daily-home-number{color:#b6a183}
 .daily-home-game .daily-home-label{display:flex;align-items:center;gap:9px;font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin:0 0 7px}
-.daily-home-start{padding:4px 7px;border:1px solid #9fb6ca;background:#e5edf4;color:var(--green-dark);font-size:10px;line-height:1;letter-spacing:.08em}
+.daily-home-start{padding:5px 9px;border:1px solid #9fb6ca;background:#e5edf4;color:var(--green-dark);font-size:12px;font-weight:800;line-height:1;letter-spacing:.08em}
 .daily-home-game.is-start-here{background:#f4f8fb;border-left-width:4px;border-bottom-color:#bdcad5}
 .daily-home-game.is-start-here h2{color:var(--green-dark)}
 .daily-home-mark{position:relative;width:92px;height:66px;justify-self:center}
@@ -41,8 +41,14 @@
 .daily-home-practice h2{font-family:var(--display);font-size:40px;line-height:1.1;letter-spacing:0;margin:0 0 22px}
 .daily-home-practice .button{min-height:48px;text-decoration:none;margin:0 8px 8px 0}
 .daily-home-practice p{font-size:16px}
+.daily-home-practice.is-practice-handoff{display:flex;align-items:end;justify-content:space-between;gap:28px}
+.daily-home-practice.is-practice-handoff h2{margin-bottom:8px}
+.daily-home-practice.is-practice-handoff p:not(.eyebrow){margin:0;color:var(--muted)}
+.daily-home-practice.is-practice-handoff .button{flex:0 0 auto;min-width:150px;margin:0}
+.app:has(> .daily-home){padding-bottom:16px}
+.app:has(> .daily-home)+.ad-slot[data-ad-slot="home"]{margin-top:8px}
 @media(max-width:600px){
- .daily-home{margin-bottom:24px}.daily-home-heading{padding-top:4px}
+ .daily-home{margin-bottom:8px}.app:has(> .daily-home){padding-bottom:10px}.daily-home-heading{padding-top:4px}
  .daily-home-heading>p:not(.eyebrow){font-size:16px;margin-bottom:24px;max-width:30ch}
  .daily-home-heading h1{font-size:48px;max-width:11ch}
  .daily-home-heading time{font-size:14px}
@@ -55,6 +61,8 @@
  .daily-home-game.is-complete{grid-template-columns:36px minmax(0,1fr);padding:16px}.daily-home-game.is-complete h2{font-size:25px}
  .daily-home-game.is-complete .button{min-width:0}
  .daily-home-practice .button{display:flex;width:100%;justify-content:center;margin:0 0 10px}
+ .daily-home-practice.is-practice-handoff{align-items:flex-start;flex-direction:column;gap:18px}
+ .daily-home-practice.is-practice-handoff .button{margin:0}
 }
 
 .daily-home-game[data-environment="latest"]{border-left-color:#8c4b36}.daily-home-game[data-environment="latest"] .daily-home-number{color:#b79b91}

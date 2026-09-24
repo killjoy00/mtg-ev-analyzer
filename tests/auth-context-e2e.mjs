@@ -171,7 +171,7 @@ try {
   await signup.locator('[name="email"]').fill('verify@example.invalid');
   await signup.locator('[name="password"]').fill('fixture-password-123');
   await signup.getByRole('button',{name:'Create account',exact:true}).click();
-  await page.getByText(/Check your email — we sent a verification link to verify@example\.invalid/).waitFor();
+  await page.getByText(/Check your email\. We sent a verification link to verify@example\.invalid/).waitFor();
   assert.equal(await page.locator('.account-verification-success').count(),1);
   assert.equal(await page.locator('#account-verification-signin').count(),1);
   assert.equal(await page.locator('.account-verification-success.form-error').count(),0);

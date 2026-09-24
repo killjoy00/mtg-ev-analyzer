@@ -114,7 +114,7 @@ try{
     assert.equal(await page.locator('.tcg-affiliate-copy strong').textContent(),'Shop Magic on TCGplayer');
     assert.equal(await page.locator('.tcg-affiliate-copy > span').textContent(),'Singles, sealed product, and more');
     assert.equal(await page.locator('.tcg-affiliate-cta').textContent(),'Shop TCGplayer →');
-    assert.equal(await page.locator('.tcg-affiliate-disclosure').textContent(),'Affiliate link — Pack One may earn a commission from purchases.');
+    assert.equal(await page.locator('.tcg-affiliate-disclosure').textContent(),'Affiliate link. Pack One may earn a commission from purchases.');
     await logo.waitFor({state:'visible'});
     const image=await logo.evaluate(el=>({
       src:new URL(el.currentSrc||el.src).pathname,

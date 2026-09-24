@@ -163,7 +163,7 @@ try{
     assert.equal(await page.locator('.run-consensus-leaders li').count(),3);
     assert.equal(await page.locator('.run-consensus-leaders li').first().locator('[data-zoom]').getAttribute('data-zoom'),p.historical_pick_id);
     assert.doesNotMatch(await page.locator('.run-consensus-leaders li').first().innerText(),/%/);
-    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),'—');
+    assert.equal(await page.locator('.run-consensus tbody tr').first().locator('td').first().textContent(),'N/A');
     assert.equal(await page.locator('.run-consensus details').count(),0,'analysis does not retain a nested comparison disclosure');
     const shops=page.locator('.run-analysis .run-card-shop');
     assert.ok(await shops.count()>=1,'revealed-card commerce links remain in analysis');

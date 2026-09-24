@@ -42,7 +42,7 @@ function practiceMarkup(patreon) {
     <header class="practice-hero">
       <p class="kicker">Practice</p>
       <h1>Keep drafting.</h1>
-      <p>Choose the kind of run you want. Practice gives you more reps without changing today’s fixed Daily challenges.</p>
+      <p>Choose the kind of run you want. Practice gives you more reps so you can become a better drafter and do better in future Daily Challenges.</p>
     </header>
     <div class="practice-grid">
       ${practiceCard({
