@@ -59,10 +59,19 @@ jobs:
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -archivePath "$RUNNER_TEMP/PackOne.xcarchive" \
+            CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             archive
           test -d "$RUNNER_TEMP/PackOne.xcarchive"
+          archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
+          test -f "$archive_plist"
+          archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
+          [[ "$archived_build_number" == "$PACKONE_IOS_BUILD_NUMBER" ]] || {
+            echo "Expected archive build $PACKONE_IOS_BUILD_NUMBER, got $archived_build_number." >&2
+            exit 1
+          }
+          echo "Verified Pack One archive build number: $archived_build_number"
 
   testflight:
     name: sign and upload TestFlight internal build
@@ -129,7 +138,18 @@ jobs:
             -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
             DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
             CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" \
             archive
+
+          archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
+          test -f "$archive_plist"
+          archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
+          [[ "$archived_build_number" == "$PACKONE_IOS_BUILD_NUMBER" ]] || {
+            echo "Expected signed archive build $PACKONE_IOS_BUILD_NUMBER, got $archived_build_number." >&2
+            exit 1
+          }
+          echo "Verified signed Pack One archive build number: $archived_build_number"
+          echo "PACKONE_ARCHIVED_BUILD_NUMBER=$archived_build_number" >> "$GITHUB_ENV"
       - name: Upload to TestFlight Internal Only
         shell: bash
         run: |
@@ -172,6 +192,7 @@ jobs:
             echo
             echo '- Bundle ID: `pro.packone.app`'
             echo '- App Store Connect app ID: `6814318676`'
+            printf -- '- Build number: `%s`\n' "$PACKONE_ARCHIVED_BUILD_NUMBER"
             echo "- Distribution: TestFlight Internal Only"
             echo "- Upload completed through authenticated Xcode distribution."
           } >> "$GITHUB_STEP_SUMMARY"
