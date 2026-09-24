@@ -4,6 +4,7 @@ import {guardIngress} from './ingress-auth.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
+import {currentSeasonForPlayer} from './draft-run-season.mjs';
 import {handlePatreon} from './patreon.mjs';
 import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 import {accountRuntimeConfig} from './account-config.mjs';
@@ -444,7 +445,7 @@ async function profileMetaByKey(profileKey) {
 }
 
 async function buildProfile(playerId, meta, { own = false } = {}) {
-  const [summaryResult, bySetResult, byModeResult, recentResult, dailyHistory, catalog, streakDates] = await Promise.all([
+  const [summaryResult, bySetResult, byModeResult, recentResult, dailyHistory, catalog, streakDates, currentSeason] = await Promise.all([
     query(
       `SELECT count(*) games,round(avg(score),1) average_score,max(score) best_score,
               count(*) FILTER (WHERE outcome='win') challenge_wins,
@@ -488,6 +489,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     dailyHistoryFor(playerId),
     loadCatalog(),
     query('SELECT DISTINCT challenge_date::text date FROM scores WHERE player_id=$1::uuid ORDER BY date',[playerId]),
+    currentSeasonForPlayer(query,playerId),
   ]);
 
   const summary = summaryResult.rows[0] || {};
@@ -576,6 +578,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     best_environments: bestEnvironments,
     cube,
     best_final_percentile: finalPercentiles.length?Math.min(...finalPercentiles):null,
+    current_season: currentSeason,
     daily_history: dailyHistory.slice(0,120),
     recent,
     trend: [...recent].slice(0, 40).reverse().map((row) => ({
