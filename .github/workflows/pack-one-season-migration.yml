@@ -79,6 +79,6 @@ jobs:
           {
             echo '### Pack One season schema'
             echo
-            echo "- Applied migration 0037 to $RELEASE_TARGET from reviewed commit `$RELEASE_COMMIT`."
+            printf '- Applied migration 0037 to %s from reviewed commit %s.\n' "$RELEASE_TARGET" "$RELEASE_COMMIT"
             echo '- Verified durable season table, single-current index, reconciliation function, and existing serving prerequisites.'
           } >> "$GITHUB_STEP_SUMMARY"
