@@ -22,11 +22,11 @@ assert.equal((home.match(/data-ad-slot="home"/g)||[]).length,1,'home has exactly
 assert.match(home, /<main id="app" class="app"><\/main>\s*<aside class="ad-slot" data-ad-slot="home" hidden aria-label="Advertisement"><\/aside>\s*<\/div>\s*<footer class="site-footer app-footer">/,'home ad slot stays directly after main inside app-shell');
 assert.doesNotMatch(home, /googlesyndication/i,'Google loader stays out of index.html');
 assert.match(home, /href="visual-c\.css\?v=6"/,'home must bust the CSS cache for the affiliate-banner styles');
-assert.match(home, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/);
+assert.match(home, /id="how-nav"[^>]*href="\/how-it-works\/"[^>]*>How To Play<\/a>/);
 assert.doesNotMatch(home, /href="\/methodology\/"[^>]*>Method<\/a>/);
 assert.match(home, /class="topbar"/);
 assert.match(home, /id="daily-nav"[^>]*>Daily Run<\/button>/);
-assert.match(home, /id="leaderboard-nav"[^>]*>Leaders<\/button>/);
+assert.doesNotMatch(home, /id="leaderboard-nav"[^>]*>Leaders<\/button>/, 'guest home must not expose Leaders before identity resolves');
 assert.match(home, /<main id="app" class="app"><\/main>/, 'the app shell should not announce every full-page rerender as a live region');
 assert.match(home, /Impact-Site-Verification: 3e227a68-dfc4-4be8-a619-b13df4f67e25/);
 assert.doesNotMatch(home, /impact-site-verification'\s+value=/i);
@@ -38,16 +38,19 @@ const howTo = await readFile('how-it-works/index.html','utf8');
 assert.match(howTo, /<h1>How to Play Pack One<\/h1>/);
 assert.match(howTo, /class="topbar"/);
 assert.match(howTo, />Daily Run<\/a>/);
-assert.match(howTo, />Leaders<\/a>/);
-assert.match(howTo, />How To Play\?<\/a>/);
+assert.doesNotMatch(howTo, />Leaders<\/a>/, 'guest How To Play nav should stay focused');
+assert.match(howTo, />How To Play<\/a>/);
 assert.match(howTo, /id="account-nav" href="\/\?account=1">Sign in<\/a>/);
+assert.match(howTo, /class="quick-start"/);
+assert.match(howTo, /No account required/);
+assert.match(howTo, /src="\/site-nav\.mjs"/);
 assert.match(howTo, /<h2>Scoring<\/h2>/);
 assert.match(howTo, /href="\/scoring\/">View scoring<\/a>/);
 assert.match(howTo, /<h2>Method<\/h2>/);
 assert.match(howTo, /href="\/methodology\/">View method<\/a>/);
 assert.match(howTo, /<h2>Sets<\/h2>/);
 assert.match(howTo, /href="\/sets\/">View sets<\/a>/);
-const staticTopbarPages = [
+const publicStaticTopbarPages = [
   'how-it-works/index.html',
   'scoring/index.html',
   'methodology/index.html',
@@ -63,24 +66,45 @@ const staticTopbarPages = [
   'about/index.html',
   'contact/index.html',
   'privacy/index.html',
-  'terms/index.html',
-  'admin/index.html'
+  'terms/index.html'
 ];
-for (const path of staticTopbarPages) {
+for (const path of publicStaticTopbarPages) {
   const html = await readFile(path, 'utf8');
   assert.match(html, /href="\/visual-c\.css\?v=3"/, `${path} needs the app header styles`);
   assert.match(html, /class="topbar"/, `${path} needs the standard app topbar`);
+  assert.match(html, /data-site-nav/, `${path} needs account-aware navigation`);
   assert.match(html, /href="\/\?game=draft-run&daily=1">Daily Run<\/a>/, `${path} needs Daily Run navigation`);
-  assert.match(html, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, `${path} needs Leaders navigation`);
-  assert.match(html, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/, `${path} needs How To Play navigation`);
+  assert.doesNotMatch(html, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/, `${path} guest markup must not expose Leaders`);
+  assert.match(html, /href="\/how-it-works\/"[^>]*>How To Play<\/a>/, `${path} needs How To Play navigation`);
   assert.match(html, /id="account-nav" href="\/\?account=1">Sign in<\/a>/, `${path} needs Sign in navigation`);
+  assert.match(html, /src="\/site-nav\.mjs"/, `${path} needs signed-in navigation enhancement`);
   assert.doesNotMatch(html, /class="site-header"|class="admin-brand"/, `${path} must not use a legacy top-level header`);
 }
+const adminTopbar = await readFile('admin/index.html','utf8');
+assert.match(adminTopbar, /href="\/\?game=draft-run&board=daily">Leaders<\/a>/);
+assert.match(adminTopbar, /href="\/how-it-works\/"[^>]*>How To Play\?<\/a>/);
 for (const path of ['about/index.html','contact/index.html','privacy/index.html','terms/index.html']) {
   const html = await readFile(path, 'utf8');
   assert.doesNotMatch(html, /Make the decision before you read the answer\./, `${path} should not use the coaching CTA`);
   assert.match(html, /class="article-return"[^>]*>[\s\S]*Back to Pack One/, `${path} needs a quiet return to the product`);
 }
+const siteNav = await readFile('site-nav.mjs','utf8');
+assert.match(siteNav, /'Practice'/);
+assert.match(siteNav, /'Leaders'/);
+assert.match(siteNav, /'Learn'/);
+assert.match(siteNav, /'My Pack One'/);
+assert.match(siteNav, /'How To Play'/);
+const dailyHome = await readFile('daily-home.mjs','utf8');
+assert.match(dailyHome, /Make your pick, then see what the trophy drafter chose/);
+assert.match(dailyHome, /Start here/);
+assert.match(dailyHome, /No account required/);
+assert.match(dailyHome, /p1-card/);
+const learnHub = await readFile('learn/index.html','utf8');
+assert.match(learnHub, /<h1>Go deeper on Pack One\.<\/h1>/);
+assert.match(learnHub, /<h2>How to Play<\/h2>/);
+assert.match(learnHub, /<h2>Scoring<\/h2>/);
+assert.match(learnHub, /<h2>Method<\/h2>/);
+assert.match(learnHub, /<h2>Sets<\/h2>/);
 const bootstrap = await readFile('bootstrap.mjs','utf8');
 assert.match(bootstrap, /else if \(params\.has\('account'\)\)[\s\S]*?renderAccount\(\{source:'route'\}\)/);
 const about = await readFile('about/index.html','utf8');
