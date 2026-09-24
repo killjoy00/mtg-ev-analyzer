@@ -25,7 +25,10 @@ async function board(period,environment='mixed'){
 }
 
 if(productionBootstrap){
+  const scoreBefore=(await query("SELECT count(*) n,coalesce(sum(score),0)::text score_sum FROM scores WHERE mode='draft_run'")).rows[0];
   const season=await resolveCurrentSeason(query);
+  const scoreAfter=(await query("SELECT count(*) n,coalesce(sum(score),0)::text score_sum FROM scores WHERE mode='draft_run'")).rows[0];
+  assert.deepEqual(scoreAfter,scoreBefore,'Season bootstrap must not change ranked scores.');
   assert.ok(season,'Production clone must establish an inaugural season.');
   const earliest=(await query("SELECT min(challenge_date)::text day FROM scores WHERE mode='draft_run' AND set_id IN ('mixed','powered-cube','latest')")).rows[0]?.day||null;
   const first=(await query("SELECT day::text,daily_featured_sets FROM draft_run_schedules WHERE environment='latest' ORDER BY day LIMIT 1")).rows[0];
