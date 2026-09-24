@@ -368,6 +368,16 @@ body[data-page="editorial"] > .topbar {
   font-size: 13px;
   line-height: 1.45;
 }
+.quick-start-action {
+  margin: -12px 0 38px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.quick-start-action span {
+  color: var(--muted);
+  font-size: 13px;
+}
 
 .learn-directory {
   display: grid;
@@ -613,6 +623,7 @@ body[data-page="editorial"] > .topbar {
   .quick-start article,
   .quick-start article + article { padding: 15px 0; border-left: 0; }
   .quick-start article + article { border-top: 1px solid var(--line); }
+  .quick-start-action { align-items: flex-start; flex-direction: column; gap: 8px; }
   .set-archive-summary > div,
   .set-archive-summary > div + div { padding: 14px 0; border-left: 0; }
   .set-archive-summary > div + div { border-top: 1px solid var(--line-strong); }
