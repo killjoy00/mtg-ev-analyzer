@@ -323,17 +323,18 @@ test('public gateway allows deletion but not maintenance endpoint',()=>{
   assert.doesNotMatch(permittedBlock,/account-deletion-maintenance-status/);
 });
 
-test('GitHub deletion workflow is manual recovery plus read-only scheduled alerting',()=>{
+test('GitHub deletion workflow is manual-only recovery',()=>{
   const flow=fs.readFileSync('.github/workflows/account-deletion-maintenance.yml','utf8');
-  assert.match(flow,/cron: '4,14,24,34,44,54 \* \* \* \*'/);
-  assert.match(flow,/workflow_dispatch/);
+  assert.match(flow,/workflow_dispatch:/);
   assert.match(flow,/id-token: write/);
   assert.match(flow,/group: pack1-account-deletion-maintenance/);
-  assert.match(flow,/account-deletion-maintenance-status/);
-  assert.match(flow,/EVENT_NAME.*github\.event_name/s);
-  assert.match(flow,/mode=attention-check/);
+  assert.match(flow,/account-deletion-maintenance/);
   assert.match(flow,/mode=manual-recovery/);
   assert.match(flow,/GITHUB_STEP_SUMMARY/);
+  assert.doesNotMatch(flow,/\bschedule:/);
+  assert.doesNotMatch(flow,/cron:/);
+  assert.doesNotMatch(flow,/account-deletion-maintenance-status/);
+  assert.doesNotMatch(flow,/attention-check/);
 });
 
 test('deletion maintenance accepts only the named Neon trigger and keeps status OIDC-only',()=>{
