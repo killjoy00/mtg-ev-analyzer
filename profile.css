@@ -259,6 +259,21 @@
 .my-card-heading > span { color:var(--muted); font-size:12px; }
 .my-pack-empty { margin:8px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
 
+.current-season-heading { display:flex; align-items:end; justify-content:space-between; gap:16px; margin-bottom:14px; }
+.current-season-heading .eyebrow { margin:0; }
+.current-season-heading h2 { margin:3px 0 0; font-size:19px; line-height:1.2; }
+.current-season-heading h2 span { color:var(--muted); font-size:12px; font-weight:600; white-space:nowrap; }
+.current-season-standings { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin:0; padding:0; list-style:none; }
+.current-season-standings li { min-width:0; padding:12px 14px; border:1px solid var(--line); border-radius:8px; background:var(--surface-soft); }
+.current-season-standings strong,.current-season-standings span { display:block; }
+.current-season-standings strong { overflow:hidden; font-size:13px; text-overflow:ellipsis; white-space:nowrap; }
+.current-season-standings span { margin-top:4px; color:var(--muted); font-size:12px; }
+.profile-section.profile-current-season { padding-top:18px; padding-bottom:18px; }
+@media (max-width:600px) {
+  .current-season-heading { align-items:start; flex-direction:column; gap:2px; }
+  .current-season-standings { grid-template-columns:1fr; }
+}
+
 .my-career-metrics { display:grid; grid-template-columns:repeat(6,minmax(0,1fr)); }
 .my-career-metrics > div { min-width:0; padding:8px 12px; text-align:center; border-right:1px solid var(--line); }
 .my-career-metrics > div:last-child { border-right:0; }

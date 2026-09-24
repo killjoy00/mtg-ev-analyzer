@@ -119,7 +119,7 @@ try {
   await reset({verify:true});
   await page.goto(base+'/?patreon=activate');
   await fill('signup');
-  await page.getByText(/Check your email — we sent a verification link/).waitFor();
+  await page.getByText(/Check your email\. We sent a verification link/).waitFor();
   assert.equal(signed,false);
   assert.equal(connectCalls,0);
   assert.equal(await page.evaluate(()=>Boolean(sessionStorage.getItem('pack1-patreon-activation-v1'))),true);

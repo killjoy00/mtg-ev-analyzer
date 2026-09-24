@@ -1,13 +1,13 @@
-const esc=x=>String(x??'—').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
+const esc=x=>String(x??'N/A').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const yes=x=>x===true||x==='t';
 const date=x=>x?new Date(x).toLocaleString():'Not recorded';
-const count=x=>x==null?'—':Number(x).toLocaleString();
-const pct=x=>x==null?'—':`${(Number(x)*100).toFixed(1)}%`;
+const count=x=>x==null?'N/A':Number(x).toLocaleString();
+const pct=x=>x==null?'N/A':`${(Number(x)*100).toFixed(1)}%`;
 const ready=s=>yes(s.ready)&&yes(s.health_current);
 const health=s=>ready(s)?'Ready':s.report&&!yes(s.ready)?'Blocked':'Check needed';
 const badge=(label,kind=label)=>`<span class="corpus-badge ${esc(String(kind).toLowerCase().replaceAll(' ','-'))}">${esc(label)}</span>`;
 function metrics(values){return `<dl class="corpus-metrics">${Object.entries(values).map(([k,v])=>`<dt>${esc(k)}</dt><dd>${esc(v)}</dd>`).join('')}</dl>`;}
-function actionForm(s,data,component=false){const choices=data.transitions[s.status]||[];if(!choices.length)return '';return `<form class="corpus-action" data-status-form data-set="${esc(s.set_id)}" ${component?`data-component="${esc(s.component_version)}"`:''}><label>Change status<select name="status" required><option value="" selected disabled>Choose a status</option>${choices.map(x=>`<option value="${x}" ${x==='Live'&&!ready(s)?'disabled':''}>${x}${x==='Live'&&!ready(s)?' — verification required':''}</option>`).join('')}</select></label><label>Reason (optional)<input name="reason" maxlength="1000"></label><button type="submit">Apply status</button></form>`;}
+function actionForm(s,data,component=false){const choices=data.transitions[s.status]||[];if(!choices.length)return '';return `<form class="corpus-action" data-status-form data-set="${esc(s.set_id)}" ${component?`data-component="${esc(s.component_version)}"`:''}><label>Change status<select name="status" required><option value="" selected disabled>Choose a status</option>${choices.map(x=>`<option value="${x}" ${x==='Live'&&!ready(s)?'disabled':''}>${x}${x==='Live'&&!ready(s)?' (verification required)':''}</option>`).join('')}</select></label><label>Reason (optional)<input name="reason" maxlength="1000"></label><button type="submit">Apply status</button></form>`;}
 function setDetails(s,data){const m=s.manifest||{},f=m.full_import||{},q=s.report?.metrics||{},components=(data.components||[]).filter(c=>c.set_id===s.set_id);return `
  <div class="corpus-detail-heading"><div><p class="muted">${esc(s.set_id.toUpperCase())} · ${esc(s.source_event_type||'PremierDraft')}</p><h2>${esc(s.set_name)}</h2>${badge(s.status||'Awaiting corpus')} ${badge(health(s))}</div><button type="button" class="secondary" id="close-corpus-detail" aria-label="Close set details">Close</button></div>
  <div class="corpus-detail-summary">${metrics({'Serving decisions':count(s.serving_count),'Below score floor':count(s.under_floor_count),'Retained decisions':count(f.total_puzzles??m.puzzles),'Release date':s.release_date,'Model':f.model_version||m.model_version,'Corpus':s.corpus_version})}</div>
