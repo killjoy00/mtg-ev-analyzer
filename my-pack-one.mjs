@@ -125,11 +125,12 @@ function profileAside(profile,progress,account,patreon) {
 function membershipAside(patreon) {
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
+  const membershipUrl=elite?supportUrl:'/patreon/';
   const connected=patreon?.connected===true;
   const title=patreon?.configured!==true?'Membership status unavailable':elite?'You&rsquo;re an Elite Member':connected?'Patreon connected':'Free member';
-  const copy=patreon?.configured!==true?'Open Patreon to review membership options.':elite?'Thanks for supporting Pack One.':connected?'Your Patreon account is linked. Upgrade to Elite for expanded practice.':'Elite unlocks Powered Cube and custom-set practice.';
+  const copy=patreon?.configured!==true?'Review Elite benefits and Patreon setup.':elite?'Thanks for supporting Pack One.':connected?'Your Patreon account is linked. Upgrade to Elite for expanded practice.':'Elite unlocks Powered Cube and custom-set practice.';
   const label=elite?'Manage membership':connected?'Upgrade to Elite':'Become Elite';
-  return '<section class="my-side-card my-membership-card"><div><span class="my-card-icon" aria-hidden="true">♛</span><h2>'+title+'</h2><p>'+copy+'</p></div><a class="button primary" href="'+supportUrl+'" rel="noopener noreferrer">'+label+'</a></section>';
+  return '<section class="my-side-card my-membership-card"><div><span class="my-card-icon" aria-hidden="true">♛</span><h2>'+title+'</h2><p>'+copy+'</p></div><a class="button primary" href="'+membershipUrl+'"'+(elite?' rel="noopener noreferrer"':'')+'>'+label+'</a></section>';
 }
 
 function shareAside(profile) {
