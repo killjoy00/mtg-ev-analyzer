@@ -218,6 +218,7 @@ test('Pack One cleanup hard-deletes attributable corpus events and preserves ret
   const text=calls.map(row=>row.sql).join('\n');
   assert.match(text,/DELETE FROM corpus_status_events WHERE auth_user_id=/);
   assert.match(text,/DELETE FROM account_deletion_verifications WHERE auth_user_id=/);
+  assert.match(text,/DELETE FROM mobile_oauth_handoffs WHERE auth_user_id=/);
   assert.doesNotMatch(text,/UPDATE corpus_status_events SET auth_user_id=NULL/);
   const retained=calls.find(row=>row.sql.includes('UPDATE game_results SET challenge_id=NULL,opponent_name=NULL'))?.sql||'';
   assert.ok(retained,'retained cross-player result is scrubbed');
@@ -312,6 +313,7 @@ test('schema and release bookkeeping include deletion migrations in both secure 
   const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   assert.equal((release.match(/migrations\/0031_account_deletion\.sql/g)||[]).length,2);
   assert.equal((release.match(/migrations\/0034_account_deletion_verification\.sql/g)||[]).length,2);
+  assert.equal((release.match(/migrations\/0037_mobile_oauth_handoffs\.sql/g)||[]).length,2);
 });
 
 test('public gateway allows deletion but not maintenance endpoint',()=>{
@@ -462,7 +464,10 @@ test('production code contains no deletion-code exposure switch or response fiel
   ].map(path=>fs.readFileSync(path,'utf8')).join('\n');
   assert.doesNotMatch(files,/PACK1_[A-Z0-9_]*(?:EXPOSE|DEBUG|TEST)[A-Z0-9_]*DELETE[A-Z0-9_]*CODE|DELETE[A-Z0-9_]*CODE[A-Z0-9_]*(?:EXPOSE|DEBUG|TEST)/);
   const startSource=fs.readFileSync('worker/growth-function.js','utf8');
-  const start=startSource.slice(startSource.indexOf('async function handleAccountDeleteVerificationStart'),startSource.indexOf('async function handleAccountDelete(request)'));
+  const startIndex=startSource.indexOf('async function handleAccountDeleteVerificationStart');
+  const endIndex=startSource.indexOf('\nasync function handleAccountDelete(',startIndex);
+  assert.ok(startIndex>=0&&endIndex>startIndex,'account deletion handler boundaries not found');
+  const start=startSource.slice(startIndex,endIndex);
   assert.doesNotMatch(start,/json\([^\n]*\bcode\b/);
 });
 

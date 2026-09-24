@@ -111,6 +111,7 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
     await query('DELETE FROM player_identity_merges WHERE source_player_id=$1::uuid OR target_player_id=$1::uuid',[player]);
   }
 
+  await query('DELETE FROM mobile_oauth_handoffs WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM provider_oauth_states WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM provider_accounts WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM entitlement_grants WHERE auth_user_id=$1::uuid',[auth]);

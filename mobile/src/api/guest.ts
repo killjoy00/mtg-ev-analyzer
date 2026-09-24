@@ -14,7 +14,7 @@ function validGuestToken(value: string) {
 
 export async function ensureGuestSession(): Promise<MobileSession> {
   const existing = await readSession();
-  if (existing?.kind === 'guest' && validGuestToken(existing.token)) return existing;
+  if (existing && validGuestToken(existing.playerToken)) return existing;
 
   const created = await requestJson<GuestSessionResponse>('/growth/v1/session', {
     method: 'POST',
@@ -23,8 +23,7 @@ export async function ensureGuestSession(): Promise<MobileSession> {
   if (!validGuestToken(created.token)) throw new Error('Pack One returned an invalid guest session.');
 
   const session: MobileSession = {
-    kind: 'guest',
-    token: created.token,
+    playerToken: created.token,
     subjectId: created.playerId,
   };
   await writeSession(session);

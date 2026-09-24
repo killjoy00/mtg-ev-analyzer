@@ -43,6 +43,30 @@ export default function HomeScreen() {
           <Text style={styles.cardAction}>Check service →</Text>
         </Pressable>
 
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/account')}
+          style={({ pressed }) => [styles.accountCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>PACK ONE ACCOUNT</Text>
+          <Text style={styles.accountTitle}>Sign in across devices</Text>
+          <Text style={styles.cardBody}>Email/password and Google use the same Pack One account authority as the website.</Text>
+          <Text style={styles.cardAction}>Account →</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/account')}
+          style={({ pressed }) => [styles.secondaryCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>PACK ONE ACCOUNT</Text>
+          <Text style={styles.cardTitle}>Sign in or manage your account</Text>
+          <Text style={styles.cardBody}>
+            Use email or Google, keep your player identity across devices, and manage account deletion from the app.
+          </Text>
+          <Text style={styles.cardAction}>Open account →</Text>
+        </Pressable>
+
         <View style={styles.note}>
           <Text style={styles.noteTitle}>One product, not a fork</Text>
           <Text style={styles.noteBody}>
@@ -83,7 +107,22 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     gap: spacing.sm,
   },
+  secondaryCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
   pressed: { opacity: 0.78 },
+  accountCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.lg,
+    gap: spacing.sm,
+  },
+  accountTitle: { color: colors.ink, fontSize: 22, fontWeight: '800' },
   cardKicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },
   cardTitle: { color: colors.ink, fontSize: 28, fontWeight: '800' },
   cardBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },

@@ -24,6 +24,8 @@ const result=await query(`SELECT
   to_regclass('account_credential_rate_limits') IS NOT NULL account_credential_rate_limits,
   to_regclass('account_deletion_operations') IS NOT NULL account_deletion_operations,
   to_regclass('account_deletion_verifications') IS NOT NULL account_deletion_verifications,
+  to_regclass('mobile_oauth_handoffs') IS NOT NULL mobile_oauth_handoffs,
+  EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='mobile_oauth_handoffs_expiry_idx') mobile_oauth_handoffs_expiry_index,
   (SELECT count(*)=4 FROM information_schema.columns
     WHERE table_schema='public' AND table_name='account_deletion_verifications'
       AND column_name IN ('auth_user_id','code_hmac','created_at','expires_at')) account_deletion_verification_columns,

@@ -25,7 +25,8 @@
     "react-native": "0.86.3",
     "react-native-safe-area-context": "~5.7.0",
     "react-native-screens": "~4.26.0",
-    "expo-constants": "~57.0.19"
+    "expo-constants": "~57.0.19",
+    "expo-web-browser": "~57.0.3"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
