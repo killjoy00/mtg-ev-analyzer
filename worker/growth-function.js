@@ -844,7 +844,9 @@ async function handleEvents(request) {
   for (const event of events) {
     const name = String(event?.name || '').trim().slice(0, 64);
     if (!/^[a-z0-9_.-]{2,64}$/i.test(name) || SERVER_EVENTS.has(name.toLowerCase())) continue;
-    clean.push({name,props:props(event.props)});
+    const eventProps=props(event.props);
+    if(name.toLowerCase()==='leaderboard_view'&&eventProps.mode==='draft_run'&&eventProps.period==='month')eventProps.period='season';
+    clean.push({name,props:eventProps});
   }
   if(clean.length)await consumePlayerLimit(query,id,'events',{limit:300,seconds:60,cost:clean.length});
   if(clean.length)await query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,e.name,e.props FROM jsonb_to_recordset($2::jsonb) e(name text,props jsonb)',[id,JSON.stringify(clean)]);
