@@ -15,111 +15,37 @@ The release workflow reads two secrets from Google Secret Manager through the al
 
 The fixed key alias is `packone-upload`. CI reads version `1` of both secrets explicitly; rotating the upload key therefore requires a deliberate workflow change rather than silently following `latest`.
 
-## One-time upload-key setup
+## Upload-key setup status
 
-Run this in Google Cloud Shell while authenticated to the `pack-one` project. The script:
+The dedicated Pack One upload key is now established. On 2026-09-24, the one-time keyless bootstrap:
 
-- enables Secret Manager
-- stops if either target secret already exists
-- generates a new PKCS12 upload key
-- keeps the random password only in a private temporary file
-- stores both values directly in Secret Manager as version 1
-- grants `packone-play-ci@pack-one.iam.gserviceaccount.com` accessor rights only on those two secrets
-- removes the local keystore/password on exit
-- deletes any secrets it created if setup fails before completion
-- prints only the safe SHA-256 certificate fingerprint
+- authenticated from GitHub Actions to Google Cloud through Workload Identity Federation
+- generated a new PKCS12 key only inside an ephemeral GitHub runner
+- created secret version `1` for both `packone-android-upload-keystore-b64` and `packone-android-upload-password`
+- granted `packone-play-ci@pack-one.iam.gserviceaccount.com` `roles/secretmanager.secretAccessor` on those two secrets
+- removed the one-time bootstrap workflow after completion
 
-```bash
-set -euo pipefail
-umask 077
+The upload certificate SHA-256 fingerprint is:
 
-PROJECT_ID="pack-one"
-SERVICE_ACCOUNT="packone-play-ci@pack-one.iam.gserviceaccount.com"
-KEYSTORE_SECRET="packone-android-upload-keystore-b64"
-PASSWORD_SECRET="packone-android-upload-password"
-KEY_ALIAS="packone-upload"
+`FD:44:7E:18:F9:3B:E2:63:59:CD:26:C9:82:A2:0F:DF:44:2F:15:C8:D5:FD:F3:EF:0D:06:50:F7:B8:B9:18:7C`
 
-gcloud config set project "$PROJECT_ID"
-gcloud services enable secretmanager.googleapis.com --project="$PROJECT_ID"
-
-for SECRET in "$KEYSTORE_SECRET" "$PASSWORD_SECRET"; do
-  if gcloud secrets describe "$SECRET" --project="$PROJECT_ID" >/dev/null 2>&1; then
-    echo "STOP: Secret already exists: $SECRET"
-    echo "Do not create a second version. Inspect the existing secret before continuing."
-    exit 1
-  fi
-done
-
-WORKDIR="$(mktemp -d)"
-CREATED_SECRETS=()
-SETUP_COMPLETE=0
-
-cleanup() {
-  rm -rf "$WORKDIR"
-  if [[ "$SETUP_COMPLETE" != "1" ]]; then
-    for SECRET in "${CREATED_SECRETS[@]:-}"; do
-      gcloud secrets delete "$SECRET" --project="$PROJECT_ID" --quiet >/dev/null 2>&1 || true
-    done
-  fi
-}
-trap cleanup EXIT
-
-openssl rand -hex 32 > "$WORKDIR/password"
-
-keytool -genkeypair \
-  -keystore "$WORKDIR/packone-upload.p12" \
-  -storetype PKCS12 \
-  -alias "$KEY_ALIAS" \
-  -keyalg RSA \
-  -keysize 4096 \
-  -validity 10000 \
-  -storepass:file "$WORKDIR/password" \
-  -keypass:file "$WORKDIR/password" \
-  -dname "CN=Pack One Android Upload,O=Gaming Forward LLC,C=US"
-
-FINGERPRINT="$(
-  keytool -list -v \
-    -keystore "$WORKDIR/packone-upload.p12" \
-    -storepass:file "$WORKDIR/password" \
-    -alias "$KEY_ALIAS" \
-  | awk -F': ' '/SHA256:/{print $2; exit}'
-)"
-
-base64 "$WORKDIR/packone-upload.p12" | tr -d '\n' > "$WORKDIR/keystore.b64"
-
-gcloud secrets create "$KEYSTORE_SECRET" \
-  --project="$PROJECT_ID" \
-  --replication-policy="automatic" \
-  --data-file="$WORKDIR/keystore.b64"
-CREATED_SECRETS+=("$KEYSTORE_SECRET")
-
-gcloud secrets create "$PASSWORD_SECRET" \
-  --project="$PROJECT_ID" \
-  --replication-policy="automatic" \
-  --data-file="$WORKDIR/password"
-CREATED_SECRETS+=("$PASSWORD_SECRET")
-
-for SECRET in "$KEYSTORE_SECRET" "$PASSWORD_SECRET"; do
-  gcloud secrets add-iam-policy-binding "$SECRET" \
-    --project="$PROJECT_ID" \
-    --member="serviceAccount:$SERVICE_ACCOUNT" \
-    --role="roles/secretmanager.secretAccessor" >/dev/null
-done
-
-SETUP_COMPLETE=1
-
-echo
-echo "ANDROID UPLOAD KEY SETUP COMPLETE"
-echo "SHA-256: $FINGERPRINT"
-```
-
-Send back only the completion line and SHA-256 fingerprint. Do not send the keystore, base64 value, or password.
+The keystore and password were not written to the repository or pasted into chat.
 
 ## First-release behavior
 
-Because `pro.packone.app` is still a draft/unpublished Play app, the API creates the first Internal Testing release with status `draft`. The edit is committed so the owner can inspect the release and complete the first rollout in Google Play Console after any required declarations/setup are satisfied.
+Because `pro.packone.app` is still a draft/unpublished Play app, the API creates Internal Testing releases with status `draft`.
 
-The workflow does not attempt a `completed` rollout for the unpublished app.
+The first authenticated release completed successfully on 2026-09-24:
+
+- package: `pro.packone.app`
+- track: `internal`
+- version code: `100015`
+- release name: `Pack One internal 9f0b499`
+- release status: `draft`
+- Google Play edit committed: `true`
+- AAB signer verified against the dedicated upload-key fingerprint above
+
+The workflow does not attempt a `completed` rollout for the unpublished app. The owner completes the first rollout in Google Play Console after required Play declarations/setup are satisfied.
 
 ## Build numbering
 
@@ -148,7 +74,9 @@ No production-track release is created by this workflow.
 
 ## Credential cleanup
 
-The intended active Android upload key lives only in Google Secret Manager. Older GitHub repository secrets named `ANDROID_UPLOAD_KEYSTORE_BASE64` and `ANDROID_UPLOAD_KEY_PASSWORD`, if still present, are obsolete and should be deleted.
+The intended active Android upload key lives only in Google Secret Manager. The temporary project-level `Secret Manager Admin` grant used for one-time bootstrap should be removed from `packone-play-ci@pack-one.iam.gserviceaccount.com`; the workflow only needs the per-secret accessor bindings created above.
+
+Older GitHub repository secrets named `ANDROID_UPLOAD_KEYSTORE_BASE64` and `ANDROID_UPLOAD_KEY_PASSWORD`, if still present, are obsolete and should be deleted.
 
 Any pre-WIF `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` repository secret and its corresponding Google Cloud service-account key should also be deleted.
 
