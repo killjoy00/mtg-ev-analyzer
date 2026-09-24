@@ -18,6 +18,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS draft_run_seasons_current_uq
 -- statement
 CREATE INDEX IF NOT EXISTS draft_run_seasons_start_idx
   ON draft_run_seasons (start_date DESC);
+-- statement
 
 -- Reconciliation is one serialized transaction. Persisted season metadata wins
 -- over mutable policy state once a season exists; policy is consulted only when
@@ -118,7 +119,7 @@ BEGIN
         LIMIT 1;
 
         IF newest_live_set IS NULL OR newest_live_set <> candidate_set THEN
-          RAISE EXCEPTION 'Inaugural season contradiction: first Latest Set schedule uses %, but newest Live regular set on ranked launch date % is %.',
+          RAISE EXCEPTION 'Inaugural season contradiction: first Latest Set schedule uses %, but newest published regular set on ranked launch date % is %.',
             candidate_set, first_ranked_date, coalesce(newest_live_set,'none');
         END IF;
         inaugural_start := first_ranked_date;
