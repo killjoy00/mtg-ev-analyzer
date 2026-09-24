@@ -25,6 +25,7 @@ export function syncSiteNavigation({doc=document}={}){
   const nav=doc.querySelector('[data-site-nav]');
   if(!nav)return;
   const signed=hasAccountSession();
+  nav.classList.toggle('is-signed-nav',signed);
   const items=signed
     ? [
         link('/?game=draft-run&daily=1','Daily Run','daily'),
