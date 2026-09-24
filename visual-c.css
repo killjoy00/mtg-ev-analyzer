@@ -68,6 +68,13 @@ button, input, select, textarea { font: inherit; }
 .achievement-mark--rank { color:var(--gold); }
 .achievement-mark--streak { color:var(--red); }
 .achievement-mark.is-locked { color:var(--faint); opacity:.62; }
+.run-board-season {
+  margin:10px 0 0;
+  color:var(--muted);
+  font-size:13px;
+  font-weight:650;
+}
+
 .run-board-player {
   display:inline-flex;
   min-width:0;
