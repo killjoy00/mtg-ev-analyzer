@@ -42,6 +42,8 @@ assert.doesNotMatch(howTo, />Leaders<\/a>/, 'guest How To Play nav should stay f
 assert.match(howTo, />How To Play<\/a>/);
 assert.match(howTo, /id="account-nav" href="\/\?account=1">Sign in<\/a>/);
 assert.match(howTo, /class="quick-start"/);
+assert.match(howTo, /class="quick-start-action"/);
+assert.match(howTo, /class="quick-start-action">[\s\S]*href="\/\?game=draft-run&daily=1">Play Daily Draft Run<\/a>[\s\S]*No account required\./);
 assert.match(howTo, /No account required/);
 assert.match(howTo, /src="\/site-nav\.mjs"/);
 assert.match(howTo, /<h2>Scoring<\/h2>/);
@@ -100,6 +102,9 @@ assert.doesNotMatch(dailyHome, /trophy drafter chose —/);
 assert.match(dailyHome, /Start here/);
 assert.match(dailyHome, /No account required/);
 assert.match(dailyHome, /p1-card/);
+assert.match(dailyHome, /Eight decisions from Powered Cube trophy drafts\./);
+assert.match(dailyHome, /Eight decisions from trophy drafts in the latest set\./);
+assert.doesNotMatch(dailyHome, /Free practice|Elite practice|data-home-elite/);
 const learnHub = await readFile('learn/index.html','utf8');
 assert.match(learnHub, /<h1>Go deeper on Pack One\.<\/h1>/);
 assert.match(learnHub, /<h2>How to Play<\/h2>/);
