@@ -49,6 +49,20 @@ Premier trophies include 7–0, 7–1 and 7–2 with the existing experience/ski
 
 Custom-set practice requires complete P1P1–P1P8 coverage with at least 16 independent medium/hard sources at each position. Live sets with incomplete opening-pack archives can still contribute valid later decisions to mixed runs; they are not offered as self-contained custom-set runs. The full historical inventory is retained.
 
+
+## Card-image maintenance
+
+Card-image repair is a separate explicit corpus mutation, not part of ingestion or lifecycle promotion. It is display-only, fail-closed, and serialized with other corpus writers. Regular environments prefer ordinary/base art from the intended set; Powered Cube uses the earliest ordinary/base printing globally. An original/only special-frame printing is allowed only when no ordinary alternative exists, while avoidable cosmetic selections remain publication blockers.
+
+Backend propagation is paged in idempotent 250-puzzle requests with an explicit cursor. Do not restore whole-environment refresh requests: large environments can exceed the authenticated import request timeout.
+
+The guarded release deploys the same reviewed code revision to development and production before running the Pack One-wide image refresh. Live propagation must pass normalization, tests, dataset audit, exact backend-revision verification, R2 publication, development/production backend refreshes, and gameplay verification. The checked-in corpus is then published separately through a generated branch because protected `main` does not accept workflow direct pushes. An authorized operator/app opens that branch as the pull request; GitHub Actions itself is not currently allowed to create PRs in this repository.
+
+If live propagation succeeded but the final source PR was not published, use the card-image source recovery workflow to regenerate from normalized R2 state and push a recovery branch, then have an authorized operator/app open that branch as the PR. Do not rerun a successful production backend refresh solely to recover repository bookkeeping.
+
+See [Card image maintenance](CARD-IMAGE-MAINTENANCE.md) and [the September 23 rollout closeout](reports/CARD-IMAGE-ROLLOUT-CLOSEOUT-2026-09-23.md).
+
+
 ## Supplemental Traditional components
 
 Current v4 supplemental identities are `traditional-premier-v4-phase2-v1` for regular environments and `traditional-cube-p2p7-v4-v1` for Powered Cube. They are pinned to parent `elite-trophy-colour-stage-v8` and model `strong-player-colour-stage-v4`.
