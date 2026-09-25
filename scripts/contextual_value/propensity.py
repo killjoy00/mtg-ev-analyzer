@@ -1,9 +1,17 @@
-"""Variable-action-set propensity helpers."""
+"""Variable-action-set observational propensity models.
+
+The broad-population propensity is deliberately separate from the strong-player
+policy. LinearSoftmaxPropensityModel is a dependency-free conditional-logit
+baseline over arbitrary candidate feature maps.
+"""
 
 from __future__ import annotations
 
 import math
+from dataclasses import dataclass
 from typing import Mapping, Sequence
+
+from .features import validate_feature_map
 
 MIN_PROBABILITY = 1e-9
 
@@ -23,12 +31,18 @@ def softmax(scores: Mapping[str, float], temperature: float = 1.0) -> dict[str, 
     return probabilities
 
 
-def validate_distribution(probabilities: Mapping[str, float], actions: Sequence[str] | None = None) -> None:
+def validate_distribution(
+    probabilities: Mapping[str, float],
+    actions: Sequence[str] | None = None,
+) -> None:
     if not probabilities:
         raise ValueError("empty probability distribution")
     if actions is not None and set(probabilities) != set(actions):
         raise ValueError("probability keys must match the complete action set")
-    if any((not math.isfinite(float(value))) or value < 0 or value > 1 for value in probabilities.values()):
+    if any(
+        (not math.isfinite(float(value))) or value < 0 or value > 1
+        for value in probabilities.values()
+    ):
         raise ValueError("probabilities must be finite and in [0, 1]")
     if not math.isclose(sum(probabilities.values()), 1.0, rel_tol=1e-10, abs_tol=1e-10):
         raise ValueError("probabilities must sum to one over the offered pack")
@@ -42,3 +56,117 @@ def support_threshold(candidate_count: int) -> float:
 
 def is_supported(probability: float, candidate_count: int) -> bool:
     return probability >= support_threshold(candidate_count)
+
+
+@dataclass(frozen=True)
+class PropensityExample:
+    features: Mapping[str, Mapping[str, float]]
+    selected_action: str
+    sample_weight: float = 1.0
+    offsets: Mapping[str, float] | None = None
+
+    def validate(self) -> None:
+        if not self.features:
+            raise ValueError("propensity example has no actions")
+        if self.selected_action not in self.features:
+            raise ValueError("selected action is not in the offered action set")
+        if not math.isfinite(self.sample_weight) or self.sample_weight < 0:
+            raise ValueError("sample_weight must be finite and non-negative")
+        for row in self.features.values():
+            validate_feature_map(row)
+        if self.offsets is not None:
+            if set(self.offsets) != set(self.features):
+                raise ValueError("offsets must cover exactly the offered action set")
+            if any(not math.isfinite(float(value)) for value in self.offsets.values()):
+                raise ValueError("offsets must be finite")
+
+
+@dataclass(frozen=True)
+class LinearSoftmaxPropensityModel:
+    feature_names: tuple[str, ...]
+    coefficients: tuple[float, ...]
+    l2: float
+
+    @classmethod
+    def fit(
+        cls,
+        examples: Sequence[PropensityExample],
+        *,
+        l2: float = 1.0,
+        learning_rate: float = 0.2,
+        epochs: int = 250,
+    ) -> "LinearSoftmaxPropensityModel":
+        if not examples:
+            raise ValueError("at least one propensity example is required")
+        if l2 < 0:
+            raise ValueError("l2 must be non-negative")
+        if learning_rate <= 0 or not math.isfinite(learning_rate):
+            raise ValueError("learning_rate must be finite and positive")
+        if epochs <= 0:
+            raise ValueError("epochs must be positive")
+        for example in examples:
+            example.validate()
+
+        names = tuple(sorted({
+            name
+            for example in examples
+            for action in example.features.values()
+            for name in action
+        }))
+        beta = [0.0] * len(names)
+        name_at = {name: index for index, name in enumerate(names)}
+        total_weight = sum(example.sample_weight for example in examples)
+        if total_weight <= 0:
+            raise ValueError("positive total sample weight is required")
+
+        for epoch in range(epochs):
+            gradient = [0.0] * len(beta)
+            for example in examples:
+                scores: dict[str, float] = {}
+                for action, row in example.features.items():
+                    score = float(example.offsets[action]) if example.offsets is not None else 0.0
+                    for name, value in row.items():
+                        score += beta[name_at[name]] * float(value)
+                    scores[action] = score
+                probabilities = softmax(scores)
+                for action, row in example.features.items():
+                    residual = (1.0 if action == example.selected_action else 0.0) - probabilities[action]
+                    scale = example.sample_weight * residual
+                    for name, value in row.items():
+                        gradient[name_at[name]] += scale * float(value)
+
+            step = learning_rate / math.sqrt(1.0 + epoch / 25.0)
+            for index in range(len(beta)):
+                grad = gradient[index] / total_weight - l2 * beta[index] / total_weight
+                beta[index] += step * grad
+
+        return cls(feature_names=names, coefficients=tuple(beta), l2=l2)
+
+    def probabilities(
+        self,
+        features: Mapping[str, Mapping[str, float]],
+        offsets: Mapping[str, float] | None = None,
+    ) -> dict[str, float]:
+        if not features:
+            raise ValueError("cannot score an empty action set")
+        if offsets is not None and set(offsets) != set(features):
+            raise ValueError("offsets must cover exactly the offered action set")
+        coefficients = dict(zip(self.feature_names, self.coefficients))
+        scores: dict[str, float] = {}
+        for action, row in features.items():
+            validate_feature_map(row)
+            score = float(offsets[action]) if offsets is not None else 0.0
+            score += sum(coefficients.get(name, 0.0) * float(value) for name, value in row.items())
+            scores[action] = score
+        return softmax(scores)
+
+    def selected_probability(
+        self,
+        features: Mapping[str, Mapping[str, float]],
+        selected_action: str,
+        offsets: Mapping[str, float] | None = None,
+    ) -> float:
+        probabilities = self.probabilities(features, offsets)
+        if selected_action not in probabilities:
+            raise ValueError("selected action is not in the offered action set")
+        return probabilities[selected_action]
