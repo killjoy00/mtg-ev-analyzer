@@ -74,6 +74,16 @@ try{
     assert.equal(fallback.props.campaign,undefined);assert.equal(fallback.props.medium,undefined);
     for(const key of ['utm_source','utm_campaign','utm_medium'])assert.equal(fallbackUrl.searchParams.has(key),false,'invalid UTM params are removed too');
 
+    start=events.length;
+    await page.goto(base+'/?ref=daily_board_share');
+    await page.locator('[data-daily-home]').waitFor();
+    await page.waitForFunction(()=>!new URL(location.href).searchParams.has('ref'));
+    const boardTouch=await waitForEvent('acquisition_touch',start);
+    const boardArrival=await waitForEvent('daily_share_arrival',start);
+    assert.equal(boardTouch.props.source,'daily_board_share');
+    assert.equal(boardArrival.props.source,'daily_board_share');
+    assert.equal(boardArrival.props.daily,true);
+
     const dst=await page.evaluate(async()=>{
       const {dailyResetCue,nextGameDateBoundary}=await import('/game-date.mjs');
       const before=new Date('2026-11-01T07:30:00Z'),after=new Date('2026-11-01T09:30:00Z');
@@ -235,7 +245,7 @@ try{
     await page.waitForFunction(()=>Boolean(new URL(location.href).searchParams.get('run')));
     assert.equal(runStarts.at(-1).source,'result_share');
     for(let i=0;i<30&&!events.some(event=>event.name==='daily_share_arrival');i++)await page.waitForTimeout(100);
-    const arrivals=events.filter(event=>event.name==='daily_share_arrival');
+    const arrivals=events.filter(event=>event.name==='daily_share_arrival'&&event.props.source==='result_share');
     assert.equal(arrivals.length,1);assert.equal(arrivals[0].props.source,'result_share');assert.equal(arrivals[0].props.daily,true);
     const resultTouches=events.filter(event=>event.name==='acquisition_touch'&&event.props.source==='result_share');
     assert.ok(resultTouches.length>=1,'result_share still records the shared-link first-touch source independently of any sharer attribution');
