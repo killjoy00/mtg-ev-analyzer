@@ -68,7 +68,7 @@ async function loadSet(s) {
   let batch=[],added=0;
   for await(const p of records(fileFor(s,'puzzle_file'))) {batch.push(p);if(batch.length===250){added+=await batchInsert(batch,s.source_snapshot_id);batch=[];}}
   if(batch.length)added+=await batchInsert(batch,s.source_snapshot_id);
-  const actual=remote?await importRequest(remote,{action:'finish-set',manifest:s}):(await query('SELECT count(*)::int puzzles FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2',[s.id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
+  const actual=remote?await importRequest(remote,{action:'finish-set',manifest:s}):(await query('SELECT count(*)::int puzzles FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND source_snapshot_id=$3',[s.id,DRAFT_RUN_CORPUS_VERSION,s.source_snapshot_id])).rows[0];
   if(Number(actual.puzzles)!==s.total_puzzles)throw Error('Database count does not match verified import: '+s.id);
   if(!remote){
     let ledgerBatch=[];
