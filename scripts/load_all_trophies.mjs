@@ -64,7 +64,7 @@ async function loadSet(s) {
     ON CONFLICT(source_snapshot_id) DO UPDATE SET manifest=EXCLUDED.manifest`,
     [s.source_snapshot_id,s.id,DRAFT_RUN_CORPUS_VERSION,s.schema_version,s.source_archive.sha256,s.skill_source.sha256,
      s.source_archive.etag||null,s.skill_source.etag||null,s.source_archive.last_modified||null,s.skill_source.last_modified||null,
-     s.import_version,s.model_version,JSON.stringify(s)]);
+     s.import_version,s.model_version,JSON.stringify({full_import:s})]);
   let batch=[],added=0;
   for await(const p of records(fileFor(s,'puzzle_file'))) {batch.push(p);if(batch.length===250){added+=await batchInsert(batch,s.source_snapshot_id);batch=[];}}
   if(batch.length)added+=await batchInsert(batch,s.source_snapshot_id);
