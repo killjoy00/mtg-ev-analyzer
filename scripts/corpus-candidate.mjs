@@ -29,10 +29,12 @@ export async function registerHealthyCandidate(query,setId,manifestHash,sourceSn
     set_id,regular_run,maximum_pick,daily_weight,selection_version,status,
     release_date,set_name,source_event_type,active_snapshot_id
    )
-   SELECT p.set_id,coalesce((p.manifest->'full_import'->>'regular_run')::boolean,false),
+   SELECT p.set_id,coalesce((v.manifest->>'regular_run')::boolean,false),
     CASE WHEN p.set_id='powered-cube' THEN 9 ELSE 8 END,1,$5,'Candidate',
     src.release_date,src.set_name,src.event_type,p.source_snapshot_id
-   FROM promoted p JOIN corpus_sources src ON src.set_id=p.set_id AND src.event_type=p.event_type
+   FROM promoted p
+   JOIN corpus_sources src ON src.set_id=p.set_id AND src.event_type=p.event_type
+   JOIN corpus_set_versions v ON v.set_id=p.set_id AND v.corpus_version=p.corpus_version
    WHERE p.set_id='powered-cube' OR src.release_date IS NOT NULL
    ON CONFLICT(set_id) DO NOTHING
    RETURNING set_id,status
