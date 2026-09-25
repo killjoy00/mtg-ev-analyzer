@@ -887,8 +887,8 @@ function appleReturn(flowKind,params={},purpose='signin') {
     target.searchParams.set('auth',purpose==='delete'
       ? failed?'apple-delete-error':'apple-delete'
       : failed?'apple-error':'apple');
-  } else if(purpose==='delete'&&failed) {
-    target.searchParams.set('appleDelete','error');
+  } else if(failed) {
+    target.searchParams.set(purpose==='delete'?'appleDelete':'apple','error');
   }
   for(const [key,value] of Object.entries(params)) {
     if(key==='apple')continue;
@@ -1031,7 +1031,11 @@ async function handleAppleCallback(request) {
   } catch(error) {
     console.error('Apple OAuth callback failed',String(error?.code||''),Number(error?.status||500));
     await query('UPDATE mobile_oauth_handoffs SET consumed_at=COALESCE(consumed_at,now()) WHERE flow_hash=$1',[digest(flowToken)]).catch(()=>{});
-    return appleReturn(flow.flow_kind,{apple:'error'},flow.purpose);
+    const appleErrorCode=error?.code==='APPLE_EXISTING_ACCOUNT_UNVERIFIED'?error.code:null;
+    return appleReturn(flow.flow_kind,{
+      apple:'error',
+      ...(appleErrorCode?{appleErrorCode}:{}),
+    },flow.purpose);
   }
 }
 
