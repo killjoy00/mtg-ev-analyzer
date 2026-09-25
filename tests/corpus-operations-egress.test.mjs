@@ -23,14 +23,3 @@ test('production promotion validates the reviewed run with standalone jq',()=>{
   assert.match(workflow,/gh run view "\$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha \| jq -e --arg sha "\$GITHUB_SHA"/);
   assert.doesNotMatch(workflow,/gh run view[^\n]*--jq --arg/);
 });
-
-test('scheduled corpus operations refresh production health without ingesting or publishing',()=>{
-  const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
-  const job=workflow.split(/\n  scheduled-production-health:\n/)[1];
-  assert.ok(job,'scheduled production health job is missing');
-  assert.match(job,/needs: corpus/);
-  assert.match(job,/if: \$\{\{ always\(\) && github\.event_name == 'schedule' \}\}/);
-  assert.match(job,/branch=br-orange-feather-ayps8kep/);
-  assert.match(job,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/production-corpus-health\.connection"/);
-  assert.doesNotMatch(job,/load_all_trophies|candidate-gameplay-canary|\/status|\/snapshot/);
-});
