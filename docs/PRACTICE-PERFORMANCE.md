@@ -31,8 +31,9 @@ JSON plans. It records:
 
 - Actual checkout SHA, PR head SHA, corpus/selection/difficulty/serving versions,
   Pacific date, clone/parent IDs, compute sizing, work_mem and server version.
-- Estimated table row counts and analyze timestamps, explicitly labeled as
-  estimates rather than newly counted exact corpus totals.
+- Planner row estimates from `pg_class.reltuples`, plus separate branch activity
+  counts and analyze timestamps. Activity counters can reset on a fresh clone;
+  zero activity is not evidence of an empty table. Estimates are not exact totals.
 - Full custom practice-set discovery time, including distinct-source coverage.
 - Mixed, Cube, single-set and multi-set custom selection plus metadata reload,
   using reproducible seeds and selected puzzle IDs/fingerprints.

@@ -100,7 +100,7 @@ export async function main() {
     code_sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),head_sha:process.env.PACK1_BENCHMARK_HEAD_SHA||null,
     branch,source_branch:PRODUCTION,started_at:new Date().toISOString(),day,
     versions:{corpus:DRAFT_RUN_CORPUS_VERSION,selection:DRAFT_RUN_SELECTION_VERSION,difficulty:DRAFT_RUN_DIFFICULTY_VERSION,serving:SERVING_POLICY_VERSION},
-    compute:{autoscaling_limit_min_cu:endpoint.autoscaling_limit_min_cu,autoscaling_limit_max_cu:endpoint.autoscaling_limit_max_cu,suspend_timeout:endpoint.suspend_timeout},
+    compute:{autoscaling_limit_min_cu:endpoint.autoscaling_limit_min_cu,autoscaling_limit_max_cu:endpoint.autoscaling_limit_max_cu,suspend_timeout_seconds:endpoint.suspend_timeout_seconds??endpoint.suspend_timeout??null},
     repetitions,discovery:null,cases:[],plans:[],ok:false};
   const plans=new Map();
   const capture=(prefix,recorder)=>{
@@ -108,7 +108,9 @@ export async function main() {
   };
   try {
     report.database=(await query("SELECT current_setting('server_version') server_version,current_setting('work_mem') work_mem,current_database() database")).rows[0];
-    report.table_estimates=(await query("SELECT relname,n_live_tup::text estimated_rows,last_analyze::text,last_autoanalyze::text FROM pg_stat_user_tables WHERE schemaname='public' AND relname IN ('draft_run_verified_puzzles','draft_run_puzzle_ratings','corpus_components','corpus_source_exclusions') ORDER BY relname")).rows;
+    // Activity counters reset on a fresh Neon branch. Planner reltuples survive
+    // the clone and are the useful estimate; keep zeroed counters separately.
+    report.table_estimates=(await query("SELECT s.relname,c.reltuples::bigint::text estimated_rows,s.n_live_tup::text branch_activity_live_rows,s.last_analyze::text,s.last_autoanalyze::text FROM pg_stat_user_tables s JOIN pg_class c ON c.oid=s.relid WHERE s.schemaname='public' AND s.relname IN ('draft_run_verified_puzzles','draft_run_puzzle_ratings','corpus_components','corpus_source_exclusions') ORDER BY s.relname")).rows;
     const discovery=recordQueries(query),started=performance.now();
     const custom=await loadCustomSetMetadata(discovery.query,DRAFT_RUN_CORPUS_VERSION,day);
     report.discovery={ms:elapsed(started),set_ids:custom.map(s=>s.set_id),queries:discovery.records};capture('practice-sets',discovery);
