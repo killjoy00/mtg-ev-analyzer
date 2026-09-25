@@ -355,7 +355,13 @@ export async function resolveAppleAccount(query,{
     const byEmail=(await query('SELECT id auth_user_id,email,name,"emailVerified" email_verified FROM neon_auth."user" WHERE lower(email)=lower($1) LIMIT 1',[email])).rows[0]||null;
     let authUserId=byEmail?.auth_user_id||null,syntheticPassword=false;
     if(authUserId&&!bool(byEmail.email_verified)) {
-      await markAppleAuthEmailVerified({authBase,userId:authUserId,env,validateServicePrincipal});
+      // Never convert an unverified email/password identity into an Apple-linked
+      // account. An attacker can pre-register a victim's email with a password;
+      // marking that row verified here would activate the attacker's credential.
+      throw Object.assign(Error('An unverified Pack One account already uses this email. Reset that account password from the email inbox before linking Apple.'),{
+        status:409,
+        code:'APPLE_EXISTING_ACCOUNT_UNVERIFIED',
+      });
     }
     if(!authUserId) {
       try {
@@ -368,9 +374,13 @@ export async function resolveAppleAccount(query,{
         if(error?.code!=='APPLE_ACCOUNT_EXISTS')throw error;
         const raced=(await query('SELECT id auth_user_id,"emailVerified" email_verified FROM neon_auth."user" WHERE lower(email)=lower($1) LIMIT 1',[email])).rows[0];
         if(!raced?.auth_user_id)throw error;
+        if(!bool(raced.email_verified)) {
+          throw Object.assign(Error('An unverified Pack One account already uses this email. Reset that account password from the email inbox before linking Apple.'),{
+            status:409,
+            code:'APPLE_EXISTING_ACCOUNT_UNVERIFIED',
+          });
+        }
         authUserId=raced.auth_user_id;
-        if(!bool(raced.email_verified))
-          await markAppleAuthEmailVerified({authBase,userId:authUserId,env,validateServicePrincipal});
       }
     }
     const given=sanitizeAppleNamePart(firstName)||null;
