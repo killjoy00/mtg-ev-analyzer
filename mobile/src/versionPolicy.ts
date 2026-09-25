@@ -54,3 +54,15 @@ export function parseVersionCheckResponse(
     minimum: { marketingVersion, build },
   };
 }
+
+
+export async function resolveVersionCheck(
+  platform: MobilePlatform,
+  load: () => Promise<unknown>,
+): Promise<VersionGateDecision> {
+  try {
+    return parseVersionCheckResponse(platform, await load()) ?? { status: 'allowed' };
+  } catch {
+    return { status: 'allowed' };
+  }
+}
