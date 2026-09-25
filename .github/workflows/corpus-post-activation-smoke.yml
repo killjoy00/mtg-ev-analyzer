@@ -1,0 +1,63 @@
+name: Corpus Post-Activation Smoke
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Environment whose already-active snapshot should be verified'
+        type: choice
+        options: [production, development]
+        default: production
+      set_id:
+        description: 'Live set that was just activated'
+        required: true
+        type: string
+      source_snapshot_id:
+        description: '64-hex source snapshot ID that must already be active'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: corpus-post-activation-smoke-${{ inputs.target }}-${{ inputs.set_id }}
+  cancel-in-progress: false
+
+jobs:
+  serving-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require reviewed code
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      - name: Prepare explicit connection and verify schema
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TARGET: ${{ inputs.target }}
+        run: |
+          set -euo pipefail
+          umask 077
+          case "$TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/corpus.connection"
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+      - name: Exercise active serving path
+        env:
+          SET_ID: ${{ inputs.set_id }}
+          SOURCE_SNAPSHOT_ID: ${{ inputs.source_snapshot_id }}
+        run: |
+          set -euo pipefail
+          [[ "$SET_ID" =~ ^[a-z0-9-]{2,40}$ ]] || { echo 'Invalid set_id.' >&2; exit 1; }
+          [[ "$SOURCE_SNAPSHOT_ID" =~ ^[a-f0-9]{64}$ ]] || { echo 'Invalid source_snapshot_id.' >&2; exit 1; }
+          node scripts/post-activation-serving-smoke.mjs "$RUNNER_TEMP/corpus.connection" "$SET_ID" "$SOURCE_SNAPSHOT_ID"
