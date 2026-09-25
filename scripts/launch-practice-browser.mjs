@@ -100,7 +100,7 @@ async function main() {
     fs.writeFileSync(directory+'/practice-browser.json',JSON.stringify(report,null,2));
     await browser.close();
   }
-  console.log(JSON.stringify({operation:'isolated-practice-browser',passed:report.passed,summary:report.summary}));
+  console.log(JSON.stringify({operation:'isolated-practice-browser',passed:report.passed,samples:report.samples,summary:report.summary}));
   if(!report.passed)process.exitCode=1;
 }
 main().catch(()=>{console.error('Isolated browser acceptance failed; inspect sanitized artifacts.');process.exitCode=1;});
