@@ -8,13 +8,36 @@ if (location.hostname === 'killjoy00.github.io') {
 } else {
 
 const params = new URLSearchParams(location.search);
-if (params.get('ref') === 'result_share' && params.get('game') === 'draft-run' && params.get('daily') === '1') {
-  window.PACK1_ENTRY_SOURCE = 'result_share';
-  params.delete('ref');
-  history.replaceState({}, '', `${location.pathname}${params.size ? '?' + params : ''}${location.hash}`);
-  const { trackEvent } = await import('./retention-events.mjs');
-  trackEvent('daily_share_arrival', { source: 'result_share', daily: true });
+const acquisitionValue=value=>{
+  const normalized=String(value??'').trim().toLowerCase();
+  return /^[a-z0-9][a-z0-9_-]{0,39}$/.test(normalized)?normalized:null;
+};
+const resultShare=params.get('ref')==='result_share'&&params.get('game')==='draft-run'&&params.get('daily')==='1';
+const utmSource=acquisitionValue(params.get('utm_source'));
+const campaign=acquisitionValue(params.get('utm_campaign'));
+const medium=acquisitionValue(params.get('utm_medium'));
+let referrerHost=null;
+if(!utmSource&&!resultShare&&document.referrer) {
+  try {
+    const referrer=new URL(document.referrer);
+    if(referrer.hostname&&referrer.hostname!==location.hostname)referrerHost=referrer.hostname.toLowerCase().replace(/\.$/,'');
+  } catch {}
 }
+const hadAttributionParams=['utm_source','utm_campaign','utm_medium'].some(key=>params.has(key));
+for(const key of ['utm_source','utm_campaign','utm_medium'])params.delete(key);
+if(resultShare) {
+  window.PACK1_ENTRY_SOURCE='result_share';
+  params.delete('ref');
+}
+if(hadAttributionParams||resultShare)history.replaceState({},'',`${location.pathname}${params.size?'?'+params:''}${location.hash}`);
+const {trackEvent:trackArrivalEvent}=await import('./retention-events.mjs');
+trackArrivalEvent('acquisition_touch',{
+  source:resultShare?'result_share':utmSource||referrerHost||'direct',
+  ...(campaign?{campaign}:{}),
+  ...(medium?{medium}:{}),
+  ...(referrerHost?{referrer_host:referrerHost}:{})
+});
+if(resultShare)trackArrivalEvent('daily_share_arrival',{source:'result_share',daily:true});
 // Only previously published stored links load the historical game reader.
 const historicalShare = params.has('challenge') && params.get('game') !== 'draft-run';
 if (!historicalShare && (params.has('legacy-board') || params.has('mode') || params.has('seed') || (params.get('set') === 'powered-cube' && params.get('game') !== 'draft-run'))) {
