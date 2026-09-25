@@ -35,7 +35,7 @@ function permitted(service,path,method,search,mode) {
   if(method==='GET'&&path==='/health')return search==='?quick=1';
   if(service==='growth') {
     if(method==='POST'&&[
-      '/v1/session','/v1/mobile/version','/v1/player/session','/v1/player/migrate',
+      '/v1/session','/v1/player/session','/v1/player/migrate',
       '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete/verification/start','/v1/account/delete','/v1/account/migrate',
       '/v1/account/link','/v1/account/link-browser','/v1/account/signout',
       '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/google/start','/v1/mobile/account/google/finish',
@@ -44,7 +44,7 @@ function permitted(service,path,method,search,mode) {
     ].includes(path))return true;
     if(method==='GET'&&[
       '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback',
-      '/v1/mobile/account/google/callback','/v1/mobile/account/session',
+      '/v1/mobile/account/google/callback','/v1/mobile/account/session','/v1/mobile/version',
       '/v1/mobile/profile/me','/v1/mobile/profile/history',
       '/v1/stats','/v1/profile/me','/v1/profile/history','/v1/patreon/status',
     ].includes(path))return true;
