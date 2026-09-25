@@ -64,7 +64,8 @@ async function main() {
   try {
     // Prepare the page/account first, then verify database idle through the
     // control plane without touching the data plane before the timed click.
-    const mixed={name:'mixed'},click=await ready(mixed),deadline=Date.now()+9*60000;
+    const cold=async configuration=>{
+    const click=await ready(configuration),deadline=Date.now()+9*60000;
     let idle;
     while(Date.now()<deadline) {
       const r=await fetch('https://console.neon.tech/api/v2/projects/patient-shadow-91417882/branches/'+fixture.branch+'/endpoints',{
@@ -77,14 +78,17 @@ async function main() {
       await new Promise(resolve=>setTimeout(resolve,15000));
     }
     assert.ok(idle,'Isolated compute did not become idle; no cold claim is permitted.');
-    await sample(mixed,click,'confirmed_idle',idle);
+    await sample(configuration,click,'confirmed_idle',idle);
+    };
+    await cold({name:'mixed'});
     for(const configuration of [{name:'mixed'},{name:'powered-cube'},{name:'custom-single',custom:1},{name:'custom-multi',custom:3}])
       for(let i=0;i<3;i++)await sample(configuration,await ready(configuration),'warm');
+    for(const configuration of [{name:'powered-cube'},{name:'custom-single',custom:1},{name:'custom-multi',custom:3}])await cold(configuration);
     report.summary=Object.fromEntries(['mixed','powered-cube','custom-single','custom-multi'].map(name=>{
       const rows=report.samples.filter(s=>s.case===name&&s.phase==='warm');
       return [name,{api:summarize(rows.map(s=>s.api_ms)),click:summarize(rows.map(s=>s.click_to_cards_ms)),images:summarize(rows.map(s=>s.click_to_images_ms))}];
     }));
-    report.passed=!errors.length&&report.samples[0].click_to_cards_ms<=report.budgets.cold_click_ms&&
+    report.passed=!errors.length&&report.samples.filter(s=>s.phase==='confirmed_idle').length===4&&report.samples.filter(s=>s.phase==='confirmed_idle').every(s=>s.click_to_cards_ms<=report.budgets.cold_click_ms)&&
       Object.values(report.summary).every(s=>s.api.p95_ms<=2000&&s.click.p95_ms<=3000);
     await page.screenshot({path:directory+'/practice-mobile.png',fullPage:true});
   } catch(error) {
