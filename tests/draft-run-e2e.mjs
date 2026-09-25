@@ -43,7 +43,7 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
     const grade=gradeDraftRunPick(p,req.cardId),evidence=rateDraftRunPuzzle(p),calibrated=calibratedSupports(p.candidates,supportSharpening(p.corpus_version));
     grade.modelTargetDisagreement=evidence.modelTargetDisagreement;
     answers.push({...grade,puzzle:publicDraftRunPuzzle(p),ranking:[...p.candidates].sort((a,b)=>b.model_probability-a.model_probability).map(c=>({id:c.id,name:c.name,support:calibrated.get(c.id),score:gradeDraftRunPick(p,c.id).score}))});revision++;body=snapshot();
-  }else if(path==='/v1/daily-status')body=eliteAccess?{player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice']}:{player:{claimed:false},capabilities:[]};
+  }else if(path==='/v1/daily-status')body=eliteAccess?{player:{claimed:true},capabilities:['account','custom_corpus','unlimited_cube_practice'],daily_streak:daily?3:0}:{player:{claimed:false},capabilities:[],daily_streak:daily?3:0};
   else if(path==='/v1/leaderboard'){
     const requested=requestUrl.searchParams.get('period')||'daily',period=requested==='month'?'season':requested;
     body={rows:[],period,season:period==='season'&&seasonAvailable?{id:'hob',set_id:'hob',name:'The Hobbit',set_release_date:'2026-08-14',start_date:'2026-09-10',end_date:null,established_by_day:'2026-09-19'}:null};
@@ -53,6 +53,35 @@ await page.route('**/*-draftrunapi.compute.c-5.us-east-2.aws.neon.tech/**',async
 });
 async function noOverflow(){const r=await page.evaluate(()=>({w:document.documentElement.clientWidth,s:document.documentElement.scrollWidth}));assert.ok(r.s<=r.w+1,`overflow ${r.s}>${r.w}`);}
 try{
+  if(!daily&&!cube&&!process.env.PACK1_TEST_SELECTION_VERSION){
+    const waitForEvent=async(name,start)=>{
+      for(let i=0;i<60;i++){const found=events.slice(start).find(event=>event.name===name);if(found)return found;await page.waitForTimeout(50);}
+      throw Error('Timed out waiting for '+name);
+    };
+    let start=events.length;
+    await page.goto(base+'/?utm_source=%20Reddit%20&utm_campaign=Launch_One&utm_medium=SOCIAL');
+    await page.locator('[data-daily-home]').waitFor();
+    const tagged=await waitForEvent('acquisition_touch',start),taggedUrl=new URL(page.url());
+    assert.equal(tagged.props.source,'reddit');assert.equal(tagged.props.campaign,'launch_one');assert.equal(tagged.props.medium,'social');
+    assert.equal(tagged.props.referrer_host,undefined);
+    for(const key of ['utm_source','utm_campaign','utm_medium'])assert.equal(taggedUrl.searchParams.has(key),false,'captured UTM params are removed from the address bar');
+
+    start=events.length;
+    await page.goto(base+'/?utm_source=bad.value&utm_campaign=bad%20space&utm_medium=bad!',{referer:'https://News.YCombinator.com/item?id=1'});
+    await page.locator('[data-daily-home]').waitFor();
+    const fallback=await waitForEvent('acquisition_touch',start),fallbackUrl=new URL(page.url());
+    assert.equal(fallback.props.source,'news.ycombinator.com');assert.equal(fallback.props.referrer_host,'news.ycombinator.com');
+    assert.equal(fallback.props.campaign,undefined);assert.equal(fallback.props.medium,undefined);
+    for(const key of ['utm_source','utm_campaign','utm_medium'])assert.equal(fallbackUrl.searchParams.has(key),false,'invalid UTM params are removed too');
+
+    const dst=await page.evaluate(async()=>{
+      const {dailyResetCue,nextGameDateBoundary}=await import('/game-date.mjs');
+      const before=new Date('2026-11-01T07:30:00Z'),after=new Date('2026-11-01T09:30:00Z');
+      return {before:dailyResetCue(before),after:dailyResetCue(after),boundary:nextGameDateBoundary(before).toISOString()};
+    });
+    assert.deepEqual(dst,{before:'New Dailies in 24h 30m',after:'New Dailies in 22h 30m',boundary:'2026-11-02T08:00:00.000Z'},'Pacific reset countdown follows the 25-hour fall-back day');
+  }
+
   await page.goto(base);
   await page.locator('[data-daily-home]').waitFor();
   await noOverflow();
@@ -186,6 +215,12 @@ try{
     if(round===0){const thumb=await page.locator('.run-pool-cards img').first().boundingBox(),pack=await page.locator('.run-card-select img').first().boundingBox();assert.ok(Math.abs(thumb.width/pack.width-.85)<.03,`Prior picks are about 85% of pack cards: ${thumb.width}/${pack.width}`);assert.equal(await page.locator('.run-pool-cards>button').count(),cube?2:1);await page.reload();await page.locator('.run-cards').waitFor();assert.equal(answers.length,1);}
   }
   await page.locator('.run-result-page').waitFor();assert.equal(await page.locator('.run-image-share,#run-share-image').count(),0);assert.equal(await page.locator('.run-review-list li').count(),puzzles.length);assert.match(await page.locator('.run-final-score').innerText(),new RegExp(String(snapshot().score))); assert.equal(await page.locator('.run-result-actions .button').count(),4);assert.equal(await page.locator('#home-editorial').count(),0);assert.ok(await page.getByRole('button',{name:'View your career',exact:true}).isVisible());assert.equal(await page.locator('.run-result-page .run-note').evaluate(el=>getComputedStyle(el).marginTop),'24px','result footnote retains its spacing');await noOverflow();
+  await page.locator('#post-game-progress[data-progression-loaded="1"]').waitFor();
+  if(daily){
+    await page.locator('.post-game-daily-cue').waitFor();
+    const cue=(await page.locator('.post-game-daily-cue').innerText()).trim();
+    assert.match(cue,/^New Dailies in \d+(?:h(?: \d+m)?|m) · 3-day streak$/,'completed Daily result shows reset countdown and session-based streak');
+  }else assert.equal(await page.locator('.post-game-daily-cue').count(),0,'practice results never show the next-Daily cue');
   assert.equal((await page.locator('.run-result-actions .button').first().textContent())?.trim(),daily?'Back to Dailies':cube?'Start Another Powered Cube Run':'Start Another Draft Run');assert.match(await page.locator('.run-result-page .run-note').innerText(),/other picks can earn up to 95 based on broader drafting evidence\./);
   const actionStyles=await page.locator('.run-result-actions .button').evaluateAll(nodes=>nodes.map(node=>{const style=getComputedStyle(node);return [style.display,style.alignItems,style.justifyContent];}));
   assert.ok(actionStyles.every(([display,align,justify])=>display==='flex'&&align==='center'&&justify==='center'),'Result actions use the same centered layout');
@@ -203,6 +238,8 @@ try{
     for(let i=0;i<30&&!events.some(event=>event.name==='daily_share_arrival');i++)await page.waitForTimeout(100);
     const arrivals=events.filter(event=>event.name==='daily_share_arrival');
     assert.equal(arrivals.length,1);assert.equal(arrivals[0].props.source,'result_share');assert.equal(arrivals[0].props.daily,true);
+    const resultTouches=events.filter(event=>event.name==='acquisition_touch'&&event.props.source==='result_share');
+    assert.ok(resultTouches.length>=1,'result_share still records the shared-link first-touch source independently of any sharer attribution');
   }else{
     assert.match(shared.url,new RegExp('shared='+shareId));
     await page.goto(shared.url);await page.locator('#accept-run-challenge').waitFor();assert.match(await page.locator('.run-invite').innerText(),/Play this run and compare/);await noOverflow();
