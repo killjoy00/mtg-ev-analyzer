@@ -82,7 +82,7 @@ The Admin navigation now includes **Campaign Links** at:
 
 The builder:
 
-- accepts slug, source, campaign, optional medium, and destination;
+- accepts source, campaign, optional medium, and destination; slug is optional for a tracked-only URL and required for a vanity route;
 - shows canonical normalized values;
 - shows inline validation errors;
 - previews the tracked UTM URL;
@@ -128,9 +128,23 @@ Post-merge verification passed:
 | Test | **36148542614** |
 | Browser / E2E | **36148542654** |
 
-The final E2E run completed successfully on attempt 2. The Pages deployment built and deployed the exact #518 merge revision. Production smoke successfully fetched `https://packone.pro/` and completed its production contract checks.
+Post-merge E2E run **36148542654** did not pass cleanly on its first attempt. Attempt 1 failed in the pre-existing Admin review-detail assertion at `tests/admin-e2e.mjs:39`: Playwright waited 30 seconds for exact text **Alternative card** to become visible and timed out. That assertion predates PR #518 and came from the existing Admin measurement coverage. No root cause was established. The same workflow run passed on attempt 2 without a product or test change. The intermittent review-detail failure is tracked in [issue #522](https://github.com/killjoy00/mtg-ev-analyzer/issues/522) and should not be dismissed as a harmless flake without further evidence.
+
+This was the second Admin-browser intervention during the #518 release: the earlier PR E2E failure was a deterministic selector problem in the newly added Campaign Links coverage and was fixed before merge; the post-merge failure was the separate, older review-detail timeout described above.
+
+The Pages deployment built and deployed the exact #518 merge revision. Production smoke successfully fetched `https://packone.pro/` and completed its production contract checks.
 
 This environment did not independently perform a manual browser fetch of the custom-domain `/go/reddit-launch/` route because direct custom-domain resolution was unavailable here. The release claim is instead grounded in the exact-revision Pages deployment, the committed generated route, the route-generation/unit coverage, the Admin browser contract, and the successful production smoke for the deployed site. No manual live-route check is being represented as completed.
+
+## Post-release review corrections
+
+A follow-up review identified three additional correctness/usability gaps in the #518 surface:
+
+- the detailed measurement document still incorrectly said the browser records one acquisition event per browser identity; it now states the actual best-effort multi-event behavior;
+- generated campaign-page social metadata could drift from the homepage without detection; campaign-link tests now compare homepage and generated Open Graph/Twitter title, description, and image metadata;
+- the Admin builder unnecessarily required a valid slug before producing a tracked UTM URL; tracked-only links now require only destination/source/campaign (and optional medium), while a slug remains required for the vanity URL and JSON registry entry.
+
+These corrections preserve the reviewed static publishing model and do not introduce backend, schema, DNS, credential, Cloudflare, or workflow changes.
 
 ## Scope boundary
 
@@ -196,6 +210,7 @@ This boundary is deliberate: published vanity routes remain reviewable, determin
 - The Admin builder does not write to GitHub or publish automatically.
 - Removing a registry entry and regenerating will remove that generator-owned route after deployment; old distributed links should therefore usually be preserved.
 - Acquisition capture is browser-side and best-effort; habit outcomes are based on stored Daily completions.
+- Admin browser review-detail coverage has an unresolved intermittent 30-second timeout tracked in [issue #522](https://github.com/killjoy00/mtg-ev-analyzer/issues/522). The release ultimately passed on rerun, but the cause has not been identified.
 
 ## Documentation
 
@@ -217,4 +232,4 @@ As of this closeout:
 - the Admin Campaign Links builder is part of the deployed Admin surface;
 - runtime and builder acquisition validation share one implementation;
 - no backend/database/DNS/credential/workflow migration was required;
-- no known release blocker remains.
+- no known release blocker remains; issue #522 remains open as a non-blocking CI reliability investigation.
