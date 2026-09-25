@@ -109,9 +109,9 @@ test('Apple identity tokens require Apple issuer, intended audience, nonce and s
 });
 
 test('Apple refresh tokens are encrypted at rest and first names are normalized',()=>{
-  const env={PACK1_RATE_LIMIT_SECRET:'r'.repeat(64)};
+  const env={APPLE_TOKEN_ENCRYPTION_KEY_V1:'a'.repeat(64)};
   const encrypted=encryptAppleRefreshToken('refresh-token-fixture',{env});
-  assert.match(encrypted,/^v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+  assert.match(encrypted,/^apple-token\.v1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
   assert.doesNotMatch(encrypted,/refresh-token-fixture/);
   assert.equal(decryptAppleRefreshToken(encrypted,{env}),'refresh-token-fixture');
   assert.equal(sanitizeAppleFirstName('  Ry\u0000an   Example  '),'Ry an Example');
@@ -169,7 +169,7 @@ test('account deletion revokes the encrypted Apple refresh token before marking 
     APPLE_TEAM_ID:'TEAMID1234',
     APPLE_SIGN_IN_KEY_ID:'KEYID12345',
     APPLE_SIGN_IN_KEY_P8:privateKey.export({type:'pkcs8',format:'pem'}),
-    PACK1_RATE_LIMIT_SECRET:'r'.repeat(64),
+    APPLE_TOKEN_ENCRYPTION_KEY_V1:'a'.repeat(64),
   };
   const encrypted=encryptAppleRefreshToken('refresh-token-delete-fixture',{env});
   const queries=[];
@@ -260,7 +260,7 @@ test('Apple sign in refuses to activate and link a pre-hijacked unverified passw
         APPLE_TEAM_ID:'TEAMID1234',
         APPLE_SIGN_IN_KEY_ID:'KEYID12345',
         APPLE_SIGN_IN_KEY_P8:clientKeys.privateKey.export({type:'pkcs8',format:'pem'}),
-        PACK1_RATE_LIMIT_SECRET:'r'.repeat(64),
+        APPLE_TOKEN_ENCRYPTION_KEY_V1:'a'.repeat(64),
       },
       fetcher,
       validateServicePrincipal:async()=>true,
@@ -270,4 +270,23 @@ test('Apple sign in refuses to activate and link a pre-hijacked unverified passw
   assert.equal(tokenExchangeCalls,1);
   assert.equal(queries.some(row=>row.sql.includes('INSERT INTO apple_auth_identities')),false);
   assert.equal(queries.some(row=>row.sql.includes('UPDATE neon_auth."user"')),false);
+});
+
+
+test('Apple token encryption requires its dedicated versioned key and ignores rate-limit key rotation',()=>{
+  const token='refresh-token-key-separation';
+  const envA={
+    APPLE_TOKEN_ENCRYPTION_KEY_V1:'1'.repeat(64),
+    PACK1_RATE_LIMIT_SECRET:'a'.repeat(64),
+  };
+  const envB={
+    APPLE_TOKEN_ENCRYPTION_KEY_V1:'1'.repeat(64),
+    PACK1_RATE_LIMIT_SECRET:'b'.repeat(64),
+  };
+  const encrypted=encryptAppleRefreshToken(token,{env:envA});
+  assert.equal(decryptAppleRefreshToken(encrypted,{env:envB}),token);
+  assert.throws(
+    ()=>decryptAppleRefreshToken(encrypted,{env:{PACK1_RATE_LIMIT_SECRET:'a'.repeat(64)}}),
+    error=>error?.code==='APPLE_TOKEN_STORAGE',
+  );
 });
