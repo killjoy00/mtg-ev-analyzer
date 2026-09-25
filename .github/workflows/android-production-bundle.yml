@@ -52,6 +52,13 @@ jobs:
             grep -n "versionCode" android/app/build.gradle >&2 || true
             exit 1
           }
+          expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
+          if ! grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle && ! grep -Fq "versionName '$expected_version_name'" android/app/build.gradle; then
+            echo "Generated Android project does not contain versionName $expected_version_name." >&2
+            grep -n "versionName" android/app/build.gradle >&2 || true
+            exit 1
+          fi
+          echo "Verified Android versionName: $expected_version_name"
       - name: Build release app bundle
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon

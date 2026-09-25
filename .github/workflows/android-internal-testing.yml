@@ -6,11 +6,6 @@ on:
     paths:
       - 'mobile/**'
       - '.github/workflows/android-internal-testing.yml'
-  push:
-    branches:
-      - 'chatgpt/pack-one-mobile-v2-android-internal-testing'
-    paths:
-      - '.github/android-internal-test-request.txt'
   workflow_dispatch:
 
 permissions:
@@ -61,6 +56,13 @@ jobs:
             grep -n "versionCode" android/app/build.gradle >&2 || true
             exit 1
           }
+          expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
+          if ! grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle && ! grep -Fq "versionName '$expected_version_name'" android/app/build.gradle; then
+            echo "Generated Android project does not contain versionName $expected_version_name." >&2
+            grep -n "versionName" android/app/build.gradle >&2 || true
+            exit 1
+          fi
+          echo "Verified Android versionName: $expected_version_name"
       - name: Apply upload-signing configuration
         env:
           PACKONE_ANDROID_UPLOAD_KEYSTORE: /tmp/packone-upload.p12
@@ -76,13 +78,27 @@ jobs:
 
   internal-release:
     name: sign and publish Android internal test
-    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
     defaults:
       run:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Store operations are allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
       - uses: actions/setup-node@v4
         with:
           node-version: 24
@@ -170,6 +186,13 @@ jobs:
             grep -n "versionCode" android/app/build.gradle >&2 || true
             exit 1
           }
+          expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
+          if ! grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle && ! grep -Fq "versionName '$expected_version_name'" android/app/build.gradle; then
+            echo "Generated Android project does not contain versionName $expected_version_name." >&2
+            grep -n "versionName" android/app/build.gradle >&2 || true
+            exit 1
+          fi
+          echo "Verified Android versionName: $expected_version_name"
       - name: Apply Pack One upload signing
         run: node ./scripts/configure-android-upload-signing.mjs
       - name: Build signed production bundle
