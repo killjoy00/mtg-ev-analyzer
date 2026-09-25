@@ -16,6 +16,7 @@ import {
   decryptAppleRefreshToken,
   encryptAppleRefreshToken,
   resetAppleKeyCache,
+  revokeAppleAuthorization,
   sanitizeAppleFirstName,
   verifyAppleIdentityToken,
 } from '../worker/apple-auth.mjs';
@@ -147,4 +148,55 @@ test('unknown Apple signing keys force one JWKS refresh for key rotation',async(
   });
   assert.equal(verified.subject,'apple-rotated-subject');
   assert.equal(calls,2);
+});
+
+
+test('Apple configuration fails closed without the explicit Key ID secret',()=>{
+  const {privateKey}=generateKeyPairSync('ec',{namedCurve:'P-256'});
+  assert.throws(
+    ()=>createAppleClientSecret(APPLE_NATIVE_CLIENT_ID,{env:{
+      APPLE_TEAM_ID:'TEAMID1234',
+      APPLE_SIGN_IN_KEY_P8:privateKey.export({type:'pkcs8',format:'pem'}),
+    }}),
+    error=>error?.code==='APPLE_CONFIG',
+  );
+});
+
+test('account deletion revokes the encrypted Apple refresh token before marking it revoked',async()=>{
+  const {privateKey}=generateKeyPairSync('ec',{namedCurve:'P-256'});
+  const env={
+    APPLE_TEAM_ID:'TEAMID1234',
+    APPLE_SIGN_IN_KEY_ID:'KEYID12345',
+    APPLE_SIGN_IN_KEY_P8:privateKey.export({type:'pkcs8',format:'pem'}),
+    PACK1_RATE_LIMIT_SECRET:'r'.repeat(64),
+  };
+  const encrypted=encryptAppleRefreshToken('refresh-token-delete-fixture',{env});
+  const queries=[];
+  const query=async(sql,params=[])=>{
+    queries.push({sql,params});
+    if(sql.includes('FROM apple_auth_tokens t'))
+      return {rows:[{
+        apple_subject:'apple-delete-subject',
+        client_id:APPLE_NATIVE_CLIENT_ID,
+        refresh_token_ciphertext:encrypted,
+      }],rowCount:1};
+    if(sql.startsWith('UPDATE apple_auth_tokens SET revoked_at='))
+      return {rows:[],rowCount:1};
+    throw Error('Unexpected SQL: '+sql);
+  };
+  let revokeBody=null;
+  const fetcher=async(url,options={})=>{
+    assert.equal(String(url),'https://appleid.apple.com/auth/revoke');
+    revokeBody=new URLSearchParams(String(options.body||''));
+    return Response.json({}, {status:200});
+  };
+  const result=await revokeAppleAuthorization(query,'11111111-1111-4111-8111-111111111111',{env,fetcher});
+  assert.deepEqual(result,{kind:'success',revoked:1});
+  assert.equal(revokeBody.get('client_id'),APPLE_NATIVE_CLIENT_ID);
+  assert.equal(revokeBody.get('token'),'refresh-token-delete-fixture');
+  assert.equal(revokeBody.get('token_type_hint'),'refresh_token');
+  assert.match(revokeBody.get('client_secret')||'',/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/);
+  const update=queries.find(row=>row.sql.startsWith('UPDATE apple_auth_tokens SET revoked_at='));
+  assert.ok(update,'authorization is marked revoked only after Apple accepts the revoke request');
+  assert.deepEqual(update.params,['apple-delete-subject',APPLE_NATIVE_CLIENT_ID]);
 });
