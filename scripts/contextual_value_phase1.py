@@ -17,7 +17,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from contextual_value.archive import ArchiveSignalProvider, GameStore, load_decisions
+from contextual_value.archive import (
+    ArchiveSignalProvider,
+    GameStore,
+    limit_decisions,
+    load_decisions,
+)
 from contextual_value.pipeline import run_development
 from contextual_value.schema import inspect_archive, write_manifest
 
@@ -31,8 +36,20 @@ def _write_predictions(path: Path, predictions) -> None:
 
 def parse_args(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--draft-archive", required=True, type=Path)
-    parser.add_argument("--game-archive", required=True, type=Path)
+    parser.add_argument(
+        "--draft-archive",
+        required=True,
+        action="append",
+        type=Path,
+        help="repeat once per Premier environment",
+    )
+    parser.add_argument(
+        "--game-archive",
+        required=True,
+        action="append",
+        type=Path,
+        help="repeat in the same environment order as --draft-archive",
+    )
     parser.add_argument("--out", type=Path, default=Path("results/contextual-value-v1"))
     parser.add_argument("--max-drafts", type=int,
                         help="deterministic development cap for smoke runs; omit for full archive")
@@ -46,13 +63,29 @@ def parse_args(argv=None):
 
 def main(argv=None):
     args = parse_args(argv)
-    draft_manifest = inspect_archive(args.draft_archive, "draft")
-    game_manifest = inspect_archive(args.game_archive, "game")
-    decisions = load_decisions(args.draft_archive, max_drafts=args.max_drafts)
+    if len(args.draft_archive) != len(args.game_archive):
+        raise SystemExit("--draft-archive and --game-archive counts must match")
+    manifests = []
+    decisions = []
+    draft_source = {}
+    for draft_archive, game_archive in zip(args.draft_archive, args.game_archive):
+        manifests.append(inspect_archive(draft_archive, "draft"))
+        manifests.append(inspect_archive(game_archive, "game"))
+        current = load_decisions(draft_archive)
+        current_ids = {row.draft_id for row in current}
+        overlap = current_ids & set(draft_source)
+        if overlap:
+            raise SystemExit(
+                f"draft archives contain duplicate draft IDs: {sorted(overlap)[:3]}"
+            )
+        for draft_id in current_ids:
+            draft_source[draft_id] = str(draft_archive)
+        decisions.extend(current)
+    decisions = limit_decisions(decisions, args.max_drafts)
     if not decisions:
-        raise SystemExit("draft archive produced no eligible broad-population decisions")
+        raise SystemExit("draft archives produced no eligible broad-population decisions")
     draft_ids = frozenset(row.draft_id for row in decisions)
-    games = GameStore.from_archive(args.game_archive, draft_ids)
+    games = GameStore.from_archives(args.game_archive, draft_ids)
     if not games.drafts:
         raise SystemExit("no eligible draft IDs matched the game archive")
 
@@ -68,7 +101,7 @@ def main(argv=None):
     )
 
     args.out.mkdir(parents=True, exist_ok=True)
-    write_manifest([draft_manifest, game_manifest], args.out / "archive-manifest.json")
+    write_manifest(manifests, args.out / "archive-manifest.json")
     (args.out / "development-report.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

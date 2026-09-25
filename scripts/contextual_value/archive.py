@@ -50,6 +50,29 @@ def _pick_example(decision: Decision) -> PickExample:
     )
 
 
+def limit_decisions(
+    decisions: Sequence[Decision],
+    max_drafts: int | None,
+) -> list[Decision]:
+    if max_drafts is None:
+        return sorted(
+            decisions,
+            key=lambda item: (item.draft_id, item.pack_number, item.pick_number),
+        )
+    if max_drafts <= 0:
+        raise ValueError("max_drafts must be positive")
+    draft_ids = {decision.draft_id for decision in decisions}
+    ordered = sorted(
+        draft_ids,
+        key=lambda draft_id: stable_score(f"contextual-value-v1-sample:{draft_id}"),
+    )
+    keep = set(ordered[:max_drafts])
+    return sorted(
+        (decision for decision in decisions if decision.draft_id in keep),
+        key=lambda item: (item.draft_id, item.pack_number, item.pick_number),
+    )
+
+
 def load_decisions(
     archive: Path,
     *,
@@ -98,19 +121,7 @@ def load_decisions(
             decisions[decision.decision_id] = decision
             by_draft[decision.draft_id].append(decision.decision_id)
 
-    keep = set(by_draft)
-    if max_drafts is not None:
-        if max_drafts <= 0:
-            raise ValueError("max_drafts must be positive")
-        ordered = sorted(
-            keep,
-            key=lambda draft_id: stable_score(f"contextual-value-v1-sample:{draft_id}"),
-        )
-        keep = set(ordered[:max_drafts])
-    return sorted(
-        (decision for decision in decisions.values() if decision.draft_id in keep),
-        key=lambda item: (item.draft_id, item.pack_number, item.pick_number),
-    )
+    return limit_decisions(list(decisions.values()), max_drafts)
 
 
 @dataclass
@@ -197,6 +208,24 @@ class GameStore:
                     counts[f"{key}_games"] += 1
                     counts[f"{key}_wins"] += won
         return cls(drafts)
+
+    @classmethod
+    def from_archives(
+        cls,
+        archives: Sequence[Path],
+        keep_ids: Iterable[str],
+    ) -> "GameStore":
+        combined: dict[str, GameDraftSummary] = {}
+        keep = set(keep_ids)
+        for archive in archives:
+            current = cls.from_archive(archive, keep)
+            overlap = set(combined) & set(current.drafts)
+            if overlap:
+                raise ValueError(
+                    f"game archives contain duplicate draft IDs: {sorted(overlap)[:3]}"
+                )
+            combined.update(current.drafts)
+        return cls(combined)
 
     def _ids(self, training_ids: frozenset[str]) -> list[str]:
         return sorted(draft_id for draft_id in training_ids if draft_id in self.drafts)

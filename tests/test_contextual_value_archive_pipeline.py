@@ -134,6 +134,26 @@ class ArchiveSignalTests(unittest.TestCase):
         self.assertIsNotNone(signals["A"].ata)
         self.assertIsNotNone(signals["A"].alsa)
 
+    def test_multiple_game_archives_merge_only_disjoint_drafts(self):
+        temp, _, game_path, draft_ids = self._fixtures()
+        self.addCleanup(temp.cleanup)
+        roots = [Path(temp.name) / "game-a.csv", Path(temp.name) / "game-b.csv"]
+        outputs = [path.open("w", newline="", encoding="utf-8") for path in roots]
+        try:
+            writers = [csv.DictWriter(handle, fieldnames=GAME_HEADER) for handle in outputs]
+            for writer in writers:
+                writer.writeheader()
+            with game_path.open("r", newline="", encoding="utf-8") as source:
+                for row in csv.DictReader(source):
+                    target = 0 if row["draft_id"] in set(draft_ids[:4]) else 1
+                    writers[target].writerow(row)
+        finally:
+            for handle in outputs:
+                handle.close()
+
+        games = GameStore.from_archives(roots, draft_ids)
+        self.assertEqual(set(games.drafts), set(draft_ids))
+
     def test_game_archive_without_main_colors_fails_closed(self):
         temp, _, game_path, draft_ids = self._fixtures()
         self.addCleanup(temp.cleanup)
