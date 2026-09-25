@@ -28,9 +28,13 @@ test('guest Daily results offer score validation instead of a career action', as
   assert.match(result, /Choose username to add score/);
   assert.match(result, /validateDailyRunId:run\.id/);
   assert.match(result, /source:'daily_result'/);
-  assert.match(source, /Sign in after the run to add this score to the leaderboard/);
+  assert.match(source, /run-ranking-state is-quiet/);
+  assert.match(source, /Playing as guest\.<\/p>/);
+  assert.match(source, /Sign in to add this score to the leaderboard/);
   assert.match(source, /This Daily isn’t ranked yet/);
   assert.match(source, /username_taken/);
+  const css = await readFile('draft-run.css', 'utf8');
+  assert.match(css, /\.run-ranking-state\.is-quiet\{[^}]*font-size:12px;[^}]*border-left:0;[^}]*padding:0/);
 });
 
 test('Draft Run reveal puts continuation before disclosures and restores result focus', async () => {
