@@ -118,6 +118,7 @@ Use it as a longer-horizon behavior marker, not as a fixed conversion rate.
 | Label | Meaning |
 | --- | --- |
 | `result_share` | First touch came through the marked Daily result-share path. |
+| `daily_board_share` | First touch came through the completed three-Daily board share. |
 | `pre_tracking` | The person had Pack One activity before acquisition tracking began. |
 | `direct` | First observed after tracking began, but no campaign/referrer source was captured. |
 | External hostname | First touch came from an external referring site without a UTM source. |
@@ -162,6 +163,8 @@ Use the habit cohorts to ask:
 
 Do not expect the new acquisition logic to rewrite the existing result-share funnel.
 
+`daily_board_share` is intentionally separate from that funnel. Read completed-board shares in the first-touch acquisition and Daily-habit cohorts so their downstream behavior can be compared with `result_share` without changing the established result-share definition.
+
 ## 7. Understand the new player-facing streak cue
 
 Players do not need to configure anything.
@@ -203,6 +206,7 @@ Before posting a tracked link:
 - choose one stable `utm_source`;
 - choose one stable `utm_campaign`;
 - optionally add `utm_medium`;
+- choose the landing destination that matches the creative: homepage for broad explanation, or a specific Daily for high-intent/formatted posts;
 - use canonical acquisition values 1–40 characters long that match `/^[a-z0-9][a-z0-9_-]{0,39}$/`;
 - use no personal information;
 - open the link once and confirm Pack One loads normally;
