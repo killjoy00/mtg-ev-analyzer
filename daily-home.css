@@ -45,7 +45,7 @@
 .daily-home-practice.is-practice-handoff h2{margin-bottom:8px}
 .daily-home-practice.is-practice-handoff p:not(.eyebrow){margin:0;color:var(--muted)}
 .daily-home-practice.is-practice-handoff .button{flex:0 0 auto;min-width:150px;margin:0}
-.daily-home-share-status{flex-basis:100%;min-height:1.2em;margin:0;color:var(--muted);font-size:12px}
+.daily-home-practice .daily-home-share-status{flex-basis:100%;min-height:1.2em;margin:0;color:var(--muted);font-size:12px}
 .app:has(> .daily-home){padding-bottom:16px}
 .app:has(> .daily-home)+.ad-slot[data-ad-slot="home"]{margin-top:8px}
 @media(max-width:600px){
