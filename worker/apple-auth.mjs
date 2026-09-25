@@ -79,8 +79,8 @@ export function createAppleClientSecret(clientId,{env=process.env,now=Math.floor
   return body+'.'+base64url(signature);
 }
 
-async function appleKeys(fetcher=fetch) {
-  if(keyCache.keys.length&&Date.now()-keyCache.at<60*60*1000)return keyCache.keys;
+async function appleKeys(fetcher=fetch,{force=false}={}) {
+  if(!force&&keyCache.keys.length&&Date.now()-keyCache.at<60*60*1000)return keyCache.keys;
   const response=await fetcher(APPLE_KEYS_ENDPOINT,{headers:{accept:'application/json'},signal:AbortSignal.timeout(10000)});
   if(!response.ok)throw Object.assign(Error('Apple identity verification is temporarily unavailable.'),{status:503,code:'APPLE_KEYS'});
   const data=await response.json().catch(()=>({}));
@@ -98,7 +98,12 @@ export async function verifyAppleIdentityToken(token,{clientId,nonce=null,fetche
   const parsed=parseJwt(token);
   if(parsed.header?.alg!=='RS256'||!parsed.header?.kid)
     throw Object.assign(Error('Apple identity token is invalid.'),{status:401,code:'APPLE_TOKEN_INVALID'});
-  const jwk=(await appleKeys(fetcher)).find(key=>key?.kid===parsed.header.kid&&key?.kty==='RSA');
+  let keys=await appleKeys(fetcher);
+  let jwk=keys.find(key=>key?.kid===parsed.header.kid&&key?.kty==='RSA');
+  if(!jwk) {
+    keys=await appleKeys(fetcher,{force:true});
+    jwk=keys.find(key=>key?.kid===parsed.header.kid&&key?.kty==='RSA');
+  }
   if(!jwk)throw Object.assign(Error('Apple identity token signing key is unavailable.'),{status:503,code:'APPLE_KEYS'});
   let verified=false;
   try {
