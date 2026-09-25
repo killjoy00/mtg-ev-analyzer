@@ -340,6 +340,7 @@ export async function resumeAccountAuth(status) {
       const clean=new URL(location.href);
       clean.searchParams.delete('auth');
       clean.searchParams.delete('appleDeleteHandoff');
+  clean.searchParams.delete('appleErrorCode');
       history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
       event('account_delete_apple_verification_failed',{source:flow.source||'account'});
       return renderAccount({source:flow.source||'account',notice:'Apple verification did not finish. Your account was not deleted.'});
@@ -382,7 +383,10 @@ export async function resumeAccountAuth(status) {
     }
   } else if(status==='apple-error') {
     event('auth_apple_failed',{source});
-    failure={provider:'apple',message:'Apple sign in did not finish. Please try again.'};
+    const appleErrorCode=new URL(location.href).searchParams.get('appleErrorCode');
+    failure={provider:'apple',message:appleErrorCode==='APPLE_EXISTING_ACCOUNT_UNVERIFIED'
+      ? 'An unverified Pack One account already uses this email. Reset its password from that inbox, verify the account, then try Apple again.'
+      : 'Apple sign in did not finish. Please try again.'};
   } else {
     event('auth_google_failed',{source});
     failure={provider:'google',message:'Google sign in did not finish. Please try again.'};
