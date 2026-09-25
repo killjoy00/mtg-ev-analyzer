@@ -100,10 +100,16 @@ jobs:
           DELETION_ADMIN_EMAIL_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL != '' }}
           DELETION_ADMIN_PASSWORD_PRESENT: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD != '' }}
           DELETE_EMAIL_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
+          APPLE_TEAM_ID_PRESENT: ${{ secrets.APPLE_TEAM_ID != '' }}
+          APPLE_SIGN_IN_KEY_ID_PRESENT: ${{ secrets.APPLE_SIGN_IN_KEY_ID != '' }}
+          APPLE_SIGN_IN_KEY_P8_PRESENT: ${{ secrets.APPLE_SIGN_IN_KEY_P8 != '' }}
         run: |
           set -euo pipefail
           [[ "$RATE_LIMIT_SECRET_PRESENT" == true ]] || { echo '::error::PACK1_RATE_LIMIT_SECRET is not provisioned.'; exit 1; }
           [[ "$DELETION_ADMIN_EMAIL_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is not provisioned.'; exit 1; }
           [[ "$DELETION_ADMIN_PASSWORD_PRESENT" == true ]] || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is not provisioned.'; exit 1; }
           [[ "$DELETE_EMAIL_KEY" == re_* && ${#DELETE_EMAIL_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is not provisioned or is malformed.'; exit 1; }
+          [[ "$APPLE_TEAM_ID_PRESENT" == true ]] || { echo '::error::APPLE_TEAM_ID is not provisioned.'; exit 1; }
+          [[ "$APPLE_SIGN_IN_KEY_ID_PRESENT" == true ]] || { echo '::error::APPLE_SIGN_IN_KEY_ID is not provisioned.'; exit 1; }
+          [[ "$APPLE_SIGN_IN_KEY_P8_PRESENT" == true ]] || { echo '::error::APPLE_SIGN_IN_KEY_P8 is not provisioned.'; exit 1; }
 
