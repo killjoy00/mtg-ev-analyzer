@@ -2,6 +2,7 @@ name: mobile
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     paths:
       - 'mobile/**'
       - 'docs/mobile-**'
@@ -17,6 +18,10 @@ on:
 
 permissions:
   contents: read
+
+concurrency:
+  group: mobile-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 jobs:
   validate:
