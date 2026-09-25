@@ -116,3 +116,25 @@ correctness failures, a 1% overall request-error ceiling, 50,000-request maximum
 limit and a two-hour branch expiry. Confirmed-idle browser timing is a separate
 acceptance record; a warm-up is not labeled a cold start. Three warm browser
 samples per case provide a regression signal, not a stable population p95.
+
+## Distributed acceptance
+
+The distributed workflow uses five independent runners for 25 actors, then
+20 runners for 100/500/1,000 actors. All use real outbound addresses. Private
+preview health responses attest the Cloudflare-observed network with the
+preview-only HMAC; production never returns this field. The collector verifies
+the expected distinct egress count and reports only that count. Attestations
+and fixture credentials are authenticated-encrypted with a workflow-specific
+key before entering artifacts; raw credentials and network digests are not
+logged. Each stage uses fresh fixture identities, with no quota reset.
+
+Arrivals share a future timestamp across runners. A generator arriving over
+five seconds late fails the stage, so runner scheduling cannot quietly reduce
+measured concurrency. The collector combines route samples, applies the
+predeclared budgets, and permits the next stage only after a pass. Incomplete
+reports, mismatched code revisions, duplicate egress, correctness errors or
+unexpected 429s fail closed. Cleanup runs after the final reached stage.
+
+This is distributed load across 5 or 20 actual networks, not one unique address
+per actor. Fixture preparation adds 2,000 accounts and 180,000 synthetic history
+rows only to the disposable branch. The production gateway is never a target.
