@@ -330,6 +330,41 @@ export async function changeAccountPassword({currentPassword,newPassword}) {
   clearLegacyAuth();
   return data;
 }
+export async function startAppleDeletionVerification() {
+  if(!firstPartyAuthEnabled())throw new Error('Account deletion requires the secure account session.');
+  await ensureMigrations();
+  const data=await api('/v1/account/delete/apple/start',{
+    method:'POST',
+    body:{confirm:true},
+    auth:false,
+  });
+  let target=null;
+  try {target=new URL(String(data?.url||''));} catch {}
+  if(!target||target.protocol!=='https:'||target.hostname!=='appleid.apple.com')
+    throw new Error('Apple verification is temporarily unavailable.');
+  location.assign(target.toString());
+}
+
+export async function completeAppleDeletion() {
+  if(!firstPartyAuthEnabled())throw new Error('Account deletion requires the secure account session.');
+  const handoff=new URL(location.href).searchParams.get('appleDeleteHandoff');
+  if(!handoff)throw new Error('Apple verification did not return a deletion proof.');
+  await ensureMigrations();
+  const data=await api('/v1/account/delete/apple/finish',{
+    method:'POST',
+    body:{confirm:true,handoffToken:handoff},
+    auth:false,
+  });
+  identityRetired=true;
+  sessionPromise=null;
+  migrationPromise=null;
+  clearLegacyAuth();
+  try {
+    for(const key of [TOKEN_KEY,NAME_KEY,'pack1-game-history-v2','pack1-daily-history-v1'])localStorage.removeItem(key);
+  } catch {}
+  return data;
+}
+
 export async function startAccountDeletionVerification() {
   if(!firstPartyAuthEnabled())throw new Error('Account deletion requires the secure account session.');
   await ensureMigrations();
