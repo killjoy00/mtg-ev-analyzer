@@ -1,0 +1,59 @@
+name: contextual-value-live-smoke
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-live-smoke-529
+
+permissions:
+  contents: read
+
+jobs:
+  tmt-validation-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download official 17Lands TMT Premier archives
+        run: |
+          mkdir -p raw-data results/contextual-value-v1-tmt-smoke
+          curl --fail --location --retry 5 --retry-delay 3 --max-time 1800 \
+            --output raw-data/draft_data_public.TMT.PremierDraft.csv.gz \
+            https://17lands-public.s3.amazonaws.com/analysis_data/draft_data/draft_data_public.TMT.PremierDraft.csv.gz
+          curl --fail --location --retry 5 --retry-delay 3 --max-time 1800 \
+            --output raw-data/game_data_public.TMT.PremierDraft.csv.gz \
+            https://17lands-public.s3.amazonaws.com/analysis_data/game_data/game_data_public.TMT.PremierDraft.csv.gz
+      - name: Run contextual-value-v1 development validation smoke
+        run: |
+          python scripts/contextual_value_phase1.py \
+            --draft-archive raw-data/draft_data_public.TMT.PremierDraft.csv.gz \
+            --game-archive raw-data/game_data_public.TMT.PremierDraft.csv.gz \
+            --max-drafts 1000 \
+            --nuisance-folds 5 \
+            --inner-feature-folds 5 \
+            --out results/contextual-value-v1-tmt-smoke
+      - name: Verify assessment stayed locked and print validation summary
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          report = json.loads(Path('results/contextual-value-v1-tmt-smoke/development-report.json').read_text())
+          assert report['assessment_opened'] is False
+          print(json.dumps({
+              'drafts': report['drafts'],
+              'simple_blend': report['models']['E_simple_behavior_outcome_blend']['selected_validation_config'],
+              'contextual_temperature': report['models']['G_contextual_value']['selected_validation_temperature'],
+              'A_cap20': report['models']['A_current_v4_strong_player']['20'],
+              'F_cap20': report['models']['F_direct_q']['20'],
+              'G_cap20': report['models']['G_contextual_value']['selected_estimates']['20'],
+          }, indent=2, sort_keys=True))
+          PY
+      - name: Upload smoke artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-tmt-smoke
+          path: results/contextual-value-v1-tmt-smoke/
+          retention-days: 14
