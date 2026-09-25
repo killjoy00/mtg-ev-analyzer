@@ -1,0 +1,75 @@
+{
+  "date": "2026-09-19",
+  "public_linking": true,
+  "public_release": "053541429b7adf01168eb27b344204e706ca67f9",
+  "public_activation_checks": {
+    "unit": 35461794211,
+    "browser": 35461794231,
+    "development": 35462022892,
+    "production": 35462227708,
+    "reconciliation": 35461859312
+  },
+  "real_member_check": {
+    "first_connection_utc": "2026-09-19T18:32:15.826Z",
+    "reconnected_utc": "2026-09-19T18:35:16.324Z",
+    "membership_status": "active_patron",
+    "campaign": "16808916",
+    "tier": "29631843",
+    "capabilities": [
+      "custom_corpus",
+      "unlimited_cube_practice"
+    ],
+    "custom_practice": {
+      "completed": true,
+      "selected_set_count": 3,
+      "distinct_source_drafts": 8,
+      "only_selected_sets": true
+    },
+    "sync": {
+      "last_synced_at": "2026-09-19T18:39:06.614Z",
+      "pages": 1,
+      "linked": 1,
+      "applied": 1,
+      "superseded": 0
+    }
+  },
+  "boundaries": {
+    "supporter_premium_denial": "automated exact-tier coverage",
+    "real_billing_transition_observed": false,
+    "actual_signed_provider_webhook_observed": false,
+    "unsigned_webhook_http_status": 401
+  },
+  "followup_release": {
+    "sha": "4cd16f4e1d2cd0aa95885222b0d48d9cc6b216c5",
+    "pr": 163,
+    "unit": 35462928388,
+    "browser": 35462928378,
+    "isolated_database": 35462928376,
+    "development": 35463356101,
+    "production": 35463480967,
+    "functions": [
+      {
+        "slug": "draftrunapi",
+        "deployment": 26,
+        "status": "completed"
+      },
+      {
+        "slug": "pack1api",
+        "deployment": 20,
+        "status": "completed"
+      },
+      {
+        "slug": "pack1growth",
+        "deployment": 17,
+        "status": "completed"
+      }
+    ],
+    "google_ads_enabled": false,
+    "ad_free_tiers": [
+      "29631835",
+      "29631843"
+    ],
+    "unknown_membership_suppresses_ads": true,
+    "live_preview_bypass_blocked": true
+  }
+}

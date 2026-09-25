@@ -1,0 +1,95 @@
+name: Traditional inventory Phase 1
+on:
+  pull_request:
+    paths:
+      - 'scripts/traditional_inventory_phase1.py'
+      - '.github/workflows/traditional-inventory-phase1.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: traditional-inventory-phase1-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      max-parallel: 12
+      matrix:
+        set:
+          - hob
+          - msh
+          - sos
+          - tmt
+          - ecl
+          - tla
+          - eoe
+          - fin
+          - tdm
+          - dft
+          - fdn
+          - dsk
+          - blb
+          - mh3
+          - otj
+          - mkm
+          - lci
+          - woe
+          - ltr
+          - mom
+          - one
+          - bro
+          - dmu
+          - snc
+          - neo
+          - vow
+          - mid
+          - ktk
+          - hbg
+          - pio
+          - powered-cube
+          - sir
+          - stx
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate reused cohort logic
+        run: python -m unittest discover -s tests -p test_format_research.py
+      - name: Inventory Traditional source
+        run: python -u scripts/traditional_inventory_phase1.py --set "${{ matrix.set }}" --out "generated/traditional-inventory/${{ matrix.set }}/result.json"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traditional-inventory-${{ matrix.set }}
+          retention-days: 90
+          path: generated/traditional-inventory/${{ matrix.set }}/result.json
+  report:
+    needs: measure
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: traditional-inventory-*
+          path: generated/traditional-inventory
+      - name: Consolidate Phase 1 matrix
+        run: |
+          mapfile -t results < <(find generated/traditional-inventory -name result.json | sort)
+          python scripts/traditional_inventory_phase1.py --summarize "${results[@]}" \
+            --out-json generated/traditional-inventory/report.json \
+            --out-md generated/traditional-inventory/report.md
+      - uses: actions/upload-artifact@v4
+        with:
+          name: traditional-inventory-phase1-report
+          retention-days: 90
+          path: |
+            generated/traditional-inventory/report.json
+            generated/traditional-inventory/report.md

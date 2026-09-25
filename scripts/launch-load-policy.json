@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "supported_launch_target": 25,
+  "nat_stages": [25, 50, 100],
+  "distributed_stages": [25, 100, 500, 1000],
+  "ramp_seconds": 15,
+  "think_time_ms": [3000, 8000],
+  "stage_deadline_seconds": 180,
+  "maximum_requests": 50000,
+  "maximum_test_minutes": 20,
+  "maximum_compute_cu": 8,
+  "maximum_error_fraction": 0.01,
+  "maximum_legitimate_429s": 0,
+  "maximum_correctness_failures": 0,
+  "route_budgets_ms": {
+    "session": {"p95": 2000, "p99": 5000},
+    "start": {"p95": 2000, "p99": 8000},
+    "view": {"p95": 1000, "p99": 3000},
+    "pick": {"p95": 2000, "p99": 5000},
+    "reroll": {"p95": 2000, "p99": 5000},
+    "read": {"p95": 2000, "p99": 5000}
+  }
+}

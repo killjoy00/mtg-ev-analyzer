@@ -1,0 +1,1 @@
+{"operation":"deploy-secure-auth","reason":"Release mobile auth schema from reviewed main 5d276b0810317cd3082ebd97cc875de8a3113fe5: apply 0037_mobile_oauth_handoffs through the guarded development-to-production secure-auth release and deploy the exact revision."}

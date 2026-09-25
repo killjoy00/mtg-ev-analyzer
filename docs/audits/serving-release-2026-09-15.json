@@ -1,0 +1,935 @@
+{
+  "ci": {
+    "hydrated_javascript": 130,
+    "local_javascript": 127,
+    "operations": {
+      "browser": 34920415640,
+      "test": 34920415843
+    },
+    "python": 72,
+    "statistics": {
+      "browser": 34919648093,
+      "isolated_database": 34919648130,
+      "test": 34919648053
+    }
+  },
+  "deleted_branch": {
+    "absence_verified": true,
+    "branch_id": "br-old-base-aybckkbe",
+    "name": "review-eight-picks-20260914",
+    "project_id": "patient-shadow-91417882",
+    "restorable_copy_retained": false,
+    "user_approved": true
+  },
+  "deployments": [
+    {
+      "deployment": 21,
+      "environment": "development",
+      "slug": "draftrunapi",
+      "status": "completed"
+    },
+    {
+      "deployment": 5,
+      "environment": "development",
+      "slug": "pack1growth",
+      "status": "completed"
+    },
+    {
+      "deployment": 4,
+      "environment": "development",
+      "slug": "pack1api",
+      "status": "completed"
+    },
+    {
+      "deployment": 17,
+      "environment": "production",
+      "slug": "draftrunapi",
+      "status": "completed"
+    },
+    {
+      "deployment": 8,
+      "environment": "production",
+      "slug": "pack1growth",
+      "status": "completed"
+    },
+    {
+      "deployment": 11,
+      "environment": "production",
+      "slug": "pack1api",
+      "status": "completed"
+    }
+  ],
+  "development_http": {
+    "branch": "br-twilight-hill-ayffyd2b",
+    "commit": "ae0122f05a09de4972051cfa7350137f56eb3906",
+    "timings": [
+      {
+        "ms": 6345,
+        "path": "/health?quick=1",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 6567,
+        "path": "/health?quick=1",
+        "service": "pack1growth"
+      },
+      {
+        "ms": 7391,
+        "path": "/health?quick=1",
+        "service": "pack1api"
+      },
+      {
+        "ms": 10273,
+        "path": "/health",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 6283,
+        "path": "/v1/events",
+        "service": "pack1growth"
+      },
+      {
+        "ms": 7212,
+        "path": "/v1/session",
+        "service": "pack1growth"
+      },
+      {
+        "ms": 10371,
+        "path": "/v1/runs",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 320,
+        "path": "/v1/runs/<qa>/reroll",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 209,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 252,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 255,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 272,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 280,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 504,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 237,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 284,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 197,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 240,
+        "path": "/v1/runs/<qa>/share",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 6335,
+        "path": "/v1/challenges/<qa>",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 7342,
+        "path": "/v1/runs",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 7831,
+        "path": "/v1/runs",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 220,
+        "path": "/v1/runs/<qa>/reroll",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 204,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 249,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 252,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 252,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 250,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 255,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 221,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 251,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 231,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 242,
+        "path": "/v1/runs/<qa>/share",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 8087,
+        "path": "/v1/challenges/<qa>",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 6784,
+        "path": "/v1/runs",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 7311,
+        "path": "/health?quick=1",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 6879,
+        "path": "/health?quick=1",
+        "service": "pack1growth"
+      },
+      {
+        "ms": 6455,
+        "path": "/health?quick=1",
+        "service": "pack1api"
+      }
+    ]
+  },
+  "excluded_attempts": [
+    {
+      "environment": "development",
+      "reason": "Image workflow replaced reviewed deployment 19 with unmarked deployment 20 during the original 34-request acceptance; restored reviewed bundle as deployment 21 and repeated stronger acceptance."
+    },
+    {
+      "environment": "production",
+      "reason": "First acceptance stopped at initial pack1growth marker: preceding revision still served during deployment propagation. No QA sessions were created in that attempt."
+    }
+  ],
+  "image_workflow": {
+    "first_attempt": "Correctly blocked mixed revisions before publishing remote images.",
+    "guarded_run": 34920585273,
+    "legacy_failure": "Ten-pick HTTP loop read a ninth puzzle after eight-pick completion; development image refresh changed zero cards/puzzles; production image steps skipped.",
+    "legacy_run": 34919852502,
+    "retry_status": "success",
+    "retry_attempt": 2,
+    "retry_job_id": 104228811805
+  },
+  "limitations": [
+    "Observational SQL and HTTP timings are not representative latency SLOs.",
+    "Native iPhone behavior remains unverified.",
+    "No new production Daily was created for testing; historical September 14 schedules remain ten picks.",
+    "Human-retention and calibration evidence was not re-estimated."
+  ],
+  "migration": "0015_draft_run_serving_statistics.sql",
+  "migration_verified": [
+    "development",
+    "production"
+  ],
+  "operational_commit": "25b455c7526be58ff008fec96938e88196347b4c",
+  "production_http": {
+    "branch": "br-orange-feather-ayps8kep",
+    "commit": "ae0122f05a09de4972051cfa7350137f56eb3906",
+    "timings": [
+      {
+        "ms": 7907,
+        "path": "/health?quick=1",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 7515,
+        "path": "/health?quick=1",
+        "service": "pack1growth"
+      },
+      {
+        "ms": 7000,
+        "path": "/health?quick=1",
+        "service": "pack1api"
+      },
+      {
+        "ms": 9477,
+        "path": "/health",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 7038,
+        "path": "/v1/events",
+        "service": "pack1growth"
+      },
+      {
+        "ms": 6859,
+        "path": "/v1/session",
+        "service": "pack1growth"
+      },
+      {
+        "ms": 14318,
+        "path": "/v1/runs",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 420,
+        "path": "/v1/runs/<qa>/reroll",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 212,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 244,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 244,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 248,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 404,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 768,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 200,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 257,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 183,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 231,
+        "path": "/v1/runs/<qa>/share",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 7204,
+        "path": "/v1/challenges/<qa>",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 8177,
+        "path": "/v1/runs",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 8592,
+        "path": "/v1/runs",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 247,
+        "path": "/v1/runs/<qa>/reroll",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 216,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 300,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 204,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 261,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 259,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 257,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 255,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 264,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 416,
+        "path": "/v1/runs/<qa>/pick",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 259,
+        "path": "/v1/runs/<qa>/share",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 8722,
+        "path": "/v1/challenges/<qa>",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 7354,
+        "path": "/v1/runs",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 8136,
+        "path": "/health?quick=1",
+        "service": "draftrunapi"
+      },
+      {
+        "ms": 7957,
+        "path": "/health?quick=1",
+        "service": "pack1growth"
+      },
+      {
+        "ms": 8398,
+        "path": "/health?quick=1",
+        "service": "pack1api"
+      }
+    ]
+  },
+  "production_qa_verification": {
+    "career_results": 2,
+    "completed": 2,
+    "eight_pick_sessions": 4,
+    "persisted": 2,
+    "private_sessions": 4,
+    "qa_sessions": 4,
+    "ranked_results": 0,
+    "ranked_sessions": 0,
+    "sessions": 4
+  },
+  "pull_requests": [
+    91,
+    92
+  ],
+  "report_date": "2026-09-15",
+  "repository": "killjoy00/mtg-ev-analyzer",
+  "runtime_commit": "ae0122f05a09de4972051cfa7350137f56eb3906",
+  "sql": "EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) SELECT p.set_id,p.pick_number,r.band,count(*)::int n FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1' WHERE p.corpus_version='elite-trophy-verified-v6' AND p.interesting AND p.pack_number=1 AND p.set_id<>'powered-cube' AND p.pick_number<=10 AND p.set_id<>ALL('{hbg,sir,pio}'::text[]) GROUP BY p.set_id,p.pick_number,r.band",
+  "sql_method": "Sequential EXPLAIN ANALYZE observations, no controlled cold reset or load-test isolation. Execution times exclude client/function/network overhead.",
+  "sql_samples": [
+    {
+      "branch": "development",
+      "execution_ms": 10411.571,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3477892,
+          "Shared Read Blocks": 57506,
+          "Temp Read Blocks": 2363,
+          "Temp Written Blocks": 2375
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3477892,
+          "Shared Read Blocks": 57506,
+          "Temp Read Blocks": 2363,
+          "Temp Written Blocks": 2375
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Nested Loop",
+          "Plan Rows": 1829,
+          "Shared Hit Blocks": 3477862,
+          "Shared Read Blocks": 57506,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        {
+          "Actual Loops": 878756,
+          "Actual Rows": 1,
+          "Index Name": "draft_run_puzzle_ratings_pkey",
+          "Node Type": "Index Scan",
+          "Plan Rows": 1,
+          "Relation Name": "draft_run_puzzle_ratings",
+          "Shared Hit Blocks": 3477862,
+          "Shared Read Blocks": 37164,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        }
+      ],
+      "phase": "before_initial",
+      "planning_ms": 39.464
+    },
+    {
+      "branch": "development",
+      "execution_ms": 4527.509,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3486192,
+          "Shared Read Blocks": 49206,
+          "Temp Read Blocks": 2363,
+          "Temp Written Blocks": 2375
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3486192,
+          "Shared Read Blocks": 49206,
+          "Temp Read Blocks": 2363,
+          "Temp Written Blocks": 2375
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Nested Loop",
+          "Plan Rows": 1829,
+          "Shared Hit Blocks": 3486162,
+          "Shared Read Blocks": 49206,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        {
+          "Actual Loops": 878756,
+          "Actual Rows": 1,
+          "Index Name": "draft_run_puzzle_ratings_pkey",
+          "Node Type": "Index Scan",
+          "Plan Rows": 1,
+          "Relation Name": "draft_run_puzzle_ratings",
+          "Shared Hit Blocks": 3486162,
+          "Shared Read Blocks": 28864,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        }
+      ],
+      "phase": "before_repeat",
+      "planning_ms": 4.901
+    },
+    {
+      "branch": "development",
+      "execution_ms": 1919.4,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3449,
+          "Shared Read Blocks": 30676,
+          "Temp Read Blocks": 13404,
+          "Temp Written Blocks": 13548
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3420,
+          "Shared Read Blocks": 30675,
+          "Temp Read Blocks": 13404,
+          "Temp Written Blocks": 13548
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Hash Join",
+          "Plan Rows": 365742,
+          "Shared Hit Blocks": 3420,
+          "Shared Read Blocks": 30675,
+          "Temp Read Blocks": 13404,
+          "Temp Written Blocks": 13548
+        }
+      ],
+      "phase": "pack_number_only",
+      "planning_ms": 4.6
+    },
+    {
+      "branch": "development",
+      "execution_ms": 1673.835,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3685,
+          "Shared Read Blocks": 30440,
+          "Temp Read Blocks": 13404,
+          "Temp Written Blocks": 13544
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3655,
+          "Shared Read Blocks": 30440,
+          "Temp Read Blocks": 13404,
+          "Temp Written Blocks": 13544
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Hash Join",
+          "Plan Rows": 365742,
+          "Shared Hit Blocks": 3655,
+          "Shared Read Blocks": 30440,
+          "Temp Read Blocks": 13404,
+          "Temp Written Blocks": 13544
+        }
+      ],
+      "phase": "pack_number_only_repeat",
+      "planning_ms": 1.76
+    },
+    {
+      "branch": "development",
+      "execution_ms": 1755.941,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 4564,
+          "Shared Read Blocks": 29561,
+          "Temp Read Blocks": 13402,
+          "Temp Written Blocks": 13536
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 4534,
+          "Shared Read Blocks": 29561,
+          "Temp Read Blocks": 13402,
+          "Temp Written Blocks": 13536
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Hash Join",
+          "Plan Rows": 366987,
+          "Shared Hit Blocks": 4534,
+          "Shared Read Blocks": 29561,
+          "Temp Read Blocks": 13402,
+          "Temp Written Blocks": 13536
+        }
+      ],
+      "phase": "all_serving_metadata",
+      "planning_ms": 2.657
+    },
+    {
+      "branch": "development",
+      "execution_ms": 1697.368,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 4930,
+          "Shared Read Blocks": 29195,
+          "Temp Read Blocks": 13405,
+          "Temp Written Blocks": 13560
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 4900,
+          "Shared Read Blocks": 29195,
+          "Temp Read Blocks": 13405,
+          "Temp Written Blocks": 13560
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Hash Join",
+          "Plan Rows": 366987,
+          "Shared Hit Blocks": 4900,
+          "Shared Read Blocks": 29195,
+          "Temp Read Blocks": 13405,
+          "Temp Written Blocks": 13560
+        }
+      ],
+      "phase": "all_serving_metadata_repeat",
+      "planning_ms": 1.941
+    },
+    {
+      "branch": "production",
+      "execution_ms": 10447.892,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3489548,
+          "Shared Read Blocks": 45695,
+          "Temp Read Blocks": 2363,
+          "Temp Written Blocks": 2375
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3489548,
+          "Shared Read Blocks": 45695,
+          "Temp Read Blocks": 2363,
+          "Temp Written Blocks": 2375
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Nested Loop",
+          "Plan Rows": 1841,
+          "Shared Hit Blocks": 3489518,
+          "Shared Read Blocks": 45695,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        {
+          "Actual Loops": 878756,
+          "Actual Rows": 1,
+          "Index Name": "draft_run_puzzle_ratings_pkey",
+          "Node Type": "Index Scan",
+          "Plan Rows": 1,
+          "Relation Name": "draft_run_puzzle_ratings",
+          "Shared Hit Blocks": 3489518,
+          "Shared Read Blocks": 25508,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        }
+      ],
+      "phase": "before_initial",
+      "planning_ms": 27.529
+    },
+    {
+      "branch": "production",
+      "execution_ms": 3791.62,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3515336,
+          "Shared Read Blocks": 19907,
+          "Temp Read Blocks": 2363,
+          "Temp Written Blocks": 2375
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 3515336,
+          "Shared Read Blocks": 19907,
+          "Temp Read Blocks": 2363,
+          "Temp Written Blocks": 2375
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Nested Loop",
+          "Plan Rows": 1841,
+          "Shared Hit Blocks": 3515306,
+          "Shared Read Blocks": 19907,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        },
+        {
+          "Actual Loops": 878756,
+          "Actual Rows": 1,
+          "Index Name": "draft_run_puzzle_ratings_pkey",
+          "Node Type": "Index Scan",
+          "Plan Rows": 1,
+          "Relation Name": "draft_run_puzzle_ratings",
+          "Shared Hit Blocks": 3515026,
+          "Shared Read Blocks": 0,
+          "Temp Read Blocks": 0,
+          "Temp Written Blocks": 0
+        }
+      ],
+      "phase": "before_repeat",
+      "planning_ms": 3
+    },
+    {
+      "branch": "production",
+      "execution_ms": 1686.438,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 1793,
+          "Shared Read Blocks": 32090,
+          "Temp Read Blocks": 13350,
+          "Temp Written Blocks": 13492
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 1763,
+          "Shared Read Blocks": 32090,
+          "Temp Read Blocks": 13350,
+          "Temp Written Blocks": 13492
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Hash Join",
+          "Plan Rows": 366028,
+          "Shared Hit Blocks": 1763,
+          "Shared Read Blocks": 32090,
+          "Temp Read Blocks": 13350,
+          "Temp Written Blocks": 13492
+        }
+      ],
+      "phase": "all_serving_metadata",
+      "planning_ms": 3.129
+    },
+    {
+      "branch": "production",
+      "execution_ms": 1716.172,
+      "nodes": [
+        {
+          "Actual Loops": 1,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 2353,
+          "Shared Read Blocks": 31530,
+          "Temp Read Blocks": 13357,
+          "Temp Written Blocks": 13488
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 858,
+          "Node Type": "Aggregate",
+          "Plan Rows": 1188,
+          "Shared Hit Blocks": 2323,
+          "Shared Read Blocks": 31530,
+          "Temp Read Blocks": 13357,
+          "Temp Written Blocks": 13488
+        },
+        {
+          "Actual Loops": 3,
+          "Actual Rows": 292918.67,
+          "Join Type": "Inner",
+          "Node Type": "Hash Join",
+          "Plan Rows": 366028,
+          "Shared Hit Blocks": 2323,
+          "Shared Read Blocks": 31530,
+          "Temp Read Blocks": 13357,
+          "Temp Written Blocks": 13488
+        }
+      ],
+      "phase": "all_serving_metadata_repeat",
+      "planning_ms": 3.358
+    }
+  ]
+}

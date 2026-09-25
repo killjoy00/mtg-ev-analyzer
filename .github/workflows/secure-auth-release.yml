@@ -1,0 +1,182 @@
+name: release secure account auth
+
+on:
+  push:
+    branches: [main]
+    paths: ['.github/secure-auth-release-request.json']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pack1-secure-auth-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      PROJECT_ID: patient-shadow-91417882
+      DEV_BRANCH: br-twilight-hill-ayffyd2b
+      PROD_BRANCH: br-orange-feather-ayps8kep
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+      PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
+      PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
+      PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
+      PACK1_RATE_LIMIT_SECRET: ${{ secrets.PACK1_RATE_LIMIT_SECRET }}
+      PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
+      PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
+      PACK1_AUTH_RESEND_API_KEY: ${{ secrets.PACK1_AUTH_RESEND_API_KEY }}
+      PACK1_ACCOUNT_DELETE_RESEND_API_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Resolve reviewed release request
+        id: request
+        run: node scripts/edge-production-control.mjs request
+
+      - name: Install pinned release tools
+        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@4.17.4 esbuild@0.28.2 wrangler@4.132.0
+
+      - name: Verify production gateway ownership before backend changes
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/edge-production-control.mjs preflight
+
+      - name: Ensure PostgreSQL client is available
+        shell: bash
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+      - name: Verify password-recovery deployment secret
+        shell: bash
+        run: |
+          set -euo pipefail
+          test ${#PACK1_RATE_LIMIT_SECRET} -ge 32 || { echo '::error::PACK1_RATE_LIMIT_SECRET is missing or too short.'; exit 1; }
+          [[ "$PACK1_DELETION_ADMIN_EMAIL" == *@* ]] || { echo '::error::PACK1_DELETION_ADMIN_EMAIL is missing or malformed.'; exit 1; }
+          test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16 || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is missing or too short.'; exit 1; }
+          [[ "$PACK1_AUTH_RESEND_API_KEY" == re_* ]] || { echo '::error::PACK1_AUTH_RESEND_API_KEY is missing or malformed.'; exit 1; }
+          [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
+
+      - name: Build exact Neon function revision
+        env:
+          ESBUILD_BIN: ${{ runner.temp }}/edge-tools/node_modules/.bin/esbuild
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_SHA" =~ ^[a-f0-9]{40}$ ]]
+          node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
+
+      - name: Apply additive secure-session schema to development
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
+          connection=$("$neon" connection-string "$DEV_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0028_account_sessions.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0029_account_recovery.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0030_account_credential_limits.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0031_account_deletion.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0032_traditional_v4_components.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0034_account_deletion_verification.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
+
+      - name: Deploy exact revision to development
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
+          while IFS=: read -r slug entry; do
+            extra=()
+            if [[ "$slug" == pack1growth ]]; then
+              extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET"
+                --env "PACK1_DELETION_ADMIN_EMAIL=$PACK1_DELETION_ADMIN_EMAIL"
+                --env "PACK1_DELETION_ADMIN_PASSWORD=$PACK1_DELETION_ADMIN_PASSWORD"
+                --env "PACK1_ACCOUNT_DELETION_ENABLED=1"
+                --env "PACK1_VERIFICATION_SWEEP_ENABLED=1")
+            fi
+            "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
+          done < .github/neon-functions.txt
+          node tests/secure-auth-release-smoke.mjs "$DEV_BRANCH" "$GITHUB_SHA" --settle --expect-deletion-email=false
+
+      - name: Verify activated Patreon secrets before production
+        shell: bash
+        run: |
+          set -euo pipefail
+          enabled=$(node --input-type=module -e "import {validPatreonPolicy} from './patreon-policy.mjs';console.log(validPatreonPolicy())")
+          echo "PATREON_RUNTIME_ENABLED=$enabled" >> "$GITHUB_ENV"
+          if [[ "$enabled" == true ]]; then
+            test -n "$PATREON_CLIENT_ID" && test -n "$PATREON_CLIENT_SECRET" && test -n "$PATREON_WEBHOOK_SECRET"
+          fi
+
+      - name: Apply additive secure-account schema to production
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
+          connection=$("$neon" connection-string "$PROD_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0028_account_sessions.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0029_account_recovery.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0030_account_credential_limits.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0031_account_deletion.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0032_traditional_v4_components.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0034_account_deletion_verification.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
+
+      - name: Deploy the development-tested revision to production
+        shell: bash
+        run: |
+          set -euo pipefail
+          neon="$RUNNER_TEMP/edge-tools/node_modules/.bin/neon"
+          while IFS=: read -r slug entry; do
+            extra=()
+            if [[ "$slug" == pack1growth ]]; then
+              extra+=(--env "PACK1_RATE_LIMIT_SECRET=$PACK1_RATE_LIMIT_SECRET"
+                --env "PACK1_DELETION_ADMIN_EMAIL=$PACK1_DELETION_ADMIN_EMAIL"
+                --env "PACK1_DELETION_ADMIN_PASSWORD=$PACK1_DELETION_ADMIN_PASSWORD"
+                --env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY"
+                --env "PACK1_ACCOUNT_DELETION_ENABLED=1"
+                --env "PACK1_VERIFICATION_SWEEP_ENABLED=1")
+              if [[ "$PATREON_RUNTIME_ENABLED" == true ]]; then
+                extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
+              fi
+            fi
+            "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$PROD_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
+          done < .github/neon-functions.txt
+          node tests/secure-auth-release-smoke.mjs "$PROD_BRANCH" "$GITHUB_SHA" --settle --expect-deletion-email=true
+
+      - name: Deploy dedicated production recovery webhook Worker
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: node scripts/auth-webhook-control.mjs deploy-production
+
+      - name: Deploy fixed first-party production gateway
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/edge-production-control.mjs deploy
+
+      - name: Verify live secure gateway and Google OAuth start
+        run: node tests/edge-production-live-smoke.mjs "$GITHUB_SHA"

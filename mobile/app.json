@@ -1,0 +1,28 @@
+{
+  "expo": {
+    "name": "Pack One",
+    "slug": "pack-one",
+    "version": "1.0",
+    "orientation": "default",
+    "scheme": "packone",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": [
+      "expo-router",
+      "expo-secure-store"
+    ],
+    "experiments": {
+      "typedRoutes": true
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "pro.packone.app"
+    },
+    "android": {
+      "edgeToEdgeEnabled": true,
+      "package": "pro.packone.app"
+    },
+    "description": "Practice real draft decisions, compare trophy picks, and track your Pack One career.",
+    "backgroundColor": "#f7f8fa"
+  }
+}

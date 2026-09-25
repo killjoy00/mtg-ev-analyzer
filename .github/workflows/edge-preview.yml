@@ -1,0 +1,149 @@
+name: operate private gateway preview
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/edge-preview-request.json']
+permissions:
+  contents: read
+concurrency:
+  group: pack1-gateway-preview
+  cancel-in-progress: false
+jobs:
+  operate:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Resolve the reviewed operation
+        id: request
+        run: node scripts/edge-control.mjs request
+      - name: Verify Cloudflare access before provisioning
+        if: steps.request.outputs.operation == 'deploy-preview' || steps.request.outputs.operation == 'check-access'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/edge-control.mjs preflight
+      - name: Disable preview routing
+        if: steps.request.outputs.operation == 'disable-preview'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/edge-control.mjs disable
+      - name: Verify Neon function access before provisioning
+        if: steps.request.outputs.operation == 'deploy-preview'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: node scripts/edge-control.mjs neon-preflight
+      - name: Set preview expiry
+        if: steps.request.outputs.operation == 'deploy-preview'
+        id: expiry
+        run: echo "expires_at=$(date -u --date '+1 day' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Create isolated preview branch
+        if: steps.request.outputs.operation == 'deploy-preview'
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: patient-shadow-91417882
+          parent_branch: br-twilight-hill-ayffyd2b
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: gateway-preview-${{ github.run_id }}-${{ github.run_attempt }}
+          database: pack1
+          role: pack1_owner
+          suspend_timeout: 300
+          expires_at: ${{ steps.expiry.outputs.expires_at }}
+      - name: Install pinned deployment tools
+        if: steps.request.outputs.operation == 'deploy-preview' || steps.request.outputs.operation == 'probe-auth-webhook' || steps.request.outputs.operation == 'stage-auth-webhook-probe' || steps.request.outputs.operation == 'cleanup-auth-webhook-probe'
+        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@4.17.4 esbuild@0.28.2 wrangler@4.132.0
+      - name: Install pinned email verification probe tools
+        if: steps.request.outputs.operation == 'probe-email-verification'
+        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@5.0.0 wrangler@4.132.0
+      - name: Stage email verification taxonomy receiver
+        if: steps.request.outputs.operation == 'probe-email-verification'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-webhook-probe-stage.mjs
+      - name: Measure Neon email verification event taxonomy
+        if: steps.request.outputs.operation == 'probe-email-verification'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-verification-taxonomy-probe.mjs
+      - name: Remove email verification taxonomy receiver
+        if: steps.request.outputs.operation == 'probe-email-verification' && always()
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-webhook-probe-cleanup.mjs
+      - name: Run isolated Auth webhook capability probe
+        if: steps.request.outputs.operation == 'probe-auth-webhook'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-webhook-probe-control-v2.mjs
+      - name: Stage standalone Auth webhook receiver
+        if: steps.request.outputs.operation == 'stage-auth-webhook-probe'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-webhook-probe-stage.mjs
+      - name: Run QA Auth webhook probe after manual enablement
+        if: steps.request.outputs.operation == 'run-auth-webhook-probe'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/auth-webhook-probe-execute.mjs
+      - name: Remove standalone Auth webhook receiver
+        if: steps.request.outputs.operation == 'cleanup-auth-webhook-probe'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/auth-webhook-probe-cleanup.mjs
+      - name: Apply reviewed retirement policy to the disposable preview
+        if: steps.request.outputs.operation == 'deploy-preview'
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+        run: |
+          node --input-type=module <<'JS'
+          import {checkBranch} from './scripts/edge-control.mjs';
+          import assert from 'node:assert/strict';
+          checkBranch(process.env.PREVIEW_BRANCH);
+          assert.equal(process.env.PREVIEW_CREATED,'true');
+          JS
+          psql "$DATABASE_URL" --single-transaction -v ON_ERROR_STOP=1 -f migrations/0016_retire_third_source.sql
+      - name: Verify schema and build exact revision
+        if: steps.request.outputs.operation == 'deploy-preview'
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          ESBUILD_BIN: ${{ runner.temp }}/edge-tools/node_modules/.bin/esbuild
+        run: |
+          node scripts/verify-neon-schema.mjs
+          node scripts/edge-corpus-check.mjs
+          node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
+      - name: Deploy protected origins and private gateway
+        if: steps.request.outputs.operation == 'deploy-preview'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/edge-control.mjs deploy
+      - name: Verify origin rejection, gateway gameplay and network quotas
+        if: steps.request.outputs.operation == 'deploy-preview'
+        env:
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+        run: node tests/edge-live-smoke.mjs
+      - name: Remove a failed newly created preview branch
+        if: failure() && steps.neon.outputs.created == 'true'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}

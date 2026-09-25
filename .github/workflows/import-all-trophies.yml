@@ -1,0 +1,121 @@
+name: Import all Premier trophies
+on:
+  workflow_dispatch:
+    inputs:
+      sets:
+        description: 'all discovers every official PremierDraft archive; or comma-separated IDs'
+        default: all
+        required: true
+      target:
+        description: 'Build only, stage development, or stage production after identical development verification'
+        type: choice
+        options: [build-only, development, production]
+        default: development
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: trophy-import-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    permissions:
+      contents: read
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Hydrate replay shards from R2
+        run: bash scripts/r2_replay_shards.sh hydrate
+      - run: npm test
+      - name: Require a reviewed main revision
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/cache/restore@v4
+        with:
+          path: generated/trophy-import
+          key: staged-trophies-v2-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py', 'scripts/deck_fit.py', 'corpus/draft-run/catalog.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            staged-trophies-v2-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py', 'scripts/deck_fit.py', 'corpus/draft-run/catalog.json') }}-
+            staged-trophies-v2-
+      - name: Import every qualifying trophy
+        env:
+          IMPORT_SETS: ${{ inputs.sets || 'all' }}
+        run: |
+          python -u scripts/run_import_all_trophies.py --sets "$IMPORT_SETS" --workers 2 --max-seconds 6000 --discard-source-archives
+      - name: Validate all outputs and accounting
+        run: node scripts/load_all_trophies.mjs unused generated/trophy-import --validate-only
+      - name: Install pinned Neon loader tooling
+        if: inputs.target != 'build-only'
+        run: npm install -g neon@4.17.4
+      - name: Prepare explicit target connections
+        if: inputs.target != 'build-only'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          IMPORT_TARGET: ${{ inputs.target }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY"
+          umask 077
+          for target in development production; do
+            if [[ "$target" == production && "$IMPORT_TARGET" != production ]]; then continue; fi
+            case "$target" in
+              development) branch=br-twilight-hill-ayffyd2b ;;
+              production) branch=br-orange-feather-ayps8kep ;;
+            esac
+            connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+            echo "::add-mask::$connection"
+            printf '%s' "$connection" > "$RUNNER_TEMP/$target.connection"
+          done
+      - name: Require identical staged development inputs before production
+        if: inputs.target == 'production'
+        run: node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/development.connection" generated/trophy-import --complete
+      - name: Stage the baseline and supplements without switching the live model
+        if: inputs.target != 'build-only'
+        env:
+          IMPORT_TARGET: ${{ inputs.target }}
+          IMPORT_SETS: ${{ inputs.sets }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          case "$IMPORT_TARGET" in development|production) ;; *) exit 1 ;; esac
+          connection_file="$RUNNER_TEMP/$IMPORT_TARGET.connection"
+          DATABASE_URL="$(cat "$connection_file")" node scripts/verify-neon-schema.mjs
+          node scripts/load_verified_draft_run.mjs "$connection_file"
+          node scripts/load_all_trophies.mjs "$connection_file" generated/trophy-import
+          complete=()
+          if [[ "$IMPORT_SETS" == all ]]; then complete+=(--complete); fi
+          node scripts/verify-corpus-load.mjs "$connection_file" generated/trophy-import "${complete[@]}"
+      - name: Write coverage summary
+        if: always()
+        run: python scripts/summarize_trophy_import.py generated/trophy-import
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: generated/trophy-import
+          key: staged-trophies-v2-${{ hashFiles('scripts/import_all_trophies.py', 'scripts/run_import_all_trophies.py', 'scripts/build_replays.py', 'scripts/deck_fit.py', 'corpus/draft-run/catalog.json') }}-${{ github.run_id }}-${{ github.run_attempt }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: verified-premier-trophies-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            generated/trophy-import/catalog.json
+            generated/trophy-import/discovery.json
+            generated/trophy-import/*/manifest.json
+            generated/trophy-import/*/images.json
+            generated/trophy-import/*/puzzles.jsonl.gz
+            generated/trophy-import/*/trophies.jsonl.gz

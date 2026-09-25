@@ -1,0 +1,234 @@
+name: iOS TestFlight
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/ios-testflight.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-testflight-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  archive-smoke:
+    name: production iOS archive structure
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      # PR smoke archives are never uploaded. The publishing job below allocates
+      # against App Store Connect so workflow renames/retries cannot reuse a number.
+      - name: Set smoke build number
+        shell: bash
+        run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Validate production mobile config
+        run: npm test
+      - name: Generate production iOS project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform ios --clean
+      - name: Archive iPhone device build without signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
+          test -n "$workspace"
+          scheme="PackOne"
+          xcodebuild -workspace "$workspace" -list -json > "$RUNNER_TEMP/xcode-workspace.json"
+          python3 -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); schemes=data.get("workspace",{}).get("schemes",[]); expected=sys.argv[2]; assert expected in schemes, f"Expected app scheme {expected!r} not found. Available schemes: {schemes}"' "$RUNNER_TEMP/xcode-workspace.json" "$scheme"
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/PackOne.xcarchive" \
+            CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            archive
+          test -d "$RUNNER_TEMP/PackOne.xcarchive"
+          archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
+          test -f "$archive_plist"
+          archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
+          expected_marketing_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          archived_marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$archive_plist")"
+          [[ "$archived_marketing_version" == "$expected_marketing_version" ]] || {
+            echo "Expected archive marketing version $expected_marketing_version, got $archived_marketing_version." >&2
+            exit 1
+          }
+          [[ "$archived_build_number" == "$PACKONE_IOS_BUILD_NUMBER" ]] || {
+            echo "Expected archive build $PACKONE_IOS_BUILD_NUMBER, got $archived_build_number." >&2
+            exit 1
+          }
+          echo "Verified Pack One archive build number: $archived_build_number"
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
+          echo "Verified Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
+
+  testflight:
+    name: sign and upload TestFlight internal build
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    runs-on: macos-latest
+    environment: pack-one-mobile-release
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Store operations are allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Require Apple distribution credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          for name in ASC_KEY_ID ASC_ISSUER_ID ASC_PRIVATE_KEY APPLE_TEAM_ID; do
+            [[ -n "${!name}" ]] || { echo "Missing required GitHub secret binding: $name" >&2; exit 1; }
+          done
+      - id: build-number
+        name: Allocate monotonic App Store build number
+        run: node ../.github/scripts/app-store-next-build-number.mjs
+      - name: Set store build number
+        shell: bash
+        run: |
+          set -euo pipefail
+          build_number="${{ steps.build-number.outputs.next_build_number }}"
+          [[ "$build_number" =~ ^[1-9][0-9]*$ ]]
+          echo "PACKONE_IOS_BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
+          echo "Using App Store-safe iOS build number: $build_number"
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate production mobile config
+        run: npm test
+      - name: Write App Store Connect API key
+        shell: bash
+        run: |
+          set -euo pipefail
+          key_path="$RUNNER_TEMP/AuthKey_${ASC_KEY_ID}.p8"
+          printf '%s' "$ASC_PRIVATE_KEY" > "$key_path"
+          chmod 600 "$key_path"
+          echo "ASC_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+      - name: Generate production iOS project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform ios --clean
+      - name: Archive signed Pack One app
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
+          test -n "$workspace"
+          scheme="PackOne"
+          xcodebuild -workspace "$workspace" -list -json > "$RUNNER_TEMP/xcode-workspace.json"
+          python3 -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); schemes=data.get("workspace",{}).get("schemes",[]); expected=sys.argv[2]; assert expected in schemes, f"Expected app scheme {expected!r} not found. Available schemes: {schemes}"' "$RUNNER_TEMP/xcode-workspace.json" "$scheme"
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/PackOne.xcarchive" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID" \
+            DEVELOPMENT_TEAM="$APPLE_TEAM_ID" \
+            CODE_SIGN_STYLE=Automatic \
+            CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" \
+            archive
+
+          archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
+          test -f "$archive_plist"
+          archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
+          expected_marketing_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          archived_marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$archive_plist")"
+          [[ "$archived_marketing_version" == "$expected_marketing_version" ]] || {
+            echo "Expected archive marketing version $expected_marketing_version, got $archived_marketing_version." >&2
+            exit 1
+          }
+          [[ "$archived_build_number" == "$PACKONE_IOS_BUILD_NUMBER" ]] || {
+            echo "Expected signed archive build $PACKONE_IOS_BUILD_NUMBER, got $archived_build_number." >&2
+            exit 1
+          }
+          echo "Verified signed Pack One archive build number: $archived_build_number"
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
+          echo "Verified signed Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
+          echo "PACKONE_ARCHIVED_BUILD_NUMBER=$archived_build_number" >> "$GITHUB_ENV"
+      - name: Upload to TestFlight Internal Only
+        shell: bash
+        run: |
+          set -euo pipefail
+          cat > "$RUNNER_TEMP/ExportOptions.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store-connect</string>
+            <key>destination</key>
+            <string>upload</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+            <key>teamID</key>
+            <string>$APPLE_TEAM_ID</string>
+            <key>uploadSymbols</key>
+            <true/>
+            <key>manageAppVersionAndBuildNumber</key>
+            <false/>
+            <key>testFlightInternalTestingOnly</key>
+            <true/>
+          </dict>
+          </plist>
+          EOF
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath "$RUNNER_TEMP/PackOne.xcarchive" \
+            -exportPath "$RUNNER_TEMP/PackOneExport" \
+            -exportOptionsPlist "$RUNNER_TEMP/ExportOptions.plist" \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$ASC_KEY_PATH" \
+            -authenticationKeyID "$ASC_KEY_ID" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID"
+
+          {
+            echo "## Pack One iOS TestFlight upload"
+            echo
+            echo '- Bundle ID: `pro.packone.app`'
+            echo '- App Store Connect app ID: `6814318676`'
+            printf -- '- Build number: `%s`\n' "$PACKONE_ARCHIVED_BUILD_NUMBER"
+            echo "- Distribution: TestFlight Internal Only"
+            echo "- Upload completed through authenticated Xcode distribution."
+          } >> "$GITHUB_STEP_SUMMARY"

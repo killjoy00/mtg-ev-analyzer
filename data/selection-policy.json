@@ -1,0 +1,113 @@
+{
+  "selection_version": "eight-pick-v4",
+  "source_pack": 1,
+  "max_pick": {
+    "mixed": 10,
+    "powered-cube": 11
+  },
+  "selectable_only_sets": [
+    "hbg",
+    "sir",
+    "pio"
+  ],
+  "regular_sets_newest_first": [
+    "hob",
+    "msh",
+    "sos",
+    "tmt",
+    "ecl",
+    "tla",
+    "eoe",
+    "fin",
+    "tdm",
+    "dft",
+    "fdn",
+    "dsk",
+    "blb",
+    "mh3",
+    "otj",
+    "mkm",
+    "ktk",
+    "lci",
+    "woe",
+    "ltr",
+    "mom",
+    "one",
+    "bro",
+    "dmu",
+    "snc",
+    "neo",
+    "vow",
+    "mid"
+  ],
+  "daily_weight_tiers": [
+    {
+      "count": 3,
+      "weight": 6
+    },
+    {
+      "count": 3,
+      "weight": 4
+    },
+    {
+      "count": 6,
+      "weight": 2
+    }
+  ],
+  "retired_set_fingerprints": [
+    "f8272fb2c87fbdf3e6c933649a30f2663ba60983247b85ec223fc22b08358988",
+    "79b159b843b0aaba706b57fc165afa2d49c3680c43503ed36af6b4f66cbade5b",
+    "ca2b25a9b0e7a993f09d627d5929fb8cbfaa95403ac921f231149dc98ddce93d"
+  ],
+  "previous_daily_weight_tiers": [
+    {
+      "count": 6,
+      "weight": 1.25
+    },
+    {
+      "count": 6,
+      "weight": 1.1
+    }
+  ],
+  "run_length": 8,
+  "daily_guaranteed_latest": 3,
+  "release_dates": {
+    "hob": "2026-08-14",
+    "msh": "2026-06-26",
+    "sos": "2026-04-24",
+    "tmt": "2026-03-06",
+    "ecl": "2026-01-23",
+    "tla": "2025-11-21",
+    "eoe": "2025-08-01",
+    "fin": "2025-06-13",
+    "tdm": "2025-04-11",
+    "dft": "2025-02-14",
+    "fdn": "2024-11-15",
+    "dsk": "2024-09-27",
+    "blb": "2024-08-02",
+    "mh3": "2024-06-14",
+    "otj": "2024-04-19",
+    "mkm": "2024-02-09",
+    "ktk": "2014-09-26",
+    "lci": "2023-11-17",
+    "woe": "2023-09-08",
+    "ltr": "2023-06-23",
+    "mom": "2023-04-21",
+    "one": "2023-02-10",
+    "bro": "2022-11-18",
+    "dmu": "2022-09-09",
+    "snc": "2022-04-29",
+    "neo": "2022-02-18",
+    "vow": "2021-11-19",
+    "mid": "2021-09-24"
+  },
+  "release_dates_source": "https://api.scryfall.com/sets",
+  "release_dates_verified_at": "2026-09-14",
+  "daily_policy": {
+    "newest_minimum": 2,
+    "previous_pool_size": 3,
+    "previous_pool_minimum": 4,
+    "recency_half_life_releases": 4,
+    "sampling": "with replacement by set; without replacement by source draft"
+  }
+}

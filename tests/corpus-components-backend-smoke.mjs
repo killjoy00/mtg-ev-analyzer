@@ -1,0 +1,57 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import {DRAFT_RUN_CORPUS_VERSION as parent,gradeDraftRunPick} from '../draft-run.mjs';
+import {TRADITIONAL_COMPONENT_VERSION as component,FROZEN_CONTEXT_MODEL_VERSION as model,TRADITIONAL_GATE_VERSION as gate} from '../corpus-components.mjs';
+import {corpusMembership,componentBelongsTo} from '../worker/corpus-components.mjs';
+import {loadPuzzleMetadata} from '../worker/draft-run-selection.mjs';
+import {insertTrophyBatch} from '../worker/trophy-import.mjs';
+if(!process.argv.includes('--dev-fixtures'))throw Error('Isolated development branch required.');
+process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
+const {query}=await import('../worker/growth-function.js'),{default:api}=await import('../worker/draft-run-function.mjs');
+const parse=x=>typeof x==='string'?JSON.parse(x):x;
+const user=crypto.randomUUID(),token=crypto.randomUUID(),pid=crypto.randomUUID().replaceAll('-','');
+let check;const sid=`qa-component-${pid.slice(0,12)}`,day='9998-03-01';
+async function status(oldStatus,status,expected=200){const r=await api.fetch(new Request(`https://packone.pro/v1/admin/corpus/${sid}/components/${component}/status`,{method:'POST',headers:{'content-type':'application/json','x-pack1-auth-session':token},body:JSON.stringify({oldStatus,status,corpusVersion:parent,reason:'QA source lifecycle'})}));const data=await r.json();assert.equal(r.status,expected,JSON.stringify(data));return data;}
+try {
+ await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[user,'QA source admin',`${user}@example.invalid`]);
+ await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[token,user]);
+ await status('Candidate','Live',403);
+ await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[user]);
+ await query('INSERT INTO draft_run_verified_sets(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)',[sid,parent,JSON.stringify({fixture:pid})]);
+ await query("INSERT INTO draft_run_environment_policy(set_id,regular_run,maximum_pick,daily_weight,selection_version,status,release_date) VALUES($1,true,8,1,'eight-pick-v4','Candidate','2024-01-01')",[sid]);
+ await query('INSERT INTO corpus_set_versions(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)',[sid,component,JSON.stringify({fixture:pid})]);
+ await query("INSERT INTO corpus_components(set_id,parent_version,component_version,event_type,model_version) VALUES($1,$2,$3,'TradDraft',$4)",[sid,parent,component,model]);
+ const original=parse((await query('SELECT payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND pick_number=1 AND interesting LIMIT 1',['blb',parent])).rows[0].payload);
+ const p={...original,set_id:sid,puzzle_id:pid,source_draft_hash:pid,source_fingerprint:pid+pid,corpus_version:component,source_event_type:'TradDraft',event_match_wins:3,event_match_losses:0,model_version:model,model_source_event:'PremierDraft'};
+ assert.equal(await insertTrophyBatch(query,[p],{componentVersion:component}),1);
+ await query("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id=$1",[sid]);
+ const count=async serving=>Number((await query(`SELECT count(*) n FROM draft_run_verified_puzzles p WHERE (${corpusMembership({serving})}) AND p.puzzle_id=$2`,[parent,pid])).rows[0].n);
+ assert.equal(await count(true),0);assert.equal(await count(false),1);
+ await status('Candidate','Live',409);
+ check=(await query('INSERT INTO corpus_health_checks(set_id,corpus_version,manifest_hash,gate_version,ready,report) SELECT set_id,corpus_version,md5(manifest::text),$3,true,\'{}\' FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2 RETURNING id',[sid,component,gate])).rows[0].id;
+ await status('Candidate','Live');assert.equal(await count(true),1);
+ await assert.rejects(()=>insertTrophyBatch(query,[p],{componentVersion:component}),/Candidate/);
+ const oldIds=(await query('SELECT puzzle_id FROM draft_run_verified_puzzles WHERE corpus_version=$1 AND interesting LIMIT 7',[parent])).rows.map(r=>r.puzzle_id);
+ await query('INSERT INTO draft_run_schedules(day,environment,corpus_version,puzzle_ids) VALUES($1::date,\'mixed\',$2,$3::jsonb)',[day,parent,JSON.stringify([pid,...oldIds])]);
+ assert.deepEqual(parse((await query('SELECT source_components FROM draft_run_schedules WHERE day=$1::date AND environment=\'mixed\'',[day])).rows[0].source_components),[parent,component].sort());
+ await status('Live','Paused');assert.equal(await count(true),0);
+ assert.equal((await loadPuzzleMetadata(query,parent,[pid]))[0].puzzle_id,pid);
+ assert.equal(await componentBelongsTo(query,p,parent),true);assert.equal(gradeDraftRunPick(p,p.historical_pick_id).score,100);
+ const events=(await query('SELECT component_version,old_status,new_status FROM corpus_status_events WHERE auth_user_id=$1::uuid ORDER BY id',[user])).rows;
+ assert.deepEqual(events.map(e=>[e.component_version,e.old_status,e.new_status]),[[component,'Candidate','Live'],[component,'Live','Paused']]);
+ console.log('PASS: admin-only source publication, fresh health gate, immutable inventory, component snapshots, pause-safe history and trophy scoring.');
+} finally {
+ await query('DELETE FROM draft_run_schedules WHERE day=$1::date AND environment=\'mixed\'',[day]);
+ await query('DELETE FROM draft_run_puzzle_ratings WHERE puzzle_id=$1',[pid]);
+ await query('DELETE FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[pid]);
+ if(check)await query('DELETE FROM corpus_health_checks WHERE id=$1::bigint',[check]);
+ await query('DELETE FROM corpus_components WHERE set_id=$1 AND component_version=$2',[sid,component]);
+ await query('DELETE FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2',[sid,component]);
+ await query('DELETE FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2',[sid,parent]);
+ await query('DELETE FROM draft_run_environment_policy WHERE set_id=$1',[sid]);
+ await query('DELETE FROM draft_run_verified_sets WHERE set_id=$1',[sid]);
+ await query('DELETE FROM corpus_status_events WHERE auth_user_id=$1::uuid',[user]);
+ await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[user]);
+ await query('DELETE FROM neon_auth.session WHERE token=$1',[token]);
+ await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[user]);
+}

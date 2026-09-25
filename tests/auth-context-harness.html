@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <base href="/">
+  <title>Pack One auth context test harness</title>
+  <link rel="stylesheet" href="/pack1.css">
+</head>
+<body>
+  <header><a id="brand-home" href="/">Pack One</a><nav class="top-actions"><button id="account-nav" type="button">Sign in</button></nav></header>
+  <main id="app"></main>
+  <script>
+    window.PACK1_API={
+      firstParty:true,
+      authBase:'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
+      url:'https://api.packone.pro/legacy',
+      growthUrl:'https://api.packone.pro/growth',
+      draftRunUrl:'https://api.packone.pro/draft'
+    };
+  </script>
+  <script type="module">
+    import {renderAccount} from '/growth.mjs';
+    window.__renderAccount=renderAccount;
+    renderAccount({source:'nav'}).catch(error=>{
+      console.error(error);
+      document.body.dataset.harnessError=error?.message||'renderAccount failed';
+    });
+  </script>
+</body>
+</html>
