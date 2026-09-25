@@ -15,7 +15,7 @@ export type AccountState = {
     available: boolean;
     googleOnly: boolean;
     socialOnly?: boolean;
-    method: 'password' | 'email' | null;
+    method: 'password' | 'email' | 'apple' | null;
   };
 };
 
@@ -175,6 +175,35 @@ export async function signOutMobileAccount(session: MobileSession) {
     });
   }
   return forgetAccountLocally(session);
+}
+
+export async function startAppleDeletionVerification(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in before deleting your account.');
+  return requestJson<{ flowToken: string; url: string }>('/growth/v1/mobile/account/delete/apple/start', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: { confirm: true },
+  });
+}
+
+export async function finishAppleDeletion(
+  session: MobileSession,
+  handoffToken: string,
+) {
+  if (!session.accountToken) throw new Error('Sign in before deleting your account.');
+  const result = await requestJson<{ ok: boolean; deletion: 'complete' | 'accepted'; operationId?: string }>(
+    '/growth/v1/mobile/account/delete/apple/finish',
+    {
+      method: 'POST',
+      mobileSessionToken: session.playerToken,
+      mobileAccountToken: session.accountToken,
+      body: { confirm: true, handoffToken },
+      timeoutMs: 30_000,
+    },
+  );
+  await clearSession();
+  return result;
 }
 
 export async function startDeletionVerification(session: MobileSession) {
