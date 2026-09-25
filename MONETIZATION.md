@@ -36,7 +36,7 @@ TCGplayer approved Pack One's Impact referral application on September 19, 2026.
 
 The code continues to record `tcgplayer_click` with card, set (when supplied), surface and affiliate-active status. Applicable links use `rel="sponsored noopener"`, and visible copy identifies them as affiliate links or places an affiliate disclosure directly beside the link group. Pack One may earn a commission from eligible purchases at no added cost to the buyer.
 
-The Daily-home fallback is the one approved expansion of this experiment. It uses the official TCGplayer logo asset on a neutral Pack One surface, routes the CTA through the approved Impact deep-link template to TCGplayer's Magic category, carries the visible disclosure “Affiliate link — Pack One may earn a commission from purchases.”, and records the surface as `daily_home_banner`. The logo is served locally; no TCGplayer or Impact script/pixel loads merely because the banner is displayed.
+The Daily-home fallback is the one approved expansion of this experiment. It uses the official TCGplayer logo asset on a neutral Pack One surface, routes the CTA through the approved Impact deep-link template to TCGplayer's Magic category, carries the visible disclosure “Affiliate link. Pack One may earn a commission from purchases.”, and records the surface as `daily_home_banner`. The logo is served locally; no TCGplayer or Impact script/pixel loads merely because the banner is displayed.
 
 Keep this measured: no store section, pricing feed, gameplay/result banner or additional affiliate placements. Compare the home-banner outbound clicks with Impact conversion reporting before expanding further. Affiliate links are not for the owner's personal purchases.
 
