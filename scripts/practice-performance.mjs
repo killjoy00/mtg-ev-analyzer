@@ -1,5 +1,6 @@
 // SQL/selector baseline or derived-cache comparison on a verified disposable clone. This does not measure Function/browser latency.
 import fs from 'node:fs';
+import assert from 'node:assert/strict';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
@@ -127,7 +128,7 @@ export async function main() {
     const discoveryMs=elapsed(started);
     if(cached) {
       const original=await loadCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION,day);
-      if(JSON.stringify(original)!==JSON.stringify(custom))throw Error('Cached custom-set metadata differs.');
+      assert.deepEqual(custom,original,'Cached custom-set metadata differs.');
     }
     report.discovery={ms:discoveryMs,set_ids:custom.map(s=>s.set_id),queries:discovery.records};capture('practice-sets',discovery);
     if(custom.length<2)throw Error('Need two eligible custom sets to cover all benchmark cases.');
