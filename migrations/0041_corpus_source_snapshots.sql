@@ -75,13 +75,10 @@ FROM corpus_set_versions v
 LEFT JOIN draft_run_environment_policy p USING(set_id)
 ON CONFLICT(source_snapshot_id) DO NOTHING;
 
-UPDATE draft_run_verified_puzzles p
-SET source_snapshot_id='historical-' || substr(encode(sha256(convert_to(p.set_id || '|' || p.corpus_version,'UTF8')),'hex'),1,32)
-WHERE source_snapshot_id IS NULL
-  AND EXISTS (
-    SELECT 1 FROM corpus_source_snapshots s
-    WHERE s.source_snapshot_id='historical-' || substr(encode(sha256(convert_to(p.set_id || '|' || p.corpus_version,'UTF8')),'hex'),1,32)
-  );
+-- Historical puzzle rows deliberately keep source_snapshot_id NULL. Their frozen
+-- snapshot exists as metadata only, avoiding a table-wide rewrite and preserving
+-- the exact historical row representation. New snapshot-backed imports always
+-- populate source_snapshot_id.
 
 UPDATE corpus_health_checks h
 SET source_snapshot_id='historical-' || substr(encode(sha256(convert_to(h.set_id || '|' || h.corpus_version,'UTF8')),'hex'),1,32)
@@ -141,7 +138,13 @@ BEGIN
         AND (p.corpus_version<>p_parent_version OR EXISTS(
           SELECT 1 FROM draft_run_environment_policy e
           WHERE e.set_id=p.set_id AND e.status='Live'
-            AND (e.active_snapshot_id IS NULL OR e.active_snapshot_id=p.source_snapshot_id)
+            AND (
+              e.active_snapshot_id IS NULL OR e.active_snapshot_id=p.source_snapshot_id
+              OR (p.source_snapshot_id IS NULL AND EXISTS(
+                SELECT 1 FROM corpus_source_snapshots hs
+                WHERE hs.source_snapshot_id=e.active_snapshot_id AND hs.schema_version='historical-frozen'
+              ))
+            )
         ))
         AND p.corpus_version IN (SELECT p_parent_version UNION SELECT c.component_version FROM corpus_components c WHERE c.parent_version=p_parent_version AND c.status='Live')
         AND (p.corpus_version=p_parent_version OR EXISTS(SELECT 1 FROM corpus_components c WHERE c.parent_version=p_parent_version AND c.component_version=p.corpus_version AND c.set_id=p.set_id AND c.status='Live'))
