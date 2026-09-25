@@ -66,7 +66,7 @@ SELECT
   v.set_id,'PremierDraft',v.corpus_version,'historical-frozen',
   'historical-frozen','historical-frozen',v.manifest,
   CASE
-    WHEN p.status='Live' THEN 'Approved'
+    WHEN p.status IN ('Live','Paused') THEN 'Approved'
     WHEN p.status='Retired' THEN 'Retired'
     WHEN p.status='Candidate' THEN 'Candidate'
     ELSE 'Blocked'
