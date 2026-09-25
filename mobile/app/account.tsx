@@ -19,6 +19,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiError } from '@/src/api/client';
 import {
   deleteMobileAccount,
+  finishAppleDeletion,
   finishAppleSignIn,
   finishGoogleSignIn,
   finishNativeAppleSignIn,
@@ -27,6 +28,7 @@ import {
   signInWithEmail,
   signOutMobileAccount,
   signUpWithEmail,
+  startAppleDeletionVerification,
   startAppleSignIn,
   startDeletionVerification,
   startGoogleSignIn,
@@ -267,12 +269,27 @@ export default function AccountScreen() {
     setBusy(true);
     setMessage(null);
     try {
-      await deleteMobileAccount(
-        session,
-        account.deletion.method === 'password'
-          ? { currentPassword: deletePassword }
-          : { code: deleteCode },
-      );
+      if (account.deletion.method === 'apple') {
+        const start = await startAppleDeletionVerification(session);
+        const result = await WebBrowser.openAuthSessionAsync(start.url, 'packone://account');
+        if (result.type !== 'success') {
+          throw new Error(result.type === 'cancel' ? 'Apple verification was cancelled.' : 'Apple verification did not finish.');
+        }
+        const callback = new URL(result.url);
+        if (callback.searchParams.get('appleDelete') === 'error') {
+          throw new Error('Apple verification did not finish.');
+        }
+        const handoff = callback.searchParams.get('appleDeleteHandoff');
+        if (!handoff) throw new Error('Apple verification did not return a deletion proof.');
+        await finishAppleDeletion(session, handoff);
+      } else {
+        await deleteMobileAccount(
+          session,
+          account.deletion.method === 'password'
+            ? { currentPassword: deletePassword }
+            : { code: deleteCode },
+        );
+      }
       const fresh = await ensureGuestSession();
       setSession(fresh);
       setAccount(null);
@@ -347,6 +364,18 @@ export default function AccountScreen() {
                     style={[styles.dangerButton, (busy || !deletePassword) && styles.disabled]}
                   >
                     <Text style={styles.dangerButtonText}>Permanently delete account</Text>
+                  </Pressable>
+                </>
+              ) : account.deletion.method === 'apple' ? (
+                <>
+                  <Text style={styles.body}>Verify with Apple again to confirm permanent deletion. No email code is required.</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy}
+                    onPress={confirmDelete}
+                    style={[styles.dangerButton, busy && styles.disabled]}
+                  >
+                    <Text style={styles.dangerButtonText}>Verify with Apple and delete account</Text>
                   </Pressable>
                 </>
               ) : account.deletion.method === 'email' ? (
