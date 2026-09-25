@@ -13,10 +13,10 @@ function setError(form,name,message) {
 export async function renderCampaignLinks(root) {
   root.innerHTML=`<section class="campaign-link-builder">
     <h1>Campaign Links / Link Builder</h1>
-    <p class="muted">Build canonical campaign entries and preview the tracked destination before committing a static vanity route.</p>
+    <p class="muted">Build a tracked campaign URL immediately, or add a slug when you also want a static vanity route.</p>
     <p class="note"><strong>Publishing step required.</strong> Building or copying this link does not publish the vanity URL. The entry must be committed to <code>campaign-links.json</code> and deployed through the normal site PR.</p>
     <form id="campaign-link-form" class="campaign-form" novalidate>
-      <label>Slug<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
+      <label>Slug (needed for vanity URL)<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
       <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
       <label>Campaign<input name="campaign" autocomplete="off" spellcheck="false" placeholder="launch-week"><small data-error="campaign" class="error" hidden></small></label>
       <label>Medium (optional)<input name="medium" autocomplete="off" spellcheck="false" placeholder="social"><small data-error="medium" class="error" hidden></small></label>
@@ -74,7 +74,9 @@ export async function renderCampaignLinks(root) {
     json.value=draft.entry?JSON.stringify(draft.entry,null,2):'';
     for(const button of root.querySelectorAll('[data-copy]')) {
       const target=button.dataset.copy;
-      button.disabled=!draft.valid||(target==='campaign-json'&&duplicate)||(target==='vanity-url'&&!draft.vanityUrl);
+      if(target==='tracked-url')button.disabled=!draft.trackedUrl;
+      else if(target==='campaign-json')button.disabled=!draft.entry||duplicate;
+      else if(target==='vanity-url')button.disabled=!draft.valid||!draft.vanityUrl;
     }
     copyStatus.textContent='';
   }

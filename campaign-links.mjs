@@ -31,6 +31,21 @@ export function isCanonicalCampaignSlug(input) {
   return normalized!==null&&input===normalized;
 }
 
+function validateCampaignTrackingFields(entry,label='campaign link') {
+  if(!entry||typeof entry!=='object'||Array.isArray(entry))throw new Error(`${label} must be an object.`);
+  if(!SUPPORTED_CAMPAIGN_DESTINATIONS.includes(entry.destination))throw new Error(`${label} destination "${entry.destination}" is not supported.`);
+  for(const key of ['source','campaign']) {
+    if(!isCanonicalAcquisitionValue(entry[key]))throw new Error(`${label} ${key} must already be canonical and match ${ACQUISITION_PATTERN}.`);
+  }
+  if(Object.hasOwn(entry,'medium')&&!isCanonicalAcquisitionValue(entry.medium))throw new Error(`${label} medium must already be canonical and match ${ACQUISITION_PATTERN}.`);
+  return {
+    destination:entry.destination,
+    source:entry.source,
+    campaign:entry.campaign,
+    ...(Object.hasOwn(entry,'medium')?{medium:entry.medium}:{})
+  };
+}
+
 export function validateCampaignEntries(input) {
   if(!Array.isArray(input))throw new Error('campaign-links.json must contain an array.');
   const seen=new Set();
@@ -43,23 +58,13 @@ export function validateCampaignEntries(input) {
     if(!isCanonicalCampaignSlug(entry.slug))throw new Error(`${label} slug must be canonical lowercase ASCII, 1-${CAMPAIGN_SLUG_MAX_LENGTH} characters, with only letters, digits, and internal hyphens.`);
     if(seen.has(entry.slug))throw new Error(`${label} duplicates slug "${entry.slug}".`);
     seen.add(entry.slug);
-    if(!SUPPORTED_CAMPAIGN_DESTINATIONS.includes(entry.destination))throw new Error(`${label} destination "${entry.destination}" is not supported.`);
-    for(const key of ['source','campaign']) {
-      if(!isCanonicalAcquisitionValue(entry[key]))throw new Error(`${label} ${key} must already be canonical and match ${ACQUISITION_PATTERN}.`);
-    }
-    if(Object.hasOwn(entry,'medium')&&!isCanonicalAcquisitionValue(entry.medium))throw new Error(`${label} medium must already be canonical and match ${ACQUISITION_PATTERN}.`);
-    return {
-      slug:entry.slug,
-      destination:entry.destination,
-      source:entry.source,
-      campaign:entry.campaign,
-      ...(Object.hasOwn(entry,'medium')?{medium:entry.medium}:{})
-    };
+    const tracking=validateCampaignTrackingFields(entry,label);
+    return {slug:entry.slug,...tracking};
   });
 }
 
 export function buildCampaignTrackingUrl(entry) {
-  const valid=validateCampaignEntries([entry])[0];
+  const valid=validateCampaignTrackingFields(entry);
   const url=new URL(valid.destination,PACK_ONE_ORIGIN);
   url.searchParams.set('utm_source',valid.source);
   url.searchParams.set('utm_campaign',valid.campaign);
@@ -81,26 +86,29 @@ export function buildCampaignDraft(input={}) {
     medium:canonicalizeAcquisitionInput(input.medium)
   };
   const errors={};
-  if(!normalizeCampaignSlug(input.slug))errors.slug=`Use 1-${CAMPAIGN_SLUG_MAX_LENGTH} lowercase letters/digits with internal hyphens only.`;
+  const slug=normalizeCampaignSlug(input.slug);
+  if(normalized.slug&&!slug)errors.slug=`Use 1-${CAMPAIGN_SLUG_MAX_LENGTH} lowercase letters/digits with internal hyphens only.`;
   if(!SUPPORTED_CAMPAIGN_DESTINATIONS.includes(normalized.destination))errors.destination='Choose a supported destination.';
   if(!normalizeAcquisitionValue(input.source))errors.source='Use 1-40 letters, digits, underscores, or hyphens; spaces and slashes are not allowed.';
   if(!normalizeAcquisitionValue(input.campaign))errors.campaign='Use 1-40 letters, digits, underscores, or hyphens; spaces and slashes are not allowed.';
   if(normalized.medium&&!normalizeAcquisitionValue(input.medium))errors.medium='Use 1-40 letters, digits, underscores, or hyphens; spaces and slashes are not allowed.';
-  const valid=Object.keys(errors).length===0;
-  const entry=valid?{
-    slug:normalized.slug,
+  const trackingValid=!errors.destination&&!errors.source&&!errors.campaign&&!errors.medium;
+  const tracking=trackingValid?{
     destination:normalized.destination,
     source:normalized.source,
     campaign:normalized.campaign,
     ...(normalized.medium?{medium:normalized.medium}:{})
   }:null;
+  const valid=trackingValid&&Boolean(slug);
+  const entry=valid?{slug:normalized.slug,...tracking}:null;
   return {
     valid,
+    trackingValid,
     errors,
     normalized,
     entry,
-    vanityUrl:normalizeCampaignSlug(input.slug)?buildCampaignVanityUrl(normalized.slug):'',
-    trackedUrl:entry?buildCampaignTrackingUrl(entry):''
+    vanityUrl:slug?buildCampaignVanityUrl(normalized.slug):'',
+    trackedUrl:tracking?buildCampaignTrackingUrl(tracking):''
   };
 }
 
