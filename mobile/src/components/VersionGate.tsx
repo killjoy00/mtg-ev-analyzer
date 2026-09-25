@@ -101,11 +101,13 @@ export function VersionGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     mounted.current = true;
-    void refresh();
+    void checkInstalledVersion().then((decision) => {
+      if (mounted.current) setState(decision);
+    });
     return () => {
       mounted.current = false;
     };
-  }, [refresh]);
+  }, []);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (nextState) => {
