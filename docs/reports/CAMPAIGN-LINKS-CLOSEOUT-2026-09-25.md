@@ -138,7 +138,7 @@ This environment did not independently perform a manual browser fetch of the cus
 
 ## Post-release review corrections
 
-A follow-up review identified three additional correctness/usability gaps in the #518 surface:
+A follow-up review identified three additional correctness/usability gaps in the #518 surface. Follow-up PR #523 addresses them:
 
 - the detailed measurement document still incorrectly said the browser records one acquisition event per browser identity; it now states the actual best-effort multi-event behavior;
 - generated campaign-page social metadata could drift from the homepage without detection; campaign-link tests now compare homepage and generated Open Graph/Twitter title, description, and image metadata;
