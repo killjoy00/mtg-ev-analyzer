@@ -48,8 +48,9 @@ FROM wanted_first_class s
 ORDER BY set_id,source_snapshot_id NULLS FIRST`,[DRAFT_RUN_CORPUS_VERSION])).rows.filter(s=>!requested.length||requested.includes(s.set_id));
 for(const s of sets) {
  const manifest=parse(s.manifest),f=manifest.full_import||{},windows=runPickWindows(s.set_id==='powered-cube'?'powered-cube':'mixed'),picks=new Set(windows.map(w=>w[0]));
- const groups=(await query(`SELECT p.pick_number,r.band,count(DISTINCT p.source_draft_hash)::int sources FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r USING(puzzle_id) WHERE p.set_id=$1 AND p.corpus_version=$2 AND ($3::text IS NULL OR p.source_snapshot_id=$3) AND p.interesting AND ${SERVING_QUALITY_SQL} AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash) AND r.difficulty_version='support-ratio-v1' GROUP BY p.pick_number,r.band`,[s.set_id,DRAFT_RUN_CORPUS_VERSION,s.source_snapshot_id||null])).rows;
  const historical=s.historical===true||s.historical==='t';
+ const puzzleSnapshotId=historical?null:(s.source_snapshot_id||null);
+ const groups=(await query(`SELECT p.pick_number,r.band,count(DISTINCT p.source_draft_hash)::int sources FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r USING(puzzle_id) WHERE p.set_id=$1 AND p.corpus_version=$2 AND ($3::text IS NULL OR p.source_snapshot_id=$3) AND p.interesting AND ${SERVING_QUALITY_SQL} AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash) AND r.difficulty_version='support-ratio-v1' GROUP BY p.pick_number,r.band`,[s.set_id,DRAFT_RUN_CORPUS_VERSION,puzzleSnapshotId])).rows;
  const ledger=s.source_snapshot_id&&!historical
   ?(await query(`SELECT count(*)::int trophies,count(*) FILTER(WHERE qualified)::int qualified,count(*) FILTER(WHERE included)::int included,count(*) FILTER(WHERE qualified AND NOT included)::int qualified_excluded,sum(puzzle_count)::int puzzles FROM corpus_source_snapshot_trajectories WHERE source_snapshot_id=$1`,[s.source_snapshot_id])).rows[0]
   :(await query(`SELECT count(*)::int trophies,count(*) FILTER(WHERE qualified)::int qualified,count(*) FILTER(WHERE included)::int included,count(*) FILTER(WHERE qualified AND NOT included)::int qualified_excluded,sum(puzzle_count)::int puzzles FROM corpus_trophy_trajectories WHERE set_id=$1 AND corpus_version=$2`,[s.set_id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
@@ -60,7 +61,7 @@ for(const s of sets) {
  let after='',total=0,usable=0,cards=0,images=0,metadata=0,storedMetadata=0,broken=0,invalidSupport=0,excludedDecisions=0;
  const byPick={},probabilitiesAudit=probabilityMetrics(null,DRAFT_RUN_CORPUS_VERSION),trajectoryAudit=trajectoryHealth();
  for(;;) {
-  const page=(await query('SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND ($3::text IS NULL OR source_snapshot_id=$3) AND puzzle_id>$4 ORDER BY puzzle_id LIMIT 1000',[s.set_id,DRAFT_RUN_CORPUS_VERSION,s.source_snapshot_id||null,after])).rows;
+  const page=(await query('SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND ($3::text IS NULL OR source_snapshot_id=$3) AND puzzle_id>$4 ORDER BY puzzle_id LIMIT 1000',[s.set_id,DRAFT_RUN_CORPUS_VERSION,puzzleSnapshotId,after])).rows;
   if(!page.length)break;
   for(const row of page) {
    after=row.puzzle_id;total++;const p=parse(row.payload);
