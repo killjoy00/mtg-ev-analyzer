@@ -6,7 +6,7 @@ Authoritative rebuild contract, 2026-09-18. Deployment evidence is separate in [
 
 A Draft Run contains exactly eight independent decisions from distinct, qualified trophy source drafts. Each shows the real pack and the drafter's earlier pool. The player's earlier answers do not modify subsequent historical states. Regular Draft Run and Powered Cube are separate environments.
 
-The homepage presents Daily Draft Run, Daily Powered Cube and Daily Latest Set immediately. Completed results become compact and unfinished Dailies stay first. After all three, applicable practice becomes prominent. A compact Elite custom-set entry remains available from the start.
+The homepage presents Daily Draft Run, Daily Powered Cube and Daily Latest Set immediately. Completed results become compact and unfinished Dailies stay first. After all three, signed-in players receive one prominent handoff to the dedicated Practice hub. Practice and Elite options are not duplicated below unfinished Dailies; signed-in navigation keeps Practice available throughout.
 
 ## Daily access and comparison
 
