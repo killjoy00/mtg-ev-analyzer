@@ -16,3 +16,5 @@ Historical compatibility and audit evidence remain preserved. No old game mode, 
 
 
 Traditional v4 release evidence and the required development-before-production component lifecycle are recorded in [the September 21 production closeout](reports/TRADITIONAL-V4-RELEASE-2026-09-21.md).
+
+Campaign-link release evidence and the owner workflow are recorded in [the September 25 campaign links closeout](reports/CAMPAIGN-LINKS-CLOSEOUT-2026-09-25.md) and [Campaign Links owner guide](CAMPAIGN-LINKS-OWNER-GUIDE.md).
