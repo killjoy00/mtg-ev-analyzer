@@ -1,5 +1,7 @@
 name: Reviewed full corpus health
 on:
+  schedule:
+    - cron: '53 7 * * *'
   workflow_dispatch:
     inputs:
       target:
@@ -18,7 +20,7 @@ jobs:
     timeout-minutes: 180
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      TARGET: ${{ inputs.target }}
+      TARGET: ${{ inputs.target || 'production' }}
     steps:
       - uses: actions/checkout@v4
       - run: test "$GITHUB_REF" = refs/heads/main
@@ -43,5 +45,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: corpus-health-${{ inputs.target }}
+          name: corpus-health-${{ inputs.target || 'production' }}
           path: corpus-health-summary.jsonl
