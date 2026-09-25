@@ -123,7 +123,7 @@ async function main(action) {
   if(installed.length!==expected.size||installed.some(slug=>!expected.has(slug)))throw Error('Unexpected inherited function inventory after deployment.');
   const config=JSON.parse(fs.readFileSync('edge/wrangler.json','utf8'));
   config.main=path.resolve('edge/gateway.mjs');config.account_id=zone.account.id;
-  config.vars={...config.vars,NEON_BRANCH_ID:branch};
+  config.vars={...config.vars,NEON_BRANCH_ID:branch,RELEASE_COMMIT:commit};
   const configPath=path.join(process.env.RUNNER_TEMP,'edge-wrangler.json');
   fs.writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
   run('wrangler',['deploy','--config',configPath]);
