@@ -4,7 +4,6 @@ import {
   createHash,
   createPrivateKey,
   createPublicKey,
-  hkdfSync,
   randomBytes,
   sign as cryptoSign,
   verify as cryptoVerify,
@@ -18,7 +17,8 @@ const APPLE_TOKEN_ENDPOINT='https://appleid.apple.com/auth/token';
 const APPLE_REVOKE_ENDPOINT='https://appleid.apple.com/auth/revoke';
 const APPLE_KEYS_ENDPOINT='https://appleid.apple.com/auth/keys';
 const APPLE_ISSUER='https://appleid.apple.com';
-const TOKEN_CIPHER_PREFIX='v1';
+const TOKEN_CIPHER_PREFIX='apple-token';
+const TOKEN_KEY_VERSION='v1';
 let keyCache={at:0,keys:[]};
 
 const bool=value=>value===true||value===1||value==='1'||value==='t'||value==='true';
@@ -50,7 +50,7 @@ function appleConfig(env=process.env) {
 }
 
 export function appleConfigured(env=process.env) {
-  try {appleConfig(env);return true;} catch {return false;}
+  try {appleConfig(env);encryptionKey(env,TOKEN_KEY_VERSION);return true;} catch {return false;}
 }
 
 export function createAppleClientSecret(clientId,{env=process.env,now=Math.floor(Date.now()/1000)}={}) {
@@ -161,34 +161,29 @@ export async function exchangeAppleAuthorizationCode(code,{clientId,redirectUri=
   return data;
 }
 
-function encryptionKey(env=process.env) {
-  const root=String(env.PACK1_RATE_LIMIT_SECRET||'');
-  if(root.length<32)
+function encryptionKey(env=process.env,keyVersion=TOKEN_KEY_VERSION) {
+  const name=keyVersion==='v1'?'APPLE_TOKEN_ENCRYPTION_KEY_V1':'';
+  const raw=name?String(env[name]||'').trim():'';
+  if(!/^[a-f0-9]{64}$/i.test(raw))
     throw Object.assign(Error('Apple credential storage is temporarily unavailable.'),{status:503,code:'APPLE_STORAGE_CONFIG'});
-  return Buffer.from(hkdfSync(
-    'sha256',
-    Buffer.from(root),
-    Buffer.from('pack1-apple-token-salt-v1'),
-    Buffer.from('pack1-apple-refresh-token-v1'),
-    32,
-  ));
+  return Buffer.from(raw,'hex');
 }
 
-export function encryptAppleRefreshToken(token,{env=process.env}={}) {
+export function encryptAppleRefreshToken(token,{env=process.env,keyVersion=TOKEN_KEY_VERSION}={}) {
   const value=String(token||'');
   if(value.length<8||value.length>8192)throw Object.assign(Error('Apple token response is invalid.'),{status:502,code:'APPLE_TOKEN_SERVICE'});
-  const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',encryptionKey(env),iv);
+  const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',encryptionKey(env,keyVersion),iv);
   const encrypted=Buffer.concat([cipher.update(value,'utf8'),cipher.final()]);
   const tag=cipher.getAuthTag();
-  return [TOKEN_CIPHER_PREFIX,base64url(iv),base64url(encrypted),base64url(tag)].join('.');
+  return [TOKEN_CIPHER_PREFIX,keyVersion,base64url(iv),base64url(encrypted),base64url(tag)].join('.');
 }
 
 export function decryptAppleRefreshToken(value,{env=process.env}={}) {
-  const [version,ivRaw,dataRaw,tagRaw]=String(value||'').split('.');
-  if(version!==TOKEN_CIPHER_PREFIX||!ivRaw||!dataRaw||!tagRaw)
+  const [prefix,keyVersion,ivRaw,dataRaw,tagRaw,...rest]=String(value||'').split('.');
+  if(prefix!==TOKEN_CIPHER_PREFIX||keyVersion!=='v1'||!ivRaw||!dataRaw||!tagRaw||rest.length)
     throw Object.assign(Error('Stored Apple authorization is invalid.'),{status:500,code:'APPLE_TOKEN_STORAGE'});
   try {
-    const decipher=createDecipheriv('aes-256-gcm',encryptionKey(env),Buffer.from(ivRaw,'base64url'));
+    const decipher=createDecipheriv('aes-256-gcm',encryptionKey(env,keyVersion),Buffer.from(ivRaw,'base64url'));
     decipher.setAuthTag(Buffer.from(tagRaw,'base64url'));
     return Buffer.concat([decipher.update(Buffer.from(dataRaw,'base64url')),decipher.final()]).toString('utf8');
   } catch {
