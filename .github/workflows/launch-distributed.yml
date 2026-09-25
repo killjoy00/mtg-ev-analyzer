@@ -66,7 +66,7 @@ jobs:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
           PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
-          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+          LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
         run: node scripts/launch-distributed-fixtures.mjs
       - name: Deploy isolated Functions and private gateway
         id: deploy
@@ -80,7 +80,7 @@ jobs:
       - name: Encrypt isolated fixture credentials for the generator jobs
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+          LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
         run: node scripts/launch-distributed-bundle.mjs pack
       - uses: actions/upload-artifact@v4
         with:
@@ -107,7 +107,7 @@ jobs:
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
-      LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+      LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
       LOAD_TARGET: '25'
       LOAD_SHARD: ${{ matrix.shard }}
       LOAD_START_AT: ${{ needs.setup.outputs.start_at }}
@@ -167,7 +167,7 @@ jobs:
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
-      LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+      LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
       LOAD_TARGET: '100'
       LOAD_SHARD: ${{ matrix.shard }}
       LOAD_START_AT: ${{ needs.collect_25.outputs.start_at }}
@@ -227,7 +227,7 @@ jobs:
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
-      LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+      LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
       LOAD_TARGET: '500'
       LOAD_SHARD: ${{ matrix.shard }}
       LOAD_START_AT: ${{ needs.collect_100.outputs.start_at }}
@@ -287,7 +287,7 @@ jobs:
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
-      LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+      LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
       LOAD_TARGET: '1000'
       LOAD_SHARD: ${{ matrix.shard }}
       LOAD_START_AT: ${{ needs.collect_500.outputs.start_at }}
