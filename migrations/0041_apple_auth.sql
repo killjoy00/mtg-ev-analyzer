@@ -38,3 +38,15 @@ DO $$ BEGIN
 EXCEPTION
   WHEN duplicate_object THEN NULL;
 END $$;
+
+
+ALTER TABLE mobile_oauth_handoffs
+  ADD COLUMN IF NOT EXISTS purpose text NOT NULL DEFAULT 'signin';
+
+DO $$ BEGIN
+  ALTER TABLE mobile_oauth_handoffs
+    ADD CONSTRAINT mobile_oauth_handoffs_purpose_check
+    CHECK(purpose IN ('signin','delete'));
+EXCEPTION
+  WHEN duplicate_object THEN NULL;
+END $$;
