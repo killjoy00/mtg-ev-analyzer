@@ -57,14 +57,21 @@ async function loadSet(s) {
   if(!s.total_puzzles)return;
   const existing=remote?await importRequest(remote,{action:'status',setId:s.id}):(await query('SELECT corpus_version FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2',[s.id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
   if(existing?.corpus_version!==DRAFT_RUN_CORPUS_VERSION)throw Error('Baseline environment missing: '+s.id);
-  if(!remote)await query(`INSERT INTO corpus_source_snapshots(
-    source_snapshot_id,set_id,event_type,corpus_version,schema_version,draft_sha256,game_sha256,draft_etag,game_etag,
-    draft_last_modified,game_last_modified,importer_identity,model_identity,manifest,lifecycle_status)
-    VALUES($1,$2,'PremierDraft',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,'Blocked')
-    ON CONFLICT(source_snapshot_id) DO UPDATE SET manifest=EXCLUDED.manifest`,
-    [s.source_snapshot_id,s.id,DRAFT_RUN_CORPUS_VERSION,s.schema_version,s.source_archive.sha256,s.skill_source.sha256,
-     s.source_archive.etag||null,s.skill_source.etag||null,s.source_archive.last_modified||null,s.skill_source.last_modified||null,
-     s.import_version,s.model_version,JSON.stringify({full_import:s})]);
+  if(!remote){
+    const snapshotManifest=JSON.stringify({full_import:s});
+    const snapshot=(await query(`INSERT INTO corpus_source_snapshots(
+      source_snapshot_id,set_id,event_type,corpus_version,schema_version,draft_sha256,game_sha256,draft_etag,game_etag,
+      draft_last_modified,game_last_modified,importer_identity,model_identity,manifest,lifecycle_status)
+      VALUES($1,$2,'PremierDraft',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,'Blocked')
+      ON CONFLICT(source_snapshot_id) DO NOTHING
+      RETURNING source_snapshot_id,manifest`,
+      [s.source_snapshot_id,s.id,DRAFT_RUN_CORPUS_VERSION,s.schema_version,s.source_archive.sha256,s.skill_source.sha256,
+       s.source_archive.etag||null,s.skill_source.etag||null,s.source_archive.last_modified||null,s.skill_source.last_modified||null,
+       s.import_version,s.model_version,snapshotManifest])).rows[0]
+      ||(await query('SELECT source_snapshot_id,manifest FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[s.source_snapshot_id])).rows[0];
+    const existingManifest=typeof snapshot?.manifest==='string'?JSON.parse(snapshot.manifest):snapshot?.manifest;
+    if(snapshot?.source_snapshot_id!==s.source_snapshot_id||JSON.stringify(existingManifest)!==JSON.stringify(JSON.parse(snapshotManifest)))throw Error('Existing source snapshot differs; immutable snapshot cannot be rewritten: '+s.id);
+  }
   let batch=[],added=0;
   for await(const p of records(fileFor(s,'puzzle_file'))) {batch.push(p);if(batch.length===250){added+=await batchInsert(batch,s.source_snapshot_id);batch=[];}}
   if(batch.length)added+=await batchInsert(batch,s.source_snapshot_id);
