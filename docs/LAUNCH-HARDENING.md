@@ -112,7 +112,6 @@ credentials remain in a mode-0600 runner file and disappear with the branch.
 
 `launch-load-policy.json` declares route p95/p99, zero legitimate 429s and zero
 correctness failures, a 1% overall request-error ceiling, 50,000-request maximum,
-20-minute test budget and 8-CU compute cap. The workflow has a 30-minute overall
+20-minute test budget and 8-CU compute cap. The workflow has a 50-minute overall
 limit and a two-hour branch expiry. Confirmed-idle browser timing is a separate
-acceptance record; a warm-up is not labeled a cold start. Three warm browser
-samples per case provide a regression signal, not a stable population p95.
+acceptance record; a warm-up is not labeled a cold start. Twenty warm browser samples per case retain every observation, with p95/p99 and raw samples. Four isolated fixture accounts keep each case below the unchanged 30-starts/10-minute per-player limit. One confirmed-idle sample per case remains a cold regression check, not a stable population p95.

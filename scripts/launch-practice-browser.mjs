@@ -10,13 +10,16 @@ async function main() {
   const fixture=JSON.parse(fs.readFileSync(process.env.LOAD_FIXTURE_FILE,'utf8'));
   checkBranch(fixture.branch);assert.equal(fixture.branch,process.env.PREVIEW_BRANCH);assert.equal(fixture.sha,process.env.GITHUB_SHA);
   assert.match(process.env.PREVIEW_ACCESS_KEY||'',/^[a-f0-9]{64}$/);
-  const user=fixture.users[900],browser=await chromium.launch({headless:true,channel:'chrome'});
+  const browser=await chromium.launch({headless:true,channel:'chrome'});
   const context=await browser.newContext({viewport:{width:390,height:844}});
-  await context.addCookies([
+  const identify=async name=>{
+    const user=fixture.users[900+['mixed','powered-cube','custom-single','custom-multi'].indexOf(name)];
+    await context.addCookies([
     {name:'__Host-pack1_player',value:user.token,url:'https://api.packone.pro/',httpOnly:true,secure:true,sameSite:'Strict'},
     {name:'__Host-pack1_account',value:user.account,url:'https://api.packone.pro/',httpOnly:true,secure:true,sameSite:'Strict'},
     {name:'__Secure-pack1_csrf',value:user.csrf,domain:'.packone.pro',path:'/',secure:true,sameSite:'Strict'},
   ]);
+  };
   let apiCalls=0;
   await context.route('**/*',async route=>{
     const request=route.request(),url=new URL(request.url());
@@ -33,10 +36,11 @@ async function main() {
     await route.continue();
   });
   const page=await context.newPage(),errors=[],report={sha:fixture.sha,branch:fixture.branch,
-    scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
+    warm_samples_per_case:20,scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
   page.on('pageerror',()=>errors.push('browser_error'));
   const directory='artifacts/launch-load';fs.mkdirSync(directory,{recursive:true});
   const ready=async configuration=>{
+    await identify(configuration.name);
     if(configuration.custom) {
       await page.goto('https://packone.pro/?game=draft-run&custom=1',{waitUntil:'domcontentloaded'});
       await page.locator('#practice-sets').waitFor();
@@ -85,7 +89,7 @@ async function main() {
     };
     await cold({name:'mixed'});
     for(const configuration of [{name:'mixed'},{name:'powered-cube'},{name:'custom-single',custom:1},{name:'custom-multi',custom:3}])
-      for(let i=0;i<3;i++)await sample(configuration,await ready(configuration),'warm');
+      for(let i=0;i<20;i++)await sample(configuration,await ready(configuration),'warm');
     for(const configuration of [{name:'powered-cube'},{name:'custom-single',custom:1},{name:'custom-multi',custom:3}])await cold(configuration);
     report.summary=Object.fromEntries(['mixed','powered-cube','custom-single','custom-multi'].map(name=>{
       const rows=report.samples.filter(s=>s.case===name&&s.phase==='warm');
