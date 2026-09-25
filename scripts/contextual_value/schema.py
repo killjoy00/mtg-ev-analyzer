@@ -91,7 +91,11 @@ def validate_header(header: Sequence[str], kind: str) -> None:
             raise ValueError(f"game: missing required columns: {', '.join(missing)}")
         if not any(name.startswith("deck_") for name in header):
             raise ValueError("game: no deck_* columns found")
-        if not any(\n            name.startswith(prefix)\n            for name in header\n            for prefix in ("opening_hand_", "drawn_", "tutored_")\n        ):
+        if not any(
+            name.startswith(prefix)
+            for name in header
+            for prefix in ("opening_hand_", "drawn_", "tutored_")
+        ):
             raise ValueError("game: no in-hand card columns found")
         return
     raise ValueError(f"unknown archive kind: {kind}")
