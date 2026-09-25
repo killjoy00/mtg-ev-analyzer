@@ -1,4 +1,4 @@
-import {buildCampaignDraft,SUPPORTED_CAMPAIGN_DESTINATIONS,validateCampaignEntries} from '../campaign-links.mjs';
+import {buildCampaignDraft,campaignDestinationLabel,SUPPORTED_CAMPAIGN_DESTINATIONS,validateCampaignEntries} from '../campaign-links.mjs';
 
 const valueOf=(form,name)=>form.elements.namedItem(name)?.value??'';
 const show=value=>value||'—';
@@ -20,7 +20,7 @@ export async function renderCampaignLinks(root) {
       <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
       <label>Campaign<input name="campaign" autocomplete="off" spellcheck="false" placeholder="launch-week"><small data-error="campaign" class="error" hidden></small></label>
       <label>Medium (optional)<input name="medium" autocomplete="off" spellcheck="false" placeholder="social"><small data-error="medium" class="error" hidden></small></label>
-      <label>Destination<select name="destination">${SUPPORTED_CAMPAIGN_DESTINATIONS.map(value=>`<option value="${value}">Homepage (${value})</option>`).join('')}</select><small data-error="destination" class="error" hidden></small></label>
+      <label>Destination<select name="destination">${SUPPORTED_CAMPAIGN_DESTINATIONS.map(value=>`<option value="${value}">${campaignDestinationLabel(value)} (${value})</option>`).join('')}</select><small data-error="destination" class="error" hidden></small></label>
     </form>
     <div class="campaign-normalized" aria-label="Canonical normalized values">
       <div><span>Canonical slug</span><output id="canonical-slug">—</output></div>
