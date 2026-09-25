@@ -197,11 +197,20 @@ export function decryptAppleRefreshToken(value,{env=process.env}={}) {
   }
 }
 
-export function sanitizeAppleFirstName(value) {
+export function sanitizeAppleNamePart(value) {
   return String(value||'')
     .replace(/[\u0000-\u001f\u007f]/g,' ')
     .replace(/\s+/g,' ')
     .trim()
+    .slice(0,80);
+}
+
+export const sanitizeAppleFirstName=sanitizeAppleNamePart;
+
+export function appleDisplayName(firstName,lastName) {
+  return [sanitizeAppleNamePart(firstName),sanitizeAppleNamePart(lastName)]
+    .filter(Boolean)
+    .join(' ')
     .slice(0,80);
 }
 
@@ -299,6 +308,7 @@ export async function resolveAppleAccount(query,{
   nonce,
   redirectUri=null,
   firstName='',
+  lastName='',
   authBase,
   env=process.env,
   fetcher=fetch,
@@ -324,7 +334,7 @@ export async function resolveAppleAccount(query,{
     if(!authUserId) {
       try {
         const created=await createAppleAuthUser({
-          authBase,email,name:sanitizeAppleFirstName(firstName)||'Pack One Player',env,validateServicePrincipal,
+          authBase,email,name:appleDisplayName(firstName,lastName)||'Pack One Player',env,validateServicePrincipal,
         });
         authUserId=created.userId;
         syntheticPassword=created.syntheticPassword;
@@ -335,11 +345,12 @@ export async function resolveAppleAccount(query,{
         authUserId=raced.auth_user_id;
       }
     }
-    const given=sanitizeAppleFirstName(firstName)||null;
-    await query(`INSERT INTO apple_auth_identities(apple_subject,auth_user_id,email,first_name,synthetic_password)
-      SELECT $1,$2::uuid,$3,$4,$5::boolean
+    const given=sanitizeAppleNamePart(firstName)||null;
+    const family=sanitizeAppleNamePart(lastName)||null;
+    await query(`INSERT INTO apple_auth_identities(apple_subject,auth_user_id,email,first_name,last_name,synthetic_password)
+      SELECT $1,$2::uuid,$3,$4,$5,$6::boolean
       WHERE pack1_identity_attachment_allowed($2::uuid)
-      ON CONFLICT(apple_subject) DO NOTHING`,[subject,authUserId,email,given,syntheticPassword]);
+      ON CONFLICT(apple_subject) DO NOTHING`,[subject,authUserId,email,given,family,syntheticPassword]);
     record=(await query(`SELECT ai.auth_user_id,u.email,u.name,ai.synthetic_password
       FROM apple_auth_identities ai
       JOIN neon_auth."user" u ON u.id=ai.auth_user_id
