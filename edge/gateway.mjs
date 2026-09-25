@@ -44,7 +44,7 @@ function permitted(service,path,method,search,mode) {
     ].includes(path))return true;
     if(method==='GET'&&[
       '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback',
-      '/v1/mobile/account/google/callback','/v1/mobile/account/session',
+      '/v1/mobile/account/google/callback','/v1/mobile/account/session','/v1/mobile/version',
       '/v1/mobile/profile/me','/v1/mobile/profile/history',
       '/v1/stats','/v1/profile/me','/v1/profile/history','/v1/patreon/status',
     ].includes(path))return true;
@@ -187,6 +187,7 @@ export class NetworkQuota {
 }
 
 export function routeFamily(path) {
+  if(path==='/growth/v1/mobile/version')return 'mobile_version';
   if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share)$/.test(path))return 'draft_'+path.split('/').at(-1);
   if(path==='/draft/v1/runs')return 'draft_start';
   if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';

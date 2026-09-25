@@ -85,7 +85,9 @@ test('generated reddit launch page is static crawler-friendly redirect HTML',asy
   const file='go/reddit-launch/index.html';
   const html=await readFile(file,'utf8');
   assert.equal(html,renderCampaignRedirectPage(productionEntry),'committed generated page must match deterministic renderer');
-  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/mobile\/assets\/images\/icon\.png"/);
+  assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview\.png"/);
+  assert.match(html,/property="og:image:width" content="1200"/);
+  assert.match(html,/property="og:image:height" content="630"/);
   assert.match(html,/name="twitter:card" content="summary_large_image"/);
   assert.match(html,/name="robots" content="noindex,nofollow"/);
   assert.match(html,/property="og:url" content="https:\/\/packone\.pro\/"/);

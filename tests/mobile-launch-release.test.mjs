@@ -51,3 +51,25 @@ test('privacy page exposes the stable Play deletion resource and fallback reques
   assert.match(releaseDocs, /https:\/\/packone\.pro\/privacy\/#delete-account/);
   assert.doesNotMatch(releaseDocs, /- Sign in with Apple provider\/capability work/);
 });
+
+
+test('v1 contains a cold-start and resume forced-update gate with fail-open outage behavior', () => {
+  const layout = read('mobile/app/_layout.tsx');
+  const gate = read('mobile/src/components/VersionGate.tsx');
+  const policy = read('mobile/src/versionPolicy.ts');
+  const gateway = read('edge/gateway.mjs');
+  const releaseWorkflow = read('.github/workflows/secure-auth-release.yml');
+  const pkg = JSON.parse(read('mobile/package.json'));
+
+  assert.match(layout, /<VersionGate>/);
+  assert.equal(pkg.dependencies['expo-application'], '~57.0.3');
+  assert.match(gate, /Application\.nativeApplicationVersion/);
+  assert.match(gate, /Application\.nativeBuildVersion/);
+  assert.match(gate, /AppState\.addEventListener\('change'/);
+  assert.match(gate, /\/growth\/v1\/mobile\/version/);
+  assert.match(policy, /catch \{\s*return \{ status: 'allowed' \};\s*\}/);
+  assert.match(policy, /apps\.apple\.com/);
+  assert.match(policy, /play\.google\.com/);
+  assert.match(gateway, /'\/v1\/mobile\/version'/);
+  assert.match(releaseWorkflow, /migrations\/0040_mobile_minimum_version\.sql/g);
+});
