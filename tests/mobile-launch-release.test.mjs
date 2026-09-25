@@ -93,6 +93,9 @@ test('v1 implements Sign in with Apple across native iOS, Android/web handoff, a
   assert.match(account, /nonce: start\.flowToken/);
   assert.match(account, /finishNativeAppleSignIn/);
   assert.match(account, /finishAppleSignIn/);
+  assert.match(account, /credential\.fullName\?\.givenName/);
+  assert.match(account, /credential\.fullName\?\.familyName/);
+  assert.match(read('migrations/0041_apple_auth.sql'), /first_name text[\s\S]*last_name text/);
   assert.match(api, /\/growth\/v1\/mobile\/account\/apple\/native/);
   assert.match(worker, /\/v1\/account\/apple\/callback/);
   assert.match(worker, /revokeAppleAuthorization/);
