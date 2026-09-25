@@ -34,7 +34,7 @@ jobs:
       PACK1_ACCOUNT_DELETE_RESEND_API_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
       APPLE_SIGN_IN_KEY_P8: ${{ secrets.APPLE_SIGN_IN_KEY_P8 }}
-      APPLE_SIGN_IN_KEY_ID: N9L9483J64
+      APPLE_SIGN_IN_KEY_ID: ${{ secrets.APPLE_SIGN_IN_KEY_ID }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -75,6 +75,7 @@ jobs:
           [[ "$PACK1_AUTH_RESEND_API_KEY" == re_* ]] || { echo '::error::PACK1_AUTH_RESEND_API_KEY is missing or malformed.'; exit 1; }
           [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
           [[ "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo '::error::APPLE_TEAM_ID is missing or malformed.'; exit 1; }
+          [[ "$APPLE_SIGN_IN_KEY_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo '::error::APPLE_SIGN_IN_KEY_ID is missing or malformed.'; exit 1; }
           [[ "$APPLE_SIGN_IN_KEY_P8" == *"BEGIN PRIVATE KEY"* ]] || { echo '::error::APPLE_SIGN_IN_KEY_P8 is missing or malformed.'; exit 1; }
 
       - name: Build exact Neon function revision
