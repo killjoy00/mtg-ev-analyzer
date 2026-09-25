@@ -98,8 +98,8 @@ export async function main() {
   const [branchData,endpointData]=await Promise.all([control('/branches/'+branch),control('/branches/'+branch+'/endpoints')]);
   const endpoint=verifyTarget({branch,connection,branchRecord:branchData.branch,endpoints:endpointData.endpoints||[]});
   const cached=process.env.PACK1_BENCHMARK_CACHE==='1';
-  if(cached)execFileSync('psql',['-X','-v','ON_ERROR_STOP=1','-f','migrations/0039_practice_serving_cache.sql'],{
-    env:{...process.env,PGDATABASE:connection},stdio:['ignore','ignore','pipe'],timeout:120000,
+  if(cached)execFileSync('psql',['-X','-d',connection,'-v','ON_ERROR_STOP=1','-f','migrations/0039_practice_serving_cache.sql'],{
+    env:process.env,stdio:['ignore','ignore','pipe'],timeout:120000,
   });
   const query=sqlQuery(connection),day=gameDateKey();
   const report={schema_version:1,scope:'serial SQL-over-HTTP selector and metadata reload; not API, browser, cold-start or capacity evidence',
