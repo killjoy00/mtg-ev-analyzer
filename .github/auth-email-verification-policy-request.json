@@ -1,1 +1,0 @@
-{"operation":"enable-required-email-verification","reason":"Part of #246 Phase 2: require verified email ownership for password authentication after resend, expired-link, WebKit, migration, and live acceptance gates passed.","required_worker_commit":"d7dbaf89f391fd82b4f344285533aaee31f0fb0f"}
