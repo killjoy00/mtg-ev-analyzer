@@ -30,6 +30,57 @@ against server elapsed time with a five-second allowance. Reloads or multiple
 view IDs for the same exposure make timing unavailable. Missing timing is null,
 never zero. Client timing is descriptive and cannot affect game scores.
 
+## Acquisition attribution
+
+The browser records one best-effort `acquisition_touch` event on arrival through
+the existing `/v1/events` path. `utm_source`, `utm_campaign`, and optional
+`utm_medium` are trimmed, lowercased, and accepted only when they match
+`^[a-z0-9][a-z0-9_-]{0,39}# Decision quality reporting
+
+The owner console lives at `/admin/`. Its API is authenticated separately from
+anonymous player sessions: a live Neon account session must belong to
+`pack1_admins`. A 256-bit private setup code can grant the initial owner access.
+Only its SHA-256 hash is stored. Invitations expire after seven days and can be
+claimed by one account; a retry by that same existing admin is safe. Codes and
+account tokens must never be committed or sent in query strings. Revoking the
+admin row immediately revokes report access, including through an old invitation.
+
+## Collection
+
+`draft_run_decision_observations` records a browser-visible decision keyed by
+session and revision. A reroll closes that exposure and creates a new revision;
+the replacement is counted only when rendered. Feedback and hidden tabs do not
+start the next decision's timer. View calls are idempotent. Pick/reroll outcomes
+are saved in the same database statement as the optimistic game update, so
+retries and competing tabs cannot duplicate outcomes or detach them from scores.
+
+Older clients can continue playing. Their outcome rows have `observed=false`
+and are excluded from the primary report. Historical response times are never
+fabricated. A browser view is evidence the page rendered a decision, not proof
+that a human read every card or that every image finished loading.
+View delivery is best-effort: locking a pick waits at most 1.5 seconds for its
+view request, then proceeds. If the outcome wins that race, it remains explicitly
+unobserved rather than being counted as a timed exposure.
+
+. Invalid values are dropped rather than normalized
+into a different tag. Captured UTM parameters are removed from the address bar
+with `history.replaceState`, so copying the current URL does not spread a
+creator's campaign tag.
+
+When there is no valid `utm_source`, Pack One records only the external
+`document.referrer` hostname as a fallback, never its path or query. A marked
+Daily result share keeps its existing `ref=result_share` behavior and counts as
+source `result_share`; the sharer's own acquisition source is not copied into
+the share URL.
+
+First-touch attribution is derived in the admin query from the earliest
+`acquisition_touch` for the canonical player. Later tagged visits never replace
+an earlier direct touch or an earlier campaign. Existing players whose product
+activity predates acquisition tracking are labeled `pre_tracking`; post-launch
+players with no captured source are `direct`. Client events are unauthenticated
+and can be forged or lost on immediate exit, so attribution is directional
+product analytics rather than billing or security evidence.
+
 ## Report definitions
 
 - **Primary cohort:** viewed decisions from non-QA sessions, first recorded
@@ -64,6 +115,43 @@ while starts and completions are server-written. The funnel follows the selected
 date range and environment only; the decision-specific run type, set, difficulty,
 pick and selection-version filters do not apply.
 
+## Daily habit and return metrics
+
+Launch habit metrics use completed `draft_run_sessions`, not browser analytics
+events and not the ranked `scores` table. A Daily completion is any completed
+Mixed, Powered Cube, or Latest Set session whose `day` is non-null. The stored
+Pacific Daily `day` is authoritative even when completion crosses midnight;
+multiple Dailies on one date count as one Daily day.
+
+Every launch metric applies the same exclusion rule: sessions with
+`measurement_qa`, players matching the established QA display-name pattern, and
+players linked to an account in `pack1_admins` are excluded. A linked account is
+one person across merged player/browser identities where the data allows it.
+Guests remain one person per browser/player identity; the admin UI states this
+limitation.
+
+For each person, **first real Daily** is the earliest included Daily completion
+date. The cohort metrics are:
+
+- **Next-day return:** completed any Daily on first day + 1.
+- **7-day return:** completed any Daily from first day + 1 through first day + 7.
+- **3-in-7:** completed Dailies on at least three distinct dates from first day
+  through first day + 6. This is the launch KPI.
+- **Ever 3-in-7:** whether the person has ever reached three distinct Daily dates
+  inside any seven-day window observed so far.
+- **Daily health:** for each Pacific date D, people with at least three distinct
+  Daily completion dates from D-6 through D.
+
+Rate denominators include only cohorts whose entire measurement window has
+closed. Immature cohorts are shown separately rather than counted as failures.
+Every rate is displayed with its raw numerator and mature denominator. Cohort
+rows are broken out by first-touch source and campaign, including `direct`,
+`result_share`, and `pre_tracking`.
+
+The legacy `analytics_daily_next_day_retention` view remains in place for
+compatibility but is superseded. It reads ranked scores, excludes guests, and is
+not the Pack One launch retention KPI.
+
 Filters cover UTC date range (up to one year), environment, run type, set,
 difficulty band, real pick number and selection version. Groups show difficulty,
 pick depth, game position, set, model disagreement and the combined scoring /
@@ -74,6 +162,37 @@ QA runs set `qa:true` at creation. Existing test-name conventions are recognized
 server-side and persisted on new sessions; the reporting view also recognizes
 legacy QA names. Clients can opt a run out of research, never opt into admin
 access. No personal identifiers or emails appear in report responses or exports.
+
+## Owner usage
+
+Use campaign links in the form:
+
+`https://packone.pro/?utm_source=<source>&utm_campaign=<campaign>`
+
+Add `&utm_medium=<medium>` only when it is useful. Keep each value to lowercase
+letters/numbers plus `_` or `-`, with at most 40 characters. Creator codes do
+not require a deploy. Example:
+
+`https://packone.pro/?utm_source=reddit&utm_campaign=reality_fracture_launch&utm_medium=post`
+
+For result sharing, use the product's Share result action; do not append campaign
+parameters to result-share URLs. Recipients are attributed to
+`result_share`, independently from the sharer's original source.
+
+In `/admin/`, open the measurements area and choose the cohort date range you
+want to inspect. The **Daily habit cohorts** table shows source/campaign rows with
+first-Daily people, next-day return, 7-day return, 3-in-7, and ever-3-in-7. Each
+rate includes its mature numerator/denominator and an immature count. The
+**3-in-7 daily health** table is the operational habit line: it answers how many
+people currently have three or more Daily days in the trailing seven Pacific
+dates. Environment and decision-specific filters intentionally do not change
+these habit metrics because the KPI spans all three Dailies.
+
+Completed Daily results and the all-Dailies-complete home state show the local
+time until the next Pacific reset. A streak appears only at two or more
+consecutive Daily dates and is derived from completed Daily sessions across all
+three Dailies; the profile `current_streak` field keeps its older ranked-score
+meaning.
 
 ## Operations and verification
 
