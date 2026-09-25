@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$VALIDATED_RUN_ID" || { echo 'production requires validated_run_id from a successful development Corpus Operations run' >&2; exit 1; }
-          gh run view "$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch --jq 'select(.conclusion=="success" and .workflowName=="Corpus Operations" and .headBranch=="main")' | grep -q .
+          gh run view "$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha --jq --arg sha "$GITHUB_SHA" 'select(.conclusion=="success" and .workflowName=="Corpus Operations" and .headBranch=="main" and .headSha==$sha)' | grep -q .
           rm -rf generated/corpus-candidates generated/corpus-operations
           mkdir -p generated/corpus-candidates generated/corpus-operations
           gh run download "$VALIDATED_RUN_ID" --name "corpus-operations-$VALIDATED_RUN_ID" --dir "$RUNNER_TEMP/validated"
@@ -120,6 +120,7 @@ jobs:
             generated/corpus-candidates/*/puzzles.jsonl.gz
 
   retained-health:
+    needs: corpus
     if: ${{ always() }}
     runs-on: ubuntu-latest
     timeout-minutes: 45
