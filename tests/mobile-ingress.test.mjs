@@ -149,3 +149,34 @@ test('native Google callback only permits the Pack One account deep link',async(
   assert.equal(rejected.status,502);
   assert.equal(rejected.headers.get('location'),null);
 });
+
+
+test('Apple form callback is forwarded without JSON coercion and may return the account deep link',async()=>{
+  const payload=new URLSearchParams({
+    state:'s'.repeat(43),
+    code:'apple-code',
+    id_token:'apple-id-token',
+  }).toString();
+  let seen=null;
+  const callback=new Request('https://api.packone.pro/growth/v1/account/apple/callback',{
+    method:'POST',
+    headers:headers({'content-type':'application/x-www-form-urlencoded'}),
+    body:payload,
+  });
+  const accepted=await gateway(callback,env(),async(url,options)=>{
+    seen={
+      url,
+      body:options.body,
+      contentType:new Headers(options.headers).get('content-type'),
+    };
+    return new Response(null,{
+      status:302,
+      headers:{location:'packone://account?appleHandoff='+'h'.repeat(43)},
+    });
+  });
+  assert.equal(accepted.status,302);
+  assert.equal(accepted.headers.get('location'),'packone://account?appleHandoff='+'h'.repeat(43));
+  assert.match(seen.url,/pack1growth.*\/v1\/account\/apple\/callback$/);
+  assert.equal(seen.body,payload);
+  assert.equal(seen.contentType,'application/x-www-form-urlencoded');
+});
