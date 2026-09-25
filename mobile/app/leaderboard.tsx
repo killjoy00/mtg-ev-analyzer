@@ -4,11 +4,12 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
-  SafeAreaView,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
   DAILY_ENVIRONMENTS,
@@ -22,6 +23,7 @@ import {
   type LeaderboardPeriod,
   type LeaderboardRow,
 } from '@/src/api/leaderboard';
+import { useAppResume } from '@/src/hooks/useAppResume';
 import { colors, spacing } from '@/src/theme';
 
 const periods: { id: LeaderboardPeriod; label: string }[] = [
@@ -99,6 +101,11 @@ export default function LeaderboardScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const requestId = useRef(0);
+
+  useAppResume(() => {
+    setRefreshing(true);
+    setReloadKey((value) => value + 1);
+  });
 
   useEffect(() => {
     const timer = setTimeout(() => {
