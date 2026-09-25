@@ -935,10 +935,14 @@ async function handleAppleCallback(request) {
     await query('UPDATE mobile_oauth_handoffs SET consumed_at=COALESCE(consumed_at,now()) WHERE flow_hash=$1',[digest(flowToken)]).catch(()=>{});
     return appleReturn(flow.flow_kind,{apple:'error'});
   }
-  let firstName='';
+  let firstName='',lastName='';
   const userRaw=String(form.get('user')||'');
   if(userRaw) {
-    try {firstName=sanitizeAppleFirstName(JSON.parse(userRaw)?.name?.firstName||'');} catch {}
+    try {
+      const appleName=JSON.parse(userRaw)?.name||{};
+      firstName=sanitizeAppleFirstName(appleName.firstName||'');
+      lastName=sanitizeAppleFirstName(appleName.lastName||'');
+    } catch {}
   }
   try {
     const auth=await resolveAppleAccount(query,{
@@ -948,6 +952,7 @@ async function handleAppleCallback(request) {
       nonce:flowToken,
       redirectUri:APPLE_REDIRECT_URI,
       firstName,
+      lastName,
       authBase:NEON_AUTH_BASE,
       validateServicePrincipal:appleServicePrincipalAllowed,
     });
@@ -1012,6 +1017,7 @@ async function handleMobileAppleNative(request) {
     clientId:APPLE_NATIVE_CLIENT_ID,
     nonce:flowToken,
     firstName:sanitizeAppleFirstName(payload.firstName||''),
+    lastName:sanitizeAppleFirstName(payload.lastName||''),
     authBase:NEON_AUTH_BASE,
     validateServicePrincipal:appleServicePrincipalAllowed,
   });
