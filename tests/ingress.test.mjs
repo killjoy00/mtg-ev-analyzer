@@ -131,13 +131,75 @@ test('strict session quota applies only to new player-session creation',async()=
   const kinds=[];
   const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'e'.repeat(64),
     NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async request=>{kinds.push(new URL(request.url).pathname);return new Response(null,{status:204});}})}};
-  const upstream=async()=>Response.json({ok:true});
+  const paths=[];
+  const upstream=async url=>{paths.push(new URL(url).pathname);return Response.json({ok:true});};
   const headers={'cf-connecting-ip':'192.0.2.44','origin':'https://packone.pro'};
   await gateway(new Request('https://api.packone.pro/growth/v1/account/session',{headers}),prod,upstream);
   await gateway(new Request('https://api.packone.pro/growth/v1/player/session',{method:'POST',headers:{...headers,'content-type':'application/json'},body:'{}'}),prod,upstream);
   const player='p1_00000000-0000-4000-8000-000000000000.'+'x'.repeat(43);
   await gateway(new Request('https://api.packone.pro/growth/v1/player/session',{method:'POST',headers:{...headers,'content-type':'application/json',cookie:'__Host-pack1_player='+player},body:'{}'}),prod,upstream);
   assert.deepEqual(kinds,['/request','/session','/request']);
+  assert.deepEqual(paths,['/v1/account/session','/v1/player/session','/internal/player-session-refresh']);
+});
+
+test('invalid cookies must pass the session quota before the origin can create a player',async()=>{
+  for(const cookie of ['invalid','p1_00000000-0000-4000-8000-000000000000.'+'x'.repeat(43)]) {
+    for(const allowed of [true,false]) {
+      const kinds=[],paths=[];
+      const quotaEnv={...env,NETWORK_QUOTA:{idFromName:x=>x,get:()=>({fetch:async request=>{
+        const kind=new URL(request.url).pathname;kinds.push(kind);
+        if(kind==='/session-only'&&!allowed)return Response.json({code:'network_rate_limited',scopes:['session']},{status:429,headers:{'retry-after':'600'}});
+        return new Response(null,{status:204});
+      }})}};
+      const result=await gateway(req('/growth/v1/player/session',{headers:{origin:'https://packone.pro',cookie:'__Host-pack1_player='+cookie,
+        'x-pack1-session-state':'valid'}}),quotaEnv,async(url,options)=>{
+        paths.push(new URL(url).pathname);
+        assert.equal(options.headers.get('x-pack1-session-state'),null,'client cannot forge origin proof');
+        if(paths.length===1) {
+          assert.equal(options.headers.get('authorization'),'Bearer '+cookie);
+          return new Response(null,{status:401,headers:{'x-pack1-session-state':'missing'}});
+        }
+        assert.equal(options.headers.get('authorization'),null);
+        assert.equal(kinds.at(-1),'/session-only','quota precedes creation');
+        return Response.json({ok:true},{status:201,headers:{'set-cookie':'__Host-pack1_player=replacement; Path=/; Secure; HttpOnly'}});
+      });
+      assert.deepEqual(kinds,['/request','/session-only']);
+      assert.deepEqual(paths,allowed?['/internal/player-session-refresh','/v1/player/session']:['/internal/player-session-refresh']);
+      assert.equal(result.status,allowed?201:429);
+      assert.equal(result.headers.get('x-pack1-session-state'),null);
+      if(!allowed){assert.deepEqual((await result.json()).scopes,['session']);assert.equal(result.headers.get('retry-after'),'600');}
+    }
+  }
+});
+
+test('an unavailable or incompatible refresh endpoint never falls back to identity creation',async()=>{
+  for(const status of [401,403,404,429,500,503]) {
+    const kinds=[],paths=[];
+    const quotaEnv={...env,NETWORK_QUOTA:{idFromName:x=>x,get:()=>({fetch:async request=>{kinds.push(new URL(request.url).pathname);return new Response(null,{status:204});}})}};
+    const result=await gateway(req('/growth/v1/player/session',{headers:{cookie:'__Host-pack1_player=invalid'}}),quotaEnv,async url=>{
+      paths.push(new URL(url).pathname);return new Response(null,{status});
+    });
+    assert.equal(result.status,status);
+    assert.deepEqual(kinds,['/request']);assert.deepEqual(paths,['/internal/player-session-refresh']);
+  }
+  let calls=0;
+  assert.equal((await gateway(req('/growth/v1/player/session',{headers:{cookie:'__Host-pack1_player=invalid'}}),env,async()=>{calls++;throw Error('timeout');})).status,503);
+  assert.equal(calls,1);
+});
+
+test('internal refresh cannot create an identity or be reached through the public gateway',async()=>{
+  const original=globalThis.fetch;
+  try {
+    globalThis.fetch=async()=>{throw Error('Read-only invalid-token refresh must not touch the database');};
+    for(const token of ['', 'invalid']) {
+      const result=await growth.fetch(new Request('https://origin.test/internal/player-session-refresh',{
+        method:'POST',headers:{origin:'https://packone.pro',authorization:'Bearer '+token,'content-type':'application/json'},body:'{}',
+      }));
+      assert.equal(result.status,401);assert.equal(result.headers.get('x-pack1-session-state'),'missing');
+      assert.equal(result.headers.get('set-cookie'),null);
+    }
+  } finally {globalThis.fetch=original;}
+  assert.equal((await gateway(req('/growth/internal/player-session-refresh'),env,()=>{throw Error('Must not forward');})).status,404);
 });
 
 test('the gateway splits the one joined Set-Cookie a Neon function can emit',async()=>{

@@ -638,13 +638,20 @@ async function historyPage(playerId, cursor, limit = 25) {
   return { rows, next_cursor: rows.length === safeLimit ? rows.at(-1)?.cursor || null : null };
 }
 
-async function handleBrowserPlayerSession(request) {
+async function handleBrowserPlayerSession(request,{existingOnly=false}={}) {
   requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const current=await player(request,false);
   if(current) {
     const meta=await profileMetaByPlayer(current);
     return json({ok:true,playerId:current,displayName:meta?.display_name||'Pack Player',profileKey:meta?.profile_key||null});
   }
+  // The gateway uses this read-only path before exempting a returning browser
+  // from the creation quota. An invalid/deleted identity must never create a
+  // player here. Older deployments return 404 for the separate internal route,
+  // so a gateway/backend version mismatch fails closed.
+  if(existingOnly)return Response.json({error:'Player session required.'},{status:401,headers:{
+    'cache-control':'no-store','x-pack1-session-state':'missing',
+  }});
   const payload=await readJson(request);
   const id=crypto.randomUUID(),token=await tokenFor(id);
   const displayName=await upsertPlayer(id,payload.displayName||'Pack Player');
@@ -1774,6 +1781,7 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/google/callback') return handleMobileGoogleCallback(request);
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
+  if (request.method === 'POST' && url.pathname === '/internal/player-session-refresh') return handleBrowserPlayerSession(request,{existingOnly:true});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signup') return handleAccountSignup(request);
