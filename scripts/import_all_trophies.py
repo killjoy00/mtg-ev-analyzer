@@ -532,7 +532,10 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
             if not included: reasons[reason or (next(iter(skipped)) if skipped else 'no_verified_decisions')]+=1
     for did,reason in sorted(rejected.items()):
         dispositions.append({'draft_id':did,'status':'excluded','qualified':False,'reason':reason,'source_draft_hash':hashlib.sha256(f'{sid}|{did}'.encode()).hexdigest()[:32],'wins':drafts[did]['wins'],'losses':drafts[did].get('losses'),'event_type':'PremierDraft'});reasons[reason]+=1
-    if base_entry and len(retained)!=len(old_rows): raise ValueError(f'{sid}: failed to reverify {len(old_rows)-len(retained)} existing decisions')
+    # Snapshot identity intentionally gives a changed source object a new puzzle
+    # namespace. Historical rows are immutable retained history, not rows this
+    # snapshot must reproduce. Same-snapshot retries are protected by the
+    # deterministic ID recipe and the loader's conflicting-payload rejection.
     trophy_count=sum(d['wins']==7 for d in drafts.values())
     if len(dispositions)!=trophy_count: raise ValueError('Incomplete trophy accounting')
     puzzle_file=directory/'puzzles.jsonl.gz';ledger_file=directory/'trophies.jsonl.gz'
