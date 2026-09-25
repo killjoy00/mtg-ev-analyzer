@@ -11,7 +11,7 @@ try {
   assert.equal(await page.getByRole('button',{name:'Export CSV'}).count(),0);
   const sample={exposures:40,players:35,answers:32,trophy_match_pct:37.5,average_partial_credit:65,median_seconds:12,p90_seconds:28,timed_answers:29,rerolls:5,likely_abandoned:2,mature_exposures:30,pending:1,partial_0_24:1,partial_25_49:4,partial_50_74:8,partial_75_95:7,runs:9,completed_runs:6};
   const fixture={generated_at:'2026-09-12T12:00:00Z',filters:{start:'2026-09-01',end:'2026-09-12',environment:'all',type:'all',set:'all',version:'all',band:'all',pick:'all'},coverage:{qa_excluded:8,repeats_excluded:3,unobserved_excluded:2},summary:sample,share_funnel:{arrivals:20,visitors:17,starts:12,completions:9,start_pct:60,completion_pct:75},habit_metrics:{cohorts:[{source:'reddit',campaign:'creator_one',cohort_people:10,next_day_mature:8,next_day_returned:3,next_day_immature:2,next_day_rate:37.5,seven_day_mature:5,seven_day_returned:2,seven_day_immature:5,seven_day_rate:40,three_in_seven_mature:6,three_in_seven_reached:2,three_in_seven_immature:4,three_in_seven_rate:33.3,ever_three_in_seven_people:4,ever_three_in_seven_rate:40}],daily_health:[{day:'2026-09-12',people:4}]},groups:['difficulty','pick','round','set','model_disagreement','version'].map((dimension,i)=>({...sample,dimension,label:['hard','9','8','blb','true','first-pack-v2 / trophy-consensus-v2 / support-ratio-v1'][i]})),sets:['blb','powered-cube'],reviews:[{...sample,puzzle_id:'a'.repeat(32),set_id:'blb',pick_number:9,model_disagreement:true}]};
-  await page.addInitScript(()=>localStorage.setItem('pack1-auth-session-v1','synthetic-admin-session'));
+  await page.addInitScript(()=>{localStorage.setItem('pack1-auth-session-v1','synthetic-admin-session');Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.__copiedText=value;}}});});
   const requests=[];
   const userId='11111111-1111-4111-8111-111111111111';
   await page.route('**/v1/admin/**',async route=>{
@@ -69,6 +69,32 @@ try {
   assert.equal((await page.locator('#user-detail').innerText()).includes('player_id'),false);
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-users-${width}.png`,fullPage:true});}
   await page.getByRole('button',{name:'Close'}).click();
+  await page.getByRole('link',{name:'Campaign Links',exact:true}).click();
+  await page.getByRole('heading',{name:'Campaign Links / Link Builder'}).waitFor();
+  await page.getByText('1 published campaign link(s).',{exact:true}).waitFor();
+  await page.getByLabel('Slug',{exact:true}).fill('New-Launch');
+  await page.getByLabel('Source',{exact:true}).fill(' Reddit ');
+  await page.getByLabel('Campaign',{exact:true}).fill(' Launch-Week ');
+  await page.getByLabel('Medium (optional)',{exact:true}).fill(' SOCIAL ');
+  assert.equal(await page.locator('#canonical-slug').innerText(),'new-launch');
+  assert.equal(await page.locator('#canonical-source').innerText(),'reddit');
+  assert.equal(await page.locator('#canonical-campaign').innerText(),'launch-week');
+  assert.equal(await page.locator('#canonical-medium').innerText(),'social');
+  const tracked='https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social';
+  assert.equal(await page.getByLabel('Tracked UTM URL').inputValue(),tracked);
+  assert.equal(await page.getByLabel('Intended vanity URL').inputValue(),'https://packone.pro/go/new-launch/');
+  assert.deepEqual(JSON.parse(await page.getByLabel('campaign-links.json entry').inputValue()),{slug:'new-launch',destination:'/',source:'reddit',campaign:'launch-week',medium:'social'});
+  await page.getByRole('button',{name:'Copy tracked URL'}).click();
+  assert.equal(await page.evaluate(()=>window.__copiedText),tracked);
+  await page.getByLabel('Source',{exact:true}).fill('launch week');
+  assert.ok(await page.locator('[data-error="source"]').isVisible());
+  assert.equal(await page.getByRole('button',{name:'Copy tracked URL'}).isDisabled(),true);
+  await page.getByLabel('Source',{exact:true}).fill('reddit');
+  await page.getByLabel('Slug',{exact:true}).fill('REDDIT-LAUNCH');
+  assert.match(await page.locator('#slug-warning').innerText(),/already exists in campaign-links\.json/);
+  assert.equal(await page.getByRole('button',{name:'Copy JSON entry'}).isDisabled(),true);
+  assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth+1),'Campaign link builder must not overflow horizontally');
+  await page.screenshot({path:'artifacts/ui-campaign-links-mobile.png',fullPage:true});
   assert.deepEqual(errors,[]);
   console.log('Admin mobile layout, locked state, filters, review details and CSV export passed.');
 } finally {await browser.close();}
