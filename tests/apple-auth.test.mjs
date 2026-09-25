@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   generateKeyPairSync,
   sign,
+  verify,
 } from 'node:crypto';
 
 import {
@@ -54,7 +55,7 @@ test('Apple client secret is short lived and signed for the requested client',()
   assert.equal(JSON.parse(Buffer.from(head,'base64url').toString('utf8')).kid,'KEYID12345');
   assert.equal(sign('sha256',Buffer.from('not-the-token'),{key:privateKey,dsaEncoding:'ieee-p1363'}).length,64);
   assert.equal(
-    (await import('node:crypto')).verify(
+    verify(
       'sha256',
       Buffer.from(head+'.'+payload),
       {key:publicKey,dsaEncoding:'ieee-p1363'},
