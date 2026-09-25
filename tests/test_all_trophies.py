@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from import_all_trophies import eligible_trophies, trajectory, rows, collect_legacy_v3, premier_sources, BASE, scan_metadata
+from import_all_trophies import eligible_trophies, trajectory, rows, collect_legacy_v3, premier_sources, BASE, scan_metadata, classify_source_schema, source_snapshot_identity
 from build_replays import PickExample
 
 class FullTrophyTests(unittest.TestCase):
@@ -56,6 +56,27 @@ class FullTrophyTests(unittest.TestCase):
             # The normal importer continues to reject inconsistent source outcomes.
             drafts,_,_,conflicts=scan_metadata(p)
             self.assertEqual(eligible_trophies(drafts,.6,conflicts=conflicts)[0],{})
+
+    def test_new_environments_fail_closed_without_modern_skill_schema(self):
+        base=['expansion','event_type','draft_id','draft_time','rank','event_match_wins','event_match_losses','pack_number','pick_number']
+        with self.assertRaisesRegex(ValueError,'unknown Draft schema'):
+            classify_source_schema(base,'fra')
+        self.assertEqual(classify_source_schema(base,'stx'),'premier-historical-arena-rank-v1')
+        self.assertEqual(classify_source_schema(base+['user_n_games_bucket','user_game_win_rate_bucket'],'fra'),'premier-modern-skill-buckets-v1')
+
+    def test_source_snapshot_identity_changes_with_either_source(self):
+        draft={'sha256':'a'*64};game={'sha256':'b'*64}
+        first=source_snapshot_identity('fra','premier-modern-skill-buckets-v1',draft,game)
+        self.assertRegex(first,r'^[a-f0-9]{64}$')
+        self.assertNotEqual(first,source_snapshot_identity('fra','premier-modern-skill-buckets-v1',{'sha256':'c'*64},game))
+        self.assertNotEqual(first,source_snapshot_identity('fra','premier-modern-skill-buckets-v1',draft,{'sha256':'d'*64}))
+
+    def test_new_snapshot_does_not_require_reproducing_historical_puzzle_ids(self):
+        import inspect
+        from import_all_trophies import build_set
+        source=inspect.getsource(build_set)
+        self.assertNotIn('failed to reverify',source)
+        self.assertIn("f'{VERSION}|{snapshot_id}|{sid}|{did}|{n}'",source)
 
     def test_legacy_requires_actual_rank_and_experience(self):
         drafts={'ok':{'wins':7,'games':100,'rank':'diamond'},'no':{'wins':7,'games':100,'rank':'platinum'},'missing':{'wins':7,'games':None,'rank':'mythic'}}

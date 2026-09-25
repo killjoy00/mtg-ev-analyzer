@@ -21,6 +21,12 @@ const result=await query(`SELECT
   to_regclass('corpus_health_checks') IS NOT NULL corpus_health,
   to_regclass('corpus_trophy_trajectories') IS NOT NULL corpus_provenance,
   to_regclass('corpus_sources') IS NOT NULL corpus_sources,
+  to_regclass('corpus_source_snapshots') IS NOT NULL corpus_source_snapshots,
+  to_regclass('corpus_source_snapshot_trajectories') IS NOT NULL corpus_source_snapshot_trajectories,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='draft_run_verified_puzzles' AND column_name='source_snapshot_id') puzzle_source_snapshot,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='corpus_health_checks' AND column_name='source_snapshot_id') health_source_snapshot,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='draft_run_environment_policy' AND column_name='active_snapshot_id') active_source_snapshot,
+  (SELECT count(*)=4 FROM information_schema.columns WHERE table_name='corpus_sources' AND column_name IN ('game_archive_url','game_archive_available','game_archive_etag','game_archive_last_modified')) dual_source_preflight,
   to_regclass('player_request_limits') IS NOT NULL limits,
   to_regclass('entitlement_grants') IS NOT NULL capabilities,
   to_regclass('account_sessions') IS NOT NULL account_sessions,
@@ -78,6 +84,6 @@ const result=await query(`SELECT
   position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0040 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0041 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');

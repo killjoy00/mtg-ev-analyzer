@@ -33,9 +33,6 @@ on:
       - 'tests/test_data_health.py'
       - 'tests/test_card_metadata.py'
       - 'tests/test_data_pipeline_workflows.py'
-  schedule:
-    - cron: '17 10 * * *'
-
 permissions:
   contents: write
   actions: write
@@ -66,33 +63,8 @@ jobs:
         with:
           python-version: '3.12'
 
-      # Until this ran, a set entered Pack One only when somebody remembered to
-      # edit data/import-queue.json by hand. Nothing watched for a release, so a
-      # newly published environment could sit unimported indefinitely - which is
-      # exactly what had happened. Discovery is committed rather than consumed
-      # in place so the queue stays a reviewable record of what was admitted.
-      - name: Queue newly released environments
-        shell: bash
-        run: |
-          set -euo pipefail
-          python scripts/refresh_import_queue.py
-          if git diff --quiet -- data/import-queue.json; then
-            echo 'No new environments to queue.'
-            exit 0
-          fi
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -- data/import-queue.json
-          git commit -m 'Queue newly released 17Lands environments [data-generated]'
-          for attempt in 1 2 3; do
-            if git pull --rebase origin "$GITHUB_REF_NAME" && git push origin "HEAD:$GITHUB_REF_NAME"; then
-              exit 0
-            fi
-            git rebase --abort >/dev/null 2>&1 || true
-            sleep $((attempt * 5))
-          done
-          echo 'Could not publish the refreshed import queue.' >&2
-          exit 1
+      # Prospective environment discovery is owned exclusively by Corpus Operations.
+      # This workflow may finish the already-reviewed historical backlog only.
 
       - name: Route catalog ownership
         id: route
@@ -103,6 +75,18 @@ jobs:
         run: |
           set -euo pipefail
           echo 'should_import=false' >> "$GITHUB_OUTPUT"
+
+          if [[ -n "$SETS" ]]; then
+            SETS="$SETS" python - <<'PY'
+import json, os
+from pathlib import Path
+requested={s.strip().upper() for s in os.environ['SETS'].split(',') if s.strip()}
+queue={str(s).upper() for s in (json.loads(Path('data/import-queue.json').read_text()).get('sets') or [])}
+unknown=sorted(requested-queue)
+if unknown:
+    raise SystemExit('Legacy importer cannot admit prospective environments; not in reviewed backlog: '+','.join(unknown))
+PY
+          fi
 
           read -r pending cube_live < <(python - <<'PY'
           import json
