@@ -65,7 +65,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
 } else {
   // Paint play links before identity/profile requests. Profiles load on demand.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
-    ? await import('./daily-home.mjs?v=6') : null;
+    ? await import('./daily-home.mjs?v=7') : null;
   home?.renderDailyHome();
   const growthReady = import('./growth.mjs?v=6');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
@@ -133,7 +133,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     await identityReady;
     (await import('./profile-product.mjs?v=6')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=6');
+    const game = await import('./draft-run-product.mjs?v=7');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();

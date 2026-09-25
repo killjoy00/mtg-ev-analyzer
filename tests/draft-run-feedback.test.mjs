@@ -40,6 +40,6 @@ test('feedback and shared HTML escaping protect card names and attributes',()=>{
 
 test('result text is spoiler-free, dated, and distinguishes Cube, practice and trophy matches',()=>{
  const run={day:'2026-09-14',score:65,answers:[{score:100,historicalMatch:true,selectedName:'Secret card'},{score:95},{score:60},{score:25},{score:0}]};
- const text=draftRunShareText(run);assert.match(text,/Draft Run · Daily 2026-09-14/);assert.match(text,/🟩🟦🟨🟧⬛/);assert.doesNotMatch(text,/Secret/);
+ const text=draftRunShareText(run);assert.match(text,/I scored 65\/100 on today’s Pack One Draft Run\. Can you beat it\?/);assert.match(text,/Daily 2026-09-14/);assert.match(text,/🟩🟦🟨🟧⬛/);assert.doesNotMatch(text,/Secret/);
  assert.match(draftRunShareText({...run,day:null,environment:'powered-cube'}),/Powered Cube · Practice/);
 });

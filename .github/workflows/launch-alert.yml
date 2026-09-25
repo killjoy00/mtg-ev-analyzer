@@ -1,0 +1,43 @@
+name: production launch telemetry and usage alert
+on:
+  schedule:
+    - cron: '2,7,12,17,22,27,32,37,42,47,52,57 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['scripts/launch-alert.mjs', '.github/workflows/launch-alert.yml']
+  pull_request:
+    branches: [main]
+    paths: ['scripts/launch-alert.mjs', '.github/workflows/launch-alert.yml']
+permissions:
+  contents: read
+  issues: write
+concurrency:
+  group: pack1-production-launch-alert
+  cancel-in-progress: false
+jobs:
+  alert:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      GITHUB_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify telemetry access without sending an alert
+        if: github.event_name == 'pull_request'
+        run: node scripts/launch-alert.mjs check
+      - name: Route production threshold breaches
+        if: github.event_name != 'pull_request'
+        run: node scripts/launch-alert.mjs alert
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: launch-alert-${{ github.run_id }}
+          path: artifacts/launch-alert
+          retention-days: 14

@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - 'scripts/practice-performance.mjs'
+      - 'scripts/practice-cache-publication.mjs'
       - 'worker/draft-run-selection.mjs'
       - 'migrations/0039_practice_serving_cache.sql'
       - 'tests/practice-performance.test.mjs'
@@ -53,6 +54,12 @@ jobs:
           PACK1_BENCHMARK_SAMPLES: '3'
           PACK1_BENCHMARK_CACHE: '1'
         run: node scripts/practice-performance.mjs
+      - name: Verify concurrent publication rollback and bulk trigger cost
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PACK1_BENCHMARK_BRANCH: ${{ steps.neon.outputs.branch_id }}
+        run: node scripts/practice-cache-publication.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
