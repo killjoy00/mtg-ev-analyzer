@@ -1,0 +1,222 @@
+name: Android internal testing
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/android-internal-testing.yml'
+  push:
+    branches:
+      - 'chatgpt/pack-one-mobile-v2-android-internal-testing'
+    paths:
+      - '.github/android-internal-test-request.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: android-internal-testing-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  signing-config-smoke:
+    name: validate Android upload signing config
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      # PR smoke builds are never uploaded. The publishing job below allocates
+      # against Google Play so workflow renames/retries cannot reuse a versionCode.
+      - name: Set smoke version code
+        shell: bash
+        run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Validate production mobile config
+        run: npm test
+      - name: Generate production Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform android --clean
+      - name: Verify native Android version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle || {
+            echo "Generated Android project does not contain versionCode $PACKONE_ANDROID_VERSION_CODE." >&2
+            grep -n "versionCode" android/app/build.gradle >&2 || true
+            exit 1
+          }
+      - name: Apply upload-signing configuration
+        env:
+          PACKONE_ANDROID_UPLOAD_KEYSTORE: /tmp/packone-upload.p12
+          PACKONE_ANDROID_UPLOAD_PASSWORD: validation-only
+          PACKONE_ANDROID_UPLOAD_KEY_ALIAS: packone-upload
+        run: node ./scripts/configure-android-upload-signing.mjs
+      - name: Verify release build points at Pack One upload signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -q 'packoneUpload {' android/app/build.gradle
+          grep -q 'signingConfig signingConfigs.packoneUpload' android/app/build.gradle
+
+  internal-release:
+    name: sign and publish Android internal test
+    if: ${{ github.event_name == 'push' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - id: auth
+        name: Authenticate to Google Cloud and Google Play
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: |
+            https://www.googleapis.com/auth/cloud-platform
+            https://www.googleapis.com/auth/androidpublisher
+
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: pack-one
+
+      - name: Load Pack One upload key from Secret Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          keystore_b64="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-keystore-b64)"
+          upload_password="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-password)"
+          echo "::add-mask::$upload_password"
+
+          keystore="$RUNNER_TEMP/packone-upload.p12"
+          printf '%s' "$keystore_b64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+
+          {
+            echo "PACKONE_ANDROID_UPLOAD_KEYSTORE=$keystore"
+            echo "PACKONE_ANDROID_UPLOAD_PASSWORD=$upload_password"
+            echo "PACKONE_ANDROID_UPLOAD_KEY_ALIAS=packone-upload"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify upload key
+        shell: bash
+        run: |
+          set -euo pipefail
+          upload_fingerprint="$(keytool -list -v \
+            -keystore "$PACKONE_ANDROID_UPLOAD_KEYSTORE" \
+            -storepass "$PACKONE_ANDROID_UPLOAD_PASSWORD" \
+            -alias "$PACKONE_ANDROID_UPLOAD_KEY_ALIAS" \
+            | awk -F': ' '/SHA256:/{print $2; exit}')"
+          [[ -n "$upload_fingerprint" ]] || { echo "Could not read upload-key SHA-256 fingerprint." >&2; exit 1; }
+          echo "Pack One Android upload certificate SHA-256: $upload_fingerprint"
+          echo "PACKONE_ANDROID_UPLOAD_CERT_SHA256=$upload_fingerprint" >> "$GITHUB_ENV"
+
+      - id: version-code
+        name: Allocate monotonic Google Play version code
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKONE_ANDROID_PACKAGE: pro.packone.app
+        run: node ./scripts/play-next-version-code.mjs
+      - name: Set store version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_code="${{ steps.version-code.outputs.next_version_code }}"
+          [[ "$version_code" =~ ^[1-9][0-9]*$ ]]
+          echo "PACKONE_ANDROID_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+          echo "Using Google Play-safe Android version code: $version_code"
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      - name: Validate production mobile config
+        run: npm test
+      - name: Generate production Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform android --clean
+      - name: Verify native Android version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle || {
+            echo "Generated Android project does not contain versionCode $PACKONE_ANDROID_VERSION_CODE." >&2
+            grep -n "versionCode" android/app/build.gradle >&2 || true
+            exit 1
+          }
+      - name: Apply Pack One upload signing
+        run: node ./scripts/configure-android-upload-signing.mjs
+      - name: Build signed production bundle
+        working-directory: mobile/android
+        run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Verify bundle signer is the Pack One upload key
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="app/build/outputs/bundle/release/app-release.aab"
+          test -s "$bundle"
+          jarsigner -verify -verbose -certs "$bundle" | tee /tmp/jarsigner.txt
+          grep -q "jar verified" /tmp/jarsigner.txt
+
+          expected="$(keytool -list -v \
+            -keystore "$PACKONE_ANDROID_UPLOAD_KEYSTORE" \
+            -storepass "$PACKONE_ANDROID_UPLOAD_PASSWORD" \
+            -alias "$PACKONE_ANDROID_UPLOAD_KEY_ALIAS" \
+            | awk -F': ' '/SHA256:/{print $2; exit}')"
+          actual="$(keytool -printcert -jarfile "$bundle" | awk -F': ' '/SHA256:/{print $2; exit}')"
+          [[ -n "$expected" && "$expected" == "$actual" ]] || {
+            echo "AAB signer does not match the Pack One upload key." >&2
+            exit 1
+          }
+
+      - name: Publish to Google Play Internal Testing
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKONE_ANDROID_PACKAGE: pro.packone.app
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="app/build/outputs/bundle/release/app-release.aab"
+          result="$(node ../scripts/play-internal-release.mjs "$bundle")"
+          echo "$result"
+          version_code="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.versionCode))' "$result")"
+          {
+            echo "## Pack One Android Internal Testing draft"
+            echo
+            echo '- Package: `pro.packone.app`'
+            echo '- Track: `internal`'
+            printf -- '- Version code: `%s`\n' "$version_code"
+            echo '- Release status: `draft`'
+            printf -- '- Upload certificate SHA-256: `%s`\n' "$PACKONE_ANDROID_UPLOAD_CERT_SHA256"
+            echo "- Signed with the dedicated Pack One upload key from Google Secret Manager."
+            echo "- First rollout must be completed in Google Play Console after required setup declarations are satisfied."
+          } >> "$GITHUB_STEP_SUMMARY"
