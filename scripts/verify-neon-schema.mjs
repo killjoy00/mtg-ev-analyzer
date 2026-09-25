@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {query} from '../worker/growth-function.js';
 import {verifyServingStatistics} from '../worker/serving-statistics.mjs';
 const result=await query(`SELECT
+  EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_reroll_set_window_idx' AND i.indisvalid) reroll_set_window,
   to_regprocedure('pack1_serving_snapshot(text,text,text)') IS NOT NULL practice_snapshot,
   to_regclass('draft_run_serving_inventory') IS NOT NULL practice_inventory,
   (SELECT count(*)=8 FROM pg_trigger WHERE tgname IN ('serving_puzzle_rows','serving_puzzle_metadata','serving_ratings','serving_exclusions','serving_components','serving_policy','serving_version_rows','serving_version_identity') AND tgenabled='O') practice_invalidation,
@@ -77,6 +78,6 @@ const result=await query(`SELECT
   position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0039 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0040 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');

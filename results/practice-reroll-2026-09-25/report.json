@@ -1,0 +1,236 @@
+{
+  "branch": "br-aged-haze-ayjl6t6b",
+  "sha": "9f01ba4ba28121b5b8af5928e7e6f4968e6dfea5",
+  "sets": [
+    "hob",
+    "msh",
+    "sos"
+  ],
+  "scope": "serial SQL diagnosis on disposable clone, not gateway capacity",
+  "samples": [
+    {
+      "phase": "before",
+      "case": "mixed",
+      "seed": "reroll-diagnosis-mixed-0",
+      "start_ms": 1155,
+      "reroll_ms": 3398
+    },
+    {
+      "phase": "before",
+      "case": "mixed",
+      "seed": "reroll-diagnosis-mixed-1",
+      "start_ms": 749,
+      "reroll_ms": 1460
+    },
+    {
+      "phase": "before",
+      "case": "mixed",
+      "seed": "reroll-diagnosis-mixed-2",
+      "start_ms": 721,
+      "reroll_ms": 1254
+    },
+    {
+      "phase": "before",
+      "case": "powered-cube",
+      "seed": "reroll-diagnosis-powered-cube-0",
+      "start_ms": 674,
+      "reroll_ms": 468
+    },
+    {
+      "phase": "before",
+      "case": "powered-cube",
+      "seed": "reroll-diagnosis-powered-cube-1",
+      "start_ms": 685,
+      "reroll_ms": 768
+    },
+    {
+      "phase": "before",
+      "case": "powered-cube",
+      "seed": "reroll-diagnosis-powered-cube-2",
+      "start_ms": 688,
+      "reroll_ms": 84
+    },
+    {
+      "phase": "before",
+      "case": "custom-single",
+      "seed": "reroll-diagnosis-custom-single-0",
+      "start_ms": 668,
+      "reroll_ms": 222
+    },
+    {
+      "phase": "before",
+      "case": "custom-single",
+      "seed": "reroll-diagnosis-custom-single-1",
+      "start_ms": 672,
+      "reroll_ms": 78
+    },
+    {
+      "phase": "before",
+      "case": "custom-single",
+      "seed": "reroll-diagnosis-custom-single-2",
+      "start_ms": 1622,
+      "reroll_ms": 82
+    },
+    {
+      "phase": "before",
+      "case": "custom-multi",
+      "seed": "reroll-diagnosis-custom-multi-0",
+      "start_ms": 1269,
+      "reroll_ms": 2009
+    },
+    {
+      "phase": "before",
+      "case": "custom-multi",
+      "seed": "reroll-diagnosis-custom-multi-1",
+      "start_ms": 741,
+      "reroll_ms": 519
+    },
+    {
+      "phase": "before",
+      "case": "custom-multi",
+      "seed": "reroll-diagnosis-custom-multi-2",
+      "start_ms": 677,
+      "reroll_ms": 375
+    },
+    {
+      "phase": "set_first_index",
+      "case": "mixed",
+      "seed": "reroll-diagnosis-mixed-0",
+      "start_ms": 1155,
+      "reroll_ms": 397
+    },
+    {
+      "phase": "set_first_index",
+      "case": "mixed",
+      "seed": "reroll-diagnosis-mixed-1",
+      "start_ms": 749,
+      "reroll_ms": 147
+    },
+    {
+      "phase": "set_first_index",
+      "case": "mixed",
+      "seed": "reroll-diagnosis-mixed-2",
+      "start_ms": 721,
+      "reroll_ms": 197
+    },
+    {
+      "phase": "set_first_index",
+      "case": "powered-cube",
+      "seed": "reroll-diagnosis-powered-cube-0",
+      "start_ms": 674,
+      "reroll_ms": 99
+    },
+    {
+      "phase": "set_first_index",
+      "case": "powered-cube",
+      "seed": "reroll-diagnosis-powered-cube-1",
+      "start_ms": 685,
+      "reroll_ms": 131
+    },
+    {
+      "phase": "set_first_index",
+      "case": "powered-cube",
+      "seed": "reroll-diagnosis-powered-cube-2",
+      "start_ms": 688,
+      "reroll_ms": 83
+    },
+    {
+      "phase": "set_first_index",
+      "case": "custom-single",
+      "seed": "reroll-diagnosis-custom-single-0",
+      "start_ms": 668,
+      "reroll_ms": 79
+    },
+    {
+      "phase": "set_first_index",
+      "case": "custom-single",
+      "seed": "reroll-diagnosis-custom-single-1",
+      "start_ms": 672,
+      "reroll_ms": 73
+    },
+    {
+      "phase": "set_first_index",
+      "case": "custom-single",
+      "seed": "reroll-diagnosis-custom-single-2",
+      "start_ms": 1622,
+      "reroll_ms": 74
+    },
+    {
+      "phase": "set_first_index",
+      "case": "custom-multi",
+      "seed": "reroll-diagnosis-custom-multi-0",
+      "start_ms": 1269,
+      "reroll_ms": 150
+    },
+    {
+      "phase": "set_first_index",
+      "case": "custom-multi",
+      "seed": "reroll-diagnosis-custom-multi-1",
+      "start_ms": 741,
+      "reroll_ms": 110
+    },
+    {
+      "phase": "set_first_index",
+      "case": "custom-multi",
+      "seed": "reroll-diagnosis-custom-multi-2",
+      "start_ms": 677,
+      "reroll_ms": 81
+    }
+  ],
+  "index_bytes": 478814208,
+  "passed": true,
+  "summary": {
+    "before": {
+      "mixed": {
+        "samples": 3,
+        "p50_ms": 1460,
+        "p95_ms": 3398,
+        "p99_ms": 3398
+      },
+      "powered-cube": {
+        "samples": 3,
+        "p50_ms": 468,
+        "p95_ms": 768,
+        "p99_ms": 768
+      },
+      "custom-single": {
+        "samples": 3,
+        "p50_ms": 82,
+        "p95_ms": 222,
+        "p99_ms": 222
+      },
+      "custom-multi": {
+        "samples": 3,
+        "p50_ms": 519,
+        "p95_ms": 2009,
+        "p99_ms": 2009
+      }
+    },
+    "set_first_index": {
+      "mixed": {
+        "samples": 3,
+        "p50_ms": 197,
+        "p95_ms": 397,
+        "p99_ms": 397
+      },
+      "powered-cube": {
+        "samples": 3,
+        "p50_ms": 99,
+        "p95_ms": 131,
+        "p99_ms": 131
+      },
+      "custom-single": {
+        "samples": 3,
+        "p50_ms": 74,
+        "p95_ms": 79,
+        "p99_ms": 79
+      },
+      "custom-multi": {
+        "samples": 3,
+        "p50_ms": 110,
+        "p95_ms": 150,
+        "p99_ms": 150
+      }
+    }
+  }
+}

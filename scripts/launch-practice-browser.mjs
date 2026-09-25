@@ -21,6 +21,9 @@ async function main() {
   await context.route('**/*',async route=>{
     const request=route.request(),url=new URL(request.url());
     if(url.hostname.endsWith('.neon.tech')){await route.abort();throw Error('Frontend attempted a direct origin request.');}
+    if(url.hostname==='packone.pro'&&url.pathname==='/practice/') {
+      await route.fulfill({status:200,contentType:'text/html',body:fs.readFileSync('practice/index.html','utf8')});return;
+    }
     if(url.hostname==='api.packone.pro') {
       apiCalls++;
       const response=await route.fetch({url:'https://api-preview.packone.pro'+url.pathname+url.search,
@@ -30,7 +33,7 @@ async function main() {
     await route.continue();
   });
   const page=await context.newPage(),errors=[],report={sha:fixture.sha,branch:fixture.branch,
-    scope:'Production frontend in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
+    scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
   page.on('pageerror',()=>errors.push('browser_error'));
   const directory='artifacts/launch-load';fs.mkdirSync(directory,{recursive:true});
   const ready=async configuration=>{

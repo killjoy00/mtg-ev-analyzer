@@ -56,6 +56,7 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
           node scripts/verify-neon-schema.mjs
           node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
       - name: Prepare accounts, entitlements, score history and query plans
