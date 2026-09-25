@@ -120,7 +120,7 @@ test('Apple launch hardening blocks pre-hijack, separates token keys, and uses A
   assert.match(apple, /APPLE_EXISTING_ACCOUNT_UNVERIFIED/);
   assert.doesNotMatch(apple, /markAppleAuthEmailVerified\(\{authBase,userId:authUserId/);
   assert.match(apple, /APPLE_TOKEN_ENCRYPTION_KEY_V1/);
-  assert.match(apple, /apple-token.*v1/);
+  assert.match(apple, /TOKEN_CIPHER_PREFIX='apple-token'[\s\S]*TOKEN_KEY_VERSION='v1'/);
   assert.match(workflow, /APPLE_TOKEN_ENCRYPTION_KEY_V1/);
   assert.match(worker, /purpose='delete'/);
   assert.match(worker, /\/v1\/mobile\/account\/delete\/apple\/start/);
