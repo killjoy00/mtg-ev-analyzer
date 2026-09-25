@@ -73,3 +73,34 @@ test('v1 contains a cold-start and resume forced-update gate with fail-open outa
   assert.match(gateway, /'\/v1\/mobile\/version'/);
   assert.match(releaseWorkflow, /migrations\/0040_mobile_minimum_version\.sql/g);
 });
+
+
+test('v1 implements Sign in with Apple across native iOS, Android/web handoff, and secure release', () => {
+  const app = JSON.parse(read('mobile/app.json'));
+  const pkg = JSON.parse(read('mobile/package.json'));
+  const account = read('mobile/app/account.tsx');
+  const api = read('mobile/src/api/account.ts');
+  const worker = read('worker/growth-function.js');
+  const apple = read('worker/apple-auth.mjs');
+  const gateway = read('edge/gateway.mjs');
+  const releaseWorkflow = read('.github/workflows/secure-auth-release.yml');
+  const integrity = read('docs/REQUEST-INTEGRITY.md');
+
+  assert.equal(app.expo.ios.usesAppleSignIn, true);
+  assert.ok(app.expo.plugins.includes('expo-apple-authentication'));
+  assert.equal(pkg.dependencies['expo-apple-authentication'], '~57.0.2');
+  assert.match(account, /AppleAuthentication\.AppleAuthenticationButton/);
+  assert.match(account, /nonce: start\.flowToken/);
+  assert.match(account, /finishNativeAppleSignIn/);
+  assert.match(account, /finishAppleSignIn/);
+  assert.match(api, /\/growth\/v1\/mobile\/account\/apple\/native/);
+  assert.match(worker, /\/v1\/account\/apple\/callback/);
+  assert.match(worker, /revokeAppleAuthorization/);
+  assert.match(apple, /https:\/\/appleid\.apple\.com\/auth\/revoke/);
+  assert.match(apple, /pro\.packone\.app/);
+  assert.match(apple, /pro\.packone\.web/);
+  assert.match(gateway, /'\/v1\/mobile\/account\/apple\/native'/);
+  assert.match(releaseWorkflow, /migrations\/0041_apple_auth\.sql/g);
+  assert.match(releaseWorkflow, /APPLE_SIGN_IN_KEY_P8/);
+  assert.doesNotMatch(integrity, /Sign in with Apple is not currently exposed/);
+});
