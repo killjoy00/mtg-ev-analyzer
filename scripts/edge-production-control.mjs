@@ -18,7 +18,14 @@ export function parseProductionRequest(value) {
 }
 
 function variable(name,value){fs.appendFileSync(process.env.GITHUB_ENV,name+'='+value+'\n');}
-function secret(value){return /^[a-f0-9]{64}$/.test(value||'');}
+export function quotaSecretUpdate(settings,generate=()=>randomBytes(32).toString('hex')) {
+  const bindings=settings?.result?.bindings||[];
+  const binding=bindings.find(row=>row.name==='QUOTA_KEY');
+  if(binding&&binding.type!=='secret_text')throw Error('Existing production quota key is not a secret.');
+  // Wrangler preserves existing secrets. Never retrieve or rotate one as part
+  // of an ordinary upload; that would reset persisted network identities.
+  return binding?{}:{QUOTA_KEY:generate()};
+}
 
 async function cf(route,{method='GET',body,allow404=false}={}) {
   let response;
@@ -83,7 +90,9 @@ async function main(action) {
   if(action!=='deploy')throw Error('Unknown production gateway operation.');
   const commit=process.env.GITHUB_SHA;
   if(!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Require an exact production release revision.');
-  const quota=randomBytes(32).toString('hex');console.log('::add-mask::'+quota);
+  const settings=await cf('/accounts/'+zone.account.id+'/workers/scripts/'+WORKER+'/settings',{allow404:true});
+  const quotaUpdate=quotaSecretUpdate(settings);
+  if(quotaUpdate.QUOTA_KEY)console.log('::add-mask::'+quotaUpdate.QUOTA_KEY);
   const bin=name=>path.join(process.env.EDGE_TOOLS_DIR,'node_modules/.bin',name);
   const run=(name,args,input)=>{
     try{return execFileSync(bin(name),args,{input,encoding:'utf8',stdio:['pipe','pipe','pipe'],env:{...process.env,CLOUDFLARE_API_TOKEN:process.env.CLOUDFLARE_EDGE_TOKEN}});}
@@ -93,17 +102,19 @@ async function main(action) {
   config.name=WORKER;
   config.main=path.resolve('edge/gateway.mjs');
   config.account_id=zone.account.id;
-  config.vars={MODE:'production',NEON_BRANCH_ID:BRANCH};
+  config.vars={MODE:'production',NEON_BRANCH_ID:BRANCH,RELEASE_COMMIT:commit};
   const configPath=path.join(process.env.RUNNER_TEMP,'edge-production-wrangler.json');
   fs.writeFileSync(configPath,JSON.stringify(config),{mode:0o600});
   run('wrangler',['deploy','--config',configPath]);
   const credentialProof=String(process.env.PACK1_RATE_LIMIT_SECRET||'');
   if(credentialProof.length<32)throw Error('Require the credential rate-limit secret for the production gateway.');
   run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({
-    QUOTA_KEY:quota,
+    ...quotaUpdate,
     CREDENTIAL_PROOF_KEY:credentialProof,
   }));
   await cf('/accounts/'+zone.account.id+'/workers/domains',{method:'PUT',body:{hostname:HOST,service:WORKER,zone_id:zone.id}});
+  const verifiedSettings=await cf('/accounts/'+zone.account.id+'/workers/scripts/'+WORKER+'/settings');
+  if(!verifiedSettings.result.bindings?.some(b=>b.name==='QUOTA_KEY'&&b.type==='secret_text'))throw Error('Production gateway quota secret was not retained.');
   const after=await context();
   if(!after.domain||after.domain.service!==WORKER)throw Error('Production gateway domain verification failed.');
   console.log('Production gateway attached to api.packone.pro.');

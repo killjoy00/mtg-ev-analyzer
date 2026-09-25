@@ -50,3 +50,34 @@ and NAT load tests, public-cache policy, query capacity, bounded overload
 behavior and the final incident runbook. This document is an implementation
 note, not a completed launch-capacity report. #516 separately owns consistent
 practice selection caching and before/after timing evidence.
+
+## Quota identity and minimum gateway telemetry
+
+Routine production deploys retain the existing `QUOTA_KEY` secret. Only the first
+installation generates it. The controller rejects a non-secret binding and
+verifies the secret still exists after upload. Rotation is a separate incident
+operation: it resets both Durable Object network identities and authenticated
+credential-network digests, so never rotate to work around ordinary NAT pressure.
+
+Workers Logs stores structured `gateway_request` events. Invocation logs are
+disabled. The application emits fixed route families, method, release SHA,
+response/upstream status, request/quota/upstream milliseconds, upstream call
+count, quota scope and coarse exception class. It does not emit headers, tokens,
+body, query string, run/player IDs, IPs or network digests. Successful requests
+are sampled at 10%; errors at 100%. Each event contains `sample_rate`; weight
+counts by its reciprocal. Provider logging limits may apply additional sampling.
+
+In Cloudflare → Workers → pack1-gateway → Observability → Query Builder, filter
+`event = gateway_request` and the release SHA. Group by route/status/quota_scope;
+compare p95/p99 of duration_ms with upstream_ms and quota_ms. High quota latency
+with no origin calls points to ingress; high upstream latency points downstream.
+A request deadline or failed response does not prove a mutation rolled back.
+Use the existing run revision/idempotency recovery; never blindly replay writes.
+
+The Durable Object call has a five-second caller deadline. Upstream requests
+retain the existing shared 120-second deadline until isolated load evidence
+supports a tighter policy. A caller abort does not promise server cancellation.
+
+The Cloudflare configuration enables storage, but a successful dry run is not
+proof that production logs/alerts are live. The reviewed release must verify
+stored events and alert delivery. Capacity and alert acceptance remain open.

@@ -183,10 +183,42 @@ export class NetworkQuota {
   async alarm() {await this.storage.deleteAll();}
 }
 
+export function routeFamily(path) {
+  if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share)$/.test(path))return 'draft_'+path.split('/').at(-1);
+  if(path==='/draft/v1/runs')return 'draft_start';
+  if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';
+  for(const name of ['leaderboard','daily-status','capabilities','practice-sets','set-catalog'])if(path==='/draft/v1/'+name)return 'draft_'+name.replaceAll('-','_');
+  if(/^\/growth\/v1\/(player\/)?session$/.test(path))return 'player_session';
+  if(/^\/growth\/v1\/(mobile\/)?account(?:\/|$)/.test(path))return 'account';
+  if(/^\/growth\/v1\/(mobile\/)?profile(?:\/|$)/.test(path))return 'profile';
+  if(/\/health$/.test(path))return 'health';
+  return 'other';
+}
 export async function gateway(request,env,fetcher=fetch) {
   const url=new URL(request.url),origin=request.headers.get('origin'),mode=env.MODE;
+  const started=performance.now(),metric={event:'gateway_request',route:routeFamily(url.pathname),method:['GET','POST','PATCH','OPTIONS'].includes(request.method)?request.method:'other',
+    release:/^[a-f0-9]{40}$/.test(env.RELEASE_COMMIT||'')?env.RELEASE_COMMIT:'unknown',quota_ms:0,upstream_ms:0,upstream_calls:0,upstream_status:null,quota_scope:null,error:null};
+  const upstreamFetch=async(...args)=>{
+    const began=performance.now();metric.upstream_calls++;
+    try {const result=await fetcher(...args);metric.upstream_status=result.status;return result;}
+    finally {metric.upstream_ms+=performance.now()-began;}
+  };
+  const quotaFetch=async(quota,kind)=>{
+    const began=performance.now();
+    try {
+      const result=await quota.fetch(new Request('https://quota/'+kind,{method:'POST',signal:AbortSignal.timeout(5000)}));
+      if(result.status===429) {
+        const data=await result.clone().json();
+        metric.quota_scope=(data.scopes||[]).filter(s=>s==='request'||s==='session').join(',')||'unknown';
+      }
+      return result;
+    } finally {metric.quota_ms+=performance.now()-began;}
+  };
   const expectedHost=mode==='production'?'api.packone.pro':'api-preview.packone.pro';
   const finish=result=>{
+    const sampleRate=result.status>=400?1:.1;
+    if(Math.random()<sampleRate)console.log(JSON.stringify({...metric,status:result.status,sample_rate:sampleRate,
+      duration_ms:Math.round(performance.now()-started),quota_ms:Math.round(metric.quota_ms),upstream_ms:Math.round(metric.upstream_ms)}));
     const headers=new Headers(result.headers);
     headers.set('cache-control','no-store');headers.set('vary','Origin');
     if(ORIGINS.has(origin)) {
@@ -243,7 +275,7 @@ export async function gateway(request,env,fetcher=fetch) {
     const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
     const digest=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,encode.encode(network)))).map(x=>x.toString(16).padStart(2,'0')).join('');
     const quota=env.NETWORK_QUOTA.get(env.NETWORK_QUOTA.idFromName(digest));
-    const limited=await quota.fetch(new Request(`https://quota/${sessionCreation?'session':'request'}`,{method:'POST'}));
+    const limited=await quotaFetch(quota,sessionCreation?'session':'request');
     if(limited.status!==204)return finish(limited.status===429?limited:response(503,'Gateway unavailable.'));
 
     const headers=new Headers({'accept':'application/json'});
@@ -283,15 +315,15 @@ export async function gateway(request,env,fetcher=fetch) {
     // their single upstream request and do not consume the creation budget.
     const upstream=upstreamOrigin+(refresh?'/internal/player-session-refresh':match[2])+url.search;
     const signal=AbortSignal.timeout(120000);
-    let result=await fetcher(upstream,{method,headers,body,redirect:'manual',signal});
+    let result=await upstreamFetch(upstream,{method,headers,body,redirect:'manual',signal});
     if(refresh&&result.status===401&&result.headers.get('x-pack1-session-state')==='missing') {
       await result.body?.cancel();
-      const creationLimit=await quota.fetch(new Request('https://quota/session-only',{method:'POST'}));
+      const creationLimit=await quotaFetch(quota,'session-only');
       if(creationLimit.status!==204)return finish(creationLimit.status===429?creationLimit:response(503,'Gateway unavailable.'));
       // One creation attempt, after the missing-session proof and quota charge.
       // A timeout or any other upstream error never authorizes a retry/create.
       headers.delete('authorization');
-      result=await fetcher(upstreamOrigin+match[2]+url.search,{method,headers,body,redirect:'manual',signal});
+      result=await upstreamFetch(upstreamOrigin+match[2]+url.search,{method,headers,body,redirect:'manual',signal});
     }
 
     const publicHeaders=new Headers();
@@ -307,6 +339,7 @@ export async function gateway(request,env,fetcher=fetch) {
     }
     return finish(new Response(result.body,{status:result.status,headers:publicHeaders}));
   } catch(error) {
+    metric.error=error?.name==='TimeoutError'?'timeout':[400,413,415].includes(error?.status)?'invalid_body':'gateway_failure';
     return finish(response([400,413,415].includes(error?.status)?error.status:503,
       [400,413,415].includes(error?.status)?error.message:'Gateway unavailable.'));
   }
