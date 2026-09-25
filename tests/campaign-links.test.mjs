@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   GENERATED_CAMPAIGN_MARKER,
+  buildCampaignDraft,
   buildCampaignTrackingUrl,
   buildCampaignVanityUrl,
   isCanonicalAcquisitionValue,
@@ -33,6 +34,31 @@ test('acquisition values share runtime normalization and canonical config rules'
   assert.equal(isCanonicalAcquisitionValue('reddit'),true);
   assert.equal(isCanonicalAcquisitionValue('Reddit'),false,'committed config must not silently normalize uppercase');
   assert.equal(isCanonicalAcquisitionValue(' reddit '),false,'committed config must not silently trim whitespace');
+});
+
+test('tracked campaign URL does not require a vanity slug',()=>{
+  const draft=buildCampaignDraft({
+    source:' Reddit ',
+    campaign:' Launch-Week ',
+    medium:' SOCIAL ',
+    destination:'/'
+  });
+  assert.equal(draft.trackingValid,true);
+  assert.equal(draft.valid,false,'full vanity entry still requires a slug');
+  assert.equal(draft.errors.slug,undefined,'blank slug is allowed for tracked-only use');
+  assert.equal(draft.entry,null);
+  assert.equal(draft.vanityUrl,'');
+  assert.equal(draft.trackedUrl,'https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social');
+
+  const invalidSlug=buildCampaignDraft({
+    slug:'bad/slug',
+    source:'reddit',
+    campaign:'launch-week',
+    destination:'/'
+  });
+  assert.match(invalidSlug.errors.slug,/Use 1-64/);
+  assert.equal(invalidSlug.trackedUrl,'https://packone.pro/?utm_source=reddit&utm_campaign=launch-week');
+  assert.equal(invalidSlug.entry,null);
 });
 
 test('campaign config rejects duplicates, unsafe slugs, invalid acquisition fields and unsupported destinations',()=>{
@@ -69,6 +95,31 @@ test('generated reddit launch page is static crawler-friendly redirect HTML',asy
   assert.equal((html.match(/<script(?:\s|>)/g)||[]).length,1,'generated page has only the inline redirect script');
   assert.doesNotMatch(html,/<script[^>]+src=/);
   assert.doesNotMatch(html,/bootstrap\.mjs|growth\.mjs|analytics|ads\.mjs|app\.js|retention-events|dataLayer|gtag\(/);
+});
+
+test('generated campaign social previews stay in parity with the homepage',async()=>{
+  const homepage=await readFile('index.html','utf8');
+  const campaign=await readFile('go/reddit-launch/index.html','utf8');
+
+  const escapeRegex=value=>value.replace(/[.*+?^$()|[\]\\]/g,'\\$&');
+  const meta=(html,key,value)=>{
+    const tag=html.match(new RegExp('<meta\\s+[^>]*'+key+'="'+escapeRegex(value)+'"[^>]*>'))?.[0];
+    assert.ok(tag,'missing '+key+'="'+value+'" metadata');
+    const content=tag.match(/content="([^"]*)"/)?.[1];
+    assert.notEqual(content,undefined,'missing content for '+key+'="'+value+'"');
+    return content;
+  };
+
+  for(const [key,value] of [
+    ['property','og:title'],
+    ['property','og:description'],
+    ['property','og:image'],
+    ['name','twitter:title'],
+    ['name','twitter:description'],
+    ['name','twitter:image']
+  ]) {
+    assert.equal(meta(campaign,key,value),meta(homepage,key,value),value+' must match homepage preview metadata');
+  }
 });
 
 test('committed campaign pages are fresh',async()=>{
