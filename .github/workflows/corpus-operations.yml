@@ -99,6 +99,8 @@ jobs:
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
       - name: Verify newly ingested Candidate health
         shell: bash
+        env:
+          TARGET: ${{ inputs.target || 'development' }}
         run: |
           set -euo pipefail
           sets=$(cat generated/corpus-operations/pending.txt)
@@ -108,6 +110,9 @@ jobs:
           fi
           IFS=',' read -r -a set_args <<< "$sets"
           node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus.connection" "${set_args[@]}"
+          if [[ "$TARGET" == development ]]; then
+            node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/corpus.connection"
+          fi
       - name: Record import failures
         if: always()
         env:
@@ -129,35 +134,3 @@ jobs:
             generated/corpus-candidates/*/manifest.json
             generated/corpus-candidates/*/trophies.jsonl.gz
             generated/corpus-candidates/*/puzzles.jsonl.gz
-
-  retained-health:
-    needs: corpus
-    if: ${{ always() }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: npm install -g neon@4.17.4
-      - name: Refresh retained corpus health independently
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          TARGET: ${{ inputs.target || 'development' }}
-        run: |
-          set -euo pipefail
-          umask 077
-          case "$TARGET" in
-            development) branch=br-twilight-hill-ayffyd2b ;;
-            production) branch=br-orange-feather-ayps8kep ;;
-            *) exit 1 ;;
-          esac
-          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
-          echo "::add-mask::$connection"
-          printf '%s' "$connection" > "$RUNNER_TEMP/corpus-health.connection"
-          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
-          node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus-health.connection"
-          if [[ "$TARGET" == development ]]; then
-            node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/corpus-health.connection"
-          fi
