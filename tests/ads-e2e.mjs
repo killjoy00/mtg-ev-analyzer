@@ -126,6 +126,11 @@ try{
     assert.equal(image.src,'/assets/tcgplayer-logo-primary-stroke.webp');
     assert.deepEqual([image.naturalWidth,image.naturalHeight],[512,227]);
     assert.ok(Math.abs((image.width/image.height)-(512/227))<0.02,'official TCGplayer logo must preserve its aspect ratio');
+    const compact=await promo.evaluate(el=>({height:el.getBoundingClientRect().height}));
+    const detailDisplay=await page.locator('.tcg-affiliate-copy > span').evaluate(el=>getComputedStyle(el).display);
+    assert.ok(image.width<=100,'mobile TCGplayer logo should stay compact');
+    assert.ok(compact.height<190,'mobile TCGplayer promotion should not dominate the Daily home');
+    assert.equal(detailDisplay,'none','secondary affiliate copy should collapse on mobile');
     assert.equal(state.google,0,'affiliate fallback never contacts Google');
     assert.equal(state.membership,0,'guest affiliate fallback skips membership');
     assert.deepEqual(state.blocked,[]);
@@ -182,6 +187,12 @@ try{
     const page=await context.newPage(),state=await installRoutes(page,{signed:true,status:{ad_free:false,ads_allowed:true}});
     await page.goto(base);
     await page.locator('[data-daily-home]').waitFor();
+    await page.locator('#practice-nav').waitFor();
+    assert.equal(await page.locator('#daily-nav').isVisible(),false,'signed mobile nav hides redundant Daily Run');
+    assert.equal(await page.locator('#practice-nav').isVisible(),true);
+    assert.equal(await page.locator('#leaderboard-nav').isVisible(),true);
+    assert.equal(await page.locator('#learn-nav').isVisible(),true);
+    assert.equal(await page.locator('#account-nav').isVisible(),true);
     await waitFor(state,'membership',1);
     await assertOneFill(page,state);
     await context.close();

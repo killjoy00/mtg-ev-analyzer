@@ -417,7 +417,7 @@ body[data-page="editorial"] > .topbar {
   gap: 16px;
 }
 
-.article-links { margin-top: 18px; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.article-links { margin-top: 18px; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); }
 .article-return { margin: 48px 0 0; padding-top: 18px; border-top: 1px solid var(--line); }
 .article-return a { color: var(--muted); font-weight: 700; text-underline-offset: 3px; }
 .topbar .brand { color: inherit; text-decoration: none; }
