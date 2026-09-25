@@ -93,7 +93,9 @@ jobs:
             corpus-candidates-${{ steps.ingestion-revision.outputs.revision }}-
       - name: Discard restored catalog provenance
         if: ${{ (inputs.target || 'development') != 'production' }}
-        run: rm -f generated/corpus-candidates/catalog.json
+        run: |
+          mkdir -p generated/corpus-candidates
+          rm -f generated/corpus-candidates/catalog.json
       - name: Discover archives and metadata
         if: ${{ (inputs.target || 'development') != 'production' }}
         run: |
