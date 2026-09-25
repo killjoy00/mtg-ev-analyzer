@@ -64,15 +64,30 @@ class RidgeOutcomeModel:
         names = tuple(sorted({name for row in rows for name in row}))
         design_names = ("__intercept__",) + names
         size = len(design_names)
+        index = {name: position for position, name in enumerate(design_names)}
         xtx = [[0.0] * size for _ in range(size)]
         xty = [0.0] * size
         for row, outcome, weight in zip(rows, outcomes, sample_weights):
+            # Candidate rows are deliberately sparse (one card identity plus a
+            # small state/signal vector). Expanding every row to every card
+            # feature makes real-archive fitting O(rows * features^2), which is
+            # needlessly prohibitive. Accumulate the exact same normal equations
+            # over only non-zero coordinates, then keep the dependency-free
+            # dense solve below.
             values = with_intercept(row)
-            vector = [values.get(name, 0.0) for name in design_names]
-            for i in range(size):
-                xty[i] += weight * vector[i] * float(outcome)
-                for j in range(size):
-                    xtx[i][j] += weight * vector[i] * vector[j]
+            active = [
+                (index[name], float(value))
+                for name, value in values.items()
+                if value != 0.0
+            ]
+            outcome_value = float(outcome)
+            for offset, (i, left) in enumerate(active):
+                xty[i] += weight * left * outcome_value
+                for j, right in active[offset:]:
+                    contribution = weight * left * right
+                    xtx[i][j] += contribution
+                    if i != j:
+                        xtx[j][i] += contribution
         for index in range(1, size):
             xtx[index][index] += l2  # never penalize intercept
         coefficients = _solve(xtx, xty)
