@@ -9,11 +9,12 @@ import {
 export type AccountState = {
   user: MobileAccountUser;
   session: { expiresAt?: string };
-  credentials: { password: boolean; google: boolean };
+  credentials: { password: boolean; google: boolean; apple: boolean };
   deletion: {
     enabled: boolean;
     available: boolean;
     googleOnly: boolean;
+    socialOnly?: boolean;
     method: 'password' | 'email' | null;
   };
 };
@@ -103,6 +104,45 @@ export async function finishGoogleSignIn(
     method: 'POST',
     mobileSessionToken: current.playerToken,
     body: { handoffToken, validateDailyRunId },
+  });
+  return { result, session: await persistAccount(result) };
+}
+
+export async function startAppleSignIn(current: MobileSession) {
+  return requestJson<{ flowToken: string; url: string }>('/growth/v1/mobile/account/apple/start', {
+    method: 'POST',
+    mobileSessionToken: current.playerToken,
+    body: {},
+  });
+}
+
+export async function finishAppleSignIn(
+  current: MobileSession,
+  handoffToken: string,
+  validateDailyRunId?: string,
+) {
+  const result = await requestJson<MobileAuthResponse>('/growth/v1/mobile/account/apple/finish', {
+    method: 'POST',
+    mobileSessionToken: current.playerToken,
+    body: { handoffToken, validateDailyRunId },
+  });
+  return { result, session: await persistAccount(result) };
+}
+
+export async function finishNativeAppleSignIn(
+  current: MobileSession,
+  credential: {
+    flowToken: string;
+    identityToken: string;
+    authorizationCode: string;
+    firstName?: string | null;
+  },
+  validateDailyRunId?: string,
+) {
+  const result = await requestJson<MobileAuthResponse>('/growth/v1/mobile/account/apple/native', {
+    method: 'POST',
+    mobileSessionToken: current.playerToken,
+    body: { ...credential, validateDailyRunId },
   });
   return { result, session: await persistAccount(result) };
 }
