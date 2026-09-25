@@ -1,0 +1,30 @@
+name: temporary release dispatch
+
+on:
+  push:
+    branches:
+      - launch/attribution-habit-metrics
+
+permissions:
+  contents: read
+  actions: write
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Dispatch reviewed revision to development
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-functions.yml/dispatches" --input - <<'JSON'
+          {
+            "ref": "main",
+            "inputs": {
+              "target": "development",
+              "commit": "572f36638a780f73a41a548eb07e3101ea2efed5"
+            }
+          }
+          JSON
