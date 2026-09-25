@@ -77,8 +77,8 @@ async function main(action) {
   }
   if(action==='disable') {
     if(domain) {
-      if(!/^(?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$/i.test(domain.id))throw Error('Unexpected custom-domain identifier.');
-      await cf(`/accounts/${zone.account.id}/workers/domains/${domain.id}`,{method:'DELETE'});
+      if(!/^[A-Za-z0-9_-]{1,128}$/.test(domain.id))throw Error('Unexpected custom-domain identifier.');
+      await cf(`/accounts/${zone.account.id}/workers/domains/${encodeURIComponent(domain.id)}`,{method:'DELETE'});
     }
     console.log('Preview custom domain disabled. Backend guards remain enabled; the isolated branch expires automatically.');return;
   }

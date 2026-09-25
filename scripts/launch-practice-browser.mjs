@@ -10,17 +10,23 @@ async function main() {
   const fixture=JSON.parse(fs.readFileSync(process.env.LOAD_FIXTURE_FILE,'utf8'));
   checkBranch(fixture.branch);assert.equal(fixture.branch,process.env.PREVIEW_BRANCH);assert.equal(fixture.sha,process.env.GITHUB_SHA);
   assert.match(process.env.PREVIEW_ACCESS_KEY||'',/^[a-f0-9]{64}$/);
-  const user=fixture.users[900],browser=await chromium.launch({headless:true,channel:'chrome'});
+  const browser=await chromium.launch({headless:true,channel:'chrome'});
   const context=await browser.newContext({viewport:{width:390,height:844}});
-  await context.addCookies([
+  const identify=async name=>{
+    const user=fixture.users[900+['mixed','powered-cube','custom-single','custom-multi'].indexOf(name)];
+    await context.addCookies([
     {name:'__Host-pack1_player',value:user.token,url:'https://api.packone.pro/',httpOnly:true,secure:true,sameSite:'Strict'},
     {name:'__Host-pack1_account',value:user.account,url:'https://api.packone.pro/',httpOnly:true,secure:true,sameSite:'Strict'},
     {name:'__Secure-pack1_csrf',value:user.csrf,domain:'.packone.pro',path:'/',secure:true,sameSite:'Strict'},
   ]);
+  };
   let apiCalls=0;
   await context.route('**/*',async route=>{
     const request=route.request(),url=new URL(request.url());
     if(url.hostname.endsWith('.neon.tech')){await route.abort();throw Error('Frontend attempted a direct origin request.');}
+    if(url.hostname==='packone.pro'&&url.pathname==='/practice/') {
+      await route.fulfill({status:200,contentType:'text/html',body:fs.readFileSync('practice/index.html','utf8')});return;
+    }
     if(url.hostname==='api.packone.pro') {
       apiCalls++;
       const response=await route.fetch({url:'https://api-preview.packone.pro'+url.pathname+url.search,
@@ -30,10 +36,16 @@ async function main() {
     await route.continue();
   });
   const page=await context.newPage(),errors=[],report={sha:fixture.sha,branch:fixture.branch,
-    scope:'Production frontend in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
+    warm_samples_per_case:20,scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
+  // Playwright routing disables HTTP caching by default. Restore normal static
+  // asset caching in Chromium; API responses remain no-store and intercepted.
+  const cdp=await context.newCDPSession(page);await cdp.send('Network.enable');
+  await cdp.send('Network.setCacheDisabled',{cacheDisabled:false});
+  let staticCacheHits=0;cdp.on('Network.requestServedFromCache',()=>staticCacheHits++);
   page.on('pageerror',()=>errors.push('browser_error'));
   const directory='artifacts/launch-load';fs.mkdirSync(directory,{recursive:true});
   const ready=async configuration=>{
+    await identify(configuration.name);
     if(configuration.custom) {
       await page.goto('https://packone.pro/?game=draft-run&custom=1',{waitUntil:'domcontentloaded'});
       await page.locator('#practice-sets').waitFor();
@@ -64,7 +76,8 @@ async function main() {
   try {
     // Prepare the page/account first, then verify database idle through the
     // control plane without touching the data plane before the timed click.
-    const mixed={name:'mixed'},click=await ready(mixed),deadline=Date.now()+9*60000;
+    const cold=async configuration=>{
+    const click=await ready(configuration),deadline=Date.now()+9*60000;
     let idle;
     while(Date.now()<deadline) {
       const r=await fetch('https://console.neon.tech/api/v2/projects/patient-shadow-91417882/branches/'+fixture.branch+'/endpoints',{
@@ -77,14 +90,17 @@ async function main() {
       await new Promise(resolve=>setTimeout(resolve,15000));
     }
     assert.ok(idle,'Isolated compute did not become idle; no cold claim is permitted.');
-    await sample(mixed,click,'confirmed_idle',idle);
+    await sample(configuration,click,'confirmed_idle',idle);
+    };
+    await cold({name:'mixed'});
     for(const configuration of [{name:'mixed'},{name:'powered-cube'},{name:'custom-single',custom:1},{name:'custom-multi',custom:3}])
-      for(let i=0;i<3;i++)await sample(configuration,await ready(configuration),'warm');
+      for(let i=0;i<20;i++)await sample(configuration,await ready(configuration),'warm');
+    for(const configuration of [{name:'powered-cube'},{name:'custom-single',custom:1},{name:'custom-multi',custom:3}])await cold(configuration);
     report.summary=Object.fromEntries(['mixed','powered-cube','custom-single','custom-multi'].map(name=>{
       const rows=report.samples.filter(s=>s.case===name&&s.phase==='warm');
       return [name,{api:summarize(rows.map(s=>s.api_ms)),click:summarize(rows.map(s=>s.click_to_cards_ms)),images:summarize(rows.map(s=>s.click_to_images_ms))}];
     }));
-    report.passed=!errors.length&&report.samples[0].click_to_cards_ms<=report.budgets.cold_click_ms&&
+    report.passed=!errors.length&&staticCacheHits>0&&report.samples.filter(s=>s.phase==='confirmed_idle').length===4&&report.samples.filter(s=>s.phase==='confirmed_idle').every(s=>s.click_to_cards_ms<=report.budgets.cold_click_ms)&&
       Object.values(report.summary).every(s=>s.api.p95_ms<=2000&&s.click.p95_ms<=3000);
     await page.screenshot({path:directory+'/practice-mobile.png',fullPage:true});
   } catch(error) {
@@ -92,11 +108,11 @@ async function main() {
     await page.screenshot({path:directory+'/practice-failure.png',fullPage:true});
     throw error;
   } finally {
-    report.browser_errors=errors.length;report.api_calls=apiCalls;
+    report.browser_errors=errors.length;report.api_calls=apiCalls;report.http_cache_hits=staticCacheHits;
     fs.writeFileSync(directory+'/practice-browser.json',JSON.stringify(report,null,2));
     await browser.close();
   }
-  console.log(JSON.stringify({operation:'isolated-practice-browser',passed:report.passed,summary:report.summary}));
+  console.log(JSON.stringify({operation:'isolated-practice-browser',passed:report.passed,http_cache_hits:staticCacheHits,samples:report.samples,summary:report.summary}));
   if(!report.passed)process.exitCode=1;
 }
 main().catch(()=>{console.error('Isolated browser acceptance failed; inspect sanitized artifacts.');process.exitCode=1;});

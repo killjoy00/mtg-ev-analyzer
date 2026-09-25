@@ -9,6 +9,11 @@
   <link rel="stylesheet" href="/visual-c.css?v=8" />
   <link rel="stylesheet" href="/editorial.css?v=4" />
   <link rel="stylesheet" href="/practice.css?v=1" />
+  <!-- Fetch game assets while choosing a practice type; this does not execute them or wake the database. -->
+  <link rel="modulepreload" href="/bootstrap.mjs?v=6" />
+  <link rel="modulepreload" href="/growth.mjs?v=6" />
+  <link rel="modulepreload" href="/draft-run-product.mjs?v=6" />
+  <link rel="preload" as="style" href="/draft-run.css?v=9" />
   <title>Practice · Pack One</title>
 </head>
 <body data-page="editorial">
