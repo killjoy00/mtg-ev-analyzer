@@ -1,4 +1,4 @@
-import {SERVING_QUALITY_SQL} from '../serving-quality.mjs';
+import {SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
 import {DAILY_SELECTION_VERSION,dailySetPlan,latestSetPlan,balancedSetPlan,liveRegularSets} from '../daily-selection.mjs';
 import {seededRandom} from '../gameplay.mjs';
 import {runPickWindows,eligiblePickForRound,selectDraftRunReroll,draftRunDifficulty} from '../draft-run.mjs';
@@ -63,10 +63,10 @@ export async function loadCustomSetMetadata(query,version,day=gameDateKey(),requ
 // Return compact group counts once, then one source trajectory per round. Every
 // eligible puzzle participates: there is no random prefix or candidate cap.
 // This consumes the same PRNG draws and sorted candidate order as selectDraftRun.
-export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[]}={}) {
+export async function selectDatabaseRun(query,version,seed,environment='mixed',{daily=false,day=gameDateKey(),selectionVersion=DRAFT_RUN_SELECTION_VERSION,setIds=[],snapshot=null}={}) {
   const random=seededRandom(seed),bands=runDifficultyBands(random,selectionVersion),selected=[],sources=[],sets=new Set();
   const windows=runPickWindows(environment,selectionVersion),released=new Set(releasedRunSets(day));
-  const metadata=selectionVersion===DAILY_SELECTION_VERSION?await loadLiveSetMetadata(query,version):null;
+  const metadata=selectionVersion===DAILY_SELECTION_VERSION?(snapshot?snapshot.metadata:await loadLiveSetMetadata(query,version)):null;
   const live=metadata?new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id)):null;
   const required=environment==='latest'?latestSetPlan(metadata,day):setIds.length?balancedSetPlan(setIds,random):daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION?dailySetPlan(metadata,day,random):daily&&environment==='mixed'&&isEightPickVersion(selectionVersion)?dailyRequiredSets(day):[];
   const groupParams=[version];
@@ -76,8 +76,14 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
   if(environment==='latest'||setIds.length||daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION){
     groupParams.push(toPgArray([...new Set(required)]));groupWhere+=` AND p.set_id=ANY($${groupParams.length}::text[])`;
   }
-  const groups=(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));
-  if(setIds.length){const eligible=new Set((await loadCustomSetMetadata(query,version,day,setIds)).map(s=>s.set_id));if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});}
+  const rows=snapshot?snapshot.groups.filter(g=>
+    (g.set_id==='powered-cube')===(environment==='powered-cube') && Number(g.pick_number)<=maxRunPick(environment) &&
+    (environment==='powered-cube'||!SELECTABLE_ONLY_SETS.has(g.set_id)) &&
+    (!(environment==='latest'||setIds.length||daily&&environment==='mixed'&&selectionVersion===DAILY_SELECTION_VERSION)||required.includes(g.set_id))
+  ):(await query(`SELECT p.set_id,p.pick_number,r.band,count(*)::int n ${from} WHERE ${groupWhere} GROUP BY p.set_id,p.pick_number,r.band`,groupParams)).rows;
+  // Counts are mutable per-run state; never mutate a shared snapshot.
+  const groups=rows.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>(!live||live.has(g.set_id))&&(!daily||selectionVersion===DAILY_SELECTION_VERSION||!isEightPickVersion(selectionVersion)||environment==='powered-cube'||released.has(g.set_id)));
+  if(setIds.length){const eligible=new Set((snapshot?customSetsFromSnapshot(snapshot,day,setIds):await loadCustomSetMetadata(query,version,day,setIds)).map(s=>s.set_id));if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});}
   const forced=requiredSetRounds(groups,bands,windows,random,required);
   const key=p=>`${p.set_id}:${p.pick_number}:${p.band}`;
   const remaining=new Map(groups.map(g=>[key(g),g]));
@@ -99,7 +105,18 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     const count=Number(available.find(g=>g.set_id===setId)?.n||0);
     if(!count)throw Object.assign(new Error('Not enough verified puzzles for a balanced run.'),{status:503});
     params.push(setId,band,Math.floor(random()*count));
-    const result=await query(`WITH chosen AS (
+    let result;
+    if(snapshot) {
+      // Preserve the live selector's C ordering and random offset exactly. The
+      // trajectory still uses its original historical membership/quality rules.
+      result=await query(`WITH chosen AS (
+        SELECT puzzle_id,source_draft_hash FROM draft_run_serving_inventory
+        WHERE snapshot_id=$2::bigint AND pick_number BETWEEN $3::int AND $4::int
+          AND source_draft_hash<>ALL($5::text[]) AND set_id=$6 AND band=$7
+        ORDER BY puzzle_id COLLATE "C" LIMIT 1 OFFSET $8::int
+      ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${base} AND ${SERVING_QUALITY_SQL}`,
+      [version,snapshot.id,window[0],window[1],toPgArray(sources),setId,band,params.at(-1)]);
+    } else result=await query(`WITH chosen AS (
       SELECT p.puzzle_id,p.source_draft_hash ${from} WHERE ${where} AND p.set_id=$${params.length-2} AND r.band=$${params.length-1}
       ORDER BY p.puzzle_id COLLATE "C" LIMIT 1 OFFSET $${params.length}::int
     ) SELECT ${columns},chosen.puzzle_id selected_id ${from} JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash WHERE ${base} AND ${SERVING_QUALITY_SQL}`,params);
@@ -147,4 +164,47 @@ export async function selectDatabaseReroll(query,version,source,options) {
   const result=await query(`SELECT * FROM (SELECT ${columns},${distance} distance ${from} WHERE ${where}) candidates
     WHERE distance<=0.16 ORDER BY distance,puzzle_id COLLATE "C" LIMIT 20`,params);
   return selectDraftRunReroll(result.rows.map(decodePuzzleMetadata),source,options);
+}
+
+
+export const servingCacheUnavailable=()=>Object.assign(Error('Practice is refreshing. Please retry shortly.'),{status:503,retryAfter:2});
+export async function loadServingSnapshot(query,version) {
+  let row;
+  try {row=(await query('SELECT pack1_serving_snapshot($1,$2,$3) snapshot',
+    [version,DRAFT_RUN_DIFFICULTY_VERSION,SERVING_POLICY_VERSION])).rows[0];}
+  catch(error){if(error.pgCode==='40001')throw servingCacheUnavailable();throw error;}
+  const snapshot=typeof row?.snapshot==='string'?JSON.parse(row.snapshot):row?.snapshot;
+  if(!snapshot)throw servingCacheUnavailable();
+  return snapshot;
+}
+export function customSetsFromSnapshot(snapshot,day,requestedSetIds=[]) {
+  const covered=new Set(snapshot.groups.filter(g=>Number(g.sources)>=16).map(g=>`${g.set_id}:${g.pick_number}:${g.band}`));
+  return liveRegularSets(snapshot.metadata,day).filter(s=>(!requestedSetIds.length||requestedSetIds.includes(s.set_id))&&
+    Array.from({length:8},(_,i)=>i+1).every(p=>['medium','hard'].every(b=>covered.has(`${s.set_id}:${p}:${b}`))));
+}
+export async function servingRevisionMatches(query,revision) {
+  return String((await query('SELECT revision::text FROM draft_run_serving_revision WHERE singleton')).rows[0]?.revision)===String(revision);
+}
+export async function loadCachedCustomSetMetadata(query,version,day=gameDateKey()) {
+  for(let attempt=0;attempt<2;attempt++) {
+    const snapshot=await loadServingSnapshot(query,version),sets=customSetsFromSnapshot(snapshot,day);
+    if(await servingRevisionMatches(query,snapshot.revision))return sets;
+  }
+  throw servingCacheUnavailable();
+}
+export async function selectCachedDatabaseRun(query,version,seed,environment='mixed',options={}) {
+  // Historical/Daily generation remains on its established selector.
+  if(options.daily||options.selectionVersion&&options.selectionVersion!==DRAFT_RUN_SELECTION_VERSION)
+    return selectDatabaseRun(query,version,seed,environment,options);
+  for(let attempt=0;attempt<2;attempt++) {
+    const snapshot=await loadServingSnapshot(query,version);
+    let selected,error;
+    try {selected=await selectDatabaseRun(query,version,seed,environment,{...options,snapshot});}
+    catch(e){error=e;}
+    if(!await servingRevisionMatches(query,snapshot.revision))continue;
+    if(error)throw error;
+    Object.defineProperty(selected,'servingRevision',{value:snapshot.revision});
+    return selected;
+  }
+  throw servingCacheUnavailable();
 }

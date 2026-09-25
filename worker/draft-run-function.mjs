@@ -17,7 +17,7 @@ import growth, { query, player, readJson, json, withCors, gameDateKey } from './
 import { handleTrophyImport } from './trophy-import.mjs';
 import {observeDecision,measurementInput,MEASUREMENT_CTE} from './decision-measurements.mjs';
 import {handleAdmin} from './measurement-admin.mjs';
-import {loadPuzzleMetadata,selectDatabaseRun,selectDatabaseReroll,loadLiveSetMetadata,loadCustomSetMetadata} from './draft-run-selection.mjs';
+import {loadPuzzleMetadata,selectCachedDatabaseRun,selectDatabaseReroll,loadLiveSetMetadata,loadCachedCustomSetMetadata,servingRevisionMatches,servingCacheUnavailable} from './draft-run-selection.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,publicDifficulty,rateDraftRunPuzzle} from '../draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,regularRunSet,dailySetWeight,dailyRequiredSets,DRAFT_RUN_LENGTH} from '../draft-run-policy.mjs';
 import {
@@ -211,6 +211,8 @@ async function start(request) {
   let corpusVersion=source?.corpus_version||DRAFT_RUN_CORPUS_VERSION,scoringVersion=source?.scoring_version||DRAFT_RUN_SCORING_VERSION;
   let servingPolicy=source?.serving_policy_version|| (source?LEGACY_SERVING_POLICY_VERSION:SERVING_POLICY_VERSION);
   let ids,featuredSets=[],difficultyVersion=source?.difficulty_version||DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion=source?.selection_version||DRAFT_RUN_SELECTION_VERSION;
+  for(let attempt=0;attempt<2;attempt++) {
+  let practiceChoices=null;
   if(source) ids=source.puzzle_ids;
   else if(day) {
     const {schedule}=await ensureDailySchedule(day,environment);
@@ -219,8 +221,11 @@ async function start(request) {
     selectionVersion=schedule.selection_version||PREVIOUS_SELECTION_VERSION;
     featuredSets=parse(schedule.daily_featured_sets||'[]');
     seed=`daily:${environment}:${day}:${schedule.corpus_version}:${selectionVersion}`;
-  } else ids=(await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{setIds})).map(p=>p.puzzle_id);
-  const choices=await loadPuzzleMetadata(query,corpusVersion,ids);
+  } else {
+    practiceChoices=await selectCachedDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,environment,{setIds});
+    ids=practiceChoices.map(p=>p.puzzle_id);
+  }
+  const choices=practiceChoices||await loadPuzzleMetadata(query,corpusVersion,ids);
   if(choices.some(p=>!p || (environment==='powered-cube')!==(p.set_id==='powered-cube'))) fail('This run uses an unavailable corpus.',409);
   const sources=choices.map(p=>p.source_draft_hash),anchors=choices.map(publicDifficulty);
   const rerolls=day||source?{set:0,pack:0}:environment==='powered-cube'||setIds.length?{set:0,pack:2}:{set:1,pack:1};
@@ -231,7 +236,10 @@ async function start(request) {
     SELECT $1::uuid,$2::date,$3,$4,$5,$6::jsonb,$7::jsonb,$8,$9,$10::jsonb,$11,$12::jsonb,$13,
       $14::boolean OR COALESCE((SELECT display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)' FROM players WHERE id=$1::uuid),false),$15::jsonb,$16::uuid,$17::boolean,$18::jsonb,$19,$20,$21
     FROM identity_allowed
-    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,corpusVersion,scoringVersion,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets),day?account?.auth_user_id||null:null,Boolean(day&&account),JSON.stringify(setIds),servingPolicy,startIdempotencyHash,startRequestHash]);
+    WHERE $22::bigint IS NULL OR EXISTS (
+      SELECT 1 FROM draft_run_serving_revision WHERE singleton AND revision=$22::bigint FOR SHARE
+    )
+    ON CONFLICT DO NOTHING RETURNING *`,[owner,day,seed,corpusVersion,scoringVersion,JSON.stringify(ids),JSON.stringify(sources),source?.id||null,environment,JSON.stringify(rerolls),difficultyVersion,JSON.stringify(anchors),selectionVersion,body.qa===true,JSON.stringify(featuredSets),day?account?.auth_user_id||null:null,Boolean(day&&account),JSON.stringify(setIds),servingPolicy,startIdempotencyHash,startRequestHash,practiceChoices?.servingRevision||null]);
   let s=inserted.rows[0];
   if(!s && day) s=(await query('SELECT * FROM draft_run_sessions WHERE (player_id=$1::uuid OR daily_account_id=$4::uuid) AND day=$2::date AND environment=$3',[owner,day,environment,account?.auth_user_id||null])).rows[0];
   if(!s && startIdempotencyHash) {
@@ -242,9 +250,12 @@ async function start(request) {
     if(s&&s.start_request_hash!==startRequestHash)
       fail('This practice start key was already used for a different request.',409);
   }
+  if(!s && practiceChoices && !await servingRevisionMatches(query,practiceChoices.servingRevision))continue;
   if(!s) fail('Could not start your run. Please retry.',409);
   if(inserted.rows.length) await query('INSERT INTO analytics_events(player_id,event_name,event_props) SELECT $1::uuid,value,$3::jsonb FROM jsonb_array_elements_text($2::jsonb)',[owner,JSON.stringify([day?'daily_started':'game_started',...(environment==='powered-cube'?['cube_started']:[])]),JSON.stringify({mode:'draft_run',set_id:environment,daily,challenge:Boolean(source),run_id:s.id,...(entrySource?{source:entrySource}:{})})]);
   return json(await responseFor(decode(s)));
+  }
+  throw servingCacheUnavailable();
 }
 
 async function change(request,id,action) {
@@ -374,7 +385,7 @@ async function route(request) {
       ORDER BY e.release_date DESC NULLS LAST,e.set_id`,[DRAFT_RUN_CORPUS_VERSION]);
     return json({corpus_version:DRAFT_RUN_CORPUS_VERSION,sets:result.rows.map(s=>({...s,regular_run:s.regular_run===true||s.regular_run==='t',training_drafts:Number(s.training_drafts||0),win_rate_cutoff:s.win_rate_cutoff==null?null:Number(s.win_rate_cutoff),qualified_trophy_drafts:Number(s.qualified_trophy_drafts||0),verified_decisions:Number(s.verified_decisions||0)}))});
   }
-  if(request.method==='GET'&&path==='/v1/practice-sets') {const owner=await player(request),caps=await accountCapabilities(await accountIdentity(request,query,owner),query);requireCapability(caps,'custom_corpus');return json({sets:await loadCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION)});}
+  if(request.method==='GET'&&path==='/v1/practice-sets') {const owner=await player(request),caps=await accountCapabilities(await accountIdentity(request,query,owner),query);requireCapability(caps,'custom_corpus');return json({sets:await loadCachedCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION)});}
   if(request.method==='GET'&&path==='/v1/daily-status') return dailyStatus(request);
   if(request.method==='GET'&&path==='/v1/leaderboard') return leaderboard(request);
   const match=path.match(/^\/v1\/runs\/([a-f0-9-]+)(?:\/(pick|reroll|share|view))?$/);
