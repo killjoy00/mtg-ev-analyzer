@@ -1,0 +1,59 @@
+name: Production corpus health refresh
+on:
+  schedule:
+    - cron: '17 */4 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: production-corpus-health-refresh
+  cancel-in-progress: false
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require reviewed code
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      - name: Refresh at most one production snapshot
+        run: |
+          set -euo pipefail
+          umask 077
+          connection=$(neon connection-string br-orange-feather-ayps8kep --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/production-health.connection"
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+
+          before=$(node scripts/plan-corpus-health-refresh.mjs "$RUNNER_TEMP/production-health.connection")
+          printf '%s\n' "$before" | tee corpus-health-refresh-plan-before.json
+          snapshot=$(printf '%s' "$before" | jq -r 'select(.action=="refresh") | .selected.source_snapshot_id // empty')
+
+          if [[ -n "$snapshot" ]]; then
+            node scripts/check-corpus-health.mjs "$RUNNER_TEMP/production-health.connection" --snapshot "$snapshot" | tee corpus-health-refresh-summary.jsonl
+          else
+            : > corpus-health-refresh-summary.jsonl
+            echo 'No production snapshot needs a deep health refresh in this slot.'
+          fi
+
+          after=$(node scripts/plan-corpus-health-refresh.mjs "$RUNNER_TEMP/production-health.connection")
+          printf '%s\n' "$after" | tee corpus-health-refresh-plan-after.json
+          printf '%s' "$after" | jq -e '(.over_capacity == false) and (.hard_deadline_risk == false)' >/dev/null || {
+            echo 'Production corpus health cadence cannot currently preserve the seven-day freshness gate; operator action is required.' >&2
+            exit 1
+          }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-corpus-health-refresh-${{ github.run_id }}
+          retention-days: 30
+          path: |
+            corpus-health-refresh-plan-before.json
+            corpus-health-refresh-plan-after.json
+            corpus-health-refresh-summary.jsonl
