@@ -75,6 +75,93 @@ server-side and persisted on new sessions; the reporting view also recognizes
 legacy QA names. Clients can opt a run out of research, never opt into admin
 access. No personal identifiers or emails appear in report responses or exports.
 
+## Launch acquisition and Daily habit reporting
+
+The launch measurement layer is additive to the decision-quality report. The
+browser records one `acquisition_touch` per browser identity. It accepts only
+sanitized `utm_source`, `utm_campaign`, and optional `utm_medium` values;
+when there is no UTM source it may use the external referrer hostname. The
+`utm_*` parameters are removed from the address bar after capture. A Daily
+result-share arrival keeps its existing `ref=result_share` behavior and is
+attributed as `result_share`.
+
+The admin report derives first-touch attribution from the earliest acquisition
+event associated with the merged player identity. If product activity predates
+the start of acquisition tracking, the source is `pre_tracking`. A player first
+seen after tracking began but with no captured source is `direct`. A missing
+campaign is displayed as `(none)`.
+
+### Daily habit definitions
+
+Habit reporting uses completed `draft_run_sessions` as the authority, not
+browser events. One habit day is one or more completed Mixed, Powered Cube, or
+Latest Set Dailies on the stored Pacific Daily date; completing multiple Dailies
+on one date still counts as one day.
+
+Linked accounts collapse to one person after identity merges. Guests remain one
+browser/player identity. All habit metrics exclude `measurement_qa` sessions,
+QA-pattern display names, and players linked to `pack1_admins`.
+
+The **Daily habit cohorts** table is grouped by first touch and campaign and
+shows:
+
+- **First-Daily people:** people whose first real Daily falls in the selected
+  date range.
+- **Next-day return:** a completed Daily on the next Pacific date.
+- **7-day return:** a completed Daily within the seven-day follow-up window.
+- **3-in-7:** at least three distinct completed Daily dates in the first
+  seven-day window.
+- **Ever 3-in-7:** lifetime observed status as of report generation. Unlike the
+  fixed-window rates, this can increase later.
+
+Next-day, 7-day, and 3-in-7 rates use only cohorts whose full observation window
+has closed. The UI shows returned/reached people, mature denominator, and
+immature cohort count beside each rate; do not treat immature cohorts as
+non-returners.
+
+The **3-in-7 daily health** table is a calendar series. For each date it counts
+people with at least three distinct completed Daily dates in the trailing seven
+Pacific dates. Use it as a product-health trend, not as a cohort conversion
+rate.
+
+### Owner workflow
+
+1. Open `/admin/` and sign in with an account present in `pack1_admins`.
+2. Set **From** and **Through** to the first-Daily cohort window you want to
+   inspect, then select **Refresh**.
+3. Read **Daily habit cohorts** by **First touch** and **Campaign**. The
+   environment, run-type, set, difficulty, pick, and selection-version filters
+   do not change these habit metrics.
+4. Compare the mature denominators before comparing rates. A large immature
+   count means the newest cohorts have not had enough time to qualify.
+5. Use **3-in-7 daily health** for the rolling count of people currently showing
+   repeat-Daily behavior.
+6. Use **Daily result-share funnel** separately for the share-link loop. That
+   funnel keeps its existing definition and is not reattributed by the new
+   first-touch logic.
+
+For campaign links, use normal Pack One URLs with `utm_source` and
+`utm_campaign`; `utm_medium` is optional. Do not put names, emails, account
+IDs, or other personal data in those values. Example:
+
+`https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social`
+
+### Player-facing Daily cue
+
+The Daily status response now includes `daily_streak`, calculated from
+consecutive distinct completed Daily dates ending today for the current player
+identity. It works for guests as well as linked accounts. After a Daily result,
+and on the Daily home once all three Dailies are complete, the browser shows
+`New Dailies in …`; when the current streak is at least two days it appends
+`· N-day streak`. The reset countdown follows the next Pacific Daily boundary,
+including 23- and 25-hour daylight-saving transitions. Practice results do not
+show this Daily cue.
+
+The acquisition/habit addition does not require a database migration. It does
+require the updated production Functions for the habit-report query and
+`daily_streak` response; a Pages-only release is therefore only a partial
+launch of these features.
+
 ## Operations and verification
 
 Apply `0011_decision_measurements.sql` in development, then run:
@@ -93,8 +180,7 @@ The arithmetic fixture checks a known five-answer cohort: 40% trophy matches,
 50 average partial credit, 3-second median, 4.6-second P90, one review decision
 and five choices in its detail report.
 
-Apply the additive migration in production before deploying the updated API,
-then deploy the frontend. Verify public report requests return 401 and ordinary
+For the original decision-observation feature, apply the additive migration in production before deploying the updated API, then deploy the frontend. The later launch acquisition/habit addition in PR #505 has no new migration; promote its exact reviewed `main` commit through development and production Functions, then verify the production admin habit tables and Daily streak response. Verify public report requests return 401 and ordinary
 accounts return 403. Generate the owner's random setup code outside Git and
 insert only its hash and expiry into `pack1_admin_invites`. Share it privately.
 
