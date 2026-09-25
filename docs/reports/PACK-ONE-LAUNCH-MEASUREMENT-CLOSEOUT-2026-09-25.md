@@ -8,7 +8,7 @@ PR #505, **Pack One launch attribution, habit metrics, cues, and previews**, mer
 
 `572f36638a780f73a41a548eb07e3101ea2efed5`
 
-GitHub Pages serves the browser-side release, and development and production Neon Functions now serve that same reviewed application revision. Launch attribution capture, Daily habit reporting, the session-derived Daily streak, reset cue and Privacy disclosure are live. PR #505 initially shipped malformed literal `\\n` text in the homepage social metadata; PR #515 subsequently corrected that regression and the fixed homepage was redeployed before this closeout was finalized.
+GitHub Pages serves the browser-side release, and development and production Neon Functions now serve that same reviewed application revision. Launch attribution capture, Daily habit reporting, the session-derived Daily streak, reset cue and Privacy disclosure are live. PR #505 initially shipped malformed literal `\n` text in the homepage social metadata; PR #515 subsequently corrected that regression and the fixed homepage was redeployed before this closeout was finalized.
 
 No schema migration was introduced by PR #505. During promotion, the release verifier correctly found a previously reviewed mobile schema prerequisite that had not yet been promoted: `0038_mobile_practice_idempotency.sql`. That prerequisite was applied and verified in development and production before the exact #505 application revision was deployed.
 
@@ -67,9 +67,9 @@ The countdown follows the next Pacific Daily boundary and is covered for both 23
 
 ### Social previews and privacy
 
-PR #505 added evergreen Pack One launch copy, a large Twitter/X card, and first-party Open Graph images. It also initially shipped literal `\\n` characters around the homepage social metadata, which could move metadata out of the parsed `<head>` and render stray text.
+PR #505 added evergreen Pack One launch copy, a large Twitter/X card, and first-party Open Graph images. It also initially shipped literal `\n` characters around the homepage social metadata, which could move metadata out of the parsed `<head>` and render stray text.
 
-PR #515 fixed that regression and merged as `2b6640e81624e3715158833a9abef545ff4420f6`. Its PR gates passed test **36144018422** and E2E **36144018028**; the E2E asserts that `og:image`, `twitter:card`, and `canonical` remain inside the parsed `<head>`. GitHub Pages then deployed that exact merge in run **36144465725**, and post-deploy production smoke **36144467337** successfully fetched the live Pack One homepage. The final deployed source no longer contains the literal-`\\n` pollution.
+PR #515 fixed that regression and merged as `2b6640e81624e3715158833a9abef545ff4420f6`. Its PR gates passed test **36144018422** and E2E **36144018028**; the E2E asserts that `og:image`, `twitter:card`, and `canonical` remain inside the parsed `<head>`. GitHub Pages then deployed that exact merge in run **36144465725**, and post-deploy production smoke **36144467337** successfully fetched the live Pack One homepage. The final deployed source no longer contains the literal-`\n` pollution.
 
 The Privacy page now discloses campaign attribution and external referrer-host collection.
 
@@ -174,7 +174,7 @@ As of this closeout:
 
 - PR #505 is merged;
 - browser attribution capture and the Daily reset cue are live;
-- the #505 literal-`\\n` homepage social-metadata regression was fixed by PR #515, and the corrected static metadata is deployed;
+- the #505 literal-`\n` homepage social-metadata regression was fixed by PR #515, and the corrected static metadata is deployed;
 - the reviewed mobile practice-idempotency schema prerequisite is present in development and production;
 - development and production Functions serve exact revision `572f36638a780f73a41a548eb07e3101ea2efed5`;
 - production acceptance run **36135923047** is green;
