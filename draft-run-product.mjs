@@ -37,7 +37,7 @@ async function loadSetNames() {
 const app=()=>document.querySelector('#app');
 function styles() {
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=8';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=9';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -100,7 +100,7 @@ function compactResultLabel(answer,sentence='') {
 }
 function cardGrid(p,answer=null) {
   const candidates=sortPackByRarity(p.candidates);
-  return `<div class="run-cards">${candidates.map(c=>`<article class="run-card ${selection===c.id?'selected':''} ${answer?.historicalId===c.id?'trophy-pick':''}"><button class="run-card-select" type="button" data-pick="${esc(c.id)}" aria-label="Pick ${esc(c.name)}" aria-pressed="${selection===c.id}" ${answer?'disabled':''}>${image(c)}<span>${esc(c.name)}</span></button><button class="run-zoom" type="button" data-zoom="${esc(c.id)}" aria-label="Enlarge ${esc(c.name)}"><span class="run-zoom-glyph" aria-hidden="true"></span></button>${answer&&(answer.historicalId===c.id||answer.selectedId===c.id)?`<span class="run-card-outcome">${answer.historicalId===c.id?'Trophy pick':'Your pick'}</span>`:''}</article>`).join('')}</div>`;
+  return `<div class="run-cards">${candidates.map(c=>`<article class="run-card ${selection===c.id?'selected':''} ${answer?.historicalId===c.id?'trophy-pick':''}"><button class="run-card-select" type="button" data-pick="${esc(c.id)}" aria-label="Pick ${esc(c.name)}" aria-pressed="${selection===c.id}" ${answer?'disabled':''}>${image(c)}</button><div class="run-card-caption"><span class="run-card-name">${esc(c.name)}</span><button class="run-zoom" type="button" data-zoom="${esc(c.id)}" aria-label="Enlarge ${esc(c.name)}"><span class="run-zoom-glyph" aria-hidden="true"></span></button></div>${answer&&(answer.historicalId===c.id||answer.selectedId===c.id)?`<span class="run-card-outcome">${answer.historicalId===c.id?'Trophy pick':'Your pick'}</span>`:''}</article>`).join('')}</div>`;
 }
 function rankingStateMarkup(value=run) {
   if(!value?.day)return '';
