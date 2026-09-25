@@ -1,11 +1,11 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 const PROJECT='patient-shadow-91417882',TITLE='[launch alert] Production capacity needs attention';
-export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:5000,quota_ms:1000,requests_per_day:100000,compute_cu_hours_per_day:24,egress_bytes_per_day:5*1024**3};
+export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:5000,quota_ms:1000,requests_per_day:100000,compute_cu_hours_per_day:24,egress_bytes_per_day:5*1024**3,egress_bytes_per_billing_period:50*1024**3};
 async function json(fetcher,url,token,body) {
   const r=await fetcher(url,{method:body?'POST':'GET',headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'},body:body?JSON.stringify(body):undefined,redirect:'error',signal:AbortSignal.timeout(20000)});
   const d=await r.json().catch(()=>null);
-  if(!r.ok||d?.success===false||d?.errors?.length)throw Error(new URL(url).hostname+' telemetry HTTP '+r.status);
+  if(!r.ok||d?.success===false||d?.errors?.length)throw Object.assign(Error(new URL(url).hostname+new URL(url).pathname+' telemetry HTTP '+r.status),{status:r.status});
   return d;
 }
 export function parseGatewayEvent(row) {
@@ -26,6 +26,7 @@ export function evaluate(events,usage) {
   if(usage.worker_requests>=thresholds.requests_per_day)alerts.push('worker_daily_usage');
   if(usage.compute_cu_hours>=thresholds.compute_cu_hours_per_day)alerts.push('neon_compute_daily_usage');
   if(usage.egress_bytes>=thresholds.egress_bytes_per_day)alerts.push('neon_egress_daily_usage');
+  if(usage.billing_period_egress_bytes>=thresholds.egress_bytes_per_billing_period)alerts.push('neon_egress_billing_period_usage');
   return {alerts,sampled_events:events.length,estimated_requests:estimated,errors,limited,slow_samples:slow,slow_quota_samples:quotaSlow,releases:[...new Set(events.map(e=>e.release))],usage};
 }
 export function parseNeonUsage(data) {
@@ -59,7 +60,18 @@ async function usage(fetcher,env,account,now) {
   const project=await json(fetcher,'https://console.neon.tech/api/v2/projects/'+PROJECT,env.NEON_API_KEY);
   const org=project.project?.org_id;if(!/^[a-z0-9-]{1,60}$/.test(org||''))throw Error('Neon project organization unavailable');
   const params=new URLSearchParams({org_id:org,project_ids:PROJECT,from:from.toISOString(),to:to.toISOString(),granularity:'daily',metrics:'compute_unit_seconds,public_network_transfer_bytes'});
-  const neon=parseNeonUsage(await json(fetcher,'https://console.neon.tech/api/v2/consumption_history/v2/projects?'+params,env.NEON_API_KEY));
+  let neon;
+  try {neon=parseNeonUsage(await json(fetcher,'https://console.neon.tech/api/v2/consumption_history/v2/projects?'+params,env.NEON_API_KEY));}
+  catch(error) {
+    if(![403,404].includes(error.status))throw error;
+    params.delete('org_id');params.set('metrics','compute_time_seconds');
+    const legacy=await json(fetcher,'https://console.neon.tech/api/v2/consumption_history/projects?'+params,env.NEON_API_KEY);
+    const selected=legacy.projects?.find(p=>p.project_id===PROJECT);
+    if(!selected?.periods||!Number.isFinite(project.project.data_transfer_bytes))throw Error('Legacy Neon usage unavailable');
+    const frames=selected.periods.flatMap(p=>p.consumption||[]);
+    if(frames.some(f=>!Number.isFinite(f.compute_time_seconds)))throw Error('Legacy Neon compute usage unavailable');
+    neon={compute_cu_hours:frames.reduce((n,f)=>n+f.compute_time_seconds,0)/3600,billing_period_egress_bytes:project.project.data_transfer_bytes,billing_period_start:project.project.consumption_period_start,source:'legacy consumption history; egress is current billing period, not daily'};
+  }
   return {day:from.toISOString().slice(0,10),scope:'entire Neon project including CI branches; production gateway only',worker_requests:rows.reduce((n,r)=>n+(r.sum?.requests||0),0),...neon};
 }
 export async function routeAlert(fetcher,env,report) {
