@@ -145,9 +145,9 @@ For campaign links, the Admin **Campaign Links / Link Builder** at
 `/admin/?area=campaign-links` is the preferred construction surface. It uses the
 same acquisition-value validation as runtime capture, previews a tracked UTM URL,
 previews an intended static `/go/<slug>/` vanity URL, and produces the exact
-`campaign-links.json` entry. The tracked UTM URL can be used immediately; the
-vanity URL is not live until its entry and generated page are committed and
-deployed through the normal site PR. See
+`campaign-links.json` entry. The tracked UTM URL can be used immediately without a slug; the
+vanity URL requires a valid slug and is not live until its entry and generated
+page are committed and deployed through the normal site PR. See
 [Campaign Links owner guide](CAMPAIGN-LINKS-OWNER-GUIDE.md).
 
 Normal Pack One URLs still use `utm_source` and `utm_campaign`;
