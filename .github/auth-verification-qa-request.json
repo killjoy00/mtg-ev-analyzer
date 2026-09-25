@@ -1,0 +1,1 @@
+{"operation":"run","branch":"br-autumn-bar-ayopmkze","authBase":"https://ep-old-surf-ayntk06i.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth","reason":"Part of #246 final acceptance: verify required-mode signup, resend, consumed-link rejection, emailVerified transition, sign-in, recovery, Chromium/WebKit UX, rollback, Worker cleanup, and whole-branch cleanup."}

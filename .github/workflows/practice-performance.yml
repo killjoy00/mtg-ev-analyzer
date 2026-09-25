@@ -1,0 +1,68 @@
+name: isolated practice performance comparison
+on:
+  pull_request:
+    paths:
+      - 'scripts/practice-performance.mjs'
+      - 'worker/draft-run-selection.mjs'
+      - 'migrations/0039_practice_serving_cache.sql'
+      - 'tests/practice-performance.test.mjs'
+      - '.github/workflows/practice-performance.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: practice-performance-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+jobs:
+  baseline:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Ensure PostgreSQL client is available
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+      - name: Set emergency expiry
+        id: expiry
+        run: echo "expires_at=$(date -u --date '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Create disposable production-sized copy
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: patient-shadow-91417882
+          parent_branch: br-orange-feather-ayps8kep
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: practice-baseline-${{ github.run_id }}-${{ github.run_attempt }}
+          database: pack1
+          role: pack1_owner
+          suspend_timeout: 300
+          expires_at: ${{ steps.expiry.outputs.expires_at }}
+      - name: Verify isolated target, build derived cache and compare selection
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PACK1_BENCHMARK_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PACK1_BENCHMARK_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+          PACK1_BENCHMARK_SAMPLES: '3'
+          PACK1_BENCHMARK_CACHE: '1'
+        run: node scripts/practice-performance.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: practice-performance-${{ github.run_id }}
+          path: artifacts/practice-performance
+          retention-days: 30
+      - name: Delete this disposable copy
+        if: always() && steps.neon.outputs.branch_id != '' && steps.neon.outputs.created == 'true'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}

@@ -1,0 +1,170 @@
+name: e2e
+
+on:
+  workflow_dispatch:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
+    paths-ignore: ['.github/model-rollout-request.json']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+      R2_BUCKET: ${{ secrets.R2_BUCKET }}
+      AWS_DEFAULT_REGION: auto
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Detect required-suite scope
+        id: scope
+        shell: bash
+        env:
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          run_full=true
+          if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
+            run_full=false
+            mapfile -t changed_files < <(git diff --name-only "$PR_BASE_SHA" "$PR_HEAD_SHA")
+            if (( ${#changed_files[@]} == 0 )); then
+              run_full=true
+            else
+              printf 'Changed files:\n'
+              printf ' - %s\n' "${changed_files[@]}"
+              for path in "${changed_files[@]}"; do
+                case "$path" in
+                  mobile/*|docs/mobile-*|docs/android-*|docs/parity.md|.github/workflows/mobile*.yml|.github/workflows/android-*.yml|.github/workflows/ios-*.yml|.github/workflows/google-play-access.yml|.github/android-*.txt|.github/ios-*.txt|.github/app-store-*.txt|.github/scripts/app-store-*.mjs|.gitignore)
+                    ;;
+                  *)
+                    run_full=true
+                    break
+                    ;;
+                esac
+              done
+            fi
+          fi
+          echo "run_full=$run_full" >> "$GITHUB_OUTPUT"
+          if [[ "$run_full" == "true" ]]; then
+            echo 'Running the full repository gate.'
+          else
+            echo 'Native-mobile/release-only PR: full web/backend gate is not required.'
+          fi
+      - name: Phase 3 done-check greps
+        if: steps.scope.outputs.run_full == 'true'
+        run: |
+          git grep -n "Sign In With Google" -- '*.mjs' '*.html' tests/ || true
+          git grep -n "account-columns" -- growth.mjs || true
+          git grep -n "renderMyProfile" -- growth.mjs || true
+          git grep -n "account-signin .form-error" -- growth.mjs || true
+          git grep -n "source" -- draft-run-product.mjs | grep run-career || true
+      - uses: actions/setup-node@v4
+        if: steps.scope.outputs.run_full == 'true'
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        if: steps.scope.outputs.run_full == 'true'
+        with:
+          python-version: '3.12'
+      - name: Install browser test dependency
+        if: steps.scope.outputs.run_full == 'true'
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Hydrate replay shards from R2 for local browser tests
+        if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
+        run: bash scripts/r2_replay_shards.sh hydrate
+      - name: Start static site
+        if: steps.scope.outputs.run_full == 'true'
+        run: |
+          nohup python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
+          echo $! > /tmp/pack1-http.pid
+          curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ -o /dev/null
+      - name: Run browser regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/e2e.mjs
+      - name: Run set archive regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/sets-e2e.mjs
+      - name: Run Daily / Set Practice regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/practice-e2e.mjs
+      - name: Run dedicated Practice hub regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/practice-hub-e2e.mjs
+      - name: Run account practice and custom corpus regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/practice-access-e2e.mjs
+      - name: Run Player Profile / Progression regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/profile-e2e.mjs
+      - name: Run Today refresh and Pacific rollover regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/home-today-e2e.mjs
+      - name: Run eight-decision Draft Run regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/draft-run-e2e.mjs
+      - name: Run Powered Cube eight-decision regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: PACK1_TEST_ENVIRONMENT=powered-cube node tests/draft-run-e2e.mjs
+      - name: Run fixed Daily sharing regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: PACK1_TEST_DAILY=1 node tests/draft-run-e2e.mjs
+      - name: Run fixed Cube Daily sharing regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: PACK1_TEST_DAILY=1 PACK1_TEST_ENVIRONMENT=powered-cube node tests/draft-run-e2e.mjs
+      - name: Run historical ten-decision compatibility regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: PACK1_TEST_SELECTION_VERSION=first-pack-v2 node tests/draft-run-e2e.mjs
+      - name: Run account browser contract
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/account-e2e.mjs
+      - name: Run auth simplification and Daily return contract
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/auth-context-e2e.mjs
+      - name: Run email verification Chromium/WebKit mobile contract
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/email-verification-e2e.mjs
+      - name: Run Patreon activation mobile contract
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/patreon-activation-e2e.mjs
+      - name: Run password recovery Chromium/WebKit mobile contract
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/password-recovery-e2e.mjs
+      - name: Run credential management Chromium/WebKit mobile contract
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/credential-management-e2e.mjs
+      - name: Run account deletion Chromium/WebKit mobile contract
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/account-deletion-e2e.mjs
+      - name: Verify display-ad membership suppression with intercepted requests
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/ads-e2e.mjs
+      - name: Run admin reporting browser contract
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/admin-e2e.mjs
+      - name: Upload UI screenshots
+        if: always() && steps.scope.outputs.run_full == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack1-ui-screenshots
+          path: artifacts/*.png
+          if-no-files-found: ignore
+      - name: Stop static site
+        if: always() && steps.scope.outputs.run_full == 'true'
+        run: |
+          if [ -f /tmp/pack1-http.pid ]; then kill "$(cat /tmp/pack1-http.pid)" || true; fi

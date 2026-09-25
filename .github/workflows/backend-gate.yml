@@ -1,0 +1,187 @@
+name: backend schema gate
+
+on:
+  pull_request:
+    paths:
+      - 'worker/**'
+      - 'migrations/**'
+      - 'draft-run.mjs'
+      - 'draft-run-policy.mjs'
+      - 'daily-selection.mjs'
+      - 'draft-run-difficulty.mjs'
+      - 'data/selection-policy.json'
+      - 'game-date.mjs'
+      - 'tests/*backend-smoke.mjs'
+      - 'scripts/verify-neon-schema.mjs'
+      - 'scripts/load_verified_draft_run.mjs'
+      - 'scripts/*corpus*manifest.mjs'
+      - 'scripts/load*tro*.mjs'
+      - '.github/workflows/prepare-rebuild.yml'
+      - '.github/workflows/backend-gate.yml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-gate-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  backend-gate:
+    # Fork PRs do not receive repository secrets. Keep them skipped rather than
+    # failing or ever pointing the fixture suites at the production branch.
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify Neon CI credential
+        shell: bash
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "$NEON_API_KEY" || {
+            echo '::error::NEON_API_KEY is not configured. Add the Neon GitHub Integration or a repository Actions secret before enabling this gate.'
+            exit 1
+          }
+
+      - name: Set emergency branch expiry
+        id: expiry
+        shell: bash
+        run: echo "expires_at=$(date -u --date '+4 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+
+      - name: Create isolated Neon branch
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          database: pack1
+          role: pack1_owner
+          expires_at: ${{ steps.expiry.outputs.expires_at }}
+
+      - name: Prepare isolated connection
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: |
+          set -euo pipefail
+          test -n "$DATABASE_URL" || { echo 'Neon branch did not return a database URL.'; exit 1; }
+          connection_file="$RUNNER_TEMP/pack1-ci.connection"
+          printf '%s' "$DATABASE_URL" > "$connection_file"
+          chmod 600 "$connection_file"
+          echo "PACK1_CI_CONNECTION=$connection_file" >> "$GITHUB_ENV"
+
+      - name: Apply pending migrations
+        shell: bash
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+
+          git fetch --no-tags origin main:refs/remotes/origin/main
+          stack_base_sha="$(git merge-base origin/main "$HEAD_SHA")"
+          echo "STACK_BASE_SHA=$stack_base_sha" >> "$GITHUB_ENV"
+
+          mapfile -t migration_changes < <(git diff --name-status "$stack_base_sha" "$HEAD_SHA" -- 'migrations/*.sql')
+          for change in "${migration_changes[@]}"; do
+            status="${change%%$'\t'*}"
+            path="${change#*$'\t'}"
+            if [[ "$status" != 'A' ]]; then
+              echo "::error file=$path::Existing migration files are immutable in backend-gated PRs; add a new migration instead (status $status)."
+              exit 1
+            fi
+          done
+
+          # Disposable CI branches are cloned from the deployed Neon default branch,
+          # which can lag Git main. Replay the known additive/repeatable mobile release
+          # backlog until those migrations are promoted, then add migrations introduced
+          # by this PR. This keeps merged-but-not-deployed schema prerequisites available
+          # without blindly replaying historical migrations.
+          release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql)
+          mapfile -t pending < <(
+            {
+              for migration in "${release_backlog[@]}"; do
+                [[ -f "$migration" ]] && printf '%s\n' "$migration"
+              done
+              printf '%s\n' "${migration_changes[@]}" | awk -F '\t' '$1 == "A" { print $2 }'
+            } | sort -u
+          )
+          if (( ${#pending[@]} == 0 )); then
+            echo 'No pending migrations in this PR.'
+          else
+            for migration in "${pending[@]}"; do
+              echo "Applying $migration"
+              psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f "$migration"
+            done
+          fi
+
+      - name: Run SQL-backed integration suites
+        shell: bash
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          DATABASE_URL="$(cat "$PACK1_CI_CONNECTION")" node scripts/verify-neon-schema.mjs
+          node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --production-bootstrap
+          # A corpus bump (or loader/import change) must still prove that the
+          # checked-in corpus can be loaded before production serves it. For
+          # unrelated backend PRs, the disposable branch already contains the
+          # production corpus copied from Neon's default branch; reloading stale
+          # checked-in display metadata can create a false failure after a
+          # successful display-only maintenance refresh.
+          if git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
+            echo 'No corpus or loader/import changes; using the cloned production corpus.'
+          else
+            node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
+          fi
+          node tests/staged-manifest-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/source-eligibility-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-components-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/retirement-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-version-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/serving-statistics-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/selection-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/serving-cache-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/draft-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/cube-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/decision-measurements-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/measurement-report-math.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/fixed-daily-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/daily-generation-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-admin-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/account-session-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/mobile-auth-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/username-uniqueness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/account-deletion-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/patreon-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/patreon-webhook-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/capabilities-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/eight-pick-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/request-integrity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          # Destructive season edge cases run last because this isolated branch is deleted next.
+          node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+
+      - name: Delete isolated Neon branch
+        if: always() && steps.neon.outputs.branch_id != ''
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}

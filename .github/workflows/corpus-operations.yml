@@ -1,0 +1,89 @@
+name: Corpus Operations
+on:
+  schedule:
+    - cron: '23 7 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Additive ingestion only; new sets stay Candidate'
+        type: choice
+        options: [development, production]
+        default: development
+permissions:
+  contents: read
+concurrency:
+  group: corpus-operations
+  cancel-in-progress: false
+jobs:
+  corpus:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require reviewed code
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      - name: Prepare explicit connection and require additive schema
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          TARGET: ${{ inputs.target || 'production' }}
+        run: |
+          set -euo pipefail
+          umask 077
+          case "$TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/corpus.connection"
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+      - uses: actions/cache/restore@v4
+        with:
+          path: generated/corpus-candidates
+          key: corpus-candidates-${{ github.sha }}-${{ github.run_id }}
+          restore-keys: |
+            corpus-candidates-${{ github.sha }}-
+            corpus-candidates-
+      - name: Discover archives and metadata
+        run: |
+          python scripts/discover-corpus.py
+          node scripts/register-corpus-sources.mjs "$RUNNER_TEMP/corpus.connection"
+      - name: Build, validate and ingest new Candidates
+        run: |
+          set -euo pipefail
+          sets=$(cat generated/corpus-operations/pending.txt)
+          if [[ -z "$sets" ]]; then echo 'No new corpus candidates.'; exit 0; fi
+          python -u scripts/run_import_all_trophies.py --sets "$sets" --output generated/corpus-candidates --workers 2 --max-seconds 6000 --discard-source-archives
+          node scripts/load_all_trophies.mjs unused generated/corpus-candidates --validate-only
+          node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
+      - name: Verify retained corpus health
+        run: node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus.connection"
+      - name: Record import failures
+        if: always()
+        env:
+          WORKFLOW_STATUS: ${{ job.status }}
+        run: node scripts/record-corpus-import-status.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
+      - uses: actions/cache/save@v4
+        if: always()
+        with:
+          path: generated/corpus-candidates
+          key: corpus-candidates-${{ github.sha }}-${{ github.run_id }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corpus-operations-${{ github.run_id }}
+          retention-days: 90
+          path: |
+            generated/corpus-operations/
+            generated/corpus-candidates/catalog.json
+            generated/corpus-candidates/*/manifest.json
+            generated/corpus-candidates/*/trophies.jsonl.gz
+            generated/corpus-candidates/*/puzzles.jsonl.gz

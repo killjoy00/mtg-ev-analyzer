@@ -1,0 +1,104 @@
+name: Traditional Phase 2 all environments
+on:
+  pull_request:
+    paths:
+      - 'research/TRADITIONAL-PHASE2-PROTOCOL.md'
+      - 'scripts/traditional_phase2.py'
+      - 'tests/test_traditional_phase2.py'
+      - '.github/workflows/traditional-phase2.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+  actions: read
+concurrency:
+  group: traditional-phase2-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  measure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        set:
+          - powered-cube
+          - hob
+          - msh
+          - sos
+          - eoe
+          - fin
+          - tdm
+          - dft
+          - fdn
+          - dsk
+          - blb
+          - mh3
+          - otj
+          - mkm
+          - ktk
+          - lci
+          - woe
+          - ltr
+          - mom
+          - one
+          - bro
+          - dmu
+          - snc
+          - neo
+          - hbg
+          - sir
+          - pio
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35289844612
+          name: verified-premier-trophies-35289844612-1
+          path: generated/frozen-v7
+      - name: Validate unchanged gates and Phase 2 scope
+        run: |
+          python -m unittest discover -s tests -p test_traditional_puzzles.py
+          python -m unittest discover -s tests -p test_traditional_phase2.py
+      - name: Reconstruct frozen Premier grader and evaluate Traditional inventory
+        run: python -u scripts/traditional_phase2.py --set "${{ matrix.set }}"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traditional-phase2-${{ matrix.set }}
+          retention-days: 90
+          path: |
+            generated/traditional-phase2/*/measurements.json.gz
+            generated/traditional-phase2/*/summary.json
+            generated/traditional-phase2/*/manifest.json
+            generated/traditional-phase2/*/puzzles.jsonl.gz
+            generated/traditional-phase2/*/trophies.jsonl.gz
+            generated/traditional-phase2/*/premier-source-audit.json
+  report:
+    needs: measure
+    if: always()
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: traditional-phase2-*
+          path: generated/traditional-phase2
+      - name: Consolidate gates, reference regression and residuals
+        run: |
+          mapfile -t measurements < <(find generated/traditional-phase2 -name measurements.json.gz | sort)
+          python scripts/traditional_phase2.py --summarize "${measurements[@]}" --out generated/traditional-phase2/report.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traditional-phase2-report
+          retention-days: 90
+          path: generated/traditional-phase2/report.json

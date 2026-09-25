@@ -1,0 +1,95 @@
+name: Traditional release evidence gate
+on:
+  pull_request:
+    paths:
+      - 'scripts/load-traditional-components.mjs'
+      - 'scripts/verify-puzzle-components.mjs'
+      - 'scripts/prepare_v4_cube_admission.py'
+      - 'scripts/traditional_v4_revalidation.py'
+      - 'corpus-components.mjs'
+      - 'card-metadata.mjs'
+      - '.github/workflows/traditional-release-gate.yml'
+permissions:
+  contents: read
+  actions: read
+jobs:
+  evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35386149822
+          pattern: traditional-phase2-*
+          path: generated/regular-phase2
+      - name: Reconstruct historical v3 gates without database changes
+        run: node scripts/load-traditional-components.mjs unused generated/regular-phase2 --validate-only > generated/phase2-health.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35662906382
+          pattern: traditional-v4-revalidation-*
+          path: generated/v4-regular-phase2
+      - name: Reconstruct leakage-corrected v4 regular gates
+        run: node scripts/load-traditional-components.mjs unused generated/v4-regular-phase2 --validate-only > generated/v4-phase2-health.json
+
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35662906382
+          name: traditional-v4-revalidation-powered-cube
+          path: generated/v4-cube-research
+      - name: Narrow and verify leakage-corrected v4 Cube evidence
+        run: |
+          python scripts/prepare_v4_cube_admission.py generated/v4-cube-research/powered-cube generated/v4-cube-admission
+          node scripts/load-traditional-components.mjs unused generated/v4-cube-admission --validate-only > generated/v4-cube-health.json
+
+      - name: Verify exact historical and corrected admission scopes
+        run: |
+          node --input-type=module - <<'JS'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          const expected='msh sos eoe fin tdm dft fdn dsk blb mh3 otj mkm lci woe ltr mom one bro dmu snc neo sir'.split(' ').sort();
+          const blocked=['hbg','hob','ktk','pio'];
+
+          const historical=JSON.parse(fs.readFileSync('generated/phase2-health.json'));
+          assert.deepEqual(historical.filter(s=>s.ready).map(s=>s.set).sort(),expected);
+          assert.deepEqual(historical.filter(s=>!s.ready).map(s=>s.set).sort(),blocked);
+
+          const corrected=JSON.parse(fs.readFileSync('generated/v4-phase2-health.json'));
+          assert.deepEqual(corrected.filter(s=>s.ready).map(s=>s.set).sort(),expected);
+          assert.deepEqual(corrected.filter(s=>!s.ready).map(s=>s.set).sort(),blocked);
+          assert.ok(corrected.every(s=>s.parity_picks>=200));
+
+          const cube=JSON.parse(fs.readFileSync('generated/v4-cube-health.json'));
+          assert.equal(cube.length,1);
+          assert.equal(cube[0].set,'powered-cube');
+          assert.equal(cube[0].ready,true);
+          assert.equal(cube[0].puzzles,1320);
+          assert.ok(cube[0].parity_picks>=200);
+
+          console.log(JSON.stringify({
+            historical_ready:historical.filter(s=>s.ready).length,
+            corrected_ready:corrected.filter(s=>s.ready).length,
+            corrected_blocked:corrected.filter(s=>!s.ready).map(s=>s.set).sort(),
+            cube:{ready:cube[0].ready,puzzles:cube[0].puzzles,parity_picks:cube[0].parity_picks}
+          }));
+          JS
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: traditional-release-health
+          path: |
+            generated/phase2-health.json
+            generated/v4-phase2-health.json
+            generated/v4-cube-health.json

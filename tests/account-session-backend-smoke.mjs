@@ -1,0 +1,191 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {createHash} from 'node:crypto';
+if(!process.argv.includes('--dev-fixtures'))throw Error('Use a disposable branch.');
+process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
+process.env.PACK1_ALLOW_LOCALHOST='1';
+const {default:growth,query}=await import('../worker/growth-function.js');
+
+const tag=crypto.randomUUID().slice(0,8);
+const authId=crypto.randomUUID(),legacyAuth=crypto.randomUUID()+crypto.randomUUID();
+const origin='https://packone.pro';
+const json=async(response,status=200)=>{const data=await response.json();assert.equal(response.status,status,JSON.stringify(data));return data;};
+// This calls the worker directly, so it sees the single joined Set-Cookie the
+// Neon runtime can actually emit. Split it exactly as edge/gateway.mjs does, so
+// these assertions describe what a browser receives rather than what the
+// function happened to write.
+const COOKIE_BOUNDARY=/,\s*(?=__(?:Host|Secure)-pack1_)/;
+const cookies=response=>(response.headers.getSetCookie?.()||[response.headers.get('set-cookie')].filter(Boolean))
+  .flatMap(line=>String(line).split(COOKIE_BOUNDARY));
+const value=(lines,name)=>{
+  const line=lines.find(row=>row.startsWith(name+'='));
+  assert.ok(line,'Missing '+name);
+  return decodeURIComponent(line.slice(name.length+1).split(';')[0]);
+};
+const cookieHeader=(account,csrf,player)=>[
+  account&&'__Host-pack1_account='+encodeURIComponent(account),
+  csrf&&'__Secure-pack1_csrf='+encodeURIComponent(csrf),
+  player&&'__Host-pack1_player='+encodeURIComponent(player),
+].filter(Boolean).join('; ');
+
+const legacyPlayer=await json(await growth.fetch(new Request('https://packone.pro/v1/session',{
+  method:'POST',headers:{'content-type':'application/json',origin},
+  body:JSON.stringify({displayName:'QA secure '+tag}),
+})));
+// The gateway's refresh-only route must prove identity without ever creating
+// one, even for a plausible forged token or a valid token with a tombstone.
+const refresh=token=>growth.fetch(new Request('https://packone.pro/internal/player-session-refresh',{
+  method:'POST',headers:{origin,'content-type':'application/json',authorization:'Bearer '+token},
+  body:JSON.stringify({displayName:'QA quota '+tag}),
+}));
+const playersBefore=Number((await query('SELECT count(*) n FROM players')).rows[0].n);
+const validRefresh=await refresh(legacyPlayer.token);
+assert.equal((await json(validRefresh)).playerId,legacyPlayer.playerId);
+assert.equal(validRefresh.headers.get('set-cookie'),null);
+const [tokenId,tokenSignature]=legacyPlayer.token.split('.');
+const forged=tokenId+'.'+(tokenSignature[0]==='A'?'B':'A')+tokenSignature.slice(1);
+for(const token of ['','invalid',forged]) {
+  const result=await refresh(token);
+  assert.equal(result.status,401);assert.equal(result.headers.get('x-pack1-session-state'),'missing');
+  assert.equal(result.headers.get('set-cookie'),null);
+}
+const quotaAuth=crypto.randomUUID();
+try {
+  await query("INSERT INTO account_deletion_operations(auth_user_id,player_id,state) VALUES($1::uuid,$2::uuid,'complete')",[quotaAuth,legacyPlayer.playerId]);
+  const deletedRefresh=await refresh(legacyPlayer.token);
+  assert.equal(deletedRefresh.status,401);assert.equal(deletedRefresh.headers.get('x-pack1-session-state'),'missing');
+  assert.equal(deletedRefresh.headers.get('set-cookie'),null);
+} finally {await query('DELETE FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[quotaAuth]);}
+assert.equal(Number((await query('SELECT count(*) n FROM players')).rows[0].n),playersBefore,'refresh never creates players');
+await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[authId,'QA Secure '+tag,'qa-secure-'+tag+'@example.invalid']);
+await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[legacyAuth,authId]);
+
+const migratedResponse=await growth.fetch(new Request('https://packone.pro/v1/account/migrate',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+legacyPlayer.token,'x-pack1-auth-session':legacyAuth},
+  body:'{}',
+}));
+const migrated=await json(migratedResponse);
+assert.equal(migrated.migrated,true);
+assert.equal(migrated.user.id,authId);
+const set=cookies(migratedResponse);
+const account=value(set,'__Host-pack1_account'),csrf=value(set,'__Secure-pack1_csrf');
+assert.match(account,/^[A-Za-z0-9_-]{43}$/);
+assert.match(csrf,/^[A-Za-z0-9_-]{43}$/);
+assert.equal(Number((await query('SELECT count(*) n FROM neon_auth.session WHERE token=$1',[legacyAuth])).rows[0].n),0,'legacy Neon session consumed');
+const stored=(await query('SELECT session_hash,csrf_hash FROM account_sessions WHERE auth_user_id=$1::uuid AND revoked_at IS NULL',[authId])).rows[0];
+assert.equal(stored.session_hash,createHash('sha256').update(account).digest('hex'));
+assert.equal(stored.csrf_hash,createHash('sha256').update(csrf).digest('hex'));
+assert.notEqual(stored.session_hash,account);
+
+const session=await json(await growth.fetch(new Request('https://packone.pro/v1/account/session',{
+  headers:{origin,cookie:cookieHeader(account,csrf)},
+})));
+assert.equal(session.user.id,authId);
+assert.equal(session.session.token,undefined,'browser account token never returns in JSON');
+
+const denied=await growth.fetch(new Request('https://packone.pro/v1/account/link-browser',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+legacyPlayer.token,cookie:cookieHeader(account,csrf)},
+  body:'{}',
+}));
+await json(denied,403);
+
+const linkedResponse=await growth.fetch(new Request('https://packone.pro/v1/account/link-browser',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+legacyPlayer.token,cookie:cookieHeader(account,csrf),'x-pack1-csrf':csrf},
+  body:'{}',
+}));
+const linked=await json(linkedResponse);
+assert.equal(linked.token,undefined,'browser link never exposes player bearer');
+const linkedCookies=cookies(linkedResponse);
+const rotated=value(linkedCookies,'__Host-pack1_account'),rotatedCsrf=value(linkedCookies,'__Secure-pack1_csrf'),player=value(linkedCookies,'__Host-pack1_player');
+assert.notEqual(rotated,account,'account session rotates on account linking');
+assert.match(player,/^p1_/);
+assert.equal((await growth.fetch(new Request('https://packone.pro/v1/account/session',{headers:{origin,cookie:cookieHeader(account,csrf,player)}}))).status,401,'rotated account session is revoked');
+
+// Once the account and browser player are already associated, link-browser is a
+// no-op. It must reuse the same account + CSRF pair and must not append another
+// historical account_sessions row merely because a page rendered.
+const beforeNoop=Number((await query('SELECT count(*) n FROM account_sessions WHERE auth_user_id=$1::uuid',[authId])).rows[0].n);
+const noopResponse=await growth.fetch(new Request('https://packone.pro/v1/account/link-browser',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
+  body:'{}',
+}));
+const noop=await json(noopResponse);
+assert.equal(noop.merged,false);
+assert.equal(cookies(noopResponse).length,0,'no-op link rewrites no identity cookies');
+assert.equal(Number((await query('SELECT count(*) n FROM account_sessions WHERE auth_user_id=$1::uuid',[authId])).rows[0].n),beforeNoop,'no-op link creates no session row');
+assert.equal(Number((await query('SELECT count(*) n FROM account_sessions WHERE auth_user_id=$1::uuid AND revoked_at IS NULL',[authId])).rows[0].n),1,'the existing account session stays active');
+
+// This is the multi-tab correctness contract: another page performing the
+// ordinary no-op link cannot invalidate the pair a first page will use for its
+// next authenticated write.
+await json(await growth.fetch(new Request('https://packone.pro/v1/profile',{
+  method:'PATCH',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
+  body:JSON.stringify({displayName:'QA Secure Same Session'}),
+})));
+
+const profileDenied=await growth.fetch(new Request('https://packone.pro/v1/profile',{
+  method:'PATCH',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,cookie:cookieHeader(rotated,rotatedCsrf,player)},
+  body:JSON.stringify({displayName:'QA Secure Changed'}),
+}));
+assert.equal(profileDenied.status,403);
+await json(await growth.fetch(new Request('https://packone.pro/v1/profile',{
+  method:'PATCH',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
+  body:JSON.stringify({displayName:'QA Secure Changed'}),
+})));
+
+const signout=await growth.fetch(new Request('https://packone.pro/v1/account/signout',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
+  body:'{}',
+}));
+await json(signout);
+assert.ok(cookies(signout).some(row=>row.startsWith('__Host-pack1_account=')&&/Max-Age=0/.test(row)));
+assert.ok(cookies(signout).some(row=>row.startsWith('__Host-pack1_player=')&&/Max-Age=0/.test(row)));
+assert.equal((await growth.fetch(new Request('https://packone.pro/v1/account/session',{headers:{origin,cookie:cookieHeader(rotated,rotatedCsrf)}}))).status,401);
+
+// A second sign-out with the now-revoked cookie must still clear it. The cookie
+// is HttpOnly, so a 401 here leaves the browser permanently holding a dead
+// session it cannot drop.
+const repeatSignout=await growth.fetch(new Request('https://packone.pro/v1/account/signout',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
+  body:'{}',
+}));
+await json(repeatSignout);
+assert.ok(cookies(repeatSignout).some(row=>row.startsWith('__Host-pack1_account=')&&/Max-Age=0/.test(row)),'revoked session can still clear its cookie');
+
+// Guest migration seeds an empty browser. It must never move an established
+// player cookie onto a different legacy bearer: that breaks the account link
+// and 401s every account surface with "Sign in again to continue".
+const strayPlayer=await json(await growth.fetch(new Request('https://packone.pro/v1/session',{
+  method:'POST',headers:{'content-type':'application/json',origin},
+  body:JSON.stringify({displayName:'QA stray '+tag}),
+})));
+const clobber=await growth.fetch(new Request('https://packone.pro/v1/player/migrate',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,'x-pack1-player-session':strayPlayer.token},
+  body:'{}',
+}));
+const kept=await json(clobber);
+assert.equal(kept.migrated,false,'an established player is not migrated over');
+assert.equal(kept.playerId,player.slice('p1_'.length).split('.')[0],'the linked player is preserved');
+assert.equal(cookies(clobber).some(row=>row.startsWith('__Host-pack1_player=')),false,'no player cookie is rewritten');
+
+// An empty browser still migrates its stored guest as before.
+const seeded=await json(await growth.fetch(new Request('https://packone.pro/v1/player/migrate',{
+  method:'POST',
+  headers:{origin,'content-type':'application/json','x-pack1-player-session':strayPlayer.token},
+  body:'{}',
+})));
+assert.equal(seeded.migrated,true);
+assert.equal(seeded.playerId,strayPlayer.playerId);
+
+await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[authId]);
+console.log('First-party account session migration, boundary rotation, no-op reuse, multi-page CSRF, no-token JSON, repeat sign-out and player-cookie preservation passed.');
