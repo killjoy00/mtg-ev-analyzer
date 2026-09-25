@@ -320,11 +320,19 @@ class ArchiveSignalProvider:
             )
             for draft_id, rows in grouped.items()
         }
+        self.expansion_of_draft: dict[str, str] = {}
+        for draft_id, rows in self.by_draft.items():
+            expansions = {row.expansion for row in rows}
+            if len(expansions) != 1:
+                raise ValueError(
+                    f"{draft_id}: draft spans multiple expansion environments"
+                )
+            self.expansion_of_draft[draft_id] = next(iter(expansions))
         self.games = games
         self.strong_minimum_games = strong_minimum_games
         self.strong_top_fraction = strong_top_fraction
         self.strong_training_cap = strong_training_cap
-        self._cache: dict[frozenset[str], ComplementArtifacts] = {}
+        self._cache: dict[tuple[str, frozenset[str]], ComplementArtifacts] = {}
 
     def _pick_pairs(self, ids: frozenset[str]):
         for draft_id in sorted(ids):
@@ -417,27 +425,56 @@ class ArchiveSignalProvider:
         }
         return ata, alsa
 
-    def artifacts(self, training_ids: frozenset[str]) -> ComplementArtifacts:
+    def artifacts(
+        self,
+        training_ids: frozenset[str],
+        expansion: str,
+    ) -> ComplementArtifacts:
+        """Build card/behavior evidence only from the scored card's environment.
+
+        Learned Q/propensity relationships may pool across Premier environments,
+        but card-name aggregates may not. Reprints, win-rate baselines and color
+        curves are set-specific evidence.
+        """
         unknown = training_ids - set(self.by_draft)
         if unknown:
             raise ValueError(f"training complement contains unknown drafts: {sorted(unknown)[:3]}")
-        cached = self._cache.get(training_ids)
+        scoped_ids = frozenset(
+            draft_id
+            for draft_id in training_ids
+            if self.expansion_of_draft[draft_id] == expansion
+        )
+        key = (expansion, scoped_ids)
+        cached = self._cache.get(key)
         if cached is not None:
             return cached
-        strong_ids = self._strong_ids(training_ids)
-        deck_fit, deck_colours = self._deck_fit(training_ids)
-        ata, alsa = self._position_stats(training_ids)
+        if not scoped_ids:
+            built = ComplementArtifacts(
+                training_ids=frozenset(),
+                strong_ids=frozenset(),
+                strong_model=None,
+                outcome_table={},
+                deck_fit=None,
+                deck_colours={},
+                ata={},
+                alsa={},
+            )
+            self._cache[key] = built
+            return built
+        strong_ids = self._strong_ids(scoped_ids)
+        deck_fit, deck_colours = self._deck_fit(scoped_ids)
+        ata, alsa = self._position_stats(scoped_ids)
         built = ComplementArtifacts(
-            training_ids=training_ids,
+            training_ids=scoped_ids,
             strong_ids=strong_ids,
             strong_model=self._strong_model(strong_ids),
-            outcome_table=self.games.outcome_table(training_ids),
+            outcome_table=self.games.outcome_table(scoped_ids),
             deck_fit=deck_fit,
             deck_colours=deck_colours,
             ata=ata,
             alsa=alsa,
         )
-        self._cache[training_ids] = built
+        self._cache[key] = built
         return built
 
     def __call__(
@@ -447,7 +484,7 @@ class ArchiveSignalProvider:
     ) -> Mapping[str, CardSignals]:
         if decision.draft_id in training_ids:
             raise AssertionError("scored draft is present in its signal training complement")
-        artifacts = self.artifacts(training_ids)
+        artifacts = self.artifacts(training_ids, decision.expansion)
         strong: dict[str, float] = {}
         if artifacts.strong_model is not None:
             raw = {
