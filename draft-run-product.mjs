@@ -1,6 +1,6 @@
 import {draftRunLength} from './draft-run-format.mjs';
 import { accountCsrfToken, ensurePackSession, firstPartyAuthEnabled, hasAccountSession, loadDailyStatus, storedAccountToken } from './growth-api.mjs';
-import { shareDraftRunCard } from './share-cards.mjs';
+import { shareDraftRunCard } from './share-cards.mjs?v=7';
 import { trackEvent } from './retention-events.mjs';
 import {decisionClock} from './decision-clock.mjs';
 import { sortPackByRarity } from './replay-data.mjs';
