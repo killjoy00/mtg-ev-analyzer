@@ -9,6 +9,7 @@ import {
 import {
   APPLE_NATIVE_CLIENT_ID,
   APPLE_REDIRECT_URI,
+  appleDisplayName,
   APPLE_WEB_CLIENT_ID,
   appleAuthorizeUrl,
   createAppleClientSecret,
@@ -112,6 +113,7 @@ test('Apple refresh tokens are encrypted at rest and first names are normalized'
   assert.doesNotMatch(encrypted,/refresh-token-fixture/);
   assert.equal(decryptAppleRefreshToken(encrypted,{env}),'refresh-token-fixture');
   assert.equal(sanitizeAppleFirstName('  Ry\u0000an   Example  '),'Ry an Example');
+  assert.equal(appleDisplayName(' Ada ',' Lovelace '),'Ada Lovelace');
 });
 
 
