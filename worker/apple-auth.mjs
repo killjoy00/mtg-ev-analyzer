@@ -161,6 +161,28 @@ export async function exchangeAppleAuthorizationCode(code,{clientId,redirectUri=
   return data;
 }
 
+export async function verifyAppleAuthorization({
+  identityToken,
+  authorizationCode,
+  clientId,
+  nonce=null,
+  redirectUri=null,
+  env=process.env,
+  fetcher=fetch,
+}={}) {
+  const presented=await verifyAppleIdentityToken(identityToken,{clientId,nonce,fetcher});
+  const exchanged=await exchangeAppleAuthorizationCode(authorizationCode,{clientId,redirectUri,env,fetcher});
+  const validated=await verifyAppleIdentityToken(exchanged.id_token,{clientId,fetcher});
+  if(validated.subject!==presented.subject)
+    throw Object.assign(Error('Apple sign in identities did not match.'),{status:401,code:'APPLE_IDENTITY_MISMATCH'});
+  return {
+    subject:presented.subject,
+    email:presented.email||validated.email||null,
+    emailVerified:presented.emailVerified||validated.emailVerified,
+    refreshToken:exchanged.refresh_token,
+  };
+}
+
 function encryptionKey(env=process.env,keyVersion=TOKEN_KEY_VERSION) {
   const name=keyVersion==='v1'?'APPLE_TOKEN_ENCRYPTION_KEY_V1':'';
   const raw=name?String(env[name]||'').trim():'';
@@ -330,20 +352,18 @@ export async function resolveAppleAccount(query,{
   fetcher=fetch,
   validateServicePrincipal,
 }={}) {
-  const presented=await verifyAppleIdentityToken(identityToken,{clientId,nonce,fetcher});
-  const exchanged=await exchangeAppleAuthorizationCode(authorizationCode,{clientId,redirectUri,env,fetcher});
-  const validated=await verifyAppleIdentityToken(exchanged.id_token,{clientId,fetcher});
-  if(validated.subject!==presented.subject)
-    throw Object.assign(Error('Apple sign in identities did not match.'),{status:401,code:'APPLE_IDENTITY_MISMATCH'});
-  const subject=presented.subject;
+  const authorization=await verifyAppleAuthorization({
+    identityToken,authorizationCode,clientId,nonce,redirectUri,env,fetcher,
+  });
+  const subject=authorization.subject;
   let record=(await query(`SELECT ai.auth_user_id,u.email,u.name,ai.synthetic_password
     FROM apple_auth_identities ai
     JOIN neon_auth."user" u ON u.id=ai.auth_user_id
     WHERE ai.apple_subject=$1 LIMIT 1`,[subject])).rows[0]||null;
 
   if(!record) {
-    const email=presented.email||validated.email;
-    if(!email||!(presented.emailVerified||validated.emailVerified))
+    const email=authorization.email;
+    if(!email||!authorization.emailVerified)
       throw Object.assign(Error('Apple did not provide a verified account email.'),{status:409,code:'APPLE_EMAIL'});
     if(email.toLowerCase()===String(env.PACK1_DELETION_ADMIN_EMAIL||'').trim().toLowerCase())
       throw Object.assign(Error('Apple account cannot use the Auth service principal.'),{status:409,code:'APPLE_LINK'});
@@ -392,13 +412,12 @@ export async function resolveAppleAccount(query,{
       throw Object.assign(Error('Apple identity could not be linked.'),{status:409,code:'APPLE_LINK'});
   }
 
-  const encrypted=encryptAppleRefreshToken(exchanged.refresh_token,{env});
-  await query(`INSERT INTO apple_auth_tokens(apple_subject,client_id,refresh_token_ciphertext,updated_at,revoked_at)
-    VALUES($1,$2,$3,now(),NULL)
-    ON CONFLICT(apple_subject,client_id) DO UPDATE SET
-      refresh_token_ciphertext=EXCLUDED.refresh_token_ciphertext,
-      updated_at=now(),
-      revoked_at=NULL`,[subject,clientId,encrypted]);
+  await storeAppleRefreshToken(query,{
+    subject,
+    clientId,
+    refreshToken:authorization.refreshToken,
+    env,
+  });
 
   return {
     user_id:record.auth_user_id,
@@ -407,6 +426,16 @@ export async function resolveAppleAccount(query,{
     apple_subject:subject,
     synthetic_password:bool(record.synthetic_password),
   };
+}
+
+export async function storeAppleRefreshToken(query,{subject,clientId,refreshToken,env=process.env}={}) {
+  const encrypted=encryptAppleRefreshToken(refreshToken,{env});
+  await query(`INSERT INTO apple_auth_tokens(apple_subject,client_id,refresh_token_ciphertext,updated_at,revoked_at)
+    VALUES($1,$2,$3,now(),NULL)
+    ON CONFLICT(apple_subject,client_id) DO UPDATE SET
+      refresh_token_ciphertext=EXCLUDED.refresh_token_ciphertext,
+      updated_at=now(),
+      revoked_at=NULL`,[subject,clientId,encrypted]);
 }
 
 export async function markApplePasswordEstablished(query,authUserId) {
