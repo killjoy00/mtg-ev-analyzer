@@ -228,7 +228,7 @@ try{
   assert.equal((await page.locator('#run-share-status').textContent())?.trim(),'');
   const shared=await page.evaluate(()=>window.__runShare);const expectedSquares=answers.map(a=>a.historicalMatch?'🟩':a.score>=85?'🟦':a.score>=60?'🟨':a.score>=25?'🟧':'⬛').join('');assert.ok(shared.text.includes(expectedSquares),'share text reflects the answers exercised by this browser run');assert.equal(shared.files,undefined);assert.doesNotMatch(shared.url,/profile|token/);
   if(daily){
-    assert.match(shared.text,/I scored \\d+\\/100 on today’s Pack One [^.]+\\. Can you beat it\\?/);assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.url,/daily=1/);assert.match(shared.url,/ref=result_share/);assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
+    assert.match(shared.text,/I scored \d+\/100 on today’s Pack One [^.]+\. Can you beat it\?/);assert.match(shared.text,/Daily 2026-09-10/);assert.match(shared.url,/daily=1/);assert.match(shared.url,/ref=result_share/);assert.doesNotMatch(shared.url,/challenge=/);assert.equal(shareCalls,0);
     assert.equal(await page.locator('#run-challenge').count(),0);
     await page.goto(shared.url);
     await page.waitForFunction(()=>!new URL(location.href).searchParams.has('ref'));
