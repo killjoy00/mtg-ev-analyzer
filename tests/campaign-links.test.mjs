@@ -5,6 +5,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {
   GENERATED_CAMPAIGN_MARKER,
+  SUPPORTED_CAMPAIGN_DESTINATIONS,
   buildCampaignDraft,
   buildCampaignTrackingUrl,
   buildCampaignVanityUrl,
@@ -59,6 +60,34 @@ test('tracked campaign URL does not require a vanity slug',()=>{
   assert.match(invalidSlug.errors.slug,/Use 1-64/);
   assert.equal(invalidSlug.trackedUrl,'https://packone.pro/?utm_source=reddit&utm_campaign=launch-week');
   assert.equal(invalidSlug.entry,null);
+});
+
+test('campaign links can land directly on each Daily without losing attribution',()=>{
+  assert.deepEqual(SUPPORTED_CAMPAIGN_DESTINATIONS,[
+    '/',
+    '/?game=draft-run&daily=1',
+    '/?game=draft-run&set=powered-cube&daily=1',
+    '/?game=draft-run&set=latest&daily=1'
+  ]);
+  for(const destination of SUPPORTED_CAMPAIGN_DESTINATIONS.slice(1)) {
+    const url=new URL(buildCampaignTrackingUrl({destination,source:'reddit',campaign:'launch-week',medium:'social'}));
+    assert.equal(url.origin,'https://packone.pro');
+    assert.equal(url.searchParams.get('game'),'draft-run');
+    assert.equal(url.searchParams.get('daily'),'1');
+    assert.equal(url.searchParams.get('utm_source'),'reddit');
+    assert.equal(url.searchParams.get('utm_campaign'),'launch-week');
+    assert.equal(url.searchParams.get('utm_medium'),'social');
+  }
+  assert.equal(new URL(buildCampaignTrackingUrl({
+    destination:'/?game=draft-run&set=powered-cube&daily=1',
+    source:'discord',
+    campaign:'launch-week'
+  })).searchParams.get('set'),'powered-cube');
+  assert.equal(new URL(buildCampaignTrackingUrl({
+    destination:'/?game=draft-run&set=latest&daily=1',
+    source:'newsletter',
+    campaign:'hob-season'
+  })).searchParams.get('set'),'latest');
 });
 
 test('campaign config rejects duplicates, unsafe slugs, invalid acquisition fields and unsupported destinations',()=>{
