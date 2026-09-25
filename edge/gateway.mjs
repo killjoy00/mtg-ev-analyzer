@@ -36,10 +36,10 @@ function permitted(service,path,method,search,mode) {
   if(service==='growth') {
     if(method==='POST'&&[
       '/v1/session','/v1/player/session','/v1/player/migrate',
-      '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete/verification/start','/v1/account/delete','/v1/account/migrate',
+      '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete/verification/start','/v1/account/delete/apple/start','/v1/account/delete/apple/finish','/v1/account/delete','/v1/account/migrate',
       '/v1/account/link','/v1/account/link-browser','/v1/account/signout','/v1/account/apple/start','/v1/account/apple/finish','/v1/account/apple/callback',
       '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/apple/start','/v1/mobile/account/apple/finish','/v1/mobile/account/apple/native','/v1/mobile/account/google/start','/v1/mobile/account/google/finish',
-      '/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete',
+      '/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
       '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect',
     ].includes(path))return true;
     if(method==='GET'&&[
@@ -126,7 +126,7 @@ function mobileSessionRoute(service,path,method) {
       '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/apple/start',
       '/v1/mobile/account/apple/finish','/v1/mobile/account/apple/native','/v1/mobile/account/google/start',
       '/v1/mobile/account/google/finish','/v1/mobile/account/signout',
-      '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete',
+      '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
     ].includes(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
@@ -138,7 +138,7 @@ function mobileSessionRoute(service,path,method) {
 }
 function mobileAccountRoute(service,path,method) {
   if(service==='growth') {
-    if(method==='POST'&&['/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete'].includes(path))return true;
+    if(method==='POST'&&['/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete'].includes(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
   if(service!=='draft')return false;
