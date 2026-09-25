@@ -130,6 +130,8 @@ Post-merge verification passed:
 
 The final E2E run completed successfully on attempt 2. The Pages deployment built and deployed the exact #518 merge revision. Production smoke successfully fetched `https://packone.pro/` and completed its production contract checks.
 
+This environment did not independently perform a manual browser fetch of the custom-domain `/go/reddit-launch/` route because direct custom-domain resolution was unavailable here. The release claim is instead grounded in the exact-revision Pages deployment, the committed generated route, the route-generation/unit coverage, the Admin browser contract, and the successful production smoke for the deployed site. No manual live-route check is being represented as completed.
+
 ## Scope boundary
 
 PR #518 changed only static/browser/test/package surfaces:
