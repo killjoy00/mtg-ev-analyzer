@@ -8,7 +8,6 @@ card outcomes, deck-fit estimate, or pick-position summaries used to score it.
 from __future__ import annotations
 
 import csv
-import math
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -76,6 +75,8 @@ def load_decisions(
             decision = parse_decision(row, header)
             if decision is None:
                 continue
+            if decision.event_type != "PremierDraft":
+                continue
             if split is not None and draft_split(decision.draft_id) != split:
                 continue
             signature = (
@@ -141,6 +142,11 @@ class GameStore:
             won_at = plain["won"]
             if draft_at is None:
                 raise ValueError("game data is missing draft_id")
+            if main_at is None:
+                raise ValueError(
+                    "game data is missing main_colors; contextual-value-v1 requires "
+                    "the complete v4 colour-fit comparator"
+                )
 
             compact: list[tuple[str, int, tuple[int, ...]]] = []
             for name, groups in cards.items():
@@ -164,12 +170,11 @@ class GameStore:
                 summary = drafts.setdefault(draft_id, GameDraftSummary())
                 summary.rows += 1
                 summary.wins += won
-                if main_at is not None:
-                    main = "".join(
-                        char for char in values[main_at].strip().upper()
-                        if char in "WUBRG"
-                    )
-                    summary.main_colours[main] += 1
+                main = "".join(
+                    char for char in values[main_at].strip().upper()
+                    if char in "WUBRG"
+                )
+                summary.main_colours[main] += 1
                 for name, deck_at, hand_at in compact:
                     if not count_of(values[deck_at]):
                         continue

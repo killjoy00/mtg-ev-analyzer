@@ -134,6 +134,22 @@ class ArchiveSignalTests(unittest.TestCase):
         self.assertIsNotNone(signals["A"].ata)
         self.assertIsNotNone(signals["A"].alsa)
 
+    def test_game_archive_without_main_colors_fails_closed(self):
+        temp, _, game_path, draft_ids = self._fixtures()
+        self.addCleanup(temp.cleanup)
+        stripped = Path(temp.name) / "game-no-colours.csv"
+        header = [name for name in GAME_HEADER if name != "main_colors"]
+        with game_path.open("r", newline="", encoding="utf-8") as source, stripped.open(
+            "w", newline="", encoding="utf-8"
+        ) as destination:
+            reader = csv.DictReader(source)
+            writer = csv.DictWriter(destination, fieldnames=header)
+            writer.writeheader()
+            for row in reader:
+                writer.writerow({name: row[name] for name in header})
+        with self.assertRaisesRegex(ValueError, "main_colors"):
+            GameStore.from_archive(stripped, draft_ids)
+
     def test_provider_rejects_same_draft_in_training_complement(self):
         temp, draft_path, game_path, draft_ids = self._fixtures()
         self.addCleanup(temp.cleanup)
