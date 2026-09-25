@@ -113,3 +113,36 @@ test('Apple refresh tokens are encrypted at rest and first names are normalized'
   assert.equal(decryptAppleRefreshToken(encrypted,{env}),'refresh-token-fixture');
   assert.equal(sanitizeAppleFirstName('  Ry\u0000an   Example  '),'Ry an Example');
 });
+
+
+test('unknown Apple signing keys force one JWKS refresh for key rotation',async()=>{
+  const first=generateKeyPairSync('rsa',{modulusLength:2048});
+  const rotated=generateKeyPairSync('rsa',{modulusLength:2048});
+  const kid='rotated-key';
+  const head=b64(JSON.stringify({alg:'RS256',kid,typ:'JWT'}));
+  const payload=b64(JSON.stringify({
+    iss:'https://appleid.apple.com',
+    aud:APPLE_NATIVE_CLIENT_ID,
+    exp:4102444800,
+    sub:'apple-rotated-subject',
+  }));
+  const signature=sign('RSA-SHA256',Buffer.from(head+'.'+payload),rotated.privateKey);
+  const token=head+'.'+payload+'.'+b64(signature);
+  const firstJwk=first.publicKey.export({format:'jwk'});
+  const rotatedJwk=rotated.publicKey.export({format:'jwk'});
+  let calls=0;
+  const fetcher=async()=>{
+    calls++;
+    return Response.json({keys:calls===1
+      ? [{...firstJwk,kid:'old-key',alg:'RS256',use:'sig'}]
+      : [{...rotatedJwk,kid,alg:'RS256',use:'sig'}]});
+  };
+  resetAppleKeyCache();
+  const verified=await verifyAppleIdentityToken(token,{
+    clientId:APPLE_NATIVE_CLIENT_ID,
+    fetcher,
+    now:2000,
+  });
+  assert.equal(verified.subject,'apple-rotated-subject');
+  assert.equal(calls,2);
+});
