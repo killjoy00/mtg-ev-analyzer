@@ -9,7 +9,8 @@ try {
  await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[user,'QA report math',`qa-math-${user}@example.invalid`]);
  await query('INSERT INTO neon_auth.session(id,"userId",token,"updatedAt","expiresAt") VALUES($1::uuid,$2::uuid,$3,now(),now()+interval \'1 hour\')',[crypto.randomUUID(),user,token]);
  await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[user]);
- const source=(await query('SELECT * FROM draft_run_sessions WHERE selection_version=\'first-pack-v2\' ORDER BY created_at DESC LIMIT 1')).rows[0];
+ const source=(await query('SELECT * FROM draft_run_sessions WHERE jsonb_array_length(puzzle_ids)>0 ORDER BY created_at DESC LIMIT 1')).rows[0];
+ assert.ok(source,'measurement math requires at least one seeded Draft Run session');
  const puzzleIds=JSON.parse(source.puzzle_ids),puzzle=(await query('SELECT payload FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[puzzleIds[0]])).rows[0];const p=JSON.parse(puzzle.payload);
  const data=Array.from({length:5},(_,i)=>({id:crypto.randomUUID(),player:crypto.randomUUID(),score:[100,100,20,50,80][i],match:i<2,selected:i<2?p.historical_pick_id:p.candidates.find(c=>c.id!==p.historical_pick_id).id,ms:(i+1)*1000}));ids=data.map(x=>x.id);players=data.map(x=>x.player);
  await query(`WITH data AS (SELECT * FROM jsonb_to_recordset($1::jsonb) d(id uuid,player uuid,score int,match boolean,selected text,ms int)),
