@@ -113,7 +113,7 @@ jobs:
           # backlog until those migrations are promoted, then add migrations introduced
           # by this PR. This keeps merged-but-not-deployed schema prerequisites available
           # without blindly replaying historical migrations.
-          release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql)
+          release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql migrations/0041_corpus_source_snapshots.sql)
           mapfile -t pending < <(
             {
               for migration in "${release_backlog[@]}"; do
