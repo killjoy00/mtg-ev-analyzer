@@ -32,7 +32,7 @@ jobs:
     # failing or ever pointing the fixture suites at the production branch.
     if: github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
         with:
@@ -113,7 +113,7 @@ jobs:
           # backlog until those migrations are promoted, then add migrations introduced
           # by this PR. This keeps merged-but-not-deployed schema prerequisites available
           # without blindly replaying historical migrations.
-          release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql)
+          release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql)
           mapfile -t pending < <(
             {
               for migration in "${release_backlog[@]}"; do
@@ -158,6 +158,7 @@ jobs:
           node tests/corpus-version-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/serving-statistics-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/selection-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/serving-cache-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/draft-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/cube-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/decision-measurements-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures

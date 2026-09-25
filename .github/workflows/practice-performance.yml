@@ -1,8 +1,10 @@
-name: isolated practice performance baseline
+name: isolated practice performance comparison
 on:
   pull_request:
     paths:
       - 'scripts/practice-performance.mjs'
+      - 'worker/draft-run-selection.mjs'
+      - 'migrations/0039_practice_serving_cache.sql'
       - 'tests/practice-performance.test.mjs'
       - '.github/workflows/practice-performance.yml'
   workflow_dispatch:
@@ -21,6 +23,12 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Ensure PostgreSQL client is available
+        run: |
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
       - name: Set emergency expiry
         id: expiry
         run: echo "expires_at=$(date -u --date '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
@@ -36,13 +44,14 @@ jobs:
           role: pack1_owner
           suspend_timeout: 300
           expires_at: ${{ steps.expiry.outputs.expires_at }}
-      - name: Verify isolated target and measure unchanged selection
+      - name: Verify isolated target, build derived cache and compare selection
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           PACK1_BENCHMARK_BRANCH: ${{ steps.neon.outputs.branch_id }}
           PACK1_BENCHMARK_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
           PACK1_BENCHMARK_SAMPLES: '3'
+          PACK1_BENCHMARK_CACHE: '1'
         run: node scripts/practice-performance.mjs
       - uses: actions/upload-artifact@v4
         if: always()

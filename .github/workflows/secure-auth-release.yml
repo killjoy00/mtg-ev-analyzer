@@ -93,7 +93,10 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0032_traditional_v4_components.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0034_account_deletion_verification.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
       - name: Deploy exact revision to development
         shell: bash
@@ -137,7 +140,10 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0032_traditional_v4_components.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0034_account_deletion_verification.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
       - name: Deploy the development-tested revision to production
         shell: bash

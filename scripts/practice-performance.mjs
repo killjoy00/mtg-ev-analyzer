@@ -1,11 +1,12 @@
-// Read-only SQL/selector baseline. This does not measure Function/browser latency.
+// SQL/selector baseline or derived-cache comparison on a verified disposable clone. This does not measure Function/browser latency.
 import fs from 'node:fs';
+import assert from 'node:assert/strict';
 import path from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {execFileSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {checkBranch} from './edge-control.mjs';
-import {selectDatabaseRun,loadCustomSetMetadata,loadPuzzleMetadata} from '../worker/draft-run-selection.mjs';
+import {selectDatabaseRun,loadCustomSetMetadata,loadPuzzleMetadata,selectCachedDatabaseRun,loadCachedCustomSetMetadata,loadServingSnapshot} from '../worker/draft-run-selection.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
@@ -19,6 +20,8 @@ const errorCode=error=>Number.isInteger(error?.status)?'http_'+error.status:
   error?.name==='TimeoutError'?'timeout':'query_or_selection_failed';
 
 export function queryFamily(sql) {
+  if(/pack1_serving_snapshot/.test(sql))return 'serving_snapshot';
+  if(/draft_run_serving_revision/.test(sql))return 'revision_check';
   if(/count\(DISTINCT p\.source_draft_hash\)/i.test(sql))return 'custom_coverage';
   if(/GROUP BY p\.set_id,p\.pick_number,r\.band/i.test(sql))return 'group_counts';
   if(/WITH chosen AS/i.test(sql))return 'candidate_and_trajectory';
@@ -95,13 +98,17 @@ export async function main() {
   };
   const [branchData,endpointData]=await Promise.all([control('/branches/'+branch),control('/branches/'+branch+'/endpoints')]);
   const endpoint=verifyTarget({branch,connection,branchRecord:branchData.branch,endpoints:endpointData.endpoints||[]});
+  const cached=process.env.PACK1_BENCHMARK_CACHE==='1';
+  if(cached)execFileSync('psql',['-X','-d',connection,'-v','ON_ERROR_STOP=1','-f','migrations/0039_practice_serving_cache.sql'],{
+    env:process.env,stdio:['ignore','ignore','pipe'],timeout:120000,
+  });
   const query=sqlQuery(connection),day=gameDateKey();
   const report={schema_version:1,scope:'serial SQL-over-HTTP selector and metadata reload; not API, browser, cold-start or capacity evidence',
     code_sha:execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim(),head_sha:process.env.PACK1_BENCHMARK_HEAD_SHA||null,
     branch,source_branch:PRODUCTION,started_at:new Date().toISOString(),day,
     versions:{corpus:DRAFT_RUN_CORPUS_VERSION,selection:DRAFT_RUN_SELECTION_VERSION,difficulty:DRAFT_RUN_DIFFICULTY_VERSION,serving:SERVING_POLICY_VERSION},
     compute:{autoscaling_limit_min_cu:endpoint.autoscaling_limit_min_cu,autoscaling_limit_max_cu:endpoint.autoscaling_limit_max_cu,suspend_timeout_seconds:endpoint.suspend_timeout_seconds??endpoint.suspend_timeout??null},
-    repetitions,discovery:null,cases:[],plans:[],ok:false};
+    cached,repetitions,discovery:null,cases:[],plans:[],ok:false};
   const plans=new Map();
   const capture=(prefix,recorder)=>{
     for(const [family,statement] of recorder.statements)if(['group_counts','custom_coverage','candidate_and_trajectory'].includes(family))plans.set(prefix+'-'+family,statement);
@@ -111,9 +118,19 @@ export async function main() {
     // Activity counters reset on a fresh Neon branch. Planner reltuples survive
     // the clone and are the useful estimate; keep zeroed counters separately.
     report.table_estimates=(await query("SELECT s.relname,c.reltuples::bigint::text estimated_rows,s.n_live_tup::text branch_activity_live_rows,s.last_analyze::text,s.last_autoanalyze::text FROM pg_stat_user_tables s JOIN pg_class c ON c.oid=s.relid WHERE s.schemaname='public' AND s.relname IN ('draft_run_verified_puzzles','draft_run_puzzle_ratings','corpus_components','corpus_source_exclusions') ORDER BY s.relname")).rows;
+    if(cached) {
+      const start=performance.now(),snapshot=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
+      report.cache_build={ms:elapsed(start),id:snapshot.id,revision:snapshot.revision,groups:snapshot.groups.length};
+      report.cache_storage=(await query("SELECT pg_total_relation_size('draft_run_serving_inventory')::text inventory_bytes,(SELECT count(*) FROM draft_run_serving_inventory)::text rows")).rows[0];
+    }
     const discovery=recordQueries(query),started=performance.now();
-    const custom=await loadCustomSetMetadata(discovery.query,DRAFT_RUN_CORPUS_VERSION,day);
-    report.discovery={ms:elapsed(started),set_ids:custom.map(s=>s.set_id),queries:discovery.records};capture('practice-sets',discovery);
+    const custom=await (cached?loadCachedCustomSetMetadata:loadCustomSetMetadata)(discovery.query,DRAFT_RUN_CORPUS_VERSION,day);
+    const discoveryMs=elapsed(started);
+    if(cached) {
+      const original=await loadCustomSetMetadata(query,DRAFT_RUN_CORPUS_VERSION,day);
+      assert.deepEqual(custom,original,'Cached custom-set metadata differs.');
+    }
+    report.discovery={ms:discoveryMs,set_ids:custom.map(s=>s.set_id),queries:discovery.records};capture('practice-sets',discovery);
     if(custom.length<2)throw Error('Need two eligible custom sets to cover all benchmark cases.');
     const cases=[{name:'mixed',environment:'mixed',setIds:[]},{name:'powered-cube',environment:'powered-cube',setIds:[]},
       {name:'custom-single',environment:'mixed',setIds:[custom[0].set_id]},
@@ -126,13 +143,20 @@ export async function main() {
         const seed='practice-baseline-v1:'+configuration.name+':'+i,recorder=recordQueries(query),start=performance.now();
         const sample={seed,phase:i===0?'first_observed':'repeat',queries:recorder.records,ok:false};entry.samples.push(sample);
         try {
-          const selected=await selectDatabaseRun(recorder.query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds});
+          const selected=await (cached?selectCachedDatabaseRun:selectDatabaseRun)(recorder.query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds});
           sample.selection_ms=elapsed(start);
-          const ids=selected.map(p=>p.puzzle_id),reloaded=await loadPuzzleMetadata(recorder.query,DRAFT_RUN_CORPUS_VERSION,ids);
+          const ids=selected.map(p=>p.puzzle_id),reloaded=cached?selected:await loadPuzzleMetadata(recorder.query,DRAFT_RUN_CORPUS_VERSION,ids);
           sample.selection_and_reload_ms=elapsed(start);
           if(ids.length!==8||new Set(selected.map(p=>p.source_draft_hash)).size!==8||reloaded.some(p=>!p))throw Error('Invalid benchmark selection.');
           sample.puzzle_ids=ids;sample.selection_fingerprint=createHash('sha256').update(JSON.stringify(ids)).digest('hex');sample.ok=true;
           if(i===0)capture(configuration.name,recorder);
+          if(cached) {
+            const baselineStart=performance.now();
+            const baseline=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds});
+            sample.live_selection_ms=elapsed(baselineStart);
+            sample.exact_parity=JSON.stringify(baseline)===JSON.stringify(selected);
+            if(!sample.exact_parity)throw Error('Cached selection metadata or RNG parity mismatch.');
+          }
         } catch(error) {sample.error=errorCode(error);throw error;}
         finally {sample.elapsed_ms=elapsed(start);}
       }
