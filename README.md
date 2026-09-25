@@ -9,6 +9,7 @@ The homepage starts with **Daily Draft Run**, **Daily Powered Cube** and **Daily
 ## Read first
 
 - [Current implementation and deployment state](docs/CURRENT-STATE.md)
+- [Campaign Links owner guide](docs/CAMPAIGN-LINKS-OWNER-GUIDE.md)
 - [Username identity, recovery and admin monitoring](docs/USERNAME-IDENTITY.md)
 - [Product contract](docs/CHARTER.md)
 - [Corpus and selection](docs/DATA-MANAGEMENT.md), [Corpus Operations](docs/CORPUS-OPERATIONS.md)
@@ -17,7 +18,7 @@ The homepage starts with **Daily Draft Run**, **Daily Powered Cube** and **Daily
 
 ## Architecture and development
 
-GitHub Pages serves the browser. Three Neon Functions own the historical API, accounts/admin, and Draft Run API. Neon Postgres stores immutable puzzles, versioned schedules, sessions, results, corpus manifests, lifecycle policy and account capabilities. Recurring Daily pre-generation and account-deletion maintenance are owned by reviewed Neon Function Triggers; the corresponding GitHub workflows are manual recovery/verification only. See [Neon scheduled maintenance](docs/NEON-SCHEDULERS.md). Existing decision measurements remain at `/admin/`; Corpus Operations is a separate area.
+GitHub Pages serves the browser. Three Neon Functions own the historical API, accounts/admin, and Draft Run API. Neon Postgres stores immutable puzzles, versioned schedules, sessions, results, corpus manifests, lifecycle policy and account capabilities. Recurring Daily pre-generation and account-deletion maintenance are owned by reviewed Neon Function Triggers; the corresponding GitHub workflows are manual recovery/verification only. See [Neon scheduled maintenance](docs/NEON-SCHEDULERS.md). Existing decision measurements remain at `/admin/`; Corpus Operations is a separate area. Campaign link construction and validation is available at `/admin/?area=campaign-links`; static `/go/<slug>/` routes are published from the reviewed `campaign-links.json` registry and generated pages.
 
 Run `npm test` for syntax, JavaScript and Python checks. Pull requests also run browser coverage; backend changes run SQL tests on disposable Neon branches. The two required merge checks stay present on every PR, with a narrow native-mobile fast path and automatic reruns when a stacked PR is retargeted to `main`; see [CI and merging](docs/CI-AND-MERGING.md). Deploy reviewed main revisions to development, verify the complete corpus and gameplay, then promote the same revision to production. A Pages deployment alone does not deploy backend code.
 
