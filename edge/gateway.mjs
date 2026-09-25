@@ -240,7 +240,8 @@ export async function gateway(request,env,fetcher=fetch) {
       (env.ORIGIN_SECRET!==undefined&&env.ORIGIN_SECRET!==''&&!secret(env.ORIGIN_SECRET)))
       return finish(response(503,'Gateway not configured.'));
     if(url.protocol!=='https:'||url.hostname!==expectedHost)return finish(response(404,'Not found.'));
-    if(origin&&!ORIGINS.has(origin))return finish(response(403,'Origin not allowed.'));
+    const appleCallbackOrigin=request.method==='POST'&&url.pathname==='/growth/v1/account/apple/callback'&&origin==='https://appleid.apple.com';
+    if(origin&&!ORIGINS.has(origin)&&!appleCallbackOrigin)return finish(response(403,'Origin not allowed.'));
     const match=url.pathname.match(/^\/(legacy|growth|draft)(\/.*)$/);
     const method=request.method==='OPTIONS'?request.headers.get('access-control-request-method'):request.method;
     if(!match||!permitted(match[1],match[2],method,url.search,mode))return finish(response(404,'Not found.'));
