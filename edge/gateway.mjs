@@ -159,23 +159,26 @@ export class NetworkQuota {
   constructor(state) {this.storage=state.storage;}
   async fetch(request) {
     const kind=new URL(request.url).pathname;
-    if(request.method!=='POST'||!['/request','/session'].includes(kind))return response(400,'Invalid quota request.');
+    if(request.method!=='POST'||!['/request','/session','/session-only'].includes(kind))return response(400,'Invalid quota request.');
     const now=Date.now();
-    const limits=[['request',120,60000],...(kind==='/session'?[['session',10,600000]]:[])];
-    const retry=await this.storage.transaction(async tx=>{
-      const pending=[];let retry=0;
+    // /session-only follows a charged /request and an origin refresh that
+    // proved the browser has no valid identity. Do not charge the request twice.
+    const limits=[...(kind!=='/session-only'?[['request',120,60000]]:[]),...(kind!=='/request'?[['session',10,600000]]:[])];
+    const {retry,scopes}=await this.storage.transaction(async tx=>{
+      const pending=[],scopes=[];let retry=0;
       for(const [key,limit,period] of limits) {
         let row=await tx.get(key);
         if(!row||now>=row.until)row={count:0,until:now+period};
-        if(row.count>=limit)retry=Math.max(retry,Math.ceil((row.until-now)/1000));
+        if(row.count>=limit){retry=Math.max(retry,Math.ceil((row.until-now)/1000));scopes.push(key);}
         pending.push([key,{...row,count:row.count+1}]);
       }
-      if(retry)return retry;
+      if(retry)return {retry,scopes};
       for(const [key,row] of pending)await tx.put(key,row);
       await tx.setAlarm(now+660000);
-      return 0;
+      return {retry:0,scopes};
     });
-    return retry?response(429,'Too many requests.',{'retry-after':String(retry)}):new Response(null,{status:204});
+    return retry?Response.json({error:'Too many requests.',code:'network_rate_limited',scopes},
+      {status:429,headers:{'cache-control':'no-store','retry-after':String(retry)}}):new Response(null,{status:204});
   }
   async alarm() {await this.storage.deleteAll();}
 }
@@ -189,6 +192,7 @@ export async function gateway(request,env,fetcher=fetch) {
     if(ORIGINS.has(origin)) {
       headers.set('access-control-allow-origin',origin);
       headers.set('access-control-allow-credentials','true');
+      headers.set('access-control-expose-headers','Retry-After');
     }
     headers.set('x-content-type-options','nosniff');
     return new Response(result.body,{status:result.status,headers});
@@ -272,8 +276,23 @@ export async function gateway(request,env,fetcher=fetch) {
 
     let body;
     if(['POST','PATCH'].includes(method)) {body=JSON.stringify(await readJson(request));headers.set('content-type','application/json');}
-    const upstream=`https://${branch}-${SERVICES[match[1]]}.compute.c-5.us-east-2.aws.neon.tech${match[2]}${url.search}`;
-    const result=await fetcher(upstream,{method,headers,body,redirect:'manual',signal:AbortSignal.timeout(120000)});
+    const upstreamOrigin=`https://${branch}-${SERVICES[match[1]]}.compute.c-5.us-east-2.aws.neon.tech`;
+    const refresh=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/player/session'&&Boolean(playerToken);
+    // A cookie is untrusted until the origin verifies it. This endpoint only
+    // returns an existing identity and never creates one. Valid refreshes retain
+    // their single upstream request and do not consume the creation budget.
+    const upstream=upstreamOrigin+(refresh?'/internal/player-session-refresh':match[2])+url.search;
+    const signal=AbortSignal.timeout(120000);
+    let result=await fetcher(upstream,{method,headers,body,redirect:'manual',signal});
+    if(refresh&&result.status===401&&result.headers.get('x-pack1-session-state')==='missing') {
+      await result.body?.cancel();
+      const creationLimit=await quota.fetch(new Request('https://quota/session-only',{method:'POST'}));
+      if(creationLimit.status!==204)return finish(creationLimit.status===429?creationLimit:response(503,'Gateway unavailable.'));
+      // One creation attempt, after the missing-session proof and quota charge.
+      // A timeout or any other upstream error never authorizes a retry/create.
+      headers.delete('authorization');
+      result=await fetcher(upstreamOrigin+match[2]+url.search,{method,headers,body,redirect:'manual',signal});
+    }
 
     const publicHeaders=new Headers();
     for(const name of ['content-type','retry-after'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));

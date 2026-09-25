@@ -32,6 +32,31 @@ const legacyPlayer=await json(await growth.fetch(new Request('https://packone.pr
   method:'POST',headers:{'content-type':'application/json',origin},
   body:JSON.stringify({displayName:'QA secure '+tag}),
 })));
+// The gateway's refresh-only route must prove identity without ever creating
+// one, even for a plausible forged token or a valid token with a tombstone.
+const refresh=token=>growth.fetch(new Request('https://packone.pro/internal/player-session-refresh',{
+  method:'POST',headers:{origin,'content-type':'application/json',authorization:'Bearer '+token},
+  body:JSON.stringify({displayName:'QA quota '+tag}),
+}));
+const playersBefore=Number((await query('SELECT count(*) n FROM players')).rows[0].n);
+const validRefresh=await refresh(legacyPlayer.token);
+assert.equal((await json(validRefresh)).playerId,legacyPlayer.playerId);
+assert.equal(validRefresh.headers.get('set-cookie'),null);
+const [tokenId,tokenSignature]=legacyPlayer.token.split('.');
+const forged=tokenId+'.'+(tokenSignature[0]==='A'?'B':'A')+tokenSignature.slice(1);
+for(const token of ['','invalid',forged]) {
+  const result=await refresh(token);
+  assert.equal(result.status,401);assert.equal(result.headers.get('x-pack1-session-state'),'missing');
+  assert.equal(result.headers.get('set-cookie'),null);
+}
+const quotaAuth=crypto.randomUUID();
+try {
+  await query("INSERT INTO account_deletion_operations(auth_user_id,player_id,state) VALUES($1::uuid,$2::uuid,'complete')",[quotaAuth,legacyPlayer.playerId]);
+  const deletedRefresh=await refresh(legacyPlayer.token);
+  assert.equal(deletedRefresh.status,401);assert.equal(deletedRefresh.headers.get('x-pack1-session-state'),'missing');
+  assert.equal(deletedRefresh.headers.get('set-cookie'),null);
+} finally {await query('DELETE FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[quotaAuth]);}
+assert.equal(Number((await query('SELECT count(*) n FROM players')).rows[0].n),playersBefore,'refresh never creates players');
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',[authId,'QA Secure '+tag,'qa-secure-'+tag+'@example.invalid']);
 await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[legacyAuth,authId]);
 

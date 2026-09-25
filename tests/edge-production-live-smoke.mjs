@@ -34,6 +34,11 @@ const set=created.response.headers.getSetCookie?.()||[created.response.headers.g
 const playerLine=set.find(row=>row.startsWith('__Host-pack1_player='));
 assert.ok(playerLine,'gateway relays the HttpOnly player cookie');
 const playerCookie=playerLine.split(';')[0];
+const refreshed=await call('/growth/v1/player/session',{
+  method:'POST',headers:{origin,'content-type':'application/json',cookie:playerCookie},body:'{}',
+});
+assert.equal(refreshed.data.playerId,created.data.playerId,'refresh preserves the same player');
+assert.equal(refreshed.response.headers.get('set-cookie'),null,'refresh creates no replacement identity');
 const daily=await call('/draft/v1/daily-status',{headers:{origin,cookie:playerCookie}});
 assert.deepEqual(daily.data.membership,{connected:false});
 assert.equal(daily.response.headers.get('access-control-allow-origin'),origin);
