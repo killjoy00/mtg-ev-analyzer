@@ -97,6 +97,17 @@ jobs:
           node scripts/register-corpus-sources.mjs "$RUNNER_TEMP/corpus.connection"
           node scripts/load_all_trophies.mjs unused generated/corpus-candidates --validate-only
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
+      - name: Verify newly ingested Candidate health
+        shell: bash
+        run: |
+          set -euo pipefail
+          sets=$(cat generated/corpus-operations/pending.txt)
+          if [[ -z "$sets" ]]; then
+            echo 'No newly ingested corpus candidates; skipping deep payload health scan.'
+            exit 0
+          fi
+          IFS=',' read -r -a set_args <<< "$sets"
+          node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus.connection" "${set_args[@]}"
       - name: Record import failures
         if: always()
         env:
