@@ -89,7 +89,7 @@ for(const population of policy.nat_stages) {
         assert.equal(run.complete,round===7);
       }
       assert.equal(run.score,Math.round(run.answers.reduce((sum,a)=>sum+a.score,0)/8));
-      const share=await call(actor,'read',`/draft/v1/runs/${run.id}/share`,{});assert.ok(share.id);
+      const share=await call(actor,'read',`/draft/v1/runs/${run.id}/share`,{});if(practice)assert.match(share.id,/^[a-f0-9]{24}$/,'practice_share');else {assert.equal(share.daily,true,'daily_share');assert.equal(new URL(share.url,'https://packone.pro').searchParams.get('daily'),'1','daily_share_url');}
       await call(actor,'read','/draft/v1/leaderboard?environment='+environment+'&period='+['daily','week','season','all'][index%4]);
       if(index%10===0) {
         attach();
@@ -101,7 +101,7 @@ for(const population of policy.nat_stages) {
       stage.completed++;
     } catch(error) {
       if(error.code==='ERR_ASSERTION'){stage.correctness_failures++;stopped=true;}
-      stage.failures.push(error.coarse||'correctness');
+      stage.failures.push(error.coarse||(error.code==='ERR_ASSERTION'?'assertion_line_'+String(error.stack).match(/launch-load.mjs:(\d+)/)?.[1]:'unexpected'));
     }
   }));
   stage.elapsed_ms=Date.now()-stageStart;

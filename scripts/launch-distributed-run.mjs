@@ -20,8 +20,15 @@ const base='https://api-preview.packone.pro',preview=process.env.PREVIEW_ACCESS_
 assert.match(preview||'',/^[a-f0-9]{64}$/);
 // Host and ingress identity are fixed. Never accept a production URL, spoof an
 // egress header, or call a provider/auth-email/billing route from this harness.
-const health=await fetch(base+'/draft/health?quick=1',{headers:{'x-pack1-preview-key':preview},redirect:'error',signal:AbortSignal.timeout(30000)});
-assert.equal(health.status,200);assert.equal((await health.json()).release_commit,fixture.sha);
+// A newly uploaded Worker can reach different egress POPs at different times.
+// Read-only readiness probes precede the synchronized measured window.
+let health;const readyDeadline=Math.min(scheduledStart-5000,Date.now()+60000);
+while(Date.now()<readyDeadline) {
+  health=await fetch(base+'/draft/health?quick=1',{headers:{'x-pack1-preview-key':preview},redirect:'error',signal:AbortSignal.timeout(10000)});
+  if(health.status===200&&(await health.json()).release_commit===fixture.sha)break;
+  health=null;await new Promise(r=>setTimeout(r,2000));
+}
+assert.ok(health,'preview_revision_not_ready');
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 const report={schema:1,sha:fixture.sha,branch:fixture.branch,scenario:'distributed real runner egress',target,generator:shard,generators,egress:seal({network:health.headers.get('x-pack1-preview-network')}),policy,
   started_at:new Date().toISOString(),stages:[],passed:false,distributed_evidence:true};
@@ -94,7 +101,7 @@ for(const population of [target/generators]) {
         assert.equal(run.complete,round===7);
       }
       assert.equal(run.score,Math.round(run.answers.reduce((sum,a)=>sum+a.score,0)/8));
-      const share=await call(actor,'read',`/draft/v1/runs/${run.id}/share`,{});assert.ok(share.id);
+      const share=await call(actor,'read',`/draft/v1/runs/${run.id}/share`,{});if(practice)assert.match(share.id,/^[a-f0-9]{24}$/,'practice_share');else {assert.equal(share.daily,true,'daily_share');assert.equal(new URL(share.url,'https://packone.pro').searchParams.get('daily'),'1','daily_share_url');}
       await call(actor,'read','/draft/v1/leaderboard?environment='+environment+'&period='+['daily','week','season','all'][globalIndex%4]);
       if(globalIndex%10===0) {
         attach();
@@ -106,7 +113,7 @@ for(const population of [target/generators]) {
       stage.completed++;
     } catch(error) {
       if(error.code==='ERR_ASSERTION'){stage.correctness_failures++;stopped=true;}
-      stage.failures.push(error.coarse||'correctness');
+      stage.failures.push(error.coarse||(error.code==='ERR_ASSERTION'?'assertion_line_'+String(error.stack).match(/launch-distributed-run.mjs:(\d+)/)?.[1]:'unexpected'));
     }
   }));
   stage.elapsed_ms=Date.now()-stageStart;
@@ -128,4 +135,4 @@ report.finished_at=new Date().toISOString();save();
 if(!report.passed)process.exitCode=1;
 
 }
-main().catch(error=>{console.error(JSON.stringify({error:'Isolated load setup or acceptance failed',code:error.pgCode||error.code||'unknown'}));process.exitCode=1;});
+main().catch(error=>{console.error(JSON.stringify({error:'Isolated load setup or acceptance failed',code:error.pgCode||error.code||'unknown',line:String(error.stack).match(/launch-distributed-run.mjs:(\d+)/)?.[1]||null}));process.exitCode=1;});

@@ -41,7 +41,7 @@ await query(`INSERT INTO account_links(auth_user_id,player_id)
 await query(`INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at)
   SELECT u->>'account_hash',(u->>'auth')::uuid,u->>'csrf_hash',now()+interval '2 hours' FROM jsonb_array_elements($1::jsonb) u`,[data]);
 await query(`INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference)
-  SELECT (u->>'auth')::uuid,c,'isolated-load',$2 FROM jsonb_array_elements($1::jsonb) u
+  SELECT (u->>'auth')::uuid,c,'patreon',$2 FROM jsonb_array_elements($1::jsonb) u
   CROSS JOIN unnest(ARRAY['unlimited_cube_practice','custom_corpus']) c`,[data,tag]);
 const today=gameDateKey();
 await query(`INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json)

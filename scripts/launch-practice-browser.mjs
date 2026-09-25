@@ -87,6 +87,10 @@ async function main() {
     report.passed=!errors.length&&report.samples[0].click_to_cards_ms<=report.budgets.cold_click_ms&&
       Object.values(report.summary).every(s=>s.api.p95_ms<=2000&&s.click.p95_ms<=3000);
     await page.screenshot({path:directory+'/practice-mobile.png',fullPage:true});
+  } catch(error) {
+    report.failure={code:error.code||error.name||'unknown',line:String(error.stack).match(/launch-practice-browser.mjs:(\d+)/)?.[1]||null};
+    await page.screenshot({path:directory+'/practice-failure.png',fullPage:true});
+    throw error;
   } finally {
     report.browser_errors=errors.length;report.api_calls=apiCalls;
     fs.writeFileSync(directory+'/practice-browser.json',JSON.stringify(report,null,2));
