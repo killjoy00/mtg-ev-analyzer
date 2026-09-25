@@ -1,5 +1,6 @@
 import {renderCorpus} from './corpus.mjs';
 import {renderUsers} from './users.mjs';
+import {renderCampaignLinks} from './campaign-links.mjs';
 import {accountCsrfToken,firstPartyAuthEnabled,hasAccountSession,storedAccountToken,signInAccount,signUpAccount,signOutAccount} from '../growth-api.mjs';
 const root=document.querySelector('#admin');
 const esc=x=>String(x??'').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
@@ -63,7 +64,7 @@ function render() {
 }
 async function load() {
   if(!hasAccountSession()){login();return;}
-  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request);return;}report=await request('/v1/admin/measurements?'+params);render();}
+  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request);return;}if(area==='campaign-links'){await renderCampaignLinks(root);return;}report=await request('/v1/admin/measurements?'+params);render();}
   catch(err){if(err.status===401||err.status===403){login(err.message);return;}const status=document.querySelector('#status');if(status)status.textContent=err.message;else root.innerHTML=`<h1>Report unavailable</h1><p class="error">${esc(err.message)}</p><button id="retry">Try again</button>`;document.querySelector('#retry')?.addEventListener('click',load);}
 }
 document.addEventListener('pack1:admin-signout',async()=>{await signOutAccount();login();});
