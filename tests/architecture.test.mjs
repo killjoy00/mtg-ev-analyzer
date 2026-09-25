@@ -51,7 +51,7 @@ test('the page has one stylesheet entrypoint and no inline style block', () => {
   const html = source('index.html');
   assert.doesNotMatch(html, /<style(?:\s|>)/i);
   const stylesheets = [...html.matchAll(/<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"/gi)].map((match) => match[1]);
-  assert.deepEqual(stylesheets, ['visual-c.css?v=7']);
+  assert.deepEqual(stylesheets, ['visual-c.css?v=8']);
 });
 
 test('current identity layer excludes retired game observers and result writers', () => {
