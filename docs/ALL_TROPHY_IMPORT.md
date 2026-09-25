@@ -35,6 +35,19 @@ The old backend reads all interesting decision metadata using keyset pagination.
 
 Run `npm test` with required replay shards in CI, validate artifacts with the loader, and load development first. Verify per-set counts, old-payload preservation, rerun idempotency, backend health and mixed/Cube starts, rerolls and completions. Measure cold/warm serving at the expanded size for the function version actually being deployed. Keep the import report alongside release evidence. The old `extract_trophy_evidence.py` and `build_verified_trophy_corpus.py` commands reproduce only the frozen baseline and are not the complete importer.
 
+
+## Production corpus health freshness and Neon egress
+
+The seven-day corpus health gate is kept fresh by `.github/workflows/corpus-health-refresh.yml`, not by a recurring full-corpus audit. The scheduler runs every four hours and reads only snapshot/health metadata first. It uses earliest-deadline-first planning and may deep-scan **at most one** active or Candidate source snapshot in a run. The exact snapshot ID is passed to `check-corpus-health.mjs --snapshot`, so a set with both an active snapshot and a newer Candidate cannot accidentally double the payload egress for one slot.
+
+The policy reserves 24 hours of safety before the seven-day health expiry. At a four-hour cadence this supports up to 36 managed active/Candidate snapshots: 36 x 4 hours = 144 hours (six days), leaving 24 hours before the 168-hour publication/reactivation gate. The planner idles when the existing deadlines have enough slack, so smaller inventories are not scanned every four hours. A changed manifest, changed gate version, missing health evidence, or approaching deadline moves a snapshot to the front of the queue.
+
+The hard recurring egress ceiling is therefore one snapshot payload scan per four-hour scheduler slot, never a daily full-corpus payload download. If the eligible inventory exceeds 36 snapshots or current evidence is already too stale for the scheduler to recover before a hard deadline, the workflow still makes one bounded refresh attempt and then fails loudly so capacity can be reviewed; it must not silently claim freshness.
+
+The scheduled refresh may write a health row and the existing health path may promote a healthy `Blocked` source snapshot to `Candidate`. It never calls the corpus admin status/snapshot endpoints and never makes an environment or source snapshot `Live`. Live activation remains an explicit administrative action with fresh health evidence.
+
+`Reviewed full corpus health` remains a manual-only workflow. Use it when an operator intentionally wants a complete deep audit; do not add a schedule to it. This separation preserves the egress control introduced after the production Neon egress alert while still maintaining normal publication/reactivation freshness.
+
 ## Unattended operation
 
 After an owner explicitly dispatches **Run workflow**, GitHub Actions performs the entire backfill without an AI session: discover all archives, import, validate, load development, complete mixed/Cube practice smoke tests, load production, and test production. It does not trigger on importer code pushes. It saves archive checkpoints in Actions cache and the compact results as 90-day artifacts; database rows and per-set completion manifests persist in Neon. Failed validation blocks later steps, and idempotent inserts make rerunning safe. Repository owners can follow the job summary and GitHub's normal failure notifications. The separately scheduled legacy replay backlog is a different workflow, documented in the repository README.
