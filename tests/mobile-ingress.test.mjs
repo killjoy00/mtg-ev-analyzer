@@ -180,3 +180,36 @@ test('Apple form callback is forwarded without JSON coercion and may return the 
   assert.equal(seen.body,payload);
   assert.equal(seen.contentType,'application/x-www-form-urlencoded');
 });
+
+
+test('mobile Apple deletion re-auth routes require and forward both mobile identities',async()=>{
+  for(const path of [
+    '/growth/v1/mobile/account/delete/apple/start',
+    '/growth/v1/mobile/account/delete/apple/finish',
+  ]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro'+path,{
+      method:'POST',
+      headers:headers({
+        'content-type':'application/json',
+        'x-pack1-mobile-session':token,
+        'x-pack1-mobile-account':account,
+      }),
+      body:JSON.stringify(path.endsWith('/start')
+        ? {confirm:true}
+        : {confirm:true,handoffToken:'h'.repeat(43)}),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      forwarded={
+        url,
+        player:new Headers(options.headers).get('authorization'),
+        account:new Headers(options.headers).get('x-pack1-mobile-account'),
+      };
+      return Response.json({ok:true});
+    });
+    assert.equal(response.status,200,path);
+    assert.match(forwarded.url,/pack1growth.*\/v1\/mobile\/account\/delete\/apple\/(?:start|finish)$/);
+    assert.equal(forwarded.player,'Bearer '+token);
+    assert.equal(forwarded.account,account);
+  }
+});
