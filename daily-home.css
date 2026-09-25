@@ -27,6 +27,7 @@
 .p1-card-front{left:45px;transform:rotate(7deg);background:#fff;color:var(--green-dark)}
 .daily-home-action{display:grid;gap:7px;justify-items:stretch}
 .daily-home-action small{color:var(--muted);font-size:11px;line-height:1.2;text-align:center;white-space:nowrap}
+.daily-home-action .daily-home-free{display:inline-flex;align-items:center;justify-content:center;justify-self:center;padding:4px 9px;border:1px solid #b9d8c5;border-radius:999px;background:#eef8f1;color:var(--green-dark);font-weight:800;letter-spacing:.01em}
 .daily-home-game h2{font-family:var(--display);font-size:36px;line-height:1.1;letter-spacing:0;font-weight:600;margin:0 0 8px}
 .daily-home-game p{font-size:16px;color:var(--muted);margin:0;line-height:1.4}
 .daily-home-game .button{min-width:134px;min-height:48px;text-align:center;text-decoration:none;justify-content:center}
