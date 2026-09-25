@@ -68,7 +68,7 @@ These values are not committed to Git:
 
 The verified Apple application record already exists.
 
-Google Play Console now grants app-scoped testing access for `pro.packone.app` to `packone-play-ci@pack-one.iam.gserviceaccount.com`. The remaining Google-side setup is keyless GitHub Actions authentication through Workload Identity Federation. No JSON service-account key should be created or stored in GitHub.
+Google Play Console grants app-scoped testing access for `pro.packone.app` to `packone-play-ci@pack-one.iam.gserviceaccount.com`. Keyless GitHub Actions authentication through Workload Identity Federation is configured and the live Play edit probe passed. No long-lived service-account JSON key is needed.
 
 ## Store listing URLs
 
@@ -160,3 +160,25 @@ gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
 ```
 
 The verified provider resource is `projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer`. The GitHub workflow now uses it directly.
+
+
+## Store build numbering
+
+Publishing jobs treat the stores as the monotonic source of truth. Before Expo Prebuild they query the highest number already accepted by the store and choose:
+
+`max(store_high_water_mark + 1, 100000 + GITHUB_RUN_NUMBER)`
+
+- iOS queries all App Store Connect builds for app `6814318676` and allocates the next `CFBundleVersion`.
+- Android opens a temporary Google Play edit, lists all current AABs, and allocates the next `versionCode`; the probe edit is then deleted.
+- PR-only smoke builds may still use `100000 + GITHUB_RUN_NUMBER` because they are never uploaded.
+
+This keeps releases monotonic if a workflow file is renamed/replaced (which resets that workflow's run counter) and also makes a rerun advance past any number the earlier attempt already uploaded. The run-number formula is only a floor, not the publishing source of truth.
+
+The values are injected through `PACKONE_IOS_BUILD_NUMBER` and `PACKONE_ANDROID_VERSION_CODE`. Config validation asserts that the requested values reach the generated Expo config. The iOS export disables Xcode's automatic build-number rewriting so the CI-assigned number is preserved.
+
+## Review deadlines for deferred items
+
+- **Export compliance:** the current internal TestFlight build may show Missing Compliance. The owner must answer App Store Connect's encryption questions before internal installation if Apple blocks the build. Source-control `ITSAppUsesNonExemptEncryption=false` only after the owner explicitly confirms that declaration is correct for the app.
+- **External TestFlight / App Store review:** resolve Apple's Guideline 4.8 equivalent-login requirement before external testing because Pack One offers Google sign-in. Sign in with Apple is the expected implementation path unless another qualifying equivalent login is deliberately chosen.
+- **Payments / upgrade links:** review Patreon/upgrade-link behavior against the then-current App Review payment and steering rules before any external TestFlight or App Store review.
+- **Production Google Play:** narrow the current repo-wide Workload Identity trust to a protected release branch or GitHub Environment before granting any production-release permission.

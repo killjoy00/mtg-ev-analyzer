@@ -4,6 +4,11 @@ import fs from 'node:fs';
 import {dailyHomeMarkup} from '../daily-home.mjs';
 const day='2026-09-18';
 const row=set_id=>({date:day,mode:'draft_run',set_id,score:91});
+
+test('homepage social metadata has no escaped-newline pollution',()=>{
+ const html=fs.readFileSync('index.html','utf8');
+ assert.equal(html.includes('\\n'),false,'Homepage HTML must not contain literal \\n escape text');
+});
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.match(html,/Eight decisions from real trophy drafts\./);

@@ -21,6 +21,14 @@ await page.route('**/*.neon.tech/**',async route=>{
 try{
  await page.setViewportSize({width:390,height:844});
  await page.goto(process.env.PACK1_E2E_URL||'http://127.0.0.1:4173',{waitUntil:'domcontentloaded'});
+ const socialMetadata=await page.evaluate(()=>({
+  ogImage:document.head.querySelector('meta[property="og:image"]')?.getAttribute('content')||null,
+  twitterCard:document.head.querySelector('meta[name="twitter:card"]')?.getAttribute('content')||null,
+  canonical:document.head.querySelector('link[rel="canonical"]')?.getAttribute('href')||null,
+ }));
+ assert.equal(socialMetadata.ogImage,'https://packone.pro/mobile/assets/images/icon.png','og:image stays inside parsed <head>');
+ assert.equal(socialMetadata.twitterCard,'summary_large_image','twitter:card stays inside parsed <head>');
+ assert.equal(socialMetadata.canonical,'https://packone.pro/','canonical stays inside parsed <head>');
  await page.locator('.daily-home-game a').first().waitFor();
  assert.equal(await page.getByRole('link',{name:'Play now',exact:true}).count(),3,'Play links do not wait for profile');
  assert.ok(!requests.some(u=>/\/(app\.js|social\.mjs|home-today\.mjs|data\/catalog\.json|shards\/)/.test(u)),'Home excludes the legacy replay dependency tree');
