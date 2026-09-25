@@ -147,3 +147,6 @@ jobs:
           printf '%s' "$connection" > "$RUNNER_TEMP/corpus-health.connection"
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus-health.connection"
+          if [[ "$TARGET" == development ]]; then
+            node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/corpus-health.connection"
+          fi
