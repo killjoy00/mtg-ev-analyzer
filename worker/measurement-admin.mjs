@@ -75,12 +75,12 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
 ), attribution AS (
   SELECT f.person_id,f.player_id,
     CASE
-      WHEN activity.first_activity < coalesce(touch.created_at,tracking.started_at,'-infinity'::timestamptz) THEN 'pre_tracking'
+      WHEN tracking.started_at IS NOT NULL AND activity.first_activity<tracking.started_at THEN 'pre_tracking'
       WHEN touch.player_id IS NOT NULL THEN touch.source
       ELSE 'direct'
     END source,
     CASE
-      WHEN activity.first_activity < coalesce(touch.created_at,tracking.started_at,'-infinity'::timestamptz) THEN '(none)'
+      WHEN tracking.started_at IS NOT NULL AND activity.first_activity<tracking.started_at THEN '(none)'
       ELSE coalesce(touch.campaign,'(none)')
     END campaign
   FROM first_daily f
@@ -191,30 +191,21 @@ export async function handleAdmin(request,query,readJson) {
         SELECT c.*,p.set_id,p.pick_number,p.payload->>'historical_pick_id' trophy_id
         FROM chosen c JOIN draft_run_verified_puzzles p USING(puzzle_id)`,filters.params),
       query(`SELECT set_id FROM draft_run_verified_sets ORDER BY set_id`),
-      query(`WITH player_flags AS (
-          SELECT p.id,
-            coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
-            OR EXISTS (
-              SELECT 1 FROM account_links a JOIN pack1_admins admin ON admin.auth_user_id=a.auth_user_id
-              WHERE a.player_id=p.id
-            ) excluded
-          FROM players p
-        ), arrivals AS (
+      query(`WITH arrivals AS (
           SELECT e.player_id,e.created_at
-          FROM analytics_events e JOIN player_flags p ON p.id=e.player_id
+          FROM analytics_events e JOIN players p ON p.id=e.player_id
           WHERE e.event_name='daily_share_arrival'
             AND e.created_at >= $1::date AND e.created_at < $2::date+interval '1 day'
             AND ($3='all' OR coalesce(e.event_props->>'set','mixed')=$3)
-            AND NOT p.excluded
+            AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
         ), starts AS (
           SELECT DISTINCT e.event_props->>'run_id' run_id
           FROM analytics_events e
           JOIN draft_run_sessions s ON s.id::text=e.event_props->>'run_id'
-          JOIN player_flags p ON p.id=s.player_id
           WHERE e.event_name='daily_started' AND e.event_props->>'source'='result_share'
             AND e.created_at >= $1::date AND e.created_at < $2::date+interval '1 day'
             AND ($3='all' OR e.event_props->>'set_id'=$3)
-            AND NOT s.measurement_qa AND NOT p.excluded
+            AND NOT s.measurement_qa
         ), completed AS (
           SELECT DISTINCT event_props->>'run_id' run_id
           FROM analytics_events WHERE event_name='daily_completed'
