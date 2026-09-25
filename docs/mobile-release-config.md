@@ -185,6 +185,12 @@ This keeps releases monotonic if a workflow file is renamed/replaced (which rese
 
 The values are injected through `PACKONE_IOS_BUILD_NUMBER` and `PACKONE_ANDROID_VERSION_CODE`. Config validation asserts that the requested values reach the generated Expo config. The iOS export disables Xcode's automatic build-number rewriting so the CI-assigned number is preserved.
 
+## Minimum supported native versions
+
+The production growth service exposes a public `GET /v1/mobile/version` compatibility check. The installed native app sends its platform, native marketing version, and native build number. Server authority lives in the Neon `settings` row `mobile_minimum_supported_versions_v1`; the initial policy is non-disruptive at `1.0` / build `1` for both platforms and can be raised later without shipping another client.
+
+The native root layout checks this contract on cold start and every foreground resume before rendering Pack One navigation. A valid server response below the configured minimum shows a non-dismissible update-required screen linked to the official App Store or Play listing. Transport failures, 5xx responses, malformed responses, and unavailable native metadata fail open so a temporary version-service outage cannot strand otherwise supported clients. Store binaries read the actual native values through `expo-application`, not Expo manifest metadata.
+
 ## Store publishing boundary
 
 The TestFlight and Google Play Internal publishing workflows are manual-only and their publishing jobs fail closed unless the dispatch is from `main` and the checked-out commit still equals current `origin/main`. Store status/probe workflows use the same current-main check. These jobs reference the `pack-one-mobile-release` GitHub Environment so repository owners can apply required-review / protected-branch rules at one release boundary.
