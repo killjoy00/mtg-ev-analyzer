@@ -1,5 +1,6 @@
 import { escapeHtml as esc } from './html.mjs';
-import { loadMyProfile } from './growth-api.mjs';
+import { loadDailyStatus, loadMyProfile } from './growth-api.mjs';
+import { dailyResetCue } from './game-date.mjs';
 import { renderAccount } from './growth.mjs?v=6';
 import { trackEvent } from './retention-events.mjs';
 
@@ -21,17 +22,21 @@ async function enhance(detail={}) {
   if(!root||root.dataset.progressionLoaded)return;
   root.dataset.progressionLoaded='1';
   try {
-    const profile=await loadMyProfile();if(!root.isConnected)return;
+    const [profile,dailyStatus]=await Promise.all([
+      loadMyProfile(),
+      root.id==='post-game-progress'&&detail.daily?loadDailyStatus().catch(()=>null):Promise.resolve(null),
+    ]);if(!root.isConnected)return;
     const current=(profile.achievements||[]).filter(a=>a.unlocked),previous=latest;
     latest=new Set(current.map(a=>a.id));
     const unlocked=previous?current.filter(a=>!previous.has(a.id)):[];
     for(const a of unlocked)trackEvent('achievement_view',{achievement:a.id,source:'result'});
     const next=nextMilestones(profile,1)[0],reason=claimReason(profile);
-    if(!next&&!reason&&!unlocked.length)return;
+    const streak=Number(dailyStatus?.daily_streak||0);
+    const dailyCue=root.id==='post-game-progress'&&detail.daily?`${dailyResetCue()}${streak>=2?` · ${streak}-day streak`:''}`:null;
+    if(!next&&!reason&&!unlocked.length&&!dailyCue)return;
     const box=root.id==='post-game-progress'?root:document.createElement('aside');box.className='post-game-progress';
     if(root.id==='post-game-progress') {
-      if(!next&&!unlocked.length)return;
-      box.innerHTML=`<p class="post-game-progress-label">Achievements</p>${unlocked.length?`<p><strong>${esc(unlocked[0].label)}</strong> unlocked.</p>`:''}${next?`<p><strong>Up next: ${esc(next.label)}</strong><br><span>${esc(next.progress_text)} · ${esc(next.description)}</span></p>`:''}`;
+      box.innerHTML=`${next||unlocked.length?'<p class="post-game-progress-label">Achievements</p>':''}${unlocked.length?`<p><strong>${esc(unlocked[0].label)}</strong> unlocked.</p>`:''}${next?`<p><strong>Up next: ${esc(next.label)}</strong><br><span>${esc(next.progress_text)} · ${esc(next.description)}</span></p>`:''}${dailyCue?`<p class="post-game-daily-cue">${esc(dailyCue)}</p>`:''}`;
       return;
     }
     box.innerHTML=`${unlocked.length?`<p><strong>${esc(unlocked[0].label)}</strong> unlocked.</p>`:''}${next?`<p><strong>Up next: ${esc(next.label)}</strong><br><span>${esc(next.progress_text)} · ${esc(next.description)}</span></p>`:''}<div><button class="text-button" data-open-career>View your career</button>${reason?'<button class="text-button" data-claim-progress>Save my progress</button>':''}</div>${reason?`<small>${esc(reason)}</small>`:''}`;
