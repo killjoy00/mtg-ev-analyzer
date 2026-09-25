@@ -17,7 +17,7 @@ for (const [name, value] of Object.entries({
   appStoreVersion: storeRelease.appStoreVersion,
   playVersionName: storeRelease.playVersionName,
 })) {
-  if (typeof value !== 'string' || !/^\\d+\\.\\d+(?:\\.\\d+)?$/.test(value)) {
+  if (typeof value !== 'string' || !/^\d+\.\d+(?:\.\d+)?$/.test(value)) {
     throw new Error(`Pack One production preflight failed. ${name} must be a dotted numeric marketing version.`);
   }
 }
