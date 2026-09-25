@@ -180,3 +180,16 @@ jobs:
 
       - name: Verify live secure gateway and Google OAuth start
         run: node tests/edge-production-live-smoke.mjs "$GITHUB_SHA"
+
+      - name: Verify retained gateway timings for this production release
+        env:
+          PACK1_EXPECT_RELEASE: ${{ github.sha }}
+        run: node scripts/launch-alert.mjs check
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: production-launch-telemetry-${{ github.run_id }}
+          path: artifacts/launch-alert
+          if-no-files-found: ignore
+          retention-days: 30
