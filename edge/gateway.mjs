@@ -309,7 +309,18 @@ export async function gateway(request,env,fetcher=fetch) {
       headers.set('x-pack1-player-session',request.headers.get('x-pack1-player-session'));
 
     let body;
-    if(['POST','PATCH'].includes(method)) {body=JSON.stringify(await readJson(request));headers.set('content-type','application/json');}
+    const appleCallback=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/account/apple/callback';
+    if(appleCallback) {
+      const contentType=String(request.headers.get('content-type')||'').toLowerCase();
+      if(!contentType.includes('application/x-www-form-urlencoded'))
+        throw Object.assign(Error('Apple callback is invalid.'),{status:415});
+      body=await request.text();
+      if(body.length>20000)throw Object.assign(Error('Apple callback is invalid.'),{status:413});
+      headers.set('content-type','application/x-www-form-urlencoded');
+    } else if(['POST','PATCH'].includes(method)) {
+      body=JSON.stringify(await readJson(request));
+      headers.set('content-type','application/json');
+    }
     const upstreamOrigin=`https://${branch}-${SERVICES[match[1]]}.compute.c-5.us-east-2.aws.neon.tech`;
     const refresh=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/player/session'&&Boolean(playerToken);
     // A cookie is untrusted until the origin verifies it. This endpoint only
@@ -333,7 +344,7 @@ export async function gateway(request,env,fetcher=fetch) {
     if(match[1]==='growth')for(const line of upstreamSetCookies(result.headers))if(publicCookie(line))publicHeaders.append('set-cookie',scopedCookie(line));
     if(result.status>=300&&result.status<400) {
       const target=safeRedirect(result.headers.get('location'),{
-        mobileOAuth:match[1]==='growth'&&match[2]==='/v1/mobile/account/google/callback',
+        mobileOAuth:match[1]==='growth'&&['/v1/mobile/account/google/callback','/v1/account/apple/callback'].includes(match[2]),
       });
       if(!target)return finish(response(502,'Unexpected upstream redirect.'));
       publicHeaders.set('location',target);
