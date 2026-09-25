@@ -85,7 +85,13 @@ test('Draft Run repeats preserve the practice context', async () => {
 
 test('secondary gameplay controls keep mobile-sized targets', async () => {
   const css = await readFile('draft-run.css', 'utf8');
-  assert.match(css, /body \.run-zoom\{[^}]*min-height:44px/);
+  const product = await readFile('draft-run-product.mjs', 'utf8');
+  assert.match(css, /body \.run-zoom\{[^}]*position:absolute;[^}]*width:44px;[^}]*min-height:44px/);
+  assert.match(css, /\.run-zoom-glyph\{[^}]*width:28px;[^}]*height:28px/);
+  assert.doesNotMatch(product, />Enlarge<\/button>/, 'card grid should not repeat visible Enlarge labels');
+  assert.match(product, /class="run-zoom"[^>]*aria-label="Enlarge \$\{esc\(c\.name\)\}"[^>]*><span class="run-zoom-glyph" aria-hidden="true"><\/span><\/button>/);
+  assert.match(product, /other picks can earn up to 95 based on broader drafting evidence\./);
+  assert.doesNotMatch(product, /held-out strong-player support/);
   assert.match(css, /\.run-lock \.run-tools \.button\{min-height:44px/);
 });
 
