@@ -8,7 +8,7 @@ PR #505, **Pack One launch attribution, habit metrics, cues, and previews**, mer
 
 `572f36638a780f73a41a548eb07e3101ea2efed5`
 
-GitHub Pages serves the browser-side release, and development and production Neon Functions now serve that same reviewed application revision. The launch attribution capture, Daily habit reporting, session-derived Daily streak, reset cue, social metadata and Privacy disclosure are therefore live together.
+GitHub Pages serves the browser-side release, and development and production Neon Functions now serve that same reviewed application revision. Launch attribution capture, Daily habit reporting, the session-derived Daily streak, reset cue and Privacy disclosure are live. PR #505 initially shipped malformed literal `\\n` text in the homepage social metadata; PR #515 subsequently corrected that regression and the fixed homepage was redeployed before this closeout was finalized.
 
 No schema migration was introduced by PR #505. During promotion, the release verifier correctly found a previously reviewed mobile schema prerequisite that had not yet been promoted: `0038_mobile_practice_idempotency.sql`. That prerequisite was applied and verified in development and production before the exact #505 application revision was deployed.
 
@@ -16,13 +16,15 @@ No schema migration was introduced by PR #505. During promotion, the release ver
 
 ### Acquisition attribution
 
-The browser records one `acquisition_touch` per browser identity.
+The browser records best-effort `acquisition_touch` events. It does not enforce one acquisition event per browser identity. First-touch reporting is created server-side by selecting the earliest qualifying acquisition event associated with the player identity.
 
 It accepts sanitized:
 
 - `utm_source`;
 - `utm_campaign`;
 - optional `utm_medium`.
+
+Each acquisition value is converted to a string, trimmed, lowercased, and then accepted only if it matches `/^[a-z0-9][a-z0-9_-]{0,39}$/`, so valid values are 1–40 characters inclusive. Malformed manually constructed UTM values such as `launch week`, `r/magictcg`, or a 41-character value are rejected/dropped after normalization.
 
 If no UTM source is present, an external referrer hostname may be used as the source. Attribution parameters are removed from the address bar after capture.
 
@@ -65,7 +67,9 @@ The countdown follows the next Pacific Daily boundary and is covered for both 23
 
 ### Social previews and privacy
 
-The homepage metadata now uses evergreen Pack One launch copy and a large Twitter/X card. Pages that already had Open Graph metadata now include a first-party `og:image` and alt text.
+PR #505 added evergreen Pack One launch copy, a large Twitter/X card, and first-party Open Graph images. It also initially shipped literal `\\n` characters around the homepage social metadata, which could move metadata out of the parsed `<head>` and render stray text.
+
+PR #515 fixed that regression and merged as `2b6640e81624e3715158833a9abef545ff4420f6`. Its PR gates passed test **36144018422** and E2E **36144018028**; the E2E asserts that `og:image`, `twitter:card`, and `canonical` remain inside the parsed `<head>`. GitHub Pages then deployed that exact merge in run **36144465725**, and post-deploy production smoke **36144467337** successfully fetched the live Pack One homepage. The final deployed source no longer contains the literal-`\\n` pollution.
 
 The Privacy page now discloses campaign attribution and external referrer-host collection.
 
@@ -114,6 +118,7 @@ The post-merge production smoke proved the browser release and existing producti
 | Step | Evidence |
 | --- | --- |
 | Feature merge | PR #505 → `572f36638a780f73a41a548eb07e3101ea2efed5` |
+| Homepage social-metadata regression fix | PR #515 → `2b6640e81624e3715158833a9abef545ff4420f6`; test **36144018422**, E2E **36144018028**, Pages **36144465725**, production smoke **36144467337** |
 | Initial development deploy attempt | run **36135364368** — correctly blocked on missing reviewed schema prerequisite |
 | Development `0038_mobile_practice_idempotency.sql` promotion + schema verification | run **36135530668** |
 | Development exact-revision deploy + acceptance | run **36135592650** |
@@ -124,7 +129,9 @@ The initial development deployment did not modify application runtime because sc
 
 The missing prerequisite was a previously reviewed additive mobile migration. It adds practice-start idempotency hashes, their shape constraint and a unique partial index. The same migration file from the reviewed release revision was then applied first to development and later to production, with the repository schema verifier passing each time.
 
-A temporary branch-only dispatcher was used to invoke the repository's existing reviewed deployment workflow. It never merged to `main` and was removed after promotion. The actual deployments still ran through `.github/workflows/deploy-functions.yml`, including its exact-revision and acceptance protections.
+The prerequisite migration itself did not run through an existing reviewed migration workflow. A temporary branch workflow checked out the reviewed release commit, obtained the target Neon connection, and ran `psql` directly against the target Neon branch. The repository already contains reviewed migration patterns such as `.github/workflows/pack-one-season-hardening-migration.yml`, but that was not the mechanism used for this prerequisite.
+
+A separate temporary branch-only push dispatcher was used to invoke the repository's existing reviewed Functions deployment workflow. It never merged to `main` and was removed after promotion. The Functions deployments ultimately ran through `.github/workflows/deploy-functions.yml`, including its exact-revision and acceptance protections.
 
 ## Production acceptance
 
@@ -166,11 +173,12 @@ These tools are intended to support product decisions, not manufacture precision
 As of this closeout:
 
 - PR #505 is merged;
-- browser attribution capture, metadata and Daily reset cue are live;
+- browser attribution capture and the Daily reset cue are live;
+- the #505 literal-`\\n` homepage social-metadata regression was fixed by PR #515, and the corrected static metadata is deployed;
 - the reviewed mobile practice-idempotency schema prerequisite is present in development and production;
 - development and production Functions serve exact revision `572f36638a780f73a41a548eb07e3101ea2efed5`;
 - production acceptance run **36135923047** is green;
 - the admin Daily habit cohorts and `daily_streak` backend response are live in production;
-- no known #505 release blocker remains.
+- the known #505 social-metadata regression is closed by #515; no known launch-measurement release blocker remains in the final post-fix state.
 
 For day-to-day use, see [Launch measurement owner guide](../LAUNCH-MEASUREMENT-OWNER-GUIDE.md).
