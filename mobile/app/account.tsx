@@ -216,7 +216,12 @@ export default function AccountScreen() {
           throw new Error(result.type === 'cancel' ? 'Apple sign in was cancelled.' : 'Apple sign in did not finish.');
         }
         const callback = new URL(result.url);
-        if (callback.searchParams.get('apple') === 'error') throw new Error('Apple sign in did not finish.');
+        if (callback.searchParams.get('apple') === 'error') {
+          const code = callback.searchParams.get('appleErrorCode');
+          throw new Error(code === 'APPLE_EXISTING_ACCOUNT_UNVERIFIED'
+            ? 'An unverified Pack One account already uses this email. Reset its password from that inbox, verify the account, then try Apple again.'
+            : 'Apple sign in did not finish.');
+        }
         const handoff = callback.searchParams.get('appleHandoff');
         if (!handoff) throw new Error('Apple sign in did not return a Pack One handoff.');
         const next = await finishAppleSignIn(session, handoff, validateDailyRunId);
