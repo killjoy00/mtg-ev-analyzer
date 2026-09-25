@@ -3,7 +3,7 @@
 Start with [CURRENT-STATE](CURRENT-STATE.md) for verified deployment boundaries and [CHARTER](CHARTER.md) for the product.
 
 - [Corpus/selection](DATA-MANAGEMENT.md), [Corpus Operations](CORPUS-OPERATIONS.md), [card-image maintenance](CARD-IMAGE-MAINTENANCE.md), [Traditional admission/publication](TRADITIONAL-PUZZLE-ADMISSION.md)
-- [Scoring](SCORING-AND-DIFFICULTY.md), [decision measurements, launch attribution, and Daily habit cohorts](DECISION-MEASUREMENTS.md), [launch measurement owner guide](LAUNCH-MEASUREMENT-OWNER-GUIDE.md)
+- [Scoring](SCORING-AND-DIFFICULTY.md), [decision measurements, launch attribution, and Daily habit cohorts](DECISION-MEASUREMENTS.md), [launch measurement owner guide](LAUNCH-MEASUREMENT-OWNER-GUIDE.md), [campaign links owner guide](CAMPAIGN-LINKS-OWNER-GUIDE.md)
 - [17Lands policy](17LANDS-DATA-REVIEW-2026-09-18.md)
 - [Rebuild audit](REBUILD-2026-09-18.md), [rebuild release/runbook](REBUILD-RELEASE.md), [Traditional results](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md), [scoring results](../results/rebuild-2026-09-18/SCORING-RESULTS.md), [Daily distribution](../results/rebuild-2026-09-18/DAILY-DISTRIBUTION.md)
 - [Backend operations](BACKEND-RELIABILITY.md), [request integrity](REQUEST-INTEGRITY.md), [CI and merging](CI-AND-MERGING.md), [remaining work](ROADMAP.md)
@@ -31,3 +31,5 @@ Dated earlier reviews are historical evidence. Superseded core documents are ret
 
 - [Pack One launch measurement closeout](reports/PACK-ONE-LAUNCH-MEASUREMENT-CLOSEOUT-2026-09-25.md): acquisition attribution, habit metrics, Daily streak/reset cue, CI coverage, schema-prerequisite catch, and exact development/production release evidence.
 - [Launch measurement owner guide](LAUNCH-MEASUREMENT-OWNER-GUIDE.md): how to build tracked campaign links, read mature Daily cohorts, use 3-in-7 health, interpret source labels, and operate the new measurement tools.
+- [Campaign links owner guide](CAMPAIGN-LINKS-OWNER-GUIDE.md): how to build tracked URLs, publish static `/go/<slug>/` routes, validate naming, retire links safely, and troubleshoot the Admin Link Builder.
+- [Campaign links release closeout](reports/CAMPAIGN-LINKS-CLOSEOUT-2026-09-25.md): PR #518 scope, exact deployment evidence, static-route architecture, and final production boundary.

@@ -140,9 +140,18 @@ rate.
    funnel keeps its existing definition and is not reattributed by the new
    first-touch logic.
 
-For campaign links, use normal Pack One URLs with `utm_source` and
-`utm_campaign`; `utm_medium` is optional. Do not put names, emails, account
-IDs, or other personal data in those values. Example:
+For campaign links, the Admin **Campaign Links / Link Builder** at
+`/admin/?area=campaign-links` is the preferred construction surface. It uses the
+same acquisition-value validation as runtime capture, previews a tracked UTM URL,
+previews an intended static `/go/<slug>/` vanity URL, and produces the exact
+`campaign-links.json` entry. The tracked UTM URL can be used immediately; the
+vanity URL is not live until its entry and generated page are committed and
+deployed through the normal site PR. See
+[Campaign Links owner guide](CAMPAIGN-LINKS-OWNER-GUIDE.md).
+
+Normal Pack One URLs still use `utm_source` and `utm_campaign`;
+`utm_medium` is optional. Do not put names, emails, account IDs, or other
+personal data in those values. Example:
 
 `https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social`
 

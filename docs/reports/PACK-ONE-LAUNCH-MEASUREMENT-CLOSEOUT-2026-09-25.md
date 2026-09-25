@@ -168,6 +168,31 @@ These tools are intended to support product decisions, not manufacture precision
 - The existing Daily result-share funnel keeps its prior definition and should be read separately from first-touch attribution.
 - The first launch cohorts will be sparse. No scoring, difficulty or trophy-pick rule changes are implied by this release.
 
+## Follow-on static campaign links
+
+PR #518 added a static operator layer on top of this measurement release and
+merged as `1f0df9bd1f26e304a7bd737d2a869ddcb4700de1`.
+
+It adds:
+
+- a reviewed `campaign-links.json` campaign registry;
+- deterministic generated `go/<slug>/index.html` routes;
+- the Admin **Campaign Links / Link Builder**;
+- shared acquisition validation between builder/config/runtime;
+- the first published route, `https://packone.pro/go/reddit-launch/`.
+
+The vanity redirect itself does not measure the visit; it redirects to the
+tracked Pack One homepage URL and the acquisition logic documented in this
+closeout performs capture there. No backend, schema, DNS, credential, Cloudflare,
+or GitHub workflow change was part of #518.
+
+Final #518 PR gates passed test **36148044301** and E2E **36148044296**.
+Post-merge Pages **36148541521**, production smoke **36148542621**, test
+**36148542614**, and E2E **36148542654** all passed.
+
+See [Campaign Links release closeout](CAMPAIGN-LINKS-CLOSEOUT-2026-09-25.md)
+and [Campaign Links owner guide](../CAMPAIGN-LINKS-OWNER-GUIDE.md).
+
 ## Final state
 
 As of this closeout:

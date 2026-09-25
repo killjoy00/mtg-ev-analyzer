@@ -23,6 +23,16 @@ The environment, run-type, set, difficulty, pick and selection-version filters o
 
 ## 2. Make campaign links
 
+The preferred operator surface is the Admin **Campaign Links / Link Builder**:
+
+`https://packone.pro/admin/?area=campaign-links`
+
+It validates and normalizes the slug, source, campaign, and optional medium; previews the tracked UTM URL; previews the intended `/go/<slug>/` vanity URL; produces the exact `campaign-links.json` entry; and warns when a slug already exists.
+
+A tracked UTM URL can be copied and used immediately. A vanity `/go/<slug>/` URL is **not** published by the builder: its JSON entry and generated page must be committed through the normal site PR and deployed by GitHub Pages.
+
+For the complete publishing, retirement, generator, and troubleshooting workflow, use [Campaign Links owner guide](CAMPAIGN-LINKS-OWNER-GUIDE.md).
+
 For links you control, add:
 
 - `utm_source` — where the visitor came from;
