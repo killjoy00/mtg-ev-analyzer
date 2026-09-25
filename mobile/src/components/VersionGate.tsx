@@ -60,7 +60,7 @@ function CheckingScreen() {
 function UpdateRequiredScreen({
   storeUrl,
   minimum,
-}: Extract<VersionGateDecision, { status: 'required' }>) {
+}: Pick<Extract<VersionGateDecision, { status: 'required' }>, 'storeUrl' | 'minimum'>) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.updateCard}>
