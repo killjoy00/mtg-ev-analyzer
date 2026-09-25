@@ -28,7 +28,7 @@ Sign in with an account that has Pack One admin access.
 
 The builder contains:
 
-- **Slug** — the short name used under `/go/`;
+- **Slug** — optional for tracked-only links; required when you want a short `/go/` vanity URL;
 - **Source** — where the visitor came from;
 - **Campaign** — the initiative or push being measured;
 - **Medium** — optional broad channel type;
@@ -100,8 +100,8 @@ That means every static campaign link currently lands on the Pack One homepage a
 Use this when you do not need a short `/go/` URL.
 
 1. Open the Admin Link Builder.
-2. Enter a slug, source, campaign, and optional medium.
-3. Confirm there are no validation errors.
+2. Enter source, campaign, and optional medium. Leave **Slug** blank if you only need the tracked URL.
+3. Confirm the source/campaign fields have no validation errors.
 4. Copy **Tracked UTM URL**.
 5. Share that URL directly.
 
@@ -109,7 +109,7 @@ Example:
 
 `https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social`
 
-The slug is still useful for planning, but no repository change is required when you share only the tracked UTM URL.
+A slug is not required for this tracked-only workflow. No repository change is required when you share only the tracked UTM URL.
 
 After Pack One captures valid acquisition parameters, the existing browser logic removes the `utm_*` parameters from the visible address bar.
 
