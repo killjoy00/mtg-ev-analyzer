@@ -193,10 +193,12 @@ Before posting a tracked link:
 - choose one stable `utm_source`;
 - choose one stable `utm_campaign`;
 - optionally add `utm_medium`;
-- keep values lowercase/simple and under 40 characters;
+- use canonical acquisition values 1–40 characters long that match `/^[a-z0-9][a-z0-9_-]{0,39}$/`;
 - use no personal information;
 - open the link once and confirm Pack One loads normally;
 - expect the UTM parameters to disappear from the address bar after capture.
+
+Browser attribution converts each UTM value to a string, trims it, lowercases it, then applies the validation rule above. That normalization is convenient for interactive input, but malformed manually constructed values can still be rejected and dropped. For example, `launch week`, `r/magictcg`, and any 41-character value are invalid after normalization. Checked-in campaign configuration should already contain canonical values rather than relying on normalization; the admin Campaign Link Builder helps surface these validation errors before a link is committed.
 
 Example campaign family:
 
@@ -218,9 +220,9 @@ Using the same campaign name across sources makes the launch initiative easy to 
 - **Expecting the streak cue in Practice.** It is Daily-only.
 - **Making product decisions from tiny early cohorts.** The first purpose of these tools is to establish clean measurement; sample size still matters.
 
-## What to ask ChatGPT
+## Example analysis requests
 
-You can also use me as the operating layer over these tools. Useful requests include:
+Useful operator requests include:
 
 - “Check the Pack One launch metrics and summarize what changed this week.”
 - “Compare the mature launch-week cohorts by source without counting immature users.”
@@ -229,4 +231,4 @@ You can also use me as the operating layer over these tools. Useful requests inc
 - “Create tracked links for Reddit, Discord and newsletter for campaign `hob-season`.”
 - “Audit the release and tell me whether acquisition, habit metrics and streaks are still healthy.”
 
-When you ask for a live read, I can use the connected repository/backend evidence available in the workspace and distinguish what is measured from what is still too early to conclude.
+For a live read, use the connected repository/backend evidence available to the operator and distinguish measured results from cohorts that are still too early to interpret.
