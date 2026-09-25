@@ -56,7 +56,13 @@ jobs:
             grep -n "versionCode" android/app/build.gradle >&2 || true
             exit 1
           }
-          node -e 'const fs=require("node:fs"); const target=JSON.parse(fs.readFileSync("store-release.json","utf8")).playVersionName; const gradle=fs.readFileSync("android/app/build.gradle","utf8"); const match=gradle.match(/\\bversionName\\s+["\\x27]([^"\\x27]+)["\\x27]/); if(!match||match[1]!==target){console.error("Expected Android versionName "+target+", got "+(match?.[1]??"missing")+"."),process.exit(1)} console.log("Verified Android versionName: "+match[1])'
+          expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
+          if ! grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle && ! grep -Fq "versionName '$expected_version_name'" android/app/build.gradle; then
+            echo "Generated Android project does not contain versionName $expected_version_name." >&2
+            grep -n "versionName" android/app/build.gradle >&2 || true
+            exit 1
+          fi
+          echo "Verified Android versionName: $expected_version_name"
       - name: Apply upload-signing configuration
         env:
           PACKONE_ANDROID_UPLOAD_KEYSTORE: /tmp/packone-upload.p12
@@ -180,7 +186,13 @@ jobs:
             grep -n "versionCode" android/app/build.gradle >&2 || true
             exit 1
           }
-          node -e 'const fs=require("node:fs"); const target=JSON.parse(fs.readFileSync("store-release.json","utf8")).playVersionName; const gradle=fs.readFileSync("android/app/build.gradle","utf8"); const match=gradle.match(/\\bversionName\\s+["\\x27]([^"\\x27]+)["\\x27]/); if(!match||match[1]!==target){console.error("Expected Android versionName "+target+", got "+(match?.[1]??"missing")+"."),process.exit(1)} console.log("Verified Android versionName: "+match[1])'
+          expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
+          if ! grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle && ! grep -Fq "versionName '$expected_version_name'" android/app/build.gradle; then
+            echo "Generated Android project does not contain versionName $expected_version_name." >&2
+            grep -n "versionName" android/app/build.gradle >&2 || true
+            exit 1
+          fi
+          echo "Verified Android versionName: $expected_version_name"
       - name: Apply Pack One upload signing
         run: node ./scripts/configure-android-upload-signing.mjs
       - name: Build signed production bundle
