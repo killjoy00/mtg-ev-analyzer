@@ -8,6 +8,7 @@ import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import { compactDraftRunFeedback, consensusFeedback } from './draft-run-feedback.mjs';
 import { tcgplayerUrl } from './tcgplayer.mjs';
+import { dailyResetCue } from './game-date.mjs';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null;
@@ -186,6 +187,18 @@ function resultRepeatAction() {
   if(run.custom_set_ids?.length)return {href:'?game=draft-run&custom=1',label:'Choose Sets for Another Run'};
   return {href:gameUrl(),label:`Start Another ${title()}`};
 }
+async function renderDailyResultCue(resultId) {
+  if(!run?.day)return;
+  const root=document.querySelector('#post-game-progress');
+  if(!root)return;
+  const status=await loadDailyStatus().catch(()=>null);
+  if(!root.isConnected||run?.id!==resultId||!run.day)return;
+  const streak=Number(status?.daily_streak||0);
+  const cue=document.createElement('p');
+  cue.className='post-game-daily-cue';
+  cue.textContent=`${dailyResetCue()}${streak>=2?` · ${streak}-day streak`:''}`;
+  root.append(cue);
+}
 function renderResult() {
   document.body.classList.remove('is-game');
   poolObserver?.disconnect();poolObserver=null;
@@ -203,6 +216,7 @@ function renderResult() {
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=6')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
 export async function returnToValidatedDaily(runId,{standing=null}={}) {

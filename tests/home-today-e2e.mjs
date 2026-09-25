@@ -3,7 +3,7 @@ import {chromium} from 'playwright';
 const browser=await chromium.launch(process.env.CI?{headless:true,channel:'chrome'}:{headless:true});
 const page=await browser.newPage({viewport:{width:390,height:844}});
 let complete=false,both=false,fail=false,starts=0,held=null,holdNext=false;
-const profile=()=>({player:{display_name:'QA Today',claimed:both},summary:{games:2,current_streak:1},achievements:[],daily_history:complete?[{date:'2026-09-14',mode:'draft_run',set_id:'mixed',score:90,rank:1,total:4},...(both?[{date:'2026-09-14',mode:'draft_run',set_id:'powered-cube',score:87},{date:'2026-09-14',mode:'draft_run',set_id:'latest',score:88}]:[])]:[]});
+const profile=()=>({player:{display_name:'QA Today',claimed:both},summary:{games:2,current_streak:1},achievements:[],daily_streak:both?3:0,daily_history:complete?[{date:'2026-09-14',mode:'draft_run',set_id:'mixed',score:90,rank:1,total:4},...(both?[{date:'2026-09-14',mode:'draft_run',set_id:'powered-cube',score:87},{date:'2026-09-14',mode:'draft_run',set_id:'latest',score:88}]:[])]:[]});
 await page.addInitScript(()=>{
  const OriginalDate=Date;window.__todayNow=OriginalDate.parse('2026-09-14T16:00:00Z');
  window.Date=class extends OriginalDate{constructor(...args){super(...(args.length?args:[window.__todayNow]));}static now(){return window.__todayNow;}};
@@ -32,6 +32,7 @@ try{
  held();await page.waitForTimeout(100);await progress('1');
  both=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await progress('3');
  assert.ok(await page.getByRole('link',{name:'Go to Practice',exact:true}).isVisible());
+ assert.equal((await page.locator('.daily-home-next-cue').innerText()).trim(),'New Dailies in 15h · 3-day streak','all-Dailies-complete home shows one local countdown/streak line');
  for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-dailies-complete-${width}.png`,fullPage:true});}
  both=false;
  await page.evaluate(()=>{window.__todayNow=Date.parse('2026-09-15T07:00:00Z');window.dispatchEvent(new Event('focus'));});await progress('0');

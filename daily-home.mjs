@@ -1,5 +1,6 @@
 import { loadDailyStatus } from './growth-api.mjs';
 import { todayStatus, gameDateKey } from './today-status.mjs';
+import { dailyResetCue } from './game-date.mjs';
 
 let generation = 0;
 let installed = false;
@@ -16,6 +17,8 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = fals
   const claimed=Boolean(profile?.player?.claimed);
   const rankingReason=profile?.ranking_identity?.reason;
   const usernameAttention=rankingReason==='username_taken'||rankingReason==='username_required';
+  const dailyStreak=Number(profile?.daily_streak||0);
+  const nextDailyCue=`${dailyResetCue()}${dailyStreak>=2?` · ${dailyStreak}-day streak`:''}`;
   const ordered = [...games].sort((a, b) => Number(status[a.key].complete) - Number(status[b.key].complete));
   return `<section class="daily-home" data-daily-home data-completed="${status.completed}">
     <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Make your pick, then see what the trophy drafter chose and how strong your pick was.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
@@ -31,8 +34,8 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), unavailable = fals
       </article>`;
     }).join('')}</div>
     ${status.completed === 3 ? `<section class="daily-home-practice${claimed?' is-practice-handoff':''}">${claimed
-      ? '<div><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>Your practice options are all in one place.</p></div><a class="button primary" href="/practice/">Go to Practice</a>'
-      : '<p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>A free account adds unlimited regular Draft Runs.</p><button class="button primary" data-home-account>Create a free account</button>'}</section>` : ''}
+      ? `<div><p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>Your practice options are all in one place.</p><p class="daily-home-next-cue">${nextDailyCue}</p></div><a class="button primary" href="/practice/">Go to Practice</a>`
+      : `<p class="eyebrow">Dailies complete</p><h2>Keep drafting.</h2><p>A free account adds unlimited regular Draft Runs.</p><p class="daily-home-next-cue">${nextDailyCue}</p><button class="button primary" data-home-account>Create a free account</button>`}</section>` : ''}
     ${unavailable ? '<p role="status">Daily progress is unavailable. Play now still resumes your saved attempt.</p>' : ''}
   </section>`;
 }
