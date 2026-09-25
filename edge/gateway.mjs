@@ -163,13 +163,16 @@ export class NetworkQuota {
     const now=Date.now();
     // /session-only follows a charged /request and an origin refresh that
     // proved the browser has no valid identity. Do not charge the request twice.
-    const limits=[...(kind!=='/session-only'?[['request',120,60000]]:[]),...(kind!=='/request'?[['session',10,600000]]:[])];
+    // 100 shared-network players need roughly 2,000–2,500 requests for a
+    // complete run. The short bucket bounds bursts; the minute bucket bounds
+    // sustained load. Session creation remains independently limited.
+    const limits=[...(kind!=='/session-only'?[['request',3600,60000],['request_burst',600,10000]]:[]),...(kind!=='/request'?[['session',120,600000]]:[])];
     const {retry,scopes}=await this.storage.transaction(async tx=>{
       const pending=[],scopes=[];let retry=0;
       for(const [key,limit,period] of limits) {
         let row=await tx.get(key);
         if(!row||now>=row.until)row={count:0,until:now+period};
-        if(row.count>=limit){retry=Math.max(retry,Math.ceil((row.until-now)/1000));scopes.push(key);}
+        if(row.count>=limit){retry=Math.max(retry,Math.ceil((row.until-now)/1000));if(!scopes.includes(key==='request_burst'?'request':key))scopes.push(key==='request_burst'?'request':key);}
         pending.push([key,{...row,count:row.count+1}]);
       }
       if(retry)return {retry,scopes};

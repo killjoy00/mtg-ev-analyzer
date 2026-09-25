@@ -1,7 +1,7 @@
 name: isolated launch NAT acceptance
 on:
   pull_request:
-    paths: ['scripts/launch-load*', '.github/workflows/launch-load.yml']
+    paths: ['scripts/launch-load*', 'scripts/launch-practice-browser.mjs', '.github/workflows/launch-load.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -39,6 +39,8 @@ jobs:
           expires_at: ${{ steps.expiry.outputs.expires_at }}
       - name: Install pinned deployment tools
         run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@4.17.4 esbuild@0.28.2 wrangler@4.132.0
+      - name: Install pinned browser driver
+        run: npm install --no-save --no-audit --no-fund playwright@1.55.0
       - name: Prepare isolated schema and exact revision
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
@@ -73,11 +75,24 @@ jobs:
           PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
         run: node scripts/edge-control.mjs deploy
+      - name: Measure confirmed-idle and warm practice in the browser
+        id: browser
+        continue-on-error: true
+        env:
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: node scripts/launch-practice-browser.mjs
+      - name: Allow the browser request window to expire before NAT measurement
+        run: node --input-type=module -e "await new Promise(r=>setTimeout(r,65000))"
       - name: Run declared shared-network stages until the first failed gate
         env:
           PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
           LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
         run: node scripts/launch-load.mjs
+      - name: Enforce the independent browser gate
+        if: steps.browser.outcome == 'failure'
+        run: exit 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
