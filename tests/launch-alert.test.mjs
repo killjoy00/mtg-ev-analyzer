@@ -19,6 +19,15 @@ test('usage aggregates billing periods with explicit units',()=>{
  assert.throws(()=>parseNeonUsage({projects:[]}));
 });
 test('existing incident is deduplicated without comments',async()=>{
- let calls=0;const action=await routeAlert(async()=>{calls++;return Response.json([{title:'[launch alert] Production capacity needs attention',number:9}]);},{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{alerts:['slow_requests']});
+ let calls=0;const action=await routeAlert(async()=>{calls++;return Response.json([{title:'[launch alert] Production capacity needs attention (slow_requests)',number:9}]);},{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{alerts:['slow_requests']});
  assert.equal(action,'existing');assert.equal(calls,1);
+});
+
+test('an existing usage incident does not suppress a new service failure',async()=>{
+ const writes=[];const fetcher=async(url,options)=>{
+  if(options.method==='POST'){writes.push(JSON.parse(options.body));return Response.json({number:10});}
+  return Response.json([{title:'[launch alert] Production capacity needs attention',body:'"neon_egress_billing_period_usage"',number:9}]);
+ };
+ assert.equal(await routeAlert(fetcher,{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{alerts:['neon_egress_billing_period_usage','gateway_5xx']}),'created');
+ assert.equal(writes.length,1);assert.match(writes[0].title,/gateway_5xx/);
 });

@@ -61,6 +61,18 @@ class SchemaTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_header([name for name in DRAFT_HEADER if not name.startswith("pool_")], "draft")
 
+    def test_game_header_requires_deck_and_in_hand_columns(self):
+        header = [
+            "draft_id", "won", "rank", "user_game_win_rate_bucket",
+            "user_n_games_bucket", "deck_A", "opening_hand_A",
+        ]
+        validate_header(header, "game")
+        with self.assertRaisesRegex(ValueError, "in-hand"):
+            validate_header(
+                [name for name in header if not name.startswith("opening_hand_")],
+                "game",
+            )
+
     def test_archive_manifest_hashes_exact_header(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "draft.csv.gz"
