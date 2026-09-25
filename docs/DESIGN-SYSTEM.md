@@ -26,8 +26,10 @@ keyboard focus is visible, and prior cards retain the established 85% size relat
 to pack cards.
 
 Guest primary navigation stays intentionally narrow: Daily Run, How To Play, and
-Sign in. Signed-in navigation may add Practice, Leaders, Learn, and My Pack One.
-Practice is a dedicated hub with unlimited regular Draft Run practice plus Elite
+Sign in. Signed-in desktop navigation is Daily Run, Practice, Leaders, Learn, and
+My Pack One. On narrow signed-in screens Daily Run is omitted from the nav because
+the Pack One brand returns to Daily home; Practice, Leaders, Learn, and My Pack One
+remain visible. Practice is a dedicated hub with unlimited regular Draft Run practice plus Elite
 Powered Cube and custom-set practice. How To Play is the beginner manual; Learn is
 the broader hub for scoring, method, set coverage, and drafting guides.
 
