@@ -1,0 +1,84 @@
+name: mobile native smoke
+
+on:
+  pull_request:
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-native-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-native-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: android native compile
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      - name: Generate Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: development
+        run: npx expo prebuild --platform android --clean
+      - name: Compile Android debug app
+        working-directory: mobile/android
+        run: ./gradlew :app:assembleDebug --no-daemon
+
+  ios:
+    name: ios simulator compile
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install mobile dependencies
+        run: npm install --no-audit --no-fund
+      - name: Generate iOS project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: development
+        run: npx expo prebuild --platform ios --clean
+      - name: Compile iOS simulator app
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
+          if [[ -z "$workspace" ]]; then
+            echo "No generated Xcode workspace found." >&2
+            exit 1
+          fi
+          scheme="$(xcodebuild -workspace "$workspace" -list -json | python3 -c 'import json,sys; data=json.load(sys.stdin); schemes=data.get("workspace",{}).get("schemes",[]); print(schemes[0] if schemes else "")')"
+          if [[ -z "$scheme" ]]; then
+            echo "No generated Xcode scheme found." >&2
+            exit 1
+          fi
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
