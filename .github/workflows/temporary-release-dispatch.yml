@@ -1,4 +1,4 @@
-name: temporary release migration
+name: temporary release dispatch
 
 on:
   push:
@@ -7,29 +7,24 @@ on:
 
 permissions:
   contents: read
+  actions: write
 
 jobs:
-  migrate:
+  dispatch:
     runs-on: ubuntu-latest
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      PROJECT_ID: patient-shadow-91417882
-      TARGET_BRANCH: br-twilight-hill-ayffyd2b
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: 572f36638a780f73a41a548eb07e3101ea2efed5
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - name: Install pinned Neon CLI
-        run: npm install -g neon@4.17.4
-      - name: Apply reviewed mobile practice idempotency migration to development
+      - name: Dispatch reviewed revision to development
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
-          test -n "$NEON_API_KEY"
-          connection=$(neon connection-string "$TARGET_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
-          echo "::add-mask::$connection"
-          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
-          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/actions/workflows/deploy-functions.yml/dispatches" --input - <<'JSON'
+          {
+            "ref": "main",
+            "inputs": {
+              "target": "development",
+              "commit": "572f36638a780f73a41a548eb07e3101ea2efed5"
+            }
+          }
+          JSON
