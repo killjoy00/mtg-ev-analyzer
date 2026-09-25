@@ -1,11 +1,6 @@
 name: iOS TestFlight status
 
 on:
-  push:
-    branches:
-      - 'chatgpt/pack-one-mobile-v2-ios-testflight'
-    paths:
-      - '.github/app-store-status-request.txt'
   workflow_dispatch:
 
 permissions:
@@ -14,7 +9,9 @@ permissions:
 jobs:
   status:
     name: read App Store Connect build status
+    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
     env:
       ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
       ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
@@ -22,6 +19,19 @@ jobs:
       PACKONE_ASC_APP_ID: '6814318676'
     steps:
       - uses: actions/checkout@v4
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Store operations are allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
       - uses: actions/setup-node@v4
         with:
           node-version: 24

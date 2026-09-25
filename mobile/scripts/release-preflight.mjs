@@ -6,6 +6,24 @@ import { spawnSync } from 'node:child_process';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const icon = resolve(root, 'assets/images/icon.png');
+const storeReleasePath = resolve(root, 'store-release.json');
+
+if (!existsSync(storeReleasePath)) {
+  throw new Error('Pack One production preflight failed. Missing mobile/store-release.json.');
+}
+
+const storeRelease = JSON.parse(readFileSync(storeReleasePath, 'utf8'));
+for (const [name, value] of Object.entries({
+  appStoreVersion: storeRelease.appStoreVersion,
+  playVersionName: storeRelease.playVersionName,
+})) {
+  if (typeof value !== 'string' || !/^\\d+\\.\\d+(?:\\.\\d+)?$/.test(value)) {
+    throw new Error(`Pack One production preflight failed. ${name} must be a dotted numeric marketing version.`);
+  }
+}
+if (storeRelease.appStoreVersion !== storeRelease.playVersionName) {
+  throw new Error('Pack One production preflight failed. App Store and Play marketing versions must match.');
+}
 
 if (!existsSync(icon)) {
   throw new Error('Pack One production preflight failed. Missing mobile/assets/images/icon.png.');
@@ -84,6 +102,9 @@ if (result.status !== 0) {
 }
 
 const config = JSON.parse(result.stdout);
+if (config.version !== storeRelease.appStoreVersion) {
+  throw new Error(`Production marketing version ${config.version ?? 'missing'} does not match intended store version ${storeRelease.appStoreVersion}.`);
+}
 if (config.ios?.bundleIdentifier !== 'pro.packone.app') {
   throw new Error('Production iOS bundle identifier must remain pro.packone.app.');
 }

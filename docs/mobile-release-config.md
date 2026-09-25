@@ -1,6 +1,6 @@
 # Pack One mobile release configuration
 
-Updated 2026-09-24.
+Updated 2026-09-25.
 
 Pack One uses Expo SDK and Expo Prebuild as React Native tooling, but **does not require Expo Application Services (EAS), an Expo account, or an Expo project ID** to build or release the app.
 
@@ -20,6 +20,10 @@ Development and preview native builds use non-store identifiers so they can coex
 - preview: `pro.packone.preview`
 
 The `packone://` custom URL scheme remains unchanged for the current native auth handoff.
+
+## Marketing version
+
+The first public store target is **1.0**. `mobile/app.json` is the Expo/native source version, while `mobile/store-release.json` records the intended App Store and Google Play marketing versions. Production preflight fails unless all three values match. CI additionally verifies the generated iOS `CFBundleShortVersionString` and Android `versionName` against the same store target.
 
 ## Native generation and local builds
 
@@ -52,6 +56,7 @@ Production/release compilation requires the normal native platform prerequisites
 - production Android identity remains `pro.packone.app`
 - no EAS project ID is required
 - the production P¹ icon exists
+- source, App Store, and Google Play marketing versions agree
 
 ## Artwork
 
@@ -75,11 +80,15 @@ Google Play Console grants app-scoped testing access for `pro.packone.app` to `p
 - Marketing: `https://packone.pro/`
 - Support/contact: `https://packone.pro/contact/`
 - Privacy: `https://packone.pro/privacy/`
+- Account deletion: `https://packone.pro/privacy/#delete-account`
 - Terms: `https://packone.pro/terms/`
+
+## Free-launch work tracked separately
+
+Sign in with Apple is a free-launch blocker tracked in issue #524; it is no longer treated as post-launch/deferred work.
 
 ## Intentionally deferred
 
-- Sign in with Apple provider/capability work
 - store billing/purchase/restore architecture
 - verified Universal Links / Android App Links
 - remote crash telemetry
@@ -175,6 +184,12 @@ Publishing jobs treat the stores as the monotonic source of truth. Before Expo P
 This keeps releases monotonic if a workflow file is renamed/replaced (which resets that workflow's run counter) and also makes a rerun advance past any number the earlier attempt already uploaded. The run-number formula is only a floor, not the publishing source of truth.
 
 The values are injected through `PACKONE_IOS_BUILD_NUMBER` and `PACKONE_ANDROID_VERSION_CODE`. Config validation asserts that the requested values reach the generated Expo config. The iOS export disables Xcode's automatic build-number rewriting so the CI-assigned number is preserved.
+
+## Store publishing boundary
+
+The TestFlight and Google Play Internal publishing workflows are manual-only and their publishing jobs fail closed unless the dispatch is from `main` and the checked-out commit still equals current `origin/main`. Store status/probe workflows use the same current-main check. These jobs reference the `pack-one-mobile-release` GitHub Environment so repository owners can apply required-review / protected-branch rules at one release boundary.
+
+Before the first public release candidate, the owner still needs to configure that GitHub Environment as protected, move Apple release credentials to environment-scoped secrets (or an equivalent protected secret boundary), and narrow Google Workload Identity Federation from repo-wide trust to the same protected release context. The workflow checks in this repository do not by themselves change Google Cloud IAM policy.
 
 ## Review deadlines for deferred items
 

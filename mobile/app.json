@@ -2,7 +2,7 @@
   "expo": {
     "name": "Pack One",
     "slug": "pack-one",
-    "version": "0.1.0",
+    "version": "1.0",
     "orientation": "default",
     "scheme": "packone",
     "userInterfaceStyle": "light",

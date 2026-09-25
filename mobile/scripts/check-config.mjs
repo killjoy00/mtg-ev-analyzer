@@ -1,5 +1,9 @@
 import { spawnSync } from 'node:child_process';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+
+const storeRelease = JSON.parse(readFileSync(new URL('../store-release.json', import.meta.url), 'utf8'));
+assert.equal(storeRelease.appStoreVersion, storeRelease.playVersionName);
 
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
@@ -28,6 +32,7 @@ assert.equal(preview.android.package, 'pro.packone.preview');
 
 const production = loadConfig('production');
 assert.equal(production.name, 'Pack One');
+assert.equal(production.version, storeRelease.appStoreVersion);
 assert.equal(production.ios.bundleIdentifier, 'pro.packone.app');
 assert.equal(production.android.package, 'pro.packone.app');
 assert.equal(production.icon, './assets/images/icon.png');
