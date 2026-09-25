@@ -44,8 +44,13 @@ export function normalizeMobileVersionPolicy(value) {
     const entry=parsed[platform];
     if(!entry||typeof entry!=='object')throw error('Mobile version policy is malformed.',503,'mobile_version_policy_invalid');
     const marketingVersion=String(entry.marketingVersion||'').trim();
-    parseMarketingVersion(marketingVersion);
-    const build=parseBuild(entry.build);
+    let build;
+    try {
+      parseMarketingVersion(marketingVersion);
+      build=parseBuild(entry.build);
+    } catch {
+      throw error('Mobile version policy is malformed.',503,'mobile_version_policy_invalid');
+    }
     policy[platform]={marketingVersion,build};
   }
   return policy;
