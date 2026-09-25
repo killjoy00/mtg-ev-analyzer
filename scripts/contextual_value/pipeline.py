@@ -13,6 +13,11 @@ from typing import Mapping, Sequence
 
 from . import MIN_ESS_RATIO, WEIGHT_CAPS
 from .dataset import Decision, choose_primary_decision, draft_split
+from .diagnostics import (
+    outcome_diagnostics,
+    paired_dr_delta_ci,
+    policy_overlap_diagnostics,
+)
 from .dr import PolicyObservation, evaluate_policy
 from .features import CardSignals, decision_feature_map
 from .nuisance import (
@@ -301,6 +306,11 @@ def run_development(
     selected_contextual = dict(contextual_by_temperature)[selected_temperature]
     selected_blend, blend_search = _best_validation_policy(blend_grid)
     selected_blend_observations = dict(blend_grid)[selected_blend]
+    validation_contextual_ci = paired_dr_delta_ci(
+        selected_contextual,
+        incumbent_observations,
+        weight_cap=WEIGHT_CAPS[1],
+    )
 
     contextual_top_agreement = 0
     for row in trophy_rows:
@@ -323,6 +333,22 @@ def run_development(
             "validation": len({row.draft_id for row in validation}),
             "assessment_withheld": len({row.draft_id for row in assessment}),
             "validation_primary_ope": len(primary),
+        },
+        "diagnostics": {
+            "outcome_q": {
+                "train_oof": outcome_diagnostics(train, train_predictions),
+                "validation": outcome_diagnostics(validation, validation_predictions),
+            },
+            "overlap": {
+                "A_current_v4_strong_player": policy_overlap_diagnostics(
+                    incumbent_observations
+                ),
+                "G_contextual_value": policy_overlap_diagnostics(
+                    selected_contextual
+                ),
+            },
+            "validation_selected_contextual_vs_v4_dr_ci95": validation_contextual_ci,
+            "validation_ci_is_selection_biased": True,
         },
         "models": {
             "A_current_v4_strong_player": _estimate_by_cap(incumbent_observations),
