@@ -11,6 +11,7 @@ on:
         default: development
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: corpus-operations
   cancel-in-progress: false
@@ -32,7 +33,7 @@ jobs:
       - name: Prepare explicit connection and require additive schema
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          TARGET: ${{ inputs.target || 'production' }}
+          TARGET: ${{ inputs.target || 'development' }}
         run: |
           set -euo pipefail
           umask 077
@@ -45,7 +46,21 @@ jobs:
           echo "::add-mask::$connection"
           printf '%s' "$connection" > "$RUNNER_TEMP/corpus.connection"
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+      - name: Require reviewed development artifact for production
+        if: ${{ (inputs.target || 'development') == 'production' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATED_RUN_ID: ${{ inputs.validated_run_id || '' }}
+        run: |
+          set -euo pipefail
+          test -n "$VALIDATED_RUN_ID" || { echo 'production requires validated_run_id from a successful development Corpus Operations run' >&2; exit 1; }
+          gh run view "$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch --jq 'select(.conclusion=="success" and .workflowName=="Corpus Operations" and .headBranch=="main")' | grep -q .
+          rm -rf generated/corpus-candidates
+          mkdir -p generated/corpus-candidates
+          gh run download "$VALIDATED_RUN_ID" --name "corpus-operations-$VALIDATED_RUN_ID" --dir "$RUNNER_TEMP/validated"
+          cp -R "$RUNNER_TEMP/validated/generated/corpus-candidates/." generated/corpus-candidates/
       - uses: actions/cache/restore@v4
+        if: ${{ (inputs.target || 'development') != 'production' }}
         with:
           path: generated/corpus-candidates
           key: corpus-candidates-${{ github.sha }}-${{ github.run_id }}
@@ -53,10 +68,12 @@ jobs:
             corpus-candidates-${{ github.sha }}-
             corpus-candidates-
       - name: Discover archives and metadata
+        if: ${{ (inputs.target || 'development') != 'production' }}
         run: |
           python scripts/discover-corpus.py
           node scripts/register-corpus-sources.mjs "$RUNNER_TEMP/corpus.connection"
       - name: Build, validate and ingest new Candidates
+        if: ${{ (inputs.target || 'development') != 'production' }}
         run: |
           set -euo pipefail
           sets=$(cat generated/corpus-operations/pending.txt)
@@ -64,8 +81,12 @@ jobs:
           python -u scripts/run_import_all_trophies.py --sets "$sets" --output generated/corpus-candidates --workers 2 --max-seconds 6000 --discard-source-archives
           node scripts/load_all_trophies.mjs unused generated/corpus-candidates --validate-only
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
-      - name: Verify retained corpus health
-        run: node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus.connection"
+      - name: Load exact development-validated artifact to production Candidate
+        if: ${{ (inputs.target || 'development') == 'production' }}
+        run: |
+          set -euo pipefail
+          node scripts/load_all_trophies.mjs unused generated/corpus-candidates --validate-only
+          node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
       - name: Record import failures
         if: always()
         env:
@@ -77,7 +98,7 @@ jobs:
           path: generated/corpus-candidates
           key: corpus-candidates-${{ github.sha }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: always() && ${{ (inputs.target || 'development') != 'production' }}
         with:
           name: corpus-operations-${{ github.run_id }}
           retention-days: 90
