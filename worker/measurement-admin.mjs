@@ -103,38 +103,38 @@ const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
   FROM first_daily f JOIN attribution a USING(person_id)
   WHERE f.first_day BETWEEN $1::date AND $2::date
 ), today AS (
-  SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date day
+  SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date AS current_day
 ), cohort_summary AS (
   SELECT source,campaign,count(*)::int cohort_people,
-    count(*) FILTER(WHERE first_day+1<today.day)::int next_day_mature,
-    count(*) FILTER(WHERE first_day+1<today.day AND next_day_return)::int next_day_returned,
-    count(*) FILTER(WHERE first_day+1>=today.day)::int next_day_immature,
-    round(100.0*count(*) FILTER(WHERE first_day+1<today.day AND next_day_return)/nullif(count(*) FILTER(WHERE first_day+1<today.day),0),1) next_day_rate,
-    count(*) FILTER(WHERE first_day+7<today.day)::int seven_day_mature,
-    count(*) FILTER(WHERE first_day+7<today.day AND seven_day_return)::int seven_day_returned,
-    count(*) FILTER(WHERE first_day+7>=today.day)::int seven_day_immature,
-    round(100.0*count(*) FILTER(WHERE first_day+7<today.day AND seven_day_return)/nullif(count(*) FILTER(WHERE first_day+7<today.day),0),1) seven_day_rate,
-    count(*) FILTER(WHERE first_day+6<today.day)::int three_in_seven_mature,
-    count(*) FILTER(WHERE first_day+6<today.day AND three_in_seven)::int three_in_seven_reached,
-    count(*) FILTER(WHERE first_day+6>=today.day)::int three_in_seven_immature,
-    round(100.0*count(*) FILTER(WHERE first_day+6<today.day AND three_in_seven)/nullif(count(*) FILTER(WHERE first_day+6<today.day),0),1) three_in_seven_rate,
+    count(*) FILTER(WHERE first_day+1<today.current_day)::int next_day_mature,
+    count(*) FILTER(WHERE first_day+1<today.current_day AND next_day_return)::int next_day_returned,
+    count(*) FILTER(WHERE first_day+1>=today.current_day)::int next_day_immature,
+    round(100.0*count(*) FILTER(WHERE first_day+1<today.current_day AND next_day_return)/nullif(count(*) FILTER(WHERE first_day+1<today.current_day),0),1) next_day_rate,
+    count(*) FILTER(WHERE first_day+7<today.current_day)::int seven_day_mature,
+    count(*) FILTER(WHERE first_day+7<today.current_day AND seven_day_return)::int seven_day_returned,
+    count(*) FILTER(WHERE first_day+7>=today.current_day)::int seven_day_immature,
+    round(100.0*count(*) FILTER(WHERE first_day+7<today.current_day AND seven_day_return)/nullif(count(*) FILTER(WHERE first_day+7<today.current_day),0),1) seven_day_rate,
+    count(*) FILTER(WHERE first_day+6<today.current_day)::int three_in_seven_mature,
+    count(*) FILTER(WHERE first_day+6<today.current_day AND three_in_seven)::int three_in_seven_reached,
+    count(*) FILTER(WHERE first_day+6>=today.current_day)::int three_in_seven_immature,
+    round(100.0*count(*) FILTER(WHERE first_day+6<today.current_day AND three_in_seven)/nullif(count(*) FILTER(WHERE first_day+6<today.current_day),0),1) three_in_seven_rate,
     count(*) FILTER(WHERE ever_three_in_seven)::int ever_three_in_seven_people,
     round(100.0*count(*) FILTER(WHERE ever_three_in_seven)/nullif(count(*),0),1) ever_three_in_seven_rate
   FROM cohorts CROSS JOIN today
   GROUP BY source,campaign ORDER BY source,campaign
 ), report_days AS (
-  SELECT generate_series($1::date,$2::date,interval '1 day')::date day
+  SELECT generate_series($1::date,$2::date,interval '1 day')::date AS date_key
 ), daily_health AS (
-  SELECT report_days.day::text day,
+  SELECT report_days.date_key::text AS "day",
     count(health.person_id) FILTER(WHERE health.completed_days>=3)::int people
   FROM report_days
   LEFT JOIN LATERAL (
     SELECT d.person_id,count(*)::int completed_days
     FROM completed_days d
-    WHERE d.day BETWEEN report_days.day-6 AND report_days.day
+    WHERE d.day BETWEEN report_days.date_key-6 AND report_days.date_key
     GROUP BY d.person_id
   ) health ON true
-  GROUP BY report_days.day ORDER BY report_days.day
+  GROUP BY report_days.date_key ORDER BY report_days.date_key
 )
 SELECT
   coalesce((SELECT jsonb_agg(to_jsonb(c) ORDER BY c.source,c.campaign) FROM cohort_summary c),'[]'::jsonb) cohorts,
