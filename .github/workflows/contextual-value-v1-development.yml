@@ -1,0 +1,95 @@
+name: contextual-value-v1-development
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/contextual-value-v1-development.yml'
+      - 'scripts/contextual_value/**'
+      - 'scripts/contextual_value_phase1.py'
+      - 'research/CONTEXTUAL-VALUE-V1-RUN.md'
+  workflow_dispatch:
+    inputs:
+      max_drafts:
+        description: 'Deterministic per-environment draft cap'
+        required: true
+        default: '3000'
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: validate-${{ matrix.expansion }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - expansion: TMT
+            set_id: tmt
+          - expansion: HOB
+            set_id: hob
+          - expansion: MSH
+            set_id: msh
+    env:
+      MAX_DRAFTS: ${{ inputs.max_drafts || '3000' }}
+      BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate research inputs
+        run: |
+          [[ "$MAX_DRAFTS" =~ ^[0-9]+$ ]] || { echo 'Invalid MAX_DRAFTS'; exit 1; }
+          test "$MAX_DRAFTS" -ge 500 || { echo 'MAX_DRAFTS must be at least 500'; exit 1; }
+      - name: Download immutable 17Lands Premier archives
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          mkdir -p raw-data
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output "raw-data/draft.csv.gz" \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output "raw-data/game.csv.gz" \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+      - name: Run contextual-value-v1 development validation
+        env:
+          SET_ID: ${{ matrix.set_id }}
+        run: |
+          mkdir -p "results/contextual-value-v1/$SET_ID"
+          python3 scripts/contextual_value_phase1.py \
+            --draft-archive raw-data/draft.csv.gz \
+            --game-archive raw-data/game.csv.gz \
+            --max-drafts "$MAX_DRAFTS" \
+            --out "results/contextual-value-v1/$SET_ID"
+      - name: Assert assessment stayed sealed
+        env:
+          SET_ID: ${{ matrix.set_id }}
+        run: |
+          python3 - "$SET_ID" <<'PY'
+          import json, sys
+          from pathlib import Path
+          sid = sys.argv[1]
+          report = json.loads((Path("results/contextual-value-v1") / sid / "development-report.json").read_text())
+          if report.get("assessment_opened") is not False:
+              raise SystemExit("assessment partition was opened")
+          if report.get("scope") != "development_only":
+              raise SystemExit("unexpected report scope")
+          print(json.dumps({
+              "set": sid,
+              "drafts": report["drafts"],
+              "G": report["models"]["G_contextual_value"]["selected_validation_temperature"],
+              "E": report["models"]["E_simple_behavior_outcome_blend"]["selected_validation_config"],
+          }, indent=2))
+          PY
+      - name: Upload development artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-${{ matrix.set_id }}-${{ env.MAX_DRAFTS }}
+          path: results/contextual-value-v1/${{ matrix.set_id }}/
+          retention-days: 30
