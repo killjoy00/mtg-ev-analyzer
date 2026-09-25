@@ -36,6 +36,109 @@ const METRICS=`count(*)::int exposures,count(DISTINCT player_id)::int players,
   count(active_ms) FILTER(WHERE outcome='pick')::int timed_answers,
   round((percentile_cont(.5) WITHIN GROUP(ORDER BY active_ms) FILTER(WHERE outcome='pick'))::numeric/1000,1) median_seconds,
   round((percentile_cont(.9) WITHIN GROUP(ORDER BY active_ms) FILTER(WHERE outcome='pick'))::numeric/1000,1) p90_seconds`;
+const HABIT_METRICS_SQL=`WITH eligible_daily_sessions AS (
+  SELECT s.id,s.player_id,coalesce(a.auth_user_id::text,'guest:'||s.player_id::text) person_id,s.day,s.created_at
+  FROM draft_run_sessions s
+  JOIN players p ON p.id=s.player_id
+  LEFT JOIN account_links a ON a.player_id=s.player_id
+  WHERE s.day IS NOT NULL
+    AND jsonb_array_length(s.answers)=jsonb_array_length(s.puzzle_ids)
+    AND NOT s.measurement_qa
+    AND NOT coalesce(p.display_name ~* '^(QA([ _-]|$)|Import check$|Production smoke|Release check)',false)
+    AND NOT EXISTS (
+      SELECT 1 FROM account_links admin_link JOIN pack1_admins admin ON admin.auth_user_id=admin_link.auth_user_id
+      WHERE admin_link.player_id=s.player_id
+    )
+), completed_days AS (
+  SELECT person_id,(min(player_id::text))::uuid player_id,day,min(created_at) completed_at
+  FROM eligible_daily_sessions GROUP BY person_id,day
+), first_daily AS (
+  SELECT person_id,(min(player_id::text))::uuid player_id,min(day) first_day
+  FROM completed_days GROUP BY person_id
+), first_touch AS (
+  SELECT DISTINCT ON (e.player_id) e.player_id,e.created_at,
+    coalesce(nullif(e.event_props->>'source',''),'direct') source,
+    nullif(e.event_props->>'campaign','') campaign
+  FROM analytics_events e
+  WHERE e.event_name='acquisition_touch' AND e.player_id IS NOT NULL
+  ORDER BY e.player_id,e.created_at,e.id
+), tracking_start AS (
+  SELECT min(created_at) started_at FROM analytics_events WHERE event_name='acquisition_touch'
+), first_activity AS (
+  SELECT f.player_id,least(
+    coalesce((SELECT min(s.created_at) FROM draft_run_sessions s WHERE s.player_id=f.player_id),'infinity'::timestamptz),
+    coalesce((SELECT min(e.created_at) FROM analytics_events e WHERE e.player_id=f.player_id AND e.event_name<>'acquisition_touch'),'infinity'::timestamptz),
+    coalesce((SELECT min(g.played_at) FROM game_results g WHERE g.player_id=f.player_id),'infinity'::timestamptz),
+    coalesce((SELECT min(sc.created_at) FROM scores sc WHERE sc.player_id=f.player_id),'infinity'::timestamptz)
+  ) first_activity
+  FROM first_daily f
+), attribution AS (
+  SELECT f.person_id,f.player_id,
+    CASE
+      WHEN tracking.started_at IS NOT NULL AND activity.first_activity<tracking.started_at THEN 'pre_tracking'
+      WHEN touch.player_id IS NOT NULL THEN touch.source
+      ELSE 'direct'
+    END source,
+    CASE
+      WHEN tracking.started_at IS NOT NULL AND activity.first_activity<tracking.started_at THEN '(none)'
+      ELSE coalesce(touch.campaign,'(none)')
+    END campaign
+  FROM first_daily f
+  LEFT JOIN first_touch touch ON touch.player_id=f.player_id
+  LEFT JOIN first_activity activity ON activity.player_id=f.player_id
+  CROSS JOIN tracking_start tracking
+), ever_three_in_seven AS (
+  SELECT DISTINCT person_id FROM (
+    SELECT anchor.person_id,anchor.day
+    FROM completed_days anchor
+    JOIN completed_days recent ON recent.person_id=anchor.person_id AND recent.day BETWEEN anchor.day-6 AND anchor.day
+    GROUP BY anchor.person_id,anchor.day HAVING count(*)>=3
+  ) reached
+), cohorts AS (
+  SELECT f.person_id,f.first_day,a.source,a.campaign,
+    EXISTS(SELECT 1 FROM completed_days d WHERE d.person_id=f.person_id AND d.day=f.first_day+1) next_day_return,
+    EXISTS(SELECT 1 FROM completed_days d WHERE d.person_id=f.person_id AND d.day BETWEEN f.first_day+1 AND f.first_day+7) seven_day_return,
+    (SELECT count(*) FROM completed_days d WHERE d.person_id=f.person_id AND d.day BETWEEN f.first_day AND f.first_day+6)>=3 three_in_seven,
+    EXISTS(SELECT 1 FROM ever_three_in_seven e WHERE e.person_id=f.person_id) ever_three_in_seven
+  FROM first_daily f JOIN attribution a USING(person_id)
+  WHERE f.first_day BETWEEN $1::date AND $2::date
+), today AS (
+  SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date AS current_day
+), cohort_summary AS (
+  SELECT source,campaign,count(*)::int cohort_people,
+    count(*) FILTER(WHERE first_day+1<today.current_day)::int next_day_mature,
+    count(*) FILTER(WHERE first_day+1<today.current_day AND next_day_return)::int next_day_returned,
+    count(*) FILTER(WHERE first_day+1>=today.current_day)::int next_day_immature,
+    round(100.0*count(*) FILTER(WHERE first_day+1<today.current_day AND next_day_return)/nullif(count(*) FILTER(WHERE first_day+1<today.current_day),0),1) next_day_rate,
+    count(*) FILTER(WHERE first_day+7<today.current_day)::int seven_day_mature,
+    count(*) FILTER(WHERE first_day+7<today.current_day AND seven_day_return)::int seven_day_returned,
+    count(*) FILTER(WHERE first_day+7>=today.current_day)::int seven_day_immature,
+    round(100.0*count(*) FILTER(WHERE first_day+7<today.current_day AND seven_day_return)/nullif(count(*) FILTER(WHERE first_day+7<today.current_day),0),1) seven_day_rate,
+    count(*) FILTER(WHERE first_day+6<today.current_day)::int three_in_seven_mature,
+    count(*) FILTER(WHERE first_day+6<today.current_day AND three_in_seven)::int three_in_seven_reached,
+    count(*) FILTER(WHERE first_day+6>=today.current_day)::int three_in_seven_immature,
+    round(100.0*count(*) FILTER(WHERE first_day+6<today.current_day AND three_in_seven)/nullif(count(*) FILTER(WHERE first_day+6<today.current_day),0),1) three_in_seven_rate,
+    count(*) FILTER(WHERE ever_three_in_seven)::int ever_three_in_seven_people,
+    round(100.0*count(*) FILTER(WHERE ever_three_in_seven)/nullif(count(*),0),1) ever_three_in_seven_rate
+  FROM cohorts CROSS JOIN today
+  GROUP BY source,campaign ORDER BY source,campaign
+), report_days AS (
+  SELECT generate_series($1::date,$2::date,interval '1 day')::date AS date_key
+), daily_health AS (
+  SELECT report_days.date_key::text AS "day",
+    count(health.person_id) FILTER(WHERE health.completed_days>=3)::int people
+  FROM report_days
+  LEFT JOIN LATERAL (
+    SELECT d.person_id,count(*)::int completed_days
+    FROM completed_days d
+    WHERE d.day BETWEEN report_days.date_key-6 AND report_days.date_key
+    GROUP BY d.person_id
+  ) health ON true
+  GROUP BY report_days.date_key ORDER BY report_days.date_key
+)
+SELECT
+  coalesce((SELECT jsonb_agg(to_jsonb(c) ORDER BY c.source,c.campaign) FROM cohort_summary c),'[]'::jsonb) cohorts,
+  coalesce((SELECT jsonb_agg(to_jsonb(h) ORDER BY h.day) FROM daily_health h),'[]'::jsonb) daily_health`;
 async function account(request,query) {
   let auth;
   try {auth=await accountSession(request,query,{allowLegacy:true});}
@@ -71,7 +174,7 @@ export async function handleAdmin(request,query,readJson) {
   const filters=reportFilters(url);
   if(url.pathname==='/v1/admin/measurements') {
     const scope=`WITH scoped AS (SELECT * ${SCOPE}), primary_data AS (SELECT * FROM scoped WHERE observed AND NOT is_qa AND first_encounter)`;
-    const [coverage,summary,groups,reviews,options,shareFunnel]=await Promise.all([
+    const [coverage,summary,groups,reviews,options,shareFunnel,habitMetrics]=await Promise.all([
       query(`${scope} SELECT count(*)::int recorded,count(*) FILTER(WHERE is_qa)::int qa_excluded,
         count(*) FILTER(WHERE NOT observed AND NOT is_qa)::int unobserved_excluded,
         count(*) FILTER(WHERE observed AND NOT is_qa AND NOT first_encounter)::int repeats_excluded,
@@ -113,10 +216,12 @@ export async function handleAdmin(request,query,readJson) {
           (SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))::int completions,
           round(100.0*(SELECT count(*) FROM starts)/nullif((SELECT count(*) FROM arrivals),0),1) start_pct,
           round(100.0*(SELECT count(*) FROM starts s WHERE EXISTS(SELECT 1 FROM completed c WHERE c.run_id=s.run_id))/nullif((SELECT count(*) FROM starts),0),1) completion_pct`,
-        [filters.start,filters.end,filters.environment])
+        [filters.start,filters.end,filters.environment]),
+      query(HABIT_METRICS_SQL,[filters.start,filters.end])
     ]);
-    return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],share_funnel:shareFunnel.rows[0],groups:groups.rows,reviews:reviews.rows,sets:options.rows.map(r=>r.set_id),
-      definitions:{primary:'First recorded encounter per player and puzzle; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.'}};
+    const habit=habitMetrics.rows[0]||{},jsonArray=value=>Array.isArray(value)?value:(typeof value==='string'?JSON.parse(value):[]);
+    return {generated_at:new Date().toISOString(),filters:{...filters,params:undefined},coverage:coverage.rows[0],summary:summary.rows[0],share_funnel:shareFunnel.rows[0],habit_metrics:{cohorts:jsonArray(habit.cohorts),daily_health:jsonArray(habit.daily_health)},groups:groups.rows,reviews:reviews.rows,sets:options.rows.map(r=>r.set_id),
+      definitions:{primary:'First recorded encounter per player and puzzle; observed in the browser; QA excluded.',abandonment:'Unfinished run with an open viewed decision and no activity for 24 hours. A return removes this classification.',timing:'Client-reported foreground time; missing for reloads, multiple tabs, old clients, or invalid timing. This is not a trusted gameplay score.',sample:'Fewer than 30 answers is an early signal, not a calibrated difficulty estimate.',review:'Decisions with at least five first-encounter answers; model disagreement first, then sample size.',habit_person:'Habit metrics count linked accounts as one person after identity merges; guests remain one browser/player identity.',habit_completion:'A Daily day is one or more completed Mixed, Powered Cube, or Latest Set sessions on the stored Pacific Daily date. Multiple Dailies on one date count once.',habit_exclusions:'All habit metrics exclude measurement-QA sessions, QA-pattern display names, and players linked to Pack One admin accounts.',habit_maturity:'Next-day, 7-day, and 3-in-7 rates include only cohorts whose full measurement window has closed; immature cohort counts are shown separately.',habit_attribution:'First touch is the earliest acquisition event for the merged player. Earlier product activity is pre_tracking; missing post-launch attribution is direct. Campaign is (none) when absent.',habit_ever:'Ever 3-in-7 is a lifetime observed status as of report generation, not a fixed-horizon cohort rate. Daily health counts people with 3+ distinct Daily days in each trailing seven-day window.'}};
   }
   const match=url.pathname.match(/^\/v1\/admin\/decisions\/([a-f0-9]{32})$/);
   if(match) {
