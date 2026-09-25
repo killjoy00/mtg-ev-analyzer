@@ -1,0 +1,98 @@
+name: isolated launch NAT acceptance
+on:
+  pull_request:
+    paths: ['scripts/launch-load*', '.github/workflows/launch-load.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: pack1-gateway-preview
+  cancel-in-progress: false
+jobs:
+  nat:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify scoped Cloudflare access
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/edge-control.mjs preflight
+      - name: Set emergency expiry
+        id: expiry
+        run: echo "expires_at=$(date -u --date '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Create disposable production-sized branch
+        id: neon
+        uses: neondatabase/create-branch-action@v6
+        with:
+          project_id: patient-shadow-91417882
+          parent_branch: br-orange-feather-ayps8kep
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch_name: launch-load-${{ github.run_id }}-${{ github.run_attempt }}
+          database: pack1
+          role: pack1_owner
+          suspend_timeout: 300
+          expires_at: ${{ steps.expiry.outputs.expires_at }}
+      - name: Install pinned deployment tools
+        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@4.17.4 esbuild@0.28.2 wrangler@4.132.0
+      - name: Prepare isolated schema and exact revision
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+          ESBUILD_BIN: ${{ runner.temp }}/edge-tools/node_modules/.bin/esbuild
+        run: |
+          node --input-type=module -e "import {checkBranch} from './scripts/edge-control.mjs';checkBranch(process.env.PREVIEW_BRANCH);if(process.env.PREVIEW_CREATED!=='true')throw Error('Fresh isolated branch required');"
+          if ! command -v psql >/dev/null 2>&1; then
+            sudo apt-get update
+            sudo apt-get install -y postgresql-client
+          fi
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0037_mobile_oauth_handoffs.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0038_mobile_practice_idempotency.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
+          node scripts/verify-neon-schema.mjs
+          node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
+      - name: Prepare accounts, entitlements, score history and query plans
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+        run: node scripts/launch-load-fixtures.mjs
+      - name: Deploy isolated Functions and private gateway
+        id: deploy
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+        run: node scripts/edge-control.mjs deploy
+      - name: Run declared shared-network stages until the first failed gate
+        env:
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+        run: node scripts/launch-load.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: launch-load-${{ github.run_id }}
+          path: artifacts/launch-load
+          retention-days: 30
+      - name: Remove this private preview route
+        if: always() && steps.deploy.outcome == 'success'
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/edge-control.mjs disable
+      - name: Delete the disposable branch
+        if: always() && steps.neon.outputs.created == 'true'
+        uses: neondatabase/delete-branch-action@v3
+        with:
+          project_id: patient-shadow-91417882
+          api_key: ${{ secrets.NEON_API_KEY }}
+          branch: ${{ steps.neon.outputs.branch_id }}
