@@ -32,7 +32,7 @@ The builder contains:
 - **Source** — where the visitor came from;
 - **Campaign** — the initiative or push being measured;
 - **Medium** — optional broad channel type;
-- **Destination** — currently the Pack One homepage only.
+- **Destination** — the Pack One homepage or one of the three Dailies.
 
 As you type, the builder shows canonical normalized values, validation messages, the tracked UTM URL, the intended vanity URL, and the JSON entry that belongs in `campaign-links.json`.
 
@@ -89,11 +89,16 @@ Do not put names, email addresses, account IDs, usernames, or other personal inf
 
 ### Destination
 
-The only supported destination today is:
+Supported destinations are:
 
-`/`
+| Destination | Use |
+| --- | --- |
+| `/` | Homepage — the default for broad or cold-audience messaging. |
+| `/?game=draft-run&daily=1` | Daily Draft Run — for high-intent “play today” creative. |
+| `/?game=draft-run&set=powered-cube&daily=1` | Daily Powered Cube — for Cube-specific creative. |
+| `/?game=draft-run&set=latest&daily=1` | Daily Latest Set — for current-set creative. |
 
-That means every static campaign link currently lands on the Pack One homepage after adding the UTM parameters.
+Use the homepage when the visitor still needs the product explained. Use a direct Daily destination when the campaign itself already supplies that context and the shortest path to the first pick is more valuable. The UTM fields remain on the destination URL until Pack One captures and removes them.
 
 ## 4. Fast workflow: create a tracked link without a deploy
 
@@ -101,9 +106,10 @@ Use this when you do not need a short `/go/` URL.
 
 1. Open the Admin Link Builder.
 2. Enter source, campaign, and optional medium. Leave **Slug** blank if you only need the tracked URL.
-3. Confirm the source/campaign fields have no validation errors.
-4. Copy **Tracked UTM URL**.
-5. Share that URL directly.
+3. Choose the destination that matches the campaign creative.
+4. Confirm the source/campaign fields have no validation errors.
+5. Copy **Tracked UTM URL**.
+6. Share that URL directly.
 
 Example:
 
@@ -231,7 +237,7 @@ Remember:
 
 - first touch is sticky;
 - a later campaign does not overwrite an earlier first touch;
-- `direct`, `pre_tracking`, external-referrer hostnames, and `result_share` have specific meanings;
+- `direct`, `pre_tracking`, external-referrer hostnames, `result_share`, and `daily_board_share` have specific meanings;
 - immature cohorts are not failures;
 - `3-in-7 daily health` is a rolling count, not a conversion rate.
 
@@ -243,12 +249,13 @@ For each new push:
 
 1. Choose one stable campaign name.
 2. Create one source-specific link per channel.
-3. Use a clear slug that will still make sense later.
-4. Use the Admin builder to catch normalization and validation problems.
-5. Use the tracked URL immediately if speed matters.
-6. Publish a vanity route only through `campaign-links.json` + generator + PR + Pages deploy.
-7. Do not change attribution on an already distributed vanity URL.
-8. Read mature outcomes rather than reacting to very small or immature cohorts.
+3. Match the destination to the creative: homepage for broad explanation, a specific Daily for high-intent or format-specific posts.
+4. Use a clear slug that will still make sense later.
+5. Use the Admin builder to catch normalization and validation problems.
+6. Use the tracked URL immediately if speed matters.
+7. Publish a vanity route only through `campaign-links.json` + generator + PR + Pages deploy.
+8. Do not change attribution on an already distributed vanity URL.
+9. Read mature outcomes rather than reacting to very small or immature cohorts. When comparing campaigns, note when their landing intent differs.
 
 Example family:
 
