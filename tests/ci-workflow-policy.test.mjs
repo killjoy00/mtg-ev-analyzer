@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 
 const unit = readFileSync('.github/workflows/test.yml','utf8');
 const browser = readFileSync('.github/workflows/e2e.yml','utf8');
+const mobile = readFileSync('.github/workflows/mobile.yml','utf8');
 
 for (const [name, flow] of [['test',unit],['browser',browser]]) {
   test(name+' required workflow reruns after a stacked PR retarget',()=>{
@@ -24,4 +25,10 @@ test('required test fast path keeps the account-deletion secret guard',()=>{
 test('browser dependency installation is skipped on the mobile-only fast path',()=>{
   assert.match(browser,/name: Install browser test dependency\n\s+if: steps\.scope\.outputs\.run_full == 'true'/);
   assert.match(browser,/name: Run browser regression\n\s+if: steps\.scope\.outputs\.run_full == 'true'/);
+});
+
+test('targeted mobile validation also reruns after a stacked PR retarget',()=>{
+  assert.match(mobile,/pull_request:\n\s+types: \[opened, synchronize, reopened, edited\]/);
+  assert.match(mobile,/group: mobile-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}/);
+  assert.match(mobile,/cancel-in-progress: true/);
 });
