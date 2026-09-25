@@ -58,7 +58,7 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$VALIDATED_RUN_ID" || { echo 'production requires validated_run_id from a successful development Corpus Operations run' >&2; exit 1; }
-          gh run view "$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha --jq --arg sha "$GITHUB_SHA" 'select(.conclusion=="success" and .workflowName=="Corpus Operations" and .headBranch=="main" and .headSha==$sha)' | grep -q .
+          gh run view "$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha | jq -e --arg sha "$GITHUB_SHA" 'select(.conclusion=="success" and .workflowName=="Corpus Operations" and .headBranch=="main" and .headSha==$sha)' >/dev/null
           rm -rf generated/corpus-candidates generated/corpus-operations
           mkdir -p generated/corpus-candidates generated/corpus-operations
           gh run download "$VALIDATED_RUN_ID" --name "corpus-operations-$VALIDATED_RUN_ID" --dir "$RUNNER_TEMP/validated"
@@ -161,3 +161,28 @@ jobs:
           if [[ "$TARGET" == development ]]; then
             node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/corpus-health.connection"
           fi
+
+
+  scheduled-production-health:
+    needs: corpus
+    if: ${{ always() && github.event_name == 'schedule' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      - name: Refresh production retained corpus health
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          branch=br-orange-feather-ayps8kep
+          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/production-corpus-health.connection"
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          node scripts/check-corpus-health.mjs "$RUNNER_TEMP/production-corpus-health.connection"
