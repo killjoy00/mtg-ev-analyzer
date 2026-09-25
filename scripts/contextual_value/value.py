@@ -8,7 +8,7 @@ from typing import Mapping, Sequence
 
 from .dataset import Decision, normalized_draft_weights
 from .dr import aipw_candidate_values
-from .features import decision_feature_map
+from .features import model_feature_map
 from .nuisance import NuisancePrediction, SignalProvider, nuisance_fold
 from .outcome import RidgeOutcomeModel
 
@@ -100,7 +100,7 @@ def fit_contextual_value_model(
         if decision.draft_id in complement:
             raise AssertionError("value-model feature complement contains the scored draft")
         signals = signal_provider(decision, complement) if signal_provider is not None else {}
-        features = decision_feature_map(decision, signals)
+        features = model_feature_map(decision, signals)
         pseudo = aipw_candidate_values(
             decision.candidates,
             decision.selected_card,

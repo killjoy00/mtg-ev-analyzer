@@ -21,7 +21,7 @@ from typing import Callable, Mapping, Sequence
 from build_replays import stable_score
 
 from .dataset import Decision, normalized_draft_weights
-from .features import CardSignals, decision_feature_map, strong_choice_offsets
+from .features import CardSignals, model_feature_map, strong_choice_offsets
 from .outcome import RidgeOutcomeModel
 from .propensity import LinearSoftmaxPropensityModel, PropensityExample
 
@@ -70,7 +70,7 @@ def _feature_bundle(
     if decision.draft_id in training_ids and signal_provider is not None:
         raise AssertionError("same draft reached its own aggregate feature complement")
     signals = signal_provider(decision, training_ids) if signal_provider is not None else {}
-    features = decision_feature_map(decision, signals)
+    features = model_feature_map(decision, signals)
     offsets = strong_choice_offsets(signals, decision.candidates) if signals else None
     return features, offsets
 

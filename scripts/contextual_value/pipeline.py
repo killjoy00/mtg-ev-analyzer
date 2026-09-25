@@ -19,7 +19,7 @@ from .diagnostics import (
     policy_overlap_diagnostics,
 )
 from .dr import PolicyObservation, evaluate_policy
-from .features import CardSignals, decision_feature_map
+from .features import CardSignals, model_feature_map
 from .nuisance import (
     NuisancePrediction,
     SignalProvider,
@@ -235,7 +235,7 @@ def run_development(
         signals = signal_provider(decision, train_ids)
         cache[decision.decision_id] = (
             signals,
-            decision_feature_map(decision, signals),
+            model_feature_map(decision, signals),
         )
 
     incumbent_observations = []
