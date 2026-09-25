@@ -23,3 +23,13 @@ test('production promotion validates the reviewed run with standalone jq',()=>{
   assert.match(workflow,/gh run view "\$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha \| jq -e --arg sha "\$GITHUB_SHA"/);
   assert.doesNotMatch(workflow,/gh run view[^\n]*--jq --arg/);
 });
+
+
+test('scheduled reviewed corpus health refreshes production without ingesting or publishing',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-health.yml',import.meta.url),'utf8');
+  assert.match(workflow,/schedule:\s+\- cron: '53 7 \* \* \*'/);
+  assert.match(workflow,/default: development/);
+  assert.match(workflow,/TARGET: \$\{\{ inputs\.target \|\| 'production' \}\}/);
+  assert.match(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/health\.connection"/);
+  assert.doesNotMatch(workflow,/load_all_trophies|register-corpus-sources|candidate-gameplay-canary|\/status|\/snapshot/);
+});
