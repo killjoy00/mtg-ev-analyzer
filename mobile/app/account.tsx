@@ -46,12 +46,13 @@ function authResult(value: unknown): value is MobileAuthResponse {
 }
 
 export default function AccountScreen() {
-  const params = useLocalSearchParams<{ validateDailyRunId?: string; environment?: string }>();
+  const params = useLocalSearchParams<{ validateDailyRunId?: string; environment?: string; returnTo?: string }>();
   const validateDailyRunId = typeof params.validateDailyRunId === 'string'
     ? params.validateDailyRunId
     : undefined;
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const returnEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
+  const returnToPractice = params.returnTo === 'practice';
   const [session, setSession] = useState<MobileSession | null>(null);
   const [account, setAccount] = useState<AccountState | null>(null);
   const [mode, setMode] = useState<Mode>('signin');
@@ -112,6 +113,8 @@ export default function AccountScreen() {
         pathname: '/draft-run',
         params: { environment: returnEnvironment },
       }), 600);
+    } else if (returnToPractice) {
+      setTimeout(() => router.replace('/practice'), 300);
     }
   };
 

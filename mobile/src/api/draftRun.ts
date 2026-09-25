@@ -2,6 +2,7 @@ import { requestJson } from '@/src/api/client';
 import type { MobileSession } from '@/src/storage/session';
 
 export type DailyEnvironment = 'mixed' | 'powered-cube' | 'latest';
+export type PracticeEnvironment = 'mixed' | 'powered-cube';
 
 export const DAILY_ENVIRONMENTS: readonly DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
 
@@ -68,6 +69,12 @@ export type DraftRunState = {
   id: string;
   environment: string;
   run_length: number;
+  set_reroll_allowed: boolean;
+  custom_set_ids?: string[];
+  rerolls: {
+    set: number;
+    pack: number;
+  };
   day: string | null;
   revision: number;
   round: number;
@@ -83,6 +90,13 @@ export type DraftRunState = {
     percentile?: number | null;
     final?: boolean;
   } | null;
+};
+
+export type PracticeSet = {
+  set_id: string;
+  set_name: string;
+  release_date?: string | null;
+  regular_run?: boolean;
 };
 
 export type DraftRunHealth = {
@@ -107,6 +121,71 @@ export function startDailyDraftRun(
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
     body: { daily: true, environment },
+    timeoutMs: 30_000,
+  });
+}
+
+export function loadPracticeCapabilities(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in to load practice access.');
+  return requestJson<{ capabilities: string[] }>('/draft/v1/capabilities', {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
+}
+
+export function loadPracticeSets(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in to load custom practice sets.');
+  return requestJson<{ sets: PracticeSet[] }>('/draft/v1/practice-sets', {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 30_000,
+  });
+}
+
+export function startPracticeDraftRun(
+  session: MobileSession,
+  {
+    environment = 'mixed',
+    setIds = [],
+    idempotencyKey,
+  }: {
+    environment?: PracticeEnvironment;
+    setIds?: string[];
+    idempotencyKey: string;
+  },
+) {
+  if (!session.accountToken) throw new Error('Sign in to start practice.');
+  return requestJson<DraftRunState>('/draft/v1/runs', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    idempotencyKey,
+    body: {
+      daily: false,
+      environment,
+      ...(setIds.length ? { setIds } : {}),
+    },
+    timeoutMs: 30_000,
+  });
+}
+
+export function rerollDraftRun(
+  run: DraftRunState,
+  type: 'set' | 'pack',
+  session: MobileSession,
+) {
+  if (!run.current) throw new Error('This run is already complete.');
+  return requestJson<DraftRunState>(`/draft/v1/runs/${encodeURIComponent(run.id)}/reroll`, {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: {
+      type,
+      revision: run.revision,
+      round: run.answers.length,
+      puzzleId: run.current.puzzle_id,
+    },
     timeoutMs: 30_000,
   });
 }

@@ -1,7 +1,7 @@
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -16,17 +16,22 @@ import { ensureGuestSession } from '@/src/api/guest';
 import {
   DAILY_ENVIRONMENT_META,
   isDailyEnvironment,
+  rerollDraftRun,
   startDailyDraftRun,
+  startPracticeDraftRun,
   submitDraftRunPick,
   type DailyEnvironment,
   type DraftRunCard,
   type DraftRunState,
+  type PracticeEnvironment,
 } from '@/src/api/draftRun';
+import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import type { MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
 
 type LoadState =
   | { status: 'loading' }
+  | { status: 'signin-required' }
   | { status: 'ready'; run: DraftRunState; session: MobileSession }
   | { status: 'error'; message: string };
 
@@ -88,30 +93,76 @@ function CardTile({
   );
 }
 
-async function loadGuestDaily(environment: DailyEnvironment) {
+function parsePracticeSets(value: string) {
+  const sets = value
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => /^[-a-z0-9]{2,40}$/.test(item));
+  return [...new Set(sets)].sort();
+}
+
+async function loadDraftSurface(
+  environment: DailyEnvironment,
+  practice: boolean,
+  setIds: string[],
+) {
   const session = await ensureGuestSession();
+  if (practice) {
+    if (!session.accountToken) return { status: 'signin-required' as const };
+    const practiceEnvironment: PracticeEnvironment = environment === 'powered-cube' ? 'powered-cube' : 'mixed';
+    const fingerprint = `${practiceEnvironment}:${setIds.join(',')}`;
+    const key = await practiceIdempotencyKey(fingerprint);
+    const run = await startPracticeDraftRun(session, {
+      environment: practiceEnvironment,
+      setIds,
+      idempotencyKey: key,
+    });
+    if (run.complete) await clearPracticeIdempotencyKey();
+    return { status: 'ready' as const, run, session };
+  }
   const run = await startDailyDraftRun(session, environment);
-  return { run, session };
+  return { status: 'ready' as const, run, session };
 }
 
 export default function DraftRunScreen() {
-  const params = useLocalSearchParams<{ environment?: string }>();
+  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string }>();
+  const practice = params.mode === 'practice';
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
-  const environment: DailyEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
+  const practiceEnvironment: PracticeEnvironment = requestedEnvironment === 'powered-cube' ? 'powered-cube' : 'mixed';
+  const environment: DailyEnvironment = practice
+    ? practiceEnvironment
+    : isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
+  const setIdsParam = practice && typeof params.setIds === 'string' ? params.setIds : '';
+  const setIds = useMemo(() => parsePracticeSets(setIdsParam), [setIdsParam]);
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
+  const surfaceMeta = practice
+    ? {
+        eyebrow: setIds.length
+          ? 'CUSTOM SET PRACTICE'
+          : environment === 'powered-cube' ? 'POWERED CUBE PRACTICE' : 'PRACTICE DRAFT RUN',
+        resultTitle: setIds.length
+          ? 'Custom practice complete.'
+          : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
+      }
+    : dailyMeta;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [mode, setMode] = useState<ViewMode>('pick');
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
   const scroll = useRef<ScrollView>(null);
 
   useEffect(() => {
     let active = true;
-    void loadGuestDaily(environment)
-      .then(({ run, session }) => {
+    void loadDraftSurface(environment, practice, setIds)
+      .then((loaded) => {
         if (!active) return;
-        setMode(run.complete ? 'result' : 'pick');
-        setState({ status: 'ready', run, session });
+        if (loaded.status === 'signin-required') {
+          setState({ status: 'signin-required' });
+          return;
+        }
+        setMode(loaded.run.complete ? 'result' : 'pick');
+        setState({ status: 'ready', run: loaded.run, session: loaded.session });
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -123,16 +174,21 @@ export default function DraftRunScreen() {
     return () => {
       active = false;
     };
-  }, [environment]);
+  }, [environment, practice, setIds]);
 
   const retry = async () => {
     setState({ status: 'loading' });
     setSelected(null);
+    setActionError(null);
     setMode('pick');
     try {
-      const { run, session } = await loadGuestDaily(environment);
-      setMode(run.complete ? 'result' : 'pick');
-      setState({ status: 'ready', run, session });
+      const loaded = await loadDraftSurface(environment, practice, setIds);
+      if (loaded.status === 'signin-required') {
+        setState({ status: 'signin-required' });
+        return;
+      }
+      setMode(loaded.run.complete ? 'result' : 'pick');
+      setState({ status: 'ready', run: loaded.run, session: loaded.session });
     } catch (error: unknown) {
       setState({
         status: 'error',
@@ -144,6 +200,7 @@ export default function DraftRunScreen() {
   const choose = (id: string) => {
     if (busy || mode !== 'pick') return;
     setSelected(id);
+    setActionError(null);
     void Haptics.selectionAsync();
   };
 
@@ -156,7 +213,11 @@ export default function DraftRunScreen() {
         const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
         if (urls.length) void Image.prefetch(urls);
       }
+      if (run.complete && practice) {
+        await clearPracticeIdempotencyKey().catch(() => undefined);
+      }
       setState({ status: 'ready', run, session: state.session });
+      setActionError(null);
       setMode('feedback');
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       scroll.current?.scrollTo({ y: 0, animated: true });
@@ -165,6 +226,27 @@ export default function DraftRunScreen() {
         status: 'error',
         message: error instanceof Error ? error.message : 'Your pick could not be saved.',
       });
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const reroll = async (type: 'set' | 'pack') => {
+    if (state.status !== 'ready' || !practice || mode !== 'pick' || !state.run.current || busy) return;
+    setBusy(true);
+    setSelected(null);
+    setActionError(null);
+    try {
+      const run = await rerollDraftRun(state.run, type, state.session);
+      if (run.current) {
+        const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
+        if (urls.length) void Image.prefetch(urls);
+      }
+      setState({ status: 'ready', run, session: state.session });
+      void Haptics.selectionAsync();
+      scroll.current?.scrollTo({ y: 0, animated: true });
+    } catch (error: unknown) {
+      setActionError(error instanceof Error ? error.message : 'That reroll could not be saved.');
     } finally {
       setBusy(false);
     }
@@ -187,6 +269,25 @@ export default function DraftRunScreen() {
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
           <Text style={styles.loadingText}>Finding today&apos;s packs…</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (state.status === 'signin-required') {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.center}>
+          <Text style={styles.eyebrow}>PRACTICE</Text>
+          <Text style={styles.errorTitle}>Sign in to start practice.</Text>
+          <Text style={styles.errorBody}>A free Pack One account includes unlimited regular Draft Run practice.</Text>
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push({ pathname: '/account', params: { returnTo: 'practice' } })}
+            style={styles.primaryButton}
+          >
+            <Text style={styles.primaryButtonText}>Sign in or create an account</Text>
+          </Pressable>
         </View>
       </SafeAreaView>
     );
@@ -218,8 +319,8 @@ export default function DraftRunScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <ScrollView contentContainerStyle={styles.resultPage}>
-          <Text style={styles.eyebrow}>{dailyMeta.eyebrow} COMPLETE</Text>
-          <Text style={styles.title}>{dailyMeta.resultTitle}</Text>
+          <Text style={styles.eyebrow}>{surfaceMeta.eyebrow} COMPLETE</Text>
+          <Text style={styles.title}>{surfaceMeta.resultTitle}</Text>
           <View style={styles.scoreBlock}>
             <Text style={styles.score}>{run.score ?? 0}</Text>
             <Text style={styles.scoreMeta}>/100 · {matches} trophy picks matched</Text>
@@ -232,14 +333,16 @@ export default function DraftRunScreen() {
           ) : null}
           <View style={styles.guestNote}>
             <Text style={styles.guestNoteTitle}>
-              {state.session.accountToken ? 'Saved to your account' : 'Guest result'}
+              {practice ? 'Saved to your career' : state.session.accountToken ? 'Saved to your account' : 'Guest result'}
             </Text>
             <Text style={styles.resultBody}>
-              {state.session.accountToken
-                ? 'This result used your signed-in Pack One identity and the same server eligibility rules as web.'
-                : 'Sign in or create your Pack One account to validate this Daily score and keep your career across devices.'}
+              {practice
+                ? 'Practice uses your signed-in Pack One identity and does not enter the Daily leaderboard.'
+                : state.session.accountToken
+                  ? 'This result used your signed-in Pack One identity and the same server eligibility rules as web.'
+                  : 'Sign in or create your Pack One account to validate this Daily score and keep your career across devices.'}
             </Text>
-            {!state.session.accountToken ? (
+            {!practice && !state.session.accountToken ? (
               <Pressable
                 accessibilityRole="button"
                 onPress={() => router.push({
@@ -264,7 +367,9 @@ export default function DraftRunScreen() {
     <SafeAreaView style={styles.safe}>
       <View style={styles.shell}>
         <ScrollView ref={scroll} contentContainerStyle={styles.page}>
-          <Text style={styles.eyebrow}>{dailyMeta.eyebrow} · {run.day ?? 'TODAY'}</Text>
+          <Text style={styles.eyebrow}>
+            {practice ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
+          </Text>
           <Text style={styles.title}>
             {puzzle.set_id.toUpperCase()} <Text style={styles.titleMeta}>· Pack 1 · Pick {puzzle.pick_number}</Text>
           </Text>
@@ -305,6 +410,35 @@ export default function DraftRunScreen() {
                   </ScrollView>
                 </View>
               ) : null}
+
+              {practice && (run.rerolls.pack > 0 || (run.set_reroll_allowed && run.rerolls.set > 0)) ? (
+                <View style={styles.rerollPanel}>
+                  <Text style={styles.sectionTitle}>Want a different decision?</Text>
+                  <View style={styles.rerollRow}>
+                    {run.rerolls.pack > 0 ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={busy}
+                        onPress={() => void reroll('pack')}
+                        style={[styles.rerollButton, busy && styles.primaryButtonDisabled]}
+                      >
+                        <Text style={styles.rerollButtonText}>New pack · {run.rerolls.pack} left</Text>
+                      </Pressable>
+                    ) : null}
+                    {run.set_reroll_allowed && run.rerolls.set > 0 ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        disabled={busy}
+                        onPress={() => void reroll('set')}
+                        style={[styles.rerollButton, busy && styles.primaryButtonDisabled]}
+                      >
+                        <Text style={styles.rerollButtonText}>New set · {run.rerolls.set} left</Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                  {actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
+                </View>
+              ) : actionError ? <Text style={styles.actionError}>{actionError}</Text> : null}
 
               <Text style={styles.sectionTitle}>Choose a card</Text>
               <View style={styles.grid}>
@@ -385,6 +519,19 @@ const styles = StyleSheet.create({
   },
   cardFallbackText: { color: colors.ink, fontWeight: '700', textAlign: 'center' },
   cardName: { color: colors.ink, fontSize: 11, lineHeight: 14, fontWeight: '700', padding: 5 },
+  rerollPanel: { gap: spacing.sm, paddingVertical: spacing.xs },
+  rerollRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  rerollButton: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  rerollButtonText: { color: colors.accentDark, fontSize: 13, fontWeight: '800' },
+  actionError: { color: colors.danger, fontSize: 13, lineHeight: 18 },
   actionDock: {
     borderTopWidth: 1,
     borderColor: colors.line,
