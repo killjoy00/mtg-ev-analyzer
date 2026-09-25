@@ -37,5 +37,15 @@ try {
    const out=execFileSync('psql',['-X','-q','-A','-t','-d',connection,'-v','ON_ERROR_STOP=1'],{input:sql,encoding:'utf8',stdio:['pipe','pipe','pipe'],timeout:120000});
    const plan=JSON.parse(out)[0];report.bulk_samples.push({repeat,cache_triggers:enabled,execution_ms:plan['Execution Time'],triggers:plan.Triggers||[]});
  }
+ // Measure the known singleton contention explicitly: a writer holding its
+ // transaction open also holds the revision row until commit.
+ const holder=query(`DO $$ BEGIN UPDATE draft_run_puzzle_ratings SET rating=rating WHERE false;
+   PERFORM pg_advisory_xact_lock(516,3);PERFORM pg_sleep(2);END $$`);
+ let writerHeld=false;
+ for(let i=0;i<50&&!writerHeld;i++)writerHeld=(await query("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=516 AND objid=3 AND granted) held")).rows[0].held==='t';
+ assert.ok(writerHeld);const waiting=performance.now();
+ await query('UPDATE draft_run_environment_policy SET status=status WHERE false');
+ report.writer_wait_ms=Math.round(performance.now()-waiting);await holder;
+ assert.ok(report.writer_wait_ms>=1000,'second writer waits for the held revision transaction');
  report.passed=report.race_passed;console.log(JSON.stringify(report));
 } finally {fs.writeFileSync(dir+'/publication.json',JSON.stringify(report,null,2));}
