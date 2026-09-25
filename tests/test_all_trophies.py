@@ -67,7 +67,19 @@ class FullTrophyTests(unittest.TestCase):
     def test_source_snapshot_identity_changes_with_either_source(self):
         draft={'sha256':'a'*64};game={'sha256':'b'*64}
         first=source_snapshot_identity('fra','premier-modern-skill-buckets-v1',draft,game)
-        self.assertRegex(first,r'^[a-f0-9]{64}        drafts={'ok':{'wins':7,'games':100,'rank':'diamond'},'no':{'wins':7,'games':100,'rank':'platinum'},'missing':{'wins':7,'games':None,'rank':'mythic'}}
+        self.assertRegex(first,r'^[a-f0-9]{64}$')
+        self.assertNotEqual(first,source_snapshot_identity('fra','premier-modern-skill-buckets-v1',{'sha256':'c'*64},game))
+        self.assertNotEqual(first,source_snapshot_identity('fra','premier-modern-skill-buckets-v1',draft,{'sha256':'d'*64}))
+
+    def test_new_snapshot_does_not_require_reproducing_historical_puzzle_ids(self):
+        import inspect
+        from import_all_trophies import build_set
+        source=inspect.getsource(build_set)
+        self.assertNotIn('failed to reverify',source)
+        self.assertIn("f'{VERSION}|{snapshot_id}|{sid}|{did}|{n}'",source)
+
+    def test_legacy_requires_actual_rank_and_experience(self):
+        drafts={'ok':{'wins':7,'games':100,'rank':'diamond'},'no':{'wins':7,'games':100,'rank':'platinum'},'missing':{'wins':7,'games':None,'rank':'mythic'}}
         selected,rejected=eligible_trophies(drafts,None,True)
         self.assertEqual(set(selected),{'ok'})
         self.assertEqual(len(rejected),2)
