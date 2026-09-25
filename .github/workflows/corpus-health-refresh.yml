@@ -6,7 +6,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: production-corpus-health-refresh
+  group: packone-corpus-health
   cancel-in-progress: false
 jobs:
   refresh:
