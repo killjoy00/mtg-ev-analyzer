@@ -5,7 +5,11 @@ export function corpusMembership({serving=false,parameter=1}={}) {
  AND (p.corpus_version<>${parameter} OR EXISTS(
    SELECT 1 FROM draft_run_environment_policy e
    WHERE e.set_id=p.set_id AND e.status='Live'
-     AND (e.active_snapshot_id IS NULL OR e.active_snapshot_id=p.source_snapshot_id)
+     AND (e.active_snapshot_id IS NULL OR e.active_snapshot_id=p.source_snapshot_id
+       OR (p.source_snapshot_id IS NULL AND EXISTS(
+         SELECT 1 FROM corpus_source_snapshots hs
+         WHERE hs.source_snapshot_id=e.active_snapshot_id AND hs.schema_version='historical-frozen'
+       )))
  ))`:'';
  // Bound the version index, enforce publication independently per set, and for
  // the parent Premier corpus expose only the environment's explicitly active
