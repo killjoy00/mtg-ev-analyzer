@@ -4,12 +4,18 @@ on:
   push:
     branches:
       - research/contextual-value-v1-live-smoke-529
+  pull_request:
+    branches:
+      - main
+      - research/contextual-value-v1-phase1-529
+    types: [opened, synchronize, reopened]
 
 permissions:
   contents: read
 
 jobs:
   tmt-validation-smoke:
+    if: github.head_ref == 'research/contextual-value-v1-live-smoke-529' || github.ref_name == 'research/contextual-value-v1-live-smoke-529'
     runs-on: ubuntu-latest
     timeout-minutes: 180
     steps:
