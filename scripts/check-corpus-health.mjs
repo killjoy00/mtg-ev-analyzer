@@ -22,24 +22,35 @@ const sets=(await query(`WITH versions AS (
  SELECT s.*,row_number() OVER(PARTITION BY s.set_id ORDER BY s.created_at DESC,s.source_snapshot_id DESC) rn
  FROM corpus_source_snapshots s JOIN versions v USING(set_id,corpus_version)
  WHERE s.schema_version<>'historical-frozen' AND s.lifecycle_status<>'Retired'
-), wanted_snapshots AS (
+), wanted_first_class AS (
  SELECT * FROM first_class WHERE rn=1
  UNION
  SELECT s.* FROM corpus_source_snapshots s
  JOIN draft_run_environment_policy p ON p.active_snapshot_id=s.source_snapshot_id
  JOIN versions v ON v.set_id=s.set_id AND v.corpus_version=s.corpus_version
  WHERE s.schema_version<>'historical-frozen'
+), historical AS (
+ SELECT s.* FROM corpus_source_snapshots s JOIN versions v USING(set_id,corpus_version)
+ WHERE s.schema_version='historical-frozen'
+), wanted_historical AS (
+ SELECT v.set_id,coalesce(h.manifest,v.manifest) manifest,
+  md5(coalesce(h.manifest,v.manifest)::text) manifest_hash,h.source_snapshot_id,true historical
+ FROM versions v
+ LEFT JOIN draft_run_environment_policy p USING(set_id)
+ LEFT JOIN historical h ON h.set_id=v.set_id AND h.corpus_version=v.corpus_version
+ WHERE NOT EXISTS(SELECT 1 FROM first_class s WHERE s.set_id=v.set_id)
+    OR (h.source_snapshot_id IS NOT NULL AND p.active_snapshot_id=h.source_snapshot_id)
 )
-SELECT v.set_id,v.manifest,md5(v.manifest::text) manifest_hash,NULL::text source_snapshot_id
-FROM versions v WHERE NOT EXISTS(SELECT 1 FROM first_class s WHERE s.set_id=v.set_id)
+SELECT set_id,manifest,manifest_hash,source_snapshot_id,historical FROM wanted_historical
 UNION ALL
-SELECT s.set_id,s.manifest,md5(s.manifest::text),s.source_snapshot_id
-FROM wanted_snapshots s
+SELECT s.set_id,s.manifest,md5(s.manifest::text),s.source_snapshot_id,false
+FROM wanted_first_class s
 ORDER BY set_id,source_snapshot_id NULLS FIRST`,[DRAFT_RUN_CORPUS_VERSION])).rows.filter(s=>!requested.length||requested.includes(s.set_id));
 for(const s of sets) {
  const manifest=parse(s.manifest),f=manifest.full_import||{},windows=runPickWindows(s.set_id==='powered-cube'?'powered-cube':'mixed'),picks=new Set(windows.map(w=>w[0]));
  const groups=(await query(`SELECT p.pick_number,r.band,count(DISTINCT p.source_draft_hash)::int sources FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r USING(puzzle_id) WHERE p.set_id=$1 AND p.corpus_version=$2 AND ($3::text IS NULL OR p.source_snapshot_id=$3) AND p.interesting AND ${SERVING_QUALITY_SQL} AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash) AND r.difficulty_version='support-ratio-v1' GROUP BY p.pick_number,r.band`,[s.set_id,DRAFT_RUN_CORPUS_VERSION,s.source_snapshot_id||null])).rows;
- const ledger=s.source_snapshot_id
+ const historical=s.historical===true||s.historical==='t';
+ const ledger=s.source_snapshot_id&&!historical
   ?(await query(`SELECT count(*)::int trophies,count(*) FILTER(WHERE qualified)::int qualified,count(*) FILTER(WHERE included)::int included,count(*) FILTER(WHERE qualified AND NOT included)::int qualified_excluded,sum(puzzle_count)::int puzzles FROM corpus_source_snapshot_trajectories WHERE source_snapshot_id=$1`,[s.source_snapshot_id])).rows[0]
   :(await query(`SELECT count(*)::int trophies,count(*) FILTER(WHERE qualified)::int qualified,count(*) FILTER(WHERE included)::int included,count(*) FILTER(WHERE qualified AND NOT included)::int qualified_excluded,sum(puzzle_count)::int puzzles FROM corpus_trophy_trajectories WHERE set_id=$1 AND corpus_version=$2`,[s.set_id,DRAFT_RUN_CORPUS_VERSION])).rows[0];
  const previous=(await query('SELECT report FROM corpus_health_checks WHERE set_id=$1 AND corpus_version=$2 AND source_snapshot_id IS NOT DISTINCT FROM $3 ORDER BY checked_at DESC,id DESC LIMIT 1',[s.set_id,DRAFT_RUN_CORPUS_VERSION,s.source_snapshot_id||null])).rows[0];
@@ -82,6 +93,6 @@ for(const s of sets) {
     WHERE set_id=$1 AND corpus_version=$2 AND md5(manifest::text)=$3 RETURNING id`,
     [s.set_id,DRAFT_RUN_CORPUS_VERSION,s.manifest_hash,report.gate_version,report.ready,JSON.stringify(report)]);
  if(!saved.rows.length)throw Error('Manifest changed during health verification: '+s.set_id);
- if(report.ready)await registerHealthyCandidate(query,s.set_id,s.manifest_hash,s.source_snapshot_id||null);
+ if(report.ready)await registerHealthyCandidate(query,s.set_id,s.manifest_hash,historical?null:(s.source_snapshot_id||null));
  console.log(JSON.stringify({set:s.set_id,ready:report.ready,blocked:report.gates.filter(g=>!g.pass).map(g=>g.id),puzzles:total}));
 }
