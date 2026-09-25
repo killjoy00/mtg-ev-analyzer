@@ -90,7 +90,7 @@ export async function routeAlert(fetcher,env,report) {
   const existing=issues.find(i=>i.title===TITLE&&!i.pull_request);
   // One open incident; no repeated comments or unsolicited person assignments.
   if(existing)return 'existing';
-  const body='Production launch thresholds exceeded. Follow [the runbook](../blob/main/docs/LAUNCH-OPERATIONS.md).\n\n```json\n'+JSON.stringify(report,null,2)+'\n```\n\nClose after investigation and recovery. Missing telemetry is an alert, never a healthy result.';
+  const body='Production launch thresholds exceeded. Follow https://github.com/'+env.GITHUB_REPOSITORY+'/blob/main/docs/LAUNCH-OPERATIONS.md.\n\n```json\n'+JSON.stringify(report,null,2)+'\n```\n\nClose after investigation and recovery. Missing telemetry is an alert, never a healthy result.';
   await json(fetcher,base+'/issues',env.GITHUB_TOKEN,{title:TITLE,body});return 'created';
 }
 export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='check'}={}) {
@@ -100,7 +100,18 @@ export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='ch
     const zone=zones.result?.filter(z=>z.name==='packone.pro'&&z.status==='active');
     if(zone?.length!==1||!/^[a-f0-9]{32}$/.test(zone[0].account?.id))throw Error('Unexpected Cloudflare account');
     const account=zone[0].account.id;
-    const events=await queryEvents(fetcher,env.CLOUDFLARE_EDGE_TOKEN,account,now-15*60000,now);
+    let events=await queryEvents(fetcher,env.CLOUDFLARE_EDGE_TOKEN,account,now-15*60000,now);
+    if(env.PACK1_EXPECT_RELEASE) {
+      if(!/^[a-f0-9]{40}$/.test(env.PACK1_EXPECT_RELEASE))throw Error('Invalid expected release');
+      const deadline=Date.now()+180000;
+      while(!events.some(e=>e.release===env.PACK1_EXPECT_RELEASE)&&Date.now()<deadline) {
+        // Read-only health probes produce sampled events without creating players.
+        for(let i=0;i<10;i++)await fetcher('https://api.packone.pro/draft/health?quick=1',{redirect:'error',signal:AbortSignal.timeout(15000)});
+        await new Promise(r=>setTimeout(r,15000));
+        events=await queryEvents(fetcher,env.CLOUDFLARE_EDGE_TOKEN,account,Date.now()-15*60000,Date.now());
+      }
+      if(!events.some(e=>e.release===env.PACK1_EXPECT_RELEASE))throw Error('Expected release absent from retained gateway logs');
+    }
     Object.assign(report,evaluate(events,await usage(fetcher,env,account,now)));
   } catch(error) {report.alerts.push('telemetry_unavailable');report.error=String(error.message).slice(0,180);}
   fs.mkdirSync('artifacts/launch-alert',{recursive:true});fs.writeFileSync('artifacts/launch-alert/report.json',JSON.stringify(report,null,2));
