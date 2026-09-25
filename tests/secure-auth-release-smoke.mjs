@@ -63,6 +63,12 @@ async function waitForGrowthHealth() {
 }
 
 const growth=await waitForGrowthHealth();
+const mobileSupported=await request('pack1growth','/v1/mobile/version?platform=ios&version=1.0&build=1');
+assert.equal(mobileSupported.updateRequired,false,'seeded iOS minimum must permit the first public version baseline');
+const mobileUnsupported=await request('pack1growth','/v1/mobile/version?platform=ios&version=0.9&build=999999');
+assert.equal(mobileUnsupported.updateRequired,true,'older marketing versions must be force-updatable');
+assert.equal(mobileUnsupported.storeUrl,'https://apps.apple.com/app/id6814318676');
+
 assert.equal(growth.account_deletion_enabled,true,'account deletion kill switch must be enabled');
 assert.equal(growth.verification_sweep_enabled,true,'verification sweep kill switch must be enabled');
 if(expectedDeletionEmail!==null)

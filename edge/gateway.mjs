@@ -35,7 +35,7 @@ function permitted(service,path,method,search,mode) {
   if(method==='GET'&&path==='/health')return search==='?quick=1';
   if(service==='growth') {
     if(method==='POST'&&[
-      '/v1/session','/v1/player/session','/v1/player/migrate',
+      '/v1/session','/v1/mobile/version','/v1/player/session','/v1/player/migrate',
       '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete/verification/start','/v1/account/delete','/v1/account/migrate',
       '/v1/account/link','/v1/account/link-browser','/v1/account/signout',
       '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/google/start','/v1/mobile/account/google/finish',
@@ -187,6 +187,7 @@ export class NetworkQuota {
 }
 
 export function routeFamily(path) {
+  if(path==='/growth/v1/mobile/version')return 'mobile_version';
   if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share)$/.test(path))return 'draft_'+path.split('/').at(-1);
   if(path==='/draft/v1/runs')return 'draft_start';
   if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';

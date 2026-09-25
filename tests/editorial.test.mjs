@@ -101,7 +101,7 @@ const dailyHome = await readFile('daily-home.mjs','utf8');
 assert.match(dailyHome, /Make your pick, then see what the trophy drafter chose and how strong your pick was\./);
 assert.doesNotMatch(dailyHome, /trophy drafter chose —/);
 assert.match(dailyHome, /Start here/);
-assert.match(dailyHome, /No account required/);
+assert.match(dailyHome, /Free · No account required/);
 assert.match(dailyHome, /p1-card/);
 assert.match(dailyHome, /Eight decisions from Powered Cube trophy drafts\./);
 assert.match(dailyHome, /Eight decisions from trophy drafts in the latest set\./);
