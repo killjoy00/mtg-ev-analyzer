@@ -22,8 +22,29 @@ test('explicit reviewed corpus health remains a manual-only full deep audit',()=
 });
 
 
-test('production promotion validates the reviewed run with standalone jq',()=>{
+test('production promotion proves builder run provenance without pinning the whole repository SHA',()=>{
   const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
-  assert.match(workflow,/gh run view "\$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha \| jq -e --arg sha "\$GITHUB_SHA"/);
-  assert.doesNotMatch(workflow,/gh run view[^\n]*--jq --arg/);
+  assert.match(workflow,/run_json=\$\(gh run view "\$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha\)/);
+  assert.match(workflow,/builder_sha=\$\(echo "\$run_json" \| jq -r '\.headSha'\)/);
+  assert.match(workflow,/corpus_promotion_provenance\.py verify "\$root\/corpus-candidates\/catalog\.json" --run-id "\$VALIDATED_RUN_ID" --run-sha "\$builder_sha" --revision "\$revision"/);
+  assert.doesNotMatch(workflow,/--arg sha "\$GITHUB_SHA"/);
+  assert.doesNotMatch(workflow,/\.headSha==\$sha/);
+});
+
+test('development cache is revision-keyed and restored catalog provenance is never reused',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
+  assert.match(workflow,/id: ingestion-revision/);
+  assert.match(workflow,/key: corpus-candidates-\$\{\{ steps\.ingestion-revision\.outputs\.revision \}\}-\$\{\{ github\.run_id \}\}/);
+  assert.match(workflow,/restore-keys: \|\s+corpus-candidates-\$\{\{ steps\.ingestion-revision\.outputs\.revision \}\}-/);
+  assert.doesNotMatch(workflow,/restore-keys: \|[^]*?\n\s+corpus-candidates-\s*(?:\n|$)/);
+  assert.match(workflow,/rm -f generated\/corpus-candidates\/catalog\.json/);
+});
+
+test('no-pending development rerun cannot mint a promotable artifact and has an explicit recovery path',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
+  assert.match(workflow,/recovery_sets:/);
+  assert.match(workflow,/no promotable artifact was produced\. For cache eviction recovery, dispatch development with recovery_sets=<set-id>/);
+  assert.match(workflow,/if \[\[ ! -f "\$catalog" \]\]; then\s+echo "promotable=false"/);
+  assert.match(workflow,/steps\.artifact\.outputs\.promotable == 'true'/);
+  assert.match(workflow,/Referenced development run has no promotable corpus artifact\. Dispatch development with recovery_sets=<set-id>/);
 });
