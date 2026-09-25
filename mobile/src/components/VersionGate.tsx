@@ -16,7 +16,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { requestJson } from '@/src/api/client';
 import { colors, spacing } from '@/src/theme';
 import {
-  parseVersionCheckResponse,
+  resolveVersionCheck,
   type MobilePlatform,
   type VersionGateDecision,
 } from '@/src/versionPolicy';
@@ -37,17 +37,12 @@ async function checkInstalledVersion(): Promise<VersionGateDecision> {
   // strand a client. Store binaries provide both values.
   if (!platform || !version || !build) return { status: 'allowed' };
 
-  try {
-    const params = new URLSearchParams({ platform, version, build });
-    const response = await requestJson<unknown>(`/growth/v1/mobile/version?${params.toString()}`, {
+  const params = new URLSearchParams({ platform, version, build });
+  return resolveVersionCheck(platform, () =>
+    requestJson<unknown>(`/growth/v1/mobile/version?${params.toString()}`, {
       timeoutMs: 5_000,
-    });
-    return parseVersionCheckResponse(platform, response) ?? { status: 'allowed' };
-  } catch {
-    // Fail open on transport/server outages. A block is allowed only when a
-    // valid server response explicitly marks this installed binary unsupported.
-    return { status: 'allowed' };
-  }
+    }),
+  );
 }
 
 function CheckingScreen() {
