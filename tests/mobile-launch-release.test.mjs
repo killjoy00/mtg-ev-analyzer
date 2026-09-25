@@ -125,6 +125,7 @@ test('Apple launch hardening blocks pre-hijack, separates token keys, and uses A
   assert.match(worker, /purpose='delete'/);
   assert.match(worker, /\/v1\/mobile\/account\/delete\/apple\/start/);
   assert.match(worker, /\/v1\/mobile\/account\/delete\/apple\/finish/);
+  assert.match(worker, /flow_kind='mobile'[\s\S]*purpose='signin'/);
   assert.match(api, /startAppleDeletionVerification/);
   assert.match(api, /finishAppleDeletion/);
   assert.match(mobile, /Verify with Apple and delete account/);
