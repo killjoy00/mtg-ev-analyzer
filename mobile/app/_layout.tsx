@@ -11,13 +11,13 @@ export default function RootLayout() {
       <>
         <StatusBar style="dark" />
         <Stack
-        unstable_screenErrorBoundary={ScreenErrorBoundary}
-        screenOptions={{
-          headerStyle: { backgroundColor: colors.surface },
-          headerShadowVisible: false,
-          headerTintColor: colors.ink,
-          contentStyle: { backgroundColor: colors.page },
-        }}
+          unstable_screenErrorBoundary={ScreenErrorBoundary}
+          screenOptions={{
+            headerStyle: { backgroundColor: colors.surface },
+            headerShadowVisible: false,
+            headerTintColor: colors.ink,
+            contentStyle: { backgroundColor: colors.page },
+          }}
         >
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="draft-run" options={{ title: 'Draft Run' }} />
