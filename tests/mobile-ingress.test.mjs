@@ -160,7 +160,7 @@ test('Apple form callback is forwarded without JSON coercion and may return the 
   let seen=null;
   const callback=new Request('https://api.packone.pro/growth/v1/account/apple/callback',{
     method:'POST',
-    headers:headers({'content-type':'application/x-www-form-urlencoded'}),
+    headers:headers({'content-type':'application/x-www-form-urlencoded',origin:'https://appleid.apple.com'}),
     body:payload,
   });
   const accepted=await gateway(callback,env(),async(url,options)=>{
