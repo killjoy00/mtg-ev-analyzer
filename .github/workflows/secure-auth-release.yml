@@ -15,6 +15,7 @@ concurrency:
 jobs:
   release:
     if: github.ref == 'refs/heads/main'
+    environment: pack-one-mobile-release
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
