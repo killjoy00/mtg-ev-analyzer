@@ -215,6 +215,7 @@ CREATE TABLE IF NOT EXISTS apple_auth_identities (
   auth_user_id uuid NOT NULL UNIQUE REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
   email text NOT NULL CHECK(length(email) BETWEEN 3 AND 254),
   first_name text,
+  last_name text,
   synthetic_password boolean NOT NULL DEFAULT false,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
