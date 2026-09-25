@@ -178,9 +178,33 @@ class NuisanceCrossFitTests(unittest.TestCase):
             wins = 7 if selected == "A" else 0
             rows.append(decision(f"q{index}", selected=selected, wins=wins))
 
+        def provider(row, training_ids):
+            self.assertNotIn(row.draft_id, training_ids)
+            return {
+                "A": CardSignals(
+                    strong_choice_probability=0.75,
+                    gih_wr=0.65,
+                    gnd_wr=0.50,
+                    iwd=0.15,
+                    gih_games=1000,
+                    gnd_games=900,
+                    deck_inclusion_probability=0.85,
+                ),
+                "B": CardSignals(
+                    strong_choice_probability=0.25,
+                    gih_wr=0.45,
+                    gnd_wr=0.50,
+                    iwd=-0.05,
+                    gih_games=900,
+                    gnd_games=1000,
+                    deck_inclusion_probability=0.65,
+                ),
+            }
+
         predictions = crossfit_nuisance(
             rows,
             folds=4,
+            signal_provider=provider,
             propensity_l2=0.5,
             outcome_l2=0.1,
         )
