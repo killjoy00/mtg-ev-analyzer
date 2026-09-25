@@ -3,7 +3,7 @@
 Start with [CURRENT-STATE](CURRENT-STATE.md) for verified deployment boundaries and [CHARTER](CHARTER.md) for the product.
 
 - [Corpus/selection](DATA-MANAGEMENT.md), [Corpus Operations](CORPUS-OPERATIONS.md), [card-image maintenance](CARD-IMAGE-MAINTENANCE.md), [Traditional admission/publication](TRADITIONAL-PUZZLE-ADMISSION.md)
-- [Scoring](SCORING-AND-DIFFICULTY.md), [decision measurements, launch attribution, and Daily habit cohorts](DECISION-MEASUREMENTS.md)
+- [Scoring](SCORING-AND-DIFFICULTY.md), [decision measurements, launch attribution, and Daily habit cohorts](DECISION-MEASUREMENTS.md), [launch measurement owner guide](LAUNCH-MEASUREMENT-OWNER-GUIDE.md)
 - [17Lands policy](17LANDS-DATA-REVIEW-2026-09-18.md)
 - [Rebuild audit](REBUILD-2026-09-18.md), [rebuild release/runbook](REBUILD-RELEASE.md), [Traditional results](../results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md), [scoring results](../results/rebuild-2026-09-18/SCORING-RESULTS.md), [Daily distribution](../results/rebuild-2026-09-18/DAILY-DISTRIBUTION.md)
 - [Backend operations](BACKEND-RELIABILITY.md), [request integrity](REQUEST-INTEGRITY.md), [CI and merging](CI-AND-MERGING.md), [remaining work](ROADMAP.md)
@@ -25,3 +25,9 @@ Dated earlier reviews are historical evidence. Superseded core documents are ret
 
 - [Pacific Daily and Neon scheduler rollout closeout](reports/PACIFIC-DAILY-NEON-SCHEDULER-CLOSEOUT-2026-09-23.md): migration/deploy chain, production scheduler activation, five idle-confirmed startup measurements, and final operating boundary.
 - [Neon scheduled maintenance](NEON-SCHEDULERS.md): active trigger definitions, identity boundary, recovery workflow, activation and rollback.
+
+
+## September 25 launch measurement release
+
+- [Pack One launch measurement closeout](reports/PACK-ONE-LAUNCH-MEASUREMENT-CLOSEOUT-2026-09-25.md): acquisition attribution, habit metrics, Daily streak/reset cue, CI coverage, schema-prerequisite catch, and exact development/production release evidence.
+- [Launch measurement owner guide](LAUNCH-MEASUREMENT-OWNER-GUIDE.md): how to build tracked campaign links, read mature Daily cohorts, use 3-in-7 health, interpret source labels, and operate the new measurement tools.
