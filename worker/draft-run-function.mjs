@@ -298,15 +298,23 @@ async function dailyStatus(request) {
   const owner=await player(request),account=await accountIdentity(request,query,owner),day=gameDateKey();
   // This is the homepage's request, so the membership lookup rides alongside
   // the other two rather than adding a round trip.
-  const [result,capabilities,membership,rankingIdentity]=await Promise.all([
+  const [result,capabilities,membership,rankingIdentity,streak]=await Promise.all([
     query(`SELECT day::text date,environment set_id,'draft_run' mode,score,id run_id
       FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date
         AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)`,[owner,day]),
     accountCapabilities(account,query),
     providerMembership(account,query),
     rankingIdentityStatus(query,owner),
+    query(`WITH completed_days AS (
+        SELECT DISTINCT day FROM draft_run_sessions
+        WHERE player_id=$1::uuid AND day IS NOT NULL AND day<=$2::date
+          AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)
+      ), ordered AS (
+        SELECT day,(row_number() OVER(ORDER BY day DESC)-1)::int day_offset FROM completed_days
+      )
+      SELECT count(*)::int streak FROM ordered WHERE day=$2::date-day_offset`,[owner,day]),
   ]);
-  return json({day,capabilities,player:{claimed:Boolean(account)},membership,ranking_identity:{eligible:rankingIdentity.eligible,reason:rankingIdentity.reason},daily_history:result.rows.map(r=>({...r,score:Number(r.score)}))});
+  return json({day,capabilities,player:{claimed:Boolean(account)},membership,ranking_identity:{eligible:rankingIdentity.eligible,reason:rankingIdentity.reason},daily_streak:Number(streak.rows[0]?.streak||0),daily_history:result.rows.map(r=>({...r,score:Number(r.score)}))});
 }
 
 async function leaderboard(request) {

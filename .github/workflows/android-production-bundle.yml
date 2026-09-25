@@ -2,6 +2,7 @@ name: Android production bundle
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     paths:
       - 'mobile/**'
       - '.github/workflows/android-production-bundle.yml'

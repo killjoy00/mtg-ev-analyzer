@@ -257,7 +257,7 @@ function accountJson(auth,session,status=200) {
 function props(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   const output = {};
-  const allowed=new Set(['mode','set','seed','daily','challenge','outcome','score','grade','period','type','round','surface','method','context','kind','own','public','achievement','environments','total','percentile','source','account','run_id','session_id','target_score','opponent_score','card','affiliate']);
+  const allowed=new Set(['mode','set','seed','daily','challenge','outcome','score','grade','period','type','round','surface','method','context','kind','own','public','achievement','environments','total','percentile','source','campaign','medium','referrer_host','account','run_id','session_id','target_score','opponent_score','card','affiliate']);
   for (const [key, item] of Object.entries(value).slice(0, 20)) {
     if (!allowed.has(key)) continue;
     if (['string', 'number', 'boolean'].includes(typeof item) || item == null) {

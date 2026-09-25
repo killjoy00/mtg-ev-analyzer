@@ -1,0 +1,31 @@
+name: iOS TestFlight status
+
+on:
+  push:
+    branches:
+      - 'chatgpt/pack-one-mobile-v2-ios-testflight'
+    paths:
+      - '.github/app-store-status-request.txt'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  status:
+    name: read App Store Connect build status
+    runs-on: ubuntu-latest
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+      PACKONE_ASC_APP_ID: '6814318676'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Read latest Pack One TestFlight builds
+        run: node .github/scripts/app-store-build-status.mjs
+      - name: Verify next monotonic build allocation
+        run: node .github/scripts/app-store-next-build-number.mjs

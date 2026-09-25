@@ -168,11 +168,11 @@ Publishing jobs treat the stores as the monotonic source of truth. Before Expo P
 
 `max(store_high_water_mark + 1, 100000 + GITHUB_RUN_NUMBER)`
 
-- iOS queries App Store Connect and allocates the next `CFBundleVersion`.
-- Android opens a temporary Google Play edit, lists current AABs, and allocates the next `versionCode`; the probe edit is deleted.
+- iOS queries all App Store Connect builds for app `6814318676` and allocates the next `CFBundleVersion`.
+- Android opens a temporary Google Play edit, lists all current AABs, and allocates the next `versionCode`; the probe edit is then deleted.
 - PR-only smoke builds may still use `100000 + GITHUB_RUN_NUMBER` because they are never uploaded.
 
-This remains monotonic if a workflow file is renamed/replaced and also makes a rerun advance past any number an earlier attempt already uploaded. The run-number formula is only a floor, not the publishing source of truth.
+This keeps releases monotonic if a workflow file is renamed/replaced (which resets that workflow's run counter) and also makes a rerun advance past any number the earlier attempt already uploaded. The run-number formula is only a floor, not the publishing source of truth.
 
 The values are injected through `PACKONE_IOS_BUILD_NUMBER` and `PACKONE_ANDROID_VERSION_CODE`. Config validation asserts that the requested values reach the generated Expo config. The iOS export disables Xcode's automatic build-number rewriting so the CI-assigned number is preserved.
 

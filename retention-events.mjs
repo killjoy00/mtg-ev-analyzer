@@ -1,6 +1,6 @@
 import { sendEvents } from './growth-api.mjs';
 
-const ALLOWED = new Set(['mode','set','seed','daily','challenge','outcome','score','grade','period','type','round','surface','method','context','kind','own','public','achievement','environments','total','percentile','source','account','run_id','target_score','opponent_score']);
+const ALLOWED = new Set(['mode','set','seed','daily','challenge','outcome','score','grade','period','type','round','surface','method','context','kind','own','public','achievement','environments','total','percentile','source','campaign','medium','referrer_host','account','run_id','target_score','opponent_score']);
 let queue=[],timer=null;
 let visitId;
 try {visitId=sessionStorage.getItem('pack1-visit-id');if(!visitId){visitId=crypto.randomUUID();sessionStorage.setItem('pack1-visit-id',visitId);}} catch {visitId=crypto.randomUUID();}
