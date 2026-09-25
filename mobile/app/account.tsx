@@ -205,6 +205,7 @@ export default function AccountScreen() {
           identityToken: credential.identityToken,
           authorizationCode: credential.authorizationCode,
           firstName: credential.fullName?.givenName ?? null,
+          lastName: credential.fullName?.familyName ?? null,
         }, validateDailyRunId);
         await finish(next.session, next.result);
       } else {
