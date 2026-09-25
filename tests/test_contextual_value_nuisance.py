@@ -6,7 +6,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from contextual_value.dataset import Decision
-from contextual_value.features import CardSignals, candidate_features
+from contextual_value.features import CardSignals, candidate_features, model_feature_map
 from contextual_value.nuisance import crossfit_nuisance
 from contextual_value.propensity import (
     LinearSoftmaxPropensityModel,
@@ -63,6 +63,22 @@ class CandidateFeatureTests(unittest.TestCase):
         self.assertNotIn("event_match_wins", a)
         self.assertNotIn("selected_card", a)
         self.assertAlmostEqual(a["gih_x_deck_probability"], 0.58 * 0.75)
+
+    def test_learned_model_features_do_not_memorize_card_identity(self):
+        row = decision("d1")
+        features = model_feature_map(
+            row,
+            {
+                "A": CardSignals(strong_choice_probability=0.7, gih_wr=0.58),
+                "B": CardSignals(strong_choice_probability=0.3, gih_wr=0.50),
+            },
+        )
+        self.assertNotIn("candidate=A", features["A"])
+        self.assertNotIn("candidate=B", features["B"])
+        self.assertNotEqual(
+            features["A"]["strong_choice_probability"],
+            features["B"]["strong_choice_probability"],
+        )
 
     def test_feature_map_requires_offered_candidate(self):
         with self.assertRaises(ValueError):
@@ -162,9 +178,33 @@ class NuisanceCrossFitTests(unittest.TestCase):
             wins = 7 if selected == "A" else 0
             rows.append(decision(f"q{index}", selected=selected, wins=wins))
 
+        def provider(row, training_ids):
+            self.assertNotIn(row.draft_id, training_ids)
+            return {
+                "A": CardSignals(
+                    strong_choice_probability=0.75,
+                    gih_wr=0.65,
+                    gnd_wr=0.50,
+                    iwd=0.15,
+                    gih_games=1000,
+                    gnd_games=900,
+                    deck_inclusion_probability=0.85,
+                ),
+                "B": CardSignals(
+                    strong_choice_probability=0.25,
+                    gih_wr=0.45,
+                    gnd_wr=0.50,
+                    iwd=-0.05,
+                    gih_games=900,
+                    gnd_games=1000,
+                    deck_inclusion_probability=0.65,
+                ),
+            }
+
         predictions = crossfit_nuisance(
             rows,
             folds=4,
+            signal_provider=provider,
             propensity_l2=0.5,
             outcome_l2=0.1,
         )
