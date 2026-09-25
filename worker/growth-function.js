@@ -1075,7 +1075,7 @@ async function handleMobileAppleNative(request) {
   const flow=(await query(`SELECT guest_player_id
     FROM mobile_oauth_handoffs
     WHERE flow_hash=$1 AND guest_player_id=$2::uuid AND provider='apple' AND flow_kind='mobile'
-      AND consumed_at IS NULL AND authenticated_at IS NULL AND expires_at>now()
+      AND purpose='signin' AND consumed_at IS NULL AND authenticated_at IS NULL AND expires_at>now()
     LIMIT 1`,[digest(flowToken),owner])).rows[0];
   if(!flow)throw Object.assign(Error('Apple sign in state expired.'),{status:409,code:'APPLE_STATE'});
   const auth=await resolveAppleAccount(query,{
@@ -1092,7 +1092,7 @@ async function handleMobileAppleNative(request) {
   const updated=await query(`UPDATE mobile_oauth_handoffs
     SET handoff_hash=$2,auth_user_id=$3::uuid,authenticated_at=now(),consumed_at=now()
     WHERE flow_hash=$1 AND guest_player_id=$4::uuid AND provider='apple' AND flow_kind='mobile'
-      AND consumed_at IS NULL AND authenticated_at IS NULL AND expires_at>now()
+      AND purpose='signin' AND consumed_at IS NULL AND authenticated_at IS NULL AND expires_at>now()
       AND pack1_identity_attachment_allowed($3::uuid)
     RETURNING guest_player_id`,[digest(flowToken),digest(consumedMarker),auth.user_id,owner]);
   if(!updated.rows[0])throw Object.assign(Error('Apple sign in state expired.'),{status:409,code:'APPLE_STATE'});
