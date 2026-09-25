@@ -107,3 +107,30 @@ test('v1 implements Sign in with Apple across native iOS, Android/web handoff, a
   assert.match(releaseWorkflow, /APPLE_SIGN_IN_KEY_P8/);
   assert.doesNotMatch(integrity, /Sign in with Apple is not currently exposed/);
 });
+
+
+test('Apple launch hardening blocks pre-hijack, separates token keys, and uses Apple deletion re-auth', () => {
+  const apple = read('worker/apple-auth.mjs');
+  const worker = read('worker/growth-function.js');
+  const workflow = read('.github/workflows/secure-auth-release.yml');
+  const mobile = read('mobile/app/account.tsx');
+  const api = read('mobile/src/api/account.ts');
+  const docs = read('docs/mobile-release-config.md');
+
+  assert.match(apple, /APPLE_EXISTING_ACCOUNT_UNVERIFIED/);
+  assert.doesNotMatch(apple, /markAppleAuthEmailVerified\(\{authBase,userId:authUserId/);
+  assert.match(apple, /APPLE_TOKEN_ENCRYPTION_KEY_V1/);
+  assert.match(apple, /apple-token.*v1/);
+  assert.match(workflow, /APPLE_TOKEN_ENCRYPTION_KEY_V1/);
+  assert.match(worker, /purpose='delete'/);
+  assert.match(worker, /\/v1\/mobile\/account\/delete\/apple\/start/);
+  assert.match(worker, /\/v1\/mobile\/account\/delete\/apple\/finish/);
+  assert.match(api, /startAppleDeletionVerification/);
+  assert.match(api, /finishAppleDeletion/);
+  assert.match(mobile, /Verify with Apple and delete account/);
+  assert.match(mobile, /appleDeleteHandoff/);
+  assert.match(docs, /Private Email Relay/);
+  assert.match(docs, /at least as prominent as the Google control/);
+  assert.match(mobile, /appleButton: \{ width: '100%', height: 52 \}/);
+  assert.match(mobile, /googleButton: \{ minHeight: 52/);
+});
