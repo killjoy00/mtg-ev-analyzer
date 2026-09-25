@@ -374,6 +374,35 @@ export async function deleteAccount({currentPassword,code}={}) {
   return data;
 }
 
+export async function startAppleSignIn() {
+  if(!firstPartyAuthEnabled())throw new Error('Sign in with Apple is not available on this release yet.');
+  await ensurePackSession();
+  const data=await raw('/v1/account/apple/start',{
+    method:'POST',
+    body:{},
+    headers:new Headers({'content-type':'application/json'}),
+  });
+  let target=null;
+  try {target=new URL(String(data?.url||''));} catch {}
+  if(!target||target.protocol!=='https:'||target.hostname!=='appleid.apple.com')
+    throw new Error('Sign in with Apple is temporarily unavailable.');
+  location.assign(target.toString());
+}
+
+export async function completeAppleSignIn() {
+  if(!firstPartyAuthEnabled())throw new Error('Sign in with Apple is not available on this release yet.');
+  const handoff=new URL(location.href).searchParams.get('appleHandoff');
+  if(!handoff)throw new Error('Apple sign in did not return a Pack One handoff.');
+  await ensurePackSession();
+  const data=await raw('/v1/account/apple/finish',{
+    method:'POST',
+    body:{handoffToken:handoff},
+    headers:new Headers({'content-type':'application/json'}),
+  });
+  clearLegacyAuth();
+  return data;
+}
+
 export async function startGoogleSignIn() {
   if(!firstPartyAuthEnabled())throw new Error('Google sign in is not available on this release yet.');
   await ensurePackSession();
