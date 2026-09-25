@@ -164,10 +164,15 @@ The verified provider resource is `projects/77537515004/locations/global/workloa
 
 ## Store build numbering
 
-Release workflows assign store build identifiers before Expo Prebuild:
+Publishing jobs treat the stores as the monotonic source of truth. Before Expo Prebuild they query the highest number already accepted by the store and choose:
 
-- iOS `CFBundleVersion`: `100000 + GITHUB_RUN_NUMBER`
-- Android `versionCode`: `100000 + GITHUB_RUN_NUMBER`
+`max(store_high_water_mark + 1, 100000 + GITHUB_RUN_NUMBER)`
+
+- iOS queries all App Store Connect builds for app `6814318676` and allocates the next `CFBundleVersion`.
+- Android opens a temporary Google Play edit, lists all current AABs, and allocates the next `versionCode`; the probe edit is then deleted.
+- PR-only smoke builds may still use `100000 + GITHUB_RUN_NUMBER` because they are never uploaded.
+
+This keeps releases monotonic if a workflow file is renamed/replaced (which resets that workflow's run counter) and also makes a rerun advance past any number the earlier attempt already uploaded. The run-number formula is only a floor, not the publishing source of truth.
 
 The values are injected through `PACKONE_IOS_BUILD_NUMBER` and `PACKONE_ANDROID_VERSION_CODE`. Config validation asserts that the requested values reach the generated Expo config. The iOS export disables Xcode's automatic build-number rewriting so the CI-assigned number is preserved.
 
