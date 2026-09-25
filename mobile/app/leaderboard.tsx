@@ -1,3 +1,4 @@
+import { useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -12,6 +13,7 @@ import {
 import {
   DAILY_ENVIRONMENTS,
   DAILY_ENVIRONMENT_META,
+  isDailyEnvironment,
   type DailyEnvironment,
 } from '@/src/api/draftRun';
 import {
@@ -28,6 +30,10 @@ const periods: { id: LeaderboardPeriod; label: string }[] = [
   { id: 'month', label: 'Month' },
   { id: 'all', label: 'All-time' },
 ];
+
+function isLeaderboardPeriod(value: string): value is LeaderboardPeriod {
+  return periods.some((period) => period.id === value);
+}
 
 type LoadState =
   | { status: 'loading' }
@@ -82,12 +88,25 @@ function RankingRow({
 }
 
 export default function LeaderboardScreen() {
-  const [period, setPeriod] = useState<LeaderboardPeriod>('daily');
-  const [environment, setEnvironment] = useState<DailyEnvironment>('mixed');
+  const params = useLocalSearchParams<{ environment?: string; period?: string }>();
+  const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
+  const requestedPeriod = typeof params.period === 'string' ? params.period : 'daily';
+  const deepLinkEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
+  const deepLinkPeriod = isLeaderboardPeriod(requestedPeriod) ? requestedPeriod : 'daily';
+  const [period, setPeriod] = useState<LeaderboardPeriod>(deepLinkPeriod);
+  const [environment, setEnvironment] = useState<DailyEnvironment>(deepLinkEnvironment);
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [refreshing, setRefreshing] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
   const requestId = useRef(0);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setEnvironment((current) => current === deepLinkEnvironment ? current : deepLinkEnvironment);
+      setPeriod((current) => current === deepLinkPeriod ? current : deepLinkPeriod);
+    }, 0);
+    return () => clearTimeout(timer);
+  }, [deepLinkEnvironment, deepLinkPeriod]);
 
   useEffect(() => {
     const id = ++requestId.current;
