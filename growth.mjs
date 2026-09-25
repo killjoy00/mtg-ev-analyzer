@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import { completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn } from './growth-api.mjs';
+import { completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn } from './growth-api.mjs';
 import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
@@ -335,6 +335,25 @@ export async function resumeAccountAuth(status) {
     return renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account',notice:'Email verified.'});
   }
 
+  if(status==='apple-delete'||status==='apple-delete-error') {
+    const clean=new URL(location.href);
+    clean.searchParams.delete('auth');
+    clean.searchParams.delete('appleDeleteHandoff');
+    history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
+    if(status==='apple-delete-error') {
+      event('account_delete_apple_verification_failed',{source:flow.source||'account'});
+      return renderAccount({source:flow.source||'account',notice:'Apple verification did not finish. Your account was not deleted.'});
+    }
+    try {
+      const result=await completeAppleDeletion();
+      event('account_delete_apple_verified',{source:flow.source||'account'});
+      return renderDeletionState(result?.deletion==='complete'?'deleted':'deleting');
+    } catch(error) {
+      event('account_delete_apple_verification_failed',{source:flow.source||'account'});
+      return renderAccount({source:flow.source||'account',notice:error?.message||'Apple verification could not be completed. Your account was not deleted.'});
+    }
+  }
+
   const source=flow.source||'unknown';
   let failure=null;
   if(status==='google') {
@@ -365,6 +384,7 @@ export async function resumeAccountAuth(status) {
   clean.searchParams.delete('auth');
   clean.searchParams.delete('neon_auth_session_verifier');
   clean.searchParams.delete('appleHandoff');
+  clean.searchParams.delete('appleDeleteHandoff');
   history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
 
   await renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
