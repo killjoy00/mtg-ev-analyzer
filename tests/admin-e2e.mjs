@@ -10,7 +10,7 @@ try {
   await page.getByRole('heading',{name:'Pack One administration'}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Export CSV'}).count(),0);
   const sample={exposures:40,players:35,answers:32,trophy_match_pct:37.5,average_partial_credit:65,median_seconds:12,p90_seconds:28,timed_answers:29,rerolls:5,likely_abandoned:2,mature_exposures:30,pending:1,partial_0_24:1,partial_25_49:4,partial_50_74:8,partial_75_95:7,runs:9,completed_runs:6};
-  const fixture={generated_at:'2026-09-12T12:00:00Z',filters:{start:'2026-09-01',end:'2026-09-12',environment:'all',type:'all',set:'all',version:'all',band:'all',pick:'all'},coverage:{qa_excluded:8,repeats_excluded:3,unobserved_excluded:2},summary:sample,share_funnel:{arrivals:20,visitors:17,starts:12,completions:9,start_pct:60,completion_pct:75},groups:['difficulty','pick','round','set','model_disagreement','version'].map((dimension,i)=>({...sample,dimension,label:['hard','9','8','blb','true','first-pack-v2 / trophy-consensus-v2 / support-ratio-v1'][i]})),sets:['blb','powered-cube'],reviews:[{...sample,puzzle_id:'a'.repeat(32),set_id:'blb',pick_number:9,model_disagreement:true}]};
+  const fixture={generated_at:'2026-09-12T12:00:00Z',filters:{start:'2026-09-01',end:'2026-09-12',environment:'all',type:'all',set:'all',version:'all',band:'all',pick:'all'},coverage:{qa_excluded:8,repeats_excluded:3,unobserved_excluded:2},summary:sample,share_funnel:{arrivals:20,visitors:17,starts:12,completions:9,start_pct:60,completion_pct:75},habit_metrics:{cohorts:[{source:'reddit',campaign:'creator_one',cohort_people:10,next_day_mature:8,next_day_returned:3,next_day_immature:2,next_day_rate:37.5,seven_day_mature:5,seven_day_returned:2,seven_day_immature:5,seven_day_rate:40,three_in_seven_mature:6,three_in_seven_reached:2,three_in_seven_immature:4,three_in_seven_rate:33.3,ever_three_in_seven_people:4,ever_three_in_seven_rate:40}],daily_health:[{day:'2026-09-12',people:4}]},groups:['difficulty','pick','round','set','model_disagreement','version'].map((dimension,i)=>({...sample,dimension,label:['hard','9','8','blb','true','first-pack-v2 / trophy-consensus-v2 / support-ratio-v1'][i]})),sets:['blb','powered-cube'],reviews:[{...sample,puzzle_id:'a'.repeat(32),set_id:'blb',pick_number:9,model_disagreement:true}]};
   await page.addInitScript(()=>localStorage.setItem('pack1-auth-session-v1','synthetic-admin-session'));
   const requests=[];
   const userId='11111111-1111-4111-8111-111111111111';
@@ -26,6 +26,9 @@ try {
   await page.reload();
   await page.getByRole('heading',{name:'How the decisions play'}).waitFor();
   await page.getByRole('heading',{name:'Daily result-share funnel'}).waitFor();
+  await page.getByRole('heading',{name:'Daily habit cohorts'}).waitFor();
+  assert.match(await page.getByText('creator_one',{exact:true}).locator('xpath=ancestor::tr').innerText(),/reddit[\s\S]*10[\s\S]*37\.5%[\s\S]*3 \/ 8 mature[\s\S]*2 immature/);
+  assert.match(await page.getByRole('heading',{name:'3-in-7 daily health'}).locator('xpath=following-sibling::div[1]').innerText(),/2026-09-12[\s\S]*4/);
   assert.match(await page.locator('.share-funnel').innerText(),/20[\s\S]*17[\s\S]*12[\s\S]*9/);
   assert.match(await page.getByText('Start conversion:',{exact:false}).innerText(),/60%[\s\S]*75%/);
   await page.getByLabel('Difficulty',{exact:true}).selectOption('hard');

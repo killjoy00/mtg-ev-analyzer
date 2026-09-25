@@ -8,6 +8,7 @@ import { escapeHtml as esc } from './html.mjs';
 import {achievementMark} from './achievement-icons.mjs';
 import { compactDraftRunFeedback, consensusFeedback } from './draft-run-feedback.mjs';
 import { tcgplayerUrl } from './tcgplayer.mjs';
+import { dailyResetCue } from './game-date.mjs';
 
 const base = () => String(window.PACK1_API?.draftRunUrl||'').replace(/\/$/,'');
 let run=null,selection=null,review=null,busy=false,dailyValidationConfirmation=null;
@@ -37,7 +38,7 @@ async function loadSetNames() {
 const app=()=>document.querySelector('#app');
 function styles() {
   if(document.querySelector('[data-draft-run-style]')) return;
-  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=7';link.dataset.draftRunStyle='1';document.head.appendChild(link);
+  const link=document.createElement('link');link.rel='stylesheet';link.href='./draft-run.css?v=9';link.dataset.draftRunStyle='1';document.head.appendChild(link);
 }
 async function api(path,body,auth=true) {
   const method=body===undefined?'GET':'POST',headers={'content-type':'application/json'};
@@ -100,7 +101,7 @@ function compactResultLabel(answer,sentence='') {
 }
 function cardGrid(p,answer=null) {
   const candidates=sortPackByRarity(p.candidates);
-  return `<div class="run-cards">${candidates.map(c=>`<article class="run-card ${selection===c.id?'selected':''} ${answer?.historicalId===c.id?'trophy-pick':''}"><button class="run-card-select" type="button" data-pick="${esc(c.id)}" aria-label="Pick ${esc(c.name)}" aria-pressed="${selection===c.id}" ${answer?'disabled':''}>${image(c)}<span>${esc(c.name)}</span></button><button class="run-zoom" type="button" data-zoom="${esc(c.id)}" aria-label="Enlarge ${esc(c.name)}">Enlarge</button>${answer&&(answer.historicalId===c.id||answer.selectedId===c.id)?`<span class="run-card-outcome">${answer.historicalId===c.id?'Trophy pick':'Your pick'}</span>`:''}</article>`).join('')}</div>`;
+  return `<div class="run-cards">${candidates.map(c=>`<article class="run-card ${selection===c.id?'selected':''} ${answer?.historicalId===c.id?'trophy-pick':''}"><button class="run-card-select" type="button" data-pick="${esc(c.id)}" aria-label="Pick ${esc(c.name)}" aria-pressed="${selection===c.id}" ${answer?'disabled':''}>${image(c)}</button><div class="run-card-caption"><span class="run-card-name">${esc(c.name)}</span><button class="run-zoom" type="button" data-zoom="${esc(c.id)}" aria-label="Enlarge ${esc(c.name)}"><span class="run-zoom-glyph" aria-hidden="true"></span></button></div>${answer&&(answer.historicalId===c.id||answer.selectedId===c.id)?`<span class="run-card-outcome">${answer.historicalId===c.id?'Trophy pick':'Your pick'}</span>`:''}</article>`).join('')}</div>`;
 }
 function rankingStateMarkup(value=run) {
   if(!value?.day)return '';
@@ -186,6 +187,18 @@ function resultRepeatAction() {
   if(run.custom_set_ids?.length)return {href:'?game=draft-run&custom=1',label:'Choose Sets for Another Run'};
   return {href:gameUrl(),label:`Start Another ${title()}`};
 }
+async function renderDailyResultCue(resultId) {
+  if(!run?.day)return;
+  const root=document.querySelector('#post-game-progress');
+  if(!root)return;
+  const status=await loadDailyStatus().catch(()=>null);
+  if(!root.isConnected||run?.id!==resultId||!run.day)return;
+  const streak=Number(status?.daily_streak||0);
+  const cue=document.createElement('p');
+  cue.className='post-game-daily-cue';
+  cue.textContent=`${dailyResetCue()}${streak>=2?` · ${streak}-day streak`:''}`;
+  root.append(cue);
+}
 function renderResult() {
   document.body.classList.remove('is-game');
   poolObserver?.disconnect();poolObserver=null;
@@ -199,10 +212,11 @@ function renderResult() {
     ${run.comparison?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
     <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required'].includes(run.ranking_identity?.reason)?'Choose username to add score':'Sign in to add score'):'View your career'}</button></div>
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
-    <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; alternatives earn up to 95 from held-out strong-player support.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
+    <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
   document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=6')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
 export async function returnToValidatedDaily(runId,{standing=null}={}) {

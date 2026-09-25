@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Release #406: deploy passwordless account-deletion email verification from merged commit ff2babe58f9d6c4c8d06879851aea9050ea5f7a6; promote the exact reviewed main revision through development and production smoke."}
+{"operation":"deploy-secure-auth","reason":"Release mobile auth schema from reviewed main 5d276b0810317cd3082ebd97cc875de8a3113fe5: apply 0037_mobile_oauth_handoffs through the guarded development-to-production secure-auth release and deploy the exact revision."}
