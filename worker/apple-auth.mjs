@@ -18,7 +18,6 @@ const APPLE_TOKEN_ENDPOINT='https://appleid.apple.com/auth/token';
 const APPLE_REVOKE_ENDPOINT='https://appleid.apple.com/auth/revoke';
 const APPLE_KEYS_ENDPOINT='https://appleid.apple.com/auth/keys';
 const APPLE_ISSUER='https://appleid.apple.com';
-const APPLE_KEY_ID_DEFAULT='N9L9483J64';
 const TOKEN_CIPHER_PREFIX='v1';
 let keyCache={at:0,keys:[]};
 
@@ -43,7 +42,7 @@ function parseJwt(token) {
 
 function appleConfig(env=process.env) {
   const teamId=String(env.APPLE_TEAM_ID||'').trim();
-  const keyId=String(env.APPLE_SIGN_IN_KEY_ID||APPLE_KEY_ID_DEFAULT).trim();
+  const keyId=String(env.APPLE_SIGN_IN_KEY_ID||'').trim();
   const privateKey=String(env.APPLE_SIGN_IN_KEY_P8||'').replace(/\\n/g,'\n').trim();
   if(!/^[A-Z0-9]{10}$/.test(teamId)||!/^[A-Z0-9]{10}$/.test(keyId)||!privateKey.includes('BEGIN PRIVATE KEY'))
     throw Object.assign(Error('Sign in with Apple is temporarily unavailable.'),{status:503,code:'APPLE_CONFIG'});
