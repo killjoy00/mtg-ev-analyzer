@@ -2,6 +2,7 @@ name: iOS TestFlight
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     paths:
       - 'mobile/**'
       - '.github/workflows/ios-testflight.yml'
