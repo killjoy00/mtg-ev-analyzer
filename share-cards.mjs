@@ -235,8 +235,8 @@ export function draftRunShareText(run) {
   const matches=run.answers.filter(a=>a.historicalMatch).length;
   const label=run.environment==='latest'?'Latest Set':run.environment==='powered-cube'?'Powered Cube':'Draft Run';
   const squares=run.answers.map(a=>a.historicalMatch?'🟩':a.score>=85?'🟦':a.score>=60?'🟨':a.score>=25?'🟧':'⬛').join('');
-  const date=run.day ? `Daily ${run.day}` : 'Practice';
-  return `Pack One · ${label} · ${date}\n${run.score}/100  ${squares}\n${matches}/${draftRunLength(run)} trophy picks matched. ${run.day?'Play today’s Daily.':'Play this run and compare.'}`;
+  if(run.day) return `I scored ${run.score}/100 on today’s Pack One ${label}. Can you beat it?\n${squares}\n${matches}/${draftRunLength(run)} trophy picks matched · Daily ${run.day}`;
+  return `Pack One · ${label} · Practice\n${run.score}/100  ${squares}\n${matches}/${draftRunLength(run)} trophy picks matched. Play this run and compare.`;
 }
 
 export async function shareDraftRunCard(run,url,{challenge=false,asImage=false}={}) {

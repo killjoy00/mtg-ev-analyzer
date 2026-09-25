@@ -9,6 +9,17 @@ test('homepage social metadata has no escaped-newline pollution',()=>{
  const html=fs.readFileSync('index.html','utf8');
  assert.equal(html.includes('\\n'),false,'Homepage HTML must not contain literal \\n escape text');
 });
+test('homepage metadata names MTG and uses a real 1200x630 social preview',()=>{
+ const html=fs.readFileSync('index.html','utf8');
+ assert.match(html,/<title>Pack One: Daily MTG Draft Decisions<\/title>/);
+ assert.match(html,/Magic: The Gathering draft decisions every day/);
+ assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview\.png"/);
+ assert.match(html,/property="og:image:width" content="1200"/);
+ assert.match(html,/property="og:image:height" content="630"/);
+ const png=fs.readFileSync('social-preview.png');
+ assert.equal(png.readUInt32BE(16),1200);
+ assert.equal(png.readUInt32BE(20),630);
+});
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);
  assert.match(html,/Eight decisions from real trophy drafts\./);
@@ -30,6 +41,7 @@ test('fresh guests get a larger Start here label instead of the generic first-ro
  const signed=dailyHomeMarkup({player:{claimed:true},capabilities:['account'],daily_history:[]},day);
  assert.doesNotMatch(signed,/daily-home-start">Start here<\/span>/);
  assert.match(signed,/The daily challenge/);
+ assert.match(guest,/Free · No account required/);
 });
 
 test('either unfinished Daily precedes the compact result',()=>{

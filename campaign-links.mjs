@@ -118,29 +118,29 @@ export function renderCampaignRedirectPage(entry) {
   const valid=validateCampaignEntries([entry])[0];
   const trackedUrl=buildCampaignTrackingUrl(valid);
   const trackedHref=htmlEscape(trackedUrl);
-  const title='Pack One: Learn from trophy drafts';
-  const description='Learn from trophy drafts. Eight picks. Your call.';
+  const title='Pack One: Daily MTG Draft Decisions';
+  const description='Eight real MTG draft decisions every day. Make your pick, then compare with a trophy drafter.';
   return `${GENERATED_CAMPAIGN_MARKER}
 <!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="description" content="Pack One: Learn from trophy drafts. Eight picks. Your call." />
+  <meta name="description" content="Eight real Magic: The Gathering draft decisions every day. Make your pick, then see what the trophy drafter chose and how strong your choice was. Free. No account required." />
   <meta name="robots" content="noindex,nofollow" />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="${title}" />
   <meta property="og:description" content="${description}" />
   <meta property="og:url" content="https://packone.pro/" />
-  <meta property="og:image" content="https://packone.pro/mobile/assets/images/icon.png" />
-  <meta property="og:image:width" content="1024" />
-  <meta property="og:image:height" content="1024" />
-  <meta property="og:image:alt" content="Pack One" />
+  <meta property="og:image" content="https://packone.pro/social-preview.png" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="Pack One: Daily MTG Draft Decisions" />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="${title}" />
   <meta name="twitter:description" content="${description}" />
-  <meta name="twitter:image" content="https://packone.pro/mobile/assets/images/icon.png" />
-  <meta name="twitter:image:alt" content="Pack One" />
+  <meta name="twitter:image" content="https://packone.pro/social-preview.png" />
+  <meta name="twitter:image:alt" content="Pack One: Daily MTG Draft Decisions" />
   <link rel="canonical" href="https://packone.pro/" />
   <title>${title}</title>
   <script>location.replace(${JSON.stringify(trackedUrl)});</script>
