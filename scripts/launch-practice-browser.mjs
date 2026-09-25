@@ -37,6 +37,11 @@ async function main() {
   });
   const page=await context.newPage(),errors=[],report={sha:fixture.sha,branch:fixture.branch,
     warm_samples_per_case:20,scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
+  // Playwright routing disables HTTP caching by default. Restore normal static
+  // asset caching in Chromium; API responses remain no-store and intercepted.
+  const cdp=await context.newCDPSession(page);await cdp.send('Network.enable');
+  await cdp.send('Network.setCacheDisabled',{cacheDisabled:false});
+  let staticCacheHits=0;cdp.on('Network.requestServedFromCache',()=>staticCacheHits++);
   page.on('pageerror',()=>errors.push('browser_error'));
   const directory='artifacts/launch-load';fs.mkdirSync(directory,{recursive:true});
   const ready=async configuration=>{
@@ -95,7 +100,7 @@ async function main() {
       const rows=report.samples.filter(s=>s.case===name&&s.phase==='warm');
       return [name,{api:summarize(rows.map(s=>s.api_ms)),click:summarize(rows.map(s=>s.click_to_cards_ms)),images:summarize(rows.map(s=>s.click_to_images_ms))}];
     }));
-    report.passed=!errors.length&&report.samples.filter(s=>s.phase==='confirmed_idle').length===4&&report.samples.filter(s=>s.phase==='confirmed_idle').every(s=>s.click_to_cards_ms<=report.budgets.cold_click_ms)&&
+    report.passed=!errors.length&&staticCacheHits>0&&report.samples.filter(s=>s.phase==='confirmed_idle').length===4&&report.samples.filter(s=>s.phase==='confirmed_idle').every(s=>s.click_to_cards_ms<=report.budgets.cold_click_ms)&&
       Object.values(report.summary).every(s=>s.api.p95_ms<=2000&&s.click.p95_ms<=3000);
     await page.screenshot({path:directory+'/practice-mobile.png',fullPage:true});
   } catch(error) {
@@ -103,11 +108,11 @@ async function main() {
     await page.screenshot({path:directory+'/practice-failure.png',fullPage:true});
     throw error;
   } finally {
-    report.browser_errors=errors.length;report.api_calls=apiCalls;
+    report.browser_errors=errors.length;report.api_calls=apiCalls;report.http_cache_hits=staticCacheHits;
     fs.writeFileSync(directory+'/practice-browser.json',JSON.stringify(report,null,2));
     await browser.close();
   }
-  console.log(JSON.stringify({operation:'isolated-practice-browser',passed:report.passed,samples:report.samples,summary:report.summary}));
+  console.log(JSON.stringify({operation:'isolated-practice-browser',passed:report.passed,http_cache_hits:staticCacheHits,samples:report.samples,summary:report.summary}));
   if(!report.passed)process.exitCode=1;
 }
 main().catch(()=>{console.error('Isolated browser acceptance failed; inspect sanitized artifacts.');process.exitCode=1;});
