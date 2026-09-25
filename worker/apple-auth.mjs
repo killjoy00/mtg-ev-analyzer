@@ -263,6 +263,26 @@ async function providerAdminSession(authBase,{env=process.env,validateServicePri
   return {cookie:signed.cookie,serviceId};
 }
 
+async function markAppleAuthEmailVerified({authBase,userId,env=process.env,validateServicePrincipal}) {
+  let admin=null;
+  try {
+    admin=await providerAdminSession(authBase,{env,validateServicePrincipal});
+    if(admin.serviceId===String(userId))
+      throw Object.assign(Error('Apple account cannot use the Auth service principal.'),{status:409,code:'APPLE_LINK'});
+    const updated=await providerAdminCall(authBase,'/admin/update-user',{cookie:admin.cookie,body:{
+      userId,
+      data:{emailVerified:true},
+    }});
+    admin.cookie=updated.cookie||admin.cookie;
+    if(!updated.response.ok)
+      throw Object.assign(Error('Apple account could not be verified.'),{status:503,code:'APPLE_ADMIN_VERIFY'});
+  } finally {
+    if(admin?.cookie) {
+      try {await providerAdminCall(authBase,'/sign-out',{cookie:admin.cookie,body:{}});} catch {}
+    }
+  }
+}
+
 export async function createAppleAuthUser({authBase,email,name,env=process.env,validateServicePrincipal}) {
   let admin=null;
   try {
@@ -285,6 +305,8 @@ export async function createAppleAuthUser({authBase,email,name,env=process.env,v
     const user=created.data?.user||created.data;
     const userId=String(user?.id||'');
     if(!/^[0-9a-f-]{36}$/i.test(userId))
+      throw Object.assign(Error('Apple account could not be created.'),{status:503,code:'APPLE_ADMIN_CREATE'});
+    if(admin.serviceId===userId)
       throw Object.assign(Error('Apple account could not be created.'),{status:503,code:'APPLE_ADMIN_CREATE'});
     const updated=await providerAdminCall(authBase,'/admin/update-user',{cookie:admin.cookie,body:{
       userId,
@@ -329,8 +351,13 @@ export async function resolveAppleAccount(query,{
     const email=presented.email||validated.email;
     if(!email||!(presented.emailVerified||validated.emailVerified))
       throw Object.assign(Error('Apple did not provide a verified account email.'),{status:409,code:'APPLE_EMAIL'});
-    const byEmail=(await query('SELECT id auth_user_id,email,name FROM neon_auth."user" WHERE lower(email)=lower($1) LIMIT 1',[email])).rows[0]||null;
+    if(email.toLowerCase()===String(env.PACK1_DELETION_ADMIN_EMAIL||'').trim().toLowerCase())
+      throw Object.assign(Error('Apple account cannot use the Auth service principal.'),{status:409,code:'APPLE_LINK'});
+    const byEmail=(await query('SELECT id auth_user_id,email,name,"emailVerified" email_verified FROM neon_auth."user" WHERE lower(email)=lower($1) LIMIT 1',[email])).rows[0]||null;
     let authUserId=byEmail?.auth_user_id||null,syntheticPassword=false;
+    if(authUserId&&!bool(byEmail.email_verified)) {
+      await markAppleAuthEmailVerified({authBase,userId:authUserId,env,validateServicePrincipal});
+    }
     if(!authUserId) {
       try {
         const created=await createAppleAuthUser({
@@ -340,9 +367,11 @@ export async function resolveAppleAccount(query,{
         syntheticPassword=created.syntheticPassword;
       } catch(error) {
         if(error?.code!=='APPLE_ACCOUNT_EXISTS')throw error;
-        const raced=(await query('SELECT id auth_user_id FROM neon_auth."user" WHERE lower(email)=lower($1) LIMIT 1',[email])).rows[0];
+        const raced=(await query('SELECT id auth_user_id,"emailVerified" email_verified FROM neon_auth."user" WHERE lower(email)=lower($1) LIMIT 1',[email])).rows[0];
         if(!raced?.auth_user_id)throw error;
         authUserId=raced.auth_user_id;
+        if(!bool(raced.email_verified))
+          await markAppleAuthEmailVerified({authBase,userId:authUserId,env,validateServicePrincipal});
       }
     }
     const given=sanitizeAppleNamePart(firstName)||null;
