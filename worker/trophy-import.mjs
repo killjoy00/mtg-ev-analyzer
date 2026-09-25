@@ -174,7 +174,7 @@ export async function normalizeResolvedImageMarkers(query,rawSetIds) {
   return {normalized};
 }
 
-export async function insertTrophyBatch(query,puzzles,{componentVersion=null}={}) {
+export async function insertTrophyBatch(query,puzzles,{componentVersion=null,sourceSnapshotId=null}={}) {
   if(!Array.isArray(puzzles)||!puzzles.length||puzzles.length>250||new Set(puzzles.map(p=>p.puzzle_id)).size!==puzzles.length)throw error('Invalid batch');
   if(componentVersion) {
     if(!supportedComponent(componentVersion))throw error('Unsupported source component');
@@ -182,14 +182,17 @@ export async function insertTrophyBatch(query,puzzles,{componentVersion=null}={}
       if(!(await query("SELECT 1 FROM corpus_components WHERE set_id=$1 AND component_version=$2 AND parent_version=$3 AND status='Candidate'",[sid,componentVersion,VERSION])).rows.length)throw error('Only an unpublished Candidate component accepts imports');
     }
   }
+  if(sourceSnapshotId&&!/^[a-f0-9]{64}$/.test(sourceSnapshotId))throw error('Invalid source snapshot');
+  if(sourceSnapshotId&&!(await query("SELECT 1 FROM corpus_source_snapshots WHERE source_snapshot_id=$1 AND lifecycle_status='Blocked'",[sourceSnapshotId])).rows.length)throw error('Source snapshot is not open for import',409);
   const dynamic=[...new Set(puzzles.map(p=>p.set_id).filter(s=>!allowed.has(s)))];
   const registered=new Set();
   for(const sid of dynamic){const r=await query("SELECT v.set_id FROM corpus_set_versions v LEFT JOIN corpus_sources s ON s.set_id=v.set_id AND s.event_type='PremierDraft' LEFT JOIN draft_run_environment_policy p ON p.set_id=v.set_id WHERE v.set_id=$1 AND v.corpus_version=$2 AND ((p.status='Candidate' AND p.source_event_type='PremierDraft') OR (p.set_id IS NULL AND v.manifest->>'discovered'='true' AND s.archive_available AND s.import_status IN ('building','validating')))",[sid,VERSION]);if(r.rows.length)registered.add(sid);}
   const batch=puzzles.map(p=>{
     if((!allowed.has(p.set_id)&&!registered.has(p.set_id))||!validateDraftRunPuzzle(p,componentVersion||VERSION)||!['puzzle_id','source_draft_hash','source_fingerprint'].every(k=>new RegExp(k==='source_fingerprint'?'^[a-f0-9]{64}$':'^[a-f0-9]{32}$').test(p[k]))||[...p.candidates,...p.prior_picks].some(c=>!c.image_url?.startsWith('https://')))throw error('Invalid verified puzzle');
-    return {puzzle_id:p.puzzle_id,set_id:p.set_id,source_draft_hash:p.source_draft_hash,corpus_version:p.corpus_version,pick_number:p.pick_number,candidate_count:p.candidates.length,consensus_top_gap:draftRunDifficulty(p).topGap,support_entropy:draftRunDifficulty(p).entropy,interesting:interestingDraftRunPuzzle(p),payload:p};
+    if(sourceSnapshotId&&p.source_snapshot_id!==sourceSnapshotId)throw error('Puzzle snapshot provenance mismatch');
+    return {puzzle_id:p.puzzle_id,set_id:p.set_id,source_snapshot_id:sourceSnapshotId,source_draft_hash:p.source_draft_hash,corpus_version:p.corpus_version,pick_number:p.pick_number,candidate_count:p.candidates.length,consensus_top_gap:draftRunDifficulty(p).topGap,support_entropy:draftRunDifficulty(p).entropy,interesting:interestingDraftRunPuzzle(p),payload:p};
   });
-  const r=await query(`WITH incoming AS (SELECT * FROM jsonb_to_recordset($1::jsonb) AS p(puzzle_id text,set_id text,source_draft_hash text,corpus_version text,pick_number smallint,candidate_count smallint,consensus_top_gap real,support_entropy real,interesting boolean,payload jsonb)), conflicts AS (SELECT i.puzzle_id FROM incoming i JOIN draft_run_verified_puzzles e USING(puzzle_id) WHERE e.payload IS DISTINCT FROM i.payload), added AS (INSERT INTO draft_run_verified_puzzles(puzzle_id,set_id,source_draft_hash,corpus_version,pick_number,candidate_count,consensus_top_gap,support_entropy,interesting,payload) SELECT * FROM incoming WHERE NOT EXISTS(SELECT 1 FROM conflicts) ON CONFLICT(puzzle_id) DO NOTHING RETURNING puzzle_id) SELECT (SELECT count(*) FROM conflicts)::int conflicts,(SELECT count(*) FROM added)::int added`,[JSON.stringify(batch)]);
+  const r=await query(`WITH incoming AS (SELECT * FROM jsonb_to_recordset($1::jsonb) AS p(puzzle_id text,set_id text,source_snapshot_id text,source_draft_hash text,corpus_version text,pick_number smallint,candidate_count smallint,consensus_top_gap real,support_entropy real,interesting boolean,payload jsonb)), conflicts AS (SELECT i.puzzle_id FROM incoming i JOIN draft_run_verified_puzzles e USING(puzzle_id) WHERE e.payload IS DISTINCT FROM i.payload), added AS (INSERT INTO draft_run_verified_puzzles(puzzle_id,set_id,source_snapshot_id,source_draft_hash,corpus_version,pick_number,candidate_count,consensus_top_gap,support_entropy,interesting,payload) SELECT * FROM incoming WHERE NOT EXISTS(SELECT 1 FROM conflicts) ON CONFLICT(puzzle_id) DO NOTHING RETURNING puzzle_id) SELECT (SELECT count(*) FROM conflicts)::int conflicts,(SELECT count(*) FROM added)::int added`,[JSON.stringify(batch)]);
   if(Number(r.rows[0].conflicts))throw error('Existing puzzle differs; no payload overwritten',409);
   return Number(r.rows[0].added);
 }
@@ -217,7 +220,7 @@ export async function handleTrophyImport(request,query) {
   if(identity.workflow_ref!==IMPORT_WORKFLOW)throw error('Trophy import identity denied',403);
 
   if(body.action==='refresh-statistics')return refreshServingStatistics(query);
-  if(body.action==='batch')return {added:await insertTrophyBatch(query,body.puzzles)};
+  if(body.action==='batch')return {added:await insertTrophyBatch(query,body.puzzles,{sourceSnapshotId:body.sourceSnapshotId||null})};
   const sid=body.setId||body.manifest?.id;
   if(!allowed.has(sid))throw error('Environment not registered');
   const status=(await query('SELECT s.corpus_version,(SELECT count(*)::int FROM draft_run_verified_puzzles p WHERE p.set_id=s.set_id AND p.corpus_version=$2) puzzles FROM draft_run_verified_sets s WHERE s.set_id=$1',[sid,VERSION])).rows[0];
