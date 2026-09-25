@@ -23,5 +23,6 @@ test('account and profile entry modules use release-versioned imports', async ()
   assert.match(profile, /progression\.mjs\?v=6/);
   assert.match(profile, /growth\.mjs\?v=6/);
   assert.match(progression, /growth\.mjs\?v=6/);
-  assert.match(draft, /growth\.mjs\?v=6/);\n  assert.match(draft, /share-cards\.mjs\?v=7/);
+  assert.match(draft, /growth\.mjs\?v=6/);
+  assert.match(draft, /share-cards\.mjs\?v=7/);
 });
