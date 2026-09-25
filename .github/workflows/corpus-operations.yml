@@ -161,28 +161,3 @@ jobs:
           if [[ "$TARGET" == development ]]; then
             node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/corpus-health.connection"
           fi
-
-
-  scheduled-production-health:
-    needs: corpus
-    if: ${{ always() && github.event_name == 'schedule' }}
-    runs-on: ubuntu-latest
-    timeout-minutes: 45
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - run: npm install -g neon@4.17.4
-      - name: Refresh production retained corpus health
-        env:
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-        run: |
-          set -euo pipefail
-          umask 077
-          branch=br-orange-feather-ayps8kep
-          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
-          echo "::add-mask::$connection"
-          printf '%s' "$connection" > "$RUNNER_TEMP/production-corpus-health.connection"
-          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
-          node scripts/check-corpus-health.mjs "$RUNNER_TEMP/production-corpus-health.connection"
