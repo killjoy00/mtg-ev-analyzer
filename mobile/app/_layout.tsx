@@ -2,12 +2,14 @@ import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
+import { VersionGate } from '@/src/components/VersionGate';
 import { colors } from '@/src/theme';
 
 export default function RootLayout() {
   return (
-    <>
-      <StatusBar style="dark" />
+    <VersionGate>
+      <>
+        <StatusBar style="dark" />
       <Stack
         unstable_screenErrorBoundary={ScreenErrorBoundary}
         screenOptions={{
@@ -27,7 +29,8 @@ export default function RootLayout() {
         <Stack.Screen name="method" options={{ title: 'Method' }} />
         <Stack.Screen name="sets" options={{ title: 'Sets' }} />
         <Stack.Screen name="account" options={{ title: 'Account' }} />
-      </Stack>
-    </>
+        </Stack>
+      </>
+    </VersionGate>
   );
 }
