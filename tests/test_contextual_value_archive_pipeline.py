@@ -2,11 +2,12 @@ import csv
 import sys
 import tempfile
 import unittest
+from collections import Counter
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from contextual_value.archive import ArchiveSignalProvider, GameStore, load_decisions
+from contextual_value.archive import ArchiveSignalProvider, GameDraftSummary, GameStore, load_decisions
 from contextual_value.dataset import Decision, draft_split
 from contextual_value.features import CardSignals
 from contextual_value.pipeline import run_development
@@ -153,6 +154,69 @@ class ArchiveSignalTests(unittest.TestCase):
 
         games = GameStore.from_archives(roots, draft_ids)
         self.assertEqual(set(games.drafts), set(draft_ids))
+
+    def test_card_outcome_signals_are_scoped_by_expansion(self):
+        def row(draft_id, expansion, selected):
+            return Decision(
+                draft_id=draft_id,
+                expansion=expansion,
+                event_type="PremierDraft",
+                draft_time="2026-01-01T00:00:00Z",
+                rank="Gold",
+                pack_number=0,
+                pick_number=0,
+                selected_card=selected,
+                candidates=("A", "B"),
+                pool=(),
+                user_game_win_rate=0.55,
+                user_games_lower_bound=100,
+                event_match_wins=4,
+                event_match_losses=3,
+            )
+
+        decisions = []
+        summaries = {}
+        training_ids = set()
+        for expansion, a_wins, b_wins in (("TST", 1, 0), ("ALT", 0, 1)):
+            for index in range(4):
+                draft_id = f"{expansion.lower()}-{index}"
+                training_ids.add(draft_id)
+                decisions.append(row(draft_id, expansion, "A" if index % 2 == 0 else "B"))
+                summaries[draft_id] = GameDraftSummary(
+                    rows=2,
+                    wins=1,
+                    cards={
+                        "A": {
+                            "gih_games": 1, "gih_wins": a_wins,
+                            "gnd_games": 1, "gnd_wins": 1 - a_wins,
+                            "deck_games": 2, "deck_wins": 1,
+                        },
+                        "B": {
+                            "gih_games": 1, "gih_wins": b_wins,
+                            "gnd_games": 1, "gnd_wins": 1 - b_wins,
+                            "deck_games": 2, "deck_wins": 1,
+                        },
+                    },
+                    played={"A", "B"},
+                    main_colours=Counter({"W": 2}),
+                )
+        tst_held = row("tst-held", "TST", "A")
+        alt_held = row("alt-held", "ALT", "A")
+        decisions.extend([tst_held, alt_held])
+        provider = ArchiveSignalProvider(
+            decisions,
+            GameStore(summaries),
+            strong_training_cap=None,
+        )
+        training = frozenset(training_ids)
+        tst = provider(tst_held, training)
+        alt = provider(alt_held, training)
+        self.assertGreater(tst["A"].gih_wr, alt["A"].gih_wr)
+        self.assertLess(tst["B"].gih_wr, alt["B"].gih_wr)
+        self.assertEqual(
+            provider.artifacts(training, "TST").training_ids,
+            frozenset(d for d in training if d.startswith("tst-")),
+        )
 
     def test_game_archive_without_main_colors_fails_closed(self):
         temp, _, game_path, draft_ids = self._fixtures()
