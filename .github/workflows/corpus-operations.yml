@@ -59,10 +59,15 @@ jobs:
           set -euo pipefail
           test -n "$VALIDATED_RUN_ID" || { echo 'production requires validated_run_id from a successful development Corpus Operations run' >&2; exit 1; }
           gh run view "$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch --jq 'select(.conclusion=="success" and .workflowName=="Corpus Operations" and .headBranch=="main")' | grep -q .
-          rm -rf generated/corpus-candidates
-          mkdir -p generated/corpus-candidates
+          rm -rf generated/corpus-candidates generated/corpus-operations
+          mkdir -p generated/corpus-candidates generated/corpus-operations
           gh run download "$VALIDATED_RUN_ID" --name "corpus-operations-$VALIDATED_RUN_ID" --dir "$RUNNER_TEMP/validated"
-          cp -R "$RUNNER_TEMP/validated/generated/corpus-candidates/." generated/corpus-candidates/
+          root="$RUNNER_TEMP/validated"
+          [[ -d "$root/generated" ]] && root="$root/generated"
+          test -f "$root/corpus-candidates/catalog.json"
+          test -f "$root/corpus-operations/discovery.json"
+          cp -R "$root/corpus-candidates/." generated/corpus-candidates/
+          cp -R "$root/corpus-operations/." generated/corpus-operations/
       - uses: actions/cache/restore@v4
         if: ${{ (inputs.target || 'development') != 'production' }}
         with:
@@ -89,6 +94,7 @@ jobs:
         if: ${{ (inputs.target || 'development') == 'production' }}
         run: |
           set -euo pipefail
+          node scripts/register-corpus-sources.mjs "$RUNNER_TEMP/corpus.connection"
           node scripts/load_all_trophies.mjs unused generated/corpus-candidates --validate-only
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
       - name: Record import failures
@@ -97,7 +103,7 @@ jobs:
           WORKFLOW_STATUS: ${{ job.status }}
         run: node scripts/record-corpus-import-status.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
       - uses: actions/cache/save@v4
-        if: always()
+        if: ${{ always() && (inputs.target || 'development') != 'production' }}
         with:
           path: generated/corpus-candidates
           key: corpus-candidates-${{ github.sha }}-${{ github.run_id }}
