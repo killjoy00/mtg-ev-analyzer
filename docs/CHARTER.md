@@ -14,7 +14,7 @@ All three Dailies are free once per Pacific date. Browser/device identity provid
 
 A Daily schedule is universal and immutable after generation, including puzzle IDs, corpus/scoring/selection/difficulty versions. Its corpus pins the model. No Daily permits rerolls. Later corpus lifecycle changes affect only newly generated schedules and sessions. An already-generated historical schedule retains its original shape for everyone joining that day.
 
-Daily sharing publishes a score and the universal Daily entry link; it never creates a private match or changes eligibility. Practice sharing means **share this run and compare**: a stable run identity supplies the exact same eight decisions. Shared recipients cannot reroll them. If the share creator reopens their own practice link, Pack One recovers the creator's original authoritative run/result; it does not create a second challenge session, compare the player against themself, or count a self-result in challenge history. Historical published links remain readable.
+Daily sharing publishes a score and the universal Daily entry link; after all three Dailies are complete, the Daily home may also share the three aggregate scores with the universal Pack One home link. Neither form creates a private match or changes eligibility. Practice sharing means **share this run and compare**: a stable run identity supplies the exact same eight decisions. Shared recipients cannot reroll them. If the share creator reopens their own practice link, Pack One recovers the creator's original authoritative run/result; it does not create a second challenge session, compare the player against themself, or count a self-result in challenge history. Historical published links remain readable.
 
 ## Sources and selection
 
