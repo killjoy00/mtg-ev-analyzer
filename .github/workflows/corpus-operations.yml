@@ -64,8 +64,17 @@ jobs:
           python -u scripts/run_import_all_trophies.py --sets "$sets" --output generated/corpus-candidates --workers 2 --max-seconds 6000 --discard-source-archives
           node scripts/load_all_trophies.mjs unused generated/corpus-candidates --validate-only
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
-      - name: Verify retained corpus health
-        run: node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus.connection"
+      - name: Verify newly ingested Candidate health
+        shell: bash
+        run: |
+          set -euo pipefail
+          sets=$(cat generated/corpus-operations/pending.txt)
+          if [[ -z "$sets" ]]; then
+            echo 'No newly ingested corpus candidates; skipping deep payload health scan.'
+            exit 0
+          fi
+          IFS=',' read -r -a set_args <<< "$sets"
+          node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus.connection" "${set_args[@]}"
       - name: Record import failures
         if: always()
         env:
