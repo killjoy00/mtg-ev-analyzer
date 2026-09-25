@@ -15,7 +15,7 @@ import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
-import {APPLE_NATIVE_CLIENT_ID,APPLE_REDIRECT_URI,APPLE_WEB_CLIENT_ID,appleAuthorizeUrl,appleConfigured,markApplePasswordEstablished,resolveAppleAccount,revokeAppleAuthorization,sanitizeAppleFirstName} from './apple-auth.mjs';
+import {APPLE_NATIVE_CLIENT_ID,APPLE_REDIRECT_URI,APPLE_WEB_CLIENT_ID,appleAuthorizeUrl,appleConfigured,markApplePasswordEstablished,resolveAppleAccount,revokeAppleAuthorization,sanitizeAppleFirstName,storeAppleRefreshToken,verifyAppleAuthorization} from './apple-auth.mjs';
 const ACCOUNT_CONFIG=accountRuntimeConfig();
 const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
 const TOKEN_PREFIX = 'p1_';
@@ -880,11 +880,18 @@ async function appleServicePrincipalAllowed(serviceId) {
   return linked.rows.length===0;
 }
 
-function appleReturn(flowKind,params={}) {
+function appleReturn(flowKind,params={},purpose='signin') {
   const target=new URL(flowKind==='mobile'?MOBILE_GOOGLE_RETURN:ACCOUNT_RETURN);
-  if(flowKind==='web')target.searchParams.set('auth',params.apple==='error'?'apple-error':'apple');
+  const failed=params.apple==='error';
+  if(flowKind==='web') {
+    target.searchParams.set('auth',purpose==='delete'
+      ? failed?'apple-delete-error':'apple-delete'
+      : failed?'apple-error':'apple');
+  } else if(purpose==='delete'&&failed) {
+    target.searchParams.set('appleDelete','error');
+  }
   for(const [key,value] of Object.entries(params)) {
-    if(key==='apple'&&flowKind==='web')continue;
+    if(key==='apple')continue;
     if(value!=null)target.searchParams.set(key,String(value));
   }
   return new Response(null,{status:302,headers:{
@@ -900,8 +907,39 @@ async function beginAppleFlow(request,{mobile=false}={}) {
   await consumePlayerLimit(query,owner,mobile?'mobile-apple-auth':'browser-apple-auth',{limit:10,seconds:600});
   await query('DELETE FROM mobile_oauth_handoffs WHERE expires_at<=now()');
   const flowToken=opaqueMobileToken();
-  await query(`INSERT INTO mobile_oauth_handoffs(flow_hash,guest_player_id,provider,flow_kind,expires_at)
-    VALUES($1,$2::uuid,'apple',$3,now()+interval '10 minutes')`,[
+  await query(`INSERT INTO mobile_oauth_handoffs(flow_hash,guest_player_id,provider,flow_kind,purpose,expires_at)
+    VALUES($1,$2::uuid,'apple',$3,'signin',now()+interval '10 minutes')`,[
+    digest(flowToken),owner,mobile?'mobile':'web',
+  ]);
+  return json({flowToken,url:appleAuthorizeUrl(flowToken)});
+}
+
+async function beginAppleDeleteFlow(request,{mobile=false}={}) {
+  const auth=await accountMutationAuth(request,{mobile});
+  if(!deletionEnabled())
+    throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'DELETION_DISABLED'});
+  const payload=await readJson(request);
+  if(payload.confirm!==true)
+    throw Object.assign(Error('Confirm permanent account deletion.'),{status:400,code:'DELETE_CONFIRMATION'});
+  const credentials=await credentialState(auth.user_id);
+  if(!credentials.apple)
+    throw Object.assign(Error('This account is not linked to Sign in with Apple.'),{status:409,code:'APPLE_DELETE_UNAVAILABLE'});
+  const owner=await player(request);
+  const initLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_init',
+    limit:DELETE_INIT_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(initLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',initLimit);
+  const network=trustedCredentialNetwork(request);
+  const networkLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_network',networkHash:network,
+    limit:DELETE_NETWORK_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(networkLimit.limited)return credentialThrottle('Too many deletion attempts. Please try again later.',networkLimit);
+  await query('DELETE FROM mobile_oauth_handoffs WHERE expires_at<=now()');
+  const flowToken=opaqueMobileToken();
+  await query(`INSERT INTO mobile_oauth_handoffs(flow_hash,guest_player_id,provider,flow_kind,purpose,expires_at)
+    VALUES($1,$2::uuid,'apple',$3,'delete',now()+interval '10 minutes')`,[
     digest(flowToken),owner,mobile?'mobile':'web',
   ]);
   return json({flowToken,url:appleAuthorizeUrl(flowToken)});
@@ -922,7 +960,7 @@ async function handleAppleCallback(request) {
     form=await readAppleCallback(request);
     flowToken=String(form.get('state')||'');
     if(!/^[A-Za-z0-9_-]{43}$/.test(flowToken))throw Error('state');
-    flow=(await query(`SELECT flow_kind,guest_player_id
+    flow=(await query(`SELECT flow_kind,guest_player_id,purpose
       FROM mobile_oauth_handoffs
       WHERE flow_hash=$1 AND provider='apple' AND consumed_at IS NULL
         AND authenticated_at IS NULL AND expires_at>now()
@@ -933,7 +971,7 @@ async function handleAppleCallback(request) {
   }
   if(form.get('error')) {
     await query('UPDATE mobile_oauth_handoffs SET consumed_at=COALESCE(consumed_at,now()) WHERE flow_hash=$1',[digest(flowToken)]).catch(()=>{});
-    return appleReturn(flow.flow_kind,{apple:'error'});
+    return appleReturn(flow.flow_kind,{apple:'error'},flow.purpose);
   }
   let firstName='',lastName='';
   const userRaw=String(form.get('user')||'');
@@ -945,6 +983,32 @@ async function handleAppleCallback(request) {
     } catch {}
   }
   try {
+    const handoffToken=opaqueMobileToken();
+    if(flow.purpose==='delete') {
+      const authorization=await verifyAppleAuthorization({
+        identityToken:String(form.get('id_token')||''),
+        authorizationCode:String(form.get('code')||''),
+        clientId:APPLE_WEB_CLIENT_ID,
+        nonce:flowToken,
+        redirectUri:APPLE_REDIRECT_URI,
+      });
+      const identity=(await query('SELECT auth_user_id FROM apple_auth_identities WHERE apple_subject=$1 LIMIT 1',[authorization.subject])).rows[0];
+      if(!identity?.auth_user_id)
+        throw Object.assign(Error('This Apple authorization is not linked to a Pack One account.'),{status:409,code:'APPLE_DELETE_IDENTITY'});
+      await storeAppleRefreshToken(query,{
+        subject:authorization.subject,
+        clientId:APPLE_WEB_CLIENT_ID,
+        refreshToken:authorization.refreshToken,
+      });
+      const updated=await query(`UPDATE mobile_oauth_handoffs
+        SET handoff_hash=$2,auth_user_id=$3::uuid,authenticated_at=now()
+        WHERE flow_hash=$1 AND provider='apple' AND purpose='delete' AND consumed_at IS NULL
+          AND authenticated_at IS NULL AND expires_at>now()
+        RETURNING flow_kind`,[digest(flowToken),digest(handoffToken),identity.auth_user_id]);
+      if(!updated.rows[0])throw Object.assign(Error('Apple deletion verification expired.'),{status:409});
+      return appleReturn(updated.rows[0].flow_kind,{appleDeleteHandoff:handoffToken},'delete');
+    }
+
     const auth=await resolveAppleAccount(query,{
       identityToken:String(form.get('id_token')||''),
       authorizationCode:String(form.get('code')||''),
@@ -956,19 +1020,18 @@ async function handleAppleCallback(request) {
       authBase:NEON_AUTH_BASE,
       validateServicePrincipal:appleServicePrincipalAllowed,
     });
-    const handoffToken=opaqueMobileToken();
     const updated=await query(`UPDATE mobile_oauth_handoffs
       SET handoff_hash=$2,auth_user_id=$3::uuid,authenticated_at=now()
-      WHERE flow_hash=$1 AND provider='apple' AND consumed_at IS NULL
+      WHERE flow_hash=$1 AND provider='apple' AND purpose='signin' AND consumed_at IS NULL
         AND authenticated_at IS NULL AND expires_at>now()
         AND pack1_identity_attachment_allowed($3::uuid)
       RETURNING flow_kind`,[digest(flowToken),digest(handoffToken),auth.user_id]);
     if(!updated.rows[0])throw Object.assign(Error('Apple sign in handoff expired.'),{status:409});
-    return appleReturn(updated.rows[0].flow_kind,{appleHandoff:handoffToken});
+    return appleReturn(updated.rows[0].flow_kind,{appleHandoff:handoffToken},'signin');
   } catch(error) {
     console.error('Apple OAuth callback failed',String(error?.code||''),Number(error?.status||500));
     await query('UPDATE mobile_oauth_handoffs SET consumed_at=COALESCE(consumed_at,now()) WHERE flow_hash=$1',[digest(flowToken)]).catch(()=>{});
-    return appleReturn(flow.flow_kind,{apple:'error'});
+    return appleReturn(flow.flow_kind,{apple:'error'},flow.purpose);
   }
 }
 
@@ -984,7 +1047,7 @@ async function consumeAppleHandoff(request,{mobile=false}={}) {
     SET consumed_at=now()
     FROM neon_auth."user" u
     WHERE h.handoff_hash=$1 AND h.guest_player_id=$2::uuid AND h.provider='apple'
-      AND h.flow_kind=$3 AND h.authenticated_at IS NOT NULL AND h.consumed_at IS NULL AND h.expires_at>now()
+      AND h.flow_kind=$3 AND h.purpose='signin' AND h.authenticated_at IS NOT NULL AND h.consumed_at IS NULL AND h.expires_at>now()
       AND u.id=h.auth_user_id
     RETURNING h.auth_user_id user_id,u.email,u.name`,[
     digest(handoffToken),owner,mobile?'mobile':'web',
@@ -1431,10 +1494,10 @@ async function accountState(auth) {
     credentials,
     deletion:{
       enabled,
-      available:enabled&&credentials.password,
+      available:enabled&&Boolean(credentials.password||credentials.apple||emailMethod),
       googleOnly:credentials.google&&!credentials.apple&&!credentials.password,
       socialOnly:(credentials.google||credentials.apple)&&!credentials.password,
-      method:enabled?(credentials.password?'password':emailMethod?'email':null):null,
+      method:enabled?(credentials.password?'password':credentials.apple?'apple':emailMethod?'email':null):null,
     },
   };
 }
@@ -1644,6 +1707,8 @@ async function handleAccountDeleteVerificationStart(request,{mobile=false}={}) {
   const state=await credentialState(auth.user_id);
   if(state.password)
     throw Object.assign(Error('Use your current password to delete this account.'),{status:409,code:'PASSWORD_DELETE_REQUIRED'});
+  if(state.apple)
+    throw Object.assign(Error('Verify with Apple to delete this account.'),{status:409,code:'APPLE_DELETE_REQUIRED'});
   if(!deletionEmailConfigured())
     throw Object.assign(Error('Account deletion verification is temporarily unavailable.'),{status:503,code:'DELETION_EMAIL_UNAVAILABLE'});
   const email=await deletionEmailForAuth(query,auth.user_id);
@@ -1664,6 +1729,51 @@ async function handleAccountDeleteVerificationStart(request,{mobile=false}={}) {
 
   const verification=await createDeletionVerification(query,{authUserId:auth.user_id,email});
   return json({ok:true,verification:'sent',expiresInSeconds:verification.expiresInSeconds});
+}
+
+async function commitAccountDeletion(auth,{mobile=false}={}) {
+  const operation=await beginDeletion(query,{authUserId:auth.user_id});
+  if(!operation)throw Object.assign(Error('Account deletion could not be started.'),{status:500,code:'DELETE_START'});
+  const final=await resumeDeletionOperation(operation,{knownEmail:auth.email});
+  const complete=final?.state==='complete';
+  let response=json({
+    ok:true,
+    deletion:complete?'complete':'accepted',
+    operationId:final?.operation_id,
+  },complete?200:202);
+  if(!mobile)response=clearPlayerCookie(clearAccountCookies(response));
+  return response;
+}
+
+async function finishAppleDeleteFlow(request,{mobile=false}={}) {
+  const auth=await accountMutationAuth(request,{mobile});
+  if(!deletionEnabled())
+    throw Object.assign(Error('Account deletion is temporarily unavailable.'),{status:503,code:'DELETION_DISABLED'});
+  const owner=await player(request);
+  trustedCredentialNetwork(request);
+  const verifyLimit=await consumeCredentialLimit(query,{
+    authUserId:auth.user_id,purpose:'account_delete_verify',
+    limit:DELETE_VERIFY_LIMIT,seconds:DELETE_LIMIT_SECONDS,
+  });
+  if(verifyLimit.limited)return credentialThrottle('Too many verification attempts. Please try again later.',verifyLimit);
+  const payload=await readJson(request);
+  if(payload.confirm!==true)
+    throw Object.assign(Error('Confirm permanent account deletion.'),{status:400,code:'DELETE_CONFIRMATION'});
+  const handoffToken=String(payload.handoffToken||'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(handoffToken))
+    throw Object.assign(Error('Apple deletion verification is invalid.'),{status:400,code:'APPLE_DELETE_HANDOFF'});
+  const consumed=await query(`UPDATE mobile_oauth_handoffs
+    SET consumed_at=now()
+    WHERE handoff_hash=$1 AND guest_player_id=$2::uuid AND auth_user_id=$3::uuid
+      AND provider='apple' AND flow_kind=$4 AND purpose='delete'
+      AND authenticated_at IS NOT NULL AND consumed_at IS NULL AND expires_at>now()
+    RETURNING auth_user_id`,[
+      digest(handoffToken),owner,auth.user_id,mobile?'mobile':'web',
+    ]);
+  if(!consumed.rows[0])
+    throw Object.assign(Error('Apple deletion verification expired or does not match this account.'),{status:409,code:'APPLE_DELETE_HANDOFF'});
+  await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'account_delete_verify'});
+  return commitAccountDeletion(auth,{mobile});
 }
 
 async function handleAccountDelete(request,{mobile=false}={}) {
@@ -1712,6 +1822,8 @@ async function handleAccountDelete(request,{mobile=false}={}) {
       await closeProviderSession(providerSession);
     }
   } else {
+    if(state.apple)
+      throw Object.assign(Error('Verify with Apple to delete this account.'),{status:409,code:'APPLE_DELETE_REQUIRED'});
     // Passwordless deletion still requires authenticated gateway network proof,
     // but verification submissions spend only the account-scoped verify bucket.
     trustedCredentialNetwork(request);
@@ -1734,17 +1846,7 @@ async function handleAccountDelete(request,{mobile=false}={}) {
     await clearCredentialLimit(query,{authUserId:auth.user_id,purpose:'account_delete_verify'});
   }
 
-  const operation=await beginDeletion(query,{authUserId:auth.user_id});
-  if(!operation)throw Object.assign(Error('Account deletion could not be started.'),{status:500,code:'DELETE_START'});
-  const final=await resumeDeletionOperation(operation,{knownEmail:auth.email});
-  const complete=final?.state==='complete';
-  let response=json({
-    ok:true,
-    deletion:complete?'complete':'accepted',
-    operationId:final?.operation_id,
-  },complete?200:202);
-  if(!mobile)response=clearPlayerCookie(clearAccountCookies(response));
-  return response;
+  return commitAccountDeletion(auth,{mobile});
 }
 
 function bearer(request) {
@@ -1963,8 +2065,12 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signin') return handleMobileAccountSignin(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/apple/start') return beginAppleFlow(request,{mobile:false});
   if (request.method === 'POST' && url.pathname === '/v1/account/apple/finish') return consumeAppleHandoff(request,{mobile:false});
+  if (request.method === 'POST' && url.pathname === '/v1/account/delete/apple/start') return beginAppleDeleteFlow(request,{mobile:false});
+  if (request.method === 'POST' && url.pathname === '/v1/account/delete/apple/finish') return finishAppleDeleteFlow(request,{mobile:false});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/apple/start') return beginAppleFlow(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/apple/finish') return consumeAppleHandoff(request,{mobile:true});
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete/apple/start') return beginAppleDeleteFlow(request,{mobile:true});
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete/apple/finish') return finishAppleDeleteFlow(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/apple/native') return handleMobileAppleNative(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/start') return handleMobileGoogleStart(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/finish') return handleMobileGoogleFinish(request);
