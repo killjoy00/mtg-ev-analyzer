@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {query} from '../worker/growth-function.js';
 import {verifyServingStatistics} from '../worker/serving-statistics.mjs';
 const result=await query(`SELECT
+  EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_reroll_set_window_idx' AND i.indisvalid) reroll_set_window,
   to_regprocedure('pack1_serving_snapshot(text,text,text)') IS NOT NULL practice_snapshot,
   to_regclass('draft_run_serving_inventory') IS NOT NULL practice_inventory,
   (SELECT count(*)=8 FROM pg_trigger WHERE tgname IN ('serving_puzzle_rows','serving_puzzle_metadata','serving_ratings','serving_exclusions','serving_components','serving_policy','serving_version_rows','serving_version_identity') AND tgenabled='O') practice_invalidation,
