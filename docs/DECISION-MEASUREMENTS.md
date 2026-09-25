@@ -78,7 +78,8 @@ access. No personal identifiers or emails appear in report responses or exports.
 ## Launch acquisition and Daily habit reporting
 
 The launch measurement layer is additive to the decision-quality report. The
-browser records one `acquisition_touch` per browser identity. It accepts only
+browser records best-effort `acquisition_touch` events; it does not enforce one
+acquisition event per browser identity. It accepts only
 sanitized `utm_source`, `utm_campaign`, and optional `utm_medium` values;
 when there is no UTM source it may use the external referrer hostname. The
 `utm_*` parameters are removed from the address bar after capture. A Daily
