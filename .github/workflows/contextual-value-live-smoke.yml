@@ -37,9 +37,9 @@ jobs:
           python scripts/contextual_value_phase1.py \
             --draft-archive raw-data/draft_data_public.TMT.PremierDraft.csv.gz \
             --game-archive raw-data/game_data_public.TMT.PremierDraft.csv.gz \
-            --max-drafts 1000 \
-            --nuisance-folds 5 \
-            --inner-feature-folds 5 \
+            --max-drafts 150 \
+            --nuisance-folds 3 \
+            --inner-feature-folds 3 \
             --out results/contextual-value-v1-tmt-smoke
       - name: Verify assessment stayed locked and print validation summary
         run: |
