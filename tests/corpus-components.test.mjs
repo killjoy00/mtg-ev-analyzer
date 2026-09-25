@@ -41,7 +41,9 @@ test('Traditional source and Premier evidence are independent; trophy match rema
 });
 
 test('historical membership survives source pauses; new generation requires explicit publication',async()=>{
- assert.ok(corpusMembership({serving:true}).includes("c.status='Live'"));assert.ok(!corpusMembership().includes('status'));
+ assert.ok(corpusMembership({serving:true}).includes("c.status='Live'"));
+ assert.ok(corpusMembership({serving:true}).includes('active_snapshot_id=p.source_snapshot_id'));
+ assert.ok(!corpusMembership().includes('active_snapshot_id'));
  let queries=0;const query=async()=>{queries++;return {rows:[{}]};};
  assert.equal(await componentBelongsTo(query,original,DRAFT_RUN_CORPUS_VERSION),true);assert.equal(queries,0);
  assert.equal(await componentBelongsTo(query,candidate(),DRAFT_RUN_CORPUS_VERSION),true);assert.equal(queries,1);
