@@ -87,11 +87,17 @@ export async function routeAlert(fetcher,env,report) {
   if(!/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPOSITORY||''))throw Error('Invalid alert repository');
   const base='https://api.github.com/repos/'+env.GITHUB_REPOSITORY;
   const issues=await json(fetcher,base+'/issues?state=open&per_page=100',env.GITHUB_TOKEN);
-  const existing=issues.find(i=>i.title===TITLE&&!i.pull_request);
-  // One open incident; no repeated comments or unsolicited person assignments.
-  if(existing)return 'existing';
-  const body='Production launch thresholds exceeded. Follow https://github.com/'+env.GITHUB_REPOSITORY+'/blob/main/docs/LAUNCH-OPERATIONS.md.\n\n```json\n'+JSON.stringify(report,null,2)+'\n```\n\nClose after investigation and recovery. Missing telemetry is an alert, never a healthy result.';
-  await json(fetcher,base+'/issues',env.GITHUB_TOKEN,{title:TITLE,body});return 'created';
+  let created=false;
+  for(const condition of new Set(report.alerts)) {
+    const title=TITLE+' ('+condition+')';
+    // A long-lived usage warning must not suppress a new outage/quota alert.
+    // Reuse the initial legacy incident only for the category it actually contains.
+    const existing=issues.find(i=>!i.pull_request&&(i.title===title||i.title===TITLE&&String(i.body||'').includes('"'+condition+'"')));
+    if(existing)continue;
+    const body='Production launch threshold: '+condition+'. Follow https://github.com/'+env.GITHUB_REPOSITORY+'/blob/main/docs/LAUNCH-OPERATIONS.md.\n\n'+JSON.stringify(report,null,2)+'\n\nClose this category incident after investigation and recovery. Other categories alert independently.';
+    await json(fetcher,base+'/issues',env.GITHUB_TOKEN,{title,body});created=true;
+  }
+  return created?'created':'existing';
 }
 export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='check'}={}) {
   const report={at:new Date(now).toISOString(),thresholds,alerts:[]};

@@ -37,6 +37,7 @@ async function cf(route,{method='GET',body,allow404=false}={}) {
   try {r=await fetch('https://api.cloudflare.com/client/v4'+route,{method,redirect:'error',headers:{authorization:`Bearer ${process.env.CLOUDFLARE_EDGE_TOKEN}`,'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000)});}catch{throw Error('Cloudflare control request failed.');}
   if(allow404&&r.status===404)return null;
   if(!r.ok)throw Error(`Cloudflare control HTTP ${r.status}; check the scoped deployment token.`);
+  if(r.status===204&&method==='DELETE')return {success:true};
   const result=await r.json();if(!result.success)throw Error('Cloudflare rejected the control request.');
   return result;
 }

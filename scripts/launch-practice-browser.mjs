@@ -21,26 +21,37 @@ async function main() {
   ]);
   };
   let apiCalls=0;
-  await context.route('**/*',async route=>{
-    const request=route.request(),url=new URL(request.url());
-    if(url.hostname.endsWith('.neon.tech')){await route.abort();throw Error('Frontend attempted a direct origin request.');}
-    if(url.hostname==='packone.pro'&&url.pathname==='/practice/') {
-      await route.fulfill({status:200,contentType:'text/html',body:fs.readFileSync('practice/index.html','utf8')});return;
-    }
-    if(url.hostname==='api.packone.pro') {
-      apiCalls++;
-      const response=await route.fetch({url:'https://api-preview.packone.pro'+url.pathname+url.search,
-        headers:{...request.headers(),'x-pack1-preview-key':process.env.PREVIEW_ACCESS_KEY},maxRedirects:0,timeout:90000});
-      await route.fulfill({response});return;
-    }
-    await route.continue();
-  });
   const page=await context.newPage(),errors=[],report={sha:fixture.sha,branch:fixture.branch,
     warm_samples_per_case:20,scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
-  // Playwright routing disables HTTP caching by default. Restore normal static
-  // asset caching in Chromium; API responses remain no-store and intercepted.
+  // Intercept only API/origin traffic and the reviewed HTML through CDP. Unlike
+  // Playwright routing, this leaves ordinary static-resource HTTP caching on.
   const cdp=await context.newCDPSession(page);await cdp.send('Network.enable');
-  await cdp.send('Network.setCacheDisabled',{cacheDisabled:false});
+  await cdp.send('Fetch.enable',{patterns:[
+    {urlPattern:'https://api.packone.pro/*',requestStage:'Request'},
+    {urlPattern:'https://*.neon.tech/*',requestStage:'Request'},
+    {urlPattern:'https://packone.pro/practice/',requestStage:'Request'},
+  ]});
+  cdp.on('Fetch.requestPaused',async event=>{
+    const {requestId,request}=event,url=new URL(request.url);
+    try {
+      if(url.hostname.endsWith('.neon.tech')) {
+        errors.push('direct_origin');await cdp.send('Fetch.failRequest',{requestId,errorReason:'BlockedByClient'});return;
+      }
+      if(url.hostname==='packone.pro') {
+        await cdp.send('Fetch.fulfillRequest',{requestId,responseCode:200,responseHeaders:[{name:'content-type',value:'text/html'}],body:fs.readFileSync('practice/index.html').toString('base64')});return;
+      }
+      apiCalls++;
+      const cookies=await context.cookies('https://api.packone.pro/');
+      const headers={...request.headers,cookie:cookies.map(c=>c.name+'='+c.value).join('; '),'x-pack1-preview-key':process.env.PREVIEW_ACCESS_KEY};
+      delete headers.host;delete headers.Host;
+      const response=await fetch('https://api-preview.packone.pro'+url.pathname+url.search,{method:request.method,headers,body:request.postData,redirect:'error',signal:AbortSignal.timeout(90000)});
+      const responseHeaders=[...response.headers].filter(([k])=>!['content-encoding','content-length','transfer-encoding','set-cookie'].includes(k)).map(([name,value])=>({name,value}));
+      for(const value of response.headers.getSetCookie())responseHeaders.push({name:'set-cookie',value});
+      await cdp.send('Fetch.fulfillRequest',{requestId,responseCode:response.status,responseHeaders,body:Buffer.from(await response.arrayBuffer()).toString('base64')});
+    } catch {
+      errors.push('proxy_failure');await cdp.send('Fetch.failRequest',{requestId,errorReason:'Failed'}).catch(()=>{});
+    }
+  });
   let staticCacheHits=0;cdp.on('Network.requestServedFromCache',()=>staticCacheHits++);
   page.on('pageerror',()=>errors.push('browser_error'));
   const directory='artifacts/launch-load';fs.mkdirSync(directory,{recursive:true});
@@ -110,6 +121,7 @@ async function main() {
   } finally {
     report.browser_errors=errors.length;report.api_calls=apiCalls;report.http_cache_hits=staticCacheHits;
     fs.writeFileSync(directory+'/practice-browser.json',JSON.stringify(report,null,2));
+    console.log(JSON.stringify(report));
     await browser.close();
   }
   console.log(JSON.stringify({operation:'isolated-practice-browser',passed:report.passed,http_cache_hits:staticCacheHits,samples:report.samples,summary:report.summary}));
