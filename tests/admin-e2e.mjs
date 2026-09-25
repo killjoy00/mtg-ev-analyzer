@@ -92,6 +92,12 @@ try {
   assert.equal(await page.getByLabel('Tracked UTM URL').inputValue(),tracked);
   assert.equal(await page.getByLabel('Intended vanity URL').inputValue(),'');
   assert.equal(await page.getByLabel('campaign-links.json entry').inputValue(),'');
+  const destination=page.getByLabel('Destination');
+  assert.equal(await destination.locator('option').count(),4);
+  await destination.selectOption('/?game=draft-run&daily=1');
+  assert.equal(await page.getByLabel('Tracked UTM URL').inputValue(),'https://packone.pro/?game=draft-run&daily=1&utm_source=reddit&utm_campaign=launch-week&utm_medium=social');
+  await destination.selectOption('/');
+  assert.equal(await page.getByLabel('Tracked UTM URL').inputValue(),tracked);
   assert.equal(await page.getByRole('button',{name:'Copy tracked URL'}).isDisabled(),false);
   assert.equal(await page.getByRole('button',{name:'Copy vanity URL'}).isDisabled(),true);
   assert.equal(await page.getByRole('button',{name:'Copy JSON entry'}).isDisabled(),true);
