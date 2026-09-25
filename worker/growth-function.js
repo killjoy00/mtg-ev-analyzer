@@ -15,6 +15,7 @@ import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
+import {APPLE_NATIVE_CLIENT_ID,APPLE_REDIRECT_URI,APPLE_WEB_CLIENT_ID,appleAuthorizeUrl,appleConfigured,markApplePasswordEstablished,resolveAppleAccount,revokeAppleAuthorization,sanitizeAppleFirstName} from './apple-auth.mjs';
 const ACCOUNT_CONFIG=accountRuntimeConfig();
 const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
 const TOKEN_PREFIX = 'p1_';
@@ -874,6 +875,160 @@ async function handleMobileGoogleFinish(request) {
   });
 }
 
+async function appleServicePrincipalAllowed(serviceId) {
+  const linked=await query('SELECT 1 FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1',[serviceId]);
+  return linked.rows.length===0;
+}
+
+function appleReturn(flowKind,params={}) {
+  const target=new URL(flowKind==='mobile'?MOBILE_GOOGLE_RETURN:ACCOUNT_RETURN);
+  if(flowKind==='web')target.searchParams.set('auth',params.apple==='error'?'apple-error':'apple');
+  for(const [key,value] of Object.entries(params)) {
+    if(key==='apple'&&flowKind==='web')continue;
+    if(value!=null)target.searchParams.set(key,String(value));
+  }
+  return new Response(null,{status:302,headers:{
+    location:target.toString(),
+    'cache-control':'no-store',
+    'referrer-policy':'no-referrer',
+  }});
+}
+
+async function beginAppleFlow(request,{mobile=false}={}) {
+  if(!mobile)requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,mobile?'mobile-apple-auth':'browser-apple-auth',{limit:10,seconds:600});
+  await query('DELETE FROM mobile_oauth_handoffs WHERE expires_at<=now()');
+  const flowToken=opaqueMobileToken();
+  await query(`INSERT INTO mobile_oauth_handoffs(flow_hash,guest_player_id,provider,flow_kind,expires_at)
+    VALUES($1,$2::uuid,'apple',$3,now()+interval '10 minutes')`,[
+    digest(flowToken),owner,mobile?'mobile':'web',
+  ]);
+  return json({flowToken,url:appleAuthorizeUrl(flowToken)});
+}
+
+async function readAppleCallback(request) {
+  const contentType=String(request.headers.get('content-type')||'').toLowerCase();
+  if(!contentType.includes('application/x-www-form-urlencoded'))
+    throw Object.assign(Error('Apple callback is invalid.'),{status:400,code:'APPLE_CALLBACK'});
+  const raw=await request.text();
+  if(raw.length>20000)throw Object.assign(Error('Apple callback is invalid.'),{status:413,code:'APPLE_CALLBACK'});
+  return new URLSearchParams(raw);
+}
+
+async function handleAppleCallback(request) {
+  let form,flowToken='',flow=null;
+  try {
+    form=await readAppleCallback(request);
+    flowToken=String(form.get('state')||'');
+    if(!/^[A-Za-z0-9_-]{43}$/.test(flowToken))throw Error('state');
+    flow=(await query(`SELECT flow_kind,guest_player_id
+      FROM mobile_oauth_handoffs
+      WHERE flow_hash=$1 AND provider='apple' AND consumed_at IS NULL
+        AND authenticated_at IS NULL AND expires_at>now()
+      LIMIT 1`,[digest(flowToken)])).rows[0]||null;
+    if(!flow)throw Error('flow');
+  } catch {
+    return appleReturn('web',{apple:'error'});
+  }
+  if(form.get('error')) {
+    await query('UPDATE mobile_oauth_handoffs SET consumed_at=COALESCE(consumed_at,now()) WHERE flow_hash=$1',[digest(flowToken)]).catch(()=>{});
+    return appleReturn(flow.flow_kind,{apple:'error'});
+  }
+  let firstName='';
+  const userRaw=String(form.get('user')||'');
+  if(userRaw) {
+    try {firstName=sanitizeAppleFirstName(JSON.parse(userRaw)?.name?.firstName||'');} catch {}
+  }
+  try {
+    const auth=await resolveAppleAccount(query,{
+      identityToken:String(form.get('id_token')||''),
+      authorizationCode:String(form.get('code')||''),
+      clientId:APPLE_WEB_CLIENT_ID,
+      nonce:flowToken,
+      redirectUri:APPLE_REDIRECT_URI,
+      firstName,
+      authBase:NEON_AUTH_BASE,
+      validateServicePrincipal:appleServicePrincipalAllowed,
+    });
+    const handoffToken=opaqueMobileToken();
+    const updated=await query(`UPDATE mobile_oauth_handoffs
+      SET handoff_hash=$2,auth_user_id=$3::uuid,authenticated_at=now()
+      WHERE flow_hash=$1 AND provider='apple' AND consumed_at IS NULL
+        AND authenticated_at IS NULL AND expires_at>now()
+        AND pack1_identity_attachment_allowed($3::uuid)
+      RETURNING flow_kind`,[digest(flowToken),digest(handoffToken),auth.user_id]);
+    if(!updated.rows[0])throw Object.assign(Error('Apple sign in handoff expired.'),{status:409});
+    return appleReturn(updated.rows[0].flow_kind,{appleHandoff:handoffToken});
+  } catch(error) {
+    console.error('Apple OAuth callback failed',String(error?.code||''),Number(error?.status||500));
+    await query('UPDATE mobile_oauth_handoffs SET consumed_at=COALESCE(consumed_at,now()) WHERE flow_hash=$1',[digest(flowToken)]).catch(()=>{});
+    return appleReturn(flow.flow_kind,{apple:'error'});
+  }
+}
+
+async function consumeAppleHandoff(request,{mobile=false}={}) {
+  if(!mobile)requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,mobile?'mobile-apple-auth':'browser-apple-auth',{limit:10,seconds:600});
+  const payload=await readJson(request);
+  const handoffToken=String(payload.handoffToken||'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(handoffToken))
+    throw Object.assign(Error('Invalid Apple sign in handoff.'),{status:400,code:'APPLE_HANDOFF'});
+  const result=await query(`UPDATE mobile_oauth_handoffs h
+    SET consumed_at=now()
+    FROM neon_auth."user" u
+    WHERE h.handoff_hash=$1 AND h.guest_player_id=$2::uuid AND h.provider='apple'
+      AND h.flow_kind=$3 AND h.authenticated_at IS NOT NULL AND h.consumed_at IS NULL AND h.expires_at>now()
+      AND u.id=h.auth_user_id
+    RETURNING h.auth_user_id user_id,u.email,u.name`,[
+    digest(handoffToken),owner,mobile?'mobile':'web',
+  ]);
+  const auth=result.rows[0];
+  if(!auth)throw Object.assign(Error('This Apple sign in handoff expired or was already used.'),{status:409,code:'APPLE_HANDOFF'});
+  const session=await issueAccountSession(query,auth);
+  if(!mobile)return accountJson(auth,session);
+  return finishMobileAccount(request,{auth,session},{
+    validateDailyRunId:payload.validateDailyRunId==null?null:String(payload.validateDailyRunId),
+  });
+}
+
+async function handleMobileAppleNative(request) {
+  const owner=await player(request);
+  await consumePlayerLimit(query,owner,'mobile-apple-auth',{limit:10,seconds:600});
+  const payload=await readJson(request);
+  const flowToken=String(payload.flowToken||'');
+  if(!/^[A-Za-z0-9_-]{43}$/.test(flowToken))
+    throw Object.assign(Error('Apple sign in state is invalid.'),{status:400,code:'APPLE_STATE'});
+  const flow=(await query(`SELECT guest_player_id
+    FROM mobile_oauth_handoffs
+    WHERE flow_hash=$1 AND guest_player_id=$2::uuid AND provider='apple' AND flow_kind='mobile'
+      AND consumed_at IS NULL AND authenticated_at IS NULL AND expires_at>now()
+    LIMIT 1`,[digest(flowToken),owner])).rows[0];
+  if(!flow)throw Object.assign(Error('Apple sign in state expired.'),{status:409,code:'APPLE_STATE'});
+  const auth=await resolveAppleAccount(query,{
+    identityToken:String(payload.identityToken||''),
+    authorizationCode:String(payload.authorizationCode||''),
+    clientId:APPLE_NATIVE_CLIENT_ID,
+    nonce:flowToken,
+    firstName:sanitizeAppleFirstName(payload.firstName||''),
+    authBase:NEON_AUTH_BASE,
+    validateServicePrincipal:appleServicePrincipalAllowed,
+  });
+  const consumedMarker=opaqueMobileToken();
+  const updated=await query(`UPDATE mobile_oauth_handoffs
+    SET handoff_hash=$2,auth_user_id=$3::uuid,authenticated_at=now(),consumed_at=now()
+    WHERE flow_hash=$1 AND guest_player_id=$4::uuid AND provider='apple' AND flow_kind='mobile'
+      AND consumed_at IS NULL AND authenticated_at IS NULL AND expires_at>now()
+      AND pack1_identity_attachment_allowed($3::uuid)
+    RETURNING guest_player_id`,[digest(flowToken),digest(consumedMarker),auth.user_id,owner]);
+  if(!updated.rows[0])throw Object.assign(Error('Apple sign in state expired.'),{status:409,code:'APPLE_STATE'});
+  const session=await issueAccountSession(query,auth);
+  return finishMobileAccount(request,{auth,session},{
+    validateDailyRunId:payload.validateDailyRunId==null?null:String(payload.validateDailyRunId),
+  });
+}
+
 const RESET_REQUEST_MESSAGE="If an account exists for that email, we've sent a password reset link.";
 const RESET_LIMIT_MAX=5;
 
@@ -986,6 +1141,7 @@ async function handlePasswordReset(request) {
     if(status>=500)throw Object.assign(Error('Password recovery is temporarily unavailable.'),{status:503,code:'PROVIDER_FAILURE'});
     throw Object.assign(Error(status===400?'This password reset link is invalid, expired, or already used.':'The new password was not accepted.'),{status:400,code:status===400?'INVALID_RESET':'PASSWORD_POLICY'});
   }
+  await markApplePasswordEstablished(query,authUserId);
   await revokeAllAccountSessions(query,authUserId);
   return clearAccountCookies(json({ok:true}));
 }
@@ -1244,13 +1400,18 @@ async function handleLink(request,{browser=false,mobile=false}={}) {
 }
 
 async function credentialState(authUserId) {
-  const result=await query(`SELECT
-    bool_or("providerId"='credential' AND password IS NOT NULL) has_password,
-    bool_or("providerId"='google') has_google
-    FROM neon_auth.account WHERE "userId"=$1::uuid`,[authUserId]);
+  const [providers,apple]=await Promise.all([
+    query(`SELECT
+      bool_or("providerId"='credential' AND password IS NOT NULL) has_password,
+      bool_or("providerId"='google') has_google
+      FROM neon_auth.account WHERE "userId"=$1::uuid`,[authUserId]),
+    query('SELECT synthetic_password FROM apple_auth_identities WHERE auth_user_id=$1::uuid LIMIT 1',[authUserId]),
+  ]);
+  const appleRow=apple.rows[0]||null;
   return {
-    password:bool(result.rows[0]?.has_password),
-    google:bool(result.rows[0]?.has_google),
+    password:bool(providers.rows[0]?.has_password)&&!bool(appleRow?.synthetic_password),
+    google:bool(providers.rows[0]?.has_google),
+    apple:Boolean(appleRow),
   };
 }
 
@@ -1265,7 +1426,8 @@ async function accountState(auth) {
     deletion:{
       enabled,
       available:enabled&&credentials.password,
-      googleOnly:credentials.google&&!credentials.password,
+      googleOnly:credentials.google&&!credentials.apple&&!credentials.password,
+      socialOnly:(credentials.google||credentials.apple)&&!credentials.password,
       method:enabled?(credentials.password?'password':emailMethod?'email':null):null,
     },
   };
@@ -1439,13 +1601,15 @@ async function resumeDeletionOperation(operation,{knownEmail=null}={}) {
     current=await cleanupPackOne(query,current,{recoveryKey});
   }
   if(current.state==='provider_delete_pending') {
+    const apple=await revokeAppleAuthorization(query,current.auth_user_id);
+    if(apple.kind!=='success') {
+      current=await finishProviderPhase(query,current,apple);
+      return current;
+    }
     const result=await removeProviderUser({
       authBase:NEON_AUTH_BASE,
       authUserId:current.auth_user_id,
-      validateServicePrincipal:async serviceId=>{
-        const linked=await query('SELECT 1 FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1',[serviceId]);
-        return linked.rows.length===0;
-      },
+      validateServicePrincipal:appleServicePrincipalAllowed,
     });
     current=await finishProviderPhase(query,current,result);
     if(current.state==='operator_review') {
@@ -1776,11 +1940,12 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured() });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), apple_sign_in_configured:appleConfigured() });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/google/callback') return handleMobileGoogleCallback(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/apple/callback') return handleAppleCallback(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/version') return handleMobileVersionCheck(request,{query,json});
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (request.method === 'POST' && url.pathname === '/internal/player-session-refresh') return handleBrowserPlayerSession(request,{existingOnly:true});
@@ -1790,6 +1955,11 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/signin') return handleAccountSignin(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signup') return handleMobileAccountSignup(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signin') return handleMobileAccountSignin(request);
+  if (request.method === 'POST' && url.pathname === '/v1/account/apple/start') return beginAppleFlow(request,{mobile:false});
+  if (request.method === 'POST' && url.pathname === '/v1/account/apple/finish') return consumeAppleHandoff(request,{mobile:false});
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/apple/start') return beginAppleFlow(request,{mobile:true});
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/apple/finish') return consumeAppleHandoff(request,{mobile:true});
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/apple/native') return handleMobileAppleNative(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/start') return handleMobileGoogleStart(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/finish') return handleMobileGoogleFinish(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/send-verification-email') return handleVerificationEmailRequest(request);
