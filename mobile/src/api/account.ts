@@ -136,6 +136,7 @@ export async function finishNativeAppleSignIn(
     identityToken: string;
     authorizationCode: string;
     firstName?: string | null;
+    lastName?: string | null;
   },
   validateDailyRunId?: string,
 ) {
