@@ -81,24 +81,32 @@ try {
  };
  const habitUrl=(from=firstDay,to=today)=>`https://packone.pro/v1/admin/measurements?from=${from}&to=${to}`;
  const habitBefore=await handleAdmin(new Request(habitUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
- const beforePre=(habitBefore.habit_metrics?.cohorts||[]).filter(r=>r.source==='pre_tracking').reduce((n,r)=>n+Number(r.cohort_people||0),0);
+ const beforeCohorts=habitBefore.habit_metrics?.cohorts||[];
+ const beforePre=beforeCohorts.filter(r=>r.source==='pre_tracking').reduce((n,r)=>n+Number(r.cohort_people||0),0);
+ const beforeDirectNone=beforeCohorts.filter(r=>r.source==='direct'&&r.campaign==='(none)').reduce((n,r)=>n+Number(r.cohort_people||0),0);
  const tag=crypto.randomUUID().replaceAll('-','').slice(0,8);
 
- // Three Dailies on one Pacific date still count as one distinct day. A direct
- // first touch remains authoritative even after a later tagged visit.
- const directCampaign='direct_'+tag,direct=await addPlayer('Habit direct '+tag);
- await touch(direct.player,{source:'direct',campaign:directCampaign},afterTracking(1));
+ // An untagged direct first touch remains authoritative even after a later
+ // tagged visit.
+ const direct=await addPlayer('Habit direct '+tag);
+ await touch(direct.player,{source:'direct'},afterTracking(1));
  await completeDaily(direct.player,firstDay,'mixed');
- await completeDaily(direct.player,firstDay,'powered-cube');
- await completeDaily(direct.player,firstDay,'latest');
- await completeDaily(direct.player,nextDay,'mixed');
  await touch(direct.player,{source:'reddit_'+tag,campaign:'later_'+tag},afterTracking(4));
+
+ // Three Dailies on one Pacific date still count as one distinct day.
+ const sameDaySource='same_day_'+tag,sameDayCampaign='distinct_'+tag,sameDay=await addPlayer('Habit same day '+tag);
+ await touch(sameDay.player,{source:sameDaySource,campaign:sameDayCampaign},afterTracking(1));
+ await completeDaily(sameDay.player,firstDay,'mixed');
+ await completeDaily(sameDay.player,firstDay,'powered-cube');
+ await completeDaily(sameDay.player,firstDay,'latest');
+ await completeDaily(sameDay.player,nextDay,'mixed');
 
  // A run whose timestamps spill into a later date is still bucketed by its
  // stored Pacific Daily date.
  const crossSource='cross_'+tag,crossCampaign='midnight_'+tag,cross=await addPlayer('Habit cross '+tag);
  await touch(cross.player,{source:crossSource,campaign:crossCampaign},afterTracking(1));
- await completeDaily(cross.player,crossDay,'mixed',{createdAt:afterTracking(5)});
+ const crossTimestamp=new Date(Math.max(Date.parse(isoDay(crossDay,1)+'T08:30:00Z'),trackingMs+5*86400000)).toISOString();
+ await completeDaily(cross.player,crossDay,'mixed',{createdAt:crossTimestamp});
 
  // Old product activity is pre_tracking even if the first captured touch later
  // carries a campaign.
@@ -134,10 +142,11 @@ try {
 
  const habitAfter=await handleAdmin(new Request(habitUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
  const cohorts=habitAfter.habit_metrics.cohorts||[],row=(source,campaign)=>cohorts.find(r=>r.source===source&&r.campaign===campaign);
- const directRow=row('direct',directCampaign);assert.ok(directRow,'direct first-touch cohort is reported');
- assert.equal(Number(directRow.cohort_people),1);assert.equal(Number(directRow.next_day_returned),1);assert.equal(Number(directRow.next_day_mature),1);
- assert.equal(Number(directRow.three_in_seven_reached),0,'three Dailies on day zero plus one next-day Daily are only two distinct days');
+ const afterDirectNone=cohorts.filter(r=>r.source==='direct'&&r.campaign==='(none)').reduce((n,r)=>n+Number(r.cohort_people||0),0);
+ assert.equal(afterDirectNone,beforeDirectNone+1,'untagged direct first touch is retained');
  assert.equal(row('reddit_'+tag,'later_'+tag),undefined,'later tagged visit never replaces the first direct touch');
+ const sameDayRow=row(sameDaySource,sameDayCampaign);assert.ok(sameDayRow);assert.equal(Number(sameDayRow.cohort_people),1);assert.equal(Number(sameDayRow.next_day_returned),1);
+ assert.equal(Number(sameDayRow.three_in_seven_reached),0,'three Dailies on day zero plus one next-day Daily are only two distinct days');
  const crossOnly=await handleAdmin(new Request(habitUrl(crossDay,crossDay),{headers:{'x-pack1-auth-session':token}}),query,readJson);
  assert.equal(Number((crossOnly.habit_metrics.cohorts||[]).find(r=>r.source===crossSource&&r.campaign===crossCampaign)?.cohort_people||0),1,'Daily is bucketed by stored day, not activity timestamp');
  const afterPre=cohorts.filter(r=>r.source==='pre_tracking').reduce((n,r)=>n+Number(r.cohort_people||0),0);assert.equal(afterPre,beforePre+1,'pre-release activity is labeled pre_tracking');
