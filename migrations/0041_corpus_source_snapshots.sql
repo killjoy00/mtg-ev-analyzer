@@ -37,8 +37,18 @@ ALTER TABLE draft_run_verified_puzzles
   ADD COLUMN IF NOT EXISTS source_snapshot_id text REFERENCES corpus_source_snapshots(source_snapshot_id);
 ALTER TABLE corpus_health_checks
   ADD COLUMN IF NOT EXISTS source_snapshot_id text REFERENCES corpus_source_snapshots(source_snapshot_id);
-ALTER TABLE corpus_trophy_trajectories
-  ADD COLUMN IF NOT EXISTS source_snapshot_id text REFERENCES corpus_source_snapshots(source_snapshot_id);
+CREATE TABLE IF NOT EXISTS corpus_source_snapshot_trajectories (
+  source_snapshot_id text NOT NULL REFERENCES corpus_source_snapshots(source_snapshot_id),
+  source_draft_hash text NOT NULL,
+  event_type text NOT NULL CHECK(event_type='PremierDraft'),
+  wins smallint NOT NULL,
+  losses smallint,
+  qualified boolean NOT NULL,
+  included boolean NOT NULL,
+  puzzle_count integer NOT NULL DEFAULT 0,
+  exclusion_reason text,
+  PRIMARY KEY(source_snapshot_id,source_draft_hash)
+);
 ALTER TABLE draft_run_environment_policy
   ADD COLUMN IF NOT EXISTS active_snapshot_id text REFERENCES corpus_source_snapshots(source_snapshot_id);
 
@@ -78,14 +88,6 @@ WHERE source_snapshot_id IS NULL
     WHERE s.source_snapshot_id='historical-' || substr(encode(sha256(convert_to(h.set_id || '|' || h.corpus_version,'UTF8')),'hex'),1,32)
   );
 
-UPDATE corpus_trophy_trajectories t
-SET source_snapshot_id='historical-' || substr(encode(sha256(convert_to(t.set_id || '|' || t.corpus_version,'UTF8')),'hex'),1,32)
-WHERE source_snapshot_id IS NULL
-  AND EXISTS (
-    SELECT 1 FROM corpus_source_snapshots s
-    WHERE s.source_snapshot_id='historical-' || substr(encode(sha256(convert_to(t.set_id || '|' || t.corpus_version,'UTF8')),'hex'),1,32)
-  );
-
 UPDATE draft_run_environment_policy p
 SET active_snapshot_id=s.source_snapshot_id
 FROM draft_run_verified_sets v
@@ -99,5 +101,5 @@ CREATE INDEX IF NOT EXISTS draft_run_verified_puzzles_snapshot_idx
   ON draft_run_verified_puzzles(source_snapshot_id,puzzle_id);
 CREATE INDEX IF NOT EXISTS corpus_health_snapshot_latest_idx
   ON corpus_health_checks(source_snapshot_id,checked_at DESC,id DESC);
-CREATE INDEX IF NOT EXISTS corpus_trophy_snapshot_idx
-  ON corpus_trophy_trajectories(source_snapshot_id,source_draft_hash);
+CREATE INDEX IF NOT EXISTS corpus_snapshot_trajectory_source_idx
+  ON corpus_source_snapshot_trajectories(source_snapshot_id,source_draft_hash);
