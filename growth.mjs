@@ -336,19 +336,27 @@ export async function resumeAccountAuth(status) {
   }
 
   if(status==='apple-delete'||status==='apple-delete-error') {
-    const clean=new URL(location.href);
-    clean.searchParams.delete('auth');
-    clean.searchParams.delete('appleDeleteHandoff');
-    history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
     if(status==='apple-delete-error') {
+      const clean=new URL(location.href);
+      clean.searchParams.delete('auth');
+      clean.searchParams.delete('appleDeleteHandoff');
+      history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
       event('account_delete_apple_verification_failed',{source:flow.source||'account'});
       return renderAccount({source:flow.source||'account',notice:'Apple verification did not finish. Your account was not deleted.'});
     }
     try {
       const result=await completeAppleDeletion();
+      const clean=new URL(location.href);
+      clean.searchParams.delete('auth');
+      clean.searchParams.delete('appleDeleteHandoff');
+      history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
       event('account_delete_apple_verified',{source:flow.source||'account'});
       return renderDeletionState(result?.deletion==='complete'?'deleted':'deleting');
     } catch(error) {
+      const clean=new URL(location.href);
+      clean.searchParams.delete('auth');
+      clean.searchParams.delete('appleDeleteHandoff');
+      history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
       event('account_delete_apple_verification_failed',{source:flow.source||'account'});
       return renderAccount({source:flow.source||'account',notice:error?.message||'Apple verification could not be completed. Your account was not deleted.'});
     }
