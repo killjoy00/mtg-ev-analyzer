@@ -5,7 +5,8 @@ import {
  HEALTH_REFRESH_CADENCE_HOURS,
  HEALTH_SAFETY_HOURS,
  MAX_MANAGED_SNAPSHOTS,
- planCorpusHealthRefresh
+ planCorpusHealthRefresh,
+ loadCorpusHealthRefreshRows
 } from '../scripts/plan-corpus-health-refresh.mjs';
 
 const now=Date.parse('2026-09-25T00:00:00Z');
@@ -61,4 +62,18 @@ test('candidate snapshots are eligible even when they are not active',()=>{
  const plan=planCorpusHealthRefresh([row(1,{hoursAgo:169,active:false})],{now});
  assert.equal(plan.selected.lifecycle_status,'Candidate');
  assert.equal(plan.selected.active,false);
+});
+
+
+test('refresh inventory query targets active/Candidate snapshots without reading puzzle payloads',async()=>{
+ let sql,params;
+ const rows=await loadCorpusHealthRefreshRows(async(statement,values)=>{
+  sql=statement;params=values;return {rows:[]};
+ });
+ assert.deepEqual(rows,[]);
+ assert.match(sql,/s\.lifecycle_status='Candidate'/);
+ assert.match(sql,/p\.active_snapshot_id=s\.source_snapshot_id/);
+ assert.match(sql,/p\.status IN \('Live','Paused','Candidate'\)/);
+ assert.doesNotMatch(sql,/draft_run_verified_puzzles|payload/);
+ assert.equal(params.length,2);
 });
