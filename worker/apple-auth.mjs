@@ -279,26 +279,6 @@ async function providerAdminSession(authBase,{env=process.env,validateServicePri
   return {cookie:signed.cookie,serviceId};
 }
 
-async function markAppleAuthEmailVerified({authBase,userId,env=process.env,validateServicePrincipal}) {
-  let admin=null;
-  try {
-    admin=await providerAdminSession(authBase,{env,validateServicePrincipal});
-    if(admin.serviceId===String(userId))
-      throw Object.assign(Error('Apple account cannot use the Auth service principal.'),{status:409,code:'APPLE_LINK'});
-    const updated=await providerAdminCall(authBase,'/admin/update-user',{cookie:admin.cookie,body:{
-      userId,
-      data:{emailVerified:true},
-    }});
-    admin.cookie=updated.cookie||admin.cookie;
-    if(!updated.response.ok)
-      throw Object.assign(Error('Apple account could not be verified.'),{status:503,code:'APPLE_ADMIN_VERIFY'});
-  } finally {
-    if(admin?.cookie) {
-      try {await providerAdminCall(authBase,'/sign-out',{cookie:admin.cookie,body:{}});} catch {}
-    }
-  }
-}
-
 export async function createAppleAuthUser({authBase,email,name,env=process.env,validateServicePrincipal}) {
   let admin=null;
   try {
