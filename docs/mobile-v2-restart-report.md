@@ -22,7 +22,7 @@ Apple is verified: App Store app 6814318676, bundle ID `pro.packone.app`, SKU `p
 
 Google Play credentials are present and can mint an Android Publisher OAuth token, but the service account receives `403 PERMISSION_DENIED` for the Pack One edit API. Play app permission/linkage remains an external blocker.
 
-The old mobile stack contains EAS configuration, but no Expo project is present on current main. Existing Expo project identity must be verified before creating anything new.
+The old mobile stack used EAS configuration, but Pack One has never depended on an Expo account. Mobile v2 keeps Expo SDK/Prebuild as local React Native tooling and does not require EAS project linkage.
 
 ## Old mobile salvage matrix
 | Old PR | Classification | Treatment |
