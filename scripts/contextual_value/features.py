@@ -161,6 +161,27 @@ def decision_feature_map(
     }
 
 
+def model_feature_map(
+    decision: Decision,
+    signals: Mapping[str, CardSignals] | None = None,
+) -> dict[str, dict[str, float]]:
+    """Features for learned propensity/Q/value models.
+
+    Card identity is intentionally excluded. Cross-fitted card statistics and
+    strong-choice/deck-fit evidence carry card strength while the learned layer
+    estimates portable relationships that can transfer across cards and sets.
+    Keeping one-hot card IDs here would make a pooled dense solve scale with the
+    entire card vocabulary and encourage memorization instead of partial
+    pooling.
+    """
+    return decision_feature_map(
+        decision,
+        signals,
+        include_identity=False,
+        include_pool_identity=False,
+    )
+
+
 def strong_choice_offsets(signals: Mapping[str, CardSignals], candidates: tuple[str, ...]) -> dict[str, float] | None:
     """Fixed log-probability offset for broad propensity fitting when available."""
     values: dict[str, float] = {}
