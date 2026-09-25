@@ -27,7 +27,7 @@ The preferred operator surface is the Admin **Campaign Links / Link Builder**:
 
 `https://packone.pro/admin/?area=campaign-links`
 
-It validates and normalizes the slug, source, campaign, and optional medium; previews the tracked UTM URL; previews the intended `/go/<slug>/` vanity URL; produces the exact `campaign-links.json` entry; and warns when a slug already exists.
+It validates and normalizes source, campaign, optional medium, and an optional slug. The slug is required only for a `/go/<slug>/` vanity route; a tracked UTM URL can be built with the slug left blank. The builder previews the tracked URL and intended vanity URL, produces the exact `campaign-links.json` entry when a valid slug is present, and warns when a slug already exists.
 
 A tracked UTM URL can be copied and used immediately. A vanity `/go/<slug>/` URL is **not** published by the builder: its JSON entry and generated page must be committed through the normal site PR and deployed by GitHub Pages.
 
