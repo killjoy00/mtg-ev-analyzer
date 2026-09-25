@@ -10,10 +10,18 @@ def main():
     sources, document = discover()
     records=[]
     for sid, expansion in sorted(sources.items()):
-        item={'set_id':sid,'event_type':'PremierDraft','archive_url':f'{BASE}/draft_data/draft_data_public.{expansion}.PremierDraft.csv.gz','expansion':expansion}
+        item={
+            'set_id':sid,
+            'event_type':'PremierDraft',
+            'archive_url':f'{BASE}/draft_data/draft_data_public.{expansion}.PremierDraft.csv.gz',
+            'game_archive_url':f'{BASE}/game_data/game_data_public.{expansion}.PremierDraft.csv.gz',
+            'expansion':expansion,
+        }
         try:
             with request(item['archive_url'],'HEAD') as r:
                 item.update(archive_available=True,archive_etag=r.headers.get('ETag'),archive_last_modified=r.headers.get('Last-Modified'))
+            with request(item['game_archive_url'],'HEAD') as r:
+                item.update(game_archive_available=True,game_archive_etag=r.headers.get('ETag'),game_archive_last_modified=r.headers.get('Last-Modified'))
             if sid=='powered-cube':
                 item.update(set_name='Powered Cube',regular_run=False,release_date=None)
             else:
@@ -25,6 +33,7 @@ def main():
             item['error']=f'{type(e).__name__}: {e}'
             # A metadata error is distinct from an unavailable source archive.
             item.setdefault('archive_available',False)
+            item.setdefault('game_archive_available',False)
         records.append(item)
     for absent in document['unavailable']:
         sid=absent['expansion'].lower()
