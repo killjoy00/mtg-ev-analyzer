@@ -44,7 +44,7 @@ The policy reserves 24 hours of safety before the seven-day health expiry. At a 
 
 The hard recurring egress ceiling is therefore one snapshot payload scan per four-hour scheduler slot, never a daily full-corpus payload download. If the eligible inventory exceeds 36 snapshots or current evidence is already too stale for the scheduler to recover before a hard deadline, the workflow still makes one bounded refresh attempt and then fails loudly so capacity can be reviewed; it must not silently claim freshness.
 
-The scheduled refresh may write a health row and the existing health path may promote a healthy `Blocked` source snapshot to `Candidate`. It never calls the corpus admin status/snapshot endpoints and never makes an environment or source snapshot `Live`. Live activation remains an explicit administrative action with fresh health evidence.
+The scheduled refresh manages only active or `Candidate` source snapshots and may write a new health row for the exact selected snapshot. It never calls the corpus admin status/snapshot endpoints and never makes an environment or source snapshot `Live`. The underlying health checker retains its existing Blocked-to-Candidate behavior for ingestion-time verification, but this scheduler does not target Blocked snapshots. Live activation remains an explicit administrative action with fresh health evidence.
 
 `Reviewed full corpus health` remains a manual-only workflow. Use it when an operator intentionally wants a complete deep audit; do not add a schedule to it. This separation preserves the egress control introduced after the production Neon egress alert while still maintaining normal publication/reactivation freshness.
 
