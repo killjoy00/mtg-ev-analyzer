@@ -119,21 +119,52 @@ class LinearSoftmaxPropensityModel:
         if total_weight <= 0:
             raise ValueError("positive total sample weight is required")
 
+        # Compile the immutable sparse design once. The previous implementation
+        # rebuilt string-keyed score/probability dictionaries and revalidated
+        # every action set on every one of the 250 epochs. On a real Draft
+        # archive that dominated Phase 1 runtime even though the mathematical
+        # update is sparse and small.
+        compiled = []
+        for example in examples:
+            actions = tuple(example.features)
+            selected_index = actions.index(example.selected_action)
+            sparse_rows = tuple(
+                tuple(
+                    (name_at[name], float(value))
+                    for name, value in example.features[action].items()
+                    if float(value) != 0.0
+                )
+                for action in actions
+            )
+            offsets = tuple(
+                float(example.offsets[action]) if example.offsets is not None else 0.0
+                for action in actions
+            )
+            compiled.append((
+                float(example.sample_weight),
+                selected_index,
+                sparse_rows,
+                offsets,
+            ))
+
         for epoch in range(epochs):
             gradient = [0.0] * len(beta)
-            for example in examples:
-                scores: dict[str, float] = {}
-                for action, row in example.features.items():
-                    score = float(example.offsets[action]) if example.offsets is not None else 0.0
-                    for name, value in row.items():
-                        score += beta[name_at[name]] * float(value)
-                    scores[action] = score
-                probabilities = softmax(scores)
-                for action, row in example.features.items():
-                    residual = (1.0 if action == example.selected_action else 0.0) - probabilities[action]
-                    scale = example.sample_weight * residual
-                    for name, value in row.items():
-                        gradient[name_at[name]] += scale * float(value)
+            for sample_weight, selected_index, sparse_rows, offsets in compiled:
+                scores = []
+                for offset, row in zip(offsets, sparse_rows):
+                    score = offset
+                    for index, value in row:
+                        score += beta[index] * value
+                    scores.append(score)
+                peak = max(scores)
+                action_weights = [math.exp(score - peak) for score in scores]
+                denominator = sum(action_weights)
+                for action_index, row in enumerate(sparse_rows):
+                    probability = action_weights[action_index] / denominator
+                    residual = (1.0 if action_index == selected_index else 0.0) - probability
+                    scale = sample_weight * residual
+                    for index, value in row:
+                        gradient[index] += scale * value
 
             step = learning_rate / math.sqrt(1.0 + epoch / 25.0)
             for index in range(len(beta)):
