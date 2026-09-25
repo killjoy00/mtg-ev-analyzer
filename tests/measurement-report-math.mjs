@@ -36,8 +36,8 @@ try {
  // Launch habit metrics: authoritative Daily sessions, shared exclusions, person
  // collapsing, first-touch attribution, Pacific day bucketing and maturity.
  const isoDay=(value,offset=0)=>{const d=new Date(value+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+offset);return d.toISOString().slice(0,10);};
- const today=(await query("SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date::text day")).rows[0].day;
- const firstDay=isoDay(today,-20),nextDay=isoDay(firstDay,1),sixthDay=isoDay(firstDay,6),crossDay=isoDay(today,-1);
+ const pacificToday=(await query("SELECT (now() AT TIME ZONE 'America/Los_Angeles')::date::text AS day")).rows[0].day;
+ const firstDay=isoDay(pacificToday,-20),nextDay=isoDay(firstDay,1),sixthDay=isoDay(firstDay,6),crossDay=isoDay(pacificToday,-1);
  let trackingStart=(await query("SELECT min(created_at) started_at FROM analytics_events WHERE event_name='acquisition_touch'")).rows[0].started_at;
  const addPlayer=async(name,{linked=false,admin=false}={})=>{
    const player=crypto.randomUUID();habitPlayers.push(player);
@@ -79,7 +79,7 @@ try {
      [id,player,day,answersJson,environment,qa,createdAt,source.id]);
    return id;
  };
- const habitUrl=(from=firstDay,to=today)=>`https://packone.pro/v1/admin/measurements?from=${from}&to=${to}`;
+ const habitUrl=(from=firstDay,to=pacificToday)=>`https://packone.pro/v1/admin/measurements?from=${from}&to=${to}`;
  const habitBefore=await handleAdmin(new Request(habitUrl(),{headers:{'x-pack1-auth-session':token}}),query,readJson);
  const beforeCohorts=habitBefore.habit_metrics?.cohorts||[];
  const beforePre=beforeCohorts.filter(r=>r.source==='pre_tracking').reduce((n,r)=>n+Number(r.cohort_people||0),0);
