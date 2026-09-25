@@ -209,7 +209,7 @@ function settingsMarkup(profile, progress, account, patreon) {
                <button class="button secondary" type="submit">Change password</button>
                <span class="profile-settings-status" aria-live="polite"></span>
              </form>`
-          : `<p><strong>Password</strong><br><span>${account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password credential to change.'}</span></p>`}
+          : `<p><strong>Password</strong><br><span>${account?.credentials?.apple?'This account signs in with Apple and does not have a Pack One password to change.':account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password credential to change.'}</span></p>`}
       </div>
     </section>`:''}
     ${account?.user?`<section class="profile-credentials profile-danger" aria-labelledby="delete-account-title">
