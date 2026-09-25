@@ -8,10 +8,10 @@ SELECT *,round(started::numeric/nullif(visitors,0),3) visitor_to_start,
   round(published_after_claim::numeric/nullif(claimed_accounts,0),3) claim_to_public_profile
 FROM analytics_retention_cohorts ORDER BY cohort_day DESC;
 
--- This is ALL Daily completers grouped by scheduled challenge date, not each
--- player's first completed Daily. Only observation_complete cohorts have a
--- fully elapsed next day. Define first-Daily completion-time cohorts and join
--- session QA provenance before using this for first-Daily retention decisions.
+-- SUPERSEDED: analytics_daily_next_day_retention is retained for schema
+-- compatibility only. It reads ranked scores, excludes guests, and is not the
+-- launch retention KPI. The admin measurements endpoint now derives first-Daily
+-- next-day, 7-day, and 3-in-7 metrics from completed draft_run_sessions.
 SELECT *,round(returned_next_day::numeric/nullif(completed_players,0),3) next_day_return_rate
 FROM analytics_daily_next_day_retention ORDER BY day DESC;
 
