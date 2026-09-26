@@ -24,6 +24,7 @@ from contextual_value.archive import (
     GameStore,
     limit_decisions,
     load_decisions,
+    select_global_draft_ids,
 )
 from contextual_value.checkpoint import (
     CORE_DEVELOPMENT_ENVIRONMENTS,
@@ -302,14 +303,61 @@ def _load_raw(args):
         raise SystemExit("raw mode requires --draft-archive and --game-archive")
     if len(args.draft_archive) != len(args.game_archive):
         raise SystemExit("--draft-archive and --game-archive counts must match")
-    started = time.perf_counter()
+
     manifests = []
-    decisions = []
-    draft_source = {}
     for draft_archive, game_archive in zip(args.draft_archive, args.game_archive):
         manifests.append(inspect_archive(draft_archive, "draft"))
         manifests.append(inspect_archive(game_archive, "game"))
-        current = load_decisions(draft_archive)
+
+    selected_ids = None
+    if args.max_drafts is not None:
+        started = time.perf_counter()
+
+        def index_progress(archive, rows_scanned, eligible_drafts):
+            print(json.dumps({
+                "event": "progress",
+                "stage": "scan_draft_index",
+                "archive": archive.name,
+                "rows_scanned": rows_scanned,
+                "eligible_drafts": eligible_drafts,
+                "peak_rss_mb": (
+                    round(_peak_rss_mb(), 3) if _peak_rss_mb() is not None else None
+                ),
+            }, sort_keys=True), flush=True)
+
+        selected_ids = select_global_draft_ids(
+            args.draft_archive,
+            args.max_drafts,
+            progress_callback=index_progress,
+        )
+        _emit_stage(
+            "select_global_draft_cohort",
+            started,
+            selected_drafts=len(selected_ids),
+            max_drafts=args.max_drafts,
+        )
+
+    started = time.perf_counter()
+    decisions = []
+    draft_source = {}
+    for draft_archive in args.draft_archive:
+        def parse_progress(rows_scanned, retained_decisions, archive=draft_archive):
+            print(json.dumps({
+                "event": "progress",
+                "stage": "parse_selected_drafts",
+                "archive": archive.name,
+                "rows_scanned": rows_scanned,
+                "retained_decisions": retained_decisions,
+                "peak_rss_mb": (
+                    round(_peak_rss_mb(), 3) if _peak_rss_mb() is not None else None
+                ),
+            }, sort_keys=True), flush=True)
+
+        current = load_decisions(
+            draft_archive,
+            keep_ids=selected_ids,
+            progress_callback=parse_progress,
+        )
         current_ids = {row.draft_id for row in current}
         overlap = current_ids & set(draft_source)
         if overlap:
@@ -319,11 +367,21 @@ def _load_raw(args):
         for draft_id in current_ids:
             draft_source[draft_id] = str(draft_archive)
         decisions.extend(current)
+
     decisions = limit_decisions(decisions, args.max_drafts)
     if not decisions:
         raise SystemExit("draft archives produced no eligible broad-population decisions")
+    if selected_ids is not None:
+        observed_ids = {row.draft_id for row in decisions}
+        if observed_ids != set(selected_ids):
+            missing = sorted(set(selected_ids) - observed_ids)[:3]
+            extra = sorted(observed_ids - set(selected_ids))[:3]
+            raise SystemExit(
+                "streaming cohort parse does not match selected draft IDs; "
+                f"missing={missing} extra={extra}"
+            )
     _emit_stage(
-        "load_and_global_cap_draft_archives",
+        "parse_selected_global_cohort",
         started,
         decisions=len(decisions),
         drafts=len({row.draft_id for row in decisions}),
