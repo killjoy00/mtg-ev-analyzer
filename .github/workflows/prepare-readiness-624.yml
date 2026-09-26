@@ -26,12 +26,37 @@ jobs:
       - name: Apply exact integration edits
         run: |
           set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('scripts/prepare-readiness-624.py')
+          p.write_text(''.join(line.replace(r'\n','\n') if line.lstrip().startswith('#') else line for line in p.read_text().splitlines(True)))
+          PY
           python scripts/prepare-readiness-624.py
           python scripts/finish-readiness-624.py
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tests/corpus-quality.test.mjs'); s=p.read_text()
+          s=s.replace('statement=s;params=p;return',"if(s.includes('INSERT INTO corpus_status_events')){statement=s;params=p;}return")
+          p.write_text(s)
+          p=Path('worker/growth-function.js'); s=p.read_text()
+          block="    const readiness=await maintainServingReadiness(query);\n    console.log(JSON.stringify({operation:'corpus-readiness-maintenance',operation_id:readiness.operation_id,state:readiness.state,revision:readiness.current_revision,ready:readiness.ready}));\n"
+          assert block in s;s=s.replace(block,'')
+          old='  const trigger=await authorizeDeletionMaintenance(request);\n  const advanced=[];'
+          assert old in s
+          s=s.replace(old,"  const trigger=await authorizeDeletionMaintenance(request);\n  const readiness=await maintainServingReadiness(query);\n  console.log(JSON.stringify({operation:'corpus-readiness-maintenance',operation_id:readiness.operation_id,state:readiness.state,revision:readiness.current_revision,ready:readiness.ready}));\n  const advanced=[];")
+          old='  return launchWatcherSignal(trigger,await deletionMaintenanceSnapshot({advanced,swept}));'
+          assert old in s
+          s=s.replace(old,"  const response=await deletionMaintenanceSnapshot({advanced,swept});\n  return launchWatcherSignal(trigger,json({...await response.json(),corpus_readiness:readiness},response.status));")
+          p.write_text(s)
+          p=Path('admin/corpus-readiness.mjs'); s=p.read_text()
+          s=s.replace('   show(result.readiness);',"   show(result.readiness);\n   const summary=root.querySelector('#corpus-status');\n   if(summary)summary.textContent=readinessMessage(result.readiness);")
+          s=s.replace('  const show=status=>{panel.innerHTML=readinessMarkup(status);};','  const show=status=>{panel.innerHTML=readinessMarkup(status);};')
+          p.write_text(s)
+          PY
           git diff --check
           git diff --stat
-          grep -n -B 12 -A 20 'const readiness=await maintainServingReadiness' worker/growth-function.js
-          grep -n -A 8 'await selectCachedDatabaseRun' worker/draft-run-function.mjs
+          grep -n -B 4 -A 8 'const readiness=await maintainServingReadiness' worker/growth-function.js
+          grep -n -A 3 'await selectCachedDatabaseRun' worker/draft-run-function.mjs
       - name: Parse changed modules and run focused behavioral suites
         run: |
           set -euo pipefail
@@ -71,7 +96,6 @@ jobs:
           commit=api('/git/commits',{'message':'Integrate durable corpus readiness with admin, maintenance and guarded release','tree':tree['sha'],'parents':[sha]})
           print('PREPARED_READINESS_COMMIT='+commit['sha'])
           print('PREPARED_PARENT='+sha)
-          # Ref advancement and PR creation are separate reviewed connector actions.
           PY
       - name: Retain source review bundle
         if: always()
