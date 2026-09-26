@@ -5,6 +5,10 @@ on:
     branches: [main]
     paths:
       - 'mobile/**'
+      - '.github/workflows/mobile.yml'
+      - '.github/workflows/ios-testflight.yml'
+      - '.github/workflows/android-internal-testing.yml'
+      - '.github/workflows/android-production-bundle.yml'
       - '.github/workflows/mobile-exact-main-rc.yml'
   workflow_dispatch:
 
