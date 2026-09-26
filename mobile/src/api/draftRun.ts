@@ -177,6 +177,14 @@ export function loadPracticeCapabilities(session: MobileSession) {
   });
 }
 
+export function loadSetCatalog(session: MobileSession) {
+  return requestJson<{ sets: PracticeSet[] }>('/draft/v1/set-catalog', {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 20_000,
+  });
+}
+
 export function loadPracticeSets(session: MobileSession) {
   if (!session.accountToken) throw new Error('Sign in to load custom practice sets.');
   return requestJson<{ sets: PracticeSet[] }>('/draft/v1/practice-sets', {
