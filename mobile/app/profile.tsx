@@ -17,14 +17,12 @@ type State =
 export default function PublicProfileScreen() {
   const params = useLocalSearchParams<{ key?: string }>();
   const profileKey = typeof params.key === 'string' ? params.key : '';
+  const validProfileKey = /^[a-f0-9]{16}$/.test(profileKey);
   const [state, setState] = useState<State>({ status: 'loading' });
 
   useEffect(() => {
     let active = true;
-    if (!/^[a-f0-9]{16}$/.test(profileKey)) {
-      setState({ status: 'error', message: 'This public profile link is invalid.' });
-      return () => { active = false; };
-    }
+    if (!validProfileKey) return () => { active = false; };
     void ensureGuestSession()
       .then((session) => loadMobilePublicProfile(profileKey, session))
       .then((profile) => {
@@ -37,7 +35,18 @@ export default function PublicProfileScreen() {
         });
       });
     return () => { active = false; };
-  }, [profileKey]);
+  }, [profileKey, validProfileKey]);
+
+  if (!validProfileKey) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <View style={styles.center}>
+          <Text style={styles.title}>Profile unavailable</Text>
+          <Text style={styles.body}>This public profile link is invalid.</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   if (state.status === 'loading') {
     return (
