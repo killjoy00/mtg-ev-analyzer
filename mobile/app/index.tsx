@@ -184,14 +184,14 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Open How to Play"
-          onPress={() => router.push('/how-to')}
+          accessibilityLabel="Open Learn"
+          onPress={() => router.push('/learn')}
           style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >
           <Text style={styles.cardKicker}>LEARN</Text>
-          <Text style={styles.utilityTitle}>How to Play</Text>
-          <Text style={styles.cardBody}>Learn the eight-decision format, scoring, methodology, and current supported sets.</Text>
-          <Text style={styles.cardAction}>Open guide →</Text>
+          <Text style={styles.utilityTitle}>Learn Pack One</Text>
+          <Text style={styles.cardBody}>Game rules, scoring, methodology, set coverage, and the same Limited decision guides as packone.pro.</Text>
+          <Text style={styles.cardAction}>Open Learn →</Text>
         </Pressable>
 
         <Pressable
@@ -205,6 +205,18 @@ export default function HomeScreen() {
             Use email, Google, or Apple, keep your player identity across devices, and manage account settings from the app.
           </Text>
           <Text style={styles.cardAction}>Open account →</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Open About and Support"
+          onPress={() => router.push('/about')}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>PACK ONE</Text>
+          <Text style={styles.utilityTitle}>About & Support</Text>
+          <Text style={styles.cardBody}>About Pack One, support contacts, attribution, Privacy Policy, and Terms.</Text>
+          <Text style={styles.cardAction}>Open About & Support →</Text>
         </Pressable>
       </ScrollView>
     </SafeAreaView>
