@@ -103,7 +103,9 @@ const fixture='qa-cache-'+crypto.randomUUID();
 const first=await loadServingSnapshot(query,fixture);
 assert.deepEqual(first.groups,[]);
 for(let i=0;i<3;i++) {
-  await query('UPDATE draft_run_environment_policy SET release_date=release_date WHERE false');
+  // Version registry statements retain conservative invalidation, providing a
+  // data-preserving revision bump for this bounded-generation cache fixture.
+  await query('UPDATE corpus_set_versions SET corpus_version=corpus_version WHERE false');
   assert.notEqual((await loadServingSnapshot(query,fixture)).id,first.id);
 }
 assert.equal(Number((await query('SELECT count(*) n FROM draft_run_serving_snapshots WHERE corpus_version=$1',[fixture])).rows[0].n),2);
