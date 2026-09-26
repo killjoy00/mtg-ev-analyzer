@@ -134,6 +134,6 @@ jobs:
           git -C "$publish_dir" rebase origin/main
 
           branch="automation/card-image-refresh-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
-          git -C "$publish_dir" push origin "HEAD:$branch"
+          git -C "$publish_dir" push origin "HEAD:refs/heads/$branch"
           echo "Generated card-image source branch: $branch" >> "$GITHUB_STEP_SUMMARY"
           echo "Open that branch as a pull request to main with the normal required checks." >> "$GITHUB_STEP_SUMMARY"
