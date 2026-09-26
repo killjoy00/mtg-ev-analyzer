@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -38,6 +38,10 @@ type LoadState =
       nextCursor?: string | null;
     };
 
+function mobileSessionIdentity(session: MobileSession) {
+  return `${session.playerToken}\n${session.accountToken ?? ''}`;
+}
+
 function environmentLabel(value: string) {
   return isDailyEnvironment(value) ? DAILY_ENVIRONMENT_META[value].title : value.toUpperCase();
 }
@@ -74,23 +78,32 @@ function HistoryRow({ item }: { item: CareerHistoryRow }) {
 
 export default function CareerScreen() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const stateRef = useRef<LoadState>(state);
   const [loadingMore, setLoadingMore] = useState(false);
-  const [reloadKey, setReloadKey] = useState(0);
+  const [refreshing, setRefreshing] = useState(false);
+  const [refreshError, setRefreshError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const requestId = useRef(0);
+  const paginationRequestId = useRef(0);
 
-  useAppResume(() => {
-    setReloadKey((value) => value + 1);
-  });
+  const commitState = useCallback((next: LoadState) => {
+    stateRef.current = next;
+    setState(next);
+  }, []);
 
-  const load = async () => {
+  const load = useCallback(async (preserveLoaded = true) => {
     const id = ++requestId.current;
-    setState({ status: 'loading' });
+    paginationRequestId.current += 1;
+    setLoadingMore(false);
+    setRefreshing(true);
+    setRefreshError(null);
+    const hadLoaded = stateRef.current.status === 'ready';
+    if (!preserveLoaded || !hadLoaded) commitState({ status: 'loading' });
     try {
       const session = await ensureGuestSession();
       if (id !== requestId.current) return;
       if (!session.accountToken) {
-        setState({ status: 'signed-out' });
+        commitState({ status: 'signed-out' });
         return;
       }
       const [profile, history] = await Promise.all([
@@ -98,7 +111,7 @@ export default function CareerScreen() {
         loadMobileCareerHistory(session),
       ]);
       if (id !== requestId.current) return;
-      setState({
+      commitState({
         status: 'ready',
         session,
         profile,
@@ -108,40 +121,57 @@ export default function CareerScreen() {
     } catch (error: unknown) {
       if (id !== requestId.current) return;
       if (error instanceof ApiError && error.status === 401) {
-        setState({ status: 'signed-out' });
+        commitState({ status: 'signed-out' });
         return;
       }
-      setState({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'My Pack One is unavailable.',
-      });
+      const message = error instanceof Error ? error.message : 'My Pack One is unavailable.';
+      if (preserveLoaded && stateRef.current.status === 'ready') {
+        setRefreshError(message);
+      } else {
+        commitState({ status: 'error', message });
+      }
+    } finally {
+      if (id === requestId.current) setRefreshing(false);
     }
-  };
+  }, [commitState]);
 
-  useEffect(() => {
-    const timer = setTimeout(() => void load(), 0);
+  useFocusEffect(useCallback(() => {
+    void load(true);
     return () => {
-      clearTimeout(timer);
       requestId.current += 1;
+      paginationRequestId.current += 1;
+      setLoadingMore(false);
     };
-  }, [reloadKey]);
+  }, [load]));
+
+  useAppResume(() => load(true));
 
   const loadMore = async () => {
-    if (state.status !== 'ready' || !state.nextCursor || loadingMore) return;
+    const current = stateRef.current;
+    if (current.status !== 'ready' || !current.nextCursor || loadingMore) return;
+    const cursor = current.nextCursor;
+    const identity = mobileSessionIdentity(current.session);
+    const id = ++paginationRequestId.current;
     setLoadingMore(true);
     try {
-      const page = await loadMobileCareerHistory(state.session, state.nextCursor);
-      setState((current) => current.status === 'ready'
-        ? {
-            ...current,
-            rows: [...current.rows, ...page.rows],
-            nextCursor: page.next_cursor,
-          }
-        : current);
+      const page = await loadMobileCareerHistory(current.session, cursor);
+      const latest = stateRef.current;
+      if (
+        id !== paginationRequestId.current
+        || latest.status !== 'ready'
+        || mobileSessionIdentity(latest.session) !== identity
+        || latest.nextCursor !== cursor
+      ) return;
+      const seen = new Set(latest.rows.map((row) => row.cursor));
+      commitState({
+        ...latest,
+        rows: [...latest.rows, ...page.rows.filter((row) => !seen.has(row.cursor))],
+        nextCursor: page.next_cursor,
+      });
     } catch {
       // Keep already-loaded history visible if pagination fails.
     } finally {
-      setLoadingMore(false);
+      if (id === paginationRequestId.current) setLoadingMore(false);
     }
   };
 
@@ -207,6 +237,8 @@ export default function CareerScreen() {
   const header = (
     <View style={styles.header}>
       <ProfileOverview profile={state.profile} />
+      {refreshing ? <Text style={styles.refreshing}>Refreshing My Pack One…</Text> : null}
+      {refreshError ? <Text accessibilityRole="alert" style={styles.error}>{refreshError}</Text> : null}
       <View style={styles.actions}>
         <Pressable accessibilityRole="button" onPress={() => void shareProfile()} style={styles.secondaryButton}>
           <Text style={styles.secondaryButtonText}>
@@ -282,6 +314,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800' },
   error: { color: colors.danger, fontSize: 13 },
+  refreshing: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
   footer: { padding: spacing.lg },
 });
