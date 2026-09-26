@@ -72,7 +72,7 @@ async function clonePuzzle({setId,version=DRAFT_RUN_CORPUS_VERSION,snapshotId=nu
 }
 
 async function cacheCount(setId) {
- const built=parse((await query("SELECT pack1_serving_snapshot($1,'support-ratio-v1',$2) snapshot",[DRAFT_RUN_CORPUS_VERSION,SERVING_POLICY_VERSION])).rows[0].snapshot);
+ const built=parse((await query("SELECT pack1_build_serving_snapshot($1,'support-ratio-v1',$2) snapshot",[DRAFT_RUN_CORPUS_VERSION,SERVING_POLICY_VERSION])).rows[0].snapshot);
  assert.ok(built?.id,`${setId}: serving cache did not build`);
  const count=Number((await query('SELECT count(*)::int n FROM draft_run_serving_inventory WHERE snapshot_id=$1::bigint AND set_id=$2',[built.id,setId])).rows[0].n);
  return {count,revision:String(built.revision),id:String(built.id)};
@@ -256,3 +256,6 @@ try {
  await query('DELETE FROM neon_auth.session WHERE token=$1',[token]);
  await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[user]);
 }
+
+// The separate readiness suite registers its own full-coverage acceptance key.
+await query('DELETE FROM draft_run_readiness_keys');
