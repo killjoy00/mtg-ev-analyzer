@@ -145,6 +145,24 @@ test('card image refresh changes display metadata only for registered environmen
   await assert.rejects(refreshTrophyImages(query,'powered-cube',[{name:target.name,image_url:'http://bad.example/card.jpg'}]),/Invalid image mapping/);
 });
 
+test('a blank mapped type line cannot erase stored metadata during image refresh',async()=>{
+  const rows=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
+  const original=structuredClone(rows[0]);
+  const target={...original.candidates[0],type_line:'Artifact'};
+  let stored={...structuredClone(original),candidates:[target,...structuredClone(original.candidates.slice(1))]};
+  const query=async(sql,params=[])=>{
+    if(sql.startsWith('SELECT puzzle_id,payload'))return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
+    if(sql.includes('UPDATE draft_run_verified_puzzles')){stored=JSON.parse(params[0])[0].payload;return {rows:[{puzzle_id:stored.puzzle_id}]};}
+    throw new Error('Unexpected SQL in image refresh test: '+sql);
+  };
+  const replacement='https://cards.example/blank-type-line.jpg';
+  const result=await refreshTrophyImages(query,'powered-cube',[{name:target.name,image_url:replacement,type_line:'  '}]);
+  assert.equal(result.updated_puzzles,1);
+  const card=stored.candidates.find(candidate=>candidate.name===target.name);
+  assert.equal(card.image_url,replacement);
+  assert.equal(card.type_line,'Artifact');
+});
+
 test('image markers clear only after every served card has an HTTPS image',async()=>{
   const updates=[];
   const query=async(sql,params=[])=>{

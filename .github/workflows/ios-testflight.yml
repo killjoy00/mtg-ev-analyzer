@@ -6,6 +6,10 @@ on:
     paths:
       - 'mobile/**'
       - '.github/workflows/ios-testflight.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/testflight-release-request.json'
   workflow_dispatch:
 
 permissions:
@@ -81,7 +85,7 @@ jobs:
 
   testflight:
     name: sign and upload TestFlight internal build
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
     runs-on: macos-latest
     environment: pack-one-mobile-release
     defaults:
@@ -94,6 +98,24 @@ jobs:
       APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve reviewed TestFlight release request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('../.github/testflight-release-request.json').read_text())
+          if set(request) != {'operation','reason'}:
+              raise SystemExit('Invalid TestFlight release request keys.')
+          if request.get('operation') != 'upload-testflight-internal':
+              raise SystemExit('Invalid TestFlight release operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('TestFlight release request requires a reason.')
+          print('Reviewed TestFlight release request:', reason)
+          PY
       - name: Require current approved main revision
         shell: bash
         run: |
