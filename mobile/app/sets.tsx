@@ -12,6 +12,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { loadSetCatalog, type SetCatalog, type SetCatalogEntry } from '@/src/api/catalog';
+import { setArchive as publishedSetArchive } from '@/src/content/setArchives';
 import { colors, spacing } from '@/src/theme';
 
 type State =
@@ -53,6 +54,7 @@ function SetCard({
   const action = environment === 'powered-cube'
     ? 'Play Cube Daily →'
     : environment === 'latest' ? 'Play Latest Set Daily →' : 'Play Draft Run Daily →';
+  const archive = publishedSetArchive(entry.set_id);
 
   return (
     <View style={styles.card}>
@@ -64,6 +66,15 @@ function SetCard({
       <Text style={styles.body}>
         {cohortLabel(entry)}{entry.training_drafts ? ` · ${formatNumber(entry.training_drafts)} training drafts` : ''}.
       </Text>
+      {archive ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push({ pathname: '/set-archive', params: { setId: entry.set_id } })}
+          style={styles.cardAction}
+        >
+          <Text style={styles.cardActionText}>Open archive analysis →</Text>
+        </Pressable>
+      ) : null}
       {environment ? (
         <Pressable
           accessibilityRole="button"
@@ -197,7 +208,7 @@ export default function SetsScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl },
+  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   hero: { gap: spacing.sm },
   kicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.3 },

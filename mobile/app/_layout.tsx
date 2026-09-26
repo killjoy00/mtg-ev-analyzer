@@ -31,6 +31,7 @@ export default function RootLayout() {
           <Stack.Screen name="scoring" options={{ title: 'Scoring' }} />
           <Stack.Screen name="method" options={{ title: 'Method' }} />
           <Stack.Screen name="sets" options={{ title: 'Sets' }} />
+          <Stack.Screen name="set-archive" options={{ title: 'Set Archive' }} />
           <Stack.Screen name="account" options={{ title: 'Account' }} />
           <Stack.Screen name="about" options={{ title: 'About & Support' }} />
           <Stack.Screen name="legal" options={{ title: 'Pack One Policy' }} />

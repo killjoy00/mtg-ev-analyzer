@@ -265,3 +265,27 @@ test('v1 includes the current Pack One Learn guides and conscious support/legal 
   assert.match(linking, /\/legal\?doc=privacy/);
   assert.match(linking, /\/legal\?doc=terms/);
 });
+
+
+test('v1 includes all four published web set archive analyses natively', () => {
+  const layout = read('mobile/app/_layout.tsx');
+  const sets = read('mobile/app/sets.tsx');
+  const detail = read('mobile/app/set-archive.tsx');
+  const content = read('mobile/src/content/setArchives.ts');
+  const linking = read('mobile/src/linking.ts');
+
+  for (const setId of ['msh','ecl','tmt','sos']) {
+    assert.match(content, new RegExp("setId: '"+setId+"'"));
+    assert.match(linking, new RegExp(setId));
+  }
+  assert.match(layout, /name="set-archive"/);
+  assert.match(sets, /Open archive analysis/);
+  assert.match(sets, /publishedSetArchive/);
+  assert.match(detail, /Average support for #1/);
+  assert.match(detail, /Cards that most often led the opening pack/);
+  assert.match(detail, /Three of the closest opening decisions in the archive/);
+  assert.match(detail, /TCGplayer \(affiliate link\)/);
+  assert.match(detail, /Affiliate disclosure/);
+  assert.match(detail, /maxWidth: 980/);
+  assert.match(linking, /\/set-archive\?setId=/);
+});
