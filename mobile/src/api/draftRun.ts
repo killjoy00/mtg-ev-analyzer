@@ -54,14 +54,30 @@ export type DraftRunPuzzle = {
   candidates: DraftRunCard[];
 };
 
+export type DraftRunRanking = {
+  id: string;
+  name: string;
+  support: number;
+  score: number;
+};
+
 export type DraftRunAnswer = {
   score: number;
   selectedId: string;
   selectedName: string;
+  selectedSupport?: number;
   historicalId: string | null;
   historicalName: string | null;
   historicalMatch: boolean;
+  consensusId?: string;
   consensusName?: string;
+  consensusSupport?: number;
+  consensusRank?: number;
+  consensusCap?: number;
+  supportRatio?: number;
+  pickNumber?: number;
+  modelTargetDisagreement?: boolean;
+  ranking?: DraftRunRanking[];
   puzzle: DraftRunPuzzle;
 };
 
@@ -187,6 +203,16 @@ export function rerollDraftRun(
       puzzleId: run.current.puzzle_id,
     },
     timeoutMs: 30_000,
+  });
+}
+
+export function createDraftRunShare(id: string, session: MobileSession) {
+  return requestJson<{ id: string }>(`/draft/v1/runs/${encodeURIComponent(id)}/share`, {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: {},
+    timeoutMs: 15_000,
   });
 }
 
