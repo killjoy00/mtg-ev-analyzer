@@ -24,7 +24,15 @@ from contextual_value.archive import (
     load_decisions,
 )
 from contextual_value.dataset import draft_split
-from contextual_value.nuisance import NuisancePrediction, crossfit_nuisance_fold
+from contextual_value.nuisance import (
+    NuisancePrediction,
+    NuisanceTrainingRow,
+    build_fold_training_rows,
+    crossfit_nuisance_fold,
+    fit_fold_from_training_rows,
+    nuisance_fold,
+    predict_fold,
+)
 from contextual_value.pipeline import run_development
 from contextual_value.schema import inspect_archive, write_manifest
 
@@ -44,6 +52,37 @@ def _read_predictions(paths: list[Path]) -> list[NuisancePrediction]:
                 if line.strip():
                     predictions.append(NuisancePrediction(**json.loads(line)))
     return predictions
+
+
+def _write_training_rows(path: Path, rows: list[NuisanceTrainingRow]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with gzip.open(path, "wt", encoding="utf-8") as handle:
+        for row in rows:
+            handle.write(json.dumps(asdict(row), sort_keys=True) + "\n")
+
+
+def _read_training_rows(paths: list[Path]) -> list[NuisanceTrainingRow]:
+    rows: list[NuisanceTrainingRow] = []
+    for path in paths:
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    rows.append(NuisanceTrainingRow(**json.loads(line)))
+    return rows
+
+
+def _outer_fold_parts(train, fold: int, folds: int):
+    if fold < 0 or fold >= folds:
+        raise SystemExit(f"fold must be in [0, {folds})")
+    all_ids = frozenset(row.draft_id for row in train)
+    held_ids = frozenset(
+        draft_id for draft_id in all_ids
+        if nuisance_fold(draft_id, folds) == fold
+    )
+    training_ids = frozenset(all_ids - held_ids)
+    if not held_ids or not training_ids:
+        raise SystemExit("outer nuisance fold requires non-empty train and held partitions")
+    return training_ids, held_ids
 
 
 def parse_args(argv=None):
@@ -74,6 +113,27 @@ def parse_args(argv=None):
         "--train-nuisance-fold",
         type=int,
         help="compute only this deterministic outer train nuisance fold and exit",
+    )
+    parser.add_argument(
+        "--train-nuisance-feature-shard",
+        type=int,
+        help="materialize one outer-fold nuisance training feature shard and exit",
+    )
+    parser.add_argument(
+        "--train-nuisance-expansion",
+        help="environment to materialize with --train-nuisance-feature-shard",
+    )
+    parser.add_argument(
+        "--assemble-train-nuisance-fold",
+        type=int,
+        help="fit/predict one outer nuisance fold from precomputed feature shards",
+    )
+    parser.add_argument(
+        "--precomputed-train-feature-shard",
+        action="append",
+        type=Path,
+        default=[],
+        help="repeat for precomputed environment feature shards",
     )
     parser.add_argument(
         "--precomputed-train-nuisance",
@@ -117,12 +177,140 @@ def main(argv=None):
     args.out.mkdir(parents=True, exist_ok=True)
     write_manifest(manifests, args.out / "archive-manifest.json")
 
-    if args.train_nuisance_fold is not None:
+    train = [row for row in decisions if draft_split(row.draft_id) == "train"]
+    selected_modes = sum(
+        value is not None
+        for value in (
+            args.train_nuisance_fold,
+            args.train_nuisance_feature_shard,
+            args.assemble_train_nuisance_fold,
+        )
+    )
+    if selected_modes > 1:
+        raise SystemExit("choose only one nuisance checkpoint mode")
+
+    if args.train_nuisance_feature_shard is not None:
+        if not args.train_nuisance_expansion:
+            raise SystemExit(
+                "--train-nuisance-expansion is required with --train-nuisance-feature-shard"
+            )
+        if args.precomputed_train_feature_shard or args.precomputed_train_nuisance:
+            raise SystemExit("feature-shard mode cannot consume precomputed nuisance artifacts")
+        fold = args.train_nuisance_feature_shard
+        training_ids, held_ids = _outer_fold_parts(train, fold, args.nuisance_folds)
+        rows = build_fold_training_rows(
+            train,
+            training_ids,
+            signal_provider=provider,
+            inner_feature_folds=args.inner_feature_folds,
+            expansion=args.train_nuisance_expansion,
+        )
+        output = args.out / (
+            f"train-feature-fold-{fold}-{args.train_nuisance_expansion}.jsonl.gz"
+        )
+        _write_training_rows(output, rows)
+        (args.out / "feature-shard-report.json").write_text(
+            json.dumps({
+                "scope": "development_only",
+                "assessment_opened": False,
+                "fold": fold,
+                "nuisance_folds": args.nuisance_folds,
+                "expansion": args.train_nuisance_expansion,
+                "row_count": len(rows),
+                "training_drafts": len(training_ids),
+                "held_drafts": len(held_ids),
+            }, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        print(json.dumps({
+            "mode": "train_nuisance_feature_shard",
+            "fold": fold,
+            "expansion": args.train_nuisance_expansion,
+            "rows": len(rows),
+            "assessment_opened": False,
+            "out": str(output),
+        }, indent=2))
+        return
+
+    if args.assemble_train_nuisance_fold is not None:
+        if args.train_nuisance_expansion:
+            raise SystemExit(
+                "--train-nuisance-expansion is only valid with --train-nuisance-feature-shard"
+            )
+        if not args.precomputed_train_feature_shard:
+            raise SystemExit(
+                "--assemble-train-nuisance-fold requires precomputed feature shards"
+            )
         if args.precomputed_train_nuisance:
+            raise SystemExit("fold assembly cannot consume completed nuisance predictions")
+        fold = args.assemble_train_nuisance_fold
+        training_ids, held_ids = _outer_fold_parts(train, fold, args.nuisance_folds)
+        rows = _read_training_rows(args.precomputed_train_feature_shard)
+        expected = {
+            row.decision_id for row in train if row.draft_id in training_ids
+        }
+        observed = {row.decision_id for row in rows}
+        if len(observed) != len(rows) or observed != expected:
+            missing = sorted(expected - observed)[:3]
+            extra = sorted(observed - expected)[:3]
+            raise SystemExit(
+                "precomputed feature shards do not exactly cover outer-fold training rows; "
+                f"missing={missing} extra={extra}"
+            )
+        print(json.dumps({
+            "mode": "assemble_train_nuisance_fold",
+            "fold": fold,
+            "feature_rows": len(rows),
+            "stage": "fit",
+            "assessment_opened": False,
+        }, sort_keys=True), flush=True)
+        fit = fit_fold_from_training_rows(
+            rows,
+            training_ids,
+            propensity_l2=args.propensity_l2,
+            outcome_l2=args.outcome_l2,
+            fold=fold,
+        )
+        held = [row for row in train if row.draft_id in held_ids]
+        print(json.dumps({
+            "mode": "assemble_train_nuisance_fold",
+            "fold": fold,
+            "stage": "predict",
+            "held_decisions": len(held),
+            "assessment_opened": False,
+        }, sort_keys=True), flush=True)
+        predictions = sorted(
+            predict_fold(fit, held, signal_provider=provider),
+            key=lambda item: item.decision_id,
+        )
+        output = args.out / f"train-nuisance-fold-{fold}.jsonl.gz"
+        _write_predictions(output, predictions)
+        (args.out / "fold-report.json").write_text(
+            json.dumps({
+                "scope": "development_only",
+                "assessment_opened": False,
+                "fold": fold,
+                "nuisance_folds": args.nuisance_folds,
+                "prediction_count": len(predictions),
+                "held_drafts": len(held_ids),
+                "feature_rows": len(rows),
+            }, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        print(json.dumps({
+            "mode": "assemble_train_nuisance_fold",
+            "fold": fold,
+            "predictions": len(predictions),
+            "assessment_opened": False,
+            "out": str(output),
+        }, indent=2), flush=True)
+        return
+
+    if args.train_nuisance_fold is not None:
+        if args.precomputed_train_feature_shard or args.precomputed_train_nuisance:
             raise SystemExit(
                 "--train-nuisance-fold cannot be combined with precomputed nuisance files"
             )
-        train = [row for row in decisions if draft_split(row.draft_id) == "train"]
         predictions = crossfit_nuisance_fold(
             train,
             args.train_nuisance_fold,
