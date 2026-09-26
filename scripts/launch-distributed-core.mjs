@@ -16,9 +16,9 @@ export function validatePolicy(p) {
   assert.ok(p.stages.every(s=>s.hold_seconds>=120&&s.players%p.generators===0));
   assert.ok(p.stages.at(-1).hold_seconds>=600&&p.recovery_seconds>=60);
   assert.ok(p.initial_seconds>=90&&p.drain_seconds>=60&&p.recovery_players===5);
-  for(const k of ['ramp_seconds','heartbeat_seconds','lease_seconds','cohort_timeout_seconds','arm_seconds','ack_margin_seconds','maximum_start_lateness_ms','maximum_arrival_lateness_ms','telemetry_bin_seconds','telemetry_settlement_seconds','telemetry_timeout_seconds','maximum_experiment_minutes','maximum_branch_lifetime_minutes','maximum_compute_cu','maximum_requests','maximum_response_bytes','maximum_project_reported_egress_delta_bytes'])assert.ok(Number.isSafeInteger(p[k])&&p[k]>0,k);
+  for(const k of ['ramp_seconds','heartbeat_seconds','lease_seconds','cohort_timeout_seconds','arm_seconds','ack_margin_seconds','maximum_start_lateness_ms','maximum_arrival_lateness_ms','telemetry_bin_seconds','telemetry_settlement_seconds','telemetry_timeout_seconds','telemetry_preflight_requests','maximum_experiment_minutes','maximum_branch_lifetime_minutes','maximum_compute_cu','maximum_requests','maximum_response_bytes','maximum_project_reported_egress_delta_bytes'])assert.ok(Number.isSafeInteger(p[k])&&p[k]>0,k);
   assert.ok(p.lease_seconds>=3*p.heartbeat_seconds&&p.arm_seconds>p.ack_margin_seconds+p.lease_seconds);
-  assert.ok(p.maximum_compute_cu<=8&&p.maximum_requests<=50000&&p.maximum_branch_lifetime_minutes<=75);
+  assert.ok(p.maximum_compute_cu<=8&&p.maximum_requests<=50000&&p.maximum_branch_lifetime_minutes<=75&&p.telemetry_preflight_requests<=100);
   assert.ok(p.maximum_branch_lifetime_minutes*p.maximum_compute_cu/60<=p.emergency_compute_ceiling_cu_hours);
   assert.ok(p.maximum_experiment_minutes<p.maximum_branch_lifetime_minutes);
   assert.equal(p.maximum_error_fraction,0);assert.equal(p.maximum_legitimate_429s,0);assert.equal(p.maximum_correctness_failures,0);
