@@ -186,6 +186,8 @@ def run_development(
     blend_lambdas: Sequence[float] = (0.0, 0.25, 0.5, 0.75, 1.0),
     blend_weights: Sequence[float] = (0.0, 0.25, 0.5, 0.75, 1.0),
     train_predictions: Sequence[NuisancePrediction] | None = None,
+    validation_predictions: Sequence[NuisancePrediction] | None = None,
+    assessment_draft_count: int | None = None,
 ) -> tuple[dict, list[NuisancePrediction], list[NuisancePrediction], ContextualValueModel]:
     """Fit on train and tune only on validation; assessment remains unopened."""
     train = [row for row in decisions if draft_split(row.draft_id) == "train"]
@@ -226,20 +228,34 @@ def run_development(
     )
 
     train_ids = frozenset(row.draft_id for row in train)
-    validation_fit = fit_fold(
-        train,
-        train_ids,
-        signal_provider=signal_provider,
-        propensity_l2=propensity_l2,
-        outcome_l2=outcome_l2,
-        inner_feature_folds=inner_feature_folds,
-        fold=-1,
-    )
-    validation_predictions = predict_fold(
-        validation_fit,
-        validation,
-        signal_provider=signal_provider,
-    )
+    if validation_predictions is None:
+        validation_fit = fit_fold(
+            train,
+            train_ids,
+            signal_provider=signal_provider,
+            propensity_l2=propensity_l2,
+            outcome_l2=outcome_l2,
+            inner_feature_folds=inner_feature_folds,
+            fold=-1,
+        )
+        validation_predictions = predict_fold(
+            validation_fit,
+            validation,
+            signal_provider=signal_provider,
+        )
+    else:
+        validation_predictions = list(validation_predictions)
+        expected_validation = {row.decision_id for row in validation}
+        observed_validation = {row.decision_id for row in validation_predictions}
+        if len(observed_validation) != len(validation_predictions):
+            raise ValueError("precomputed validation nuisance predictions contain duplicate decisions")
+        if observed_validation != expected_validation:
+            missing = sorted(expected_validation - observed_validation)[:3]
+            extra = sorted(observed_validation - expected_validation)[:3]
+            raise ValueError(
+                "precomputed validation nuisance predictions do not match validation decisions; "
+                f"missing={missing} extra={extra}"
+            )
     by_prediction = {row.decision_id: row for row in validation_predictions}
     primary = _group_primary(validation)
     if not primary:
@@ -340,13 +356,25 @@ def run_development(
             return None
         return sum(int(row[name] == row["selected"]) for row in trophy_rows) / len(trophy_rows)
 
+    observed_assessment_count = len({row.draft_id for row in assessment})
+    if assessment_draft_count is not None and assessment_draft_count < 0:
+        raise ValueError("assessment_draft_count must be non-negative")
     report = {
         "scope": "development_only",
         "assessment_opened": False,
+        "assessment_boundary": {
+            "outcomes_loaded_into_pipeline": bool(assessment),
+            "outcomes_used_for_fit": False,
+            "outcomes_scored": False,
+        },
         "drafts": {
             "train": len({row.draft_id for row in train}),
             "validation": len({row.draft_id for row in validation}),
-            "assessment_withheld": len({row.draft_id for row in assessment}),
+            "assessment_withheld": (
+                int(assessment_draft_count)
+                if assessment_draft_count is not None
+                else observed_assessment_count
+            ),
             "validation_primary_ope": len(primary),
         },
         "diagnostics": {
