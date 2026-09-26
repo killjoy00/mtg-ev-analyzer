@@ -1129,8 +1129,8 @@ async function consumeRecoveryLimit(email) {
   return {limited:Number(result.rows[0]?.attempts||0)>RESET_LIMIT_MAX,expiresAt:result.rows[0]?.expires_at,key};
 }
 
-async function handlePasswordResetRequest(request) {
-  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+async function handlePasswordResetRequest(request,{mobile=false}={}) {
+  if(!mobile)requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const payload=await readJson(request);
   const email=normalizedRecoveryEmail(payload.email);
   const limit=await consumeRecoveryLimit(email);
@@ -1162,8 +1162,8 @@ async function consumeVerificationLimit(email) {
   return {limited:Number(result.rows[0]?.attempts||0)>RESET_LIMIT_MAX,expiresAt:result.rows[0]?.expires_at,key};
 }
 
-async function handleVerificationEmailRequest(request) {
-  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+async function handleVerificationEmailRequest(request,{mobile=false}={}) {
+  if(!mobile)requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const payload=await readJson(request);
   const email=normalizedRecoveryEmail(payload.email);
   const limit=await consumeVerificationLimit(email);
@@ -1198,8 +1198,8 @@ async function recoveryUserForToken(token) {
   return id;
 }
 
-async function handlePasswordReset(request) {
-  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+async function handlePasswordReset(request,{mobile=false}={}) {
+  if(!mobile)requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const payload=await readJson(request);
   const token=recoveryToken(payload.token);
   const password=String(payload.newPassword||'');
@@ -1588,9 +1588,8 @@ async function closeProviderSession(cookie) {
   try {await neonAuthSession('/sign-out',{body:{},cookie});} catch {}
 }
 
-async function handlePasswordChange(request) {
-  requireTrustedOrigin(request,ALLOWED_ORIGINS);
-  const auth=await authSession(request,{required:true,allowLegacy:false,csrf:true});
+async function handlePasswordChange(request,{mobile=false}={}) {
+  const auth=await accountMutationAuth(request,{mobile});
   const payload=await readJson(request);
   const currentPassword=String(payload.currentPassword||'');
   const newPassword=String(payload.newPassword||'');
@@ -1646,7 +1645,8 @@ async function handlePasswordChange(request) {
     }
     providerSession=changed.cookie||providerSession;
     await revokeAllAccountSessions(query,auth.user_id);
-    return clearAccountCookies(json({ok:true,signedOut:true}));
+    const response=json({ok:true,signedOut:true});
+    return mobile?response:clearAccountCookies(response);
   } finally {
     await closeProviderSession(providerSession);
   }
@@ -1957,17 +1957,26 @@ async function handlePublicProfile(profileKey) {
   return json(await buildProfile(meta.player_id, meta, { own: false }));
 }
 
-async function handleProfileUpdate(request) {
-  const id = await player(request);
+async function handleProfileUpdate(request,{mobile=false}={}) {
+  let id,auth;
+  if(mobile) {
+    const identity=await mobileAccountIdentity(request);
+    id=identity.owner;
+    auth=identity.auth;
+  } else {
+    id=await player(request);
+    auth=await authSession(request);
+  }
   const meta = await profileMetaByPlayer(id);
   if (!meta) throw Object.assign(new Error('Player profile unavailable.'), { status: 404 });
   if (!bool(meta.claimed)) {
     throw Object.assign(new Error('Claim an account before publishing or customizing a profile.'), { status: 403 });
   }
-  const auth = await authSession(request);
-  const link = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1', [auth.user_id]);
-  if (link.rows[0]?.player_id !== id) {
-    throw Object.assign(new Error('Sign in again to change account settings.'), { status: 403 });
+  if(!mobile) {
+    const link = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1', [auth.user_id]);
+    if (link.rows[0]?.player_id !== id) {
+      throw Object.assign(new Error('Sign in again to change account settings.'), { status: 403 });
+    }
   }
   const payload = await readJson(request);
 
@@ -2079,9 +2088,13 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/start') return handleMobileGoogleStart(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/google/finish') return handleMobileGoogleFinish(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/send-verification-email') return handleVerificationEmailRequest(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/send-verification-email') return handleVerificationEmailRequest(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/account/request-password-reset') return handlePasswordResetRequest(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/request-password-reset') return handlePasswordResetRequest(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/account/reset-password') return handlePasswordReset(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/reset-password') return handlePasswordReset(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/account/password-change') return handlePasswordChange(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/password-change') return handlePasswordChange(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/account/delete/verification/start') return handleAccountDeleteVerificationStart(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/delete') return handleAccountDelete(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/migrate') return handleAccountMigration(request);
@@ -2096,6 +2109,7 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccount(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/me') return handleMobileMyProfile(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/profile/history') return handleMobileMyHistory(request);
+  if (request.method === 'PATCH' && url.pathname === '/v1/mobile/profile') return handleProfileUpdate(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/signout') return handleMobileSignout(request);
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete/verification/start') return handleAccountDeleteVerificationStart(request,{mobile:true});
   if (request.method === 'POST' && url.pathname === '/v1/mobile/account/delete') return handleAccountDelete(request,{mobile:true});
