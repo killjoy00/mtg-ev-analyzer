@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import zlib from 'node:zlib';
 import {generateKeyPairSync,sign} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from '../worker/trophy-import-auth.mjs';
 import {insertTrophyBatch,handleTrophyImport,refreshTrophyImagePage,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
 import {SERVING_ANALYZE_SQL,SOURCE_ANALYZE_SQL,SERVING_STATISTICS_COLUMNS,SERVING_STATISTICS_READY_SQL} from '../worker/serving-statistics.mjs';
@@ -89,6 +90,25 @@ test('only the signed main trophy import can request fixed serving statistics ma
   assert.deepEqual(await handleTrophyImport(request(current),query),{analyzed_tables:Object.keys(SERVING_STATISTICS_COLUMNS)});
   assert.deepEqual(calls,[...SERVING_ANALYZE_SQL,...SOURCE_ANALYZE_SQL,SERVING_STATISTICS_READY_SQL]);
   await assert.rejects(handleTrophyImport(request(current),async()=>{throw Error('maintenance failed');}),/maintenance failed/);
+});
+
+test('the retired remote corpus load cannot insert, stage or finalize anything',async t=>{
+  t.mock.method(globalThis,'fetch',async()=>Response.json({keys:[jwk]}));
+  const now=Math.floor(Date.now()/1000);
+  const current={...claims,iat:now-10,nbf:now-10,exp:now+300};
+  const query=async()=>{throw Error('SQL must not run for a retired remote load action');};
+  const request=(body,identity=current)=>new Request('https://example/v1/trophy-import',{
+    method:'POST',headers:{'content-type':'application/json',authorization:'Bearer '+token(identity)},body:JSON.stringify(body)});
+  // A batch against a snapshot that was never staged is exactly the broken sequence.
+  const batch={action:'batch',sourceSnapshotId:'a'.repeat(64),puzzles:[{puzzle_id:'x',set_id:'hob'}]};
+  for(const body of [batch,{action:'status',setId:'hob'},{action:'finish-set',manifest:{id:'hob',source_snapshot_id:'a'.repeat(64)}}]) {
+    await assert.rejects(handleTrophyImport(request(body),query),error=>error.status===410&&/Remote trophy import is disabled/.test(error.message),body.action);
+    // OIDC identity is still checked first: other workflows are denied, not told the path is retired.
+    await assert.rejects(handleTrophyImport(request(body,{...current,workflow_ref:IMAGE_REFRESH_WORKFLOW}),query),/denied/);
+  }
+  const loader=spawnSync(process.execPath,['scripts/load_all_trophies.mjs','https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech','generated/does-not-exist'],{encoding:'utf8'});
+  assert.notEqual(loader.status,0);
+  assert.match(loader.stderr,/Remote trophy import is disabled; pass a reviewed direct connection file\./);
 });
 
 test('card image refresh changes display metadata only for registered environments',async()=>{

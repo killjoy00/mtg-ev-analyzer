@@ -224,30 +224,11 @@ export async function handleTrophyImport(request,query) {
   if(identity.workflow_ref!==IMPORT_WORKFLOW)throw error('Trophy import identity denied',403);
 
   if(body.action==='refresh-statistics')return refreshServingStatistics(query);
-  if(body.action==='batch')return {added:await insertTrophyBatch(query,body.puzzles,{sourceSnapshotId:body.sourceSnapshotId||null})};
-  const sid=body.setId||body.manifest?.id;
-  if(!allowed.has(sid))throw error('Environment not registered');
-  const sourceSnapshotId=body.manifest?.source_snapshot_id||null;
-  const status=(await query('SELECT s.corpus_version,(SELECT count(*)::int FROM draft_run_verified_puzzles p WHERE p.set_id=s.set_id AND p.corpus_version=$2 AND ($3::text IS NULL OR p.source_snapshot_id=$3)) puzzles FROM draft_run_verified_sets s WHERE s.set_id=$1',[sid,VERSION,sourceSnapshotId])).rows[0];
-  if(status?.corpus_version!==VERSION)throw error('Baseline environment missing',409);
-  if(body.action==='status')return {...status,puzzles:Number(status.puzzles)};
-  if(body.action==='finish-set') {
-    const m=body.manifest;
-    if(!/^[a-f0-9]{64}$/.test(m?.source_snapshot_id||''))throw error('Missing source snapshot identity',409);
-    const snapshotManifest=JSON.stringify({full_import:m});
-    const snapshot=(await query(`INSERT INTO corpus_source_snapshots(
-      source_snapshot_id,set_id,event_type,corpus_version,schema_version,draft_sha256,game_sha256,draft_etag,game_etag,
-      draft_last_modified,game_last_modified,importer_identity,model_identity,manifest,lifecycle_status)
-      VALUES($1,$2,'PremierDraft',$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13::jsonb,'Blocked')
-      ON CONFLICT(source_snapshot_id) DO NOTHING RETURNING source_snapshot_id,manifest`,
-      [m.source_snapshot_id,sid,VERSION,m.schema_version,m.source_archive?.sha256,m.skill_source?.sha256,m.source_archive?.etag||null,m.skill_source?.etag||null,
-       m.source_archive?.last_modified||null,m.skill_source?.last_modified||null,m.import_version,m.model_version,snapshotManifest])).rows[0]
-      ||(await query('SELECT source_snapshot_id,manifest FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[m.source_snapshot_id])).rows[0];
-    const storedManifest=typeof snapshot?.manifest==='string'?JSON.parse(snapshot.manifest):snapshot?.manifest;
-    if(snapshot?.source_snapshot_id!==m.source_snapshot_id||JSON.stringify(storedManifest)!==JSON.stringify(JSON.parse(snapshotManifest)))throw error('Existing source snapshot differs',409);
-    if(m.corpus_version!==VERSION||m.import_version!=='all-premier-trophies-v1'||!Number.isInteger(m.total_puzzles)||m.total_puzzles<1||m.total_puzzles!==m.existing_puzzles_preserved+m.additional_puzzles||m.source_trophies!==m.included_trophies+m.excluded_trophies||!/^[a-f0-9]{64}$/.test(m.input_signature)||Number(status.puzzles)!==m.total_puzzles)throw error('Import accounting mismatch',409);
-    await query("UPDATE draft_run_verified_sets SET manifest=jsonb_set(manifest,'{full_import}',$2::jsonb) WHERE set_id=$1",[sid,JSON.stringify({...m,github_run_id:identity.run_id,github_sha:identity.sha})]);
-    return {puzzles:Number(status.puzzles)};
-  }
+  // Remote corpus loading is retired. Every reviewed workflow loads verified
+  // artifacts through a direct connection, which stages the immutable source
+  // snapshot before any puzzle insert. The remote sequence sent batches before
+  // its snapshot existed, so it is refused outright rather than half-supported.
+  if(['batch','status','finish-set'].includes(body.action))
+    throw error('Remote trophy import is disabled; load verified artifacts with the direct reviewed loader.',410);
   throw error('Unknown import action');
 }
