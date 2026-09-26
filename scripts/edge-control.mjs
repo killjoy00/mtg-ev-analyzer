@@ -37,7 +37,10 @@ async function cf(route,{method='GET',body,allow404=false}={}) {
   try {r=await fetch('https://api.cloudflare.com/client/v4'+route,{method,redirect:'error',headers:{authorization:`Bearer ${process.env.CLOUDFLARE_EDGE_TOKEN}`,'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000)});}catch{throw Error('Cloudflare control request failed.');}
   if(allow404&&r.status===404)return null;
   if(!r.ok)throw Error(`Cloudflare control HTTP ${r.status}; check the scoped deployment token.`);
-  const result=await r.json();if(!result.success)throw Error('Cloudflare rejected the control request.');
+  const bodyText=await r.text();
+  if(method==='DELETE'&&!bodyText.trim())return {success:true};
+  let result;try{result=JSON.parse(bodyText);}catch{throw Error('Cloudflare control returned invalid JSON.');}
+  if(!result?.success)throw Error('Cloudflare rejected the control request.');
   return result;
 }
 async function context() {
@@ -77,9 +80,10 @@ async function main(action) {
   }
   if(action==='disable') {
     if(domain) {
-      if(!/^[a-f0-9]{32}$/.test(domain.id))throw Error('Unexpected custom-domain identifier.');
-      await cf(`/accounts/${zone.account.id}/workers/domains/${domain.id}`,{method:'DELETE'});
+      if(!/^[A-Za-z0-9_-]{1,128}$/.test(domain.id))throw Error('Unexpected custom-domain identifier.');
+      await cf(`/accounts/${zone.account.id}/workers/domains/${encodeURIComponent(domain.id)}`,{method:'DELETE'});
     }
+    const remaining=await context();if(remaining.domain)throw Error('Preview hostname remains attached after deletion.');
     console.log('Preview custom domain disabled. Backend guards remain enabled; the isolated branch expires automatically.');return;
   }
   if(action!=='deploy')throw Error('Unknown preview operation.');
@@ -129,6 +133,17 @@ async function main(action) {
   run('wrangler',['deploy','--config',configPath]);
   run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({ORIGIN_SECRET:origin,PREVIEW_KEY:preview,QUOTA_KEY:quota}));
   await cf(`/accounts/${zone.account.id}/workers/domains`,{method:'PUT',body:{hostname:HOST,service:WORKER,zone_id:zone.id}});
+  // A newly attached hostname can lag the control-plane response. Verify the
+  // public preview route and exact revision before handing it to any browser.
+  let ready=false;const deadline=Date.now()+90000;
+  while(Date.now()<deadline&&!ready) {
+    try {
+      const r=await fetch(`https://${HOST}/draft/health?quick=1`,{headers:{'x-pack1-preview-key':preview},redirect:'error',signal:AbortSignal.timeout(10000)});
+      ready=r.status===200&&(await r.json()).release_commit===commit;
+    } catch { /* bounded read-only propagation probe */ }
+    if(!ready)await new Promise(resolve=>setTimeout(resolve,2000));
+  }
+  if(!ready)throw Error('Preview hostname did not serve the reviewed revision before the readiness deadline.');
   variable('PREVIEW_ACCESS_KEY',preview);variable('PREVIEW_ORIGIN_SECRET',origin);
   console.log('Private preview deployed. Live acceptance must still pass.');
 }
@@ -137,5 +152,6 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url)main(p
   // this control process; never print a provider response or process arguments.
   const message=String(error.message||'');
   console.error(/^(Add repository|Invalid preview|An isolated|Cloudflare control|Cloudflare rejected|Neon control|Expected the|Invalid Cloudflare|Cannot verify|Preview hostname|Preview DNS|Existing Worker|Unexpected custom|Unknown preview|Require a newly|Unexpected inherited|Origin did|Origin revision|Origin closure|neon failed|wrangler failed)/.test(message)?message:'Preview operation failed; inspect the sanitized step status.');
+  console.error(JSON.stringify({error_class:error.name||'Error',line:String(error.stack).match(/edge-control.mjs:(\d+)/)?.[1]||null}));
   process.exitCode=1;
 });

@@ -185,6 +185,7 @@ def run_development(
     temperature_grid: Sequence[float] = (0.25, 0.5, 1.0, 2.0, 4.0),
     blend_lambdas: Sequence[float] = (0.0, 0.25, 0.5, 0.75, 1.0),
     blend_weights: Sequence[float] = (0.0, 0.25, 0.5, 0.75, 1.0),
+    train_predictions: Sequence[NuisancePrediction] | None = None,
 ) -> tuple[dict, list[NuisancePrediction], list[NuisancePrediction], ContextualValueModel]:
     """Fit on train and tune only on validation; assessment remains unopened."""
     train = [row for row in decisions if draft_split(row.draft_id) == "train"]
@@ -193,14 +194,28 @@ def run_development(
     if not train or not validation:
         raise ValueError("development run requires non-empty train and validation partitions")
 
-    train_predictions = crossfit_nuisance(
-        train,
-        folds=nuisance_folds,
-        signal_provider=signal_provider,
-        propensity_l2=propensity_l2,
-        outcome_l2=outcome_l2,
-        inner_feature_folds=inner_feature_folds,
-    )
+    if train_predictions is None:
+        train_predictions = crossfit_nuisance(
+            train,
+            folds=nuisance_folds,
+            signal_provider=signal_provider,
+            propensity_l2=propensity_l2,
+            outcome_l2=outcome_l2,
+            inner_feature_folds=inner_feature_folds,
+        )
+    else:
+        train_predictions = list(train_predictions)
+        expected = {row.decision_id for row in train}
+        observed = {row.decision_id for row in train_predictions}
+        if len(observed) != len(train_predictions):
+            raise ValueError("precomputed train nuisance predictions contain duplicate decisions")
+        if observed != expected:
+            missing = sorted(expected - observed)[:3]
+            extra = sorted(observed - expected)[:3]
+            raise ValueError(
+                "precomputed train nuisance predictions do not match training decisions; "
+                f"missing={missing} extra={extra}"
+            )
     value_model = fit_contextual_value_model(
         train,
         train_predictions,

@@ -23,6 +23,8 @@ from contextual_value.archive import (
     limit_decisions,
     load_decisions,
 )
+from contextual_value.dataset import draft_split
+from contextual_value.nuisance import NuisancePrediction, crossfit_nuisance_fold
 from contextual_value.pipeline import run_development
 from contextual_value.schema import inspect_archive, write_manifest
 
@@ -32,6 +34,16 @@ def _write_predictions(path: Path, predictions) -> None:
     with gzip.open(path, "wt", encoding="utf-8") as handle:
         for prediction in predictions:
             handle.write(json.dumps(asdict(prediction), sort_keys=True) + "\n")
+
+
+def _read_predictions(paths: list[Path]) -> list[NuisancePrediction]:
+    predictions: list[NuisancePrediction] = []
+    for path in paths:
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    predictions.append(NuisancePrediction(**json.loads(line)))
+    return predictions
 
 
 def parse_args(argv=None):
@@ -58,6 +70,18 @@ def parse_args(argv=None):
     parser.add_argument("--propensity-l2", type=float, default=1.0)
     parser.add_argument("--outcome-l2", type=float, default=10.0)
     parser.add_argument("--value-l2", type=float, default=10.0)
+    parser.add_argument(
+        "--train-nuisance-fold",
+        type=int,
+        help="compute only this deterministic outer train nuisance fold and exit",
+    )
+    parser.add_argument(
+        "--precomputed-train-nuisance",
+        action="append",
+        type=Path,
+        default=[],
+        help="repeat for precomputed outer-fold train nuisance prediction files",
+    )
     return parser.parse_args(argv)
 
 
@@ -90,6 +114,51 @@ def main(argv=None):
         raise SystemExit("no eligible draft IDs matched the game archive")
 
     provider = ArchiveSignalProvider(decisions, games)
+    args.out.mkdir(parents=True, exist_ok=True)
+    write_manifest(manifests, args.out / "archive-manifest.json")
+
+    if args.train_nuisance_fold is not None:
+        if args.precomputed_train_nuisance:
+            raise SystemExit(
+                "--train-nuisance-fold cannot be combined with precomputed nuisance files"
+            )
+        train = [row for row in decisions if draft_split(row.draft_id) == "train"]
+        predictions = crossfit_nuisance_fold(
+            train,
+            args.train_nuisance_fold,
+            folds=args.nuisance_folds,
+            signal_provider=provider,
+            propensity_l2=args.propensity_l2,
+            outcome_l2=args.outcome_l2,
+            inner_feature_folds=args.inner_feature_folds,
+        )
+        output = args.out / f"train-nuisance-fold-{args.train_nuisance_fold}.jsonl.gz"
+        _write_predictions(output, predictions)
+        (args.out / "fold-report.json").write_text(
+            json.dumps({
+                "scope": "development_only",
+                "assessment_opened": False,
+                "fold": args.train_nuisance_fold,
+                "nuisance_folds": args.nuisance_folds,
+                "prediction_count": len(predictions),
+                "held_drafts": len({row.draft_id for row in predictions}),
+            }, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        print(json.dumps({
+            "mode": "train_nuisance_fold",
+            "fold": args.train_nuisance_fold,
+            "predictions": len(predictions),
+            "assessment_opened": False,
+            "out": str(output),
+        }, indent=2))
+        return
+
+    precomputed = (
+        _read_predictions(args.precomputed_train_nuisance)
+        if args.precomputed_train_nuisance
+        else None
+    )
     report, train_predictions, validation_predictions, value_model = run_development(
         decisions,
         signal_provider=provider,
@@ -98,10 +167,8 @@ def main(argv=None):
         propensity_l2=args.propensity_l2,
         outcome_l2=args.outcome_l2,
         value_l2=args.value_l2,
+        train_predictions=precomputed,
     )
-
-    args.out.mkdir(parents=True, exist_ok=True)
-    write_manifest(manifests, args.out / "archive-manifest.json")
     (args.out / "development-report.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",

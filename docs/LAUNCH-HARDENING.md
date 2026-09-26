@@ -85,3 +85,59 @@ The Cloudflare configuration enables storage, but a successful dry run is not
 proof that production logs/alerts are live. The reviewed release must verify
 stored events and alert delivery. See the acceptance report for the tested
 revision, retained release event and limits of the capacity claim.
+
+## Measured NAT failure and candidate launch budgets
+
+The first live isolated 25-player test stopped on the eleventh new guest:
+`session` 429, Retry-After 589 s. Its 97 requests had already consumed most of
+its separate 120/minute budget. See `results/launch-nat-baseline-2026-09-25`.
+
+The candidate policy supports 100 shared-network players' complete paced runs:
+3,600 general requests/minute, a separate 600-request/10-second burst bucket,
+and 120 new identities/10 minutes. Every actual creation (including invalid
+cookies) consumes the creation bucket. Existing verified players retain access
+until a general bucket is exhausted. Account/credential and player mutation
+limits remain independent. Rejection charges none of the other buckets.
+
+These are fixed windows. A boundary can admit twice one window's capacity in
+quick succession: up to 1,200 requests around a burst boundary and 240 identity
+creations around a session boundary. The minute bucket retains its count across
+burst resets. The limits bound abuse; they do not establish capacity by
+arithmetic. Real Workers tests verify concurrency/persistence; the isolated NAT
+workload must pass its predefined gates before production uses this policy.
+
+The workload selects a supported launch target of 25 active players, with
+25/50/100 NAT stages and 25/100/500/1,000 distributed targets. Stage escalation
+stops on the first failed gate. The NAT run uses 50% new guests, 30% established
+accounts and 20% entitled practice, all three Dailies, 3–8-second decision times,
+eight view/pick pairs, rerolls, sharing, boards and a guest-to-ranked cohort.
+No egress spoofing or between-stage quota-key rotation is permitted. Fixture
+credentials remain in a mode-0600 runner file and disappear with the branch.
+
+`launch-load-policy.json` declares route p95/p99, zero legitimate 429s and zero
+correctness failures, a 1% overall request-error ceiling, 50,000-request maximum,
+20-minute test budget and 8-CU compute cap. The workflow has a 50-minute overall
+limit and a two-hour branch expiry. Confirmed-idle browser timing is a separate
+acceptance record; a warm-up is not labeled a cold start. Twenty warm browser samples per case retain every observation, with p95/p99 and raw samples. Four isolated fixture accounts keep each case below the unchanged 30-starts/10-minute per-player limit. One confirmed-idle sample per case remains a cold regression check, not a stable population p95.
+
+## Distributed acceptance
+
+The distributed workflow uses five independent runners for 25 actors, then
+20 runners for 100/500/1,000 actors. All use real outbound addresses. Private
+preview health responses attest the Cloudflare-observed network with the
+preview-only HMAC; production never returns this field. The collector verifies
+the expected distinct egress count and reports only that count. Attestations
+and fixture credentials are authenticated-encrypted with a workflow-specific
+key before entering artifacts; raw credentials and network digests are not
+logged. Each stage uses fresh fixture identities, with no quota reset.
+
+Arrivals share a future timestamp across runners. A generator arriving over
+five seconds late fails the stage, so runner scheduling cannot quietly reduce
+measured concurrency. The collector combines route samples, applies the
+predeclared budgets, and permits the next stage only after a pass. Incomplete
+reports, mismatched code revisions, duplicate egress, correctness errors or
+unexpected 429s fail closed. Cleanup runs after the final reached stage.
+
+This is distributed load across 5 or 20 actual networks, not one unique address
+per actor. Fixture preparation adds 2,000 accounts and 180,000 synthetic history
+rows only to the disposable branch. The production gateway is never a target.

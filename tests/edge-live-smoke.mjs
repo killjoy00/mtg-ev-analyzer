@@ -57,10 +57,10 @@ for(const environment of ['mixed','powered-cube']) {
 await verify();
 // Invalid bodies consume the edge creation budget without creating accounts.
 // Changing client-supplied forwarding headers must not grant extra capacity.
-const limited=await Promise.all(Array.from({length:12},async(_,i)=>{
+const limited=await Promise.all(Array.from({length:122},async(_,i)=>{
   const r=await fetch(base+'/growth/v1/session',{method:'POST',headers:{'x-pack1-preview-key':preview,'content-type':'application/json','x-forwarded-for':`192.0.2.${i+1}`},body:'null',redirect:'error'});
   assert.ok([400,429].includes(r.status));if(r.status===429)assert.ok(Number(r.headers.get('retry-after'))>0);return r.status;
 }));
-assert.ok(limited.filter(s=>s===400).length<=9,'Spoofed headers bypassed the creation quota.');
+assert.ok(limited.filter(s=>s===400).length<=119,'Spoofed headers bypassed the creation quota.');
 assert.ok(limited.includes(429));
 console.log(JSON.stringify({status:'passed',commit,branch,preview:base,checks:['direct origin denied','private preview','mixed and Cube eight-pick practice','reroll, retry, share and scoring','durable network creation quota']},null,2));

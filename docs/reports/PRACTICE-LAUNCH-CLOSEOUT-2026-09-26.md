@@ -1,6 +1,6 @@
 # Practice and launch acceptance: issues #516 and #527
 
-Final gateway and release results are added below after the corresponding gates complete.
+The final browser and shared-network gates passed, and the supported 25-player distributed target passed. This report retains exact test revisions, measurement limits and the guarded production release record.
 
 ## Implementation
 
@@ -10,7 +10,7 @@ Snapshot-aware invalidation from 0041/0042 preserves active-corpus correctness w
 
 Rerolls retain their exact distance arithmetic, C-collated ties, eligibility and RNG policy. The covering index and ordered candidate plan reduce work before the same 20 eligible candidates reach the shared selector. The expanded isolated gate compared every candidate row/order and final result in 42 cases across Mixed, Cube, single/multi custom, pack/set rerolls and early/later rounds. Historical exhaustive selector integration also passed.
 
-Network protection charges actual guest identity creation, including invalid-cookie paths. Existing verified identities retain their exemption from creation limits. Candidate shared-network policy is 3,600 requests/minute, 600/10 seconds and 120 creations/10 minutes; credential/account limits remain independent. JSON 429 scope and Retry-After are preserved. Routine deployment retains QUOTA_KEY.
+Network protection charges actual guest identity creation, including invalid-cookie paths. Existing verified identities retain their exemption from creation limits. Validated shared-network policy is 3,600 requests/minute, 600/10 seconds and 120 creations/10 minutes; credential/account limits remain independent. JSON 429 scope and Retry-After are preserved. Routine deployment retains QUOTA_KEY.
 
 ## Isolated SQL evidence
 
@@ -38,6 +38,29 @@ The supported target was declared as 25 active players before testing. NAT stage
 Route p95/p99 budgets in seconds: session 2/5, start 2/8, view 1/3, pick 2/5, reroll 2/5, reads 2/5. Correctness failures and unintended 429s must be zero. Distributed acceptance verifies real distinct egress and arrival lateness, rather than spoofed headers. No quota reset occurs between stages.
 
 Browser acceptance measures 20 warm samples and one separately confirmed-idle sample per mode. Warm API p95 must be <=2 s; click-to-first-cards p95 <=3 s; each confirmed-idle click <=6 s. One idle observation per mode is a regression sample, not a population p95. Image decoding is recorded separately. The harness keeps normal static caching and sends API traffic only to the private preview.
+
+## Final browser and shared-network acceptance
+
+[Run 36213435234](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36213435234) passed at tested merge revision `bc94bdf5d7cb2f45da24cce6beb0513e2a32e5f5` (PR #534 head `3ae0159763e3794d180ecff751964e434b50c628`). Preview route removal and disposable branch deletion both passed.
+
+All 80 warm browser samples and four separately confirmed-idle samples passed, with zero browser errors and 3,492 static cache hits. Times below are milliseconds.
+
+| Mode | Warm API p95 | Warm click p95 | Confirmed-idle click |
+|---|---:|---:|---:|
+| mixed | 1505 | 1833 | 4051 |
+| powered-cube | 492 | 942 | 3403 |
+| custom-single | 417 | 438 | 1793 |
+| custom-multi | 452 | 483 | 2046 |
+
+All NAT stages passed without resetting quota state. Each stage completed one paced run per actor in approximately 67–68 seconds; the combined measurement window was 03:36:49–03:40:12 UTC. All 3,774 requests returned 200/201, with zero correctness failures, errors or 429s. Observed arrival lateness p99 was at most 2 ms.
+
+| Players | Completed | Requests | Start p95/p99 ms | Pick p95/p99 ms | Reroll p95/p99 ms | Read p95/p99 ms |
+|---:|---:|---:|---:|---:|---:|---:|
+| 25 | 25 | 539 | 601.8/839.59 | 240.04/450.96 | 649.82/649.82 | 381.21/586.84 |
+| 50 | 50 | 1078 | 586.32/965.27 | 197.16/245.81 | 1007.55/1007.55 | 216.72/557.5 |
+| 100 | 100 | 2157 | 603.9/986.63 | 223.08/362.73 | 867.14/937.81 | 238.66/404.59 |
+
+This validates the tested 100-player shared-network scenario. The overall supported launch target remains 25 because independent-egress testing above 25 was incomplete. Neither scenario establishes indefinite endurance or a universal capacity ceiling.
 
 ## Distributed gateway acceptance
 
