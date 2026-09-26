@@ -1097,7 +1097,7 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   shell: { flex: 1 },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   loadingText: { color: colors.muted, fontSize: 15 },
   errorTitle: { color: colors.ink, fontSize: 24, fontWeight: '800', textAlign: 'center' },
@@ -1244,7 +1244,7 @@ const styles = StyleSheet.create({
   resultReviewCopy: { flex: 1, gap: 2 },
   resultReviewTitle: { color: colors.ink, fontSize: 14, lineHeight: 19, fontWeight: '800' },
   resultReviewScore: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-  resultPage: { padding: spacing.lg, paddingTop: spacing.xxl, gap: spacing.lg },
+  resultPage: { padding: spacing.lg, paddingTop: spacing.xxl, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 980 },
   scoreBlock: { borderTopWidth: 3, borderColor: colors.accent, backgroundColor: colors.surface, padding: spacing.xl },
   score: { color: colors.ink, fontSize: 72, lineHeight: 76, fontWeight: '800', letterSpacing: -2 },
   scoreMeta: { color: colors.muted, fontSize: 15, fontWeight: '700' },

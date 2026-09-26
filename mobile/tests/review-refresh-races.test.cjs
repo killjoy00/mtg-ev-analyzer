@@ -759,3 +759,16 @@ test('Daily home keeps the promo mounted and reports a retryable error when TCGp
   assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 1);
   await act(async () => root.unmount());
 });
+
+
+test('first-class tablet content stays bounded on Practice, Draft Run/results, and article screens', () => {
+  const article = fs.readFileSync(path.join(process.cwd(), 'src', 'components', 'ArticleScreen.tsx'), 'utf8');
+  const practice = fs.readFileSync(path.join(process.cwd(), 'app', 'practice.tsx'), 'utf8');
+  const draft = fs.readFileSync(path.join(process.cwd(), 'app', 'draft-run.tsx'), 'utf8');
+  assert.match(article, /maxWidth: 840/);
+  assert.match(article, /alignSelf: 'center'/);
+  assert.match(practice, /maxWidth: 860/);
+  assert.match(practice, /alignSelf: 'center'/);
+  assert.ok((draft.match(/maxWidth: 980/g) || []).length >= 2, 'Draft Run play and result surfaces should both be bounded');
+  assert.ok((draft.match(/alignSelf: 'center'/g) || []).length >= 2, 'Draft Run play and result surfaces should both be centered');
+});
