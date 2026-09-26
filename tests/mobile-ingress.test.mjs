@@ -172,6 +172,52 @@ test('native account parity routes stay inside the mobile bridge',async()=>{
   assert.equal((await gateway(browserProfile,env(),async()=>{throw Error('must not reach upstream')})).status,403);
 });
 
+test('native Patreon management requires both mobile identities and cannot open browser provider routes',async()=>{
+  for(const [path,method] of [
+    ['/growth/v1/mobile/patreon/status','GET'],
+    ['/growth/v1/mobile/patreon/connect','POST'],
+    ['/growth/v1/mobile/patreon/disconnect','POST'],
+  ]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro'+path,{
+      method,
+      headers:headers({
+        ...(method==='POST'?{'content-type':'application/json'}:{}),
+        'x-pack1-mobile-session':token,
+        'x-pack1-mobile-account':account,
+      }),
+      ...(method==='POST'?{body:'{}'}:{}),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      const next=new Headers(options.headers);
+      forwarded={url,player:next.get('authorization'),account:next.get('x-pack1-mobile-account')};
+      return Response.json({connected:false,capabilities:[]});
+    });
+    assert.equal(response.status,200,path);
+    assert.equal(forwarded.player,'Bearer '+token);
+    assert.equal(forwarded.account,account);
+    assert.ok(forwarded.url.includes('/v1/mobile/patreon/'));
+  }
+
+  const missingAccount=new Request('https://api.packone.pro/growth/v1/mobile/patreon/status',{
+    headers:headers({'x-pack1-mobile-session':token}),
+  });
+  // The gateway can forward the player identity, but the origin mobile alias
+  // still requires the paired account token. Browser provider routes remain
+  // separately unreachable with mobile headers.
+  const browserConnect=new Request('https://api.packone.pro/growth/v1/patreon/connect',{
+    method:'POST',
+    headers:headers({
+      'content-type':'application/json',
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+    }),
+    body:'{}',
+  });
+  assert.equal((await gateway(browserConnect,env(),async()=>{throw Error('must not reach upstream')})).status,403);
+  assert.equal(missingAccount.headers.get('x-pack1-mobile-account'),null);
+});
+
 test('practice idempotency is only forwarded to Draft Run creation',async()=>{
   const key='practice_'+('k'.repeat(32));
   let forwarded=null;
