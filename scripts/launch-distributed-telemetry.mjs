@@ -34,10 +34,23 @@ export async function previewAccount({fetcher=fetch,token=process.env.CLOUDFLARE
 }
 export function inspectBin(events,{sha,requests,from,to},p) {
   const failures=[],required=Math.max(1,Math.floor(requests*p.minimum_telemetry_sample_fraction));
+  const status_counts=Object.fromEntries([...new Set(events.map(e=>e.status))].sort((a,b)=>a-b).map(status=>[status,events.filter(e=>e.status===status).length]));
+  const route_status_counts={};
+  for(const e of events) {
+    const key=(e.route||'other')+':'+e.status;route_status_counts[key]=(route_status_counts[key]||0)+1;
+  }
   if(events.some(e=>e.release!==sha))failures.push('wrong_release');
-  if(events.some(e=>e.status<200||e.status>=300))failures.push('retained_application_error');
+  // Every generated client request is independently recorded before fetch and a
+  // non-2xx client response already fails evaluateStage. The fixed preview
+  // hostname can also receive unauthenticated Internet traffic, which the
+  // gateway correctly rejects with 4xx and logs at 100%. Retain/count those
+  // boundary rejects, but do not misattribute them to the load cohort. A retained
+  // 429 or 5xx is still a hard telemetry failure because it can reflect quota or
+  // service degradation outside the sampled success stream.
+  const boundary_rejections=events.filter(e=>e.status>=400&&e.status<500&&e.status!==429).length;
+  if(events.some(e=>e.status===429||e.status>=500))failures.push('retained_system_error');
   if(events.length<required)failures.push('missing_or_sparse_retained_telemetry');
-  return {from,to,client_requests:requests,retained_events:events.length,required_events:required,
+  return {from,to,client_requests:requests,retained_events:events.length,required_events:required,status_counts,route_status_counts,boundary_rejections,
     gateway_duration_ms:quantiles(events.map(e=>e.duration_ms)),quota_ms:quantiles(events.map(e=>e.quota_ms)),upstream_ms:quantiles(events.map(e=>e.upstream_ms)),
     failures,passed:failures.length===0};
 }
@@ -54,5 +67,5 @@ export async function inspectPreviewTelemetry({reports,sha,from,to,policy,accoun
     bins.push(bin);
   }
   return {service:'pack1-gateway-preview',sha,bins,passed:bins.some(b=>b.client_requests>0)&&bins.every(b=>b.passed),
-    limitation:'Ten-percent success sampling: positive per-minute evidence and fully sampled errors, not lossless request reconciliation or a population latency SLO.'};
+    limitation:'Ten-percent success sampling: positive per-minute evidence and fully sampled errors, not lossless request reconciliation or a population latency SLO. Preview-only 4xx boundary rejects are retained separately because generated client non-2xx responses already fail the unsampled client record.'};
 }
