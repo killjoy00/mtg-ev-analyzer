@@ -23,7 +23,8 @@ export default function RootLayout() {
           <Stack.Screen name="draft-run" options={{ title: 'Draft Run' }} />
           <Stack.Screen name="practice" options={{ title: 'Practice' }} />
           <Stack.Screen name="leaderboard" options={{ title: 'Leaderboard' }} />
-          <Stack.Screen name="career" options={{ title: 'Career' }} />
+          <Stack.Screen name="career" options={{ title: 'My Pack One' }} />
+          <Stack.Screen name="profile" options={{ title: 'Player Profile' }} />
           <Stack.Screen name="how-to" options={{ title: 'How to Play' }} />
           <Stack.Screen name="scoring" options={{ title: 'Scoring' }} />
           <Stack.Screen name="method" options={{ title: 'Method' }} />
