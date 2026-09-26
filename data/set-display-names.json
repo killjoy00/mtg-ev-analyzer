@@ -1,6 +1,6 @@
 {
   "source": "https://api.scryfall.com/sets",
-  "verified_at": "2026-09-14",
+  "verified_at": "2026-09-26",
   "names": {
     "stx": "Strixhaven: School of Mages",
     "mid": "Innistrad: Midnight Hunt",
@@ -34,6 +34,7 @@
     "msh": "Marvel Super Heroes",
     "tmt": "Teenage Mutant Ninja Turtles",
     "ecl": "Lorwyn Eclipsed",
+    "fra": "Reality Fracture",
     "powered-cube": "Powered Cube"
   }
 }
