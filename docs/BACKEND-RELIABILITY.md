@@ -21,7 +21,7 @@ Existing Daily schedules are read before selection. Friend challenges load their
 
 Rerolls filter by environment, pick window, seen sources, band and rating anchors in SQL, then return at most the closest twenty candidates under the existing distance formula. The shared reference selector revalidates those candidates and applies the existing seeded choice. SQL converts stored `real` metadata through its text representation to match the HTTP loader's JavaScript values.
 
-The API no longer caches or downloads the million-row pool. `loadVerifiedPool` remains an offline audit/reference utility. Missing ratings are excluded by the serving join; `/health` separately reports `unrated_puzzles` and `missing_sets` and returns 503 for incomplete coverage. This makes data failures observable without taking every healthy run offline. Missing metadata for a specific stored challenge still fails explicitly.
+The API no longer caches or downloads the million-row pool. `loadVerifiedPool` remains an offline audit/reference utility. Missing ratings are excluded by the serving join; `/health` separately reports `unrated_puzzles` and `missing_sets` and returns 503 for incomplete coverage. `missing_sets` lists Live environments with nothing to serve; Candidate, Paused and Retired catalog sets are intentionally non-serving and are reported in `non_serving_sets` without failing health. This makes data failures observable without taking every healthy run offline. Missing metadata for a specific stored challenge still fails explicitly.
 
 ## Planner statistics
 
