@@ -157,6 +157,9 @@ jobs:
       - name: Run admin reporting browser contract
         if: steps.scope.outputs.run_full == 'true'
         run: node tests/admin-e2e.mjs
+      - name: Run corpus readiness browser contract
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/corpus-readiness-e2e.mjs
       - name: Upload UI screenshots
         if: always() && steps.scope.outputs.run_full == 'true'
         uses: actions/upload-artifact@v4

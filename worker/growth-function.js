@@ -14,6 +14,7 @@ import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,dele
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
+import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
 import {APPLE_NATIVE_CLIENT_ID,APPLE_REDIRECT_URI,APPLE_WEB_CLIENT_ID,appleAuthorizeUrl,appleConfigured,markApplePasswordEstablished,resolveAppleAccount,revokeAppleAuthorization,sanitizeAppleFirstName,storeAppleRefreshToken,verifyAppleAuthorization} from './apple-auth.mjs';
@@ -1913,6 +1914,8 @@ async function launchWatcherSignal(trigger,response) {
 async function handleDeletionMaintenance(request) {
   if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
   const trigger=await authorizeDeletionMaintenance(request);
+  const readiness=await maintainServingReadiness(query);
+  console.log(JSON.stringify({operation:'corpus-readiness-maintenance',operation_id:readiness.operation_id,state:readiness.state,revision:readiness.current_revision,ready:readiness.ready}));
   const advanced=[];
   if(deletionEnabled()) {
     for(const operation of await maintenanceBatch(query,{limit:20})) {
@@ -1936,7 +1939,8 @@ async function handleDeletionMaintenance(request) {
     }
   }
   const swept=verificationSweepEnabled()?await sweepExpiredVerification(query,{limit:200}):null;
-  return launchWatcherSignal(trigger,await deletionMaintenanceSnapshot({advanced,swept}));
+  const response=await deletionMaintenanceSnapshot({advanced,swept});
+  return launchWatcherSignal(trigger,json({...await response.json(),corpus_readiness:readiness},response.status));
 }
 
 async function handleDeletionMaintenanceStatus(request) {
