@@ -1,3 +1,4 @@
+import {registerServingReadiness,readServingReadiness,advanceServingReadiness,retryServingReadiness,readinessKey} from './corpus-readiness.mjs';
 import {SERVING_POLICY_VERSION,SERVING_QUALITY_SQL,MINIMUM_IMPLIED_TROPHY_SCORE} from '../serving-quality.mjs';
 import {corpusMembership} from './corpus-components.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
@@ -91,7 +92,7 @@ export function assembleCorpusAdmin({sets,history,components,blockedSources,reta
  };
 }
 
-export async function handleCorpusAdmin(request,query,readJson,accountId,automationIdentity=null) {
+async function handleCorpusLifecycle(request,query,readJson,accountId,automationIdentity=null) {
  const path=new URL(request.url).pathname;
  if(request.method==='GET'&&path==='/v1/admin/corpus') {
   const [sets,history,components,blockedSources,retainedInventory,servingInventory,snapshots,servingRevision]=await Promise.all([
@@ -178,7 +179,7 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
    RETURNING set_id,component_version,status
   ), audit AS(INSERT INTO corpus_status_events(set_id,component_version,auth_user_id,old_status,new_status,reason,admin_identity)
    SELECT set_id,component_version,$6::uuid,$3,status,$7,$9::jsonb FROM changed RETURNING id)
-  SELECT changed.* FROM changed CROSS JOIN audit`,[component[1],component[2],old,next,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,TRADITIONAL_GATE_VERSION,automationIdentity?JSON.stringify(automationIdentity):null]);
+  SELECT changed.*,audit.id::text activation_event_id FROM changed CROSS JOIN audit`,[component[1],component[2],old,next,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,TRADITIONAL_GATE_VERSION,automationIdentity?JSON.stringify(automationIdentity):null]);
   if(!result.rows.length)fail('Status changed, or source publication is blocked by quality gates or parent status.',409);
   return {ok:true,...result.rows[0]};
  }
@@ -195,6 +196,7 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
    SELECT p.set_id,p.status,p.active_snapshot_id
    FROM draft_run_environment_policy p
    WHERE p.set_id=$1 AND p.status='Live' AND EXISTS(SELECT 1 FROM identity_allowed)
+    AND ($8::text IS NULL OR p.active_snapshot_id=$8) FOR UPDATE OF p
   ), target AS MATERIALIZED (
    SELECT s.source_snapshot_id
    FROM corpus_source_snapshots s
@@ -226,8 +228,8 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
    SELECT c.set_id,$4::uuid,'Live','Live',$5,$7::jsonb,c.source_snapshot_id,c.previous_source_snapshot_id
    FROM changed c RETURNING id
   )
-  SELECT c.* FROM changed c CROSS JOIN promoted CROSS JOIN audit`,
-  [snapshotMatch[1],b.sourceSnapshotId,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,CORPUS_GATE_VERSION,automationIdentity?JSON.stringify(automationIdentity):null]);
+  SELECT c.*,audit.id::text activation_event_id FROM changed c CROSS JOIN promoted CROSS JOIN audit`,
+  [snapshotMatch[1],b.sourceSnapshotId,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,CORPUS_GATE_VERSION,automationIdentity?JSON.stringify(automationIdentity):null,b.expectedActiveSnapshotId||null]);
   if(!result.rows.length)fail('Snapshot changed, is not Candidate, or lacks fresh passing health evidence.',409);
   return {ok:true,...result.rows[0]};
  }
@@ -258,9 +260,54 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
    RETURNING s.source_snapshot_id
   ), audit AS (INSERT INTO corpus_status_events(set_id,auth_user_id,old_status,new_status,reason,source_snapshot_id)
    SELECT set_id,$5::uuid,$2,status,$6,active_snapshot_id FROM changed RETURNING id)
-  SELECT changed.* FROM changed CROSS JOIN audit`,[match[1],old,next,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,CORPUS_GATE_VERSION]);
+  SELECT changed.*,audit.id::text activation_event_id FROM changed CROSS JOIN audit`,[match[1],old,next,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,CORPUS_GATE_VERSION]);
   if(!result.rows.length)fail('Status changed, or publication is blocked by missing/stale quality verification. Refresh the dashboard.',409);
   return {ok:true,...result.rows[0]};
  }
  fail('Not found.',404);
+}
+
+
+// Lifecycle admission is unchanged. Only a committed audit event may hand off
+// to readiness, and the event's revision is assigned by the transactional outbox.
+export async function handleCorpusAdmin(request,query,readJson,accountId,automationIdentity=null) {
+ const url=new URL(request.url),path=url.pathname;
+ if(request.method==='GET'&&path==='/v1/admin/corpus/readiness') {
+  const operationId=url.searchParams.get('operation');
+  if(operationId&&!/^[1-9][0-9]{0,18}$/.test(operationId))fail('Invalid readiness operation.');
+  return readServingReadiness(query,{operationId});
+ }
+ const retry=path.match(/^\/v1\/admin\/corpus\/readiness\/([1-9][0-9]{0,18})\/retry$/);
+ if(request.method==='POST'&&retry) {
+  if(!accountId&&!automationIdentity)fail('Authenticated administrative identity required.',403);
+  await readJson(request);
+  const readiness=await retryServingReadiness(query,retry[1],automationIdentity||{account_id:accountId});
+  return {ok:readiness.ready,publication_unchanged:true,readiness};
+ }
+ if(request.method==='GET') {
+  const data=await handleCorpusLifecycle(request,query,readJson,accountId,automationIdentity);
+  const readiness=await readServingReadiness(query).catch(()=>({state:'unavailable',ready:false}));
+  return {...data,readiness};
+ }
+ if(!accountId&&!automationIdentity)fail('Authenticated administrative identity required.',403);
+ let registered=false;
+ const guardedQuery=async(sql,params)=>{
+  if(!registered){await registerServingReadiness(query);registered=true;}
+  return query(sql,params);
+ };
+ const result=await handleCorpusLifecycle(request,guardedQuery,readJson,accountId,automationIdentity);
+ // Never turn an error after commit into a claim that activation was rolled back.
+ let readiness;
+ try {
+  const job=(await query(`SELECT j.id::text id FROM corpus_status_events e
+   JOIN draft_run_readiness_jobs j ON j.revision=e.readiness_revision
+   JOIN draft_run_readiness_keys k ON k.id=j.key_id
+   WHERE e.id=$1::bigint AND k.corpus_version=$2 AND k.difficulty_version=$3
+    AND k.serving_policy_version=$4 AND k.cache_schema=$5`,[result.activation_event_id,...readinessKey])).rows[0];
+  if(!job)throw Error('Committed readiness operation was not found');
+  readiness=await advanceServingReadiness(query,{operationId:job.id});
+ } catch {
+  readiness={state:'unavailable',ready:false,message:'Activation committed. Readiness could not be confirmed; inspect its audit event and retry readiness, not activation.'};
+ }
+ return {...result,ok:readiness.ready===true,activation_committed:true,readiness};
 }

@@ -25,7 +25,9 @@ for(const s of prepared.filter(s=>s.health.ready)) {
   pending.push(s);continue;
  }
  const result=await handleCorpusAdmin(new Request(`https://packone.pro/v1/admin/corpus/${s.sid}/components/${component}/status`,{method:'POST'}),query,async()=>({oldStatus:'Candidate',status:'Live',corpusVersion:parent,reason:'Owner-authorized puzzle-source expansion; frozen Premier grader unchanged. Reviewed publication '+identity.run_id}),null,identity);
- console.log(JSON.stringify(result));live.push(s);
+ console.log(JSON.stringify(result));
+ if(!result.ok)throw Error('Publication committed but readiness did not complete: '+JSON.stringify(result.readiness));
+ live.push(s);
 }
 await verifyComponents(query,live,'Live');
 await verifyComponents(query,pending,'Candidate');

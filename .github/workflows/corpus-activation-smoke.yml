@@ -69,6 +69,7 @@ jobs:
             echo "::add-mask::$connection"
             printf '%s' "$connection" > "$RUNNER_TEMP/activation-smoke.connection"
             echo "Checking $target"
+            DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
             if [[ -n "$SET_ID" ]]; then
               expected=()
               if [[ -n "$SNAPSHOT_ID" ]]; then expected=(--snapshot "$SNAPSHOT_ID"); fi

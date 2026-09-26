@@ -6,10 +6,13 @@ const result=await query(`SELECT
   EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_reroll_set_window_idx' AND i.indisvalid) reroll_set_window,
   to_regprocedure('pack1_serving_snapshot(text,text,text)') IS NOT NULL practice_snapshot,
   to_regclass('draft_run_serving_inventory') IS NOT NULL practice_inventory,
-  (SELECT count(*)=13 FROM pg_trigger WHERE tgname IN (
+  (SELECT count(*)=22 FROM pg_trigger WHERE tgname IN (
     'serving_puzzle_insert','serving_puzzle_delete','serving_puzzle_metadata','serving_puzzle_truncate',
     'serving_ratings_insert','serving_ratings_delete','serving_ratings','serving_ratings_truncate',
-    'serving_exclusions','serving_components','serving_policy','serving_version_rows','serving_version_identity'
+    'serving_version_rows','serving_version_identity',
+    'serving_exclusions_insert','serving_exclusions_delete','serving_exclusions_update','serving_exclusions_truncate',
+    'serving_components_insert','serving_components_delete','serving_components_update','serving_components_truncate',
+    'serving_policy_insert','serving_policy_delete','serving_policy_update','serving_policy_truncate'
   ) AND tgenabled='O') practice_invalidation,
   to_regprocedure('pack1_puzzle_can_affect_serving(text,text)') IS NOT NULL snapshot_aware_practice_invalidation,
   (SELECT count(*)=2 FROM pg_constraint WHERE conname IN ('draft_run_sessions_environment_check','draft_run_schedules_environment_check') AND pg_get_constraintdef(oid) LIKE '%latest%') latest_daily,
