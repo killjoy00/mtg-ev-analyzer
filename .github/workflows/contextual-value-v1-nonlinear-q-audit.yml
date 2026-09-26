@@ -33,6 +33,13 @@ jobs:
           merge-multiple: true
           run-id: 36256947308
           github-token: ${{ github.token }}
+      - name: Download retained validation nuisance checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-nuisance-fold--1
+          path: precomputed-validation
+          run-id: 36256947308
+          github-token: ${{ github.token }}
       - name: Run validation-only nonlinear Q audit
         run: |
           python3 research/contextual_value_q_challenger.py \
@@ -42,6 +49,7 @@ jobs:
             --feature-shard precomputed-features/train-feature-fold--1-ECL.jsonl.gz \
             --feature-shard precomputed-features/train-feature-fold--1-TLA.jsonl.gz \
             --source-sha aa5b17d96b43f3ce08f52fad55ba17f327472c1b \
+            --validation-nuisance precomputed-validation/validation-nuisance.jsonl.gz \
             --out results/contextual-value-v1/nonlinear-q-audit.json
       - name: Assert assessment remains sealed
         run: |
@@ -51,6 +59,8 @@ jobs:
           assert report["scope"] == "development_only"
           assert report["assessment_opened"] is False
           assert report["assessment_outcomes_used"] is False
+          assert report["source_skill_timing_verified"] is False
+          assert report["baseline"]["retained_prediction_max_abs_error"] <= 1e-9
           PY
       - name: Upload audit artifact
         uses: actions/upload-artifact@v4
