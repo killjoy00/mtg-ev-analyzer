@@ -1,5 +1,5 @@
 import * as Application from 'expo-application';
-import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
+import { type ReactNode } from 'react';
 import {
   ActivityIndicator,
   AppState,
@@ -14,14 +14,13 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requestJson } from '@/src/api/client';
+import { VersionGateBoundary } from '@/src/components/VersionGateBoundary';
 import { colors, spacing } from '@/src/theme';
 import {
   resolveVersionCheck,
   type MobilePlatform,
   type VersionGateDecision,
 } from '@/src/versionPolicy';
-
-type GateState = 'checking' | VersionGateDecision;
 
 function nativePlatform(): MobilePlatform | null {
   if (Platform.OS === 'ios' || Platform.OS === 'android') return Platform.OS;
@@ -43,6 +42,11 @@ async function checkInstalledVersion(): Promise<VersionGateDecision> {
       timeoutMs: 5_000,
     }),
   );
+}
+
+function subscribeToAppState(listener: (nextState: AppStateStatus) => void) {
+  const subscription = AppState.addEventListener('change', listener);
+  return () => subscription.remove();
 }
 
 function CheckingScreen() {
@@ -89,42 +93,19 @@ function UpdateRequiredScreen({
 }
 
 export function VersionGate({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<GateState>('checking');
-  const mounted = useRef(true);
-  const previousState = useRef<AppStateStatus>(AppState.currentState);
-
-  const refresh = useCallback(async () => {
-    setState('checking');
-    const next = await checkInstalledVersion();
-    if (mounted.current) setState(next);
-  }, []);
-
-  useEffect(() => {
-    mounted.current = true;
-    void checkInstalledVersion().then((decision) => {
-      if (mounted.current) setState(decision);
-    });
-    return () => {
-      mounted.current = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    const subscription = AppState.addEventListener('change', (nextState) => {
-      const previous = previousState.current;
-      previousState.current = nextState;
-      if ((previous === 'inactive' || previous === 'background') && nextState === 'active') {
-        void refresh();
-      }
-    });
-    return () => subscription.remove();
-  }, [refresh]);
-
-  if (state === 'checking') return <CheckingScreen />;
-  if (state.status === 'required') {
-    return <UpdateRequiredScreen storeUrl={state.storeUrl} minimum={state.minimum} />;
-  }
-  return children;
+  return (
+    <VersionGateBoundary
+      checkVersion={checkInstalledVersion}
+      initialAppState={AppState.currentState}
+      subscribe={subscribeToAppState}
+      checkingFallback={<CheckingScreen />}
+      renderRequired={(decision) => (
+        <UpdateRequiredScreen storeUrl={decision.storeUrl} minimum={decision.minimum} />
+      )}
+    >
+      {children}
+    </VersionGateBoundary>
+  );
 }
 
 const styles = StyleSheet.create({
