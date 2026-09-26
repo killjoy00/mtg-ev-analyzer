@@ -13,6 +13,7 @@ import {consumeDeletionVerification,createDeletionVerification,deletionEmailConf
 import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,deletionRecoveryKey,finishProviderPhase,loadDeletionOperation,maintenanceBatch,removeProviderUser,stuckDeletion,sweepExpiredVerification,verificationSweepEnabled} from './account-deletion.mjs';
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
+import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
 import {APPLE_NATIVE_CLIENT_ID,APPLE_REDIRECT_URI,APPLE_WEB_CLIENT_ID,appleAuthorizeUrl,appleConfigured,markApplePasswordEstablished,resolveAppleAccount,revokeAppleAuthorization,sanitizeAppleFirstName,storeAppleRefreshToken,verifyAppleAuthorization} from './apple-auth.mjs';
@@ -1888,9 +1889,30 @@ async function authorizeDeletionMaintenance(request,{allowTrigger=true}={}) {
   return null;
 }
 
+async function launchWatcherSignal(trigger,response) {
+  if(trigger?.name!=='pack1-account-deletion-maintenance')return response;
+  let freshness;
+  try {
+    freshness=await inspectLaunchCoverageFreshness({now:Date.parse(trigger.scheduledAt)});
+  } catch {
+    freshness={ok:false,reason:'coverage_check_failed',max_age_minutes:30};
+  }
+  if(freshness.ok)return response;
+  console.error(JSON.stringify({
+    event:'launch_watcher_stale',
+    reason:freshness.reason,
+    covered_through:freshness.covered_through||null,
+    age_minutes:Number.isFinite(freshness.age_minutes)?freshness.age_minutes:null,
+    max_age_minutes:freshness.max_age_minutes,
+    release_commit:releaseMetadata().release_commit,
+  }));
+  const snapshot=await response.json();
+  return json({...snapshot,ok:false,launch_watcher:freshness},503);
+}
+
 async function handleDeletionMaintenance(request) {
   if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
-  await authorizeDeletionMaintenance(request);
+  const trigger=await authorizeDeletionMaintenance(request);
   const advanced=[];
   if(deletionEnabled()) {
     for(const operation of await maintenanceBatch(query,{limit:20})) {
@@ -1914,7 +1936,7 @@ async function handleDeletionMaintenance(request) {
     }
   }
   const swept=verificationSweepEnabled()?await sweepExpiredVerification(query,{limit:200}):null;
-  return deletionMaintenanceSnapshot({advanced,swept});
+  return launchWatcherSignal(trigger,await deletionMaintenanceSnapshot({advanced,swept}));
 }
 
 async function handleDeletionMaintenanceStatus(request) {

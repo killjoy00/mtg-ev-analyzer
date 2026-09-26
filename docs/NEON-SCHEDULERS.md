@@ -12,6 +12,8 @@ All triggers belong to Neon project `patient-shadow-91417882`, production branch
 | `pack1-daily-retry` | `draftrunapi` | `/internal/daily-generation` | `37 7,8 * * *` | Idempotent retry at 00:37 Pacific |
 | `pack1-account-deletion-maintenance` | `pack1growth` | `/internal/account-deletion-maintenance` | `9,19,29,39,49,59 * * * *` | Resume bounded deletion work and sweep expired verification state |
 
+The existing account-deletion trigger is also the independent stale signal for production launch monitoring. After its deletion/sweep work completes, the Neon-scheduled invocation reads sanitized launch coverage state from public issue #596. Coverage more than 30 minutes behind the trigger's edge-attested `scheduled_at`, or inaccessible/invalid state, emits `launch_watcher_stale` and returns 503 for that trigger run. Manual GitHub deletion-maintenance recovery skips this check. No additional trigger, GitHub credential, gameplay request, IP/player identity or quota secret is involved.
+
 Neon cron is UTC. The Daily triggers therefore fire at both candidate UTC hours for PST/PDT. The handler converts the trigger's `data.scheduled_at` to `America/Los_Angeles` and performs work only when the resulting local time is exactly 00:07 or 00:37 for the matching named trigger. The other DST-side invocation exits successfully without touching Daily state. Daily schedule creation remains idempotent and player-triggered creation remains the fallback.
 
 Trigger-only requests require Neon's `X-Neon-Trigger-Invocation-Id` edge-attested header, the matching body invocation ID, a schedule trigger envelope, and the exact expected trigger name. Ordinary callers cannot synthesize the `X-Neon-*` header through Neon's public edge.
