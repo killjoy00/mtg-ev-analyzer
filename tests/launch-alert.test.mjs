@@ -251,7 +251,8 @@ test('recoverable coverage issue stays open when coverage persistence is unavail
   if((options.method||'GET')==='GET')return Response.json([{
    title:'[launch alert] Production capacity needs attention (coverage_pending)',number:77,
   }]);
-  patches++;return Response.json({number:77});
+  if(options.method==='PATCH')patches++;
+  return Response.json({number:78});
  };
  const action=await routeAlert(fetcher,{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{
   alerts:['telemetry_unavailable'],coverage:{state_persisted:false,pending_windows:0},
