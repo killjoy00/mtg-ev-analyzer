@@ -21,7 +21,7 @@ from contextual_value.archive import ArchiveSignalProvider
 from contextual_value.checkpoint import draft_id_sha256
 from contextual_value.dataset import draft_split
 from contextual_value.features import model_feature_map, strong_choice_offsets
-from contextual_value.nuisance import NuisancePrediction, nuisance_fold
+from contextual_value.nuisance import NuisancePrediction, NuisanceTrainingRow, nuisance_fold
 from contextual_value.pipeline import run_development
 from contextual_value.propensity import LinearSoftmaxPropensityModel
 from contextual_value.schema import file_sha256
@@ -29,7 +29,7 @@ from contextual_value.schema import file_sha256
 from contextual_value_propensity_lbfgs import (
     FTOL, GTOL, L2, MAXITER, MAXLS, SCIPY_VERSION,
     _compile, _examples, _gradient_self_check, _load_source_cohort,
-    _meta_path, _objective_gradient, _read_feature_rows,
+    _meta_path, _objective_gradient,
 )
 
 
@@ -70,6 +70,54 @@ def _parts(train, validation, fold):
     if not training_ids or not held_ids or not held:
         raise SystemExit("empty nuisance fold partition")
     return training_ids, held_ids, held
+
+
+CORE = ("MSH", "SOS", "ECL", "TLA")
+
+
+def _read_feature_rows_for_fold(
+    paths,
+    manifest,
+    source_sha,
+    fold,
+    training_ids,
+    held_ids,
+):
+    rows = []
+    seen = set()
+    expected_training_hash = draft_id_sha256(training_ids)
+    expected_held_hash = draft_id_sha256(held_ids)
+    for path in paths:
+        meta = json.loads(_meta_path(path).read_text(encoding="utf-8"))
+        expansion = meta.get("expansion")
+        if expansion not in CORE or expansion in seen:
+            raise SystemExit(f"invalid or duplicate feature shard expansion: {expansion!r}")
+        checks = {
+            "kind": "nuisance_training_features",
+            "cohort_id": manifest["cohort_id"],
+            "selected_drafts_sha256": manifest["selected_drafts_sha256"],
+            "code_revision": source_sha,
+            "fold": fold,
+            "training_drafts_sha256": expected_training_hash,
+            "held_drafts_sha256": expected_held_hash,
+            "payload_sha256": file_sha256(path),
+        }
+        for key, value in checks.items():
+            if meta.get(key) != value:
+                raise SystemExit(f"{path}: incompatible {key}")
+        before = len(rows)
+        with gzip.open(path, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    rows.append(NuisanceTrainingRow(**json.loads(line)))
+        if len(rows) - before != int(meta.get("row_count", -1)):
+            raise SystemExit(f"{path}: row-count mismatch")
+        seen.add(expansion)
+    if seen != set(CORE):
+        raise SystemExit(f"incomplete core feature shards: {sorted(set(CORE) - seen)}")
+    if {row.draft_id for row in rows} != set(training_ids):
+        raise SystemExit("feature rows do not cover the full training draft complement")
+    return rows
 
 
 def _read_retained(path, manifest, source_sha, fold, training_ids, held_ids):
@@ -199,8 +247,13 @@ def run_fold(args):
     train = [row for row in decisions if draft_split(row.draft_id) == "train"]
     validation = [row for row in decisions if draft_split(row.draft_id) == "validation"]
     training_ids, held_ids, held = _parts(train, validation, args.fold)
-    rows = _read_feature_rows(
-        args.feature_shard, manifest, args.source_sha, training_ids, held_ids
+    rows = _read_feature_rows_for_fold(
+        args.feature_shard,
+        manifest,
+        args.source_sha,
+        args.fold,
+        training_ids,
+        held_ids,
     )
     expected_training = {
         row.decision_id for row in train if row.draft_id in training_ids
