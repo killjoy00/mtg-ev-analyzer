@@ -192,6 +192,11 @@ export async function routeAlert(fetcher,env,report) {
   }
   for(const condition of RECOVERABLE_ALERTS) {
     if(active.has(condition))continue;
+    const persisted=report.coverage?.state_persisted===true;
+    const resolved=condition==='coverage_pending'
+      ?persisted&&report.coverage.pending_windows===0
+      :persisted&&['queued','not_needed'].includes(report.coverage?.continuation?.status);
+    if(!resolved)continue;
     const title=TITLE+' ('+condition+')';
     const match=issues.find(i=>!i.pull_request&&i.title===title);
     if(!match)continue;
@@ -266,6 +271,7 @@ async function alertCoverageCheck(fetcher,env,account,now,report) {
     const saved=await saveCoverageState(fetcher,env,inspected.state,{now});
     report.coverage.persisted_through=saved.covered_through;
     report.coverage.persisted_at=saved.updated_at;
+    report.coverage.state_persisted=true;
   } catch(error) {
     report.alerts.push('telemetry_unavailable');pushError(report,error);
     report.coverage.state_persisted=false;
