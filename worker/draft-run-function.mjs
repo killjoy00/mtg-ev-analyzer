@@ -164,6 +164,13 @@ async function start(request) {
   // creator. Reopening your own link should recover the authoritative original
   // result instead of creating a self-challenge with a fake opponent record.
   if(source?.owner_player_id===owner)return json(await responseFor(await session(source.session_id,owner)));
+  if(source) {
+    const previous=(await query(
+      'SELECT * FROM draft_run_sessions WHERE player_id=$1::uuid AND challenge_id=$2 ORDER BY created_at,id LIMIT 1',
+      [owner,source.id],
+    )).rows[0];
+    if(previous)return json(await responseFor(decode(previous)));
+  }
   const account=daily?await linkedPlayerIdentity(query,owner):await accountIdentity(request,query,owner);
   const capabilities=daily?[]:await accountCapabilities(account,query);
   let environment;
@@ -179,7 +186,12 @@ async function start(request) {
   if(rawIdempotency&&daily)fail('Practice idempotency keys are not valid for Daily runs.');
   if(rawIdempotency&&source)fail('Practice idempotency keys are not valid for shared runs.');
   if(rawIdempotency&&!IDEMPOTENCY_KEY.test(rawIdempotency))fail('Invalid practice idempotency key.');
-  const startIdempotencyHash=rawIdempotency?digest(rawIdempotency):null;
+  // Shared runs intentionally reject client idempotency keys. Derive the same
+  // database idempotency shape from the authoritative stored share instead so
+  // dropped/concurrent start retries converge on one player/share session.
+  const startIdempotencyHash=source
+    ? digest(`shared:${source.id}`)
+    : rawIdempotency?digest(rawIdempotency):null;
   const startRequestHash=startIdempotencyHash?digest(JSON.stringify({
     version:1,environment,setIds:[...setIds].sort(),challenge:source?.id||null,qa:body.qa===true,
   })):null;
@@ -207,7 +219,11 @@ async function start(request) {
     }
   }
   await consumePlayerLimit(query,owner,'runs',{limit:30,seconds:600});
-  let seed=day ? `daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}` : startIdempotencyHash ? `practice:${startIdempotencyHash}` : crypto.randomUUID();
+  let seed=day
+    ? `daily:${environment}:${day}:${DRAFT_RUN_CORPUS_VERSION}:${DRAFT_RUN_SELECTION_VERSION}`
+    : source
+      ? `shared:${source.id}:${owner}`
+      : startIdempotencyHash ? `practice:${startIdempotencyHash}` : crypto.randomUUID();
   let corpusVersion=source?.corpus_version||DRAFT_RUN_CORPUS_VERSION,scoringVersion=source?.scoring_version||DRAFT_RUN_SCORING_VERSION;
   let servingPolicy=source?.serving_policy_version|| (source?LEGACY_SERVING_POLICY_VERSION:SERVING_POLICY_VERSION);
   let ids,featuredSets=[],difficultyVersion=source?.difficulty_version||DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion=source?.selection_version||DRAFT_RUN_SELECTION_VERSION;
