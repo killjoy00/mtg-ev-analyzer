@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  evaluate,inspectGatewayCoverage,parseGatewayEvent,parseNeonUsage,queryEvents,routeAlert,
+  MAX_CONTINUATION_DEPTH,evaluate,inspectGatewayCoverage,parseGatewayEvent,parseNeonUsage,queryEvents,routeAlert,scheduleCoverageContinuation,
 } from '../scripts/launch-alert.mjs';
 import {
   WINDOW_MS,coverageTarget,mergeCoverageState,parseCoverageState,renderCoverageState,
@@ -141,3 +141,123 @@ test('coverage state round-trips only the sanitized machine marker',()=>{
  assert.equal(parsed.covered_through,original.covered_through);
  assert.doesNotMatch(body,/token|cookie|ip_address/i);
 });
+
+test('gap longer than 150 minutes drains in bounded passes without skipping windows',async()=>{
+ const now=Date.parse('2026-09-26T14:02:00Z'),target=coverageTarget(now),covered=target-4*60*60_000;
+ const calls=[];
+ const first=await inspectGatewayCoverage({
+  state:state({floor:covered-60*60_000,through:covered}),now,
+  loadWindow:async(from,to)=>{calls.push([from,to]);return [];},
+ });
+ assert.equal(first.plan.newEnds.length,30);
+ assert.equal(first.state.covered_through,new Date(covered+150*60_000).toISOString());
+ assert.equal(first.remainingNewWindows,18);
+ assert.ok(calls.every(([from,to])=>to-from===WINDOW_MS));
+ const second=await inspectGatewayCoverage({
+  state:first.state,now,loadWindow:async(from,to)=>{calls.push([from,to]);return [];},
+ });
+ assert.equal(second.failed,null);
+ assert.equal(second.remainingNewWindows,0);
+ assert.equal(second.state.covered_through,new Date(target).toISOString());
+});
+
+test('interrupted catch-up retries from the durable watermark and completes contiguously',async()=>{
+ const now=Date.parse('2026-09-26T12:32:00Z'),target=coverageTarget(now),covered=target-90*60_000;
+ const failEnd=covered+20*60_000;let failedOnce=false;
+ const first=await inspectGatewayCoverage({
+  state:state({floor:covered-60*60_000,through:covered}),now,
+  loadWindow:async(from,to)=>{
+   if(to===failEnd&&!failedOnce){failedOnce=true;throw Error('transient retained-log failure');}
+   return [];
+  },
+ });
+ assert.equal(first.failed.to,new Date(failEnd).toISOString());
+ assert.equal(first.state.covered_through,new Date(failEnd-5*60_000).toISOString());
+ assert.ok(first.remainingNewWindows>0);
+ const second=await inspectGatewayCoverage({
+  state:first.state,now,loadWindow:async()=>[],
+ });
+ assert.equal(second.failed,null);
+ assert.equal(second.remainingNewWindows,0);
+ assert.equal(second.state.covered_through,new Date(target).toISOString());
+});
+
+test('bounded continuation dispatch increments depth and preserves the root run',async()=>{
+ let request;
+ const result=await scheduleCoverageContinuation(async(url,options)=>{
+  request={url,options};
+  return new Response(null,{status:204});
+ },{
+  GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_TOKEN:'token',
+  GITHUB_RUN_ID:'36271472063',PACK1_LAUNCH_CONTINUATION_DEPTH:'2',
+  PACK1_LAUNCH_CONTINUATION_ROOT_RUN_ID:'36270000000',
+ },{pending_windows:18,unrecoverable:false});
+ assert.equal(result.status,'queued');
+ assert.equal(result.depth,3);
+ assert.equal(result.root_run_id,'36270000000');
+ assert.match(request.url,/actions\/workflows\/launch-alert\.yml\/dispatches$/);
+ assert.deepEqual(JSON.parse(request.options.body),{
+  ref:'main',inputs:{continuation_depth:'3',continuation_root_run_id:'36270000000'},
+ });
+});
+
+test('continuation failure is surfaced and depth cap prevents an unbounded retry chain',async()=>{
+ await assert.rejects(()=>scheduleCoverageContinuation(async()=>new Response('{}',{status:503}),{
+  GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_TOKEN:'token',
+  GITHUB_RUN_ID:'36271472063',PACK1_LAUNCH_CONTINUATION_DEPTH:'0',
+ },{pending_windows:18,unrecoverable:false}),/telemetry HTTP 503/);
+ let calls=0;
+ const capped=await scheduleCoverageContinuation(async()=>{calls++;return new Response(null,{status:204});},{
+  GITHUB_REPOSITORY:'killjoy00/mtg-ev-analyzer',GITHUB_TOKEN:'token',
+  GITHUB_RUN_ID:'36271472063',PACK1_LAUNCH_CONTINUATION_DEPTH:String(MAX_CONTINUATION_DEPTH),
+ },{pending_windows:1,unrecoverable:false});
+ assert.equal(capped.status,'limit_reached');
+ assert.equal(calls,0);
+});
+
+test('delayed logs are detected by replay after a previously empty inspection',async()=>{
+ const now=Date.parse('2026-09-26T12:32:00Z'),target=coverageTarget(now),burstAt=target-15*60_000;
+ const current=state({floor:target-2*60*60_000,through:target});
+ const empty=await inspectGatewayCoverage({state:current,now,loadWindow:async()=>[]});
+ assert.equal(empty.alerts.length,0);
+ const burst=Array.from({length:10},(_,i)=>baseEvent({id:'delayed-'+i,status:429,sample_rate:1}));
+ const replay=await inspectGatewayCoverage({
+  state:empty.state,now,loadWindow:async(from,to)=>from<=burstAt&&burstAt<=to?burst:[],
+ });
+ assert.ok(replay.alerts.includes('network_or_application_429'));
+ assert.equal(replay.state.covered_through,new Date(target).toISOString());
+});
+
+test('recoverable coverage issue closes after catch-up recovery',async()=>{
+ const calls=[];
+ const fetcher=async(url,options={})=>{
+  calls.push({url,options});
+  if((options.method||'GET')==='GET')return Response.json([{
+   title:'[launch alert] Production capacity needs attention (coverage_pending)',number:77,
+  }]);
+  assert.equal(options.method,'PATCH');
+  assert.match(url,/\/issues\/77$/);
+  assert.deepEqual(JSON.parse(options.body),{state:'closed',state_reason:'completed'});
+  return Response.json({number:77,state:'closed'});
+ };
+ const action=await routeAlert(fetcher,{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{alerts:[],coverage:{state_persisted:true,pending_windows:0,continuation:{status:'not_needed'}}});
+ assert.equal(action,'recovered');
+ assert.equal(calls.length,2);
+});
+
+test('recoverable coverage issue stays open when coverage persistence is unavailable',async()=>{
+ let patches=0;
+ const fetcher=async(url,options={})=>{
+  if((options.method||'GET')==='GET')return Response.json([{
+   title:'[launch alert] Production capacity needs attention (coverage_pending)',number:77,
+  }]);
+  if(options.method==='PATCH')patches++;
+  return Response.json({number:78});
+ };
+ const action=await routeAlert(fetcher,{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{
+  alerts:['telemetry_unavailable'],coverage:{state_persisted:false,pending_windows:0},
+ });
+ assert.equal(action,'created');
+ assert.equal(patches,0,'missing coverage evidence must not auto-close the pending incident');
+});
+

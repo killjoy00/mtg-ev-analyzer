@@ -14,6 +14,7 @@ import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,dele
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
+import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
@@ -1892,25 +1893,51 @@ async function authorizeDeletionMaintenance(request,{allowTrigger=true}={}) {
 
 async function launchWatcherSignal(trigger,response) {
   if(trigger?.name!=='pack1-account-deletion-maintenance')return response;
+  const scheduledAt=Date.parse(trigger.scheduledAt);
   let freshness;
   try {
-    freshness=await inspectLaunchCoverageFreshness({now:Date.parse(trigger.scheduledAt)});
+    freshness=await inspectLaunchCoverageFreshness({now:scheduledAt});
   } catch {
     freshness={ok:false,reason:'coverage_check_failed',max_age_minutes:30};
   }
-  if(freshness.ok)return response;
+  let operatorAlert=null;
+  try {
+    operatorAlert=await reconcileLaunchWatcherAlert({query,freshness,now:scheduledAt});
+  } catch(error) {
+    console.error(JSON.stringify({
+      event:'launch_watcher_operator_alert_failure',
+      reason:String(error?.message||error).slice(0,120),
+      coverage_reason:freshness.reason,
+      covered_through:freshness.covered_through||null,
+      release_commit:releaseMetadata().release_commit,
+    }));
+    if(freshness.ok) {
+      const snapshot=await response.json();
+      return json({...snapshot,ok:false,launch_watcher:freshness,launch_watcher_alert:{ok:false,reason:'operator_alert_failed'}},503);
+    }
+  }
+  if(freshness.ok) {
+    if(operatorAlert?.action==='recovered')console.log(JSON.stringify({
+      event:'launch_watcher_recovered',
+      covered_through:freshness.covered_through||null,
+      age_minutes:Number.isFinite(freshness.age_minutes)?freshness.age_minutes:null,
+      operator_alert:operatorAlert.action,
+      release_commit:releaseMetadata().release_commit,
+    }));
+    return response;
+  }
   console.error(JSON.stringify({
     event:'launch_watcher_stale',
     reason:freshness.reason,
     covered_through:freshness.covered_through||null,
     age_minutes:Number.isFinite(freshness.age_minutes)?freshness.age_minutes:null,
     max_age_minutes:freshness.max_age_minutes,
+    operator_alert:operatorAlert?.action||'failed',
     release_commit:releaseMetadata().release_commit,
   }));
   const snapshot=await response.json();
   return json({...snapshot,ok:false,launch_watcher:freshness},503);
 }
-
 async function handleDeletionMaintenance(request) {
   if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
   const trigger=await authorizeDeletionMaintenance(request);

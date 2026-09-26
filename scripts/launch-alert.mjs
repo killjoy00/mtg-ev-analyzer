@@ -1,11 +1,14 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {
-  COVERAGE_ISSUE_NUMBER,COVERAGE_ISSUE_TITLE,WINDOW_MS,
+  COVERAGE_ISSUE_NUMBER,COVERAGE_ISSUE_TITLE,WINDOW_MS,STEP_MS,
   normalizeCoverageState,parseCoverageState,renderCoverageState,mergeCoverageState,planCoverage,withWindowAlerts,
 } from '../launch-monitoring.mjs';
 
 const PROJECT='patient-shadow-91417882',TITLE='[launch alert] Production capacity needs attention';
+const CONTINUATION_WORKFLOW='launch-alert.yml';
+export const MAX_CONTINUATION_DEPTH=12;
+const RECOVERABLE_ALERTS=new Set(['coverage_pending','coverage_continuation_failed']);
 export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:5000,quota_ms:1000,requests_per_day:100000,compute_cu_hours_per_day:24,compute_cu_hours_per_billing_period:200,egress_bytes_per_day:5*1024**3,egress_bytes_per_billing_period:50*1024**3};
 
 async function json(fetcher,url,token,body,method=body?'POST':'GET') {
@@ -94,7 +97,7 @@ export async function inspectGatewayCoverage({state,now=Date.now(),loadWindow}) 
   let next={...current,coverage_floor:new Date(plan.coverageFloor).toISOString(),alerted_windows:{...current.alerted_windows}};
   const routed=new Set(),windows=[];
   if(plan.unrecoverable) {
-    return {state:next,plan,windows,alerts:[],failed:null,unrecoverable:true};
+    return {state:next,plan,windows,alerts:[],failed:null,unrecoverable:true,remainingNewWindows:plan.allNewEnds.length};
   }
   const newEnds=new Set(plan.newEnds);
   let failed=null;
@@ -114,7 +117,11 @@ export async function inspectGatewayCoverage({state,now=Date.now(),loadWindow}) 
       break;
     }
   }
-  return {state:next,plan,windows,alerts:[...routed],failed,unrecoverable:false};
+  const coveredAfter=next.covered_through?Date.parse(next.covered_through):null;
+  const remainingNewWindows=coveredAfter===null
+    ?plan.allNewEnds.length
+    :Math.max(0,Math.ceil((plan.target-coveredAfter)/STEP_MS));
+  return {state:next,plan,windows,alerts:[...routed],failed,unrecoverable:false,remainingNewWindows};
 }
 
 async function usage(fetcher,env,account,now) {
@@ -169,23 +176,38 @@ export async function saveCoverageState(fetcher,env,proposed,{now=Date.now()}={}
 }
 
 export async function routeAlert(fetcher,env,report) {
-  if(!report.alerts.length)return 'none';
   if(!/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPOSITORY||''))throw Error('Invalid alert repository');
   const base='https://api.github.com/repos/'+env.GITHUB_REPOSITORY;
   const issues=await json(fetcher,base+'/issues?state=open&per_page=100',env.GITHUB_TOKEN);
-  let created=false;
-  for(const condition of new Set(report.alerts)) {
+  const active=new Set(report.alerts||[]);
+  let created=false,existing=false,recovered=false;
+  for(const condition of active) {
     const title=TITLE+' ('+condition+')';
     // A long-lived usage warning must not suppress a new outage/quota alert.
     // Reuse the initial legacy incident only for the category it actually contains.
-    const existing=issues.find(i=>!i.pull_request&&(i.title===title||i.title===TITLE&&String(i.body||'').includes('"'+condition+'"')));
-    if(existing)continue;
-    const body='Production launch threshold: '+condition+'. Follow https://github.com/'+env.GITHUB_REPOSITORY+'/blob/main/docs/LAUNCH-OPERATIONS.md.\n\n'+JSON.stringify(report,null,2)+'\n\nClose this category incident after investigation and recovery. Other categories alert independently.';
+    const match=issues.find(i=>!i.pull_request&&(i.title===title||i.title===TITLE&&String(i.body||'').includes('"'+condition+'"')));
+    if(match){existing=true;continue;}
+    const body='Production launch threshold: '+condition+'. Follow https://github.com/'+env.GITHUB_REPOSITORY+'/blob/main/docs/LAUNCH-OPERATIONS.md.\\n\\n'+JSON.stringify(report,null,2)+'\\n\\nClose this category incident after investigation and recovery. Other categories alert independently.';
     await json(fetcher,base+'/issues',env.GITHUB_TOKEN,{title,body});created=true;
   }
-  return created?'created':'existing';
+  for(const condition of RECOVERABLE_ALERTS) {
+    if(active.has(condition))continue;
+    const persisted=report.coverage?.state_persisted===true;
+    const resolved=condition==='coverage_pending'
+      ?persisted&&report.coverage.pending_windows===0
+      :persisted&&['queued','not_needed'].includes(report.coverage?.continuation?.status);
+    if(!resolved)continue;
+    const title=TITLE+' ('+condition+')';
+    const match=issues.find(i=>!i.pull_request&&i.title===title);
+    if(!match)continue;
+    await json(fetcher,base+'/issues/'+match.number,env.GITHUB_TOKEN,{state:'closed',state_reason:'completed'},'PATCH');
+    recovered=true;
+  }
+  if(created)return 'created';
+  if(recovered)return 'recovered';
+  if(existing)return 'existing';
+  return 'none';
 }
-
 async function productionAccount(fetcher,env) {
   const zones=await json(fetcher,'https://api.cloudflare.com/client/v4/zones?name=packone.pro&per_page=50',env.CLOUDFLARE_EDGE_TOKEN);
   const zone=zones.result?.filter(z=>z.name==='packone.pro'&&z.status==='active');
@@ -226,7 +248,7 @@ async function alertCoverageCheck(fetcher,env,account,now,report) {
     bootstrap:inspected.plan.bootstrap,
     replay_windows:inspected.plan.replayEnds.length,
     catchup_windows:inspected.plan.newEnds.length,
-    pending_windows:inspected.plan.pendingNewWindows,
+    pending_windows:inspected.remainingNewWindows,
     minimum_retention_floor:new Date(inspected.plan.retentionFloor).toISOString(),
     unrecoverable:inspected.unrecoverable,
     failed_window:inspected.failed,
@@ -234,6 +256,7 @@ async function alertCoverageCheck(fetcher,env,account,now,report) {
   report.windows=inspected.windows;
   report.alerts.push(...inspected.alerts);
   if(inspected.unrecoverable)report.alerts.push('coverage_unrecoverable');
+  if(!inspected.unrecoverable&&inspected.remainingNewWindows>0)report.alerts.push('coverage_pending');
   if(inspected.failed) {report.alerts.push('telemetry_unavailable');pushError(report,inspected.failed.error);}
 
   try {
@@ -248,10 +271,38 @@ async function alertCoverageCheck(fetcher,env,account,now,report) {
     const saved=await saveCoverageState(fetcher,env,inspected.state,{now});
     report.coverage.persisted_through=saved.covered_through;
     report.coverage.persisted_at=saved.updated_at;
+    report.coverage.state_persisted=true;
   } catch(error) {
     report.alerts.push('telemetry_unavailable');pushError(report,error);
     report.coverage.state_persisted=false;
   }
+}
+
+export function launchContinuationDepth(env=process.env) {
+  const raw=String(env.PACK1_LAUNCH_CONTINUATION_DEPTH??'0').trim();
+  if(!/^\d{1,2}$/.test(raw))throw Error('Invalid launch continuation depth');
+  const depth=Number(raw);
+  if(depth>MAX_CONTINUATION_DEPTH)throw Error('Launch continuation depth exceeds limit');
+  return depth;
+}
+
+export async function scheduleCoverageContinuation(fetcher,env,coverage) {
+  const pending=Number(coverage?.pending_windows||0);
+  if(!Number.isInteger(pending)||pending<0)throw Error('Invalid pending launch coverage count');
+  if(pending===0||coverage?.unrecoverable)return {status:'not_needed',pending_windows:pending};
+  if(env.GITHUB_REPOSITORY!=='killjoy00/mtg-ev-analyzer')throw Error('Invalid launch continuation repository');
+  const depth=launchContinuationDepth(env);
+  if(depth>=MAX_CONTINUATION_DEPTH)return {status:'limit_reached',depth,max_depth:MAX_CONTINUATION_DEPTH,pending_windows:pending};
+  const root=String(env.PACK1_LAUNCH_CONTINUATION_ROOT_RUN_ID||env.GITHUB_RUN_ID||'').trim();
+  if(!/^\d{1,24}$/.test(root))throw Error('Invalid launch continuation root run');
+  await json(
+    fetcher,
+    'https://api.github.com/repos/'+env.GITHUB_REPOSITORY+'/actions/workflows/'+CONTINUATION_WORKFLOW+'/dispatches',
+    env.GITHUB_TOKEN,
+    {ref:'main',inputs:{continuation_depth:String(depth+1),continuation_root_run_id:root}},
+    'POST',
+  );
+  return {status:'queued',depth:depth+1,max_depth:MAX_CONTINUATION_DEPTH,root_run_id:root,pending_windows:pending};
 }
 
 export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='check'}={}) {
@@ -264,10 +315,36 @@ export async function run({fetcher=fetch,env=process.env,now=Date.now(),mode='ch
     report.alerts.push('telemetry_unavailable');pushError(report,error);
   }
   report.alerts=[...new Set(report.alerts)];
+  if(mode==='alert') {
+    if(report.coverage?.pending_windows>0&&!report.coverage.unrecoverable) {
+      try {
+        const continuation=await scheduleCoverageContinuation(fetcher,env,report.coverage);
+        report.coverage.continuation=continuation;
+        if(continuation.status==='limit_reached') {
+          report.alerts.push('coverage_continuation_failed');
+          pushError(report,Error('Launch coverage continuation depth limit reached'));
+        }
+      } catch(error) {
+        report.alerts.push('coverage_continuation_failed');
+        pushError(report,error);
+        if(report.coverage)report.coverage.continuation={status:'failed'};
+      }
+    } else if(report.coverage) {
+      report.coverage.continuation={status:'not_needed',pending_windows:Number(report.coverage.pending_windows||0)};
+    }
+    report.alerts=[...new Set(report.alerts)];
+    try {
+      report.alert_route=await routeAlert(fetcher,env,report);
+    } catch(error) {
+      report.alerts.push('telemetry_unavailable');pushError(report,error);report.alert_route='failed';
+    }
+  }
+  report.alerts=[...new Set(report.alerts)];
   fs.mkdirSync('artifacts/launch-alert',{recursive:true});fs.writeFileSync('artifacts/launch-alert/report.json',JSON.stringify(report,null,2));
   console.log(JSON.stringify(report));
-  if(mode==='alert')console.log('Launch alert route: '+await routeAlert(fetcher,env,report));
+  if(mode==='alert')console.log('Launch alert route: '+(report.alert_route||'none'));
   if(report.alerts.includes('coverage_unrecoverable'))throw Error('Launch telemetry coverage is unrecoverable');
+  if(report.alerts.includes('coverage_continuation_failed'))throw Error('Launch telemetry continuation failed');
   if(report.alerts.includes('telemetry_unavailable'))throw Error('Launch telemetry access failed');
   return report;
 }
