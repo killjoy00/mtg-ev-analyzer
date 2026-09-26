@@ -1,0 +1,155 @@
+name: contextual-value-v1-converged-propensity-pooled
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN: '36256947308'
+  SOURCE_SHA: aa5b17d96b43f3ce08f52fad55ba17f327472c1b
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  refit-fold:
+    name: lbfgs-fold-${{ matrix.fold }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        fold: [-1, 0, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned optimizer dependency
+        run: python -m pip install --disable-pip-version-check 'scipy==1.18.1'
+      - name: Download retained cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download retained feature shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-feature-fold-${{ matrix.fold }}-*
+          path: precomputed-features
+          merge-multiple: true
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download retained nuisance checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-nuisance-fold-${{ matrix.fold }}
+          path: retained-nuisance
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Refit behavior only with converged propensity
+        shell: bash
+        run: |
+          set -euo pipefail
+          FOLD='${{ matrix.fold }}'
+          if [[ "$FOLD" == '-1' ]]; then
+            RETAINED='retained-nuisance/validation-nuisance.jsonl.gz'
+          else
+            RETAINED="retained-nuisance/train-nuisance-fold-$FOLD.jsonl.gz"
+          fi
+          OUT="results/contextual-value-v1/lbfgs-fold-$FOLD"
+          python3 research/contextual_value_propensity_lbfgs_refit.py fold \
+            --fold "$FOLD" \
+            --cohort-dir preprocessed-core \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-MSH.jsonl.gz" \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-SOS.jsonl.gz" \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-ECL.jsonl.gz" \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-TLA.jsonl.gz" \
+            --retained-nuisance "$RETAINED" \
+            --source-sha "$SOURCE_SHA" \
+            --out "$OUT"
+      - name: Assert convergence and fixed Q
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          reports = list(pathlib.Path("results/contextual-value-v1").glob("lbfgs-fold-*/fold-report.json"))
+          assert len(reports) == 1
+          report = json.loads(reports[0].read_text())
+          assert report["assessment_opened"] is False
+          assert report["assessment_outcomes_used"] is False
+          assert report["q_values_preserved"] is True
+          assert report["solver"]["gradient_max_abs"] <= 1e-6
+          PY
+      - name: Upload converged nuisance fold
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-lbfgs-nuisance-fold-${{ matrix.fold }}
+          path: results/contextual-value-v1/lbfgs-fold-${{ matrix.fold }}/
+          retention-days: 30
+
+  pooled-validation:
+    needs: refit-fold
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned optimizer dependency
+        run: python -m pip install --disable-pip-version-check 'scipy==1.18.1'
+      - name: Download retained cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download original pooled report
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-pooled-msh-sos-ecl-tla-8000
+          path: original-pooled
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download converged nuisance folds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-lbfgs-nuisance-fold-*
+          path: converged-nuisance
+          merge-multiple: true
+      - name: Run controlled pooled validation
+        run: |
+          python3 research/contextual_value_propensity_lbfgs_refit.py pooled \
+            --cohort-dir preprocessed-core \
+            --train-prediction converged-nuisance/lbfgs-nuisance-fold-0.jsonl.gz \
+            --train-prediction converged-nuisance/lbfgs-nuisance-fold-1.jsonl.gz \
+            --train-prediction converged-nuisance/lbfgs-nuisance-fold-2.jsonl.gz \
+            --train-prediction converged-nuisance/lbfgs-nuisance-fold-3.jsonl.gz \
+            --train-prediction converged-nuisance/lbfgs-nuisance-fold-4.jsonl.gz \
+            --validation-prediction converged-nuisance/lbfgs-nuisance-fold--1.jsonl.gz \
+            --source-sha "$SOURCE_SHA" \
+            --original-report original-pooled/development-report.json \
+            --out results/contextual-value-v1/converged-propensity-pooled
+      - name: Assert assessment remains sealed
+        run: |
+          python3 - <<'PY'
+          import json
+          report = json.load(open("results/contextual-value-v1/converged-propensity-pooled/development-report.json"))
+          assert report["assessment_opened"] is False
+          boundary = report["assessment_boundary"]
+          assert boundary["outcomes_loaded_into_pipeline"] is False
+          assert boundary["outcomes_used_for_fit"] is False
+          assert boundary["outcomes_scored"] is False
+          PY
+      - name: Upload controlled pooled result
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-converged-propensity-pooled
+          path: results/contextual-value-v1/converged-propensity-pooled/
+          retention-days: 30
