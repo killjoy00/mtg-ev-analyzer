@@ -22,15 +22,18 @@ import {
   DAILY_ENVIRONMENT_META,
   isDailyEnvironment,
   loadDraftRun,
+  loadSharedRun,
   rerollDraftRun,
   startDailyDraftRun,
   startPracticeDraftRun,
+  startSharedDraftRun,
   submitDraftRunPick,
   type DailyEnvironment,
   type DraftRunAnswer,
   type DraftRunCard,
   type DraftRunState,
   type PracticeEnvironment,
+  type SharedRunInfo,
 } from '@/src/api/draftRun';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
@@ -40,6 +43,7 @@ import { colors, spacing } from '@/src/theme';
 type LoadState =
   | { status: 'loading' }
   | { status: 'signin-required' }
+  | { status: 'invite'; info: SharedRunInfo; session: MobileSession }
   | { status: 'ready'; run: DraftRunState; session: MobileSession }
   | { status: 'error'; message: string };
 
@@ -346,8 +350,13 @@ async function loadDraftSurface(
   environment: DailyEnvironment,
   practice: boolean,
   setIds: string[],
+  sharedId = '',
 ) {
   const session = await ensureGuestSession();
+  if (sharedId) {
+    const info = await loadSharedRun(sharedId, session);
+    return { status: 'invite' as const, info, session };
+  }
   if (practice) {
     if (!session.accountToken) return { status: 'signin-required' as const };
     const practiceEnvironment: PracticeEnvironment = environment === 'powered-cube' ? 'powered-cube' : 'mixed';
@@ -366,8 +375,9 @@ async function loadDraftSurface(
 }
 
 export default function DraftRunScreen() {
-  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string }>();
-  const practice = params.mode === 'practice';
+  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; shared?: string }>();
+  const sharedId = typeof params.shared === 'string' && /^[a-f0-9]{24}$/.test(params.shared) ? params.shared : '';
+  const practice = params.mode === 'practice' || Boolean(sharedId);
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const practiceEnvironment: PracticeEnvironment = requestedEnvironment === 'powered-cube' ? 'powered-cube' : 'mixed';
   const environment: DailyEnvironment = practice
@@ -377,14 +387,19 @@ export default function DraftRunScreen() {
   const setIds = useMemo(() => parsePracticeSets(setIdsParam), [setIdsParam]);
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
   const surfaceMeta = practice
-    ? {
-        eyebrow: setIds.length
-          ? 'CUSTOM SET PRACTICE'
-          : environment === 'powered-cube' ? 'POWERED CUBE PRACTICE' : 'PRACTICE DRAFT RUN',
-        resultTitle: setIds.length
-          ? 'Custom practice complete.'
-          : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
-      }
+    ? sharedId
+      ? {
+          eyebrow: 'SHARED DRAFT RUN',
+          resultTitle: 'Shared run complete.',
+        }
+      : {
+          eyebrow: setIds.length
+            ? 'CUSTOM SET PRACTICE'
+            : environment === 'powered-cube' ? 'POWERED CUBE PRACTICE' : 'PRACTICE DRAFT RUN',
+          resultTitle: setIds.length
+            ? 'Custom practice complete.'
+            : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
+        }
     : dailyMeta;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [mode, setMode] = useState<ViewMode>('pick');
@@ -424,11 +439,15 @@ export default function DraftRunScreen() {
 
   useEffect(() => {
     let active = true;
-    void loadDraftSurface(environment, practice, setIds)
+    void loadDraftSurface(environment, practice, setIds, sharedId)
       .then((loaded) => {
         if (!active) return;
         if (loaded.status === 'signin-required') {
           setState({ status: 'signin-required' });
+          return;
+        }
+        if (loaded.status === 'invite') {
+          setState(loaded);
           return;
         }
         setMode(loaded.run.complete ? 'result' : 'pick');
@@ -444,7 +463,7 @@ export default function DraftRunScreen() {
     return () => {
       active = false;
     };
-  }, [environment, practice, setIds]);
+  }, [environment, practice, setIds, sharedId]);
 
   const retry = async () => {
     setState({ status: 'loading' });
@@ -452,9 +471,13 @@ export default function DraftRunScreen() {
     setActionError(null);
     setMode('pick');
     try {
-      const loaded = await loadDraftSurface(environment, practice, setIds);
+      const loaded = await loadDraftSurface(environment, practice, setIds, sharedId);
       if (loaded.status === 'signin-required') {
         setState({ status: 'signin-required' });
+        return;
+      }
+      if (loaded.status === 'invite') {
+        setState(loaded);
         return;
       }
       setMode(loaded.run.complete ? 'result' : 'pick');
@@ -464,6 +487,35 @@ export default function DraftRunScreen() {
         status: 'error',
         message: error instanceof Error ? error.message : 'Draft Run is unavailable.',
       });
+    }
+  };
+
+  const acceptSharedRun = async () => {
+    if (state.status !== 'invite' || busy) return;
+    if (!state.session.accountToken) {
+      router.push({
+        pathname: '/account',
+        params: { returnTo: 'shared', shared: state.info.id },
+      });
+      return;
+    }
+    setBusy(true);
+    setActionError(null);
+    try {
+      const run = await startSharedDraftRun(state.session, state.info.id);
+      setState({ status: 'ready', run, session: state.session });
+      setMode(run.complete ? 'result' : 'pick');
+      setSelected(null);
+      setReviewIndex(null);
+      setShowAnalysis(false);
+      setShowPackReview(false);
+    } catch (error: unknown) {
+      setState({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'This shared run could not be started.',
+      });
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -585,6 +637,49 @@ export default function DraftRunScreen() {
           <ActivityIndicator color={colors.accent} />
           <Text style={styles.loadingText}>Finding today&apos;s packs…</Text>
         </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (state.status === 'invite') {
+    const cubeInvite = state.info.environment === 'powered-cube';
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ScrollView contentContainerStyle={styles.invitePage}>
+          <Text style={styles.eyebrow}>A FRIEND&apos;S {cubeInvite ? 'POWERED CUBE RUN' : 'DRAFT RUN'}</Text>
+          <Text style={styles.title}>Play this run and compare.</Text>
+          <Text style={styles.errorBody}>
+            {state.info.name} sent you {state.info.run_length} real decisions from trophy drafts. You&apos;ll see the same packs and the same earlier picks.
+          </Text>
+          {state.info.scores.length ? (
+            <View style={styles.sharedScores}>
+              <Text style={styles.analysisTitle}>Scores so far</Text>
+              {state.info.scores.map((item, index) => (
+                <View key={`${item.name}:${index}`} style={styles.sharedScoreRow}>
+                  <Text style={styles.sharedScoreName}>{item.name}</Text>
+                  <Text style={styles.sharedScoreValue}>{item.score}/100</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          <Text style={styles.errorBody}>
+            {cubeInvite
+              ? 'Powered Cube practice access is required.'
+              : 'A free Pack One account includes regular shared-run practice.'}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => void acceptSharedRun()}
+            style={[styles.primaryButton, busy && styles.primaryButtonDisabled]}
+          >
+            {busy ? <ActivityIndicator color="#fff" /> : (
+              <Text style={styles.primaryButtonText}>
+                {state.session.accountToken ? 'Play this run' : 'Sign in to play this run'}
+              </Text>
+            )}
+          </Pressable>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -899,6 +994,11 @@ export default function DraftRunScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   shell: { flex: 1 },
+  invitePage: { padding: spacing.xl, paddingTop: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 720 },
+  sharedScores: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.sm },
+  sharedScoreRow: { flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: colors.line, paddingVertical: spacing.sm },
+  sharedScoreName: { flex: 1, color: colors.ink, fontSize: 14, fontWeight: '700' },
+  sharedScoreValue: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   loadingText: { color: colors.muted, fontSize: 15 },
