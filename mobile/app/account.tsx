@@ -1,7 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -93,14 +93,31 @@ export default function AccountScreen() {
   const [deleteCodeSent, setDeleteCodeSent] = useState(false);
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+  const [enrichmentWarning, setEnrichmentWarning] = useState<string | null>(null);
+  const enrichmentRequestId = useRef(0);
 
-  const applyProfile = (next: CareerProfile | null) => {
+  const applyProfile = useCallback((next: CareerProfile | null) => {
     setProfile(next);
     setProfileName(next?.player.display_name ?? '');
     setProfilePublic(Boolean(next?.player.profile_public));
     setFavoriteSetId(next?.player.favorite_set_id ?? '');
     setShowcaseAchievement(next?.player.showcase_achievement ?? '');
-  };
+  }, []);
+
+  const loadOptionalEnrichment = useCallback(async (current: MobileSession) => {
+    const id = ++enrichmentRequestId.current;
+    setEnrichmentWarning(null);
+    const [profileResult, catalogResult] = await Promise.allSettled([
+      loadMobileCareer(current),
+      loadSetCatalog(current),
+    ]);
+    if (id !== enrichmentRequestId.current) return;
+    if (profileResult.status === 'fulfilled') applyProfile(profileResult.value);
+    if (catalogResult.status === 'fulfilled') setCatalogSets(catalogResult.value.sets);
+    if (profileResult.status === 'rejected' || catalogResult.status === 'rejected') {
+      setEnrichmentWarning('Signed in. Some profile details could not refresh; account access is still active.');
+    }
+  }, [applyProfile]);
 
   useEffect(() => {
     let active = true;
@@ -110,24 +127,22 @@ export default function AccountScreen() {
         setSession(current);
         if (!current.accountToken) return;
         try {
-          const [state, nextProfile, catalog] = await Promise.all([
-            loadMobileAccount(current),
-            loadMobileCareer(current),
-            loadSetCatalog(current),
-          ]);
+          const state = await loadMobileAccount(current);
           if (active) {
             setAccount(state);
-            applyProfile(nextProfile);
-            setCatalogSets(catalog.sets);
+            void loadOptionalEnrichment(current);
           }
         } catch (error: unknown) {
           if (!active) return;
           if (error instanceof ApiError && error.status === 401) {
             const guest = await forgetAccountLocally(current);
             if (!active) return;
+            enrichmentRequestId.current += 1;
             setSession(guest);
             setAccount(null);
             applyProfile(null);
+            setCatalogSets([]);
+            setEnrichmentWarning(null);
             setMessage('Your account session expired. Sign in again.');
           } else {
             setMessage(error instanceof Error ? error.message : 'Could not restore your account session.');
@@ -140,26 +155,18 @@ export default function AccountScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [applyProfile, loadOptionalEnrichment]);
 
   const finish = async (next: MobileSession, result: MobileAuthResponse) => {
     setSession(next);
-    const [state, nextProfile, catalog] = await Promise.all([
-      loadMobileAccount(next),
-      loadMobileCareer(next),
-      loadSetCatalog(next),
-    ]);
-    setAccount(state);
-    applyProfile(nextProfile);
-    setCatalogSets(catalog.sets);
     setPassword('');
-    setMessage(
-      result.linked.validatedDailyScore
-        ? 'Signed in. Today\'s guest Daily was validated for this account.'
-        : result.linked.rankingIdentity?.eligible === false
-          ? 'Signed in. Choose a unique leaderboard name below before using ranked public identity.'
-          : 'Signed in to your Pack One account.',
-    );
+    const successMessage = result.linked.validatedDailyScore
+      ? 'Signed in. Today\'s guest Daily was validated for this account.'
+      : result.linked.rankingIdentity?.eligible === false
+        ? 'Signed in. Choose a unique leaderboard name below before using ranked public identity.'
+        : 'Signed in to your Pack One account.';
+    setMessage(successMessage);
+
     if (result.linked.validatedDailyScore) {
       setTimeout(() => router.replace({
         pathname: '/draft-run',
@@ -167,6 +174,25 @@ export default function AccountScreen() {
       }), 600);
     } else if (returnToPractice) {
       setTimeout(() => router.replace('/practice'), 300);
+    }
+
+    void loadOptionalEnrichment(next);
+    try {
+      const state = await loadMobileAccount(next);
+      setAccount(state);
+    } catch (error: unknown) {
+      if (error instanceof ApiError && error.status === 401) {
+        const guest = await forgetAccountLocally(next);
+        enrichmentRequestId.current += 1;
+        setSession(guest);
+        setAccount(null);
+        applyProfile(null);
+        setCatalogSets([]);
+        setEnrichmentWarning(null);
+        setMessage('The new account session could not be verified. Sign in again.');
+        return;
+      }
+      setEnrichmentWarning('Signed in. Account details could not refresh yet; your secure session is still saved.');
     }
   };
 
@@ -287,11 +313,14 @@ export default function AccountScreen() {
     setMessage(null);
     try {
       await signOutMobileAccount(session);
+      enrichmentRequestId.current += 1;
+      enrichmentRequestId.current += 1;
       const fresh = await ensureGuestSession();
       setSession(fresh);
       setAccount(null);
       applyProfile(null);
       setCatalogSets([]);
+      setEnrichmentWarning(null);
       setMessage('Signed out.');
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Could not sign out.');
@@ -372,11 +401,13 @@ export default function AccountScreen() {
     setMessage(null);
     try {
       await changeMobilePassword(session, currentPassword, newPassword);
+      enrichmentRequestId.current += 1;
       const guest = await forgetAccountLocally(session);
       setSession(guest);
       setAccount(null);
       applyProfile(null);
       setCatalogSets([]);
+      setEnrichmentWarning(null);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -435,6 +466,7 @@ export default function AccountScreen() {
       setAccount(null);
       applyProfile(null);
       setCatalogSets([]);
+      setEnrichmentWarning(null);
       setDeletePassword('');
       setDeleteCode('');
       setDeleteCodeSent(false);
@@ -843,6 +875,9 @@ export default function AccountScreen() {
         )}
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
+        {enrichmentWarning ? (
+          <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text>
+        ) : null}
 
       </ScrollView>
     </SafeAreaView>
@@ -885,6 +920,7 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   disabled: { opacity: 0.42 },
   message: { color: colors.accentDark, fontSize: 14, lineHeight: 21, fontWeight: '700' },
+  enrichmentWarning: { color: colors.muted, fontSize: 13, lineHeight: 19, fontWeight: '700' },
   settingsSection: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.md },
   sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   fieldLabel: { color: colors.ink, fontSize: 13, fontWeight: '800' },
