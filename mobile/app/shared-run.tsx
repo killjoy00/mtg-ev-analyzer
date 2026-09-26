@@ -146,7 +146,10 @@ function SharedRunGate({ shareId }: { shareId: string }) {
       else commit({ status: 'error', message: detail });
     }
   }, [commit, makeSurface, recovery, shareId]);
-  reloadRef.current = reload;
+
+  useEffect(() => {
+    reloadRef.current = reload;
+  }, [reload]);
 
   useEffect(() => {
     mounted.current = true;
