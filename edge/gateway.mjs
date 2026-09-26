@@ -44,7 +44,7 @@ function permitted(service,path,method,search,mode) {
       '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect','/v1/mobile/patreon/connect','/v1/mobile/patreon/disconnect',
     ].includes(path))return true;
     if(method==='GET'&&[
-      '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback',
+      '/v1/account/session','/v1/account/daily-dates','/v1/account/google/callback','/v1/patreon/callback',
       '/v1/mobile/account/google/callback','/v1/mobile/account/session','/v1/mobile/version',
       '/v1/mobile/profile/me','/v1/mobile/profile/history',
       '/v1/stats','/v1/profile/me','/v1/profile/history','/v1/patreon/status','/v1/mobile/patreon/status',
