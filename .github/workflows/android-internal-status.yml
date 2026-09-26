@@ -1,20 +1,43 @@
 name: Android Internal Testing status
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/android-internal-status-request.json'
   workflow_dispatch:
 
 permissions:
   contents: read
   id-token: write
+  issues: write
 
 jobs:
   status:
     name: read Google Play internal track
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
     runs-on: ubuntu-latest
     environment: pack-one-mobile-release
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve reviewed Android internal status request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('.github/android-internal-status-request.json').read_text())
+          if set(request) != {'operation','reason'}:
+              raise SystemExit('Invalid Android internal status request keys.')
+          if request.get('operation') != 'check-android-internal-status':
+              raise SystemExit('Invalid Android internal status operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Android internal status request requires a reason.')
+          print('Reviewed Android internal status request:', reason)
+          PY
       - name: Require current approved main revision
         shell: bash
         run: |
@@ -45,6 +68,7 @@ jobs:
       - name: Read Internal Testing status
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
           set -euo pipefail
@@ -55,10 +79,35 @@ jobs:
           cleanup() { curl --silent --show-error -X DELETE -H "$auth_header" "$base/edits/$edit_id" >/dev/null || true; }
           trap cleanup EXIT
           track_json="$(curl --fail-with-body --silent --show-error -H "$auth_header" "$base/edits/$edit_id/tracks/internal")"
-          testers_json="$(curl --fail-with-body --silent --show-error -H "$auth_header" "$base/edits/$edit_id/testers/internal")"
           echo "$track_json"
-          echo "$testers_json"
           echo "## Google Play Internal Testing status" >> "$GITHUB_STEP_SUMMARY"
           echo "$track_json" >> "$GITHUB_STEP_SUMMARY"
-          echo "## Google Play Internal Testing testers" >> "$GITHUB_STEP_SUMMARY"
-          echo "$testers_json" >> "$GITHUB_STEP_SUMMARY"
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            comment_body="$(TRACK_JSON="$track_json" node <<'NODE'
+          const track=JSON.parse(process.env.TRACK_JSON || '{}');
+          const releases=Array.isArray(track.releases) ? track.releases : [];
+          const latest=releases[0] || {};
+          const codes=Array.isArray(latest.versionCodes) ? latest.versionCodes.join(', ') : 'none';
+          const status=typeof latest.status === 'string' ? latest.status : 'unknown';
+          const name=typeof latest.name === 'string' ? latest.name : 'unnamed';
+          process.stdout.write([
+            'Android Internal Testing status check:',
+            '',
+            '- Track: `internal`',
+            `- Latest release: \`${name}\``,
+            `- Version code(s): \`${codes}\``,
+            `- Release status: \`${status}\``,
+            `- Verified from current main: \`${process.env.GITHUB_SHA || 'unknown'}\``,
+          ].join('\n'));
+          NODE
+            )"
+            payload="$(COMMENT_BODY="$comment_body" node -e 'process.stdout.write(JSON.stringify({body:process.env.COMMENT_BODY}))')"
+            curl --fail-with-body --silent --show-error \
+              -X POST \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/json" \
+              -d "$payload" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/issues/524/comments" >/dev/null
+          fi
