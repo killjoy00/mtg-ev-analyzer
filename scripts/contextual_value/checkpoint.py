@@ -132,6 +132,7 @@ def build_cohort_manifest(
         "schema_version": COHORT_SCHEMA_VERSION,
         "scope": "development_only",
         "assessment_outcomes_serialized": False,
+        "code_revision": os.environ.get("GITHUB_SHA", "local"),
         "configuration": {
             "max_drafts": max_drafts,
             "nuisance_folds": nuisance_folds,
@@ -327,7 +328,8 @@ def verify_checkpoint_metadata(
     for key, value in expected.items():
         if metadata.get(key) != value:
             raise ValueError(f"{payload_path}: incompatible checkpoint {key}")
-    if require_code_revision is not None and metadata.get("code_revision") != require_code_revision:
+    expected_revision = require_code_revision or os.environ.get("GITHUB_SHA")
+    if expected_revision is not None and metadata.get("code_revision") != expected_revision:
         raise ValueError(f"{payload_path}: incompatible checkpoint code revision")
     if metadata.get("payload_sha256") != file_sha256(payload_path):
         raise ValueError(f"{payload_path}: checkpoint payload hash mismatch")
