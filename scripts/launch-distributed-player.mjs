@@ -15,7 +15,7 @@ export const wait=async(ms,signal)=>{
 export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch}) {
   return async(actor,route,path,body,{report=null,windows=null}={})=>{
     const url=permittedRequest(path,body);
-    if(++budget.gateway_requests>Math.floor((policy.maximum_requests-2500)/policy.generators))throw Object.assign(Error('request_ceiling'),{category:'cost'});
+    if(++budget.gateway_requests>Math.floor((policy.maximum_requests-policy.telemetry_preflight_requests)/policy.generators))throw Object.assign(Error('request_ceiling'),{category:'cost'});
     const at=now(),record={route,at,status:0,ms:0,bytes:0,phase:!windows||at<windows.hold?'initial':at<windows.drain?'hold':at<windows.recovery?'drain':'recovery'};
     if(report)report.requests.push(record);
     const headers={'x-pack1-preview-key':fixture.preview,origin:'https://packone.pro','content-type':'application/json'};
