@@ -1,14 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import {
   LAUNCH_WATCHER_ALERT_STATE_KEY,parseLaunchWatcherAlertState,reconcileLaunchWatcherAlert,
 } from '../worker/launch-watcher-alert.mjs';
 
-const ENV={
-  PACK1_ACCOUNT_DELETE_RESEND_API_KEY:'re_fixture',
-  PACK1_LAUNCH_ALERT_EMAIL:'ops@example.test',
-};
+const ENV={PACK1_ACCOUNT_DELETE_RESEND_API_KEY:'re_fixture'};
 const STALE={
   ok:false,reason:'coverage_stale',covered_through:'2026-09-26T10:00:00.000Z',
   age_minutes:40,max_age_minutes:30,
@@ -49,16 +45,17 @@ test('independent stale operator alert is sent once per stale episode',async()=>
   assert.equal(requests.length,1);
   assert.equal(store.state().status,'stale');
   assert.match(requests[0].options.headers['Idempotency-Key'],/^pack1-launch-stale-[a-f0-9]{24}$/);
-  assert.deepEqual(JSON.parse(requests[0].options.body).to,['ops@example.test']);
+  assert.deepEqual(JSON.parse(requests[0].options.body).to,['admin@packone.pro']);
 });
 
-test('service-principal email is not accepted as an implicit operator destination',async()=>{
-  const store=memoryState();
-  await assert.rejects(()=>reconcileLaunchWatcherAlert({
+test('service-principal email cannot redirect the established operator destination',async()=>{
+  const store=memoryState(),requests=[];
+  await reconcileLaunchWatcherAlert({
     query:store.query,freshness:STALE,now:Date.parse('2026-09-26T10:40:00Z'),
     env:{PACK1_ACCOUNT_DELETE_RESEND_API_KEY:'re_fixture',PACK1_DELETION_ADMIN_EMAIL:'service@example.test'},
-    fetcher:async()=>new Response('{}',{status:200}),
-  }),/operator email destination is unavailable/);
+    fetcher:async(url,options)=>{requests.push(JSON.parse(options.body));return new Response('{}',{status:200});},
+  });
+  assert.deepEqual(requests[0].to,['admin@packone.pro']);
 });
 
 test('failed stale delivery stays pending and retries with the same idempotency key',async()=>{
@@ -104,17 +101,3 @@ test('coverage recovery sends one recovery alert and returns to healthy dedupe s
   assert.equal(store.state().status,'fresh');
 });
 
-
-test('every production pack1growth deploy path preserves the explicit launch alert mailbox',()=>{
-  for(const path of [
-    '.github/workflows/secure-auth-release.yml',
-    '.github/workflows/deploy-functions.yml',
-    '.github/workflows/account-deletion-controls.yml',
-  ]) {
-    const source=fs.readFileSync(path,'utf8');
-    assert.match(source,/PACK1_LAUNCH_ALERT_EMAIL:\s*\$\{\{ secrets\.PACK1_LAUNCH_ALERT_EMAIL \}\}/,path);
-    assert.match(source,/--env "PACK1_LAUNCH_ALERT_EMAIL=\$PACK1_LAUNCH_ALERT_EMAIL"/,path);
-  }
-  const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
-  assert.match(release,/PACK1_LAUNCH_ALERT_EMAIL is missing or malformed/);
-});
