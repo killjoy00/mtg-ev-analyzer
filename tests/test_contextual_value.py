@@ -19,7 +19,7 @@ from contextual_value.dataset import (
     parse_decision,
 )
 from contextual_value.dr import PolicyObservation, aipw_candidate_values, evaluate_policy
-from contextual_value.evaluate import compare_policies
+from contextual_value.evaluate import REQUIRED_ABLATIONS, compare_policies
 from contextual_value.features import validate_feature_map
 from contextual_value.nuisance import (
     build_fold_training_rows,
@@ -339,12 +339,23 @@ class EvaluationGateTests(unittest.TestCase):
             "TLA": (-0.04, 0.14),
         }
 
+    @staticmethod
+    def _powered():
+        return {"MSH": True, "SOS": True, "ECL": True, "TLA": True}
+
+    @staticmethod
+    def _ablations():
+        return {name: True for name in REQUIRED_ABLATIONS}
+
     def _complete_kwargs(self):
         return dict(
             ci95=(1.0, 3.0),
             environment_deltas=self._environment_evidence(),
-            ablations_coherent=True,
+            environment_powered=self._powered(),
+            ablation_evidence=self._ablations(),
+            out_of_environment_name="predeclared-holdout",
             out_of_environment_ci95=(-0.04, 0.10),
+            out_of_environment_excluded_from_development=True,
         )
 
     def test_gate_requires_all_written_research_evidence(self):
@@ -372,7 +383,10 @@ class EvaluationGateTests(unittest.TestCase):
         kwargs["environment_deltas"] = evidence
         result = compare_policies(candidate, incumbent, **kwargs)
         self.assertEqual(result["status"], "incomplete")
-        self.assertIn("TLA", result["evidence"]["development_environments"]["missing"])
+        self.assertIn(
+            "TLA",
+            result["evidence"]["development_environments"]["missing_intervals"],
+        )
 
     def test_malformed_environment_interval_is_incomplete(self):
         candidate, incumbent = self._policies()
@@ -384,14 +398,54 @@ class EvaluationGateTests(unittest.TestCase):
         self.assertEqual(result["status"], "incomplete")
         self.assertIn("SOS", result["evidence"]["development_environments"]["malformed"])
 
-    def test_missing_ablation_or_holdout_evidence_is_incomplete(self):
+    def test_no_powered_environment_is_incomplete_not_vacuous_pass(self):
         candidate, incumbent = self._policies()
         kwargs = self._complete_kwargs()
-        kwargs["ablations_coherent"] = None
-        self.assertEqual(compare_policies(candidate, incumbent, **kwargs)["status"], "incomplete")
+        kwargs["environment_powered"] = {
+            "MSH": False, "SOS": False, "ECL": False, "TLA": False
+        }
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIsNone(result["checks"]["no_concentrated_harm"])
+
+    def test_missing_or_malformed_ablation_evidence_is_incomplete(self):
+        candidate, incumbent = self._policies()
         kwargs = self._complete_kwargs()
-        kwargs["out_of_environment_ci95"] = None
+        ablations = self._ablations()
+        missing = REQUIRED_ABLATIONS[0]
+        ablations.pop(missing)
+        kwargs["ablation_evidence"] = ablations
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIn(missing, result["evidence"]["ablations"]["missing"])
+
+        kwargs = self._complete_kwargs()
+        ablations = self._ablations()
+        ablations[REQUIRED_ABLATIONS[1]] = "yes"
+        kwargs["ablation_evidence"] = ablations
         self.assertEqual(compare_policies(candidate, incumbent, **kwargs)["status"], "incomplete")
+
+    def test_failed_required_ablation_is_a_gate_failure(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        ablations = self._ablations()
+        ablations["remove_propensity_correction"] = False
+        kwargs["ablation_evidence"] = ablations
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "fail")
+        self.assertFalse(result["checks"]["ablations_coherent_no_leakage_proxy"])
+
+    def test_missing_or_nonexcluded_holdout_is_not_a_pass(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        kwargs["out_of_environment_name"] = None
+        self.assertEqual(compare_policies(candidate, incumbent, **kwargs)["status"], "incomplete")
+
+        kwargs = self._complete_kwargs()
+        kwargs["out_of_environment_excluded_from_development"] = False
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "fail")
+        self.assertFalse(result["checks"]["out_of_environment_excluded_from_development"])
 
     def test_complete_harm_evidence_can_fail_gate(self):
         candidate, incumbent = self._policies()
