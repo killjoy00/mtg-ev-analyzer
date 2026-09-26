@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError } from '@/src/api/client';
 import {
+  changeMobilePassword,
   deleteMobileAccount,
   finishAppleDeletion,
   finishAppleSignIn,
@@ -25,6 +26,8 @@ import {
   finishNativeAppleSignIn,
   forgetAccountLocally,
   loadMobileAccount,
+  requestMobilePasswordReset,
+  requestMobileVerificationEmail,
   signInWithEmail,
   signOutMobileAccount,
   signUpWithEmail,
@@ -35,6 +38,11 @@ import {
   type AccountState,
   type MobileAuthResponse,
 } from '@/src/api/account';
+import {
+  loadMobileCareer,
+  updateMobileProfile,
+  type CareerProfile,
+} from '@/src/api/career';
 import { isDailyEnvironment } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
 import { type MobileSession } from '@/src/storage/session';
@@ -63,15 +71,31 @@ export default function AccountScreen() {
   const returnToPractice = params.returnTo === 'practice';
   const [session, setSession] = useState<MobileSession | null>(null);
   const [account, setAccount] = useState<AccountState | null>(null);
+  const [profile, setProfile] = useState<CareerProfile | null>(null);
   const [mode, setMode] = useState<Mode>('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [profileName, setProfileName] = useState('');
+  const [profilePublic, setProfilePublic] = useState(false);
+  const [favoriteSetId, setFavoriteSetId] = useState('');
+  const [showcaseAchievement, setShowcaseAchievement] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteCode, setDeleteCode] = useState('');
   const [deleteCodeSent, setDeleteCodeSent] = useState(false);
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+
+  const applyProfile = (next: CareerProfile | null) => {
+    setProfile(next);
+    setProfileName(next?.player.display_name ?? '');
+    setProfilePublic(Boolean(next?.player.profile_public));
+    setFavoriteSetId(next?.player.favorite_set_id ?? '');
+    setShowcaseAchievement(next?.player.showcase_achievement ?? '');
+  };
 
   useEffect(() => {
     let active = true;
@@ -81,8 +105,14 @@ export default function AccountScreen() {
         setSession(current);
         if (!current.accountToken) return;
         try {
-          const state = await loadMobileAccount(current);
-          if (active) setAccount(state);
+          const [state, nextProfile] = await Promise.all([
+            loadMobileAccount(current),
+            loadMobileCareer(current),
+          ]);
+          if (active) {
+            setAccount(state);
+            applyProfile(nextProfile);
+          }
         } catch (error: unknown) {
           if (!active) return;
           if (error instanceof ApiError && error.status === 401) {
@@ -90,6 +120,7 @@ export default function AccountScreen() {
             if (!active) return;
             setSession(guest);
             setAccount(null);
+            applyProfile(null);
             setMessage('Your account session expired. Sign in again.');
           } else {
             setMessage(error instanceof Error ? error.message : 'Could not restore your account session.');
@@ -106,14 +137,18 @@ export default function AccountScreen() {
 
   const finish = async (next: MobileSession, result: MobileAuthResponse) => {
     setSession(next);
-    const state = await loadMobileAccount(next);
+    const [state, nextProfile] = await Promise.all([
+      loadMobileAccount(next),
+      loadMobileCareer(next),
+    ]);
     setAccount(state);
+    applyProfile(nextProfile);
     setPassword('');
     setMessage(
       result.linked.validatedDailyScore
         ? 'Signed in. Today\'s guest Daily was validated for this account.'
         : result.linked.rankingIdentity?.eligible === false
-          ? 'Signed in. Choose a unique player name on Pack One before using ranked public identity.'
+          ? 'Signed in. Choose a unique leaderboard name below before using ranked public identity.'
           : 'Signed in to your Pack One account.',
     );
     if (result.linked.validatedDailyScore) {
@@ -246,9 +281,98 @@ export default function AccountScreen() {
       const fresh = await ensureGuestSession();
       setSession(fresh);
       setAccount(null);
+      applyProfile(null);
       setMessage('Signed out.');
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Could not sign out.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!session?.accountToken || busy || !profile) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const updated = await updateMobileProfile(session, {
+        displayName: profileName.trim(),
+        profilePublic,
+        favoriteSetId: favoriteSetId || null,
+        showcaseAchievement: showcaseAchievement || null,
+      });
+      applyProfile(updated);
+      setMessage(updated.player.username_owned === false
+        ? 'Profile saved. Choose a different unique leaderboard name to become rank-eligible.'
+        : 'Profile settings saved.');
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Could not save profile settings.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const forgotPassword = async () => {
+    if (!session || busy) return;
+    if (!email.trim()) {
+      setMessage('Enter your account email first.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await requestMobilePasswordReset(session, email.trim());
+      setMessage(result.message);
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Password recovery is temporarily unavailable.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    if (!session || busy) return;
+    if (!email.trim()) {
+      setMessage('Enter your account email first.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await requestMobileVerificationEmail(session, email.trim());
+      setMessage(result.message);
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Email verification is temporarily unavailable.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (!session?.accountToken || busy || !account?.credentials.password) return;
+    if (newPassword !== confirmPassword) {
+      setMessage('New passwords do not match.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setMessage('New password must be at least 8 characters.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      await changeMobilePassword(session, currentPassword, newPassword);
+      const guest = await forgetAccountLocally(session);
+      setSession(guest);
+      setAccount(null);
+      applyProfile(null);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPassword('');
+      setMessage('Password changed. Pack One signed out every account session; sign in again with your new password.');
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Could not change your password.');
     } finally {
       setBusy(false);
     }
@@ -298,6 +422,7 @@ export default function AccountScreen() {
       const fresh = await ensureGuestSession();
       setSession(fresh);
       setAccount(null);
+      applyProfile(null);
       setDeletePassword('');
       setDeleteCode('');
       setDeleteCodeSent(false);
