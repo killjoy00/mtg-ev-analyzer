@@ -39,7 +39,6 @@ jobs:
       PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
       PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
       PACK1_ACCOUNT_DELETE_RESEND_API_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
-      PACK1_LAUNCH_ALERT_EMAIL: ${{ secrets.PACK1_LAUNCH_ALERT_EMAIL }}
       PATREON_CLIENT_ID: ${{ secrets.PATREON_CLIENT_ID }}
       PATREON_CLIENT_SECRET: ${{ secrets.PATREON_CLIENT_SECRET }}
       PATREON_WEBHOOK_SECRET: ${{ secrets.PATREON_WEBHOOK_SECRET }}
@@ -64,8 +63,6 @@ jobs:
           test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16
           deletion_email_key_valid=0
           [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] && deletion_email_key_valid=1
-          launch_alert_email_valid=0
-          [[ "$PACK1_LAUNCH_ALERT_EMAIL" == *@* ]] && launch_alert_email_valid=1
           case "$TARGET" in
             development)
               branch=br-twilight-hill-ayffyd2b
@@ -94,10 +91,6 @@ jobs:
             if [[ "$deletion_email_key_valid" == 1 ]]; then
               deletion_email_expected=1
             fi
-            if [[ "$launch_alert_email_valid" != 1 ]]; then
-              echo '::error::PACK1_LAUNCH_ALERT_EMAIL must be configured for production pack1growth redeploys.'
-              exit 1
-            fi
           fi
           echo "TARGET_BRANCH=$branch" >> "$GITHUB_ENV"
           echo "RELEASE_COMMIT=$commit" >> "$GITHUB_ENV"
@@ -124,9 +117,6 @@ jobs:
           )
           if [[ "$DELETION_EMAIL_EXPECTED" == 1 ]]; then
             extra+=(--env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY")
-          fi
-          if [[ "$TARGET_BRANCH" == br-orange-feather-ayps8kep ]]; then
-            extra+=(--env "PACK1_LAUNCH_ALERT_EMAIL=$PACK1_LAUNCH_ALERT_EMAIL")
           fi
           if [[ -n "$PATREON_CLIENT_ID" && -n "$PATREON_CLIENT_SECRET" && -n "$PATREON_WEBHOOK_SECRET" ]]; then
             extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
