@@ -1,0 +1,28 @@
+name: Capacity development source checkpoint
+on:
+  push:
+    branches: ['chatgpt/distributed-capacity-629']
+    paths: ['.github/workflows/capacity-development.yml']
+permissions:
+  contents: read
+jobs:
+  checkpoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Retain exact public tracked source (no credentials or runtime files)
+        run: |
+          mkdir -p /tmp/capacity-source
+          git archive --format=tar HEAD | gzip > /tmp/capacity-source/source.tar.gz
+          git rev-parse HEAD > /tmp/capacity-source/source-sha.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: capacity-development-source
+          path: /tmp/capacity-source
+          retention-days: 1
+      - name: Baseline JavaScript regressions
+        run: npm run test:js
