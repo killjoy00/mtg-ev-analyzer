@@ -8,12 +8,13 @@ on:
       - 'scripts/contextual_value/**'
       - 'scripts/contextual_value_phase1.py'
       - 'research/CONTEXTUAL-VALUE-V1-PROTOCOL.md'
+      - 'research/CONTEXTUAL-VALUE-V1-CORE-POOL.md'
   workflow_dispatch:
     inputs:
       max_drafts:
-        description: 'Deterministic pooled draft cap across TMT/HOB/MSH'
+        description: 'Deterministic pooled draft cap across MSH/SOS/ECL/TLA'
         required: true
-        default: '6000'
+        default: '8000'
         type: string
 
 permissions:
@@ -24,7 +25,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 360
     env:
-      MAX_DRAFTS: ${{ inputs.max_drafts || '6000' }}
+      MAX_DRAFTS: ${{ inputs.max_drafts || '8000' }}
       BASE: https://17lands-public.s3.amazonaws.com/analysis_data
     steps:
       - uses: actions/checkout@v4
@@ -34,11 +35,11 @@ jobs:
       - name: Validate research inputs
         run: |
           [[ "$MAX_DRAFTS" =~ ^[0-9]+$ ]] || { echo 'Invalid MAX_DRAFTS'; exit 1; }
-          test "$MAX_DRAFTS" -ge 1500 || { echo 'MAX_DRAFTS must be at least 1500'; exit 1; }
-      - name: Download pooled 17Lands Premier archives
+          test "$MAX_DRAFTS" -ge 2000 || { echo 'MAX_DRAFTS must be at least 2000'; exit 1; }
+      - name: Download core 17Lands Premier archives
         run: |
           mkdir -p raw-data
-          for EXPANSION in TMT HOB MSH; do
+          for EXPANSION in MSH SOS ECL TLA; do
             curl --fail --location --retry 5 --retry-delay 3 \
               --output "raw-data/draft-$EXPANSION.csv.gz" \
               "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
@@ -46,30 +47,33 @@ jobs:
               --output "raw-data/game-$EXPANSION.csv.gz" \
               "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
           done
-      - name: Run pooled contextual-value-v1 development validation
+      - name: Run pooled contextual-value-v1 core development validation
         run: |
-          mkdir -p results/contextual-value-v1/pooled-tmt-hob-msh
+          mkdir -p results/contextual-value-v1/pooled-msh-sos-ecl-tla
           python3 scripts/contextual_value_phase1.py \
-            --draft-archive raw-data/draft-TMT.csv.gz \
-            --game-archive raw-data/game-TMT.csv.gz \
-            --draft-archive raw-data/draft-HOB.csv.gz \
-            --game-archive raw-data/game-HOB.csv.gz \
             --draft-archive raw-data/draft-MSH.csv.gz \
             --game-archive raw-data/game-MSH.csv.gz \
+            --draft-archive raw-data/draft-SOS.csv.gz \
+            --game-archive raw-data/game-SOS.csv.gz \
+            --draft-archive raw-data/draft-ECL.csv.gz \
+            --game-archive raw-data/game-ECL.csv.gz \
+            --draft-archive raw-data/draft-TLA.csv.gz \
+            --game-archive raw-data/game-TLA.csv.gz \
             --max-drafts "$MAX_DRAFTS" \
-            --out results/contextual-value-v1/pooled-tmt-hob-msh
+            --out results/contextual-value-v1/pooled-msh-sos-ecl-tla
       - name: Assert assessment stayed sealed and summarize selection
         run: |
           python3 - <<'PY'
           import json
           from pathlib import Path
-          p = Path("results/contextual-value-v1/pooled-tmt-hob-msh/development-report.json")
+          p = Path("results/contextual-value-v1/pooled-msh-sos-ecl-tla/development-report.json")
           report = json.loads(p.read_text())
           if report.get("assessment_opened") is not False:
               raise SystemExit("assessment partition was opened")
           if report.get("scope") != "development_only":
               raise SystemExit("unexpected report scope")
           print(json.dumps({
+              "core_pool": ["MSH", "SOS", "ECL", "TLA"],
               "drafts": report["drafts"],
               "selected_temperature": report["models"]["G_contextual_value"]["selected_validation_temperature"],
               "selected_simple_blend": report["models"]["E_simple_behavior_outcome_blend"]["selected_validation_config"],
@@ -82,6 +86,6 @@ jobs:
       - name: Upload pooled development artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: contextual-value-v1-pooled-tmt-hob-msh-${{ env.MAX_DRAFTS }}
-          path: results/contextual-value-v1/pooled-tmt-hob-msh/
+          name: contextual-value-v1-pooled-msh-sos-ecl-tla-${{ env.MAX_DRAFTS }}
+          path: results/contextual-value-v1/pooled-msh-sos-ecl-tla/
           retention-days: 30
