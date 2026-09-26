@@ -30,7 +30,7 @@ from contextual_value.nuisance import (
     predict_fold,
 )
 from contextual_value.outcome import RidgeOutcomeModel
-from contextual_value.propensity import softmax, support_threshold, validate_distribution
+from contextual_value.propensity import LinearSoftmaxPropensityModel, softmax, support_threshold, validate_distribution
 from contextual_value.schema import inspect_archive, validate_header
 from contextual_value.uncertainty import cluster_bootstrap
 from contextual_value_experiment import protocol
@@ -218,6 +218,38 @@ class PropensityTests(unittest.TestCase):
     def test_support_gate_matches_protocol_formula(self):
         self.assertEqual(support_threshold(2), 0.05)
         self.assertEqual(support_threshold(20), 0.01)
+
+    def test_action_invariant_skill_terms_cancel_from_conditional_logit(self):
+        model = LinearSoftmaxPropensityModel(
+            feature_names=("candidate_signal", "user_game_win_rate", "rank=Gold"),
+            coefficients=(1.0, 7.0, -3.0),
+            l2=1.0,
+        )
+        low_skill = {
+            "A": {"candidate_signal": 0.8, "user_game_win_rate": 0.52, "rank=Gold": 1.0},
+            "B": {"candidate_signal": 0.2, "user_game_win_rate": 0.52, "rank=Gold": 1.0},
+        }
+        high_skill = {
+            "A": {"candidate_signal": 0.8, "user_game_win_rate": 0.68, "rank=Gold": 1.0},
+            "B": {"candidate_signal": 0.2, "user_game_win_rate": 0.68, "rank=Gold": 1.0},
+        }
+        self.assertEqual(model.probabilities(low_skill), model.probabilities(high_skill))
+
+    def test_candidate_specific_skill_interaction_can_change_choice_probabilities(self):
+        model = LinearSoftmaxPropensityModel(
+            feature_names=("skill_x_candidate_signal",),
+            coefficients=(2.0,),
+            l2=1.0,
+        )
+        low_skill = {
+            "A": {"skill_x_candidate_signal": 0.52 * 0.8},
+            "B": {"skill_x_candidate_signal": 0.52 * 0.2},
+        }
+        high_skill = {
+            "A": {"skill_x_candidate_signal": 0.68 * 0.8},
+            "B": {"skill_x_candidate_signal": 0.68 * 0.2},
+        }
+        self.assertNotEqual(model.probabilities(low_skill), model.probabilities(high_skill))
 
 
 class DoublyRobustTests(unittest.TestCase):
