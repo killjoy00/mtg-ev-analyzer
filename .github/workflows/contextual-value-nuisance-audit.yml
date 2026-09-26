@@ -1,0 +1,84 @@
+name: contextual-value-v1-nuisance-audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'scripts/contextual_value_nuisance_audit.py'
+      - 'tests/test_contextual_value_nuisance_audit.py'
+      - '.github/workflows/contextual-value-nuisance-audit.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: contextual-nuisance-audit-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: false
+
+env:
+  OPENBLAS_NUM_THREADS: '1'
+  OMP_NUM_THREADS: '1'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  solver-audit:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Require unchanged baseline research semantics for checkpoint reuse
+        run: |
+          git diff --exit-code aa5b17d96b43f3ce08f52fad55ba17f327472c1b -- \
+            scripts/contextual_value/ scripts/build_replays.py scripts/card_outcomes.py scripts/deck_fit.py
+      - name: Install isolated numerical-audit dependencies
+        run: python -m pip install 'numpy==2.3.5' 'scipy==1.17.0'
+      - name: Mandatory numerical equivalence and isolation tests
+        run: |
+          python - <<'PY'
+          import unittest
+          import numpy, scipy
+          suite = unittest.defaultTestLoader.discover('tests', pattern='test_contextual_value_nuisance_audit.py')
+          result = unittest.TextTestRunner(verbosity=2).run(suite)
+          if not result.wasSuccessful() or result.skipped:
+              raise SystemExit('Numerical audit tests must pass without skips')
+          PY
+      - name: Download only pinned reusable development ZIPs
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir -p audit-inputs
+          PYTHONPATH=scripts python - <<'PY'
+          import subprocess
+          from pathlib import Path
+          from contextual_value_nuisance_audit import BUNDLES, check_zip
+          for name, (artifact, sha) in BUNDLES.items():
+              destination = Path('audit-inputs') / (name + '.zip')
+              with destination.open('wb') as handle:
+                  subprocess.run(['gh', 'api', f'repos/killjoy00/mtg-ev-analyzer/actions/artifacts/{artifact}/zip'], stdout=handle, check=True)
+              check_zip(destination, sha)
+          PY
+      - name: Run one same-objective optimizer comparison
+        run: |
+          set -o pipefail
+          mkdir -p results/contextual-value-v1/nuisance-audit
+          python scripts/contextual_value_nuisance_audit.py \
+            --inputs audit-inputs --out results/contextual-value-v1/nuisance-audit \
+            2>&1 | tee results/contextual-value-v1/nuisance-audit/execution.log
+      - name: Retain audit and telemetry, including on failure
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-nuisance-audit-${{ github.run_id }}-${{ github.run_attempt }}
+          path: results/contextual-value-v1/nuisance-audit/
+          retention-days: 30
+          if-no-files-found: warn
