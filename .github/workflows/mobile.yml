@@ -35,6 +35,6 @@ jobs:
         with:
           node-version: 24
       - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Lint, typecheck and validate Expo config
         run: npm test
