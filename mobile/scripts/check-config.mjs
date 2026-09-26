@@ -36,6 +36,18 @@ assert.equal(production.version, storeRelease.appStoreVersion);
 assert.equal(production.ios.bundleIdentifier, 'pro.packone.app');
 assert.equal(production.android.package, 'pro.packone.app');
 assert.equal(production.icon, './assets/images/icon.png');
+assert.equal(production.userInterfaceStyle, 'light');
+assert.equal(production.android?.edgeToEdgeEnabled, undefined);
+assert.deepEqual(production.android?.adaptiveIcon, {
+  foregroundImage: './assets/images/adaptive-foreground.png',
+  monochromeImage: './assets/images/adaptive-monochrome.png',
+  backgroundColor: '#1e4d7a',
+});
+assert.deepEqual([...(production.android?.blockedPermissions || [])].sort(), [
+  'android.permission.READ_EXTERNAL_STORAGE',
+  'android.permission.SYSTEM_ALERT_WINDOW',
+  'android.permission.WRITE_EXTERNAL_STORAGE',
+]);
 assert.equal(production.extra.buildProfile, 'production');
 assert.equal(production.extra?.eas?.projectId, undefined);
 
