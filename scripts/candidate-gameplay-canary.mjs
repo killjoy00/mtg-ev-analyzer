@@ -2,8 +2,12 @@ import assert from 'node:assert/strict';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 import {DRAFT_RUN_CORPUS_VERSION,gradeDraftRunPick,runPickWindows,validateDraftRunPuzzle} from '../draft-run.mjs';
 import {SERVING_QUALITY_SQL} from '../serving-quality.mjs';
+import {toPgArray} from '../worker/draft-run-selection.mjs';
 
 const query=corpusDatabase(process.argv[2]);
+const expectedSets=[...new Set(process.argv.slice(3).map(value=>String(value||'').trim()).filter(Boolean))];
+if(!expectedSets.length)throw Error('Expected Candidate set IDs are required.');
+if(expectedSets.some(setId=>!/^[a-z0-9-]{2,40}$/.test(setId)))throw Error('Invalid expected Candidate set ID.');
 const snapshots=(await query(`SELECT s.source_snapshot_id,s.set_id
  FROM corpus_source_snapshots s
  JOIN LATERAL (
@@ -12,9 +16,14 @@ const snapshots=(await query(`SELECT s.source_snapshot_id,s.set_id
    ORDER BY checked_at DESC,id DESC LIMIT 1
  ) h ON true
  WHERE s.corpus_version=$1 AND s.lifecycle_status='Candidate'
+   AND s.set_id=ANY($2::text[])
    AND h.ready AND h.manifest_hash=md5(s.manifest::text)
    AND h.checked_at>now()-interval '7 days'
- ORDER BY s.set_id,s.created_at DESC`,[DRAFT_RUN_CORPUS_VERSION])).rows;
+ ORDER BY s.set_id,s.created_at DESC`,[DRAFT_RUN_CORPUS_VERSION,toPgArray(expectedSets)])).rows;
+
+const foundSets=new Set(snapshots.map(snapshot=>snapshot.set_id));
+const missingSets=expectedSets.filter(setId=>!foundSets.has(setId));
+assert.deepEqual(missingSets,[],`Expected fresh Candidate snapshot(s) missing: ${missingSets.join(',')}`);
 
 for(const snapshot of snapshots) {
   const windows=runPickWindows(snapshot.set_id==='powered-cube'?'powered-cube':'mixed');
@@ -42,4 +51,3 @@ for(const snapshot of snapshots) {
   }
   console.log(JSON.stringify({set:snapshot.set_id,source_snapshot_id:snapshot.source_snapshot_id,picks,canary:'pass'}));
 }
-if(!snapshots.length)console.log(JSON.stringify({canary:'no_candidate_snapshots'}));
