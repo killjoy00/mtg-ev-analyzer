@@ -73,3 +73,65 @@ test('v1 contains a cold-start and resume forced-update gate with fail-open outa
   assert.match(gateway, /'\/v1\/mobile\/version'/);
   assert.match(releaseWorkflow, /migrations\/0040_mobile_minimum_version\.sql/g);
 });
+
+
+test('v1 implements Sign in with Apple across native iOS, Android/web handoff, and secure release', () => {
+  const app = JSON.parse(read('mobile/app.json'));
+  const pkg = JSON.parse(read('mobile/package.json'));
+  const account = read('mobile/app/account.tsx');
+  const api = read('mobile/src/api/account.ts');
+  const worker = read('worker/growth-function.js');
+  const apple = read('worker/apple-auth.mjs');
+  const gateway = read('edge/gateway.mjs');
+  const releaseWorkflow = read('.github/workflows/secure-auth-release.yml');
+  const integrity = read('docs/REQUEST-INTEGRITY.md');
+
+  assert.equal(app.expo.ios.usesAppleSignIn, true);
+  assert.ok(app.expo.plugins.includes('expo-apple-authentication'));
+  assert.equal(pkg.dependencies['expo-apple-authentication'], '~57.0.2');
+  assert.match(account, /AppleAuthentication\.AppleAuthenticationButton/);
+  assert.match(account, /nonce: start\.flowToken/);
+  assert.match(account, /finishNativeAppleSignIn/);
+  assert.match(account, /finishAppleSignIn/);
+  assert.match(account, /credential\.fullName\?\.givenName/);
+  assert.match(account, /credential\.fullName\?\.familyName/);
+  assert.match(read('migrations/0041_apple_auth.sql'), /first_name text[\s\S]*last_name text/);
+  assert.match(api, /\/growth\/v1\/mobile\/account\/apple\/native/);
+  assert.match(worker, /\/v1\/account\/apple\/callback/);
+  assert.match(worker, /revokeAppleAuthorization/);
+  assert.match(apple, /https:\/\/appleid\.apple\.com\/auth\/revoke/);
+  assert.match(apple, /pro\.packone\.app/);
+  assert.match(apple, /pro\.packone\.web/);
+  assert.match(gateway, /'\/v1\/mobile\/account\/apple\/native'/);
+  assert.match(releaseWorkflow, /migrations\/0041_apple_auth\.sql/g);
+  assert.match(releaseWorkflow, /APPLE_SIGN_IN_KEY_P8/);
+  assert.doesNotMatch(integrity, /Sign in with Apple is not currently exposed/);
+});
+
+
+test('Apple launch hardening blocks pre-hijack, separates token keys, and uses Apple deletion re-auth', () => {
+  const apple = read('worker/apple-auth.mjs');
+  const worker = read('worker/growth-function.js');
+  const workflow = read('.github/workflows/secure-auth-release.yml');
+  const mobile = read('mobile/app/account.tsx');
+  const api = read('mobile/src/api/account.ts');
+  const docs = read('docs/mobile-release-config.md');
+
+  assert.match(apple, /APPLE_EXISTING_ACCOUNT_UNVERIFIED/);
+  assert.doesNotMatch(apple, /markAppleAuthEmailVerified\(\{authBase,userId:authUserId/);
+  assert.match(apple, /APPLE_TOKEN_ENCRYPTION_KEY_V1/);
+  assert.match(apple, /TOKEN_CIPHER_PREFIX='apple-token'[\s\S]*TOKEN_KEY_VERSION='v1'/);
+  assert.match(workflow, /APPLE_TOKEN_ENCRYPTION_KEY_V1/);
+  assert.match(worker, /purpose='delete'/);
+  assert.match(worker, /\/v1\/mobile\/account\/delete\/apple\/start/);
+  assert.match(worker, /\/v1\/mobile\/account\/delete\/apple\/finish/);
+  assert.match(worker, /flow_kind='mobile'[\s\S]*purpose='signin'/);
+  assert.match(api, /startAppleDeletionVerification/);
+  assert.match(api, /finishAppleDeletion/);
+  assert.match(mobile, /Verify with Apple and delete account/);
+  assert.match(mobile, /appleDeleteHandoff/);
+  assert.match(docs, /Private Email Relay/);
+  assert.match(docs, /at least as prominent as the Google control/);
+  assert.match(mobile, /appleButton: \{ width: '100%', height: 52 \}/);
+  assert.match(mobile, /googleButton: \{ minHeight: 52/);
+});

@@ -73,6 +73,7 @@ assert.equal(growth.account_deletion_enabled,true,'account deletion kill switch 
 assert.equal(growth.verification_sweep_enabled,true,'verification sweep kill switch must be enabled');
 if(expectedDeletionEmail!==null)
   assert.equal(growth.deletion_email_configured,expectedDeletionEmail,'deletion email configuration');
+assert.equal(growth.apple_sign_in_configured,true,'Sign in with Apple runtime secrets');
 
 // Non-destructive route proof: the endpoint must be mounted, accept only the
 // trusted first-party origin, and reject a request without the secure account

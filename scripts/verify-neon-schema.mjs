@@ -36,6 +36,9 @@ const result=await query(`SELECT
   to_regclass('account_deletion_verifications') IS NOT NULL account_deletion_verifications,
   to_regclass('mobile_oauth_handoffs') IS NOT NULL mobile_oauth_handoffs,
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='mobile_oauth_handoffs_expiry_idx') mobile_oauth_handoffs_expiry_index,
+  to_regclass('apple_auth_identities') IS NOT NULL apple_auth_identities,
+  to_regclass('apple_auth_tokens') IS NOT NULL apple_auth_tokens,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='mobile_oauth_handoffs' AND column_name='flow_kind') mobile_oauth_flow_kind,
   (SELECT count(*)=2 FROM information_schema.columns
     WHERE table_schema='public' AND table_name='draft_run_sessions'
       AND column_name IN ('start_idempotency_hash','start_request_hash')) practice_idempotency_columns,
