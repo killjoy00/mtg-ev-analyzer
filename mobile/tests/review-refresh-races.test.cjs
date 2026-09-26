@@ -458,3 +458,64 @@ test('successful authentication returns to Practice even when optional profile/c
 
   await act(async () => root.unmount());
 });
+
+
+test('Learn keeps core education native and opens canonical guides, support, and policy pages', async () => {
+  const pushed = [];
+  const opened = [];
+  const mocks = {
+    'expo-router': { router: { push(value) { pushed.push(value); } } },
+    'expo-web-browser': { openBrowserAsync: async (url) => { opened.push(url); } },
+    'react-native': {
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/contentLinks': {
+      canonicalContentUrl: (key) => ({
+        learn: 'https://packone.pro/learn/', about: 'https://packone.pro/about/', contact: 'https://packone.pro/contact/',
+        privacy: 'https://packone.pro/privacy/', terms: 'https://packone.pro/terms/',
+      })[key],
+    },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/learn.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  const press = async (label) => {
+    const node = root.root.findAll((item) => item.type === 'Pressable' && item.props.accessibilityLabel === label)[0];
+    assert.ok(node, label); await act(async () => { node.props.onPress(); await Promise.resolve(); });
+  };
+  await press('Open How to Play');
+  assert.deepEqual(pushed, ['/how-to']);
+  await press('Open Drafting guides on packone.pro');
+  await press('Open Support & contact on packone.pro');
+  await press('Open Privacy on packone.pro');
+  await press('Open Terms on packone.pro');
+  assert.deepEqual(opened, [
+    'https://packone.pro/learn/', 'https://packone.pro/contact/', 'https://packone.pro/privacy/', 'https://packone.pro/terms/',
+  ]);
+  assert.match(renderedText(root.toJSON()), /Editorial guides and policy pages open their canonical Pack One web versions/);
+  await act(async () => root.unmount());
+});
+
+test('Learn exposes a visible retry message when the canonical browser handoff fails', async () => {
+  const mocks = {
+    'expo-router': { router: { push() {} } },
+    'expo-web-browser': { openBrowserAsync: async () => { throw new Error('browser unavailable'); } },
+    'react-native': {
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/contentLinks': { canonicalContentUrl: () => 'https://packone.pro/contact/' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/learn.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  const contact = root.root.findAll((item) => item.type === 'Pressable' && item.props.accessibilityLabel === 'Open Support & contact on packone.pro')[0];
+  await act(async () => { contact.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
+  assert.match(renderedText(root.toJSON()), /Could not open Support & contact\. Try again when your browser is available\./);
+  await act(async () => root.unmount());
+});
