@@ -23,7 +23,7 @@ const authorize = () => 'https://www.patreon.com/oauth2/authorize?' + new URLSea
   client_id: 'fixture', scope: 'identity', state: 'm_' + 'a'.repeat(64),
   redirect_uri: 'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/patreon/callback' });
 const deferred = () => { let resolve; let reject; const promise = new Promise((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
-const host = (name) => (props) => React.createElement(name, props, props.children);
+const host = (name) => function Host(props) { return React.createElement(name, props, props.children); };
 function text(node) { if (node == null) return ''; if (typeof node === 'string' || typeof node === 'number') return String(node); if (Array.isArray(node)) return node.map(text).join(' '); return text(node.children || []); }
 const drain = () => new Promise((resolve) => setImmediate(resolve));
 
