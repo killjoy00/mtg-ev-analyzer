@@ -582,7 +582,7 @@ class ArchiveSignalShardEquivalenceTests(unittest.TestCase):
                         selected = "A" if (index + pick_number) % 2 == 0 else "B"
                         row = _draft_row(draft_id, selected, (index + 2) % 8, pick_number)
                         row["expansion"] = expansion
-                        row["pack_card_C"] = "1" if index == 0 and pick_number == 0 else "0"
+                        row["pack_card_C"] = "1" if pick_number == 0 else "0"
                         row["pool_C"] = "0"
                         writer.writerow(row)
             with gzip.open(game_path, "wt", newline="", encoding="utf-8") as handle:
@@ -646,11 +646,9 @@ class ArchiveSignalShardEquivalenceTests(unittest.TestCase):
             self.assertAlmostEqual(left.sample_weight, right.sample_weight, places=15)
             self.assertEqual(left.outcome, right.outcome)
 
-        rare = next(
-            row for row in mono
-            if "C" in row.features and row.features["C"].get("gih_wr") is None
-        )
+        rare = next(row for row in mono if "C" in row.features)
         self.assertIn("C", rare.features)
+        self.assertNotIn("gih_wr", rare.features["C"])
 
         monolithic_fit = fit_fold_from_training_rows(
             monolithic_rows, training_ids, propensity_l2=0.5, outcome_l2=1.0, fold=fold
