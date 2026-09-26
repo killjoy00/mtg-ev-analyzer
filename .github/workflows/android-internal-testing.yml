@@ -6,6 +6,10 @@ on:
     paths:
       - 'mobile/**'
       - '.github/workflows/android-internal-testing.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/android-release-request.json'
   workflow_dispatch:
 
 permissions:
@@ -34,7 +38,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       # PR smoke builds are never uploaded. The publishing job below allocates
       # against Google Play so workflow renames/retries cannot reuse a versionCode.
       - name: Set smoke version code
@@ -63,6 +67,15 @@ jobs:
             exit 1
           fi
           echo "Verified Android versionName: $expected_version_name"
+      - name: Verify minimal Android release permissions
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          ./gradlew :app:processReleaseMainManifest --no-daemon
+          manifest="$(find app/build/intermediates/merged_manifests -type f -path '*release*' -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          node ../scripts/verify-android-release-manifest.mjs "$manifest"
       - name: Apply upload-signing configuration
         env:
           PACKONE_ANDROID_UPLOAD_KEYSTORE: /tmp/packone-upload.p12
@@ -77,8 +90,8 @@ jobs:
           grep -q 'signingConfig signingConfigs.packoneUpload' android/app/build.gradle
 
   internal-release:
-    name: sign and publish Android internal test
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    name: sign and publish Android test build
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
     runs-on: ubuntu-latest
     environment: pack-one-mobile-release
     defaults:
@@ -86,6 +99,51 @@ jobs:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+      - id: release-request
+        name: Resolve reviewed Android release request
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            {
+              echo "PACKONE_PLAY_TARGET=internal"
+              echo "PACKONE_PLAY_TRACK=internal"
+            } >> "$GITHUB_ENV"
+            exit 0
+          fi
+          python3 - <<'PY'
+          import json,re,os
+          from pathlib import Path
+
+          request=json.loads(Path('../.github/android-release-request.json').read_text())
+          operation=request.get('operation')
+          target=request.get('target')
+          reason=request.get('reason')
+          if operation != 'publish-android-test':
+              raise SystemExit('Invalid Android release operation.')
+          if target not in {'internal','closed'}:
+              raise SystemExit('Android release target must be internal or closed.')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Android release request requires a reason.')
+
+          if target == 'internal':
+              if set(request) != {'operation','target','reason'}:
+                  raise SystemExit('Internal Android request has unexpected keys.')
+              track='internal'
+          else:
+              if set(request) != {'operation','target','track','reason'}:
+                  raise SystemExit('Closed Android request has unexpected keys.')
+              track=request.get('track')
+              if not isinstance(track,str) or not re.fullmatch(r'[A-Za-z0-9._-]{1,100}',track):
+                  raise SystemExit('Closed Android track is malformed.')
+              if track in {'internal','production','beta','qa'}:
+                  raise SystemExit('Closed Android request must name an explicit closed-testing track.')
+
+          with open(os.environ['GITHUB_ENV'],'a',encoding='utf-8') as env:
+              env.write(f'PACKONE_PLAY_TARGET={target}\n')
+              env.write(f'PACKONE_PLAY_TRACK={track}\n')
+          print(f'Reviewed Android release request: target={target} track={track} reason={reason}')
+          PY
       - name: Require current approved main revision
         shell: bash
         run: |
@@ -169,7 +227,7 @@ jobs:
           echo "PACKONE_ANDROID_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
           echo "Using Google Play-safe Android version code: $version_code"
       - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Validate production mobile config
         run: npm test
       - name: Generate production Android project
@@ -199,6 +257,14 @@ jobs:
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon
 
+      - name: Verify minimal Android release permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find android/app/build/intermediates/merged_manifests -type f -path '*release*' -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          node ./scripts/verify-android-release-manifest.mjs "$manifest"
+
       - name: Verify bundle signer is the Pack One upload key
         working-directory: mobile/android
         shell: bash
@@ -220,7 +286,7 @@ jobs:
             exit 1
           }
 
-      - name: Publish to Google Play Internal Testing
+      - name: Publish to reviewed Google Play testing track
         env:
           PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
           PACKONE_ANDROID_PACKAGE: pro.packone.app
@@ -232,14 +298,17 @@ jobs:
           result="$(node ../scripts/play-internal-release.mjs "$bundle")"
           echo "$result"
           version_code="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.versionCode))' "$result")"
+          track="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.track))' "$result")"
+          target="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.target))' "$result")"
           {
-            echo "## Pack One Android Internal Testing draft"
+            echo "## Pack One Android testing draft"
             echo
             echo '- Package: `pro.packone.app`'
-            echo '- Track: `internal`'
+            printf -- '- Target: `%s`\n' "$target"
+            printf -- '- Track: `%s`\n' "$track"
             printf -- '- Version code: `%s`\n' "$version_code"
             echo '- Release status: `draft`'
             printf -- '- Upload certificate SHA-256: `%s`\n' "$PACKONE_ANDROID_UPLOAD_CERT_SHA256"
             echo "- Signed with the dedicated Pack One upload key from Google Secret Manager."
-            echo "- First rollout must be completed in Google Play Console after required setup declarations are satisfied."
+            echo "- Production is not an allowed target for this workflow."
           } >> "$GITHUB_STEP_SUMMARY"
