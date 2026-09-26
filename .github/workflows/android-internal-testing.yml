@@ -32,13 +32,17 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
       - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
       # PR smoke builds are never uploaded. The publishing job below allocates
       # against Google Play so workflow renames/retries cannot reuse a versionCode.
       - name: Set smoke version code
@@ -123,7 +127,9 @@ jobs:
           echo "Verified current main revision: $head_sha"
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -191,7 +197,9 @@ jobs:
           echo "PACKONE_ANDROID_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
           echo "Using Google Play-safe Android version code: $version_code"
       - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
       - name: Validate production mobile config
         run: npm test
       - name: Generate production Android project
