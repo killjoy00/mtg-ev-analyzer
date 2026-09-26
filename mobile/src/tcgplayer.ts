@@ -1,5 +1,6 @@
 const SEARCH_BASE = 'https://www.tcgplayer.com/search/magic/product';
 const IMPACT_DEEP_LINK = 'https://partner.tcgplayer.com/c/7742974/1780961/21018?u={url}';
+const MAGIC_HOME = 'https://www.tcgplayer.com/categories/trading-and-collectible-card-games/magic-the-gathering';
 
 export function tcgplayerDestination(cardName: string) {
   const name = String(cardName || '').trim();
@@ -8,4 +9,8 @@ export function tcgplayerDestination(cardName: string) {
 
 export function tcgplayerUrl(cardName: string) {
   return IMPACT_DEEP_LINK.replace('{url}', encodeURIComponent(tcgplayerDestination(cardName)));
+}
+
+export function tcgplayerMagicUrl() {
+  return IMPACT_DEEP_LINK.replace('{url}', encodeURIComponent(MAGIC_HOME));
 }
