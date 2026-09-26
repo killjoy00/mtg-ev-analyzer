@@ -2,6 +2,7 @@ import {createHash} from 'node:crypto';
 
 export const LAUNCH_WATCHER_ALERT_STATE_KEY='launch_watcher_operator_alert_v1';
 export const LAUNCH_WATCHER_ALERT_SENDER='Pack One <accounts@packone.pro>';
+export const LAUNCH_WATCHER_ALERT_DESTINATION='admin@packone.pro';
 const RESEND_URL='https://api.resend.com/emails';
 const STATUS=new Set(['fresh','stale_pending','stale','recovery_pending']);
 
@@ -61,10 +62,8 @@ async function saveState(query,state) {
 
 function alertConfig(env) {
   const apiKey=String(env.PACK1_ACCOUNT_DELETE_RESEND_API_KEY||'');
-  const destination=String(env.PACK1_LAUNCH_ALERT_EMAIL||'').trim();
   if(!apiKey.startsWith('re_')||apiKey.length<=3)throw Error('Launch watcher operator email key is unavailable');
-  if(!/^[^@\s]+@[^@\s]+$/.test(destination))throw Error('Launch watcher operator email destination is unavailable');
-  return {apiKey,destination};
+  return {apiKey,destination:LAUNCH_WATCHER_ALERT_DESTINATION};
 }
 
 function episodeId(clock,freshness) {
