@@ -16,6 +16,7 @@ const NATIVE_PATHS = new Set([
   '/profile',
   '/scoring',
   '/sets',
+  '/set-archive',
 ]);
 
 function environmentFromSet(value: string | null) {
@@ -38,6 +39,8 @@ function directArticlePath(pathname: string) {
   if (normalized === '/methodology') return '/method';
   if (normalized === '/scoring') return '/scoring';
   if (normalized === '/sets') return '/sets';
+  const setArchive = normalized.match(/^\/sets\/(msh|ecl|tmt|sos)$/);
+  if (setArchive) return `/set-archive?setId=${setArchive[1]}`;
   return null;
 }
 
@@ -113,6 +116,11 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
   if (pathname === '/legal') {
     const doc = searchParams.get('doc');
     return doc && ['privacy', 'terms', 'disclosure'].includes(doc) ? `?doc=${doc}` : '';
+  }
+
+  if (pathname === '/set-archive') {
+    const setId = searchParams.get('setId');
+    return setId && ['msh', 'ecl', 'tmt', 'sos'].includes(setId) ? `?setId=${setId}` : '';
   }
 
   if (pathname === '/leaderboard') {
