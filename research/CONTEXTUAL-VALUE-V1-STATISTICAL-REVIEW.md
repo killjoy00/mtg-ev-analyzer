@@ -19,6 +19,8 @@ In the current feature map this applies, absent interactions, to state-only term
 
 Those terms can still be useful to Q/value regressions. They do **not** let the current linear propensity express that players of different skill/rank respond differently to candidate-specific signals.
 
+The current shared feature map also mixes raw win-rate, log-experience, binary one-hots, and card-statistic scales under L2-regularized fits. For propensity, the action-invariant skill terms still cancel regardless of scale. For Q/value, feature scale changes the effective regularization penalty. Before freezing Q/value specification, either justify the current scales or predeclare train-complement-only standardization and evaluate it as an explicit development specification change; do not normalize using validation or assessment statistics.
+
 ## Source-timing boundary
 
 The parser enforces that rank, user-game-win-rate bucket, and experience bucket are constant across all picks of one draft, and they are exposed through `pre_treatment_state()`. That is evidence of draft-level stability in the imported archive, not proof of the upstream timestamp semantics.
