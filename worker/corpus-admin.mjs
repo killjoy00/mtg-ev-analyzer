@@ -8,7 +8,7 @@ const parse=x=>typeof x==='string'?JSON.parse(x):x;
 export async function handleCorpusAdmin(request,query,readJson,accountId,automationIdentity=null) {
  const path=new URL(request.url).pathname;
  if(request.method==='GET'&&path==='/v1/admin/corpus') {
-  const [sets,history,components,blockedSources,inventory]=await Promise.all([
+  const [sets,history,components,blockedSources,inventory,snapshots]=await Promise.all([
    query(`WITH known AS (SELECT set_id FROM draft_run_verified_sets UNION SELECT set_id FROM corpus_sources)
     SELECT k.set_id,p.status,p.regular_run,coalesce(p.set_name,s.set_name,k.set_id) set_name,
     coalesce(p.release_date,s.release_date)::text release_date,coalesce(s.event_type,p.source_event_type) source_event_type,
@@ -35,10 +35,19 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
     WHERE (${corpusMembership()}) AND p.interesting AND p.pack_number=1 AND r.difficulty_version='support-ratio-v1'
     AND p.pick_number BETWEEN CASE WHEN p.set_id='powered-cube' THEN 2 ELSE 1 END AND CASE WHEN p.set_id='powered-cube' THEN 9 ELSE 8 END
     AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)
-    GROUP BY p.set_id,p.corpus_version,p.pick_number`,[DRAFT_RUN_CORPUS_VERSION])
+    GROUP BY p.set_id,p.corpus_version,p.pick_number`,[DRAFT_RUN_CORPUS_VERSION]),
+   query(`SELECT s.source_snapshot_id,s.set_id,s.corpus_version,s.schema_version,s.lifecycle_status,s.created_at,
+     s.draft_sha256,s.game_sha256,s.draft_last_modified,s.game_last_modified,
+     h.checked_at,h.ready,h.report,(h.manifest_hash=md5(s.manifest::text) AND h.checked_at>now()-interval '7 days' AND h.gate_version=$2) health_current,
+     (p.active_snapshot_id=s.source_snapshot_id) active
+    FROM corpus_source_snapshots s
+    LEFT JOIN draft_run_environment_policy p ON p.set_id=s.set_id
+    LEFT JOIN LATERAL(SELECT * FROM corpus_health_checks q WHERE q.source_snapshot_id=s.source_snapshot_id ORDER BY checked_at DESC,id DESC LIMIT 1) h ON true
+    WHERE s.corpus_version=$1 AND s.schema_version<>'historical-frozen'
+    ORDER BY s.set_id,s.created_at DESC,s.source_snapshot_id DESC`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION])
   ]);
   const counts=(set,version=null)=>{const rows=inventory.rows.filter(r=>r.set_id===set&&(version?r.corpus_version===version:r.corpus_version===DRAFT_RUN_CORPUS_VERSION||components.rows.some(c=>c.set_id===set&&c.component_version===r.corpus_version&&c.status==='Live')));return {eligible_count:rows.reduce((n,r)=>n+Number(r.eligible),0),under_floor_count:rows.reduce((n,r)=>n+Number(r.under_floor),0),serving_by_pick:rows.reduce((by,r)=>{by[r.pick_number]=(by[r.pick_number]||0)+Number(r.eligible);return by;},{})};};
-  return {corpus_version:DRAFT_RUN_CORPUS_VERSION,serving_policy_version:SERVING_POLICY_VERSION,minimum_implied_trophy_score:MINIMUM_IMPLIED_TROPHY_SCORE,thresholds:CORPUS_THRESHOLDS,gate_version:CORPUS_GATE_VERSION,sets:sets.rows.map(r=>({...r,...counts(r.set_id),serving_count:r.status==='Live'?counts(r.set_id).eligible_count:0,manifest:parse(r.manifest),report:parse(r.report)})),components:components.rows.map(r=>({...r,...counts(r.set_id,r.component_version),manifest:parse(r.manifest),report:parse(r.report)})),blocked_sources:blockedSources.rows,history:history.rows,transitions:CORPUS_TRANSITIONS};
+  return {corpus_version:DRAFT_RUN_CORPUS_VERSION,serving_policy_version:SERVING_POLICY_VERSION,minimum_implied_trophy_score:MINIMUM_IMPLIED_TROPHY_SCORE,thresholds:CORPUS_THRESHOLDS,gate_version:CORPUS_GATE_VERSION,sets:sets.rows.map(r=>({...r,...counts(r.set_id),serving_count:r.status==='Live'?counts(r.set_id).eligible_count:0,manifest:parse(r.manifest),report:parse(r.report)})),components:components.rows.map(r=>({...r,...counts(r.set_id,r.component_version),manifest:parse(r.manifest),report:parse(r.report)})),blocked_sources:blockedSources.rows,snapshots:snapshots.rows.map(r=>({...r,report:parse(r.report)})),history:history.rows,transitions:CORPUS_TRANSITIONS};
  }
  const component=path.match(/^\/v1\/admin\/corpus\/([a-z0-9-]{2,40})\/components\/([a-z0-9-]{2,80})\/status$/);
  if(request.method==='POST'&&component) {
@@ -65,6 +74,55 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
   if(!result.rows.length)fail('Status changed, or source publication is blocked by quality gates or parent status.',409);
   return {ok:true,...result.rows[0]};
  }
+ const snapshotMatch=path.match(/^\/v1\/admin\/corpus\/([a-z0-9-]{2,40})\/snapshot$/);
+ if(request.method==='POST'&&snapshotMatch) {
+  if(!accountId&&!automationIdentity)fail('Authenticated administrative identity required.',403);
+  const b=await readJson(request);
+  if(b.corpusVersion!==DRAFT_RUN_CORPUS_VERSION)fail('The serving corpus changed. Refresh the dashboard.',409);
+  if(!/^[a-f0-9]{64}$/.test(String(b.sourceSnapshotId||'')))fail('Invalid source snapshot identity.');
+  if(b.reason!=null&&(typeof b.reason!=='string'||b.reason.length>1000))fail('Reason must be at most 1,000 characters.');
+  const result=await query(`WITH identity_allowed AS MATERIALIZED (
+   SELECT 1 WHERE $4::uuid IS NULL OR pack1_identity_attachment_allowed($4::uuid)
+  ), current AS MATERIALIZED (
+   SELECT p.set_id,p.status,p.active_snapshot_id
+   FROM draft_run_environment_policy p
+   WHERE p.set_id=$1 AND p.status='Live' AND EXISTS(SELECT 1 FROM identity_allowed)
+  ), target AS MATERIALIZED (
+   SELECT s.source_snapshot_id
+   FROM corpus_source_snapshots s
+   JOIN LATERAL (
+    SELECT * FROM corpus_health_checks h
+    WHERE h.source_snapshot_id=s.source_snapshot_id
+    ORDER BY checked_at DESC,id DESC LIMIT 1
+   ) h ON true
+   WHERE s.source_snapshot_id=$2 AND s.set_id=$1 AND s.corpus_version=$3
+    AND s.lifecycle_status='Candidate'
+    AND h.ready AND h.gate_version=$6 AND h.manifest_hash=md5(s.manifest::text)
+    AND h.checked_at>now()-interval '7 days'
+  ), changed AS (
+   UPDATE draft_run_environment_policy p
+   SET active_snapshot_id=t.source_snapshot_id,status_changed_at=now()
+   FROM current c,target t
+   WHERE p.set_id=c.set_id AND c.active_snapshot_id IS DISTINCT FROM t.source_snapshot_id
+   RETURNING p.set_id,p.status,c.active_snapshot_id previous_source_snapshot_id,p.active_snapshot_id source_snapshot_id
+  ), promoted AS (
+   UPDATE corpus_source_snapshots s SET lifecycle_status='Approved',status_changed_at=now()
+   FROM changed c WHERE s.source_snapshot_id=c.source_snapshot_id AND s.lifecycle_status='Candidate'
+   RETURNING s.source_snapshot_id
+  ), superseded AS (
+   UPDATE corpus_source_snapshots s SET lifecycle_status='Superseded',status_changed_at=now(),superseded_by=c.source_snapshot_id
+   FROM changed c WHERE s.source_snapshot_id=c.previous_source_snapshot_id AND s.lifecycle_status='Approved'
+   RETURNING s.source_snapshot_id
+  ), audit AS (
+   INSERT INTO corpus_status_events(set_id,auth_user_id,old_status,new_status,reason,admin_identity,source_snapshot_id,previous_source_snapshot_id)
+   SELECT c.set_id,$4::uuid,'Live','Live',$5,$7::jsonb,c.source_snapshot_id,c.previous_source_snapshot_id
+   FROM changed c RETURNING id
+  )
+  SELECT c.* FROM changed c CROSS JOIN promoted CROSS JOIN audit`,
+  [snapshotMatch[1],b.sourceSnapshotId,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,CORPUS_GATE_VERSION,automationIdentity?JSON.stringify(automationIdentity):null]);
+  if(!result.rows.length)fail('Snapshot changed, is not Candidate, or lacks fresh passing health evidence.',409);
+  return {ok:true,...result.rows[0]};
+ }
  const match=path.match(/^\/v1\/admin\/corpus\/([a-z0-9-]{2,40})\/status$/);
  if(request.method==='POST'&&match) {
   const b=await readJson(request),old=b.oldStatus,next=b.status;
@@ -79,14 +137,19 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
    UPDATE draft_run_environment_policy p SET status=$3,status_changed_at=now()
    WHERE p.set_id=$1 AND p.status=$2 AND EXISTS(SELECT 1 FROM identity_allowed)
      AND ($3<>'Live' OR EXISTS (
-    SELECT 1 FROM corpus_set_versions v JOIN LATERAL (
-     SELECT * FROM corpus_health_checks c WHERE c.set_id=v.set_id AND c.corpus_version=v.corpus_version ORDER BY checked_at DESC,id DESC LIMIT 1
-    ) h ON true WHERE v.set_id=p.set_id AND v.corpus_version=$4 AND h.ready AND h.gate_version=$7
-      AND h.manifest_hash=md5(v.manifest::text) AND h.checked_at>now()-interval '7 days'
+    SELECT 1 FROM corpus_source_snapshots s JOIN LATERAL (
+     SELECT * FROM corpus_health_checks c WHERE c.source_snapshot_id=s.source_snapshot_id ORDER BY checked_at DESC,id DESC LIMIT 1
+    ) h ON true WHERE s.source_snapshot_id=p.active_snapshot_id AND s.set_id=p.set_id AND s.corpus_version=$4
+      AND s.lifecycle_status IN ('Candidate','Approved') AND h.ready AND h.gate_version=$7
+      AND h.manifest_hash=md5(s.manifest::text) AND h.checked_at>now()-interval '7 days'
       AND p.source_event_type='PremierDraft' AND (p.set_id='powered-cube' OR (p.release_date IS NOT NULL AND p.set_name IS NOT NULL AND btrim(p.set_name)<>''))))
-   RETURNING p.set_id,p.status
-  ), audit AS (INSERT INTO corpus_status_events(set_id,auth_user_id,old_status,new_status,reason)
-   SELECT set_id,$5::uuid,$2,status,$6 FROM changed RETURNING id)
+   RETURNING p.set_id,p.status,p.active_snapshot_id
+  ), approved AS (
+   UPDATE corpus_source_snapshots s SET lifecycle_status='Approved',status_changed_at=now()
+   FROM changed c WHERE c.status='Live' AND s.source_snapshot_id=c.active_snapshot_id AND s.lifecycle_status='Candidate'
+   RETURNING s.source_snapshot_id
+  ), audit AS (INSERT INTO corpus_status_events(set_id,auth_user_id,old_status,new_status,reason,source_snapshot_id)
+   SELECT set_id,$5::uuid,$2,status,$6,active_snapshot_id FROM changed RETURNING id)
   SELECT changed.* FROM changed CROSS JOIN audit`,[match[1],old,next,DRAFT_RUN_CORPUS_VERSION,accountId,b.reason||null,CORPUS_GATE_VERSION]);
   if(!result.rows.length)fail('Status changed, or publication is blocked by missing/stale quality verification. Refresh the dashboard.',409);
   return {ok:true,...result.rows[0]};

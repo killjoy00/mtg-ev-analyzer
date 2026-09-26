@@ -39,7 +39,12 @@ try {
  await change('Live','Paused');
  await call('/hob/status',{oldStatus:'Live',status:'Paused',corpusVersion:DRAFT_RUN_CORPUS_VERSION},409);
  await call('/hob/status',{oldStatus:'Paused',status:'Live',corpusVersion:DRAFT_RUN_CORPUS_VERSION},409);
- check=(await query(`INSERT INTO corpus_health_checks(set_id,corpus_version,manifest_hash,gate_version,ready,report) SELECT set_id,corpus_version,md5(manifest::text),$2,true,'{"fixture":true}' FROM corpus_set_versions WHERE set_id='hob' AND corpus_version=$1 RETURNING id`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION])).rows[0].id;
+ check=(await query(`INSERT INTO corpus_health_checks(set_id,corpus_version,source_snapshot_id,manifest_hash,gate_version,ready,report)
+ SELECT p.set_id,s.corpus_version,s.source_snapshot_id,md5(s.manifest::text),$2,true,'{"fixture":true}'
+ FROM draft_run_environment_policy p
+ JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
+ WHERE p.set_id='hob' AND s.corpus_version=$1
+ RETURNING id`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION])).rows[0].id;
  await change('Paused','Live');
  const audit=(await query('SELECT old_status,new_status,reason FROM corpus_status_events WHERE auth_user_id=$1::uuid ORDER BY id',[user])).rows;
  assert.deepEqual(audit.map(x=>[x.old_status,x.new_status]),[['Live','Paused'],['Paused','Live']]);

@@ -106,6 +106,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_mobile_minimum_version.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
@@ -160,6 +161,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0039_practice_serving_cache.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_mobile_minimum_version.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
