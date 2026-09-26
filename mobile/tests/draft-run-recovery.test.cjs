@@ -157,6 +157,10 @@ async function fixture(options = {}) {
       clearPracticeIdempotencyKey: options.clearKey ?? (async () => {}),
       practiceIdempotencyKey: async () => 'practice_' + 'k'.repeat(32),
     },
+    '@/src/tcgplayer': {
+      tcgplayerUrl: (name) => 'https://partner.tcgplayer.com/c/7742974/1780961/21018?u='
+        + encodeURIComponent('https://www.tcgplayer.com/search/magic/product?q=' + encodeURIComponent(String(name).trim()) + '&view=grid'),
+    },
     '@/src/theme': {
       colors: new Proxy({}, { get: () => '#000' }),
       spacing: new Proxy({}, { get: () => 8 }),
@@ -305,4 +309,22 @@ test('failed revealed-card affiliate handoff stays in analysis and offers a retr
     assert.match(screen.text(), /Could not open TCGplayer\. You can try the affiliate link again\./);
     assert.match(screen.text(), /Why this score/);
   } finally { await screen.close(); }
+});
+
+
+test('TCGplayer helper rejects blank names and preserves the approved nested card destination', () => {
+  const filename = path.join(process.cwd(), 'src', 'tcgplayer.ts');
+  const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+    fileName: filename,
+  }).outputText;
+  const compiled = new Module(filename, module);
+  compiled.filename = filename;
+  compiled.paths = Module._nodeModulePaths(path.dirname(filename));
+  compiled._compile(output, filename);
+  assert.throws(() => compiled.exports.tcgplayerUrl('   '), /Invalid TCGplayer card name/);
+  assert.equal(
+    compiled.exports.tcgplayerUrl('Black Lotus & Co'),
+    'https://partner.tcgplayer.com/c/7742974/1780961/21018?u=https%3A%2F%2Fwww.tcgplayer.com%2Fsearch%2Fmagic%2Fproduct%3Fq%3DBlack%2520Lotus%2520%2526%2520Co%26view%3Dgrid',
+  );
 });
