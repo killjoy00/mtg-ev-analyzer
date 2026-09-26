@@ -27,3 +27,13 @@ test('post-activation smoke is operationally separate from activation',()=>{
   assert.match(workflow,/test "\$GITHUB_REF" = refs\/heads\/main/);
   assert.doesNotMatch(admin,/post-activation-serving-smoke/);
 });
+
+test('pre-activation canary requires the sets this run actually staged',()=>{
+  const canary=fs.readFileSync(new URL('../scripts/candidate-gameplay-canary.mjs',import.meta.url),'utf8');
+  const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
+  assert.match(canary,/Expected Candidate set IDs are required/);
+  assert.match(canary,/Expected fresh Candidate snapshot\(s\) missing/);
+  assert.match(canary,/s\.set_id=ANY\(\$2::text\[\]\)/);
+  assert.doesNotMatch(canary,/no_candidate_snapshots/);
+  assert.match(workflow,/candidate-gameplay-canary\.mjs "\$RUNNER_TEMP\/corpus\.connection" "\$\{set_args\[@\]\}"/);
+});
