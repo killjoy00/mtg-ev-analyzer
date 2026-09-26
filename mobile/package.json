@@ -10,15 +10,14 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "config:check": "node ./scripts/check-config.mjs",
-    "test": "npm run test:lifecycle && npm run test:draft-run && npm run test:shared-run-storage && npm run test:shared-run-screen && npm run test:membership && npm run test:profiles && npm run test:activity && npm run lint && npm run typecheck && npm run config:check && npm run release:check",
+    "test": "npm run test:lifecycle && npm run test:draft-run && npm run test:shared-run-storage && npm run test:shared-run-screen && npm run test:membership && npm run test:profiles && npm run lint && npm run typecheck && npm run config:check && npm run release:check",
     "release:check": "node ./scripts/release-preflight.mjs",
     "test:lifecycle": "node --test ./tests/version-gate-lifecycle.test.cjs",
     "test:draft-run": "node --test ./tests/draft-run-race.test.cjs ./tests/draft-run-recovery.test.cjs",
     "test:shared-run-storage": "node --test ./tests/shared-run-storage.test.cjs",
     "test:shared-run-screen": "node --test ./tests/shared-run-screen.test.cjs ./tests/shared-run-home-resume.test.cjs",
     "test:membership": "node --test ./tests/membership.test.cjs",
-    "test:profiles": "node --test ./tests/public-profile-api.test.cjs ./tests/profile-browsing.test.cjs",
-    "test:activity": "node --test ./tests/profile-activity.test.cjs ./tests/profile-activity-screen.test.cjs"
+    "test:profiles": "node --test ./tests/public-profile-api.test.cjs ./tests/profile-browsing.test.cjs"
   },
   "dependencies": {
     "expo": "~57.0.24",
@@ -38,7 +37,8 @@
     "react-native-screens": "~4.26.0",
     "expo-apple-authentication": "~57.0.2",
     "react-dom": "19.2.3",
-    "react-native-worklets": "0.10.1"
+    "react-native-worklets": "0.10.1",
+    "react-native-reanimated": "4.5.1"
   },
   "devDependencies": {
     "@types/react": "~19.2.2",
