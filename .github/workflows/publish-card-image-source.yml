@@ -66,6 +66,6 @@ jobs:
           fi
           git commit -m 'Refresh Pack One to main card art [card-images-refreshed]'
           branch="automation/card-image-source-${GITHUB_RUN_ID}"
-          git push origin "HEAD:$branch"
+          git push origin "HEAD:refs/heads/$branch"
           echo "Generated card-image recovery branch: $branch" >> "$GITHUB_STEP_SUMMARY"
           echo "Open that branch as a pull request to main with the normal required checks." >> "$GITHUB_STEP_SUMMARY"
