@@ -4,6 +4,8 @@ import type { MobileSession } from '@/src/storage/session';
 export type NativePatreonStatus = {
   configured: boolean;
   connected: boolean;
+  ad_free: boolean;
+  ads_allowed: boolean;
   capabilities: string[];
   account_capabilities: string[];
   account_user_id: string;
@@ -36,6 +38,7 @@ export function checkedPatreonStatus(value: unknown, session: MobileSession): Na
   const strings = (items: unknown): items is string[] => Array.isArray(items)
     && items.every((item) => typeof item === 'string' && /^[a-z_]{3,60}$/.test(item));
   if (typeof data.configured !== 'boolean' || typeof data.connected !== 'boolean'
+    || typeof data.ad_free !== 'boolean' || typeof data.ads_allowed !== 'boolean'
     || !strings(data.capabilities) || !strings(data.account_capabilities)
     || data.player_id?.toLowerCase() !== player
     || data.account_user_id?.toLowerCase() !== session.accountUser?.id.toLowerCase()

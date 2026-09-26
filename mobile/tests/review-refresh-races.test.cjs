@@ -116,6 +116,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
   globalThis.clearInterval = () => {};
 
   const mocks = {
+    'expo-image': { Image: host('Image') },
     'expo-router': {
       router: { push() {} },
       useFocusEffect: focus.useFocusEffect,
@@ -140,7 +141,9 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
       },
     },
     '@/src/api/guest': { ensureGuestSession: async () => guest },
+    '@/src/api/patreon': { loadNativePatreonStatus: async () => ({ ads_allowed: false }) },
     '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://example.invalid/magic' },
     '@/src/theme': theme,
   };
 
@@ -604,4 +607,155 @@ test('published set web URLs rewrite only the four reviewed archives into native
     assert.equal(compiled.exports.rewriteIncomingPath(`https://packone.pro/sets/${setId}/`), `/set-archive?setId=${setId}`);
   }
   assert.equal(compiled.exports.rewriteIncomingPath('https://packone.pro/sets/unknown/'), '/');
+});
+
+
+test('Daily home shows the disclosed TCGplayer fallback to guests without a membership lookup', async () => {
+  const focus = focusControl();
+  let membershipCalls = 0;
+  const opened = [];
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
+    'react-native': {
+      Linking: { openURL: async (url) => { opened.push(url); } },
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/draftRun': {
+      DAILY_ENVIRONMENT_META: {
+        mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '' },
+        'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '' },
+        latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '' },
+      },
+      loadDailyStatus: async () => dailyStatus('2026-09-26', false),
+    },
+    '@/src/api/guest': { ensureGuestSession: async () => ({ playerToken: 'guest-token' }) },
+    '@/src/api/patreon': { loadNativePatreonStatus: async () => { membershipCalls += 1; return { ads_allowed: false }; } },
+    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/index.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); await Promise.resolve(); });
+  assert.equal(membershipCalls, 0);
+  const promo = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link')[0];
+  assert.ok(promo);
+  assert.match(renderedText(root.toJSON()), /Affiliate link\. Pack One may earn a commission/);
+  await act(async () => { promo.props.onPress(); await Promise.resolve(); });
+  assert.deepEqual(opened, ['https://partner.example/magic']);
+  await act(async () => root.unmount());
+});
+
+test('Daily home hides promotion for signed-in ad-free, failed, or unverified membership status', async () => {
+  for (const membership of [
+    async () => ({ ads_allowed: false }),
+    async () => { throw new Error('offline'); },
+    async () => ({ ads_allowed: null }),
+  ]) {
+    const focus = focusControl();
+    const mocks = {
+      'expo-image': { Image: host('Image') },
+      'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
+      'react-native': {
+        Linking: { openURL: async () => {} }, Pressable: host('Pressable'), ScrollView,
+        StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
+      },
+      'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+      '@/src/api/draftRun': {
+        DAILY_ENVIRONMENT_META: {
+          mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '' },
+          'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '' },
+          latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '' },
+        },
+        loadDailyStatus: async () => dailyStatus('2026-09-26', false),
+      },
+      '@/src/api/guest': { ensureGuestSession: async () => ({ playerToken: 'player', accountToken: 'account' }) },
+      '@/src/api/patreon': { loadNativePatreonStatus: membership },
+      '@/src/hooks/useAppResume': { useAppResume() {} },
+      '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
+      '@/src/theme': theme,
+    };
+    const Screen = compileScreen('app/index.tsx', mocks);
+    let root;
+    await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); await Promise.resolve(); });
+    assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 0);
+    await act(async () => root.unmount());
+  }
+});
+
+test('Daily home rejects late promotion eligibility from a previous signed-in account', async () => {
+  const focus = focusControl();
+  const firstMembership = deferred();
+  let sessions = 0;
+  const accountA = { playerToken: 'player-a', accountToken: 'account-a' };
+  const accountB = { playerToken: 'player-b', accountToken: 'account-b' };
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
+    'react-native': {
+      Linking: { openURL: async () => {} }, Pressable: host('Pressable'), ScrollView,
+      StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/draftRun': {
+      DAILY_ENVIRONMENT_META: {
+        mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '' },
+        'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '' },
+        latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '' },
+      },
+      loadDailyStatus: async () => dailyStatus('2026-09-26', false),
+    },
+    '@/src/api/guest': { ensureGuestSession: async () => (++sessions === 1 ? accountA : accountB) },
+    '@/src/api/patreon': {
+      loadNativePatreonStatus: async (session) => session === accountA ? firstMembership.promise : { ads_allowed: false },
+    },
+    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/index.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  await act(async () => { focus.trigger(); await Promise.resolve(); await Promise.resolve(); });
+  assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 0);
+  await act(async () => { firstMembership.resolve({ ads_allowed: true }); await firstMembership.promise; await Promise.resolve(); });
+  assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 0);
+  await act(async () => root.unmount());
+});
+
+test('Daily home keeps the promo mounted and reports a retryable error when TCGplayer handoff fails', async () => {
+  const focus = focusControl();
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
+    'react-native': {
+      Linking: { openURL: async () => { throw new Error('no browser'); } }, Pressable: host('Pressable'), ScrollView,
+      StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/draftRun': {
+      DAILY_ENVIRONMENT_META: {
+        mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '' },
+        'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '' },
+        latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '' },
+      },
+      loadDailyStatus: async () => dailyStatus('2026-09-26', false),
+    },
+    '@/src/api/guest': { ensureGuestSession: async () => ({ playerToken: 'guest-token' }) },
+    '@/src/api/patreon': { loadNativePatreonStatus: async () => ({ ads_allowed: false }) },
+    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/index.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); await Promise.resolve(); });
+  const promo = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link')[0];
+  await act(async () => { promo.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
+  assert.match(renderedText(root.toJSON()), /Could not open TCGplayer\. Try the affiliate link again\./);
+  assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 1);
+  await act(async () => root.unmount());
 });
