@@ -1,0 +1,196 @@
+name: Mobile exact-main RC smoke
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-exact-main-rc-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  validate:
+    name: validate exact current main
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "RC smoke is allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || { echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2; exit 1; }
+          echo "Verified exact current main: $head_sha"
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install deterministic mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Run full mobile validation
+        run: npm test
+
+  ios-archive:
+    name: build unsigned iOS RC archive
+    needs: validate
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || exit 1
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install deterministic mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Set RC build number
+        shell: bash
+        run: echo "PACKONE_IOS_BUILD_NUMBER=$((300000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Generate production iOS project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform ios --clean
+      - name: Archive iPhone device build without signing
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
+          test -n "$workspace"
+          xcodebuild -workspace "$workspace" -scheme PackOne -configuration Release -destination 'generic/platform=iOS' -archivePath "$RUNNER_TEMP/PackOne.xcarchive" CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO archive
+          plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
+          test -f "$plist"
+          expected_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$plist")" == "$expected_version" ]]
+          [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")" == "$PACKONE_IOS_BUILD_NUMBER" ]]
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); assert data.get("ITSAppUsesNonExemptEncryption") is False' "$plist"
+          ditto -c -k --keepParent "$RUNNER_TEMP/PackOne.xcarchive" "$RUNNER_TEMP/PackOne-unsigned.xcarchive.zip"
+      - name: Upload unsigned iOS RC archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-ios-unsigned-rc
+          path: ${{ runner.temp }}/PackOne-unsigned.xcarchive.zip
+          if-no-files-found: error
+          retention-days: 7
+
+  android-bundle:
+    name: build Android RC bundle
+    needs: validate
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || exit 1
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install deterministic mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Set RC version code
+        shell: bash
+        run: echo "PACKONE_ANDROID_VERSION_CODE=$((300000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+      - name: Generate production Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform android --clean
+      - name: Verify native Android version
+        shell: bash
+        run: |
+          set -euo pipefail
+          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle
+          expected="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
+          grep -Eq "versionName[[:space:]]+['\"]$expected['\"]" android/app/build.gradle
+      - name: Build release app bundle
+        working-directory: mobile/android
+        run: ./gradlew :app:bundleRelease --no-daemon
+      - name: Verify bundle signature
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          bundle="app/build/outputs/bundle/release/app-release.aab"
+          test -s "$bundle"
+          jarsigner -verify -verbose -certs "$bundle" | tee /tmp/jarsigner.txt
+          grep -q "jar verified" /tmp/jarsigner.txt
+      - name: Upload Android RC bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-rc
+          path: mobile/android/app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+          retention-days: 7
+
+  manifest:
+    name: record RC evidence
+    needs: [validate, ios-archive, android-bundle]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Write exact-main RC manifest
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p rc-evidence
+          node - <<'NODE'
+          const fs = require('node:fs');
+          const release = JSON.parse(fs.readFileSync('mobile/store-release.json', 'utf8'));
+          const out = {
+            source_sha: process.env.GITHUB_SHA,
+            workflow_run_id: process.env.GITHUB_RUN_ID,
+            workflow_run_number: process.env.GITHUB_RUN_NUMBER,
+            ref: process.env.GITHUB_REF,
+            app_store_version: release.appStoreVersion,
+            play_version_name: release.playVersionName,
+            publication: 'none',
+            ios_artifact: 'unsigned archive; not installable/store-published',
+            android_artifact: 'production bundle smoke; not Play-published'
+          };
+          fs.writeFileSync('rc-evidence/mobile-exact-main-rc.json', JSON.stringify(out, null, 2) + '\n');
+          NODE
+          cat rc-evidence/mobile-exact-main-rc.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-mobile-rc-evidence
+          path: rc-evidence/mobile-exact-main-rc.json
+          if-no-files-found: error
+          retention-days: 30
