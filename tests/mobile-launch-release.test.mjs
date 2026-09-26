@@ -199,3 +199,26 @@ test('v1 routes stored friend runs and public profiles through the native parity
   assert.match(gateway, /shared-runs/);
   assert.match(gateway, /\[a-f0-9\]\{24\}/);
 });
+
+
+test('v1 manages existing Patreon Elite access natively without forking entitlement authority', () => {
+  const account = read('mobile/app/account.tsx');
+  const api = read('mobile/src/api/account.ts');
+  const worker = read('worker/patreon.mjs');
+  const gateway = read('edge/gateway.mjs');
+
+  assert.match(api, /loadMobilePatreonStatus/);
+  assert.match(api, /startMobilePatreonConnect/);
+  assert.match(api, /disconnectMobilePatreon/);
+  assert.match(api, /\/growth\/v1\/mobile\/patreon\/status/);
+  assert.match(account, /Already a member\? Connect Patreon/);
+  assert.match(account, /Refresh Patreon access/);
+  assert.match(account, /Disconnect Patreon/);
+  assert.match(account, /Pack One mobile does not sell or upgrade Elite/);
+  assert.match(worker, /MOBILE_STATE_PREFIX='m'/);
+  assert.match(worker, /mobileAccountIdentity/);
+  assert.match(worker, /provider_oauth_states/);
+  assert.match(worker, /entitlement_grants/);
+  assert.match(gateway, /\/v1\/mobile\/patreon\/connect/);
+  assert.match(gateway, /\/v1\/mobile\/patreon\/disconnect/);
+});
