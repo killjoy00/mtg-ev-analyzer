@@ -6,10 +6,10 @@ import {policy} from './launch-distributed-control.mjs';
 import {evaluateStage,fingerprint} from './launch-distributed-core.mjs';
 const root='artifacts/distributed-results',files=fs.existsSync(root)?fs.readdirSync(root,{recursive:true}):[];
 const named=pattern=>files.filter(f=>pattern.test(path.basename(f))).map(f=>JSON.parse(fs.readFileSync(path.join(root,f),'utf8')));
-const declarations=named(/^experiment-declaration\.json$/),cohorts=named(/^cohort-\d\.json$/),summaries=named(/^distributed-stage-\d+\.json$/),reasons=[];
+const declarations=named(/^experiment-declaration\.json$/),preflights=named(/^telemetry-preflight\.json$/),cohorts=named(/^cohort-\d\.json$/),summaries=named(/^distributed-stage-\d+\.json$/),reasons=[];
 const reject=reason=>reasons.push(reason);
 const declaration=declarations[0],scope=declaration?.scope;
-if(declarations.length!==1||scope?.sha!==process.env.GITHUB_SHA||scope?.run_id!==process.env.GITHUB_RUN_ID||scope?.attempt!==process.env.GITHUB_RUN_ATTEMPT||scope?.policy_hash!==fingerprint(policy))reject('declaration_missing_or_wrong_revision');
+if(declarations.length!==1||scope?.sha!==process.env.GITHUB_SHA||scope?.run_id!==process.env.GITHUB_RUN_ID||scope?.attempt!==process.env.GITHUB_RUN_ATTEMPT||scope?.policy_hash!==fingerprint(policy))reject('declaration_missing_or_wrong_revision');\nconst preflight=preflights[0];\nif(preflights.length!==1||preflight?.passed!==true||preflight?.sha!==scope?.sha||preflight?.health_requests!==policy.telemetry_preflight_requests)reject('telemetry_preflight_missing_or_failed');
 if(cohorts.length!==policy.generators||new Set(cohorts.map(r=>r.shard)).size!==policy.generators||cohorts.some(r=>fingerprint(r.scope)!==fingerprint(scope)||!r.passed))reject('cohort_incomplete_or_failed');
 const stages=[];
 for(let stage=0;stage<policy.stages.length;stage++) {
@@ -22,7 +22,7 @@ for(let stage=0;stage<policy.stages.length;stage++) {
     assert.ok(cohorts.every(c=>c.history?.[stage]?.digest===fingerprint(retained[0])),'stage_decision_digest');stages.push(retained[0]);
   } catch {reject('stage_'+policy.stages[stage].players+'_missing_or_failed');}
 }
-const budget=cohorts.reduce((n,c)=>{for(const key of Object.keys(n))n[key]+=c.budget?.[key]||0;return n;},{gateway_requests:60,response_bytes:0,coordinator_queries:0});
+const budget=cohorts.reduce((n,c)=>{for(const key of Object.keys(n))n[key]+=c.budget?.[key]||0;return n;},{gateway_requests:preflight?.health_requests||0,response_bytes:0,coordinator_queries:0});
 if(budget.gateway_requests>policy.maximum_requests||budget.response_bytes>policy.maximum_response_bytes||budget.coordinator_queries>policy.maximum_coordinator_queries)reject('aggregate_resource_ceiling');
 const report={scope,policy,verified:declaration?.verified,budget,stages,reasons,passed:!reasons.length,
   historical_supported_distributed_players:25,candidate_distributed_players:!reasons.length?100:null,
