@@ -1,0 +1,87 @@
+name: prepare corpus readiness 624
+on:
+  push:
+    branches: [fix/corpus-activation-readiness-624]
+    paths:
+      - '.github/workflows/prepare-readiness-624.yml'
+      - 'scripts/prepare-readiness-624.py'
+      - 'scripts/finish-readiness-624.py'
+permissions:
+  contents: write
+concurrency:
+  group: prepare-corpus-readiness-624
+  cancel-in-progress: false
+jobs:
+  prepare:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/fix/corpus-activation-readiness-624'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply exact integration edits
+        run: |
+          set -euo pipefail
+          python scripts/prepare-readiness-624.py
+          python scripts/finish-readiness-624.py
+          git diff --check
+          git diff --stat
+          grep -n -B 12 -A 20 'const readiness=await maintainServingReadiness' worker/growth-function.js
+          grep -n -A 8 'await selectCachedDatabaseRun' worker/draft-run-function.mjs
+      - name: Parse changed modules and run focused behavioral suites
+        run: |
+          set -euo pipefail
+          node --check worker/corpus-readiness.mjs
+          node --check worker/corpus-admin.mjs
+          node --check worker/growth-function.js
+          node --check worker/activated-snapshot-smoke.mjs
+          node --check admin/corpus.mjs
+          node --check admin/corpus-readiness.mjs
+          node --check tests/corpus-readiness-backend-smoke.mjs
+          node --check tests/corpus-readiness-e2e.mjs
+          node --test tests/corpus-readiness.test.mjs tests/activated-snapshot-smoke.test.mjs tests/serving-cache.test.mjs tests/corpus-admin-reporting.test.mjs tests/corpus-quality.test.mjs
+      - name: Prepare immutable commit for connector review
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          rm scripts/prepare-readiness-624.py scripts/finish-readiness-624.py .github/workflows/prepare-readiness-624.yml
+          python - <<'PY'
+          import os,json,subprocess,urllib.request,base64
+          base='https://api.github.com/repos/killjoy00/mtg-ev-analyzer'
+          def api(path,data=None):
+              req=urllib.request.Request(base+path, data=None if data is None else json.dumps(data).encode(), headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req) as response:return json.load(response)
+          sha=os.environ['GITHUB_SHA']
+          head=api('/git/ref/heads/fix/corpus-activation-readiness-624')['object']['sha']
+          assert head==sha,'Branch advanced; do not overwrite concurrent work'
+          changed=subprocess.check_output(['git','diff','--name-only','HEAD'],text=True).splitlines()
+          changed+=subprocess.check_output(['git','ls-files','--others','--exclude-standard'],text=True).splitlines()
+          entries=[]
+          for path in sorted(set(changed)):
+              if not os.path.isfile(path):entries.append({'path':path,'mode':'100644','type':'blob','sha':None});continue
+              with open(path,'rb') as f:content=base64.b64encode(f.read()).decode()
+              blob=api('/git/blobs',{'content':content,'encoding':'base64'})
+              entries.append({'path':path,'mode':'100644','type':'blob','sha':blob['sha']})
+          tree=api('/git/trees',{'base_tree':api('/git/commits/'+sha)['tree']['sha'],'tree':entries})
+          commit=api('/git/commits',{'message':'Integrate durable corpus readiness with admin, maintenance and guarded release','tree':tree['sha'],'parents':[sha]})
+          print('PREPARED_READINESS_COMMIT='+commit['sha'])
+          print('PREPARED_PARENT='+sha)
+          # Ref advancement and PR creation are separate reviewed connector actions.
+          PY
+      - name: Retain source review bundle
+        if: always()
+        run: |
+          mkdir -p artifacts/readiness-source
+          git diff --binary > artifacts/readiness-source/integration.patch
+          tar -czf artifacts/readiness-source/source.tgz --exclude=.git --exclude=artifacts .
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: readiness-source-${{ github.run_id }}
+          path: artifacts/readiness-source
+          retention-days: 7
