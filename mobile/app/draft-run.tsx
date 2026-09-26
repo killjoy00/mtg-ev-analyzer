@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -38,6 +39,7 @@ import {
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import type { MobileSession } from '@/src/storage/session';
+import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 
 type LoadState =
@@ -146,29 +148,40 @@ function FeedbackCard({
   onZoom: (card: DraftRunCard) => void;
 }) {
   if (!card) return null;
+  const shopUrl = tcgplayerUrl(card.name);
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}: ${card.name}. Open enlarged card.`}
-      onPress={() => onZoom(card)}
-      style={styles.feedbackCard}
-    >
-      <Text style={styles.feedbackCardLabel}>{label}</Text>
-      {card.image_url ? (
-        <Image
-          source={card.image_url}
-          style={styles.feedbackCardImage}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          accessibilityLabel={card.name}
-        />
-      ) : (
-        <View style={styles.feedbackCardFallback}>
-          <Text style={styles.cardFallbackText}>{card.name}</Text>
-        </View>
-      )}
-      <Text style={styles.feedbackCardName} numberOfLines={2}>{card.name}</Text>
-    </Pressable>
+    <View style={styles.feedbackCard}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${card.name}. Open enlarged card.`}
+        onPress={() => onZoom(card)}
+        style={styles.feedbackCardZoom}
+      >
+        <Text style={styles.feedbackCardLabel}>{label}</Text>
+        {card.image_url ? (
+          <Image
+            source={card.image_url}
+            style={styles.feedbackCardImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            accessibilityLabel={card.name}
+          />
+        ) : (
+          <View style={styles.feedbackCardFallback}>
+            <Text style={styles.cardFallbackText}>{card.name}</Text>
+          </View>
+        )}
+        <Text style={styles.feedbackCardName} numberOfLines={2}>{card.name}</Text>
+      </Pressable>
+      <Pressable
+        accessibilityRole="link"
+        accessibilityLabel={`Find ${card.name} on TCGplayer, affiliate link`}
+        onPress={() => void Linking.openURL(shopUrl)}
+        style={styles.shopLink}
+      >
+        <Text style={styles.shopLinkText}>Find on TCGplayer (affiliate link)</Text>
+      </Pressable>
+    </View>
   );
 }
 
@@ -206,6 +219,9 @@ function FeedbackAnalysis({
         />
         {!answer.historicalMatch ? <FeedbackCard card={trophy} label="Trophy pick" onZoom={onZoom} /> : null}
       </View>
+      <Text style={styles.affiliateDisclosure}>
+        Pack One may earn a commission from eligible TCGplayer purchases at no added cost to you.
+      </Text>
 
       {compactFeedback(answer) ? <Text style={styles.analysisLead}>{compactFeedback(answer)}</Text> : null}
 
@@ -1118,6 +1134,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disclosureText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
+  feedbackCardZoom: { gap: spacing.xs },
+  shopLink: { minHeight: 40, justifyContent: 'center', paddingVertical: spacing.xs },
+  shopLinkText: { color: colors.accentDark, fontSize: 12, lineHeight: 16, fontWeight: '800', textDecorationLine: 'underline' },
+  affiliateDisclosure: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   analysisPanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.md },
   analysisLead: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: '700' },
   analysisTitle: { color: colors.ink, fontSize: 18, lineHeight: 23, fontWeight: '800' },
