@@ -77,6 +77,13 @@ jobs:
           PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
         run: node scripts/edge-control.mjs deploy
+      - name: Verify browser interception before idle measurements
+        env:
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          LOAD_FIXTURE_FILE: ${{ runner.temp }}/launch-load-fixtures.json
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PACK1_BROWSER_SMOKE: '1'
+        run: node scripts/launch-practice-browser.mjs
       - name: Measure confirmed-idle and warm practice in the browser
         id: browser
         continue-on-error: true

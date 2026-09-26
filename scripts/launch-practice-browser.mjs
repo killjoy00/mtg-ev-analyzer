@@ -22,7 +22,7 @@ async function main() {
   };
   let apiCalls=0;
   const page=await context.newPage(),errors=[],report={sha:fixture.sha,branch:fixture.branch,
-    warm_samples_per_case:20,scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
+    warm_samples_per_case:process.env.PACK1_BROWSER_SMOKE==='1'?2:20,smoke:process.env.PACK1_BROWSER_SMOKE==='1',scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
   // Intercept only API/origin traffic and the reviewed HTML through CDP. Unlike
   // Playwright routing, this leaves ordinary static-resource HTTP caching on.
   const cdp=await context.newCDPSession(page);await cdp.send('Network.enable');
@@ -48,12 +48,15 @@ async function main() {
       const responseHeaders=[...response.headers].filter(([k])=>!['content-encoding','content-length','transfer-encoding','set-cookie'].includes(k)).map(([name,value])=>({name,value}));
       for(const value of response.headers.getSetCookie())responseHeaders.push({name:'set-cookie',value});
       await cdp.send('Fetch.fulfillRequest',{requestId,responseCode:response.status,responseHeaders,body:Buffer.from(await response.arrayBuffer()).toString('base64')});
-    } catch {
-      errors.push('proxy_failure');await cdp.send('Fetch.failRequest',{requestId,errorReason:'Failed'}).catch(()=>{});
+    } catch(error) {
+      // A navigation can cancel an intercepted analytics request before its
+      // response arrives. Chromium then rejects fulfillment of the dead id.
+      if(/Invalid InterceptionId|Invalid interceptionId|No resource with given identifier|Session closed|Target closed/.test(String(error.message)))return;
+      errors.push('proxy_'+(error.name||'Error'));await cdp.send('Fetch.failRequest',{requestId,errorReason:'Failed'}).catch(()=>{});
     }
   });
   let staticCacheHits=0;cdp.on('Network.requestServedFromCache',()=>staticCacheHits++);
-  page.on('pageerror',()=>errors.push('browser_error'));
+  page.on('pageerror',error=>errors.push('browser_'+error.name+'_'+(/Failed to fetch/.test(error.message)?'fetch':/aborted/i.test(error.message)?'aborted':'other')+'_'+(String(error.stack).match(/([a-z-]+\.m?js):\d+/)?.[0]||'unknown')));
   const directory='artifacts/launch-load';fs.mkdirSync(directory,{recursive:true});
   const ready=async configuration=>{
     await identify(configuration.name);
@@ -103,15 +106,15 @@ async function main() {
     assert.ok(idle,'Isolated compute did not become idle; no cold claim is permitted.');
     await sample(configuration,click,'confirmed_idle',idle);
     };
-    await cold({name:'mixed'});
+    if(process.env.PACK1_BROWSER_SMOKE!=='1')await cold({name:'mixed'});
     for(const configuration of [{name:'mixed'},{name:'powered-cube'},{name:'custom-single',custom:1},{name:'custom-multi',custom:3}])
-      for(let i=0;i<20;i++)await sample(configuration,await ready(configuration),'warm');
-    for(const configuration of [{name:'powered-cube'},{name:'custom-single',custom:1},{name:'custom-multi',custom:3}])await cold(configuration);
+      for(let i=0;i<(process.env.PACK1_BROWSER_SMOKE==='1'?2:20);i++)await sample(configuration,await ready(configuration),'warm');
+    if(process.env.PACK1_BROWSER_SMOKE!=='1')for(const configuration of [{name:'powered-cube'},{name:'custom-single',custom:1},{name:'custom-multi',custom:3}])await cold(configuration);
     report.summary=Object.fromEntries(['mixed','powered-cube','custom-single','custom-multi'].map(name=>{
       const rows=report.samples.filter(s=>s.case===name&&s.phase==='warm');
       return [name,{api:summarize(rows.map(s=>s.api_ms)),click:summarize(rows.map(s=>s.click_to_cards_ms)),images:summarize(rows.map(s=>s.click_to_images_ms))}];
     }));
-    report.passed=!errors.length&&staticCacheHits>0&&report.samples.filter(s=>s.phase==='confirmed_idle').length===4&&report.samples.filter(s=>s.phase==='confirmed_idle').every(s=>s.click_to_cards_ms<=report.budgets.cold_click_ms)&&
+    report.passed=!errors.length&&staticCacheHits>0&&report.samples.filter(s=>s.phase==='confirmed_idle').length===(process.env.PACK1_BROWSER_SMOKE==='1'?0:4)&&report.samples.filter(s=>s.phase==='confirmed_idle').every(s=>s.click_to_cards_ms<=report.budgets.cold_click_ms)&&
       Object.values(report.summary).every(s=>s.api.p95_ms<=2000&&s.click.p95_ms<=3000);
     await page.screenshot({path:directory+'/practice-mobile.png',fullPage:true});
   } catch(error) {
@@ -119,7 +122,7 @@ async function main() {
     await page.screenshot({path:directory+'/practice-failure.png',fullPage:true});
     throw error;
   } finally {
-    report.browser_errors=errors.length;report.api_calls=apiCalls;report.http_cache_hits=staticCacheHits;
+    report.browser_errors=errors.length;report.error_categories=Object.fromEntries([...new Set(errors)].map(e=>[e,errors.filter(x=>x===e).length]));report.api_calls=apiCalls;report.http_cache_hits=staticCacheHits;
     fs.writeFileSync(directory+'/practice-browser.json',JSON.stringify(report,null,2));
     console.log(JSON.stringify(report));
     await browser.close();
