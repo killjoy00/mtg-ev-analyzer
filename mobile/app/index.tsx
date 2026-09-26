@@ -221,14 +221,14 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Open How to Play"
-          onPress={() => router.push('/how-to')}
+          accessibilityLabel="Open Learn"
+          onPress={() => router.push('/learn')}
           style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >
           <Text style={styles.cardKicker}>LEARN</Text>
-          <Text style={styles.utilityTitle}>How to Play</Text>
-          <Text style={styles.cardBody}>Learn the eight-decision format, scoring, methodology, and current supported sets.</Text>
-          <Text style={styles.cardAction}>Open guide →</Text>
+          <Text style={styles.utilityTitle}>Learn Pack One</Text>
+          <Text style={styles.cardBody}>Start with the native rules, scoring, method, and set coverage, then open the current drafting guides.</Text>
+          <Text style={styles.cardAction}>Open Learn →</Text>
         </Pressable>
 
         <Pressable
