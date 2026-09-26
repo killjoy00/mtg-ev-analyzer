@@ -1,0 +1,79 @@
+name: Corpus activation serving smoke
+# Drives the production selectors - serving cache, single-set practice, pack
+# reroll and Daily/Latest planning - and fails unless every selected Premier
+# decision comes from the environment's active snapshot. Writes no sessions,
+# schedules or results.
+# Scheduled: every environment activated in the last 26 hours, development then
+# production. With no recent activation it reads only status events.
+# Manual: one named environment on one target.
+on:
+  schedule:
+    - cron: '47 9 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Database branch to verify'
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+      set_id:
+        description: 'Activated environment, for example fra. Leave empty to check every activation in the last 26 hours.'
+        type: string
+        required: false
+      snapshot_id:
+        description: 'Optional: the snapshot you expect to be active'
+        type: string
+        required: false
+permissions:
+  contents: read
+concurrency:
+  group: packone-corpus-activation-smoke
+  cancel-in-progress: false
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      TARGETS: ${{ inputs.target || 'development production' }}
+      SET_ID: ${{ inputs.set_id }}
+      SNAPSHOT_ID: ${{ inputs.snapshot_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require reviewed code
+        run: test "$GITHUB_REF" = refs/heads/main
+      - name: Validate inputs
+        run: |
+          [[ -z "$SET_ID" || "$SET_ID" =~ ^[a-z0-9-]{2,40}$ ]] || { echo 'set_id must be an environment ID' >&2; exit 1; }
+          [[ -z "$SNAPSHOT_ID" || "$SNAPSHOT_ID" =~ ^([a-f0-9]{64}|historical-[a-f0-9]{32})$ ]] || {
+            echo 'snapshot_id must be one exact source snapshot ID' >&2
+            exit 1
+          }
+          [[ -z "$SNAPSHOT_ID" || -n "$SET_ID" ]] || { echo 'snapshot_id requires set_id' >&2; exit 1; }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      - name: Exercise activated snapshots through the serving path
+        run: |
+          set -euo pipefail
+          umask 077
+          for target in $TARGETS; do
+            case "$target" in
+              development) branch=br-twilight-hill-ayffyd2b ;;
+              production) branch=br-orange-feather-ayps8kep ;;
+              *) exit 1 ;;
+            esac
+            connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+            echo "::add-mask::$connection"
+            printf '%s' "$connection" > "$RUNNER_TEMP/activation-smoke.connection"
+            echo "Checking $target"
+            if [[ -n "$SET_ID" ]]; then
+              expected=()
+              if [[ -n "$SNAPSHOT_ID" ]]; then expected=(--snapshot "$SNAPSHOT_ID"); fi
+              node scripts/activated-snapshot-smoke.mjs "$RUNNER_TEMP/activation-smoke.connection" --set "$SET_ID" "${expected[@]}"
+            else
+              node scripts/activated-snapshot-smoke.mjs "$RUNNER_TEMP/activation-smoke.connection" --recent 26
+            fi
+          done

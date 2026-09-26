@@ -4,7 +4,6 @@ import {pathToFileURL} from 'node:url';
 import { DRAFT_RUN_DIFFICULTY_VERSION } from '../draft-run-difficulty.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,DRAFT_RUN_LENGTH,SELECTABLE_ONLY_SETS,maxRunPick} from '../draft-run-policy.mjs';
 import {eligiblePickForRound} from '../draft-run.mjs';
-import catalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 export async function verifyTrophyImport(base,{fetcher=fetch,log=console.log}={}) {
 base=base?.replace(/\/$/,'');
 if(!/^https:\/\/br-(twilight-hill-ayffyd2b|orange-feather-ayps8kep)-draftrunapi\.compute\.c-5\.us-east-2\.aws\.neon\.tech$/.test(base))throw Error('Unexpected backend');
@@ -14,7 +13,8 @@ function assertPrivatePuzzle(p){
   assert.equal(p.historical_pick_id,undefined);
   assert.ok(p.candidates.every(c=>c.model_probability===undefined));
 }
-const health=await call('/health');assert.equal(health.sets,catalog.sets.length);assert.equal(health.expansion_sets,catalog.sets.filter(s=>s.id!=='powered-cube').length);assert.ok(health.puzzles>20000);
+// Every Live environment serves; Candidate catalog sets are intentionally non-serving.
+const health=await call('/health');assert.deepEqual(health.missing_sets,[]);assert.equal(health.sets,health.live_sets);assert.ok(health.sets>=4);assert.ok(health.puzzles>20000);
 const guest=await call('/v1/session',{displayName:'Import check'});
 const friendGuest=await call('/v1/session',{displayName:'Import check peer'});
 for(const environment of ['mixed','powered-cube']) {

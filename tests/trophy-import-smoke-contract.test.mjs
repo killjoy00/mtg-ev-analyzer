@@ -4,7 +4,6 @@ import {verifyTrophyImport} from './trophy-import-http-smoke.mjs';
 import {DRAFT_RUN_LENGTH,DRAFT_RUN_SELECTION_VERSION} from '../draft-run-policy.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
 import {runPickWindows} from '../draft-run.mjs';
-import catalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 
 test('the import/image HTTP gate completes exactly eight picks in each environment',async()=>{
   let state,serial=0;
@@ -17,7 +16,7 @@ test('the import/image HTTP gate completes exactly eight picks in each environme
   await verifyTrophyImport('https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech',{
     log:()=>{},fetcher:async(url,options)=>{
       const path=new URL(url).pathname,body=options.body?JSON.parse(options.body):null;
-      if(path==='/health')return Response.json({sets:catalog.sets.length,expansion_sets:catalog.sets.length-1,puzzles:1000000});
+      if(path==='/health')return Response.json({sets:29,live_sets:29,expansion_sets:28,missing_sets:[],non_serving_sets:['hbg','pio','sir'],puzzles:1000000});
       if(path==='/v1/session')return Response.json({token:'qa-token'});
       if(path==='/v1/runs') {
         assert.equal(body.qa,true);
@@ -38,4 +37,14 @@ test('the import/image HTTP gate completes exactly eight picks in each environme
   });
   assert.deepEqual(picks,{mixed:8,'powered-cube':8});
   assert.deepEqual(friends,['mixed','powered-cube']);
+});
+
+test('the import/image HTTP gate fails when a Live environment has nothing to serve',async()=>{
+  const health={sets:28,live_sets:29,expansion_sets:27,missing_sets:['hob'],non_serving_sets:['hbg','pio','sir'],puzzles:1000000};
+  await assert.rejects(verifyTrophyImport('https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech',{
+    log:()=>{},fetcher:async url=>{
+      if(new URL(url).pathname==='/health')return Response.json(health);
+      throw Error('No gameplay request may run after a failed health gate');
+    },
+  }),/hob/);
 });

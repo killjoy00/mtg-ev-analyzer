@@ -6,6 +6,7 @@ import sys
 import tempfile
 import unittest
 from collections import Counter
+from dataclasses import asdict
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
@@ -20,6 +21,7 @@ from contextual_value.dataset import (
 from contextual_value.dr import PolicyObservation, aipw_candidate_values, evaluate_policy
 from contextual_value.evaluate import compare_policies
 from contextual_value.features import validate_feature_map
+from contextual_value.nuisance import crossfit_nuisance, crossfit_nuisance_fold
 from contextual_value.outcome import RidgeOutcomeModel
 from contextual_value.propensity import softmax, support_threshold, validate_distribution
 from contextual_value.schema import inspect_archive, validate_header
@@ -131,6 +133,31 @@ class DatasetTests(unittest.TestCase):
         decisions = [decision for decision in decisions if decision]
         weights = normalized_draft_weights(decisions)
         self.assertAlmostEqual(sum(weights.values()), 1.0)
+
+
+class NuisanceCheckpointTests(unittest.TestCase):
+    def test_fold_checkpoints_recombine_to_exact_crossfit_predictions(self):
+        decisions = []
+        for index in range(30):
+            decision = parse_decision(
+                row(
+                    draft_id=f"draft-{index}",
+                    pick="A" if index % 2 else "B",
+                    wins=str(index % 8),
+                ),
+                DRAFT_HEADER,
+            )
+            self.assertIsNotNone(decision)
+            decisions.append(decision)
+        full = crossfit_nuisance(decisions, folds=3)
+        checkpointed = []
+        for fold in range(3):
+            checkpointed.extend(crossfit_nuisance_fold(decisions, fold, folds=3))
+        checkpointed.sort(key=lambda item: item.decision_id)
+        self.assertEqual(
+            [asdict(item) for item in checkpointed],
+            [asdict(item) for item in full],
+        )
 
 
 class PropensityTests(unittest.TestCase):

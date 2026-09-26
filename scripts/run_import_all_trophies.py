@@ -114,6 +114,8 @@ def main():
                         help='stop scheduling new environments after this build budget; 0 is unlimited')
     parser.add_argument('--discard-source-archives', action='store_true',
                         help='retain verified checkpoints but remove disposable source downloads')
+    parser.add_argument('--allow-historical-frozen-rebuild', action='store_true',
+                        help='reproducibility only: allow explicitly named STX/MID/VOW; --sets all still excludes them')
     args = parser.parse_args()
     if args.workers < 1 or args.max_seconds < 0:
         parser.error('workers must be positive and max-seconds nonnegative')
@@ -129,10 +131,8 @@ def main():
     importer.request = resilient_request
     sources, discovery = importer.discover()
     importer.atomic_json(Path(args.output) / 'discovery.json', discovery)
-    ids = list(sources) if args.sets == 'all' else args.sets.split(',')
-    if any(sid not in sources for sid in ids):
-        raise ValueError('Requested set has no official Premier archive')
-    ids = list(dict.fromkeys(ids))
+    ids = importer.select_import_sets(
+        sources, args.sets, args.allow_historical_frozen_rebuild)
 
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
         results, errors = run_jobs(executor, ids, sources, args, started)

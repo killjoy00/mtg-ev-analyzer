@@ -78,14 +78,14 @@ jobs:
 
           if [[ -n "$SETS" ]]; then
             SETS="$SETS" python - <<'PY'
-import json, os
-from pathlib import Path
-requested={s.strip().upper() for s in os.environ['SETS'].split(',') if s.strip()}
-queue={str(s).upper() for s in (json.loads(Path('data/import-queue.json').read_text()).get('sets') or [])}
-unknown=sorted(requested-queue)
-if unknown:
-    raise SystemExit('Legacy importer cannot admit prospective environments; not in reviewed backlog: '+','.join(unknown))
-PY
+          import json, os
+          from pathlib import Path
+          requested={s.strip().upper() for s in os.environ['SETS'].split(',') if s.strip()}
+          queue={str(s).upper() for s in (json.loads(Path('data/import-queue.json').read_text()).get('sets') or [])}
+          unknown=sorted(requested-queue)
+          if unknown:
+              raise SystemExit('Legacy importer cannot admit prospective environments; not in reviewed backlog: '+','.join(unknown))
+          PY
           fi
 
           read -r pending cube_live < <(python - <<'PY'

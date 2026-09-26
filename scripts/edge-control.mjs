@@ -133,6 +133,17 @@ async function main(action) {
   run('wrangler',['deploy','--config',configPath]);
   run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({ORIGIN_SECRET:origin,PREVIEW_KEY:preview,QUOTA_KEY:quota}));
   await cf(`/accounts/${zone.account.id}/workers/domains`,{method:'PUT',body:{hostname:HOST,service:WORKER,zone_id:zone.id}});
+  // A newly attached hostname can lag the control-plane response. Verify the
+  // public preview route and exact revision before handing it to any browser.
+  let ready=false;const deadline=Date.now()+90000;
+  while(Date.now()<deadline&&!ready) {
+    try {
+      const r=await fetch(`https://${HOST}/draft/health?quick=1`,{headers:{'x-pack1-preview-key':preview},redirect:'error',signal:AbortSignal.timeout(10000)});
+      ready=r.status===200&&(await r.json()).release_commit===commit;
+    } catch { /* bounded read-only propagation probe */ }
+    if(!ready)await new Promise(resolve=>setTimeout(resolve,2000));
+  }
+  if(!ready)throw Error('Preview hostname did not serve the reviewed revision before the readiness deadline.');
   variable('PREVIEW_ACCESS_KEY',preview);variable('PREVIEW_ORIGIN_SECRET',origin);
   console.log('Private preview deployed. Live acceptance must still pass.');
 }

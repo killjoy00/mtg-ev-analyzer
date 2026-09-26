@@ -354,14 +354,19 @@ async function route(request) {
       FROM draft_run_verified_puzzles p LEFT JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=$2
       WHERE (${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash) GROUP BY p.set_id`,[DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION]);
     const rows=result.rows,sets=new Set(rows.map(p=>p.set_id)),unrated=rows.reduce((n,p)=>n+Number(p.unrated),0);
-    const missingSets=corpusCatalog.sets.filter(s=>!sets.has(s.id)).map(s=>s.id);
     const live=await loadLiveSetMetadata(query,DRAFT_RUN_CORPUS_VERSION),regular=liveRegularSets(live,gameDateKey()).map(s=>s.set_id);
+    // Only a Live environment is expected to serve. Candidate, Paused and
+    // Retired environments are intentionally absent from serving, so they are
+    // reported rather than failed; a Live environment with nothing to serve fails.
+    const liveIds=new Set(live.map(s=>s.set_id));
+    const missingSets=live.filter(s=>!sets.has(s.set_id)).map(s=>s.set_id).sort();
+    const nonServingSets=corpusCatalog.sets.map(s=>s.id).filter(id=>!liveIds.has(id)).sort();
     const by_set=Object.fromEntries(rows.filter(p=>Number(p.decisions)>0).sort((a,b)=>a.set_id.localeCompare(b.set_id)).map(p=>[p.set_id,{drafts:Number(p.drafts),decisions:Number(p.decisions),regular_run:regular.includes(p.set_id),status:live.some(s=>s.set_id===p.set_id)?'Live':'not-serving',daily_optional_weight:regular.includes(p.set_id)?recencyWeight(regular.indexOf(p.set_id)):null}]));
     const total=key=>rows.reduce((n,p)=>n+Number(p[key]),0),mixed=rows.filter(p=>regular.includes(p.set_id));
     const ok=!unrated&&!missingSets.length&&regular.length>=4&&corpusCatalog.corpus_version===DRAFT_RUN_CORPUS_VERSION;
     return json({ok,service:'draft-run',scoring_version:DRAFT_RUN_SCORING_VERSION,difficulty_version:DRAFT_RUN_DIFFICULTY_VERSION,selection_version:DRAFT_RUN_SELECTION_VERSION,corpus_version:DRAFT_RUN_CORPUS_VERSION,run_length:DRAFT_RUN_LENGTH,serving_policy_version:SERVING_POLICY_VERSION,minimum_implied_trophy_score:20,daily_featured_sets:regular.slice(0,4),daily_policy:{newest_minimum:2,previous_three_minimum:4,recency_half_life_releases:4},...releaseMetadata(),
       puzzles:total('decisions'),archived_playable_puzzles:total('archived'),sets:sets.size,expansion_sets:rows.filter(p=>p.set_id!=='powered-cube').length,regular_sets:mixed.length,
-      mixed_puzzles:mixed.reduce((n,p)=>n+Number(p.decisions),0),cube_puzzles:Number(rows.find(p=>p.set_id==='powered-cube')?.decisions||0),unrated_puzzles:unrated,missing_sets:missingSets,by_set},ok?200:503);
+      mixed_puzzles:mixed.reduce((n,p)=>n+Number(p.decisions),0),cube_puzzles:Number(rows.find(p=>p.set_id==='powered-cube')?.decisions||0),unrated_puzzles:unrated,live_sets:live.length,missing_sets:missingSets,non_serving_sets:nonServingSets,by_set},ok?200:503);
   }
   if(request.method==='POST'&&path==='/v1/session') return growth.fetch(request);
   if(request.method==='POST'&&path==='/v1/runs') return start(request);
