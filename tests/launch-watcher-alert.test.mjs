@@ -6,7 +6,7 @@ import {
 
 const ENV={
   PACK1_ACCOUNT_DELETE_RESEND_API_KEY:'re_fixture',
-  PACK1_DELETION_ADMIN_EMAIL:'ops@example.test',
+  PACK1_LAUNCH_ALERT_EMAIL:'ops@example.test',
 };
 const STALE={
   ok:false,reason:'coverage_stale',covered_through:'2026-09-26T10:00:00.000Z',
@@ -48,6 +48,16 @@ test('independent stale operator alert is sent once per stale episode',async()=>
   assert.equal(requests.length,1);
   assert.equal(store.state().status,'stale');
   assert.match(requests[0].options.headers['Idempotency-Key'],/^pack1-launch-stale-[a-f0-9]{24}$/);
+  assert.deepEqual(JSON.parse(requests[0].options.body).to,['ops@example.test']);
+});
+
+test('service-principal email is not accepted as an implicit operator destination',async()=>{
+  const store=memoryState();
+  await assert.rejects(()=>reconcileLaunchWatcherAlert({
+    query:store.query,freshness:STALE,now:Date.parse('2026-09-26T10:40:00Z'),
+    env:{PACK1_ACCOUNT_DELETE_RESEND_API_KEY:'re_fixture',PACK1_DELETION_ADMIN_EMAIL:'service@example.test'},
+    fetcher:async()=>new Response('{}',{status:200}),
+  }),/operator email destination is unavailable/);
 });
 
 test('failed stale delivery stays pending and retries with the same idempotency key',async()=>{
