@@ -308,3 +308,27 @@ test('v1 mirrors the live Daily-home TCGplayer fallback without adding a native 
   assert.equal(pkg.dependencies['react-native-google-mobile-ads'], undefined);
   assert.equal(pkg.dependencies['expo-ads-admob'], undefined);
 });
+
+
+test('v1 parity matrix accounts for every public product surface and explicit exceptions', () => {
+  const matrix = read('docs/mobile-web-parity.md');
+
+  for (const required of [
+    'Three fixed Dailies',
+    'Model-supported alternatives / Why this score?',
+    'Stored practice share / friend run',
+    'This season leaderboard',
+    'Achievements + locked progress',
+    'Connect existing Patreon membership',
+    'Daily-home TCGplayer fallback',
+    'MSH editorial set archive',
+    'Learn hub',
+    'Privacy Policy',
+    'iPad is a first-class v1 surface',
+  ]) assert.ok(matrix.includes(required), required);
+
+  assert.match(matrix, /Patreon join\/upgrade purchase CTA[\s\S]*Explicit external blocker/);
+  assert.match(matrix, /Apple AASA requires the real Apple Team ID/);
+  assert.match(matrix, /Google Play \*\*app-signing\*\* certificate SHA-256/);
+  assert.match(matrix, /Admin[\s\S]*not copied into the app/);
+});
