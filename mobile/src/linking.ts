@@ -64,6 +64,11 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     const next = new URLSearchParams();
     const returnTo = searchParams.get('returnTo');
     if (returnTo === 'practice') next.set('returnTo', 'practice');
+    const shared = searchParams.get('shared');
+    if (returnTo === 'challenge' && shared && /^[a-f0-9]{24}$/.test(shared)) {
+      next.set('returnTo', 'challenge');
+      next.set('shared', shared);
+    }
     const environment = environmentFromSet(searchParams.get('environment'));
     if (searchParams.has('environment')) next.set('environment', environment);
     return next.size ? `?${next.toString()}` : '';
@@ -74,6 +79,8 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     const environment = environmentFromSet(searchParams.get('environment'));
     next.set('environment', environment);
     if (searchParams.get('mode') === 'practice') next.set('mode', 'practice');
+    const shared = searchParams.get('shared') || searchParams.get('challenge');
+    if (shared && /^[a-f0-9]{24}$/.test(shared)) next.set('shared', shared);
     const rawSets = searchParams.get('setIds');
     if (rawSets) {
       const safeSets = [...new Set(
@@ -130,9 +137,10 @@ export function rewriteIncomingPath(path: string) {
         return `/draft-run?environment=${environment}`;
       }
 
-      // Stored friend challenges are not silently converted into a different
-      // native run. Until the native challenge surface lands, route safely home.
-      if (searchParams.has('shared') || searchParams.has('challenge')) return '/';
+      const shared = searchParams.get('shared') || searchParams.get('challenge');
+      if (shared && /^[a-f0-9]{24}$/.test(shared)) {
+        return `/draft-run?environment=${environment}&shared=${shared}`;
+      }
 
       if (searchParams.get('custom') === '1') return '/practice';
 
