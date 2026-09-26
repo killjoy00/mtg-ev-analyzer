@@ -49,6 +49,14 @@ import {
   type PracticeSet,
 } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
+import {
+  disconnectMobilePatreon,
+  isElitePatreon,
+  loadMobilePatreonStatus,
+  startMobilePatreonConnect,
+  type PatreonStatus,
+} from '@/src/api/patreon';
+import { useAppResume } from '@/src/hooks/useAppResume';
 import { type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
 
@@ -79,6 +87,7 @@ export default function AccountScreen() {
   const [account, setAccount] = useState<AccountState | null>(null);
   const [profile, setProfile] = useState<CareerProfile | null>(null);
   const [catalogSets, setCatalogSets] = useState<PracticeSet[]>([]);
+  const [patreon, setPatreon] = useState<PatreonStatus | null>(null);
   const [mode, setMode] = useState<Mode>('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -104,6 +113,21 @@ export default function AccountScreen() {
     setShowcaseAchievement(next?.player.showcase_achievement ?? '');
   };
 
+  const refreshPatreon = async (current: MobileSession | null = session) => {
+    if (!current?.accountToken) {
+      setPatreon(null);
+      return;
+    }
+    try {
+      setPatreon(await loadMobilePatreonStatus(current));
+    } catch {
+      // Membership status is enrichment. Practice capability checks remain
+      // independently server-authoritative even if this panel cannot refresh.
+    }
+  };
+
+  useAppResume(() => refreshPatreon());
+
   useEffect(() => {
     let active = true;
     void ensureGuestSession()
@@ -112,15 +136,17 @@ export default function AccountScreen() {
         setSession(current);
         if (!current.accountToken) return;
         try {
-          const [state, nextProfile, catalog] = await Promise.all([
+          const [state, nextProfile, catalog, membership] = await Promise.all([
             loadMobileAccount(current),
             loadMobileCareer(current),
             loadSetCatalog(current),
+            loadMobilePatreonStatus(current).catch(() => null),
           ]);
           if (active) {
             setAccount(state);
             applyProfile(nextProfile);
             setCatalogSets(catalog.sets);
+            setPatreon(membership);
           }
         } catch (error: unknown) {
           if (!active) return;
@@ -146,14 +172,16 @@ export default function AccountScreen() {
 
   const finish = async (next: MobileSession, result: MobileAuthResponse) => {
     setSession(next);
-    const [state, nextProfile, catalog] = await Promise.all([
+    const [state, nextProfile, catalog, membership] = await Promise.all([
       loadMobileAccount(next),
       loadMobileCareer(next),
       loadSetCatalog(next),
+      loadMobilePatreonStatus(next).catch(() => null),
     ]);
     setAccount(state);
     applyProfile(nextProfile);
     setCatalogSets(catalog.sets);
+    setPatreon(membership);
     setPassword('');
     setMessage(
       result.linked.validatedDailyScore
@@ -299,6 +327,7 @@ export default function AccountScreen() {
       setAccount(null);
       applyProfile(null);
       setCatalogSets([]);
+      setPatreon(null);
       setMessage('Signed out.');
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Could not sign out.');
@@ -384,6 +413,7 @@ export default function AccountScreen() {
       setAccount(null);
       applyProfile(null);
       setCatalogSets([]);
+      setPatreon(null);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -394,6 +424,49 @@ export default function AccountScreen() {
     } finally {
       setBusy(false);
     }
+  };
+
+  const connectPatreon = async () => {
+    if (!session?.accountToken || busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const start = await startMobilePatreonConnect(session);
+      setMessage('Patreon opened in your browser. Finish connecting there, then return to Pack One.');
+      await WebBrowser.openBrowserAsync(start.url);
+      await refreshPatreon(session);
+      setMessage('Patreon membership status refreshed.');
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Could not connect Patreon.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const disconnectPatreon = async () => {
+    if (!session?.accountToken || busy || !patreon?.connected) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      await disconnectMobilePatreon(session);
+      await refreshPatreon(session);
+      setMessage('Patreon disconnected. Patreon-provided Elite access was removed.');
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Could not disconnect Patreon.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const confirmPatreonDisconnect = () => {
+    Alert.alert(
+      'Disconnect Patreon?',
+      'This removes Patreon-provided Elite access from Pack One until you connect Patreon again.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Disconnect', style: 'destructive', onPress: () => void disconnectPatreon() },
+      ],
+    );
   };
 
   const sendDeleteCode = async () => {
@@ -442,6 +515,7 @@ export default function AccountScreen() {
       setAccount(null);
       applyProfile(null);
       setCatalogSets([]);
+      setPatreon(null);
       setDeletePassword('');
       setDeleteCode('');
       setDeleteCodeSent(false);
@@ -470,6 +544,14 @@ export default function AccountScreen() {
       || a.set_name.localeCompare(b.set_name)
   ));
   const unlockedAchievements = (profile?.achievements ?? []).filter((item) => item.unlocked);
+  const elite = isElitePatreon(patreon);
+  const membershipTitle = patreon?.configured === false
+    ? 'Membership status unavailable'
+    : elite
+      ? 'Elite Member'
+      : patreon?.connected
+        ? 'Patreon connected'
+        : 'Free member';
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -594,6 +676,54 @@ export default function AccountScreen() {
                 </Pressable>
               </View>
             ) : null}
+
+            <View style={styles.settingsSection}>
+              <Text style={styles.sectionTitle}>Elite membership</Text>
+              <View style={[styles.membershipCard, elite && styles.membershipCardElite]}>
+                <Text style={styles.membershipTitle}>{membershipTitle}</Text>
+                <Text style={styles.body}>
+                  {elite
+                    ? 'Elite access is active. Powered Cube and custom-set practice are unlocked on this account.'
+                    : patreon?.connected
+                      ? 'Your Patreon account is linked, but it does not currently provide Elite access.'
+                      : 'Existing Elite access is recognized in the mobile app after you connect the Patreon account that provides it.'}
+                </Text>
+                {patreon?.membership?.sync_pending ? (
+                  <Text style={styles.fieldHelp}>Patreon is syncing a recent membership change.</Text>
+                ) : patreon?.membership?.last_synced_at ? (
+                  <Text style={styles.fieldHelp}>
+                    Last synced {new Date(patreon.membership.last_synced_at).toLocaleString()}
+                  </Text>
+                ) : null}
+                <Text style={styles.fieldHelp}>
+                  Membership purchases and upgrades are not sold inside Pack One mobile.
+                </Text>
+              </View>
+
+              {patreon?.configured !== false ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy}
+                  onPress={() => void connectPatreon()}
+                  style={[styles.secondaryButton, busy && styles.disabled]}
+                >
+                  <Text style={styles.secondaryButtonText}>
+                    {patreon?.connected ? 'Refresh Patreon access' : 'Connect existing Patreon membership'}
+                  </Text>
+                </Pressable>
+              ) : null}
+
+              {patreon?.connected ? (
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy}
+                  onPress={confirmPatreonDisconnect}
+                  style={[styles.textButton, busy && styles.disabled]}
+                >
+                  <Text style={styles.dangerTextButton}>Disconnect Patreon</Text>
+                </Pressable>
+              ) : null}
+            </View>
 
             <View style={styles.settingsSection}>
               <Text style={styles.sectionTitle}>Sign-in credentials</Text>
@@ -926,9 +1056,13 @@ const styles = StyleSheet.create({
   optionChipText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   optionChipTextSelected: { color: colors.accentDark },
   credentialLine: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+  membershipCard: { borderWidth: 1, borderColor: colors.lineStrong, padding: spacing.md, gap: spacing.sm },
+  membershipCardElite: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  membershipTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
   passwordBox: { gap: spacing.md },
   textButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   textButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
+  dangerTextButton: { color: colors.danger, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
   dangerZone: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.md },
   dangerTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
   dangerButton: { minHeight: 50, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
