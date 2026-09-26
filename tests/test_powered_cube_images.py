@@ -47,6 +47,30 @@ class PoweredCubeImageRefreshTests(unittest.TestCase):
         reprint = self.card(id="reprint", released_at="2026-01-01", image_uris={"normal":"https://cards.example/reprint.jpg"})
         self.assertLess(images.printing_rank(original, "Black Lotus"), images.printing_rank(reprint, "Black Lotus"))
 
+    def test_titania_prefers_original_readable_frame_over_full_art_variant(self):
+        name = "Titania, Protector of Argoth"
+        original = self.card(
+            id="224d904a-5972-4152-878a-9a922e7a55b6",
+            name=name,
+            set="c14",
+            collector_number="50",
+            released_at="2014-11-07",
+            image_uris={"normal": "https://cards.example/titania-c14.jpg"},
+        )
+        full_art = self.card(
+            id="titania-full-art",
+            name=name,
+            set="mh2",
+            collector_number="416",
+            released_at="2021-06-18",
+            full_art=True,
+            border_color="borderless",
+            image_uris={"normal": "https://cards.example/titania-full-art.jpg"},
+        )
+        chosen = min((full_art, original), key=lambda card: images.printing_rank(card, name))
+        self.assertEqual(chosen["id"], original["id"])
+        self.assertEqual(images.special_flags(chosen), [])
+
     def test_face_alias_uses_matching_face_image_and_text(self):
         card = self.card(
             name="Front // Back",
