@@ -1,0 +1,104 @@
+name: Generate Android release assets
+
+on:
+  push:
+    branches: ['chatgpt/android-release-hardening']
+    paths:
+      - '.github/workflows/generate-android-release-assets.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  generate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: chatgpt/android-release-hardening
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Generate deterministic mobile lockfile
+        working-directory: mobile
+        run: npm install --package-lock-only --no-audit --no-fund
+      - name: Generate adaptive launcher layers from the verified P1 icon
+        run: |
+          python3 -m pip install --quiet pillow==11.3.0
+          python3 - <<'PY'
+          from collections import Counter
+          from pathlib import Path
+          from PIL import Image
+
+          source=Path('mobile/assets/images/icon.png')
+          foreground=Path('mobile/assets/images/adaptive-foreground.png')
+          monochrome=Path('mobile/assets/images/adaptive-monochrome.png')
+          img=Image.open(source).convert('RGBA')
+          if img.size != (1024,1024):
+              raise SystemExit(f'expected 1024x1024 source icon, got {img.size}')
+
+          rgba=list(img.getdata())
+          transparent=sum(1 for r,g,b,a in rgba if a < 16)
+          alpha=img.getchannel('A')
+
+          if transparent > len(rgba)//10:
+              mask=alpha
+          else:
+              opaque=[(r,g,b) for r,g,b,a in rgba if a > 240]
+              bg=Counter(opaque).most_common(1)[0][0]
+              mask=Image.new('L',img.size,0)
+              out=[]
+              br,bg_g,bb=bg
+              for r,g,b,a in rgba:
+                  distance=max(abs(r-br),abs(g-bg_g),abs(b-bb))
+                  edge=max(0,min(255,(distance-4)*6))
+                  out.append((edge*a)//255)
+              mask.putdata(out)
+
+          bbox=mask.getbbox()
+          if not bbox:
+              raise SystemExit('could not isolate the P1 mark from the source icon')
+          mark=mask.crop(bbox)
+          max_mark=614
+          scale=min(max_mark/mark.width,max_mark/mark.height)
+          size=(max(1,round(mark.width*scale)),max(1,round(mark.height*scale)))
+          mark=mark.resize(size,Image.Resampling.LANCZOS)
+
+          def layer(color,path):
+              canvas=Image.new('RGBA',(1024,1024),(0,0,0,0))
+              glyph=Image.new('RGBA',mark.size,color)
+              glyph.putalpha(mark)
+              pos=((1024-mark.width)//2,(1024-mark.height)//2)
+              canvas.alpha_composite(glyph,pos)
+              canvas.save(path,optimize=True)
+              actual=canvas.getchannel('A').getbbox()
+              if not actual:
+                  raise SystemExit(f'{path} is empty')
+              if actual[2]-actual[0] > 620 or actual[3]-actual[1] > 620:
+                  raise SystemExit(f'{path} exceeds the adaptive-icon safe target: {actual}')
+              if canvas.getpixel((0,0))[3] != 0:
+                  raise SystemExit(f'{path} corner is not transparent')
+              print(path, 'alpha bounds', actual)
+
+          layer((255,255,255,255),foreground)
+          layer((255,255,255,255),monochrome)
+          PY
+      - name: Verify generated release inputs
+        working-directory: mobile
+        run: |
+          test -s package-lock.json
+          npm ci --ignore-scripts --no-audit --no-fund
+          test -s assets/images/adaptive-foreground.png
+          test -s assets/images/adaptive-monochrome.png
+      - name: Commit generated release inputs
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add mobile/package-lock.json mobile/assets/images/adaptive-foreground.png mobile/assets/images/adaptive-monochrome.png
+          if git diff --cached --quiet; then
+            echo 'Generated inputs already current.'
+            exit 0
+          fi
+          git commit -m 'Generate locked mobile dependencies and adaptive Android icons'
+          git push origin HEAD:chatgpt/android-release-hardening
