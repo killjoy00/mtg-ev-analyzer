@@ -250,10 +250,12 @@ async function webhook(request,query,json) {
   return json({ok:true});
 }
 
-export async function handlePatreon(request,{query,authSession,json}) {
+export async function handlePatreon(request,{query,authSession,mobileAccountIdentity,json}) {
   const url=new URL(request.url);
-  if(url.pathname==='/v1/patreon/webhook'&&request.method==='POST')return webhook(request,query,json);
-  if(url.pathname==='/v1/patreon/callback'&&request.method==='GET') {
+  const mobileRoute=url.pathname.startsWith('/v1/mobile/patreon/');
+  const route=mobileRoute?url.pathname.replace('/v1/mobile/patreon/','/v1/patreon/'):url.pathname;
+  if(!mobileRoute&&route==='/v1/patreon/webhook'&&request.method==='POST')return webhook(request,query,json);
+  if(!mobileRoute&&route==='/v1/patreon/callback'&&request.method==='GET') {
     if(!configured())return redirect('unavailable');
     const state=String(url.searchParams.get('state')||''),code=String(url.searchParams.get('code')||'');
     if(!/^[a-f0-9]{64}$/.test(state)||!code)return redirect('error');
@@ -290,10 +292,12 @@ export async function handlePatreon(request,{query,authSession,json}) {
       return redirect('error');
     }
   }
-  if(!url.pathname.startsWith('/v1/patreon/'))return null;
-  const auth=await authSession(request),authUserId=auth.user_id;
-  if(url.pathname==='/v1/patreon/status'&&request.method==='GET')return json(await status(query,authUserId));
-  if(url.pathname==='/v1/patreon/connect'&&request.method==='POST') {
+  if(!route.startsWith('/v1/patreon/'))return null;
+  const authUserId=mobileRoute
+    ? (await mobileAccountIdentity(request)).auth.user_id
+    : (await authSession(request)).user_id;
+  if(route==='/v1/patreon/status'&&request.method==='GET')return json(await status(query,authUserId));
+  if(route==='/v1/patreon/connect'&&request.method==='POST') {
     if(!configured()||!patreonAccountAllowed(authUserId))return json({error:'Patreon membership is not fully configured yet.'},503);
     const state=randomBytes(32).toString('hex'),hash=createHash('sha256').update(state).digest('hex');
     await query('DELETE FROM provider_oauth_states WHERE expires_at<=now()');
@@ -313,7 +317,7 @@ export async function handlePatreon(request,{query,authSession,json}) {
     target.searchParams.set('state',state);
     return json({url:target.toString()});
   }
-  if(url.pathname==='/v1/patreon/disconnect'&&request.method==='POST') {
+  if(route==='/v1/patreon/disconnect'&&request.method==='POST') {
     await query(`WITH states AS (
       DELETE FROM provider_oauth_states WHERE auth_user_id=$1::uuid AND provider='patreon'
     ), accounts AS (

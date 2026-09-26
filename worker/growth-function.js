@@ -2068,7 +2068,9 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/google/callback') return handleMobileGoogleCallback(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/apple/callback') return handleAppleCallback(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/version') return handleMobileVersionCheck(request,{query,json});
-  if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
+  if (url.pathname.startsWith('/v1/patreon/') || url.pathname.startsWith('/v1/mobile/patreon/')) {
+    return handlePatreon(request,{query,authSession,mobileAccountIdentity,json});
+  }
   if (request.method === 'POST' && url.pathname === '/internal/player-session-refresh') return handleBrowserPlayerSession(request,{existingOnly:true});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);
