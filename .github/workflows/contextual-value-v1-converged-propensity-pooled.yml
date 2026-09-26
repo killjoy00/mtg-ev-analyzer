@@ -1,6 +1,13 @@
 name: contextual-value-v1-converged-propensity-pooled
 
 on:
+  push:
+    branches:
+      - research/contextual-value-v1-propensity-lbfgs-pooled-529
+    paths:
+      - '.github/workflows/contextual-value-v1-converged-propensity-pooled.yml'
+      - 'research/contextual_value_propensity_lbfgs.py'
+      - 'research/contextual_value_propensity_lbfgs_refit.py'
   workflow_dispatch:
 
 permissions:
