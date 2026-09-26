@@ -1,6 +1,6 @@
 # Mobile web/native parity inventory
 
-Tracking: #575. Rebuilt from current main 2b1da5574835a82caa6e350b7b1fe8d1512ba389 on September 26, 2026.
+Tracking: #575. Reconciled through current main 8956f8c5011a7bdffd71c2184a5006558b362d69 on September 26, 2026.
 
 This document replaces blanket source-string parity claims with an A–E inventory. **Implemented** means reviewed product code is present on main. It does not mean physical-device acceptance, live association-file verification, store-console approval, or public-release authorization.
 
@@ -102,7 +102,11 @@ PR #648 merged as `528ed80a0c15afb9760ba2b71d8c4693e342324a` and adds a store-fr
 - uploads GitHub Actions artifacts plus a SHA/version manifest; and
 - has no App Store Connect, Google Play, release-environment or store-publishing credentials.
 
-The first main run began on `528ed80a...`, then #651 advanced main to `2b1da5574835a82caa6e350b7b1fe8d1512ba389` while those native builds were still running. That earlier run therefore cannot be the final exact-main certificate; the manifest is designed to fail closed if its source SHA is no longer current main. A fresh final run is required after the remaining docs/policy freeze so its manifest identifies the actual release-candidate main SHA.
+The first main run began on `528ed80a...` and became stale when #651 advanced main, as designed. #654 then widened recertification coverage for release-workflow changes, and #656 changed exact-main concurrency so obsolete runs cancel when a newer qualifying main run starts.
+
+Workflow **36278475765** subsequently completed green on exact current main `8956f8c5011a7bdffd71c2184a5006558b362d69`. Validation, the unsigned iOS production archive, Android production bundle and final evidence job all passed. The evidence job re-fetched `main` after both native builds and confirmed that the source SHA had not moved. It records App Store version **1.0**, Play version name **1.0** and `publication: none`. The unsigned iOS artifact ZIP digest is `882be6c7e6218b39316857634832e2b7ad1483c576423b217980cedefa80af60`; the Android RC artifact ZIP digest is `7d4720461e7b080ed69931f47535a959076d7b42aa2fc3b318bf0d91a0c70246`, with versionCode **300003**.
+
+This exact-main evidence remains valid only while that SHA is the intended release source. Any later `main` movement requires another exact-main recertification before signed store candidates are treated as final.
 
 ### Release evidence still open
 
