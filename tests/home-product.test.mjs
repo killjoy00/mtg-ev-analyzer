@@ -9,16 +9,29 @@ test('homepage social metadata has no escaped-newline pollution',()=>{
  const html=fs.readFileSync('index.html','utf8');
  assert.equal(html.includes('\\n'),false,'Homepage HTML must not contain literal \\n escape text');
 });
-test('homepage metadata names MTG and uses a real 1200x630 social preview',()=>{
+test('homepage metadata names MTG and uses a complete 1200x630 social preview',()=>{
  const html=fs.readFileSync('index.html','utf8');
  assert.match(html,/<title>Pack One: Daily MTG Draft Decisions<\/title>/);
  assert.match(html,/Magic: The Gathering draft decisions every day/);
- assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview\.png"/);
+ assert.match(html,/property="og:image" content="https:\/\/packone\.pro\/social-preview-v2\.png"/);
  assert.match(html,/property="og:image:width" content="1200"/);
  assert.match(html,/property="og:image:height" content="630"/);
- const png=fs.readFileSync('social-preview.png');
+ const png=fs.readFileSync('social-preview-v2.png');
+ assert.equal(png.subarray(0,8).toString('hex'),'89504e470d0a1a0a');
  assert.equal(png.readUInt32BE(16),1200);
  assert.equal(png.readUInt32BE(20),630);
+ let offset=8,sawIend=false;
+ while(offset<png.length){
+  assert.ok(offset+12<=png.length,'PNG chunk header/CRC must be complete');
+  const length=png.readUInt32BE(offset);
+  const type=png.subarray(offset+4,offset+8).toString('ascii');
+  const next=offset+12+length;
+  assert.ok(next<=png.length,'PNG '+type+' chunk must not be truncated');
+  offset=next;
+  if(type==='IEND'){sawIend=true;break;}
+ }
+ assert.equal(sawIend,true,'PNG must end with IEND');
+ assert.equal(offset,png.length,'PNG must not contain trailing bytes after IEND');
 });
 test('Daily descriptions reinforce trophy-draft provenance',()=>{
  const html=dailyHomeMarkup(null,day);

@@ -1,6 +1,6 @@
 # Pack One mobile store submission packet
 
-Updated 2026-09-25. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated 2026-09-26. This file is the source-of-truth submission packet for the first free public mobile release.
 
 ## Shared release identity
 
@@ -162,6 +162,7 @@ Pack One is unofficial Fan Content permitted under the Wizards Fan Content Polic
 ### App content declarations
 
 - Ads: **Yes**. Native Pack One intentionally renders clearly disclosed TCGplayer affiliate promotional links (the Daily-home fallback and reviewed revealed-card destinations). The binary still has no third-party ad SDK and does not use an advertising ID.
+  - Rationale: Google Play's current App Content guidance requires an ads declaration and explicitly includes display/native/banner ads; its examples are non-exhaustive. Pack One's affiliate promotional surfaces are therefore declared conservatively as ads even though they are first-party-rendered links rather than an ad SDK.
 - App access: Some features are available without login; account and Elite features require access. Supply one non-expiring Elite reviewer account in Play Console Sign-in details. Do not store its password in Git.
 - Privacy policy: https://packone.pro/privacy/
 - Account deletion URL: https://packone.pro/privacy/#delete-account
