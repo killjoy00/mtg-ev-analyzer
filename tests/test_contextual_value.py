@@ -233,7 +233,11 @@ class PropensityTests(unittest.TestCase):
             "A": {"candidate_signal": 0.8, "user_game_win_rate": 0.68, "rank=Gold": 1.0},
             "B": {"candidate_signal": 0.2, "user_game_win_rate": 0.68, "rank=Gold": 1.0},
         }
-        self.assertEqual(model.probabilities(low_skill), model.probabilities(high_skill))
+        low = model.probabilities(low_skill)
+        high = model.probabilities(high_skill)
+        self.assertEqual(set(low), set(high))
+        for action in low:
+            self.assertAlmostEqual(low[action], high[action], places=15)
 
     def test_candidate_specific_skill_interaction_can_change_choice_probabilities(self):
         model = LinearSoftmaxPropensityModel(
