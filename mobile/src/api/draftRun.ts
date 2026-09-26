@@ -134,6 +134,15 @@ export type DailyStatus = {
   })[];
 };
 
+export type SharedRunInfo = {
+  id: string;
+  name: string;
+  score: number;
+  environment: string;
+  run_length: number;
+  scores: { name: string; score: number }[];
+};
+
 export type DraftRunHealth = {
   ok: boolean;
   service?: string;
@@ -152,6 +161,24 @@ export function loadDailyStatus(session: MobileSession) {
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
     timeoutMs: 15_000,
+  });
+}
+
+export function loadSharedRun(id: string, session: MobileSession) {
+  return requestJson<SharedRunInfo>(`/draft/v1/shared-runs/${encodeURIComponent(id)}`, {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
+}
+
+export function startSharedDraftRun(session: MobileSession, challengeId: string) {
+  return requestJson<DraftRunState>('/draft/v1/runs', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: { challenge: challengeId },
+    timeoutMs: 30_000,
   });
 }
 
