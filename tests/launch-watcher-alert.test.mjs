@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
   LAUNCH_WATCHER_ALERT_STATE_KEY,parseLaunchWatcherAlertState,reconcileLaunchWatcherAlert,
 } from '../worker/launch-watcher-alert.mjs';
@@ -101,4 +102,19 @@ test('coverage recovery sends one recovery alert and returns to healthy dedupe s
   assert.equal(messages[1].body.subject,'[Pack One] Launch coverage recovered');
   assert.match(messages[1].headers['Idempotency-Key'],/^pack1-launch-recovered-[a-f0-9]{24}$/);
   assert.equal(store.state().status,'fresh');
+});
+
+
+test('every production pack1growth deploy path preserves the explicit launch alert mailbox',()=>{
+  for(const path of [
+    '.github/workflows/secure-auth-release.yml',
+    '.github/workflows/deploy-functions.yml',
+    '.github/workflows/account-deletion-controls.yml',
+  ]) {
+    const source=fs.readFileSync(path,'utf8');
+    assert.match(source,/PACK1_LAUNCH_ALERT_EMAIL:\s*\$\{\{ secrets\.PACK1_LAUNCH_ALERT_EMAIL \}\}/,path);
+    assert.match(source,/--env "PACK1_LAUNCH_ALERT_EMAIL=\$PACK1_LAUNCH_ALERT_EMAIL"/,path);
+  }
+  const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
+  assert.match(release,/PACK1_LAUNCH_ALERT_EMAIL is missing or malformed/);
 });
