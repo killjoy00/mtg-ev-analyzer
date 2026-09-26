@@ -11,6 +11,9 @@ const COOKIE_NAMES=new Set(['__Host-pack1_account','__Secure-pack1_csrf','__Host
 const response=(status,error,headers={})=>Response.json({error},{status,headers:{'cache-control':'no-store',...headers}});
 const secret=value=>/^[a-f0-9]{64}$/.test(value||'');
 const encode=new TextEncoder();
+// The finite private preview retains every success so quiet active minutes
+// cannot randomly lack positive telemetry. Production sampling is unchanged.
+export const gatewaySampleRate=(mode,status)=>mode==='preview'||status>=400?1:.1;
 
 export function ipNetwork(value) {
   if(isIP(value)===4)return value;
@@ -241,7 +244,7 @@ export async function gateway(request,env,fetcher=fetch) {
   const expectedHost=mode==='production'?'api.packone.pro':'api-preview.packone.pro';
   const finish=result=>{
     const duration=Math.round(performance.now()-started),quota=Math.round(metric.quota_ms),upstream=Math.round(metric.upstream_ms);
-    const sampleRate=result.status>=400?1:.1;
+    const sampleRate=gatewaySampleRate(mode,result.status);
     if(Math.random()<sampleRate)console.log(JSON.stringify({...metric,status:result.status,sample_rate:sampleRate,
       duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
     const headers=new Headers(result.headers);

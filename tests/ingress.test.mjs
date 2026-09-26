@@ -4,7 +4,7 @@ import {guardIngress} from '../worker/ingress-auth.mjs';
 import legacy from '../worker/index.js';
 import growth from '../worker/growth-function.js';
 import draft from '../worker/draft-run-function.mjs';
-import {gateway,ipNetwork} from '../edge/gateway.mjs';
+import {gateway,gatewaySampleRate,ipNetwork} from '../edge/gateway.mjs';
 import {parseRequest,checkBranch,inheritedFunctionSlugs,commandFailure} from '../scripts/edge-control.mjs';
 import {closedOrigin} from '../edge/closed-origin.mjs';
 import {freshDeployment,deployPreviewFunction} from '../scripts/edge-neon-deploy.mjs';
@@ -15,6 +15,13 @@ const key='a'.repeat(64);
 const env={MODE:'preview',NEON_BRANCH_ID:'br-isolated-preview',ORIGIN_SECRET:key,PREVIEW_KEY:'b'.repeat(64),QUOTA_KEY:'c'.repeat(64),
   NETWORK_QUOTA:{idFromName(name){assert.match(name,/^[a-f0-9]{64}$/);return name;},get(){return {fetch:async()=>new Response(null,{status:204})};}}};
 const req=(path='/growth/v1/session',options={})=>new Request('https://api-preview.packone.pro'+path,{method:'POST',body:'{}',...options,headers:{'content-type':'application/json','x-pack1-preview-key':env.PREVIEW_KEY,'cf-connecting-ip':'192.0.2.1',...options.headers}});
+
+test('finite private preview retains successes without changing production sampling',()=>{
+  assert.equal(gatewaySampleRate('preview',200),1);
+  assert.equal(gatewaySampleRate('preview',503),1);
+  assert.equal(gatewaySampleRate('production',200),.1);
+  assert.equal(gatewaySampleRate('production',503),1);
+});
 
 test('all three real handlers block direct URLs before health, preflight or database work',async()=>{
   const prior={required:process.env.PACK1_REQUIRE_INGRESS,secret:process.env.PACK1_INGRESS_SECRET};

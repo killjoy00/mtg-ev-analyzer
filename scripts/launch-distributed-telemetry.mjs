@@ -67,5 +67,5 @@ export async function inspectPreviewTelemetry({reports,sha,from,to,policy,accoun
     bins.push(bin);
   }
   return {service:'pack1-gateway-preview',sha,bins,passed:bins.some(b=>b.client_requests>0)&&bins.every(b=>b.passed),
-    limitation:'Ten-percent success sampling: positive per-minute evidence and fully sampled errors, not lossless request reconciliation or a population latency SLO. Preview-only 4xx boundary rejects are retained separately because generated client non-2xx responses already fail the unsampled client record.'};
+    limitation:'The finite private preview emits every success and error, but the retained log API is not a lossless request ledger or a population latency SLO. Exact route percentiles come from unsampled client records. Preview-only 4xx boundary rejects are retained separately because generated client non-2xx responses already fail the client record.'};
 }
