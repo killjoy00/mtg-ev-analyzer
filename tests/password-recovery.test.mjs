@@ -34,6 +34,7 @@ function installFetch({providerStatus=200,attempts=1,recovery='valid'}={}) {
         if(recovery==='expired')return dbResponse(['auth_user_id','expires_at'],[[authId,'2000-01-01T00:00:00Z']],1);
         return dbResponse(['auth_user_id','expires_at'],[[authId,'2099-01-01T00:00:00Z']],1);
       }
+      if(sql.startsWith('UPDATE apple_auth_identities SET synthetic_password=false'))return dbResponse([],[],0);
       if(sql.includes('UPDATE account_sessions SET revoked_at'))return dbResponse([],[],2);
       throw Error('Unexpected SQL: '+sql);
     }
