@@ -220,6 +220,7 @@ export async function gateway(request,env,fetcher=fetch) {
       return result;
     } finally {metric.quota_ms+=performance.now()-began;}
   };
+  let previewNetwork=null;
   const expectedHost=mode==='production'?'api.packone.pro':'api-preview.packone.pro';
   const finish=result=>{
     const sampleRate=result.status>=400?1:.1;
@@ -232,6 +233,7 @@ export async function gateway(request,env,fetcher=fetch) {
       headers.set('access-control-allow-credentials','true');
       headers.set('access-control-expose-headers','Retry-After');
     }
+    if(mode==='preview'&&previewNetwork&&url.pathname==='/draft/health')headers.set('x-pack1-preview-network',previewNetwork);
     headers.set('x-content-type-options','nosniff');
     return new Response(result.body,{status:result.status,headers});
   };
@@ -281,6 +283,7 @@ export async function gateway(request,env,fetcher=fetch) {
     const network=ipNetwork(request.headers.get('cf-connecting-ip')||'');
     const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
     const digest=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,encode.encode(network)))).map(x=>x.toString(16).padStart(2,'0')).join('');
+    if(preview)previewNetwork=digest;
     const quota=env.NETWORK_QUOTA.get(env.NETWORK_QUOTA.idFromName(digest));
     const limited=await quotaFetch(quota,sessionCreation?'session':'request');
     if(limited.status!==204)return finish(limited.status===429?limited:response(503,'Gateway unavailable.'));
