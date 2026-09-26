@@ -156,50 +156,204 @@ def _objective_gradient(model, examples):
     }
 
 
-def _validation_metrics(model, decisions, games, training_ids):
+
+def _fit_epoch_checkpoints(
+    examples,
+    checkpoints,
+    *,
+    l2=1.0,
+    learning_rate=0.2,
+):
+    """Run the production optimizer once and snapshot exact epoch checkpoints."""
+    checkpoints = tuple(sorted(set(checkpoints)))
+    if not checkpoints or checkpoints[0] <= 0:
+        raise ValueError("positive checkpoints are required")
+    for example in examples:
+        example.validate()
+
+    names = tuple(sorted({
+        name
+        for example in examples
+        for action in example.features.values()
+        for name in action
+    }))
+    beta = [0.0] * len(names)
+    name_at = {name: index for index, name in enumerate(names)}
+    total_weight = sum(example.sample_weight for example in examples)
+    if total_weight <= 0:
+        raise ValueError("positive total sample weight is required")
+
+    compiled = []
+    for example in examples:
+        actions = tuple(example.features)
+        selected_index = actions.index(example.selected_action)
+        sparse_rows = tuple(
+            tuple(
+                (name_at[name], float(value))
+                for name, value in example.features[action].items()
+                if float(value) != 0.0
+            )
+            for action in actions
+        )
+        offsets = tuple(
+            float(example.offsets[action]) if example.offsets is not None else 0.0
+            for action in actions
+        )
+        compiled.append((
+            float(example.sample_weight),
+            selected_index,
+            sparse_rows,
+            offsets,
+        ))
+
+    snapshots = {}
+    checkpoint_set = set(checkpoints)
+    for epoch in range(checkpoints[-1]):
+        gradient = [0.0] * len(beta)
+        for sample_weight, selected_index, sparse_rows, offsets in compiled:
+            scores = []
+            for offset, row in zip(offsets, sparse_rows):
+                score = offset
+                for index, value in row:
+                    score += beta[index] * value
+                scores.append(score)
+            peak = max(scores)
+            action_weights = [math.exp(score - peak) for score in scores]
+            denominator = sum(action_weights)
+            for action_index, row in enumerate(sparse_rows):
+                probability = action_weights[action_index] / denominator
+                residual = (1.0 if action_index == selected_index else 0.0) - probability
+                scale = sample_weight * residual
+                for index, value in row:
+                    gradient[index] += scale * value
+
+        step = learning_rate / math.sqrt(1.0 + epoch / 25.0)
+        for index in range(len(beta)):
+            grad = gradient[index] / total_weight - l2 * beta[index] / total_weight
+            beta[index] += step * grad
+
+        completed = epoch + 1
+        if completed in checkpoint_set:
+            snapshots[completed] = LinearSoftmaxPropensityModel(
+                feature_names=names,
+                coefficients=tuple(beta),
+                l2=l2,
+            )
+        if completed % 50 == 0 or completed in checkpoint_set:
+            print(json.dumps({
+                "event": "propensity_fit_progress",
+                "completed_epochs": completed,
+                "target_epochs": checkpoints[-1],
+            }), flush=True)
+
+    return snapshots
+
+
+def _assert_checkpoint_equivalence(examples):
+    """Guard the audit helper against drifting from the production optimizer."""
+    sample = examples[: min(25, len(examples))]
+    if not sample:
+        raise ValueError("equivalence check requires examples")
+    checkpoints = (5, 11)
+    path = _fit_epoch_checkpoints(sample, checkpoints)
+    for epochs in checkpoints:
+        independent = LinearSoftmaxPropensityModel.fit(
+            sample,
+            l2=1.0,
+            epochs=epochs,
+        )
+        if path[epochs].feature_names != independent.feature_names:
+            raise AssertionError("checkpoint optimizer feature names differ")
+        if any(
+            not math.isclose(left, right, rel_tol=0.0, abs_tol=1e-15)
+            for left, right in zip(
+                path[epochs].coefficients,
+                independent.coefficients,
+            )
+        ):
+            raise AssertionError(
+                f"checkpoint optimizer differs from independent {epochs}-epoch fit"
+            )
+
+
+def _prepare_validation(decisions, games, training_ids):
+    """Build held-out candidate feature maps once; models only change coefficients."""
     provider = ArchiveSignalProvider(decisions, games)
-    validation = [row for row in decisions if draft_split(row.draft_id) == "validation"]
+    validation = [
+        row for row in decisions
+        if draft_split(row.draft_id) == "validation"
+    ]
     draft_weights = normalized_draft_weights(validation)
+    prepared = []
+    total = len(validation)
+    for index, decision in enumerate(validation, start=1):
+        signals = provider(decision, training_ids)
+        prepared.append({
+            "selected_action": decision.selected_card,
+            "features": model_feature_map(decision, signals),
+            "offsets": strong_choice_offsets(signals, decision.candidates),
+            "sample_weight": draft_weights[decision.decision_id],
+            "skill": (
+                "<0.50"
+                if decision.user_game_win_rate < 0.50
+                else (
+                    "0.50-<0.60"
+                    if decision.user_game_win_rate < 0.60
+                    else ">=0.60"
+                )
+            ),
+            "draft_id": decision.draft_id,
+        })
+        if index % 5000 == 0 or index == total:
+            print(json.dumps({
+                "event": "validation_feature_progress",
+                "completed_decisions": index,
+                "total_decisions": total,
+            }), flush=True)
+    return prepared
+
+
+def _validation_metrics(model, prepared):
     losses = []
     weighted_loss = 0.0
     top1 = []
     selected_probabilities = []
     by_skill = defaultdict(list)
-    for decision in validation:
-        signals = provider(decision, training_ids)
-        features = model_feature_map(decision, signals)
-        offsets = strong_choice_offsets(signals, decision.candidates)
-        probabilities = model.probabilities(features, offsets)
-        selected = max(1e-300, probabilities[decision.selected_card])
+    for row in prepared:
+        probabilities = model.probabilities(row["features"], row["offsets"])
+        selected = max(1e-300, probabilities[row["selected_action"]])
         loss = -math.log(selected)
         losses.append(loss)
-        weighted_loss += draft_weights[decision.decision_id] * loss
+        weighted_loss += row["sample_weight"] * loss
         selected_probabilities.append(selected)
         leader = max(probabilities, key=probabilities.get)
-        top1.append(float(leader == decision.selected_card))
-        rate = decision.user_game_win_rate
-        skill = "<0.50" if rate < 0.50 else ("0.50-<0.60" if rate < 0.60 else ">=0.60")
-        by_skill[skill].append(loss)
+        top1.append(float(leader == row["selected_action"]))
+        by_skill[row["skill"]].append(loss)
     ordered = sorted(selected_probabilities)
+
     def quantile(q):
         if not ordered:
             return None
-        return ordered[min(len(ordered)-1, int(q * (len(ordered)-1)))]
+        return ordered[min(len(ordered) - 1, int(q * (len(ordered) - 1)))]
+
     return {
-        "decisions": len(validation),
-        "drafts": len({row.draft_id for row in validation}),
+        "decisions": len(prepared),
+        "drafts": len({row["draft_id"] for row in prepared}),
         "log_loss_per_decision": statistics.fmean(losses),
         "log_loss_draft_normalized": weighted_loss,
         "top1_accuracy": statistics.fmean(top1),
         "selected_probability_quantiles": {
-            "p01": quantile(0.01), "p05": quantile(0.05), "p50": quantile(0.50),
-            "p95": quantile(0.95), "p99": quantile(0.99),
+            "p01": quantile(0.01),
+            "p05": quantile(0.05),
+            "p50": quantile(0.50),
+            "p95": quantile(0.95),
+            "p99": quantile(0.99),
         },
         "log_loss_by_recorded_skill": {
-            key: statistics.fmean(values) for key, values in sorted(by_skill.items())
+            key: statistics.fmean(values)
+            for key, values in sorted(by_skill.items())
         },
     }
-
 
 def main():
     args = parse_args()
@@ -215,7 +369,17 @@ def main():
     )
     examples = _examples(rows)
 
-    fits = {}
+    _assert_checkpoint_equivalence(examples)
+    prepared_validation = _prepare_validation(
+        decisions,
+        games,
+        training_ids,
+    )
+    fits = _fit_epoch_checkpoints(
+        examples,
+        epoch_grid,
+        l2=1.0,
+    )
     report = {
         "scope": "development_only",
         "source_run": 36256947308,
@@ -230,12 +394,13 @@ def main():
         "fits": {},
     }
     for epochs in epoch_grid:
-        model = LinearSoftmaxPropensityModel.fit(examples, l2=1.0, epochs=epochs)
-        fits[epochs] = model
+        model = fits[epochs]
         report["fits"][str(epochs)] = {
             "optimizer": _objective_gradient(model, examples),
-            "validation": _validation_metrics(model, decisions, games, training_ids),
-            "coefficient_l2": math.sqrt(sum(value * value for value in model.coefficients)),
+            "validation": _validation_metrics(model, prepared_validation),
+            "coefficient_l2": math.sqrt(
+                sum(value * value for value in model.coefficients)
+            ),
         }
 
     baseline = fits[epoch_grid[0]]
