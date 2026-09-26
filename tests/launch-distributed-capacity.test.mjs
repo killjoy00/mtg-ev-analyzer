@@ -12,6 +12,7 @@ const released=()=>{let s=formed();for(let i=0;i<5;i++)s=transition(s,msg(i,{ack
 
 test('committed policy is bounded and cannot silently claim 100 or launch 500 players',()=>{
  assert.equal(validatePolicy(policy),policy);
+ assert.deepEqual(policy.route_budgets_ms.start,{p95:3000,p99:8000});
  for(const patch of [{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101}])assert.throws(()=>validatePolicy({...policy,...patch}));
  assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:500,hold_seconds:600}]}));
  assert.throws(()=>initialControl({...scope,branch:'br-orange-feather-ayps8kep'},start,policy));
@@ -90,6 +91,12 @@ function completeReports() {
 const evaluate=reports=>evaluateStage(reports,{scope,stage:0,start_at:start,networks:Object.fromEntries(reports.map(r=>[r.shard,r.network]))},policy);
 test('complete route, actor, sustained hold, recovery and cross-generator Daily evidence passes',()=>{
  const result=evaluate(completeReports());assert.equal(result.passed,true);assert.equal(result.target,25);assert.equal(result.distinct_real_egress,5);assert.equal(result.correctness_failures,0);assert.equal(result.routes.pick.p99_ms,50);
+});
+test('three-second draft-start p95 is accepted but anything slower still fails',()=>{
+ const atBudget=completeReports();for(const report of atBudget)for(const request of report.requests)if(request.route==='start')request.ms=3000;
+ assert.equal(evaluate(atBudget).passed,true);
+ const tooSlow=completeReports();for(const report of tooSlow)for(const request of report.requests)if(request.route==='start')request.ms=3001;
+ const result=evaluate(tooSlow);assert.equal(result.passed,false);assert.ok(result.reasons.some(r=>r.reason==='route_latency_start'||r.reason==='initial_latency_start'));
 });
 for(const [name,mutate] of [
  ['absent runner',r=>r.pop()],['duplicate runner',r=>r[1].shard=0],['missing route',r=>r.forEach(x=>x.requests=x.requests.filter(y=>y.route!=='reroll'))],
