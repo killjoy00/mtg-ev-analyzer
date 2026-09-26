@@ -1,0 +1,45 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import {pathToFileURL} from 'node:url';
+import {policy,metadata} from './launch-distributed-control.mjs';
+import {PROJECT,projectSnapshot} from './neon-egress-evidence.mjs';
+import {previewAccount,queryPreviewEvents} from './launch-distributed-telemetry.mjs';
+export async function preflightTelemetry({fetcher=fetch,sleep=ms=>new Promise(r=>setTimeout(r,ms)),clock=Date.now}={}) {
+  const sha=process.env.GITHUB_SHA,key=process.env.PREVIEW_ACCESS_KEY,account=await previewAccount({fetcher});
+  assert.match(sha||'',/^[a-f0-9]{40}$/);assert.match(key||'',/^[a-f0-9]{64}$/);
+  const from=clock();
+  // Prove log API/schema access before any gameplay, then generate only bounded
+  // private health traffic. No production probe or mutation can be supplied.
+  await queryPreviewEvents(fetcher,process.env.CLOUDFLARE_EDGE_TOKEN,account,from-60000,from);
+  for(let i=0;i<60;i++) {
+    const r=await fetcher('https://api-preview.packone.pro/draft/health?quick=1',{headers:{'x-pack1-preview-key':key},redirect:'error',signal:AbortSignal.timeout(10000)});
+    assert.ok(r.ok&&(await r.json()).release_commit===sha,'private_preview_revision');await sleep(500);
+  }
+  const to=clock();await sleep(policy.telemetry_settlement_seconds*1000);
+  const events=await queryPreviewEvents(fetcher,process.env.CLOUDFLARE_EDGE_TOKEN,account,from,to);
+  assert.ok(events.some(e=>e.release===sha&&e.status===200),'positive_preview_telemetry_missing');
+  assert.ok(events.every(e=>e.release===sha&&e.status===200),'unexpected_preview_telemetry');
+  return {passed:true,sha,service:'pack1-gateway-preview',from,to,health_requests:60,retained_events:events.length};
+}
+export async function verifyCleanup(branch,{fetcher=fetch}={}) {
+  assert.match(branch||'',/^br-[a-z0-9-]+$/);assert.ok(!['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(branch));
+  const account=await previewAccount({fetcher});
+  const domain=await fetcher(`https://api.cloudflare.com/client/v4/accounts/${account}/workers/domains`,{headers:{authorization:'Bearer '+process.env.CLOUDFLARE_EDGE_TOKEN},redirect:'error',signal:AbortSignal.timeout(20000)});
+  const d=await domain.json();assert.ok(domain.ok&&d.success&&Array.isArray(d.result)&&(d.result_info?.total_pages||1)<=1,'cleanup_domain_inventory');
+  const branchResult=await fetcher(`https://console.neon.tech/api/v2/projects/${PROJECT}/branches/${branch}`,{headers:{authorization:'Bearer '+process.env.NEON_API_KEY},redirect:'error',signal:AbortSignal.timeout(20000)});
+  const report={branch,observed_at:new Date().toISOString(),preview_mapping_absent:!d.result.some(v=>v.hostname==='api-preview.packone.pro'),branch_get_status:branchResult.status};
+  report.passed=report.preview_mapping_absent&&report.branch_get_status===404;return report;
+}
+async function main() {
+  fs.mkdirSync('artifacts/launch-load',{recursive:true});
+  if(process.argv[2]==='budget') {
+    const snapshot=projectSnapshot((await metadata('')).project,new Date().toISOString());
+    fs.writeFileSync('artifacts/launch-load/usage-before-provisioning.json',JSON.stringify(snapshot,null,2));
+  } else if(process.argv[2]==='telemetry') {
+    const r=await preflightTelemetry();fs.writeFileSync('artifacts/launch-load/telemetry-preflight.json',JSON.stringify(r,null,2));
+  } else if(process.argv[2]==='cleanup') {
+    const r=await verifyCleanup(process.env.PREVIEW_BRANCH);fs.writeFileSync('artifacts/launch-load/cleanup.json',JSON.stringify(r,null,2));
+    if(!r.passed)throw Error('cleanup_verification_failed');
+  } else throw Error('unknown_setup_action');
+}
+if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href)main().catch(error=>{console.error(JSON.stringify({error:'capacity_safety_or_evidence_check_failed',code:error.code||null,line:String(error.stack).match(/launch-distributed-[a-z]+\.mjs:(\d+)/)?.[0]||null}));process.exitCode=1;});
