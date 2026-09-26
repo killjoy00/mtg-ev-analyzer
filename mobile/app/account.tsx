@@ -66,13 +66,18 @@ function authResult(value: unknown): value is MobileAuthResponse {
 }
 
 export default function AccountScreen() {
-  const params = useLocalSearchParams<{ validateDailyRunId?: string; environment?: string; returnTo?: string }>();
+  const params = useLocalSearchParams<{ validateDailyRunId?: string; environment?: string; returnTo?: string; shared?: string }>();
   const validateDailyRunId = typeof params.validateDailyRunId === 'string'
     ? params.validateDailyRunId
     : undefined;
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const returnEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const returnToPractice = params.returnTo === 'practice';
+  const returnToShared = params.returnTo === 'shared'
+    && typeof params.shared === 'string'
+    && /^[a-f0-9]{24}$/.test(params.shared)
+    ? params.shared
+    : '';
   const [session, setSession] = useState<MobileSession | null>(null);
   const [account, setAccount] = useState<AccountState | null>(null);
   const [profile, setProfile] = useState<CareerProfile | null>(null);
@@ -165,6 +170,11 @@ export default function AccountScreen() {
         pathname: '/draft-run',
         params: { environment: returnEnvironment },
       }), 600);
+    } else if (returnToShared) {
+      setTimeout(() => router.replace({
+        pathname: '/draft-run',
+        params: { shared: returnToShared },
+      }), 300);
     } else if (returnToPractice) {
       setTimeout(() => router.replace('/practice'), 300);
     }
