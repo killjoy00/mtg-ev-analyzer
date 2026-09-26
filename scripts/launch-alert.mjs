@@ -176,7 +176,7 @@ export async function saveCoverageState(fetcher,env,proposed,{now=Date.now()}={}
 }
 
 export async function routeAlert(fetcher,env,report) {
-  if(!/^[\\w.-]+\\/[\\w.-]+$/.test(env.GITHUB_REPOSITORY||''))throw Error('Invalid alert repository');
+  if(!/^[\w.-]+\/[\w.-]+$/.test(env.GITHUB_REPOSITORY||''))throw Error('Invalid alert repository');
   const base='https://api.github.com/repos/'+env.GITHUB_REPOSITORY;
   const issues=await json(fetcher,base+'/issues?state=open&per_page=100',env.GITHUB_TOKEN);
   const active=new Set(report.alerts||[]);
@@ -274,7 +274,7 @@ async function alertCoverageCheck(fetcher,env,account,now,report) {
 
 export function launchContinuationDepth(env=process.env) {
   const raw=String(env.PACK1_LAUNCH_CONTINUATION_DEPTH??'0').trim();
-  if(!/^\\d{1,2}$/.test(raw))throw Error('Invalid launch continuation depth');
+  if(!/^\d{1,2}$/.test(raw))throw Error('Invalid launch continuation depth');
   const depth=Number(raw);
   if(depth>MAX_CONTINUATION_DEPTH)throw Error('Launch continuation depth exceeds limit');
   return depth;
@@ -288,7 +288,7 @@ export async function scheduleCoverageContinuation(fetcher,env,coverage) {
   const depth=launchContinuationDepth(env);
   if(depth>=MAX_CONTINUATION_DEPTH)return {status:'limit_reached',depth,max_depth:MAX_CONTINUATION_DEPTH,pending_windows:pending};
   const root=String(env.PACK1_LAUNCH_CONTINUATION_ROOT_RUN_ID||env.GITHUB_RUN_ID||'').trim();
-  if(!/^\\d{1,24}$/.test(root))throw Error('Invalid launch continuation root run');
+  if(!/^\d{1,24}$/.test(root))throw Error('Invalid launch continuation root run');
   await json(
     fetcher,
     'https://api.github.com/repos/'+env.GITHUB_REPOSITORY+'/actions/workflows/'+CONTINUATION_WORKFLOW+'/dispatches',
