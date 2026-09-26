@@ -5,20 +5,45 @@ export type CareerSummary = {
   games: number;
   average_score: number;
   best_score: number;
+  challenge_wins: number;
+  challenge_losses: number;
+  challenge_ties: number;
   daily_games: number;
   environments_played: number;
   current_streak: number;
   best_streak: number;
 };
 
-export type CareerProfile = {
-  player: {
-    display_name: string;
-    profile_key?: string | null;
-    claimed?: boolean;
-    username_owned?: boolean;
-  };
-  summary: CareerSummary;
+export type ProfileEnvironment = {
+  set_id: string;
+  games: number;
+  average_score: number;
+  best_score: number;
+  daily_games?: number;
+  last_played_at?: string | null;
+};
+
+export type ProfileAchievement = {
+  id: string;
+  label: string;
+  description?: string;
+  unlocked: boolean;
+  current?: number;
+  target?: number;
+  progress_text?: string;
+  earned_at?: string | null;
+};
+
+export type DailyHistoryRow = {
+  date: string;
+  set_id: string;
+  mode: string;
+  score: number;
+  grade?: string | null;
+  rank: number;
+  total: number;
+  percentile?: number | null;
+  final?: boolean;
 };
 
 export type CareerHistoryRow = {
@@ -30,6 +55,42 @@ export type CareerHistoryRow = {
   grade?: string | null;
   is_daily: boolean;
   outcome?: string | null;
+};
+
+export type CareerProfile = {
+  player: {
+    display_name: string;
+    profile_key?: string | null;
+    profile_public?: boolean;
+    favorite_set_id?: string | null;
+    showcase_achievement?: string | null;
+    claimed?: boolean;
+    username_owned?: boolean;
+  };
+  summary: CareerSummary;
+  environment_total: number;
+  by_set: ProfileEnvironment[];
+  by_mode: Array<{ mode: string; games: number; average_score: number; best_score: number }>;
+  best_environments: ProfileEnvironment[];
+  cube?: ProfileEnvironment | null;
+  best_final_percentile?: number | null;
+  current_season?: {
+    id: string;
+    set_id: string;
+    name: string;
+    start_date?: string | null;
+    end_date?: string | null;
+    standings: Array<{
+      environment: string;
+      rank: number;
+      average: number;
+      days: number;
+    }>;
+  } | null;
+  daily_history: DailyHistoryRow[];
+  recent: CareerHistoryRow[];
+  trend: Array<{ played_at: string; score: number; set_id: string; mode: string }>;
+  achievements: ProfileAchievement[];
 };
 
 export type CareerHistoryPage = {
@@ -48,6 +109,17 @@ function accountOptions(session: MobileSession) {
 
 export function loadMobileCareer(session: MobileSession) {
   return requestJson<CareerProfile>('/growth/v1/mobile/profile/me', accountOptions(session));
+}
+
+export function loadMobilePublicProfile(profileKey: string, session: MobileSession) {
+  return requestJson<CareerProfile>(
+    `/growth/v1/mobile/profile/${encodeURIComponent(profileKey)}`,
+    {
+      mobileSessionToken: session.playerToken,
+      mobileAccountToken: session.accountToken,
+      timeoutMs: 20_000,
+    },
+  );
 }
 
 export function loadMobileCareerHistory(
