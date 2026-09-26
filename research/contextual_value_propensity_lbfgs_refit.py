@@ -123,15 +123,16 @@ def _solve(examples):
 
     iterations = []
     def callback(intermediate_result):
-        value, gradient = objective(intermediate_result.x)
-        iterations.append({
+        # Do not recompute a full gradient here: L-BFGS already evaluated the
+        # objective for this accepted iterate. Final convergence is still
+        # asserted from an explicit objective+gradient evaluation below.
+        entry = {
             "iteration": len(iterations) + 1,
-            "objective": float(value),
-            "gradient_l2": float(np.linalg.norm(gradient)),
-            "gradient_max_abs": float(np.max(np.abs(gradient))) if len(gradient) else 0.0,
-        })
+            "objective": float(intermediate_result.fun),
+        }
+        iterations.append(entry)
         if len(iterations) % 5 == 0:
-            print(json.dumps({"event": "lbfgs_progress", **iterations[-1]}), flush=True)
+            print(json.dumps({"event": "lbfgs_progress", **entry}), flush=True)
 
     result = minimize(
         objective,
