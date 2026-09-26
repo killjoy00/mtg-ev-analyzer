@@ -519,3 +519,89 @@ test('Learn exposes a visible retry message when the canonical browser handoff f
   assert.match(renderedText(root.toJSON()), /Could not open Support & contact\. Try again when your browser is available\./);
   await act(async () => root.unmount());
 });
+
+
+test('published set archive renders current editorial evidence and exact disclosed TCGplayer links', async () => {
+  const opened = [];
+  const archive = {
+    setId: 'msh', replaySeats: 300, trainingDrafts: 5000, trainingPicks: 209999,
+    experiencedCohortDrafts: 40480, winRateCutoff: '60%', averageTopSupport: '48.8%',
+    withinTenPoints: '24%', historicalTopMatch: '68%', averageGap: '27.9%', thirtyPointGap: '42%',
+    topCards: [{ name: 'Cosmic Cube', imageUrl: 'https://cards.example/cube.jpg' }],
+    closeDecisions: [{ first: 'Cosmic Cube', second: 'The Mighty Thor, Jane Foster', firstSupport: '37.7%', secondSupport: '37.6%', gap: '0.1%' }],
+  };
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { replace() {}, push() {} }, useLocalSearchParams: () => ({ setId: 'msh' }) },
+    'react-native': {
+      Linking: { openURL: async (url) => { opened.push(url); } },
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/content/setArchives': { setArchive: () => archive },
+    '@/src/tcgplayer': { tcgplayerUrl: (name) => `https://partner.example/?card=${encodeURIComponent(name)}` },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/set-archive.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  const text = renderedText(root.toJSON());
+  assert.match(text, /300\s+historical replay seats/);
+  assert.match(text, /209,999\s+picks/);
+  assert.match(text, /48.8%/);
+  assert.match(text, /Cosmic Cube/);
+  assert.match(text, /37\.7%\s+support/);
+  assert.match(text, /Affiliate disclosure/);
+  const link = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Cosmic Cube on TCGplayer, affiliate link')[0];
+  assert.ok(link);
+  await act(async () => { link.props.onPress(); await Promise.resolve(); });
+  assert.deepEqual(opened, ['https://partner.example/?card=Cosmic%20Cube']);
+  await act(async () => root.unmount());
+});
+
+test('published set archive keeps the analysis mounted when affiliate browser handoff fails', async () => {
+  const archive = {
+    setId: 'msh', replaySeats: 300, trainingDrafts: 5000, trainingPicks: 209999,
+    experiencedCohortDrafts: 40480, winRateCutoff: '60%', averageTopSupport: '48.8%',
+    withinTenPoints: '24%', historicalTopMatch: '68%', averageGap: '27.9%', thirtyPointGap: '42%',
+    topCards: [{ name: 'Cosmic Cube', imageUrl: 'https://cards.example/cube.jpg' }], closeDecisions: [],
+  };
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { replace() {}, push() {} }, useLocalSearchParams: () => ({ setId: 'msh' }) },
+    'react-native': {
+      Linking: { openURL: async () => { throw new Error('no browser'); } },
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/content/setArchives': { setArchive: () => archive },
+    '@/src/tcgplayer': { tcgplayerUrl: () => 'https://partner.example/card' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/set-archive.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  const link = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link')[0];
+  await act(async () => { link.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
+  assert.match(renderedText(root.toJSON()), /Could not open TCGplayer for Cosmic Cube\. Try the affiliate link again\./);
+  assert.match(renderedText(root.toJSON()), /MSH\s+Pack One archive/);
+  await act(async () => root.unmount());
+});
+
+test('published set web URLs rewrite only the four reviewed archives into native detail routes', () => {
+  const filename = path.join(process.cwd(), 'src', 'linking.ts');
+  const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+    fileName: filename,
+  }).outputText;
+  const compiled = new Module(filename, module);
+  compiled.filename = filename;
+  compiled.paths = Module._nodeModulePaths(path.dirname(filename));
+  compiled._compile(output, filename);
+  for (const setId of ['msh', 'ecl', 'tmt', 'sos']) {
+    assert.equal(compiled.exports.rewriteIncomingPath(`https://packone.pro/sets/${setId}/`), `/set-archive?setId=${setId}`);
+  }
+  assert.equal(compiled.exports.rewriteIncomingPath('https://packone.pro/sets/unknown/'), '/');
+});

@@ -14,6 +14,7 @@ const NATIVE_PATHS = new Set([
   '/historical-challenge',
   '/scoring',
   '/sets',
+  '/set-archive',
 ]);
 
 function environmentFromSet(value: string | null) {
@@ -29,6 +30,8 @@ function directArticlePath(pathname: string) {
   if (normalized === '/methodology') return '/method';
   if (normalized === '/scoring') return '/scoring';
   if (normalized === '/sets') return '/sets';
+  const archive = normalized.match(/^\/sets\/(msh|ecl|tmt|sos)$/);
+  if (archive) return `/set-archive?setId=${archive[1]}`;
   return null;
 }
 
@@ -96,6 +99,11 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
   if (pathname === '/profile') {
     const key = searchParams.get('key');
     return key && /^[a-f0-9]{16}$/.test(key) ? `?key=${key}` : '';
+  }
+
+  if (pathname === '/set-archive') {
+    const setId = searchParams.get('setId')?.toLowerCase();
+    return setId && ['msh', 'ecl', 'tmt', 'sos'].includes(setId) ? `?setId=${setId}` : '';
   }
 
   if (pathname === '/historical-challenge') {
