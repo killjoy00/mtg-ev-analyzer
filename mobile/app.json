@@ -18,11 +18,61 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "pro.packone.app",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "associatedDomains": [
+        "applinks:packone.pro"
+      ]
     },
     "android": {
       "edgeToEdgeEnabled": true,
-      "package": "pro.packone.app"
+      "package": "pro.packone.app",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "packone.pro",
+              "pathPrefix": "/open/profile/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "packone.pro",
+              "pathPrefix": "/open/shared/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        },
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "packone.pro",
+              "pathPrefix": "/open/daily/"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "description": "Practice real draft decisions, compare trophy picks, and track your Pack One career.",
     "backgroundColor": "#f7f8fa"
