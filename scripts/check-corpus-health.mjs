@@ -1,7 +1,7 @@
 import {effectiveCardMetadata} from '../card-metadata.mjs';
 import {meetsServingQuality,SERVING_QUALITY_SQL,SERVING_POLICY_VERSION} from '../serving-quality.mjs';
 // Read every included puzzle once; persist an operational report, never gameplay mutations.
-// node scripts/check-corpus-health.mjs CONNECTION [set-id ...]
+// node scripts/check-corpus-health.mjs CONNECTION [set-id ...]\n// node scripts/check-corpus-health.mjs CONNECTION --snapshot SOURCE_SNAPSHOT_ID
 import fs from 'node:fs';
 import {validateAudit} from './load-source-exclusions.mjs';
 import {probabilityMetrics,trajectoryHealth,matchesFrozenSourceAudit} from './corpus-health-evidence.mjs';
@@ -12,11 +12,30 @@ import catalog from '../corpus/draft-run/catalog.json' with {type:'json'};
 import {corpusGates} from '../corpus-quality.mjs';
 const query=corpusDatabase(process.argv[2]);
 const frozenAudit=validateAudit(JSON.parse(fs.readFileSync('results/rebuild-2026-09-18/frozen-premier-outcomes.json')));
-const requested=process.argv.slice(3),parse=x=>typeof x==='string'?JSON.parse(x):x;
+const rawArgs=process.argv.slice(3),requested=[],parse=x=>typeof x==='string'?JSON.parse(x):x;
+let requestedSnapshot=null;
+for(let i=0;i<rawArgs.length;i++) {
+ if(rawArgs[i]==='--snapshot') {
+  if(requestedSnapshot||!rawArgs[i+1])throw Error('Use --snapshot exactly once with a source snapshot ID.');
+  requestedSnapshot=rawArgs[++i];
+ } else if(rawArgs[i].startsWith('--'))throw Error('Unknown corpus health option: '+rawArgs[i]);
+ else requested.push(rawArgs[i]);
+}
+if(requestedSnapshot&&requested.length)throw Error('Choose exact --snapshot health or set IDs, not both.');
 const aging=(await query(`SELECT set_id,max(checked_at) checked_at FROM corpus_health_checks
  WHERE ready AND corpus_version=$1 GROUP BY set_id HAVING max(checked_at)<now()-interval '5 days'`,[DRAFT_RUN_CORPUS_VERSION])).rows;
 for(const row of aging)console.warn(JSON.stringify({warning:'corpus_health_aging',set:row.set_id,last_health_verification:row.checked_at}));
-const sets=(await query(`WITH versions AS (
+let sets;
+if(requestedSnapshot) {
+ sets=(await query(`SELECT s.set_id,s.manifest,md5(s.manifest::text) manifest_hash,s.source_snapshot_id,
+   (s.schema_version='historical-frozen') historical
+  FROM corpus_source_snapshots s
+  JOIN corpus_set_versions v ON v.set_id=s.set_id AND v.corpus_version=s.corpus_version
+  WHERE s.source_snapshot_id=$2 AND s.corpus_version=$1 AND s.lifecycle_status<>'Retired'`,
+  [DRAFT_RUN_CORPUS_VERSION,requestedSnapshot])).rows;
+ if(sets.length!==1)throw Error('Requested source snapshot is missing, retired, or outside the current corpus: '+requestedSnapshot);
+} else {
+ sets=(await query(`WITH versions AS (
  SELECT * FROM corpus_set_versions WHERE corpus_version=$1
 ), first_class AS (
  SELECT s.*,row_number() OVER(PARTITION BY s.set_id ORDER BY s.created_at DESC,s.source_snapshot_id DESC) rn
@@ -46,6 +65,7 @@ UNION ALL
 SELECT s.set_id,s.manifest,md5(s.manifest::text),s.source_snapshot_id,false
 FROM wanted_first_class s
 ORDER BY set_id,source_snapshot_id NULLS FIRST`,[DRAFT_RUN_CORPUS_VERSION])).rows.filter(s=>!requested.length||requested.includes(s.set_id));
+}
 for(const s of sets) {
  const manifest=parse(s.manifest),f=manifest.full_import||{},windows=runPickWindows(s.set_id==='powered-cube'?'powered-cube':'mixed'),picks=new Set(windows.map(w=>w[0]));
  const historical=s.historical===true||s.historical==='t';
