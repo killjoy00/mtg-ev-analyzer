@@ -11,6 +11,8 @@ V4_REBUILD = ROOT / ".github" / "workflows" / "rebuild-v4-draft-run-corpus.yml"
 GITIGNORE = ROOT / ".gitignore"
 R2_SHARDS = ROOT / "scripts" / "r2_replay_shards.sh"
 REBUILD_RELEASE = ROOT / "docs" / "REBUILD-RELEASE.md"
+CARD_IMAGE_REFRESH = ROOT / ".github" / "workflows" / "refresh-powered-cube-images.yml"
+CARD_IMAGE_SOURCE = ROOT / ".github" / "workflows" / "publish-card-image-source.yml"
 
 
 class DataPipelineWorkflowTests(unittest.TestCase):
@@ -143,6 +145,14 @@ class DataPipelineWorkflowTests(unittest.TestCase):
             finalize.index("Hydrate checkpointed v4 replay shards from R2"),
             finalize.index("Verify complete v4 provenance"),
         )
+
+    def test_card_image_publication_uses_fully_qualified_branch_refs(self):
+        refresh = CARD_IMAGE_REFRESH.read_text()
+        recovery = CARD_IMAGE_SOURCE.read_text()
+        for workflow in (refresh, recovery):
+            self.assertIn('push origin "HEAD:refs/heads/$branch"', workflow)
+            self.assertNotIn('push origin "HEAD:$branch"', workflow)
+        self.assertIn("[publish-card-image-source]", recovery)
 
     def test_backlog_routes_before_shared_lock(self):
         text = BACKLOG.read_text()
