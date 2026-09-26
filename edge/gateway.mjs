@@ -61,7 +61,7 @@ function permitted(service,path,method,search,mode) {
     if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
     if(method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path))return true;
     if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
-    if(method==='GET'&&/^\/v1\/challenges\/[a-f0-9]{24}$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/(?:challenges|shared-runs)\/[a-f0-9]{24}$/.test(path))return true;
     return mode==='production'&&adminPath(path,method);
   }
   return (method==='POST'&&['/v1/session','/v1/scores','/v1/challenges'].includes(path))||
