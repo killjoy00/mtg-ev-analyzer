@@ -77,7 +77,7 @@ jobs:
         run: |
           python3 - <<'PY'
           import json, pathlib
-          reports = list(pathlib.Path("results/contextual-value-v1").glob("lbfgs-fold-*/fold-report.json"))
+          reports = list(pathlib.Path("results/contextual-value-v1").glob("lbfgs-fold-*/lbfgs-fold-*-report.json"))
           assert len(reports) == 1
           report = json.loads(reports[0].read_text())
           assert report["assessment_opened"] is False
@@ -134,6 +134,12 @@ jobs:
             --train-prediction converged-nuisance/lbfgs-nuisance-fold-3.jsonl.gz \
             --train-prediction converged-nuisance/lbfgs-nuisance-fold-4.jsonl.gz \
             --validation-prediction converged-nuisance/lbfgs-nuisance-fold--1.jsonl.gz \
+            --fold-report converged-nuisance/lbfgs-fold--1-report.json \
+            --fold-report converged-nuisance/lbfgs-fold-0-report.json \
+            --fold-report converged-nuisance/lbfgs-fold-1-report.json \
+            --fold-report converged-nuisance/lbfgs-fold-2-report.json \
+            --fold-report converged-nuisance/lbfgs-fold-3-report.json \
+            --fold-report converged-nuisance/lbfgs-fold-4-report.json \
             --source-sha "$SOURCE_SHA" \
             --original-report original-pooled/development-report.json \
             --out results/contextual-value-v1/converged-propensity-pooled
