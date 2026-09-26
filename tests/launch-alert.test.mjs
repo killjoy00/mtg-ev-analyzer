@@ -240,8 +240,23 @@ test('recoverable coverage issue closes after catch-up recovery',async()=>{
   assert.deepEqual(JSON.parse(options.body),{state:'closed',state_reason:'completed'});
   return Response.json({number:77,state:'closed'});
  };
- const action=await routeAlert(fetcher,{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{alerts:[]});
+ const action=await routeAlert(fetcher,{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{alerts:[],coverage:{state_persisted:true,pending_windows:0,continuation:{status:'not_needed'}}});
  assert.equal(action,'recovered');
  assert.equal(calls.length,2);
+});
+
+test('recoverable coverage issue stays open when coverage persistence is unavailable',async()=>{
+ let patches=0;
+ const fetcher=async(url,options={})=>{
+  if((options.method||'GET')==='GET')return Response.json([{
+   title:'[launch alert] Production capacity needs attention (coverage_pending)',number:77,
+  }]);
+  patches++;return Response.json({number:77});
+ };
+ const action=await routeAlert(fetcher,{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{
+  alerts:['telemetry_unavailable'],coverage:{state_persisted:false,pending_windows:0},
+ });
+ assert.equal(action,'created');
+ assert.equal(patches,0,'missing coverage evidence must not auto-close the pending incident');
 });
 
