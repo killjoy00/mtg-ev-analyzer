@@ -1965,7 +1965,6 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
     auth=identity.auth;
   } else {
     id=await player(request);
-    auth=await authSession(request);
   }
   const meta = await profileMetaByPlayer(id);
   if (!meta) throw Object.assign(new Error('Player profile unavailable.'), { status: 404 });
@@ -1973,6 +1972,7 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
     throw Object.assign(new Error('Claim an account before publishing or customizing a profile.'), { status: 403 });
   }
   if(!mobile) {
+    auth=await authSession(request);
     const link = await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1', [auth.user_id]);
     if (link.rows[0]?.player_id !== id) {
       throw Object.assign(new Error('Sign in again to change account settings.'), { status: 403 });
