@@ -9,8 +9,17 @@ on:
         type: choice
         options: [development, production]
         default: development
+      validated_run_id:
+        description: 'Successful development Corpus Operations run ID whose exact artifact may be promoted'
+        required: false
+        type: string
+      recovery_sets:
+        description: 'Development-only comma-separated sets to rebuild/reverify when an artifact cache was evicted'
+        required: false
+        type: string
 permissions:
   contents: read
+  actions: read
 concurrency:
   group: corpus-operations
   cancel-in-progress: false
@@ -28,11 +37,14 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
+      - name: Compute ingestion-relevant revision
+        id: ingestion-revision
+        run: echo "revision=$(python scripts/corpus_promotion_provenance.py revision)" >> "$GITHUB_OUTPUT"
       - run: npm install -g neon@4.17.4
       - name: Prepare explicit connection and require additive schema
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          TARGET: ${{ inputs.target || 'production' }}
+          TARGET: ${{ inputs.target || 'development' }}
         run: |
           set -euo pipefail
           umask 077
@@ -45,48 +57,126 @@ jobs:
           echo "::add-mask::$connection"
           printf '%s' "$connection" > "$RUNNER_TEMP/corpus.connection"
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+      - name: Require reviewed development artifact for production
+        if: ${{ (inputs.target || 'development') == 'production' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATED_RUN_ID: ${{ inputs.validated_run_id || '' }}
+          RECOVERY_SETS: ${{ inputs.recovery_sets || '' }}
+        run: |
+          set -euo pipefail
+          test -z "$RECOVERY_SETS" || { echo 'recovery_sets is development-only' >&2; exit 1; }
+          test -n "$VALIDATED_RUN_ID" || { echo 'production requires validated_run_id from a successful development Corpus Operations run' >&2; exit 1; }
+          run_json=$(gh run view "$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha)
+          echo "$run_json" | jq -e 'select(.conclusion=="success" and .workflowName=="Corpus Operations" and .headBranch=="main")' >/dev/null
+          builder_sha=$(echo "$run_json" | jq -r '.headSha')
+          rm -rf generated/corpus-candidates generated/corpus-operations "$RUNNER_TEMP/validated"
+          mkdir -p generated/corpus-candidates generated/corpus-operations
+          if ! gh run download "$VALIDATED_RUN_ID" --name "corpus-operations-$VALIDATED_RUN_ID" --dir "$RUNNER_TEMP/validated"; then
+            echo "::error::Referenced development run has no promotable corpus artifact. Dispatch development with recovery_sets=<set-id> to rebuild or reverify an evicted artifact."
+            exit 1
+          fi
+          root="$RUNNER_TEMP/validated"
+          [[ -d "$root/generated" ]] && root="$root/generated"
+          test -f "$root/corpus-candidates/catalog.json"
+          test -f "$root/corpus-operations/discovery.json"
+          revision=$(python scripts/corpus_promotion_provenance.py revision)
+          python scripts/corpus_promotion_provenance.py verify "$root/corpus-candidates/catalog.json" --run-id "$VALIDATED_RUN_ID" --run-sha "$builder_sha" --revision "$revision"
+          cp -R "$root/corpus-candidates/." generated/corpus-candidates/
+          cp -R "$root/corpus-operations/." generated/corpus-operations/
       - uses: actions/cache/restore@v4
+        if: ${{ (inputs.target || 'development') != 'production' }}
         with:
           path: generated/corpus-candidates
-          key: corpus-candidates-${{ github.sha }}-${{ github.run_id }}
+          key: corpus-candidates-${{ steps.ingestion-revision.outputs.revision }}-${{ github.run_id }}
           restore-keys: |
-            corpus-candidates-${{ github.sha }}-
-            corpus-candidates-
+            corpus-candidates-${{ steps.ingestion-revision.outputs.revision }}-
+      - name: Discard restored catalog provenance
+        if: ${{ (inputs.target || 'development') != 'production' }}
+        run: |
+          mkdir -p generated/corpus-candidates
+          rm -f generated/corpus-candidates/catalog.json
       - name: Discover archives and metadata
+        if: ${{ (inputs.target || 'development') != 'production' }}
         run: |
           python scripts/discover-corpus.py
           node scripts/register-corpus-sources.mjs "$RUNNER_TEMP/corpus.connection"
       - name: Build, validate and ingest new Candidates
+        if: ${{ (inputs.target || 'development') != 'production' }}
+        env:
+          TARGET: ${{ inputs.target || 'development' }}
+          RECOVERY_SETS: ${{ inputs.recovery_sets || '' }}
         run: |
           set -euo pipefail
-          sets=$(cat generated/corpus-operations/pending.txt)
-          if [[ -z "$sets" ]]; then echo 'No new corpus candidates.'; exit 0; fi
+          pending=$(cat generated/corpus-operations/pending.txt)
+          sets="$pending"
+          if [[ -n "$RECOVERY_SETS" ]]; then
+            [[ "$TARGET" == development ]] || { echo 'recovery_sets is development-only' >&2; exit 1; }
+            sets="$RECOVERY_SETS"
+            echo "Recovery requested for: $sets"
+          fi
+          if [[ -z "$sets" ]]; then
+            echo 'No new corpus candidates; no promotable artifact was produced. For cache eviction recovery, dispatch development with recovery_sets=<set-id>.'
+            exit 0
+          fi
+          printf '%s' "$sets" > generated/corpus-operations/validated-sets.txt
           python -u scripts/run_import_all_trophies.py --sets "$sets" --output generated/corpus-candidates --workers 2 --max-seconds 6000 --discard-source-archives
+          node scripts/load_all_trophies.mjs unused generated/corpus-candidates --validate-only
+          node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
+      - name: Load exact development-validated artifact to production Candidate
+        if: ${{ (inputs.target || 'development') == 'production' }}
+        run: |
+          set -euo pipefail
+          node scripts/register-corpus-sources.mjs "$RUNNER_TEMP/corpus.connection"
           node scripts/load_all_trophies.mjs unused generated/corpus-candidates --validate-only
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
       - name: Verify newly ingested Candidate health
         shell: bash
+        env:
+          TARGET: ${{ inputs.target || 'development' }}
         run: |
           set -euo pipefail
-          sets=$(cat generated/corpus-operations/pending.txt)
+          sets=$(cat generated/corpus-operations/validated-sets.txt 2>/dev/null || cat generated/corpus-operations/pending.txt)
           if [[ -z "$sets" ]]; then
             echo 'No newly ingested corpus candidates; skipping deep payload health scan.'
             exit 0
           fi
           IFS=',' read -r -a set_args <<< "$sets"
           node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus.connection" "${set_args[@]}"
+          if [[ "$TARGET" == development ]]; then
+            node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/corpus.connection"
+          fi
+      - name: Verify current run owns promotable artifact
+        id: artifact
+        if: ${{ always() && (inputs.target || 'development') != 'production' }}
+        run: |
+          set -euo pipefail
+          catalog=generated/corpus-candidates/catalog.json
+          if [[ ! -f "$catalog" ]]; then
+            echo "promotable=false" >> "$GITHUB_OUTPUT"
+            echo 'No catalog was built; a no-op run cannot be used for production promotion.'
+            exit 0
+          fi
+          revision=$(python scripts/corpus_promotion_provenance.py revision)
+          if python scripts/corpus_promotion_provenance.py verify "$catalog" --run-id "$GITHUB_RUN_ID" --run-sha "$GITHUB_SHA" --revision "$revision"; then
+            echo "promotable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "promotable=false" >> "$GITHUB_OUTPUT"
+            echo '::error::Current run does not own a complete promotable corpus artifact.'
+            exit 1
+          fi
       - name: Record import failures
         if: always()
         env:
           WORKFLOW_STATUS: ${{ job.status }}
         run: node scripts/record-corpus-import-status.mjs "$RUNNER_TEMP/corpus.connection" generated/corpus-candidates
       - uses: actions/cache/save@v4
-        if: always()
+        if: ${{ always() && (inputs.target || 'development') != 'production' }}
         with:
           path: generated/corpus-candidates
-          key: corpus-candidates-${{ github.sha }}-${{ github.run_id }}
+          key: corpus-candidates-${{ steps.ingestion-revision.outputs.revision }}-${{ github.run_id }}
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: ${{ always() && steps.artifact.outputs.promotable == 'true' }}
         with:
           name: corpus-operations-${{ github.run_id }}
           retention-days: 90
@@ -96,3 +186,13 @@ jobs:
             generated/corpus-candidates/*/manifest.json
             generated/corpus-candidates/*/trophies.jsonl.gz
             generated/corpus-candidates/*/puzzles.jsonl.gz
+      - uses: actions/upload-artifact@v4
+        if: ${{ always() && (inputs.target || 'development') != 'production' && steps.artifact.outputs.promotable != 'true' }}
+        with:
+          name: corpus-operations-diagnostics-${{ github.run_id }}
+          retention-days: 30
+          if-no-files-found: ignore
+          path: |
+            generated/corpus-operations/
+            generated/corpus-candidates/catalog.json
+            generated/corpus-candidates/*/manifest.json

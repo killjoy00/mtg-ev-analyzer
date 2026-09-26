@@ -21,5 +21,5 @@ test('lifecycle rejects retired reactivation and stale clients; mutation is audi
  await assert.rejects(()=>handleCorpusAdmin(request,()=>{throw Error('must not query');},async()=>({oldStatus:'Retired',status:'Live'}),'admin'),e=>e.status===400);
  await assert.rejects(()=>handleCorpusAdmin(request,()=>{throw Error('must not query');},async()=>({oldStatus:'Candidate',status:'Live',corpusVersion:'old'}),'admin'),e=>e.status===409);
  let statement,params;const result=await handleCorpusAdmin(request,async(s,p)=>{statement=s;params=p;return {rows:[{set_id:'hob',status:'Paused'}]};},async()=>({oldStatus:'Live',status:'Paused',corpusVersion:DRAFT_RUN_CORPUS_VERSION,reason:'Review source'}),'admin');
- assert.equal(result.status,'Paused');assert.ok(statement.includes('INSERT INTO corpus_status_events'));assert.ok(statement.includes('md5(v.manifest::text)'));assert.ok(!/draft_run_(sessions|schedules)/.test(statement));assert.equal(params[4],'admin');
+ assert.equal(result.status,'Paused');assert.ok(statement.includes('INSERT INTO corpus_status_events'));assert.ok(statement.includes('md5(s.manifest::text)'));assert.ok(!/draft_run_(sessions|schedules)/.test(statement));assert.equal(params[4],'admin');
 });

@@ -8,6 +8,7 @@ import {
   changeAccountPassword,
   deleteAccount,
   startAccountDeletionVerification,
+  startAppleDeletionVerification,
   disconnectPatreon,
   signOutAccount,
   loadProfileHistory,
@@ -135,6 +136,14 @@ function dailyRow(row, names, index) {
 function deletionControlMarkup(account) {
   const deletion=account?.deletion||{};
   const legacyPassword=deletion.method===undefined&&deletion.available===true&&!deletion.googleOnly;
+  if(deletion.method==='apple') {
+    return `<form class="account-form" id="account-delete-apple">
+      <label class="profile-toggle"><input required type="checkbox" name="confirm"><span><strong>I understand this permanently deletes my account and cannot be undone.</strong></span></label>
+      <p>Pack One will ask you to verify with Apple again. No deletion email is required.</p>
+      <button class="button secondary" type="submit">Verify with Apple and delete account</button>
+      <span class="profile-settings-status" aria-live="polite"></span>
+    </form>`;
+  }
   if(deletion.method==='email') {
     return `<form class="account-form" id="account-delete-email">
       <label class="profile-toggle"><input required type="checkbox" name="confirm"><span><strong>I understand this permanently deletes my account and cannot be undone.</strong></span></label>
@@ -209,7 +218,7 @@ function settingsMarkup(profile, progress, account, patreon) {
                <button class="button secondary" type="submit">Change password</button>
                <span class="profile-settings-status" aria-live="polite"></span>
              </form>`
-          : `<p><strong>Password</strong><br><span>${account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password credential to change.'}</span></p>`}
+          : `<p><strong>Password</strong><br><span>${account?.credentials?.apple?'This account signs in with Apple and does not have a Pack One password to change.':account?.credentials?.google?'This account signs in with Google and does not have a Pack One password to change.':'This account does not have a password credential to change.'}</span></p>`}
       </div>
     </section>`:''}
     ${account?.user?`<section class="profile-credentials profile-danger" aria-labelledby="delete-account-title">
@@ -321,6 +330,20 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       button.disabled=false;
     } finally {
       form.reset();
+    }
+  });
+  document.querySelector('#account-delete-apple')?.addEventListener('submit',async e=>{
+    e.preventDefault();
+    const form=e.currentTarget,button=form.querySelector('button[type="submit"]'),status=form.querySelector('.profile-settings-status');
+    const data=Object.fromEntries(new FormData(form));
+    if(data.confirm!=='on'){status.textContent='Confirm that you understand deletion is permanent.';return;}
+    button.disabled=true;status.textContent='Opening Apple verification…';
+    try {
+      track('account_delete_apple_verification_started');
+      await startAppleDeletionVerification();
+    } catch(error) {
+      status.textContent=error?.message||'Apple verification could not be started.';
+      button.disabled=false;
     }
   });
   document.querySelector('#account-delete')?.addEventListener('submit',async e=>{

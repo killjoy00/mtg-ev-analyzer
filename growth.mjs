@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import { completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startGoogleSignIn } from './growth-api.mjs';
+import { completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn } from './growth-api.mjs';
 import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
@@ -101,6 +101,10 @@ function googleError(message='') {
   const target=document.querySelector('#account-google-error');
   if(target)target.textContent=message;
 }
+function appleError(message='') {
+  const target=document.querySelector('#account-apple-error');
+  if(target)target.textContent=message;
+}
 
 function setFormPending(form,pending,label) {
   const button=form?.querySelector('button[type="submit"]');
@@ -197,20 +201,37 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       : upgradingElite
         ? 'Create or sign in to your free Pack One account first. Then we’ll show you the Elite benefits and Patreon connection steps.'
         : '';
-  const google=firstPartyAuthEnabled()
-    ? '<div class="account-social"><button class="button primary" id="account-google" type="button">Sign in with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p></div>'
+  const social=firstPartyAuthEnabled()
+    ? '<div class="account-social"><button class="button primary" id="account-apple" type="button">Sign in with Apple</button><p class="form-error" id="account-apple-error" aria-live="polite"></p><button class="button secondary" id="account-google" type="button">Sign in with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p></div>'
     : '';
   const toggleCopy=authMode==='signup'
     ? 'Already have an account? <button class="text-button" id="account-mode-toggle" type="button">Sign in</button>'
     : 'New to Pack One? <button class="text-button" id="account-mode-toggle" type="button">Create account</button>';
   const accountNote=authMode==='signin'?'<small>A free account saves your record and enables leaderboard participation.</small>':'';
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account Access</p><h1>${heading}</h1>${intro?`<p>${intro}</p>`:''}${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header><div class="account-auth-card">${formMarkup(authMode)}</div>${google}<div class="account-new-user"><p>${toggleCopy}</p>${accountNote}</div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite&&!activatingPatreon?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite||activatingPatreon?'Not now, keep playing':'Keep playing as guest'}</button></div></section>`;
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account Access</p><h1>${heading}</h1>${intro?`<p>${intro}</p>`:''}${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header><div class="account-auth-card">${formMarkup(authMode)}</div>${social}<div class="account-new-user"><p>${toggleCopy}</p>${accountNote}</div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite&&!activatingPatreon?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite||activatingPatreon?'Not now, keep playing':'Keep playing as guest'}</button></div></section>`;
 
   document.querySelector('#account-mode-toggle')?.addEventListener('click',()=>void renderAccount({
     validateDailyRunId:pendingDailyRunValidation,
     intent,source,
     mode:authMode==='signin'?'signup':'signin',
   }));
+  document.querySelector('#account-apple')?.addEventListener('click',async e=>{
+    const button=e.currentTarget;
+    if(button.disabled)return;
+    appleError('');
+    button.disabled=true;
+    const idle=button.textContent;
+    button.textContent='Connecting…';
+    try {
+      saveAuthFlow(intent,source);
+      event('auth_apple_started',{source});
+      await startAppleSignIn();
+    } catch(error) {
+      button.disabled=false;
+      button.textContent=idle;
+      appleError(error?.message||'Apple sign in did not finish. Please try again.');
+    }
+  });
   document.querySelector('#account-google')?.addEventListener('click',async e=>{
     const button=e.currentTarget;
     if(button.disabled)return;
@@ -313,33 +334,74 @@ export async function resumeAccountAuth(status) {
     event('auth_verification_completed',{source:flow.source||'unknown'});
     return renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account',notice:'Email verified.'});
   }
+
+  if(status==='apple-delete'||status==='apple-delete-error') {
+    if(status==='apple-delete-error') {
+      const clean=new URL(location.href);
+      clean.searchParams.delete('auth');
+      clean.searchParams.delete('appleDeleteHandoff');
+  clean.searchParams.delete('appleErrorCode');
+      history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
+      event('account_delete_apple_verification_failed',{source:flow.source||'account'});
+      return renderAccount({source:flow.source||'account',notice:'Apple verification did not finish. Your account was not deleted.'});
+    }
+    try {
+      const result=await completeAppleDeletion();
+      const clean=new URL(location.href);
+      clean.searchParams.delete('auth');
+      clean.searchParams.delete('appleDeleteHandoff');
+      history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
+      event('account_delete_apple_verified',{source:flow.source||'account'});
+      return renderDeletionState(result?.deletion==='complete'?'deleted':'deleting');
+    } catch(error) {
+      const clean=new URL(location.href);
+      clean.searchParams.delete('auth');
+      clean.searchParams.delete('appleDeleteHandoff');
+      history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
+      event('account_delete_apple_verification_failed',{source:flow.source||'account'});
+      return renderAccount({source:flow.source||'account',notice:error?.message||'Apple verification could not be completed. Your account was not deleted.'});
+    }
+  }
+
+  const source=flow.source||'unknown';
+  let failure=null;
   if(status==='google') {
     try {
       await completeGoogleSignIn();
-      event('auth_google_completed',{source:flow.source||'unknown'});
+      event('auth_google_completed',{source});
     } catch(error) {
-      event('auth_google_failed',{source:flow.source||'unknown'});
-      const clean=new URL(location.href);
-      clean.searchParams.delete('auth');
-      clean.searchParams.delete('neon_auth_session_verifier');
-      history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
-      await renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
-      googleError(error?.message||'Google sign in did not finish. Please try again.');
-      return;
+      event('auth_google_failed',{source});
+      failure={provider:'google',message:error?.message||'Google sign in did not finish. Please try again.'};
     }
+  } else if(status==='apple') {
+    try {
+      await completeAppleSignIn();
+      event('auth_apple_completed',{source});
+    } catch(error) {
+      event('auth_apple_failed',{source});
+      failure={provider:'apple',message:error?.message||'Apple sign in did not finish. Please try again.'};
+    }
+  } else if(status==='apple-error') {
+    event('auth_apple_failed',{source});
+    const appleErrorCode=new URL(location.href).searchParams.get('appleErrorCode');
+    failure={provider:'apple',message:appleErrorCode==='APPLE_EXISTING_ACCOUNT_UNVERIFIED'
+      ? 'An unverified Pack One account already uses this email. Reset its password from that inbox, verify the account, then try Apple again.'
+      : 'Apple sign in did not finish. Please try again.'};
   } else {
-    event('auth_google_failed',{source:flow.source||'unknown'});
+    event('auth_google_failed',{source});
+    failure={provider:'google',message:'Google sign in did not finish. Please try again.'};
   }
+
   const clean=new URL(location.href);
   clean.searchParams.delete('auth');
   clean.searchParams.delete('neon_auth_session_verifier');
+  clean.searchParams.delete('appleHandoff');
+  clean.searchParams.delete('appleDeleteHandoff');
   history.replaceState({},'',clean.pathname+(clean.searchParams.size?'?'+clean.searchParams:''));
-  if(status!=='google') {
-    await renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
-    googleError('Google sign in did not finish. Please try again.');
-    return;
-  }
-  return renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
+
+  await renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account'});
+  if(failure?.provider==='apple')appleError(failure.message);
+  if(failure?.provider==='google')googleError(failure.message);
 }
 
 export function renderDeletionState(deletionState) {

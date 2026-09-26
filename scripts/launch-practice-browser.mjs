@@ -51,8 +51,8 @@ async function main() {
     } catch(error) {
       // A navigation can cancel an intercepted analytics request before its
       // response arrives. Chromium then rejects fulfillment of the dead id.
-      if(/Invalid InterceptionId|Invalid interceptionId|No resource with given identifier|Session closed|Target closed/.test(String(error.message)))return;
-      errors.push('proxy_'+(error.name||'Error'));await cdp.send('Fetch.failRequest',{requestId,errorReason:'Failed'}).catch(()=>{});
+      if(/Invalid InterceptionId|Invalid interceptionId|No resource with given identifier|Can only perform operation while paused|Session closed|Target closed/.test(String(error.message)))return;
+      errors.push('proxy_'+(error.name||'Error')+'_'+(String(error.message).match(/Protocol error \(([^)]+)\)/)?.[1]||'network')); await cdp.send('Fetch.failRequest',{requestId,errorReason:'Failed'}).catch(()=>{});
     }
   });
   let staticCacheHits=0;cdp.on('Network.requestServedFromCache',()=>staticCacheHits++);

@@ -10,7 +10,7 @@ const {default:api}=await import('../worker/draft-run-function.mjs');
 const user=crypto.randomUUID(),token=crypto.randomUUID();
 async function call(path,body,status=200,auth=token){const r=await api.fetch(new Request('https://packone.pro/v1/admin/corpus'+path,{method:body?'POST':'GET',headers:{'content-type':'application/json',...(auth?{'x-pack1-auth-session':auth}:{})},body:body?JSON.stringify(body):undefined}));const data=await r.json();assert.equal(r.status,status,JSON.stringify(data));return data;}
 const original=(await query("SELECT status FROM draft_run_environment_policy WHERE set_id='hob'")).rows[0].status;
-let check;const discovered='qa-candidate-'+crypto.randomUUID().slice(0,8);
+let check,staleCheck;const discovered='qa-candidate-'+crypto.randomUUID().slice(0,8);
 try {
  await call('',null,401,null);
  await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[user,'QA corpus admin',`${user}@example.invalid`]);
@@ -39,7 +39,24 @@ try {
  await change('Live','Paused');
  await call('/hob/status',{oldStatus:'Live',status:'Paused',corpusVersion:DRAFT_RUN_CORPUS_VERSION},409);
  await call('/hob/status',{oldStatus:'Paused',status:'Live',corpusVersion:DRAFT_RUN_CORPUS_VERSION},409);
- check=(await query(`INSERT INTO corpus_health_checks(set_id,corpus_version,manifest_hash,gate_version,ready,report) SELECT set_id,corpus_version,md5(manifest::text),$2,true,'{"fixture":true}' FROM corpus_set_versions WHERE set_id='hob' AND corpus_version=$1 RETURNING id`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION])).rows[0].id;
+ // Health is a pre-flight check, not a heartbeat: serving never reads it, but a
+ // passing check older than seven days cannot reactivate. Age every inherited row
+ // so this passing-but-stale row is the latest evidence the gate sees.
+ await query("UPDATE corpus_health_checks SET checked_at=now()-interval '9 days' WHERE set_id='hob' AND corpus_version=$1",[DRAFT_RUN_CORPUS_VERSION]);
+ staleCheck=(await query(`INSERT INTO corpus_health_checks(set_id,corpus_version,source_snapshot_id,manifest_hash,gate_version,ready,report,checked_at)
+ SELECT p.set_id,s.corpus_version,s.source_snapshot_id,md5(s.manifest::text),$2,true,'{"fixture":"stale"}',now()-interval '8 days'
+ FROM draft_run_environment_policy p
+ JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
+ WHERE p.set_id='hob' AND s.corpus_version=$1
+ RETURNING id`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION])).rows[0].id;
+ await call('/hob/status',{oldStatus:'Paused',status:'Live',corpusVersion:DRAFT_RUN_CORPUS_VERSION},409);
+ // One exact snapshot check (simulated by a fresh passing row) then allows it.
+ check=(await query(`INSERT INTO corpus_health_checks(set_id,corpus_version,source_snapshot_id,manifest_hash,gate_version,ready,report)
+ SELECT p.set_id,s.corpus_version,s.source_snapshot_id,md5(s.manifest::text),$2,true,'{"fixture":true}'
+ FROM draft_run_environment_policy p
+ JOIN corpus_source_snapshots s ON s.source_snapshot_id=p.active_snapshot_id
+ WHERE p.set_id='hob' AND s.corpus_version=$1
+ RETURNING id`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION])).rows[0].id;
  await change('Paused','Live');
  const audit=(await query('SELECT old_status,new_status,reason FROM corpus_status_events WHERE auth_user_id=$1::uuid ORDER BY id',[user])).rows;
  assert.deepEqual(audit.map(x=>[x.old_status,x.new_status]),[['Live','Paused'],['Paused','Live']]);
@@ -57,6 +74,7 @@ try {
  await query('DELETE FROM draft_run_verified_sets WHERE set_id=$1',[discovered]);
  await query("UPDATE draft_run_environment_policy SET status=$1 WHERE set_id='hob'",[original]);
  if(check)await query('DELETE FROM corpus_health_checks WHERE id=$1::bigint',[check]);
+ if(staleCheck)await query('DELETE FROM corpus_health_checks WHERE id=$1::bigint',[staleCheck]);
  await query("DELETE FROM corpus_set_versions WHERE corpus_version='qa-future-manifest'");
  await query('DELETE FROM corpus_status_events WHERE auth_user_id=$1::uuid',[user]);
  await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[user]);

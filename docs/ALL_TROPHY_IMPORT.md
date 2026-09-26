@@ -35,6 +35,21 @@ The old backend reads all interesting decision metadata using keyset pagination.
 
 Run `npm test` with required replay shards in CI, validate artifacts with the loader, and load development first. Verify per-set counts, old-payload preservation, rerun idempotency, backend health and mixed/Cube starts, rerolls and completions. Measure cold/warm serving at the expanded size for the function version actually being deployed. Keep the import report alongside release evidence. The old `extract_trophy_evidence.py` and `build_verified_trophy_corpus.py` commands reproduce only the frozen baseline and are not the complete importer.
 
+
+## Corpus health evidence and Neon egress
+
+Health evidence is a pre-flight inspection, not a heartbeat. Serving reads only the environment status and its `active_snapshot_id`; it never reads health rows, so a Live corpus keeps serving however old its last check is. Evidence younger than seven days, for the exact manifest and gate version, is required only when an administrator acts: activating a Candidate snapshot, publishing a Candidate environment for the first time, or returning a Paused environment to Live. Source snapshots are immutable, so an unchanged snapshot is never rescanned on a timer.
+
+- **New snapshot:** Corpus Operations deep-scans it once, immediately after ingestion. Activating within seven days needs no second scan.
+- **Older evidence at activation or reactivation:** the admin gate refuses the action. Run `Corpus snapshot health check` (`.github/workflows/corpus-health-refresh.yml`) with the exact `snapshot_id` shown in the admin Corpus area or the evidence report, then act. It is manual only and scans exactly one snapshot.
+- **Evidence report:** `Corpus health evidence report` (`.github/workflows/corpus-health-report.yml`) runs daily against production. It reads snapshot, policy and health metadata only, never puzzle payloads, and never writes. Waiting Candidate and Paused snapshots whose evidence is stale, failed, or expiring within 48 hours are listed in the run summary and as warnings; old evidence on Live snapshots is informational. The run does not fail because evidence is old.
+- **Image refresh:** it may change only display fields, requires HTTPS images, and cannot blank a stored type line, so it cannot change any health gate and does not invalidate evidence. Current-version source exclusions have no automated writer; the frozen audit loader writes only its own historical corpus version.
+- **Gate or serving-policy code change:** a new gate version makes all evidence non-current. Run `Reviewed full corpus health` once, deliberately.
+
+No scheduled workflow deep-scans retained corpus payloads; recurring payload egress is limited to newly ingested sets. `tests/corpus-operations-egress.test.mjs` enforces that contract.
+
+`Reviewed full corpus health` remains a manual-only workflow. Use it when an operator intentionally wants a complete deep audit; do not add a schedule to it.
+
 ## Unattended operation
 
 After an owner explicitly dispatches **Run workflow**, GitHub Actions performs the entire backfill without an AI session: discover all archives, import, validate, load development, complete mixed/Cube practice smoke tests, load production, and test production. It does not trigger on importer code pushes. It saves archive checkpoints in Actions cache and the compact results as 90-day artifacts; database rows and per-set completion manifests persist in Neon. Failed validation blocks later steps, and idempotent inserts make rerunning safe. Repository owners can follow the job summary and GitHub's normal failure notifications. The separately scheduled legacy replay backlog is a different workflow, documented in the repository README.

@@ -13,7 +13,7 @@ try {
   // Stratify a real-data fixture across every available set, pick and band.
   // SQL retains each stored real's text representation, matching the API loader.
   await query(`CREATE TABLE ${pTable} AS SELECT * FROM (
-    SELECT p.puzzle_id,p.corpus_version,p.interesting,p.set_id,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,p.consensus_top_gap,p.support_entropy,
+    SELECT p.puzzle_id,p.corpus_version,p.source_snapshot_id,p.interesting,p.set_id,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,p.consensus_top_gap,p.support_entropy,
       row_number() OVER(PARTITION BY p.set_id,p.pick_number,r.band ORDER BY p.puzzle_id) fixture_row
     FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
     WHERE p.corpus_version=$1 AND p.interesting AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)

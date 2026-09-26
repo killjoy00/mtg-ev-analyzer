@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {loadCustomSetMetadata} from '../worker/draft-run-selection.mjs';
 import {registerHealthyCandidate} from '../scripts/corpus-candidate.mjs';
 test('custom choices require every decision while preserving mixed Live eligibility',async()=>{
@@ -13,4 +14,10 @@ test('custom choices require every decision while preserving mixed Live eligibil
 test('Candidate registration requires current complete health and never changes existing states',async()=>{
  let statement,args;await registerHealthyCandidate(async(sql,p)=>{statement=sql;args=p;return {rows:[]};},'new-set','hash');
  assert.match(statement,/h.ready/);assert.match(statement,/md5\(v.manifest::text\)=\$3/);assert.match(statement,/s.import_status='complete'/);assert.match(statement,/ON CONFLICT\(set_id\) DO NOTHING/);assert.equal(args[0],'new-set');
+});
+
+test('historical snapshot health scans retained NULL-snapshot puzzle rows',()=>{
+ const source=fs.readFileSync(new URL('../scripts/check-corpus-health.mjs',import.meta.url),'utf8');
+ assert.match(source,/const puzzleSnapshotId=historical\?null:/);
+ assert.match(source,/DRAFT_RUN_CORPUS_VERSION,puzzleSnapshotId,after/);
 });
