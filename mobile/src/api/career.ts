@@ -111,6 +111,24 @@ export function loadMobileCareer(session: MobileSession) {
   return requestJson<CareerProfile>('/growth/v1/mobile/profile/me', accountOptions(session));
 }
 
+export function updateMobileProfile(
+  session: MobileSession,
+  payload: {
+    displayName?: string;
+    profilePublic?: boolean;
+    favoriteSetId?: string | null;
+    showcaseAchievement?: string | null;
+  },
+) {
+  return requestJson<CareerProfile>('/growth/v1/mobile/profile', {
+    method: 'PATCH',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: payload,
+    timeoutMs: 20_000,
+  });
+}
+
 export function loadMobilePublicProfile(profileKey: string, session: MobileSession) {
   return requestJson<CareerProfile>(
     `/growth/v1/mobile/profile/${encodeURIComponent(profileKey)}`,
