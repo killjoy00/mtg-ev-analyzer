@@ -172,6 +172,38 @@ test('native account parity routes stay inside the mobile bridge',async()=>{
   assert.equal((await gateway(browserProfile,env(),async()=>{throw Error('must not reach upstream')})).status,403);
 });
 
+test('native shared-run bridge accepts only modern 24-character shares',async()=>{
+  const shareId='a'.repeat(24);
+  for(const accountHeader of [null,account]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro/draft/v1/shared-runs/'+shareId,{
+      headers:headers({
+        'x-pack1-mobile-session':token,
+        ...(accountHeader?{'x-pack1-mobile-account':accountHeader}:{}),
+      }),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      const h=new Headers(options.headers);
+      forwarded={url,player:h.get('authorization'),account:h.get('x-pack1-mobile-account')};
+      return Response.json({id:shareId,name:'A friend',score:88,environment:'mixed',run_length:8,scores:[]});
+    });
+    assert.equal(response.status,200);
+    assert.ok(forwarded.url.endsWith('/v1/shared-runs/'+shareId));
+    assert.equal(forwarded.player,'Bearer '+token);
+    assert.equal(forwarded.account,accountHeader);
+  }
+
+  const legacy='b'.repeat(12);
+  const blocked=new Request('https://api.packone.pro/draft/v1/challenges/'+legacy,{
+    headers:headers({'x-pack1-mobile-session':token}),
+  });
+  assert.equal(
+    (await gateway(blocked,env(),async()=>{throw Error('must not reach upstream')})).status,
+    404,
+    'legacy 12-character challenge IDs belong to the legacy service, not Draft Run',
+  );
+});
+
 test('practice idempotency is only forwarded to Draft Run creation',async()=>{
   const key='practice_'+('k'.repeat(32));
   let forwarded=null;
