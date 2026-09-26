@@ -47,6 +47,7 @@ def parse_args():
     pooled.add_argument("--cohort-dir", type=Path, required=True)
     pooled.add_argument("--train-prediction", action="append", type=Path, required=True)
     pooled.add_argument("--validation-prediction", type=Path, required=True)
+    pooled.add_argument("--fold-report", action="append", type=Path, required=True)
     pooled.add_argument("--source-sha", required=True)
     pooled.add_argument("--original-report", type=Path, required=True)
     pooled.add_argument("--out", type=Path, required=True)
@@ -258,16 +259,54 @@ def run_fold(args):
         "held_drafts": len(held_ids),
         "training_rows": len(rows),
         "held_predictions": len(predictions),
+        "prediction_sha256": file_sha256(output),
         "q_values_preserved": True,
         "assessment_opened": False,
         "assessment_outcomes_used": False,
         "solver": solver,
     }
     args.out.mkdir(parents=True, exist_ok=True)
-    (args.out / "fold-report.json").write_text(
+    (args.out / f"lbfgs-fold-{args.fold}-report.json").write_text(
         json.dumps(report, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
     )
+
+
+def _verify_fold_reports(paths, *, manifest, prediction_digests):
+    reports = {}
+    for path in paths:
+        report = json.loads(path.read_text(encoding="utf-8"))
+        fold = int(report.get("fold"))
+        if fold not in {-1, 0, 1, 2, 3, 4} or fold in reports:
+            raise SystemExit(f"{path}: unexpected or duplicate fold report {fold}")
+        if report.get("scope") != "development_only":
+            raise SystemExit(f"{path}: unexpected fold-report scope")
+        if report.get("source_run") != 36256947308:
+            raise SystemExit(f"{path}: unexpected source run")
+        if report.get("source_sha") != "aa5b17d96b43f3ce08f52fad55ba17f327472c1b":
+            raise SystemExit(f"{path}: unexpected source SHA")
+        if report.get("cohort_id") != manifest["cohort_id"]:
+            raise SystemExit(f"{path}: unexpected cohort")
+        if report.get("assessment_opened") is not False:
+            raise SystemExit(f"{path}: assessment boundary violated")
+        if report.get("assessment_outcomes_used") is not False:
+            raise SystemExit(f"{path}: assessment outcomes used")
+        if report.get("q_values_preserved") is not True:
+            raise SystemExit(f"{path}: retained Q not preserved")
+        solver = report.get("solver") or {}
+        if solver.get("success") is not True:
+            raise SystemExit(f"{path}: solver did not report success")
+        if float(solver.get("gradient_max_abs", float("inf"))) > GTOL:
+            raise SystemExit(f"{path}: solver gradient criterion failed")
+        check = solver.get("gradient_self_check") or {}
+        if float(check.get("max_abs_error", float("inf"))) > 2e-6:
+            raise SystemExit(f"{path}: analytic gradient self-check failed")
+        if report.get("prediction_sha256") != prediction_digests.get(fold):
+            raise SystemExit(f"{path}: prediction payload digest mismatch")
+        reports[fold] = report
+    if set(reports) != {-1, 0, 1, 2, 3, 4}:
+        raise SystemExit("incomplete converged-propensity fold reports")
+    return reports
 
 
 def _extract_primary(report):
@@ -284,6 +323,7 @@ def run_pooled(args):
     decisions, games, manifest = _load_source_cohort(args.cohort_dir, args.source_sha)
     train_predictions = []
     seen_folds = set()
+    prediction_digests = {}
     for path in args.train_prediction:
         rows = _read_predictions(path)
         folds = {row.fold for row in rows}
@@ -293,6 +333,7 @@ def run_pooled(args):
         if fold not in range(5) or fold in seen_folds:
             raise SystemExit(f"{path}: unexpected or duplicate fold {fold}")
         seen_folds.add(fold)
+        prediction_digests[fold] = file_sha256(path)
         train_predictions.extend(rows)
     if seen_folds != set(range(5)):
         raise SystemExit("missing train prediction folds")
@@ -300,6 +341,12 @@ def run_pooled(args):
     validation_predictions = _read_predictions(args.validation_prediction)
     if {row.fold for row in validation_predictions} != {-1}:
         raise SystemExit("validation predictions must be fold -1")
+    prediction_digests[-1] = file_sha256(args.validation_prediction)
+    fold_reports = _verify_fold_reports(
+        args.fold_report,
+        manifest=manifest,
+        prediction_digests=prediction_digests,
+    )
 
     provider = ArchiveSignalProvider(decisions, games)
     report, train_out, validation_out, value_model = run_development(
@@ -333,6 +380,14 @@ def run_pooled(args):
     report["controlled_propensity_refit"] = {
         "q_values": "retained unchanged from run 36256947308",
         "behavior_model": "same conditional-logit objective solved to gtol <= 1e-6 with L-BFGS",
+        "verified_fold_reports": {
+            str(fold): {
+                "prediction_sha256": fold_reports[fold]["prediction_sha256"],
+                "iterations": fold_reports[fold]["solver"]["iterations"],
+                "gradient_max_abs": fold_reports[fold]["solver"]["gradient_max_abs"],
+            }
+            for fold in sorted(fold_reports)
+        },
         "original": _extract_primary(original),
         "converged": _extract_primary(report),
     }
