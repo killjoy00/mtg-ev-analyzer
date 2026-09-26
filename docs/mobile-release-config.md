@@ -85,13 +85,15 @@ Google Play Console grants app-scoped testing access for `pro.packone.app` to `p
 
 ## Free-launch work tracked separately
 
-Sign in with Apple is a free-launch blocker tracked in issue #524; it is no longer treated as post-launch/deferred work.
+Sign in with Apple is implemented and tracked for final physical-device / relay / deletion-revocation acceptance in issue #575. It is not treated as post-launch or deferred work.
+
+The minimum verified HTTPS linking needed for profile/share/continuation parity is also a #575 release gate. Native AASA/App Links configuration is implemented; final acceptance still requires the hosted association payloads to match the real Apple Team ID and Google Play app-signing certificate.
 
 ## Intentionally deferred
 
-- store billing/purchase/restore architecture
-- verified Universal Links / Android App Links
-- remote crash telemetry
+- store billing/purchase/restore architecture only where the selected storefront strategy does not require it for v1 Elite parity
+- additional Universal Links / Android App Links coverage beyond the minimum #575 parity routes
+- remote crash telemetry beyond store-native diagnostics
 
 
 ## Google Play CI authentication

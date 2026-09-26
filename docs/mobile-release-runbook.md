@@ -41,6 +41,18 @@ This file satisfies that operational-documentation requirement.
 - iOS `CFBundleVersion` and Android `versionCode` advance for every store upload.
 - Store-aware allocators choose monotonic build numbers/codes and must remain the source of truth.
 
+## Exact-main source freeze before signed candidates
+
+Before either platform's final signed candidate is uploaded:
+
+1. Freeze the intended release source on reviewed `main`, including mobile code, release-workflow changes, release documentation, and any product data/source changes that must ship with v1.
+2. Run the store-free `Mobile exact-main RC smoke` workflow for that exact `main` SHA.
+3. Require all four stages to pass: exact-main deterministic validation, unsigned iOS production archive, Android production bundle, and the final evidence job that re-fetches `main` after both native builds.
+4. Record the SHA/version/artifact evidence in #575.
+5. Treat **any later `main` movement as invalidating final-source status**. Re-run exact-main certification before uploading signed TestFlight or Play candidates.
+
+The store-free smoke proves source/build reproducibility only. It never substitutes for signed store processing or physical-device acceptance.
+
 ## iOS normal release
 
 1. Merge application changes to reviewed current `main`.
