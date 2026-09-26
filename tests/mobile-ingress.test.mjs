@@ -149,3 +149,67 @@ test('native Google callback only permits the Pack One account deep link',async(
   assert.equal(rejected.status,502);
   assert.equal(rejected.headers.get('location'),null);
 });
+
+
+test('Apple form callback is forwarded without JSON coercion and may return the account deep link',async()=>{
+  const payload=new URLSearchParams({
+    state:'s'.repeat(43),
+    code:'apple-code',
+    id_token:'apple-id-token',
+  }).toString();
+  let seen=null;
+  const callback=new Request('https://api.packone.pro/growth/v1/account/apple/callback',{
+    method:'POST',
+    headers:headers({'content-type':'application/x-www-form-urlencoded',origin:'https://appleid.apple.com'}),
+    body:payload,
+  });
+  const accepted=await gateway(callback,env(),async(url,options)=>{
+    seen={
+      url,
+      body:options.body,
+      contentType:new Headers(options.headers).get('content-type'),
+    };
+    return new Response(null,{
+      status:302,
+      headers:{location:'packone://account?appleHandoff='+'h'.repeat(43)},
+    });
+  });
+  assert.equal(accepted.status,302);
+  assert.equal(accepted.headers.get('location'),'packone://account?appleHandoff='+'h'.repeat(43));
+  assert.match(seen.url,/pack1growth.*\/v1\/account\/apple\/callback$/);
+  assert.equal(seen.body,payload);
+  assert.equal(seen.contentType,'application/x-www-form-urlencoded');
+});
+
+
+test('mobile Apple deletion re-auth routes require and forward both mobile identities',async()=>{
+  for(const path of [
+    '/growth/v1/mobile/account/delete/apple/start',
+    '/growth/v1/mobile/account/delete/apple/finish',
+  ]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro'+path,{
+      method:'POST',
+      headers:headers({
+        'content-type':'application/json',
+        'x-pack1-mobile-session':token,
+        'x-pack1-mobile-account':account,
+      }),
+      body:JSON.stringify(path.endsWith('/start')
+        ? {confirm:true}
+        : {confirm:true,handoffToken:'h'.repeat(43)}),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      forwarded={
+        url,
+        player:new Headers(options.headers).get('authorization'),
+        account:new Headers(options.headers).get('x-pack1-mobile-account'),
+      };
+      return Response.json({ok:true});
+    });
+    assert.equal(response.status,200,path);
+    assert.match(forwarded.url,/pack1growth.*\/v1\/mobile\/account\/delete\/apple\/(?:start|finish)$/);
+    assert.equal(forwarded.player,'Bearer '+token);
+    assert.equal(forwarded.account,account);
+  }
+});

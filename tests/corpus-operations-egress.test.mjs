@@ -5,7 +5,8 @@ import fs from 'node:fs';
 test('scheduled corpus operations only deep-scan newly ingested sets',()=>{
   const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
   assert.match(workflow,/name: Verify newly ingested Candidate health/);
-  assert.match(workflow,/sets=\$\(cat generated\/corpus-operations\/pending\.txt\)/);
+  assert.match(workflow,/pending=\$\(cat generated\/corpus-operations\/pending\.txt\)/);
+  assert.match(workflow,/sets=\$\(cat generated\/corpus-operations\/validated-sets\.txt 2>\/dev\/null \|\| cat generated\/corpus-operations\/pending\.txt\)/);
   assert.match(workflow,/No newly ingested corpus candidates; skipping deep payload health scan\./);
   assert.match(workflow,/IFS=',' read -r -a set_args <<< "\$sets"/);
   assert.match(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/corpus\.connection" "\$\{set_args\[@\]\}"/);
@@ -22,8 +23,48 @@ test('explicit reviewed corpus health remains a manual-only full deep audit',()=
 });
 
 
-test('production promotion validates the reviewed run with standalone jq',()=>{
+test('production promotion proves builder run provenance without pinning the whole repository SHA',()=>{
   const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
-  assert.match(workflow,/gh run view "\$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha \| jq -e --arg sha "\$GITHUB_SHA"/);
-  assert.doesNotMatch(workflow,/gh run view[^\n]*--jq --arg/);
+  assert.match(workflow,/run_json=\$\(gh run view "\$VALIDATED_RUN_ID" --json conclusion,workflowName,headBranch,headSha\)/);
+  assert.match(workflow,/builder_sha=\$\(echo "\$run_json" \| jq -r '\.headSha'\)/);
+  assert.match(workflow,/corpus_promotion_provenance\.py verify "\$root\/corpus-candidates\/catalog\.json" --run-id "\$VALIDATED_RUN_ID" --run-sha "\$builder_sha" --revision "\$revision"/);
+  assert.doesNotMatch(workflow,/--arg sha "\$GITHUB_SHA"/);
+  assert.doesNotMatch(workflow,/\.headSha==\$sha/);
+});
+
+test('development cache is revision-keyed and restored catalog provenance is never reused',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
+  assert.match(workflow,/id: ingestion-revision/);
+  assert.match(workflow,/key: corpus-candidates-\$\{\{ steps\.ingestion-revision\.outputs\.revision \}\}-\$\{\{ github\.run_id \}\}/);
+  assert.match(workflow,/restore-keys: \|\s+corpus-candidates-\$\{\{ steps\.ingestion-revision\.outputs\.revision \}\}-/);
+  assert.doesNotMatch(workflow,/restore-keys: \|[^]*?\n\s+corpus-candidates-\s*(?:\n|$)/);
+  assert.match(workflow,/rm -f generated\/corpus-candidates\/catalog\.json/);
+});
+
+test('no-pending development rerun cannot mint a promotable artifact and has an explicit recovery path',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
+  assert.match(workflow,/recovery_sets:/);
+  assert.match(workflow,/no promotable artifact was produced\. For cache eviction recovery, dispatch development with recovery_sets=<set-id>/);
+  assert.match(workflow,/if \[\[ ! -f "\$catalog" \]\]; then\s+echo "promotable=false"/);
+  assert.match(workflow,/steps\.artifact\.outputs\.promotable == 'true'/);
+  assert.match(workflow,/Referenced development run has no promotable corpus artifact\. Dispatch development with recovery_sets=<set-id>/);
+});
+
+
+test('scheduled production health refresh is bounded to one exact snapshot and never publishes Live',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-health-refresh.yml',import.meta.url),'utf8');
+  assert.match(workflow,/cron: '17 \*\/4 \* \* \*'/);
+  assert.match(workflow,/node scripts\/plan-corpus-health-refresh\.mjs "\$RUNNER_TEMP\/production-health\.connection"/);
+  assert.match(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/production-health\.connection" --snapshot "\$snapshot"/);
+  assert.doesNotMatch(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/production-health\.connection"\s*(?:\||$)/m);
+  assert.match(workflow,/\.over_capacity == false/);
+  assert.match(workflow,/\.hard_deadline_risk == false/);
+  assert.doesNotMatch(workflow,/load_all_trophies|register-corpus-sources|candidate-gameplay-canary|\/v1\/admin\/corpus|\/snapshot|\/status/);
+});
+
+test('exact snapshot health mode cannot be combined with set-wide selection',()=>{
+  const script=fs.readFileSync(new URL('../scripts/check-corpus-health.mjs',import.meta.url),'utf8');
+  assert.match(script,/rawArgs\[i\]==='--snapshot'/);
+  assert.match(script,/Choose exact --snapshot health or set IDs, not both\./);
+  assert.match(script,/WHERE s\.source_snapshot_id=\$2 AND s\.corpus_version=\$1 AND s\.lifecycle_status<>'Retired'/);
 });

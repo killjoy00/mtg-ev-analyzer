@@ -15,6 +15,7 @@ import time
 import urllib.error
 
 import import_all_trophies as importer
+from corpus_promotion_provenance import builder_metadata
 
 
 _TRANSIENT_HTTP = {408, 425, 429, 500, 502, 503, 504}
@@ -139,6 +140,7 @@ def main():
     report = {
         'import_version': importer.IMPORT_VERSION,
         'corpus_version': importer.VERSION,
+        'builder': builder_metadata(),
         'requested_sets': ids,
         'sets': sorted(results, key=lambda s: s['id']),
         'errors': errors,
