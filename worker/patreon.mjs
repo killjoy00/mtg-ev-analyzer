@@ -1,10 +1,12 @@
 import {PATREON_POLICY,validPatreonPolicy,currentPatreonMembership,premiumPatreonMembership,adFreePatreonMembership} from '../patreon-policy.mjs';
 import {createHash,createHmac,randomBytes,timingSafeEqual} from 'node:crypto';
+import {readJson} from './request-json.mjs';
+import {nativePatreonAction,nativePatreonState,validPatreonState,patreonReturnUrl} from './patreon-mobile-policy.mjs';
+import {nativePatreonIdentity,nativePatreonStatus,requestNativePatreonRefresh} from './patreon-mobile.mjs';
 
 const PROVIDER='patreon';
 const PATREON_ORIGIN='https://www.patreon.com';
 const REDIRECT_URI='https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/patreon/callback';
-const RETURN_ORIGIN='https://packone.pro/';
 const USER_AGENT='Pack One - Membership Sync (https://packone.pro)';
 const MEMBER_FIELDS='currently_entitled_amount_cents,patron_status,last_charge_status,is_free_trial,is_gifted';
 // The grant set, the was-Elite-before probe and the activation transition gate
@@ -25,10 +27,8 @@ export function patreonAccountAllowed(authUserId,policy=PATREON_POLICY) {
 }
 const configured=()=>validPatreonPolicy()&&oauthConfigured()&&Boolean(process.env.PATREON_WEBHOOK_SECRET);
 
-function redirect(status) {
-  const url=new URL(RETURN_ORIGIN);
-  url.searchParams.set('patreon',status);
-  return new Response(null,{status:302,headers:{location:url.toString(),'cache-control':'no-store'}});
+function redirect(status,mobile=false) {
+  return new Response(null,{status:302,headers:{location:patreonReturnUrl(status,{mobile}),'cache-control':'no-store','referrer-policy':'no-referrer'}});
 }
 
 function membership(resource,userId=null) {
@@ -250,18 +250,23 @@ async function webhook(request,query,json) {
   return json({ok:true});
 }
 
-export async function handlePatreon(request,{query,authSession,json}) {
+export async function handlePatreon(request,{query,authSession,json,playerSession}) {
   const url=new URL(request.url);
   if(url.pathname==='/v1/patreon/webhook'&&request.method==='POST')return webhook(request,query,json);
   if(url.pathname==='/v1/patreon/callback'&&request.method==='GET') {
-    if(!configured())return redirect('unavailable');
     const state=String(url.searchParams.get('state')||''),code=String(url.searchParams.get('code')||'');
-    if(!/^[a-f0-9]{64}$/.test(state)||!code)return redirect('error');
+    // The native prefix is part of the persisted random state's digest. It
+    // cannot be changed to switch completion surfaces for an existing flow.
+    const mobile=nativePatreonState(state);
+    const finish=outcome=>redirect(outcome,mobile);
+    if(!configured())return finish('unavailable');
+    if(!validPatreonState(state)||(!mobile&&!code))return finish('error');
     const hash=createHash('sha256').update(state).digest('hex');
     const consumed=await query(`UPDATE provider_oauth_states SET consumed_at=now() WHERE state_hash=$1 AND provider=$2 AND expires_at>now() AND consumed_at IS NULL
       RETURNING auth_user_id`,[hash,PROVIDER]);
-    if(!consumed.rows[0])return redirect('expired');
-    if(!patreonAccountAllowed(consumed.rows[0].auth_user_id))return redirect('unavailable');
+    if(!consumed.rows[0])return finish('expired');
+    if(!code)return finish('cancelled');
+    if(!patreonAccountAllowed(consumed.rows[0].auth_user_id))return finish('unavailable');
     const authUserId=consumed.rows[0].auth_user_id;
     try {
       const observedAt=new Date().toISOString();
@@ -271,31 +276,44 @@ export async function handlePatreon(request,{query,authSession,json}) {
       const existing=await query('SELECT provider_user_id FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider=$2',[authUserId,PROVIDER]);
       if(existing.rows[0]&&String(existing.rows[0].provider_user_id)!==resolved.userId) {
         await query('DELETE FROM provider_oauth_states WHERE state_hash=$1',[hash]);
-        return redirect('identity-mismatch');
+        return finish('identity-mismatch');
       }
       const applied=await applyPatreonMembership(query,authUserId,resolved.userId,resolved.member,{link:true,observedAt,oauthStateHash:hash});
       await query('DELETE FROM provider_oauth_states WHERE state_hash=$1',[hash]);
       if(!applied) {
         const current=await query('SELECT provider_user_id FROM provider_accounts WHERE auth_user_id=$1::uuid AND provider=$2',[authUserId,PROVIDER]);
-        if(current.rows[0]&&String(current.rows[0].provider_user_id)!==resolved.userId)return redirect('identity-mismatch');
-        return redirect('expired');
+        if(current.rows[0]&&String(current.rows[0].provider_user_id)!==resolved.userId)return finish('identity-mismatch');
+        return finish('expired');
       }
-      return redirect('connected');
+      return finish('connected');
     } catch(error) {
       if(error?.pgCode==='23505'||error?.code==='23505') {
         await query('DELETE FROM provider_oauth_states WHERE state_hash=$1',[hash]).catch(()=>{});
-        return redirect('conflict');
+        return finish('conflict');
       }
       console.error('Patreon OAuth callback failed',Number(error.providerStatus||error.status||500));
-      return redirect('error');
+      return finish('error');
     }
   }
   if(!url.pathname.startsWith('/v1/patreon/'))return null;
-  const auth=await authSession(request),authUserId=auth.user_id;
-  if(url.pathname==='/v1/patreon/status'&&request.method==='GET')return json(await status(query,authUserId));
-  if(url.pathname==='/v1/patreon/connect'&&request.method==='POST') {
+  const native=url.pathname.startsWith('/v1/patreon/mobile/');
+  const action=nativePatreonAction(url.pathname,request.method);
+  if(native&&!action)return json({error:'Not found.'},404);
+  const bound=native?await nativePatreonIdentity(request,{query,authSession,playerSession}):null;
+  const authUserId=bound?bound.authUserId:(await authSession(request)).user_id;
+  const path=native?`/v1/patreon/${action}`:url.pathname;
+  if(path==='/v1/patreon/status'&&request.method==='GET') {
+    const provider=await status(query,authUserId);
+    return json(bound?await nativePatreonStatus(query,bound,provider):provider);
+  }
+  if(native&&['refresh','disconnect'].includes(action)) {
+    const body=await readJson(request);
+    if(body.confirm!==true)fail('Confirm the Patreon account action.');
+  }
+  if(native&&action==='refresh')return json(await requestNativePatreonRefresh(query,authUserId));
+  if(path==='/v1/patreon/connect'&&request.method==='POST') {
     if(!configured()||!patreonAccountAllowed(authUserId))return json({error:'Patreon membership is not fully configured yet.'},503);
-    const state=randomBytes(32).toString('hex'),hash=createHash('sha256').update(state).digest('hex');
+    const state=(native?'m_':'')+randomBytes(32).toString('hex'),hash=createHash('sha256').update(state).digest('hex');
     await query('DELETE FROM provider_oauth_states WHERE expires_at<=now()');
     const inserted=await query(`WITH identity_allowed AS MATERIALIZED (
       SELECT 1 WHERE pack1_identity_attachment_allowed($2::uuid)
@@ -313,7 +331,7 @@ export async function handlePatreon(request,{query,authSession,json}) {
     target.searchParams.set('state',state);
     return json({url:target.toString()});
   }
-  if(url.pathname==='/v1/patreon/disconnect'&&request.method==='POST') {
+  if(path==='/v1/patreon/disconnect'&&request.method==='POST') {
     await query(`WITH states AS (
       DELETE FROM provider_oauth_states WHERE auth_user_id=$1::uuid AND provider='patreon'
     ), accounts AS (
