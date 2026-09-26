@@ -1,7 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -96,15 +96,15 @@ export default function AccountScreen() {
   const [enrichmentWarning, setEnrichmentWarning] = useState<string | null>(null);
   const enrichmentRequestId = useRef(0);
 
-  const applyProfile = (next: CareerProfile | null) => {
+  const applyProfile = useCallback((next: CareerProfile | null) => {
     setProfile(next);
     setProfileName(next?.player.display_name ?? '');
     setProfilePublic(Boolean(next?.player.profile_public));
     setFavoriteSetId(next?.player.favorite_set_id ?? '');
     setShowcaseAchievement(next?.player.showcase_achievement ?? '');
-  };
+  }, []);
 
-  const loadOptionalEnrichment = async (current: MobileSession) => {
+  const loadOptionalEnrichment = useCallback(async (current: MobileSession) => {
     const id = ++enrichmentRequestId.current;
     setEnrichmentWarning(null);
     const [profileResult, catalogResult] = await Promise.allSettled([
@@ -117,7 +117,7 @@ export default function AccountScreen() {
     if (profileResult.status === 'rejected' || catalogResult.status === 'rejected') {
       setEnrichmentWarning('Signed in. Some profile details could not refresh; account access is still active.');
     }
-  };
+  }, [applyProfile]);
 
   useEffect(() => {
     let active = true;
@@ -155,7 +155,7 @@ export default function AccountScreen() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [applyProfile, loadOptionalEnrichment]);
 
   const finish = async (next: MobileSession, result: MobileAuthResponse) => {
     setSession(next);
