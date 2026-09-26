@@ -104,10 +104,133 @@ test('native public profile aliases are readable without exposing browser profil
       return Response.json({player:{profile_key:profileKey}});
     });
     assert.equal(response.status,200);
-    assert.match(forwarded.url,new RegExp('/v1/mobile/profile/'+profileKey+'$'));
+    assert.match(forwarded.url,new RegExp('/v1/mobile/profile/'+profileKey+'
+  const key='practice_'+('k'.repeat(32));
+  let forwarded=null;
+  const start=new Request('https://api.packone.pro/draft/v1/runs',{
+    method:'POST',
+    headers:headers({
+      'content-type':'application/json',
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+      'x-idempotency-key':key,
+    }),
+    body:'{}',
+  });
+  const response=await gateway(start,env(),async(_url,options)=>{
+    forwarded=new Headers(options.headers).get('x-idempotency-key');
+    return Response.json({ok:true});
+  });
+  assert.equal(response.status,200);
+  assert.equal(forwarded,key);
+
+  const invalid=new Request('https://api.packone.pro/draft/v1/runs',{
+    method:'POST',
+    headers:headers({
+      'content-type':'application/json',
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+      'x-idempotency-key':'bad key',
+    }),
+    body:'{}',
+  });
+  assert.equal((await gateway(invalid,env(),async()=>{throw Error('must not reach upstream')})).status,400);
+
+  const wrongRoute=new Request('https://api.packone.pro/draft/v1/capabilities',{
+    headers:headers({
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+      'x-idempotency-key':key,
+    }),
+  });
+  assert.equal((await gateway(wrongRoute,env(),async()=>{throw Error('must not reach upstream')})).status,403);
+});
+
+test('native Google callback only permits the Pack One account deep link',async()=>{
+  const callback=new Request('https://api.packone.pro/growth/v1/mobile/account/google/callback?flow='+'f'.repeat(43),{
+    headers:headers({}),
+  });
+  const accepted=await gateway(callback,env(),async()=>new Response(null,{
+    status:302,
+    headers:{location:'packone://account?googleHandoff='+'h'.repeat(43)},
+  }));
+  assert.equal(accepted.status,302);
+  assert.equal(accepted.headers.get('location'),'packone://account?googleHandoff='+'h'.repeat(43));
+
+  const rejected=await gateway(callback,env(),async()=>new Response(null,{
+    status:302,
+    headers:{location:'packone://evil?googleHandoff='+'h'.repeat(43)},
+  }));
+  assert.equal(rejected.status,502);
+  assert.equal(rejected.headers.get('location'),null);
+});
+
+
+test('Apple form callback is forwarded without JSON coercion and may return the account deep link',async()=>{
+  const payload=new URLSearchParams({
+    state:'s'.repeat(43),
+    code:'apple-code',
+    id_token:'apple-id-token',
+  }).toString();
+  let seen=null;
+  const callback=new Request('https://api.packone.pro/growth/v1/account/apple/callback',{
+    method:'POST',
+    headers:headers({'content-type':'application/x-www-form-urlencoded',origin:'https://appleid.apple.com'}),
+    body:payload,
+  });
+  const accepted=await gateway(callback,env(),async(url,options)=>{
+    seen={
+      url,
+      body:options.body,
+      contentType:new Headers(options.headers).get('content-type'),
+    };
+    return new Response(null,{
+      status:302,
+      headers:{location:'packone://account?appleHandoff='+'h'.repeat(43)},
+    });
+  });
+  assert.equal(accepted.status,302);
+  assert.equal(accepted.headers.get('location'),'packone://account?appleHandoff='+'h'.repeat(43));
+  assert.match(seen.url,/pack1growth.*\/v1\/account\/apple\/callback$/);
+  assert.equal(seen.body,payload);
+  assert.equal(seen.contentType,'application/x-www-form-urlencoded');
+});
+
+
+test('mobile Apple deletion re-auth routes require and forward both mobile identities',async()=>{
+  for(const path of [
+    '/growth/v1/mobile/account/delete/apple/start',
+    '/growth/v1/mobile/account/delete/apple/finish',
+  ]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro'+path,{
+      method:'POST',
+      headers:headers({
+        'content-type':'application/json',
+        'x-pack1-mobile-session':token,
+        'x-pack1-mobile-account':account,
+      }),
+      body:JSON.stringify(path.endsWith('/start')
+        ? {confirm:true}
+        : {confirm:true,handoffToken:'h'.repeat(43)}),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      forwarded={
+        url,
+        player:new Headers(options.headers).get('authorization'),
+        account:new Headers(options.headers).get('x-pack1-mobile-account'),
+      };
+      return Response.json({ok:true});
+    });
+    assert.equal(response.status,200,path);
+    assert.match(forwarded.url,/pack1growth.*\/v1\/mobile\/account\/delete\/apple\/(?:start|finish)$/);
+    assert.equal(forwarded.player,'Bearer '+token);
+    assert.equal(forwarded.account,account);
+  }
+});
+));
     assert.equal(forwarded.authorization,'Bearer '+token);
   }
-
   const blocked=new Request('https://api.packone.pro/growth/v1/profile/'+profileKey,{
     headers:headers({'x-pack1-mobile-session':token}),
   });
@@ -123,10 +246,7 @@ test('native account parity routes stay inside the mobile bridge',async()=>{
     let forwarded=null;
     const request=new Request('https://api.packone.pro'+path,{
       method:'POST',
-      headers:headers({
-        'content-type':'application/json',
-        'x-pack1-mobile-session':token,
-      }),
+      headers:headers({'content-type':'application/json','x-pack1-mobile-session':token}),
       body:JSON.stringify(path.endsWith('/reset-password')
         ? {token:'r'.repeat(32),newPassword:'new-password'}
         : {email:'qa@example.invalid'}),
@@ -139,7 +259,6 @@ test('native account parity routes stay inside the mobile bridge',async()=>{
     assert.match(forwarded.url,/pack1growth.*\/v1\/mobile\/account\//);
     assert.equal(forwarded.player,'Bearer '+token);
   }
-
   for(const [path,method,body] of [
     ['/growth/v1/mobile/profile','PATCH',{displayName:'Native Player'}],
     ['/growth/v1/mobile/account/password-change','POST',{currentPassword:'old-password',newPassword:'new-password'}],
@@ -155,31 +274,31 @@ test('native account parity routes stay inside the mobile bridge',async()=>{
       body:JSON.stringify(body),
     });
     const response=await gateway(request,env(),async(url,options)=>{
-      forwarded={
-        url,
-        player:new Headers(options.headers).get('authorization'),
-        account:new Headers(options.headers).get('x-pack1-mobile-account'),
-      };
+      forwarded={url,player:new Headers(options.headers).get('authorization'),account:new Headers(options.headers).get('x-pack1-mobile-account')};
       return Response.json({ok:true});
     });
     assert.equal(response.status,200,path);
     assert.equal(forwarded.player,'Bearer '+token);
     assert.equal(forwarded.account,account);
   }
-
-  const browserProfile=new Request('https://api.packone.pro/growth/v1/profile',{
-    method:'PATCH',
-    headers:headers({
-      'content-type':'application/json',
-      'x-pack1-mobile-session':token,
-      'x-pack1-mobile-account':account,
-    }),
-    body:JSON.stringify({displayName:'Nope'}),
-  });
-  assert.equal((await gateway(browserProfile,env(),async()=>{throw Error('must not reach upstream')})).status,403);
 });
 
-test('practice idempotency is only forwarded to Draft Run creation',async()=>{
+test('native stored friend-run reads use only exact 24-hex share ids',async()=>{
+  const share='0123456789abcdef01234567';
+  for(const accountHeader of [null,account]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro/draft/v1/shared-runs/'+share,{
+      headers:headers({
+        'x-pack1-mobile-session':token,
+        ...(accountHeader?{'x-pack1-mobile-account':accountHeader}:{}),
+      }),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      forwarded={url,authorization:new Headers(options.headers).get('authorization')};
+      return Response.json({id:share,run_length:8});
+    });
+    assert.equal(response.status,200);
+    assert.match(forwarded.url,new RegExp('/v1/shared-runs/'+share+'
   const key='practice_'+('k'.repeat(32));
   let forwarded=null;
   const start=new Request('https://api.packone.pro/draft/v1/runs',{
@@ -307,75 +426,10 @@ test('mobile Apple deletion re-auth routes require and forward both mobile ident
     assert.equal(forwarded.authorization,'Bearer '+token);
   }
 
-  const blocked=new Request('https://api.packone.pro/growth/v1/profile/'+profileKey,{
+  const invalid=new Request('https://api.packone.pro/draft/v1/shared-runs/not-a-share',{
     headers:headers({'x-pack1-mobile-session':token}),
   });
-  assert.equal((await gateway(blocked,env(),async()=>{throw Error('must not reach upstream')})).status,403);
-});
-
-test('native account parity routes stay inside the mobile bridge',async()=>{
-  for(const path of [
-    '/growth/v1/mobile/account/request-password-reset',
-    '/growth/v1/mobile/account/send-verification-email',
-    '/growth/v1/mobile/account/reset-password',
-  ]) {
-    let forwarded=null;
-    const request=new Request('https://api.packone.pro'+path,{
-      method:'POST',
-      headers:headers({
-        'content-type':'application/json',
-        'x-pack1-mobile-session':token,
-      }),
-      body:JSON.stringify(path.endsWith('/reset-password')
-        ? {token:'r'.repeat(32),newPassword:'new-password'}
-        : {email:'qa@example.invalid'}),
-    });
-    const response=await gateway(request,env(),async(url,options)=>{
-      forwarded={url,player:new Headers(options.headers).get('authorization')};
-      return Response.json({ok:true});
-    });
-    assert.equal(response.status,200,path);
-    assert.match(forwarded.url,/pack1growth.*\/v1\/mobile\/account\//);
-    assert.equal(forwarded.player,'Bearer '+token);
-  }
-
-  for(const [path,method,body] of [
-    ['/growth/v1/mobile/profile','PATCH',{displayName:'Native Player'}],
-    ['/growth/v1/mobile/account/password-change','POST',{currentPassword:'old-password',newPassword:'new-password'}],
-  ]) {
-    let forwarded=null;
-    const request=new Request('https://api.packone.pro'+path,{
-      method,
-      headers:headers({
-        'content-type':'application/json',
-        'x-pack1-mobile-session':token,
-        'x-pack1-mobile-account':account,
-      }),
-      body:JSON.stringify(body),
-    });
-    const response=await gateway(request,env(),async(url,options)=>{
-      forwarded={
-        url,
-        player:new Headers(options.headers).get('authorization'),
-        account:new Headers(options.headers).get('x-pack1-mobile-account'),
-      };
-      return Response.json({ok:true});
-    });
-    assert.equal(response.status,200,path);
-    assert.equal(forwarded.player,'Bearer '+token);
-    assert.equal(forwarded.account,account);
-  }
-
-  const browserProfile=new Request('https://api.packone.pro/growth/v1/profile',{
-    method:'PATCH',
-    headers:headers({
-      'content-type':'application/json',
-      'x-pack1-mobile-session':token,
-      'x-pack1-mobile-account':account,
-    }),
-    body:JSON.stringify({displayName:'Nope'}),
-  });
-  assert.equal((await gateway(browserProfile,env(),async()=>{throw Error('must not reach upstream')})).status,403);
+  assert.equal((await gateway(invalid,env(),async()=>{throw Error('must not reach upstream')})).status,403);
 });
 
 test('practice idempotency is only forwarded to Draft Run creation',async()=>{
