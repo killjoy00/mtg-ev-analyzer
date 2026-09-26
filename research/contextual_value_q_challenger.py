@@ -53,6 +53,7 @@ def parse_args():
     parser.add_argument("--cohort-dir", type=Path, required=True)
     parser.add_argument("--feature-shard", action="append", type=Path, required=True)
     parser.add_argument("--source-sha", required=True)
+    parser.add_argument("--validation-nuisance", type=Path, required=True)
     parser.add_argument("--out", type=Path, required=True)
     return parser.parse_args()
 
@@ -119,6 +120,46 @@ def _read_feature_rows(paths, manifest, source_sha, training_ids, validation_ids
     return rows
 
 
+def _read_retained_validation_nuisance(
+    path,
+    *,
+    manifest,
+    source_sha,
+    training_ids,
+    validation_ids,
+):
+    meta = json.loads(_meta_path(path).read_text(encoding="utf-8"))
+    checks = {
+        "kind": "nuisance_predictions",
+        "cohort_id": manifest["cohort_id"],
+        "selected_drafts_sha256": manifest["selected_drafts_sha256"],
+        "code_revision": source_sha,
+        "fold": -1,
+        "training_drafts_sha256": draft_id_sha256(training_ids),
+        "held_drafts_sha256": draft_id_sha256(validation_ids),
+        "payload_sha256": file_sha256(path),
+    }
+    for key, value in checks.items():
+        if meta.get(key) != value:
+            raise SystemExit(f"{path}: incompatible retained nuisance {key}")
+
+    predictions = {}
+    with gzip.open(path, "rt", encoding="utf-8") as handle:
+        for line in handle:
+            if not line.strip():
+                continue
+            row = json.loads(line)
+            decision_id = row["decision_id"]
+            if decision_id in predictions:
+                raise SystemExit(
+                    f"{path}: duplicate retained nuisance decision {decision_id}"
+                )
+            predictions[decision_id] = row
+    if len(predictions) != int(meta.get("row_count", -1)):
+        raise SystemExit(f"{path}: retained nuisance row-count mismatch")
+    return predictions
+
+
 def _prepare_validation(decisions, games, training_ids):
     provider = ArchiveSignalProvider(decisions, games)
     validation = [
@@ -146,6 +187,7 @@ def _prepare_validation(decisions, games, training_ids):
                 )
             ),
             "features": features,
+            "selected_action": decision.selected_card,
             "outcome": float(decision.event_match_wins),
             "sample_weight": float(weights[decision.decision_id]),
         })
@@ -268,6 +310,13 @@ def main():
         validation_ids,
     )
     validation = _prepare_validation(decisions, games, training_ids)
+    retained_validation = _read_retained_validation_nuisance(
+        args.validation_nuisance,
+        manifest=manifest,
+        source_sha=args.source_sha,
+        training_ids=training_ids,
+        validation_ids=validation_ids,
+    )
 
     train_features = [row.features[row.selected_action] for row in rows]
     train_outcomes = np.asarray([row.outcome for row in rows], dtype=np.float64)
@@ -283,6 +332,30 @@ def main():
         [ridge.predict(row["features"]) for row in validation],
         dtype=np.float64,
     )
+    retained_q = []
+    for row in validation:
+        nuisance = retained_validation.get(row["decision_id"])
+        if nuisance is None:
+            raise SystemExit(
+                "retained validation nuisance is missing "
+                + row["decision_id"]
+            )
+        retained_q.append(
+            float(nuisance["q_values"][row["selected_action"]])
+        )
+    if set(retained_validation) != {row["decision_id"] for row in validation}:
+        raise SystemExit(
+            "retained validation nuisance decision IDs do not exactly match validation"
+        )
+    baseline_max_abs_error = max(
+        abs(float(left) - float(right))
+        for left, right in zip(ridge_predictions, retained_q)
+    )
+    if baseline_max_abs_error > 1e-9:
+        raise SystemExit(
+            "reconstructed ridge Q does not match retained successful predictions; "
+            f"max_abs_error={baseline_max_abs_error}"
+        )
 
     vectorizer = DictVectorizer(sparse=False, dtype=np.float32)
     x_train = vectorizer.fit_transform(train_features)
@@ -304,6 +377,7 @@ def main():
         "cohort_id": manifest["cohort_id"],
         "assessment_opened": False,
         "assessment_outcomes_used": False,
+        "source_skill_timing_verified": False,
         "training_drafts": len(training_ids),
         "validation_drafts": len(validation_ids),
         "training_rows": len(rows),
@@ -312,6 +386,7 @@ def main():
         "baseline": {
             "family": "RidgeOutcomeModel",
             "l2": 10.0,
+            "retained_prediction_max_abs_error": baseline_max_abs_error,
             "metrics": ridge_report,
         },
         "challenger": {
@@ -335,7 +410,10 @@ def main():
         },
         "interpretation_boundary": (
             "Validation-only nuisance evidence. This report cannot adopt the "
-            "challenger, open assessment, or establish downstream policy value."
+            "challenger, open assessment, or establish downstream policy value. "
+            "The upstream temporal semantics of recorded skill/experience fields "
+            "remain unverified, so nonlinear use of those fields is not eligible "
+            "for causal interpretation or freeze."
         ),
     }
     args.out.parent.mkdir(parents=True, exist_ok=True)
