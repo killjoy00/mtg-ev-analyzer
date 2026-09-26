@@ -34,6 +34,10 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-release-request\.json'/s, path);
       assert.match(workflow, /request\.get\('operation'\) != 'upload-android-internal'/, path);
+    } else if (path === '.github/workflows/android-internal-status.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-status-request\.json'/s, path);
+      assert.match(workflow, /request\.get\('operation'\) != 'check-android-internal-status'/, path);
     } else {
       assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/, path);
     }
@@ -54,6 +58,12 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.equal(androidRequest.operation, 'upload-android-internal');
   assert.equal(typeof androidRequest.reason, 'string');
   assert.ok(androidRequest.reason.trim().length > 0);
+
+  const androidStatusRequest = JSON.parse(read('.github/android-internal-status-request.json'));
+  assert.deepEqual(Object.keys(androidStatusRequest).sort(), ['operation','reason']);
+  assert.equal(androidStatusRequest.operation, 'check-android-internal-status');
+  assert.equal(typeof androidStatusRequest.reason, 'string');
+  assert.ok(androidStatusRequest.reason.trim().length > 0);
 
   assert.match(ios, /CFBundleShortVersionString/);
   assert.match(ios, /store-release\.json/);
