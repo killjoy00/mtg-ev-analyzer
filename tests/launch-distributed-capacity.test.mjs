@@ -4,6 +4,7 @@ import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequ
 import {policy,heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
 import {inspectBin,inspectPreviewTelemetry,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
 import {requestClient} from '../scripts/launch-distributed-player.mjs';
+import {preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
 const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
 const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
 const formed=()=>{let s=initialControl(scope,start,policy);for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,policy);return s;};
@@ -11,7 +12,7 @@ const released=()=>{let s=formed();for(let i=0;i<5;i++)s=transition(s,msg(i,{ack
 
 test('committed policy is bounded and cannot silently claim 100 or launch 500 players',()=>{
  assert.equal(validatePolicy(policy),policy);
- for(const patch of [{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120}])assert.throws(()=>validatePolicy({...policy,...patch}));
+ for(const patch of [{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101}])assert.throws(()=>validatePolicy({...policy,...patch}));
  assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:500,hold_seconds:600}]}));
  assert.throws(()=>initialControl({...scope,branch:'br-orange-feather-ayps8kep'},start,policy));
 });
@@ -128,6 +129,30 @@ test('preview log query uses the real retained-event parser, exact service filte
 });
 test('inaccessible, truncated and schema-invalid retained preview telemetry cannot produce a pass',async()=>{
  for(const fetcher of [async()=>Response.json({}, {status:403}),async()=>Response.json({result:{}}),async()=>Response.json({result:{events:{events:Array(200).fill({})}}})])await assert.rejects(()=>queryPreviewEvents(fetcher,'t','a',0,500));
+});
+test('preview telemetry preflight waits beyond initial settlement but still fails at the declared timeout',async()=>{
+ const saved={sha:process.env.GITHUB_SHA,key:process.env.PREVIEW_ACCESS_KEY,token:process.env.CLOUDFLARE_EDGE_TOKEN};
+ process.env.GITHUB_SHA=scope.sha;process.env.PREVIEW_ACCESS_KEY='b'.repeat(64);process.env.CLOUDFLARE_EDGE_TOKEN='token';
+ const row={$metadata:{id:'preflight-retained'},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:.1,route:'health'}};
+ const run=async(delayed)=>{
+  let now=0,queries=0,health=0;
+  const fetcher=async(url,options)=>{
+   if(url.includes('/zones?'))return Response.json({success:true,result:[{account:{id:'a'.repeat(32)}}]});
+   if(url.includes('/telemetry/query')){queries++;const rows=delayed&&queries>=4?[row]:[];return Response.json({success:true,result:{events:{events:rows}}});}
+   if(url.startsWith('https://api-preview.packone.pro/')){health++;return Response.json({release_commit:scope.sha});}
+   throw Error('unexpected_preflight_url');
+  };
+  const report=await preflightTelemetry({fetcher,clock:()=>now,sleep:async ms=>{now+=ms;}});
+  return {report,health};
+ };
+ try {
+  const delayed=await run(true);assert.equal(delayed.report.passed,true);assert.equal(delayed.health,policy.telemetry_preflight_requests);assert.equal(delayed.report.checks.length,3);
+  const absent=await run(false);assert.equal(absent.report.passed,false);assert.equal(absent.report.reason,'positive_preview_telemetry_missing');assert.equal(absent.report.checks.at(-1).retained_events,0);
+ } finally {
+  if(saved.sha===undefined)delete process.env.GITHUB_SHA;else process.env.GITHUB_SHA=saved.sha;
+  if(saved.key===undefined)delete process.env.PREVIEW_ACCESS_KEY;else process.env.PREVIEW_ACCESS_KEY=saved.key;
+  if(saved.token===undefined)delete process.env.CLOUDFLARE_EDGE_TOKEN;else process.env.CLOUDFLARE_EDGE_TOKEN=saved.token;
+ }
 });
 test('complete preview inspection rejects a missing active minute, not just an empty full-run result',async()=>{
  const to=120000,requests=[{at:1},{at:60001}],row={$metadata:{id:'retained'},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:.1,route:'draft_pick'}};
