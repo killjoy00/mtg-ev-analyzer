@@ -15,6 +15,7 @@ concurrency:
 jobs:
   release:
     if: github.ref == 'refs/heads/main'
+    environment: pack-one-mobile-release
     runs-on: ubuntu-latest
     timeout-minutes: 35
     env:
@@ -31,6 +32,10 @@ jobs:
       PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
       PACK1_AUTH_RESEND_API_KEY: ${{ secrets.PACK1_AUTH_RESEND_API_KEY }}
       PACK1_ACCOUNT_DELETE_RESEND_API_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+      APPLE_SIGN_IN_KEY_P8: ${{ secrets.APPLE_SIGN_IN_KEY_P8 }}
+      APPLE_SIGN_IN_KEY_ID: ${{ secrets.APPLE_SIGN_IN_KEY_ID }}
+      APPLE_TOKEN_ENCRYPTION_KEY_V1: ${{ secrets.APPLE_TOKEN_ENCRYPTION_KEY_V1 }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,6 +75,10 @@ jobs:
           test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16 || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is missing or too short.'; exit 1; }
           [[ "$PACK1_AUTH_RESEND_API_KEY" == re_* ]] || { echo '::error::PACK1_AUTH_RESEND_API_KEY is missing or malformed.'; exit 1; }
           [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
+          [[ "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo '::error::APPLE_TEAM_ID is missing or malformed.'; exit 1; }
+          [[ "$APPLE_SIGN_IN_KEY_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo '::error::APPLE_SIGN_IN_KEY_ID is missing or malformed.'; exit 1; }
+          [[ "$APPLE_SIGN_IN_KEY_P8" == *"BEGIN PRIVATE KEY"* ]] || { echo '::error::APPLE_SIGN_IN_KEY_P8 is missing or malformed.'; exit 1; }
+          [[ "$APPLE_TOKEN_ENCRYPTION_KEY_V1" =~ ^[A-Fa-f0-9]{64}$ ]] || { echo '::error::APPLE_TOKEN_ENCRYPTION_KEY_V1 must be a 32-byte hex key.'; exit 1; }
 
       - name: Build exact Neon function revision
         env:
@@ -98,6 +107,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_mobile_minimum_version.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -113,7 +123,11 @@ jobs:
                 --env "PACK1_DELETION_ADMIN_EMAIL=$PACK1_DELETION_ADMIN_EMAIL"
                 --env "PACK1_DELETION_ADMIN_PASSWORD=$PACK1_DELETION_ADMIN_PASSWORD"
                 --env "PACK1_ACCOUNT_DELETION_ENABLED=1"
-                --env "PACK1_VERIFICATION_SWEEP_ENABLED=1")
+                --env "PACK1_VERIFICATION_SWEEP_ENABLED=1"
+                --env "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+                --env "APPLE_SIGN_IN_KEY_ID=$APPLE_SIGN_IN_KEY_ID"
+                --env "APPLE_SIGN_IN_KEY_P8=$APPLE_SIGN_IN_KEY_P8"
+                --env "APPLE_TOKEN_ENCRYPTION_KEY_V1=$APPLE_TOKEN_ENCRYPTION_KEY_V1")
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
@@ -148,6 +162,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_mobile_minimum_version.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0040_practice_reroll_index.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -164,7 +179,11 @@ jobs:
                 --env "PACK1_DELETION_ADMIN_PASSWORD=$PACK1_DELETION_ADMIN_PASSWORD"
                 --env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY"
                 --env "PACK1_ACCOUNT_DELETION_ENABLED=1"
-                --env "PACK1_VERIFICATION_SWEEP_ENABLED=1")
+                --env "PACK1_VERIFICATION_SWEEP_ENABLED=1"
+                --env "APPLE_TEAM_ID=$APPLE_TEAM_ID"
+                --env "APPLE_SIGN_IN_KEY_ID=$APPLE_SIGN_IN_KEY_ID"
+                --env "APPLE_SIGN_IN_KEY_P8=$APPLE_SIGN_IN_KEY_P8"
+                --env "APPLE_TOKEN_ENCRYPTION_KEY_V1=$APPLE_TOKEN_ENCRYPTION_KEY_V1")
               if [[ "$PATREON_RUNTIME_ENABLED" == true ]]; then
                 extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
               fi
