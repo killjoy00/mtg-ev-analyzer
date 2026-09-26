@@ -6,6 +6,10 @@ on:
     paths:
       - 'mobile/**'
       - '.github/workflows/android-internal-testing.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/android-internal-release-request.json'
   workflow_dispatch:
 
 permissions:
@@ -78,7 +82,7 @@ jobs:
 
   internal-release:
     name: sign and publish Android internal test
-    if: ${{ github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main' }}
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
     runs-on: ubuntu-latest
     environment: pack-one-mobile-release
     defaults:
@@ -86,6 +90,24 @@ jobs:
         working-directory: mobile
     steps:
       - uses: actions/checkout@v4
+      - name: Resolve reviewed Android internal release request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('../.github/android-internal-release-request.json').read_text())
+          if set(request) != {'operation','reason'}:
+              raise SystemExit('Invalid Android internal release request keys.')
+          if request.get('operation') != 'upload-android-internal':
+              raise SystemExit('Invalid Android internal release operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Android internal release request requires a reason.')
+          print('Reviewed Android internal release request:', reason)
+          PY
       - name: Require current approved main revision
         shell: bash
         run: |
