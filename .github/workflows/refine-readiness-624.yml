@@ -1,0 +1,117 @@
+name: refine corpus readiness 624
+on:
+  push:
+    branches: [work/corpus-readiness-refine-624]
+    paths: ['.github/workflows/refine-readiness-624.yml']
+permissions:
+  contents: write
+jobs:
+  refine:
+    if: github.repository == 'killjoy00/mtg-ev-analyzer' && github.ref == 'refs/heads/work/corpus-readiness-refine-624'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Apply reviewed integration deltas
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('edge/gateway.mjs'); s=p.read_text()
+          old="  if(path==='/v1/admin/corpus'&&method==='GET')return true;"
+          assert s.count(old)==1
+          s=s.replace(old,old+"\n  if(path==='/v1/admin/corpus/readiness'&&method==='GET')return true;\n  if(/^\\/v1\\/admin\\/corpus\\/readiness\\/[1-9][0-9]{0,18}\\/retry$/.test(path)&&method==='POST')return true;")
+          p.write_text(s)
+          p=Path('scripts/practice-performance.mjs'); s=p.read_text()
+          old="'0042_serving_revision_snapshot_staging.sql']"
+          assert s.count(old)==1
+          s=s.replace(old,"'0042_serving_revision_snapshot_staging.sql','0043_corpus_activation_readiness.sql']")
+          old='  const query=sqlQuery(connection),day=gameDateKey();'
+          assert s.count(old)==1
+          s=s.replace(old,"  // This verified disposable clone compares the unchanged builder/selector primitive.\n  // The separate readiness acceptance suite registers and proves the serving gate.\n  if(cached)execFileSync('psql',['-X','-d',connection,'-v','ON_ERROR_STOP=1','-c','DELETE FROM draft_run_readiness_keys'],{env:process.env,stdio:['ignore','ignore','pipe'],timeout:30000});\n"+old)
+          p.write_text(s)
+          p=Path('tests/corpus-readiness-backend-smoke.mjs'); s=p.read_text()
+          old="'payload',p.payload||jsonb_build_object('source_snapshot_id',$1::text)"
+          assert s.count(old)==1
+          s=s.replace(old,"'payload',p.payload||jsonb_build_object('source_snapshot_id',$1::text,'puzzle_id',md5($1||p.puzzle_id),'source_draft_hash',md5($1||p.source_draft_hash))")
+          p.write_text(s)
+          p=Path('.github/workflows/backend-gate.yml'); s=p.read_text()
+          line='          node tests/corpus-readiness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures\n'
+          assert s.count(line)==1;s=s.replace(line,'')
+          anchor='          node tests/staged-manifest-backend-smoke.mjs'
+          assert s.count(anchor)==1
+          s=s.replace(anchor,'          # Prove the new readiness state machine before independent legacy fixtures.\n'+line+anchor)
+          p.write_text(s)
+          Path('tests/corpus-readiness-gateway.test.mjs').write_text('''import test from 'node:test';
+          import assert from 'node:assert/strict';
+          import {gateway} from '../edge/gateway.mjs';
+          const env={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'a'.repeat(64),
+           NETWORK_QUOTA:{idFromName:x=>x,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+          const request=(path,method='GET',extra={})=>new Request('https://api.packone.pro/draft'+path,{
+           method,headers:{origin:'https://packone.pro','cf-connecting-ip':'203.0.113.8',
+            cookie:'__Host-pack1_account=fixture; unrelated=discard','x-pack1-csrf':'fixture-csrf',
+            authorization:'Bearer untrusted-caller','content-type':'application/json',...extra},
+           ...(method==='POST'?{body:'{}'}:{})});
+          test('readiness reads and authorized retries cross the exact production gateway routes',async()=>{
+           for(const [path,method] of [['/v1/admin/corpus/readiness?operation=17','GET'],['/v1/admin/corpus/readiness/17/retry','POST']]) {
+            let calls=0;
+            const result=await gateway(request(path,method),env,async(url,options)=>{
+             calls++;assert.equal(url,'https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech'+path);
+             assert.equal(options.method,method);assert.equal(options.headers.get('cookie'),'__Host-pack1_account=fixture');
+             assert.equal(options.headers.get('authorization'),null);assert.equal(options.headers.get('x-pack1-csrf'),'fixture-csrf');
+             if(method==='POST')assert.equal(options.body,'{}');
+             return Response.json({ready:false,state:'warming'});
+            });
+            assert.equal(calls,1);assert.equal(result.status,200);assert.equal(result.headers.get('cache-control'),'no-store');
+            assert.equal(result.headers.get('access-control-allow-credentials'),'true');assert.equal((await result.json()).ready,false);
+           }
+          });
+          test('readiness does not widen method, operation-id, preview, mobile or backend-admin authority',async()=>{
+           const never=()=>{throw Error('Disallowed route reached upstream');};
+           for(const [path,method] of [['/v1/admin/corpus/readiness','POST'],['/v1/admin/corpus/readiness/17/retry','GET'],
+            ['/v1/admin/corpus/readiness/0/retry','POST'],['/v1/admin/corpus/readiness/-1/retry','POST'],
+            ['/v1/admin/corpus/readiness/17/activate','POST'],['/v1/admin/corpus/readiness/12345678901234567890/retry','POST']]) {
+            assert.equal((await gateway(request(path,method),env,never)).status,404);
+           }
+           const preview={...env,MODE:'preview',NEON_BRANCH_ID:'br-isolated-readiness',PREVIEW_KEY:'b'.repeat(64),ORIGIN_SECRET:'c'.repeat(64)};
+           const previewRequest=new Request('https://api-preview.packone.pro/draft/v1/admin/corpus/readiness',{headers:{'x-pack1-preview-key':preview.PREVIEW_KEY}});
+           assert.equal((await gateway(previewRequest,preview,never)).status,404);
+           const mobile='p1_00000000-0000-4000-8000-000000000000.'+'d'.repeat(43);
+           assert.equal((await gateway(request('/v1/admin/corpus/readiness','GET',{'x-pack1-mobile-session':mobile}),env,never)).status,403);
+           const denied=await gateway(request('/v1/admin/corpus/readiness/17/retry','POST'),env,async()=>Response.json({error:'Admin access required'},{status:403}));
+           assert.equal(denied.status,403);assert.equal((await denied.json()).error,'Admin access required');
+          });
+          ''')
+          PY
+          git diff --check
+          node --check edge/gateway.mjs
+          node --check tests/corpus-readiness-backend-smoke.mjs
+          node --test tests/corpus-readiness.test.mjs tests/corpus-readiness-gateway.test.mjs tests/activated-snapshot-smoke.test.mjs tests/corpus-admin-reporting.test.mjs tests/corpus-quality.test.mjs tests/serving-cache.test.mjs tests/practice-performance.test.mjs
+      - name: Store immutable blobs for the reviewed PR commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python - <<'PY'
+          import os,json,subprocess,urllib.request,base64
+          root='https://api.github.com/repos/killjoy00/mtg-ev-analyzer'
+          paths=['edge/gateway.mjs','scripts/practice-performance.mjs','tests/corpus-readiness-backend-smoke.mjs','.github/workflows/backend-gate.yml','tests/corpus-readiness-gateway.test.mjs']
+          entries=[]
+          for path in paths:
+              with open(path,'rb') as f:content=base64.b64encode(f.read()).decode()
+              req=urllib.request.Request(root+'/git/blobs',data=json.dumps({'content':content,'encoding':'base64'}).encode(),headers={'Authorization':'Bearer '+os.environ['GH_TOKEN'],'Accept':'application/vnd.github+json','Content-Type':'application/json'})
+              with urllib.request.urlopen(req) as response:blob=json.load(response)
+              entries.append({'path':path,'mode':'100644','type':'blob','sha':blob['sha']})
+          print('REVIEWED_BASE=b1739fa26f385b586824c677f9504982cb47af08')
+          print('REVIEWED_TREE_ENTRIES='+json.dumps(entries))
+          os.makedirs('artifacts/refinement',exist_ok=True)
+          with open('artifacts/refinement/tree-entries.json','w') as f:json.dump(entries,f)
+          PY
+          git diff --binary > artifacts/refinement/refinement.patch
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: readiness-refinement-${{ github.run_id }}
+          path: artifacts/refinement
+          retention-days: 7
