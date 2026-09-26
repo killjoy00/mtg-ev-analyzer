@@ -35,6 +35,10 @@ function normalizeImageMapping(raw) {
     for(const key of ['mana_cost','rarity','type_line']) {
       if(entry[key]!==undefined) {
         if(typeof entry[key]!=='string'||entry[key].length>1000)throw error('Invalid image mapping');
+        // A blank type line never replaces stored metadata. With HTTPS images
+        // enforced above, an image refresh cannot change any corpus health gate,
+        // so existing health evidence stays valid without a rescan.
+        if(key==='type_line'&&!entry[key].trim())continue;
         display[key]=entry[key];
       }
     }

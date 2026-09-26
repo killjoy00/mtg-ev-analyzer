@@ -51,15 +51,43 @@ test('no-pending development rerun cannot mint a promotable artifact and has an 
 });
 
 
-test('scheduled production health refresh is bounded to one exact snapshot and never publishes Live',()=>{
+test('no scheduled workflow deep-scans retained corpus payloads',()=>{
+  const directory=new URL('../.github/workflows/',import.meta.url);
+  for(const name of fs.readdirSync(directory).filter(file=>file.endsWith('.yml'))) {
+    const workflow=fs.readFileSync(new URL(name,directory),'utf8');
+    if(!/^\s+schedule:/m.test(workflow))continue;
+    if(name==='corpus-operations.yml') {
+      // Only newly ingested sets are scanned, always with explicit set arguments.
+      for(const call of workflow.match(/node scripts\/check-corpus-health\.mjs[^\n]*/g)||[])
+        assert.match(call,/"\$\{set_args\[@\]\}"/,name+': '+call);
+      continue;
+    }
+    assert.doesNotMatch(workflow,/check-corpus-health\.mjs|candidate-gameplay-canary|plan-corpus-health-refresh/,name);
+  }
+});
+
+test('snapshot health check is manual and scans exactly one named snapshot',()=>{
   const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-health-refresh.yml',import.meta.url),'utf8');
-  assert.match(workflow,/cron: '17 \*\/4 \* \* \*'/);
-  assert.match(workflow,/node scripts\/plan-corpus-health-refresh\.mjs "\$RUNNER_TEMP\/production-health\.connection"/);
-  assert.match(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/production-health\.connection" --snapshot "\$snapshot"/);
-  assert.doesNotMatch(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/production-health\.connection"\s*(?:\||$)/m);
-  assert.match(workflow,/\.over_capacity == false/);
-  assert.match(workflow,/\.hard_deadline_risk == false/);
-  assert.doesNotMatch(workflow,/load_all_trophies|register-corpus-sources|candidate-gameplay-canary|\/v1\/admin\/corpus|\/snapshot|\/status/);
+  assert.match(workflow,/^name: Corpus snapshot health check$/m);
+  assert.doesNotMatch(workflow,/schedule:/);
+  assert.match(workflow,/snapshot_id:\s+description:[^\n]*\n\s+type: string\n\s+required: true/);
+  assert.match(workflow,/default: development/);
+  assert.match(workflow,/\[\[ "\$SNAPSHOT_ID" =~ \^\(\[a-f0-9\]\{64\}\|historical-\[a-f0-9\]\{32\}\)\$ \]\]/);
+  assert.match(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/snapshot-health\.connection" --snapshot "\$SNAPSHOT_ID"/);
+  // The operator-supplied ID reaches the shell only through the validated env var.
+  assert.deepEqual(workflow.match(/\$\{\{ inputs\.snapshot_id \}\}/g),['${{ inputs.snapshot_id }}']);
+  assert.match(workflow,/SNAPSHOT_ID: \$\{\{ inputs\.snapshot_id \}\}/);
+  assert.doesNotMatch(workflow,/load_all_trophies|register-corpus-sources|candidate-gameplay-canary|plan-corpus-health-refresh|\/v1\/admin\/corpus/);
+});
+
+test('scheduled health evidence report is metadata-only and never fails on old evidence',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-health-report.yml',import.meta.url),'utf8');
+  assert.match(workflow,/schedule:\s+- cron: '37 8 \* \* \*'/);
+  assert.match(workflow,/TARGET: \$\{\{ inputs\.target \|\| 'production' \}\}/);
+  assert.match(workflow,/node scripts\/corpus-health-freshness\.mjs "\$RUNNER_TEMP\/health-report\.connection" --summary "\$GITHUB_STEP_SUMMARY"/);
+  assert.doesNotMatch(workflow,/check-corpus-health|load_all_trophies|register-corpus-sources|candidate-gameplay-canary/);
+  const script=fs.readFileSync(new URL('../scripts/corpus-health-freshness.mjs',import.meta.url),'utf8');
+  assert.doesNotMatch(script,/draft_run_verified_puzzles|INSERT INTO|UPDATE |DELETE FROM|process\.exit(Code)?\s*[=(]\s*[1-9]/);
 });
 
 test('exact snapshot health mode cannot be combined with set-wide selection',()=>{

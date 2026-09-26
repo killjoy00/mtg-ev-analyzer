@@ -1,7 +1,9 @@
 import {effectiveCardMetadata} from '../card-metadata.mjs';
 import {meetsServingQuality,SERVING_QUALITY_SQL,SERVING_POLICY_VERSION} from '../serving-quality.mjs';
 // Read every included puzzle once; persist an operational report, never gameplay mutations.
-// node scripts/check-corpus-health.mjs CONNECTION [set-id ...]\n// node scripts/check-corpus-health.mjs CONNECTION --snapshot SOURCE_SNAPSHOT_ID
+// node scripts/check-corpus-health.mjs CONNECTION [set-id ...]
+// node scripts/check-corpus-health.mjs CONNECTION --snapshot SOURCE_SNAPSHOT_ID
+// Evidence age is reported by scripts/corpus-health-freshness.mjs, which reads no payloads.
 import fs from 'node:fs';
 import {validateAudit} from './load-source-exclusions.mjs';
 import {probabilityMetrics,trajectoryHealth,matchesFrozenSourceAudit} from './corpus-health-evidence.mjs';
@@ -22,9 +24,6 @@ for(let i=0;i<rawArgs.length;i++) {
  else requested.push(rawArgs[i]);
 }
 if(requestedSnapshot&&requested.length)throw Error('Choose exact --snapshot health or set IDs, not both.');
-const aging=(await query(`SELECT set_id,max(checked_at) checked_at FROM corpus_health_checks
- WHERE ready AND corpus_version=$1 GROUP BY set_id HAVING max(checked_at)<now()-interval '5 days'`,[DRAFT_RUN_CORPUS_VERSION])).rows;
-for(const row of aging)console.warn(JSON.stringify({warning:'corpus_health_aging',set:row.set_id,last_health_verification:row.checked_at}));
 let sets;
 if(requestedSnapshot) {
  sets=(await query(`SELECT s.set_id,s.manifest,md5(s.manifest::text) manifest_hash,s.source_snapshot_id,
