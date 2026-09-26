@@ -9,6 +9,7 @@ const NATIVE_PATHS = new Set([
   '/leaderboard',
   '/method',
   '/practice',
+  '/profile',
   '/scoring',
   '/sets',
 ]);
@@ -74,6 +75,8 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     const environment = environmentFromSet(searchParams.get('environment'));
     next.set('environment', environment);
     if (searchParams.get('mode') === 'practice') next.set('mode', 'practice');
+    const shared = searchParams.get('shared') || searchParams.get('challenge');
+    if (shared && /^[a-f0-9]{24}$/.test(shared)) next.set('shared', shared);
     const rawSets = searchParams.get('setIds');
     if (rawSets) {
       const safeSets = [...new Set(
@@ -82,6 +85,11 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
       if (safeSets.length) next.set('setIds', safeSets.join(','));
     }
     return `?${next.toString()}`;
+  }
+
+  if (pathname === '/profile') {
+    const key = searchParams.get('key');
+    return key && /^[a-f0-9]{16}$/.test(key) ? `?key=${key}` : '';
   }
 
   if (pathname === '/leaderboard') {
@@ -114,6 +122,9 @@ export function rewriteIncomingPath(path: string) {
 
     if (searchParams.get('account') === '1') return '/account';
 
+    const publicProfile = searchParams.get('profile');
+    if (publicProfile && /^[a-f0-9]{16}$/.test(publicProfile)) return `/profile?key=${publicProfile}`;
+
     if (searchParams.get('game') === 'draft-run') {
       const environment = environmentFromSet(searchParams.get('set'));
 
@@ -130,9 +141,10 @@ export function rewriteIncomingPath(path: string) {
         return `/draft-run?environment=${environment}`;
       }
 
-      // Stored friend challenges are not silently converted into a different
-      // native run. Until the native challenge surface lands, route safely home.
-      if (searchParams.has('shared') || searchParams.has('challenge')) return '/';
+      const shared = searchParams.get('shared') || searchParams.get('challenge');
+      if (shared) return /^[a-f0-9]{24}$/.test(shared)
+        ? `/draft-run?shared=${shared}`
+        : '/';
 
       if (searchParams.get('custom') === '1') return '/practice';
 
