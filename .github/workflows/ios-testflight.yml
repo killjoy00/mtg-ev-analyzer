@@ -33,7 +33,7 @@ jobs:
         with:
           node-version: 24
       - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       # PR smoke archives are never uploaded. The publishing job below allocates
       # against App Store Connect so workflow renames/retries cannot reuse a number.
       - name: Set smoke build number
@@ -151,7 +151,7 @@ jobs:
           echo "PACKONE_IOS_BUILD_NUMBER=$build_number" >> "$GITHUB_ENV"
           echo "Using App Store-safe iOS build number: $build_number"
       - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Validate production mobile config
         run: npm test
       - name: Write App Store Connect API key
