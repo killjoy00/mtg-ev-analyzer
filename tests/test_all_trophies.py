@@ -9,7 +9,7 @@ import tempfile
 import unittest
 from pathlib import Path
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]/'scripts'))
-from import_all_trophies import eligible_trophies, trajectory, rows, collect_legacy_v3, premier_sources, BASE, scan_metadata, classify_source_schema, source_snapshot_identity
+from import_all_trophies import (eligible_trophies, trajectory, rows, collect_legacy_v3, premier_sources, BASE, scan_metadata, classify_source_schema, source_snapshot_identity, select_import_sets, decision_semantics_digest, verify_rebuild_determinism)
 from build_replays import PickExample
 
 class FullTrophyTests(unittest.TestCase):
@@ -70,6 +70,42 @@ class FullTrophyTests(unittest.TestCase):
         self.assertRegex(first,r'^[a-f0-9]{64}$')
         self.assertNotEqual(first,source_snapshot_identity('fra','premier-modern-skill-buckets-v1',{'sha256':'c'*64},game))
         self.assertNotEqual(first,source_snapshot_identity('fra','premier-modern-skill-buckets-v1',draft,{'sha256':'d'*64}))
+
+    def test_prospective_imports_never_rebuild_historical_frozen_sets(self):
+        sources={'stx':'STX','mid':'MID','vow':'VOW','fra':'FRA','ktk':'KTK'}
+        self.assertEqual(select_import_sets(sources,'all'),['fra','ktk'])
+        self.assertEqual(select_import_sets(sources,'all',True),['fra','ktk'])
+        with self.assertRaisesRegex(ValueError,'Historical-frozen sets may not be rebuilt'):
+            select_import_sets(sources,'stx,fra')
+        self.assertEqual(
+            select_import_sets(sources,'stx,fra,stx',True),
+            ['stx','fra'])
+
+    def test_unchanged_source_rebuild_preserves_decision_semantics(self):
+        first={
+            'puzzle_id':'snapshot-one-puzzle',
+            'source_snapshot_id':'snapshot-one',
+            'set_id':'fra',
+            'source_draft_hash':'draft-a',
+            'source_fingerprint':'trajectory-a',
+            'corpus_version':'test-corpus',
+            'pick_number':1,
+            'historical_pick_id':'card-a',
+            'prior_picks':[{'id':'prior','name':'Prior'}],
+            'candidates':[
+                {'id':'card-a','name':'A','support':0.7},
+                {'id':'card-b','name':'B','support':0.3},
+            ],
+        }
+        rebuilt={**first,'puzzle_id':'snapshot-two-puzzle','source_snapshot_id':'snapshot-two'}
+        self.assertEqual(decision_semantics_digest([first]),decision_semantics_digest([rebuilt]))
+        self.assertEqual(
+            verify_rebuild_determinism('fra',[first],[rebuilt]),
+            decision_semantics_digest([first]))
+        changed=json.loads(json.dumps(rebuilt))
+        changed['historical_pick_id']='card-b'
+        with self.assertRaisesRegex(ValueError,'changed decision payload semantics'):
+            verify_rebuild_determinism('fra',[first],[changed])
 
     def test_new_snapshot_does_not_require_reproducing_historical_puzzle_ids(self):
         import inspect

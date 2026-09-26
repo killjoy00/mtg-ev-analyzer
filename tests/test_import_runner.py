@@ -13,6 +13,12 @@ import run_import_all_trophies as runner
 
 
 class ImportRunnerTests(unittest.TestCase):
+    def test_runner_uses_the_shared_frozen_history_selection_guard(self):
+        import inspect
+        source=inspect.getsource(runner.main)
+        self.assertIn('select_import_sets',source)
+        self.assertIn('--allow-historical-frozen-rebuild',source)
+
     def test_budget_finishes_active_sets_but_does_not_queue_the_rest(self):
         executor = mock.Mock()
         def submit(*args):
