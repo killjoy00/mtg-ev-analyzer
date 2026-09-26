@@ -9,6 +9,9 @@
 // Selection is read-only: no session, schedule or result is written. Loading
 // the serving cache may build a cache snapshot, exactly as a practice start does.
 // node scripts/activated-snapshot-smoke.mjs CONNECTION_FILE --set SET_ID [--snapshot ID] [--day YYYY-MM-DD]
+// node scripts/activated-snapshot-smoke.mjs CONNECTION_FILE --recent HOURS
+//   smoke every environment activated (first publication, reactivation or snapshot
+//   switch) within HOURS; reads only status events when there is none.
 import assert from 'node:assert/strict';
 import {fileURLToPath} from 'node:url';
 import {resolve} from 'node:path';
@@ -91,32 +94,39 @@ export async function runActivatedSnapshotSmoke(query,{setId,snapshotId=null,day
  assert.equal(Number(inventory.other_snapshot),0,`${setId}: serving cache inventory includes decisions outside the active snapshot`);
  result.checks.serving_cache={cache_snapshot:cache.id,revision:cache.revision,decisions:Number(inventory.total)};
 
- // Single-set practice through the cached selector used by practice starts.
+ // Single-set practice through the cached selector used by practice starts. A
+ // first-class snapshot passed the P1-P8 coverage gate, so it must be offered;
+ // a historical environment with incomplete opening packs legitimately is not.
  const eligible=customSetsFromSnapshot(cache,day,[setId]).some(s=>s.set_id===setId);
- assert.ok(eligible,`${setId}: not offered for single-set practice (needs P1-P8 medium and hard coverage of at least 16 sources)`);
- const practice=await selectCachedDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,'mixed',{setIds:[setId],day});
- assert.deepEqual(practice.map(p=>Number(p.pick_number)),runPickWindows('mixed').map(w=>w[0]),`${setId}: practice picks do not follow the run windows`);
- let snapshots=await puzzleSnapshots(query,practice.map(p=>p.puzzle_id));
- assertFromActiveSnapshot(env,practice,snapshots,'practice');
- result.checks.practice={puzzles:practice.map(p=>p.puzzle_id)};
+ if(!eligible&&env.historical) {
+  result.checks.practice={applicable:false,reason:'historical environment is not offered for single-set practice'};
+  result.checks.reroll={applicable:false,reason:'no single-set practice run to reroll'};
+ } else {
+  assert.ok(eligible,`${setId}: not offered for single-set practice (needs P1-P8 medium and hard coverage of at least 16 sources)`);
+  const practice=await selectCachedDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,'mixed',{setIds:[setId],day});
+  assert.deepEqual(practice.map(p=>Number(p.pick_number)),runPickWindows('mixed').map(w=>w[0]),`${setId}: practice picks do not follow the run windows`);
+  let snapshots=await puzzleSnapshots(query,practice.map(p=>p.puzzle_id));
+  assertFromActiveSnapshot(env,practice,snapshots,'practice');
+  result.checks.practice={puzzles:practice.map(p=>p.puzzle_id)};
 
- // Pack reroll: a comparable replacement from the same active snapshot.
- // Try rounds in order until one yields a Premier replacement.
- const excludedSources=practice.map(p=>p.source_draft_hash);
- let reroll=null,round=-1;
- for(let i=0;i<practice.length&&!reroll;i++) {
-  const candidate=await selectDatabaseReroll(query,DRAFT_RUN_CORPUS_VERSION,practice[i],{
-   type:'pack',round:i,seed,environment:'mixed',setIds:[setId],excludedSources,
-   difficultyVersion:DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion:DRAFT_RUN_SELECTION_VERSION,daily:false,day});
-  if(!candidate)continue;
-  assert.ok(!excludedSources.includes(candidate.source_draft_hash),`${setId}: reroll reused a source already in the run`);
-  snapshots=await puzzleSnapshots(query,[candidate.puzzle_id]);
-  if(snapshots.get(candidate.puzzle_id)?.corpus_version!==DRAFT_RUN_CORPUS_VERSION)continue;
-  assertFromActiveSnapshot(env,[candidate],snapshots,'reroll');
-  reroll=candidate;round=i;
+  // Pack reroll: a comparable replacement from the same active snapshot.
+  // Try rounds in order until one yields a Premier replacement.
+  const excludedSources=practice.map(p=>p.source_draft_hash);
+  let reroll=null,round=-1;
+  for(let i=0;i<practice.length&&!reroll;i++) {
+   const candidate=await selectDatabaseReroll(query,DRAFT_RUN_CORPUS_VERSION,practice[i],{
+    type:'pack',round:i,seed,environment:'mixed',setIds:[setId],excludedSources,
+    difficultyVersion:DRAFT_RUN_DIFFICULTY_VERSION,selectionVersion:DRAFT_RUN_SELECTION_VERSION,daily:false,day});
+   if(!candidate)continue;
+   assert.ok(!excludedSources.includes(candidate.source_draft_hash),`${setId}: reroll reused a source already in the run`);
+   snapshots=await puzzleSnapshots(query,[candidate.puzzle_id]);
+   if(snapshots.get(candidate.puzzle_id)?.corpus_version!==DRAFT_RUN_CORPUS_VERSION)continue;
+   assertFromActiveSnapshot(env,[candidate],snapshots,'reroll');
+   reroll=candidate;round=i;
+  }
+  assert.ok(reroll,`${setId}: no round produced a comparable Premier pack reroll`);
+  result.checks.reroll={round,replaced:practice[round].puzzle_id,replacement:reroll.puzzle_id};
  }
- assert.ok(reroll,`${setId}: no round produced a comparable Premier pack reroll`);
- result.checks.reroll={round,replaced:practice[round].puzzle_id,replacement:reroll.puzzle_id};
 
  // Daily and Latest Set: planned from Live database metadata; the newest regular
  // release fills the Latest Set Daily and the first two mixed Daily slots.
@@ -130,13 +140,36 @@ export async function runActivatedSnapshotSmoke(query,{setId,snapshotId=null,day
   const mixed=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed+':daily','mixed',{daily:true,day});
   const newestSlots=mixed.filter(p=>p.set_id===setId);
   assert.ok(newestSlots.length>=2,`${setId}: mixed Daily used ${newestSlots.length} newest-set slots, expected at least 2`);
-  snapshots=await puzzleSnapshots(query,[...latest,...newestSlots].map(p=>p.puzzle_id));
+  const snapshots=await puzzleSnapshots(query,[...latest,...newestSlots].map(p=>p.puzzle_id));
   assertFromActiveSnapshot(env,latest,snapshots,'latest daily');
   assertFromActiveSnapshot(env,newestSlots,snapshots,'mixed daily');
   result.checks.daily={applicable:true,latest:latest.map(p=>p.puzzle_id),mixed_newest_slots:newestSlots.length};
  }
  log(JSON.stringify({smoke:'activated_snapshot',pass:true,...result}));
  return result;
+}
+
+// Activations are the admin lifecycle's Live status events: first publication,
+// reactivation, and snapshot switches (Live -> Live with a new snapshot).
+export async function loadRecentActivations(query,hours) {
+ if(!Number.isFinite(hours)||hours<=0||hours>24*14)fail('--recent must be between 0 and 336 hours.');
+ return (await query(`SELECT e.set_id,p.active_snapshot_id,max(e.changed_at) activated_at
+  FROM corpus_status_events e JOIN draft_run_environment_policy p ON p.set_id=e.set_id
+  WHERE e.component_version IS NULL AND e.new_status='Live' AND p.status='Live'
+    AND e.changed_at>now()-make_interval(hours=>$1::int)
+  GROUP BY e.set_id,p.active_snapshot_id ORDER BY e.set_id`,[Math.ceil(hours)])).rows;
+}
+
+export async function runRecentActivationSmokes(query,{hours,day=gameDateKey(),log=console.log}={}) {
+ const activations=await loadRecentActivations(query,hours);
+ if(!activations.length){log(JSON.stringify({smoke:'activated_snapshot',recent_hours:hours,activations:0}));return [];}
+ const failures=[],results=[];
+ for(const activation of activations) {
+  try {results.push(await runActivatedSnapshotSmoke(query,{setId:activation.set_id,snapshotId:activation.active_snapshot_id,day,log}));}
+  catch(error){failures.push(`${activation.set_id}: ${error.message}`);log(JSON.stringify({smoke:'activated_snapshot',set_id:activation.set_id,pass:false,error:error.message}));}
+ }
+ if(failures.length)fail(`${failures.length} of ${activations.length} recent activations failed: ${failures.join('; ')}`);
+ return results;
 }
 
 async function main() {
@@ -146,6 +179,12 @@ async function main() {
  const {corpusDatabase}=await import('./neon-corpus-db.mjs');
  const day=option('--day')||gameDateKey();
  if(!/^\d{4}-\d{2}-\d{2}$/.test(day))fail('--day must be YYYY-MM-DD.');
+ const recent=option('--recent');
+ if(recent!==null) {
+  if(option('--set')||option('--snapshot'))fail('Use --recent or --set, not both.');
+  await runRecentActivationSmokes(corpusDatabase(args[0]),{hours:Number(recent),day});
+  return;
+ }
  await runActivatedSnapshotSmoke(corpusDatabase(args[0]),{setId:option('--set'),snapshotId:option('--snapshot'),day});
 }
 
