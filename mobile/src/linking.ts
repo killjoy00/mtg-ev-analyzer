@@ -88,7 +88,8 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     const next = new URLSearchParams();
     next.set('environment', environmentFromSet(searchParams.get('environment')));
     const requestedPeriod = searchParams.get('period');
-    next.set('period', ['daily', 'week', 'month', 'all'].includes(requestedPeriod || '') ? requestedPeriod! : 'daily');
+    const canonicalPeriod = requestedPeriod === 'month' ? 'season' : requestedPeriod;
+    next.set('period', ['daily', 'week', 'season', 'all'].includes(canonicalPeriod || '') ? canonicalPeriod! : 'daily');
     return `?${next.toString()}`;
   }
 
@@ -118,8 +119,9 @@ export function rewriteIncomingPath(path: string) {
 
       if (searchParams.has('board')) {
         const requestedPeriod = searchParams.get('board');
-        const period = ['daily', 'week', 'month', 'all'].includes(requestedPeriod || '')
-          ? requestedPeriod
+        const canonicalPeriod = requestedPeriod === 'month' ? 'season' : requestedPeriod;
+        const period = ['daily', 'week', 'season', 'all'].includes(canonicalPeriod || '')
+          ? canonicalPeriod
           : 'daily';
         return `/leaderboard?environment=${environment}&period=${period}`;
       }
