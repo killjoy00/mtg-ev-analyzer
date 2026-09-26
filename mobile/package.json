@@ -10,11 +10,12 @@
     "lint": "eslint . --max-warnings=0",
     "typecheck": "tsc --noEmit",
     "config:check": "node ./scripts/check-config.mjs",
-    "test": "npm run test:lifecycle && npm run test:draft-run && npm run test:shared-run-storage && npm run lint && npm run typecheck && npm run config:check && npm run release:check",
+    "test": "npm run test:lifecycle && npm run test:draft-run && npm run test:shared-run-storage && npm run test:shared-run-screen && npm run lint && npm run typecheck && npm run config:check && npm run release:check",
     "release:check": "node ./scripts/release-preflight.mjs",
     "test:lifecycle": "node --test ./tests/version-gate-lifecycle.test.cjs",
     "test:draft-run": "node --test ./tests/draft-run-race.test.cjs ./tests/draft-run-recovery.test.cjs",
-    "test:shared-run-storage": "node --test ./tests/shared-run-storage.test.cjs"
+    "test:shared-run-storage": "node --test ./tests/shared-run-storage.test.cjs",
+    "test:shared-run-screen": "node --test ./tests/shared-run-screen.test.cjs ./tests/shared-run-home-resume.test.cjs"
   },
   "dependencies": {
     "expo": "~57.0.24",

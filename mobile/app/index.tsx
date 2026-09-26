@@ -185,6 +185,18 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
+          accessibilityLabel="Resume saved shared run"
+          onPress={() => router.push('/resume-shared-run')}
+          style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
+        >
+          <Text style={styles.cardKicker}>SHARED RUN</Text>
+          <Text style={styles.utilityTitle}>Your last shared run</Text>
+          <Text style={styles.cardBody}>Reopen this device&apos;s saved picks or result with the same Pack One account.</Text>
+          <Text style={styles.cardAction}>Find saved run →</Text>
+        </Pressable>
+
+        <Pressable
+          accessibilityRole="button"
           accessibilityLabel="Open leaderboard"
           onPress={() => router.push('/leaderboard')}
           style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}

@@ -35,6 +35,7 @@ import {
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import type { MobileSession } from '@/src/storage/session';
+import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { colors, spacing } from '@/src/theme';
 
 type LoadState =
@@ -379,10 +380,11 @@ async function loadDraftSurface(
   return { status: 'ready' as const, run, session };
 }
 
-export default function DraftRunScreen() {
+export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface } = {}) {
   const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string }>();
-  const practice = params.mode === 'practice';
-  const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
+  const practice = !shared && params.mode === 'practice';
+  const requestedEnvironment = shared?.initialRun.environment
+    ?? (typeof params.environment === 'string' ? params.environment : 'mixed');
   const practiceEnvironment: PracticeEnvironment = requestedEnvironment === 'powered-cube' ? 'powered-cube' : 'mixed';
   const environment: DailyEnvironment = practice
     ? practiceEnvironment
@@ -390,16 +392,18 @@ export default function DraftRunScreen() {
   const setIdsParam = practice && typeof params.setIds === 'string' ? params.setIds : '';
   const setIds = useMemo(() => parsePracticeSets(setIdsParam), [setIdsParam]);
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
-  const surfaceMeta = practice
-    ? {
-        eyebrow: setIds.length
-          ? 'CUSTOM SET PRACTICE'
-          : environment === 'powered-cube' ? 'POWERED CUBE PRACTICE' : 'PRACTICE DRAFT RUN',
-        resultTitle: setIds.length
-          ? 'Custom practice complete.'
-          : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
-      }
-    : dailyMeta;
+  const surfaceMeta = shared
+    ? { eyebrow: 'SHARED DRAFT RUN', resultTitle: 'Shared run complete.' }
+    : practice
+      ? {
+          eyebrow: setIds.length
+            ? 'CUSTOM SET PRACTICE'
+            : environment === 'powered-cube' ? 'POWERED CUBE PRACTICE' : 'PRACTICE DRAFT RUN',
+          resultTitle: setIds.length
+            ? 'Custom practice complete.'
+            : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
+        }
+      : dailyMeta;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const stateRef = useRef<LoadState>(state);
   const refreshGeneration = useRef(0);
@@ -467,9 +471,11 @@ export default function DraftRunScreen() {
     const token = beginRefresh(current);
     try {
       const previousRun = current.run;
-      const run = practice
-        ? await loadDraftRun(previousRun.id, current.session)
-        : await startDailyDraftRun(current.session, environment);
+      const run = shared
+        ? await shared.loadRun()
+        : practice
+          ? await loadDraftRun(previousRun.id, current.session)
+          : await startDailyDraftRun(current.session, environment);
       if (!refreshStillCurrent(token, run)) return;
       commitState({ status: 'ready', run, session: current.session });
       setSelected((selection) => (
@@ -492,14 +498,19 @@ export default function DraftRunScreen() {
 
   useEffect(() => {
     let active = true;
-    void loadDraftSurface(environment, practice, setIds)
+    const initial = shared
+      ? Promise.resolve({ status: 'ready' as const, run: shared.initialRun, session: shared.session })
+      : loadDraftSurface(environment, practice, setIds);
+    void initial
       .then((loaded) => {
         if (!active) return;
         if (loaded.status === 'signin-required') {
           commitState({ status: 'signin-required' });
           return;
         }
-        setMode(loaded.run.complete ? 'result' : 'pick');
+        const recoveredFeedback = Boolean(shared && !loaded.run.complete && loaded.run.answers.length);
+        setReviewIndex(recoveredFeedback ? loaded.run.answers.length - 1 : null);
+        setMode(loaded.run.complete ? 'result' : recoveredFeedback ? 'feedback' : 'pick');
         commitState({ status: 'ready', run: loaded.run, session: loaded.session });
       })
       .catch((error: unknown) => {
@@ -514,7 +525,7 @@ export default function DraftRunScreen() {
       refreshGeneration.current += 1;
       mutationGeneration.current += 1;
     };
-  }, [environment, practice, setIds]);
+  }, [environment, practice, setIds, shared]);
 
   const retry = async () => {
     refreshGeneration.current += 1;
@@ -524,12 +535,16 @@ export default function DraftRunScreen() {
     setActionError(null);
     setMode('pick');
     try {
-      const loaded = await loadDraftSurface(environment, practice, setIds);
+      const loaded = shared
+        ? { status: 'ready' as const, run: await shared.loadRun(), session: shared.session }
+        : await loadDraftSurface(environment, practice, setIds);
       if (loaded.status === 'signin-required') {
         commitState({ status: 'signin-required' });
         return;
       }
-      setMode(loaded.run.complete ? 'result' : 'pick');
+      const recoveredFeedback = Boolean(shared && !loaded.run.complete && loaded.run.answers.length);
+      setReviewIndex(recoveredFeedback ? loaded.run.answers.length - 1 : null);
+      setMode(loaded.run.complete ? 'result' : recoveredFeedback ? 'feedback' : 'pick');
       commitState({ status: 'ready', run: loaded.run, session: loaded.session });
     } catch (error: unknown) {
       commitState({
@@ -586,14 +601,16 @@ export default function DraftRunScreen() {
     const token = beginMutation(current);
     setBusy(true);
     try {
-      const run = await submitDraftRunPick(current.run, selected, current.session);
+      const run = shared
+        ? await shared.submitPick(current.run, selected)
+        : await submitDraftRunPick(current.run, selected, current.session);
       if (!mutationStillCurrent(token, run)) return;
       await showCommittedPick(run, current.session, current.run.answers.length, token);
     } catch (error: unknown) {
       if (!mutationStillCurrent(token)) return;
       const message = error instanceof Error ? error.message : 'Your pick could not be saved.';
       try {
-        const reconciled = await loadDraftRun(current.run.id, current.session);
+        const reconciled = shared ? await shared.loadRun() : await loadDraftRun(current.run.id, current.session);
         if (!mutationStillCurrent(token, reconciled)) return;
         const expectedRound = current.run.answers.length;
         const recovered = reconciled.answers[expectedRound];
@@ -624,19 +641,20 @@ export default function DraftRunScreen() {
   const shareResult = async () => {
     if (state.status !== 'ready' || !state.run.complete) return;
     const matches = state.run.answers.filter((item) => item.historicalMatch).length;
-    const label = environment === 'latest' ? 'Latest Set' : environment === 'powered-cube' ? 'Powered Cube' : 'Draft Run';
+    const resultEnvironment = state.run.environment;
+    const label = resultEnvironment === 'latest' ? 'Latest Set' : resultEnvironment === 'powered-cube' ? 'Powered Cube' : 'Draft Run';
     const squares = state.run.answers.map((item) => (
       item.historicalMatch ? '🟩' : item.score >= 85 ? '🟦' : item.score >= 60 ? '🟨' : item.score >= 25 ? '🟧' : '⬛'
     )).join('');
     setShareError(null);
     try {
-      const setParam = environment === 'mixed' ? '' : `&set=${environment}`;
+      const setParam = resultEnvironment === 'powered-cube' || resultEnvironment === 'latest' ? `&set=${resultEnvironment}` : '';
       const url = state.run.day
         ? `https://packone.pro/?game=draft-run${setParam}&daily=1&ref=result_share`
-        : `https://packone.pro/?game=draft-run${setParam}&shared=${(await createDraftRunShare(state.run.id, state.session)).id}`;
+        : `https://packone.pro/?game=draft-run${setParam}&shared=${(shared ? await shared.createShare() : await createDraftRunShare(state.run.id, state.session)).id}`;
       const text = state.run.day
         ? `I scored ${state.run.score ?? 0}/100 on today’s Pack One ${label}. Can you beat it?\n${squares}\n${matches}/${state.run.run_length} trophy picks matched · Daily ${state.run.day}`
-        : `Pack One · ${label} · Practice\n${state.run.score ?? 0}/100  ${squares}\n${matches}/${state.run.run_length} trophy picks matched. Play this run and compare.`;
+        : `Pack One · ${label} · ${shared ? 'Shared run' : 'Practice'}\n${state.run.score ?? 0}/100  ${squares}\n${matches}/${state.run.run_length} trophy picks matched. Play this run and compare.`;
       await Share.share({ message: `${text}\n${url}` });
     } catch {
       setShareError('Could not open sharing. Your result is still saved.');
@@ -697,7 +715,7 @@ export default function DraftRunScreen() {
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
           <ActivityIndicator color={colors.accent} />
-          <Text style={styles.loadingText}>Finding today&apos;s packs…</Text>
+          <Text style={styles.loadingText}>{shared ? 'Recovering your shared run…' : 'Finding today’s packs…'}</Text>
         </View>
       </SafeAreaView>
     );
@@ -756,6 +774,14 @@ export default function DraftRunScreen() {
             <Text style={styles.score}>{run.score ?? 0}</Text>
             <Text style={styles.scoreMeta}>/100 · {matches} trophy picks matched</Text>
           </View>
+          {shared && run.comparison ? (
+            <View style={styles.analysisPanel}>
+              <Text style={styles.analysisTitle}>You: {run.score ?? 0} · {run.comparison.name}: {run.comparison.score}</Text>
+              <Text style={styles.resultBody}>{run.comparison.exact
+                ? Number(run.score) > run.comparison.score ? 'You won this shared run.' : Number(run.score) < run.comparison.score ? 'Your friend won this shared run.' : 'This shared run was a tie.'
+                : 'These results are not an exact same-decision comparison.'}</Text>
+            </View>
+          ) : null}
           {run.standing ? (
             <Text style={styles.resultBody}>
               #{run.standing.rank} of {run.standing.total} today
@@ -796,16 +822,18 @@ export default function DraftRunScreen() {
           {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
           <View style={styles.guestNote}>
             <Text style={styles.guestNoteTitle}>
-              {practice ? 'Saved to your career' : state.session.accountToken ? 'Saved to your account' : 'Guest result'}
+              {practice || shared ? 'Saved to your career' : state.session.accountToken ? 'Saved to your account' : 'Guest result'}
             </Text>
             <Text style={styles.resultBody}>
-              {practice
-                ? 'Practice uses your signed-in Pack One identity and does not enter the Daily leaderboard.'
-                : state.session.accountToken
-                  ? 'This result used your signed-in Pack One identity and the same server eligibility rules as web.'
-                  : 'Sign in or create your Pack One account to validate this Daily score and keep your career across devices.'}
+              {shared
+                ? 'This is your saved shared run. Reopening the invitation recovers the same picks and result, not another attempt.'
+                : practice
+                  ? 'Practice uses your signed-in Pack One identity and does not enter the Daily leaderboard.'
+                  : state.session.accountToken
+                    ? 'This result used your signed-in Pack One identity and the same server eligibility rules as web.'
+                    : 'Sign in or create your Pack One account to validate this Daily score and keep your career across devices.'}
             </Text>
-            {!practice && !state.session.accountToken ? (
+            {!shared && !practice && !state.session.accountToken ? (
               <Pressable
                 accessibilityRole="button"
                 onPress={() => router.push({
@@ -831,7 +859,7 @@ export default function DraftRunScreen() {
       <View style={styles.shell}>
         <ScrollView ref={scroll} contentContainerStyle={styles.page}>
           <Text style={styles.eyebrow}>
-            {practice ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
+            {practice || shared ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
           </Text>
           <Text style={styles.title}>
             {puzzle.set_id.toUpperCase()} <Text style={styles.titleMeta}>· Pack 1 · Pick {puzzle.pick_number}</Text>
@@ -898,12 +926,18 @@ export default function DraftRunScreen() {
                   <Text style={styles.sectionBody}>Choose for this drafter&apos;s pool.</Text>
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poolRow}>
                     {puzzle.prior_picks.map((card, index) => (
-                      <View key={`${card.id}-${index}`} style={styles.poolCard}>
+                      <Pressable
+                        key={`${card.id}-${index}`}
+                        accessibilityRole="button"
+                        accessibilityLabel={`View earlier pick ${index + 1}: ${card.name}`}
+                        onPress={() => setZoomedCard(card)}
+                        style={styles.poolCard}
+                      >
                         {card.image_url ? (
                           <Image source={card.image_url} style={styles.poolImage} contentFit="cover" cachePolicy="memory-disk" />
                         ) : null}
                         <Text style={styles.poolName} numberOfLines={2}>{index + 1}. {card.name}</Text>
-                      </View>
+                      </Pressable>
                     ))}
                   </ScrollView>
                 </View>

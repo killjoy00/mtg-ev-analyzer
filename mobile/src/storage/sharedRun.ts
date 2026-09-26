@@ -14,10 +14,11 @@ type SharedRunRecord = {
 };
 
 function playerId(session: MobileSession) {
-  if (session.subjectId && UUID.test(session.subjectId)) return session.subjectId.toLowerCase();
-  const match = session.playerToken.match(/^p1_([a-f0-9-]{36})\./i);
-  const id = match?.[1];
-  return id && UUID.test(id) ? id.toLowerCase() : null;
+  const tokenPlayer = session.playerToken.match(/^p1_([a-f0-9-]{36})\./i)?.[1];
+  if (!tokenPlayer || !UUID.test(tokenPlayer)) return null;
+  if (session.subjectId && (!UUID.test(session.subjectId)
+    || session.subjectId.toLowerCase() !== tokenPlayer.toLowerCase())) return null;
+  return tokenPlayer.toLowerCase();
 }
 
 function accountUserId(session: MobileSession) {
@@ -45,8 +46,8 @@ function validRecord(value: unknown): value is SharedRunRecord {
     && UUID.test(record.accountUserId);
 }
 
-export async function readSharedRunContinuation(shareId: string, session: MobileSession) {
-  if (!SHARE_ID.test(shareId)) return null;
+/** Discover this device's last checkpoint only for its exact signed-in owner. */
+export async function readLatestSharedRunContinuation(session: MobileSession) {
   const current = identity(session);
   if (!current) return null;
   const raw = await SecureStore.getItemAsync(SHARED_RUN_KEY);
@@ -54,15 +55,18 @@ export async function readSharedRunContinuation(shareId: string, session: Mobile
   try {
     const record: unknown = JSON.parse(raw);
     if (!validRecord(record)) return null;
-    if (
-      record.shareId !== shareId
-      || record.playerId.toLowerCase() !== current.player
-      || record.accountUserId.toLowerCase() !== current.account
-    ) return null;
-    return record.runId.toLowerCase();
+    if (record.playerId.toLowerCase() !== current.player
+      || record.accountUserId.toLowerCase() !== current.account) return null;
+    return { shareId: record.shareId, runId: record.runId.toLowerCase() };
   } catch {
     return null;
   }
+}
+
+export async function readSharedRunContinuation(shareId: string, session: MobileSession) {
+  if (!SHARE_ID.test(shareId)) return null;
+  const saved = await readLatestSharedRunContinuation(session);
+  return saved?.shareId === shareId ? saved.runId : null;
 }
 
 export async function writeSharedRunContinuation(
