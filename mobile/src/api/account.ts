@@ -148,6 +148,40 @@ export async function finishNativeAppleSignIn(
   return { result, session: await persistAccount(result) };
 }
 
+export function requestMobilePasswordReset(session: MobileSession, email: string) {
+  return requestJson<{ ok: boolean; message: string }>('/growth/v1/mobile/account/request-password-reset', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    body: { email },
+  });
+}
+
+export function requestMobileVerificationEmail(session: MobileSession, email: string) {
+  return requestJson<{ ok: boolean; message: string }>('/growth/v1/mobile/account/send-verification-email', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    body: { email },
+  });
+}
+
+export function resetMobilePassword(session: MobileSession, token: string, newPassword: string) {
+  return requestJson<{ ok: boolean }>('/growth/v1/mobile/account/reset-password', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    body: { token, newPassword },
+  });
+}
+
+export function changeMobilePassword(session: MobileSession, currentPassword: string, newPassword: string) {
+  if (!session.accountToken) throw new Error('Sign in before changing your password.');
+  return requestJson<{ ok: boolean; signedOut: boolean }>('/growth/v1/mobile/account/password-change', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: { currentPassword, newPassword },
+  });
+}
+
 export async function loadMobileAccount(session: MobileSession) {
   if (!session.accountToken) return null;
   return requestJson<AccountState>('/growth/v1/mobile/account/session', {
