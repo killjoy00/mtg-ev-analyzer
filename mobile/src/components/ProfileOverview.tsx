@@ -1,4 +1,5 @@
-import { StyleSheet, Text, View } from 'react-native';
+import { router } from 'expo-router';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import {
   type CareerProfile,
@@ -93,6 +94,15 @@ function DailyRows({ rows }: { rows: DailyHistoryRow[] }) {
 }
 
 export function ProfileOverview({ profile, publicView = false }: { profile: CareerProfile; publicView?: boolean }) {
+  const publicKey = profile.player.profile_key;
+  const canExplore = !publicView || (profile.player.profile_public === true && typeof publicKey === 'string' && /^[a-f0-9]{16}$/.test(publicKey));
+  const activityLink = (tab: 'archive' | 'achievements' | 'daily', label: string) => canExplore ? (
+    <Pressable accessibilityRole="button" accessibilityLabel={label}
+      onPress={() => router.push({ pathname: '/profile-activity', params: { tab, ...(publicView ? { profileKey: publicKey! } : {}) } })}
+      style={styles.activityButton}>
+      <Text style={styles.activityButtonText}>{label}</Text>
+    </Pressable>
+  ) : null;
   const { summary } = profile;
   const trend = (profile.trend || []).slice(-10);
   const played = Number(summary.environments_played || 0);
@@ -170,15 +180,18 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
       <Section title="Achievements">
         <Text style={styles.meta}>{unlocked} / {(profile.achievements || []).length} unlocked</Text>
         <AchievementRows rows={profile.achievements || []} showcase={profile.player.showcase_achievement} />
+        {activityLink('achievements', 'Browse achievements and sharing')}
       </Section>
 
       <Section title="Daily History">
         <DailyRows rows={profile.daily_history || []} />
+        {activityLink('daily', 'Browse Daily finishes and sharing')}
       </Section>
 
       <Section title="Archive Progress">
         <Text style={styles.archiveNumber}>{played} / {total || 0}</Text>
         <Text style={styles.body}>Pack One environments played.</Text>
+        {activityLink('archive', 'Explore archive progress')}
         {total > 0 ? (
           <View style={styles.archiveTrack}>
             <View style={[styles.archiveFill, { width: `${Math.min(100, Math.round((played / total) * 100))}%` as `${number}%` }]} />
@@ -191,6 +204,8 @@ export function ProfileOverview({ profile, publicView = false }: { profile: Care
 
 const styles = StyleSheet.create({
   root: { gap: spacing.lg },
+  activityButton: { minHeight: 48, borderWidth: 1, borderColor: colors.accent, padding: spacing.md, justifyContent: 'center', alignItems: 'center' },
+  activityButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textAlign: 'center' },
   hero: { gap: spacing.xs },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
   name: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7 },
