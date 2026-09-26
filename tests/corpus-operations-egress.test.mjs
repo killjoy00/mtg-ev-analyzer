@@ -31,7 +31,7 @@ test('production promotion validates the reviewed run with standalone jq',()=>{
 
 test('scheduled production health refresh is bounded to one exact snapshot and never publishes Live',()=>{
   const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-health-refresh.yml',import.meta.url),'utf8');
-  assert.match(workflow,/cron: '17 \/\*\/4 \* \* \*'/);
+  assert.match(workflow,/cron: '17 \\*\\/4 \\* \\* \\*'/);
   assert.match(workflow,/node scripts\/plan-corpus-health-refresh\.mjs "\$RUNNER_TEMP\/production-health\.connection"/);
   assert.match(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/production-health\.connection" --snapshot "\$snapshot"/);
   assert.doesNotMatch(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/production-health\.connection"\s*(?:\||$)/m);
