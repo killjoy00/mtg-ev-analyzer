@@ -222,3 +222,17 @@ test('v1 manages existing Patreon Elite access natively without forking entitlem
   assert.match(gateway, /\/v1\/mobile\/patreon\/connect/);
   assert.match(gateway, /\/v1\/mobile\/patreon\/disconnect/);
 });
+
+
+test('v1 exposes the approved TCGplayer card destination only inside revealed score analysis', () => {
+  const draft = read('mobile/app/draft-run.tsx');
+  const helper = read('mobile/src/tcgplayer.ts');
+
+  assert.match(helper, /https:\/\/www\.tcgplayer\.com\/search\/magic\/product/);
+  assert.match(helper, /https:\/\/partner\.tcgplayer\.com\/c\/7742974\/1780961\/21018\?u=\{url\}/);
+  assert.match(helper, /encodeURIComponent\(tcgplayerDestination\(cardName\)\)/);
+  assert.match(draft, /Find on TCGplayer \(affiliate link\)/);
+  assert.match(draft, /Pack One may earn a commission from eligible TCGplayer purchases at no added cost to you/);
+  assert.match(draft, /<FeedbackAnalysis/);
+  assert.doesNotMatch(read('mobile/app/index.tsx'), /TCGplayer/);
+});
