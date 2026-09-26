@@ -1,12 +1,6 @@
 name: contextual-value-v1-nonlinear-q-audit
 
 on:
-  push:
-    branches:
-      - research/contextual-value-v1-nonlinear-q-audit-529
-    paths:
-      - '.github/workflows/contextual-value-v1-nonlinear-q-audit.yml'
-      - 'research/contextual_value_q_challenger.py'
   workflow_dispatch:
 
 permissions:
