@@ -40,7 +40,7 @@ function permitted(service,path,method,search,mode) {
       '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete/verification/start','/v1/account/delete/apple/start','/v1/account/delete/apple/finish','/v1/account/delete','/v1/account/migrate',
       '/v1/account/link','/v1/account/link-browser','/v1/account/signout','/v1/account/apple/start','/v1/account/apple/finish','/v1/account/apple/callback',
       '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/apple/start','/v1/mobile/account/apple/finish','/v1/mobile/account/apple/native','/v1/mobile/account/google/start','/v1/mobile/account/google/finish',
-      '/v1/mobile/account/signout','/v1/mobile/account/request-password-reset','/v1/mobile/account/send-verification-email','/v1/mobile/account/reset-password','/v1/mobile/account/password-change','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
+      '/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
       '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect',
     ].includes(path))return true;
     if(method==='GET'&&[
@@ -132,8 +132,6 @@ function mobileSessionRoute(service,path,method) {
       '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
     ].includes(path))return true;
     if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
-    if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
-    if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
   if(service!=='draft')return false;
@@ -147,6 +145,7 @@ function mobileAccountRoute(service,path,method) {
   if(service==='growth') {
     if(method==='POST'&&['/v1/mobile/account/signout','/v1/mobile/account/password-change','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete'].includes(path))return true;
     if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
+    if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
   if(service!=='draft')return false;
@@ -173,13 +172,16 @@ export class NetworkQuota {
     const now=Date.now();
     // /session-only follows a charged /request and an origin refresh that
     // proved the browser has no valid identity. Do not charge the request twice.
-    const limits=[...(kind!=='/session-only'?[['request',120,60000]]:[]),...(kind!=='/request'?[['session',10,600000]]:[])];
+    // 100 shared-network players need roughly 2,000–2,500 requests for a
+    // complete run. The short bucket bounds bursts; the minute bucket bounds
+    // sustained load. Session creation remains independently limited.
+    const limits=[...(kind!=='/session-only'?[['request',3600,60000],['request_burst',600,10000]]:[]),...(kind!=='/request'?[['session',120,600000]]:[])];
     const {retry,scopes}=await this.storage.transaction(async tx=>{
       const pending=[],scopes=[];let retry=0;
       for(const [key,limit,period] of limits) {
         let row=await tx.get(key);
         if(!row||now>=row.until)row={count:0,until:now+period};
-        if(row.count>=limit){retry=Math.max(retry,Math.ceil((row.until-now)/1000));scopes.push(key);}
+        if(row.count>=limit){retry=Math.max(retry,Math.ceil((row.until-now)/1000));if(!scopes.includes(key==='request_burst'?'request':key))scopes.push(key==='request_burst'?'request':key);}
         pending.push([key,{...row,count:row.count+1}]);
       }
       if(retry)return {retry,scopes};
@@ -194,12 +196,12 @@ export class NetworkQuota {
 }
 
 export function routeFamily(path) {
+  if(path==='/growth/v1/mobile/version')return 'mobile_version';
   if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share)$/.test(path))return 'draft_'+path.split('/').at(-1);
   if(path==='/draft/v1/runs')return 'draft_start';
   if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';
   if(/^\/draft\/v1\/(?:challenges|shared-runs)\/[^/]+$/.test(path))return 'draft_shared_read';
   for(const name of ['leaderboard','daily-status','capabilities','practice-sets','set-catalog'])if(path==='/draft/v1/'+name)return 'draft_'+name.replaceAll('-','_');
-  if(path==='/growth/v1/mobile/version')return 'mobile_version';
   if(/^\/growth\/v1\/(player\/)?session$/.test(path))return 'player_session';
   if(/^\/growth\/v1\/(mobile\/)?account(?:\/|$)/.test(path))return 'account';
   if(/^\/growth\/v1\/(mobile\/)?profile(?:\/|$)/.test(path))return 'profile';
@@ -226,6 +228,7 @@ export async function gateway(request,env,fetcher=fetch) {
       return result;
     } finally {metric.quota_ms+=performance.now()-began;}
   };
+  let previewNetwork=null;
   const expectedHost=mode==='production'?'api.packone.pro':'api-preview.packone.pro';
   const finish=result=>{
     const sampleRate=result.status>=400?1:.1;
@@ -238,6 +241,7 @@ export async function gateway(request,env,fetcher=fetch) {
       headers.set('access-control-allow-credentials','true');
       headers.set('access-control-expose-headers','Retry-After');
     }
+    if(mode==='preview'&&previewNetwork&&url.pathname==='/draft/health')headers.set('x-pack1-preview-network',previewNetwork);
     headers.set('x-content-type-options','nosniff');
     return new Response(result.body,{status:result.status,headers});
   };
@@ -287,6 +291,7 @@ export async function gateway(request,env,fetcher=fetch) {
     const network=ipNetwork(request.headers.get('cf-connecting-ip')||'');
     const key=await crypto.subtle.importKey('raw',encode.encode(env.QUOTA_KEY),{name:'HMAC',hash:'SHA-256'},false,['sign']);
     const digest=Array.from(new Uint8Array(await crypto.subtle.sign('HMAC',key,encode.encode(network)))).map(x=>x.toString(16).padStart(2,'0')).join('');
+    if(preview)previewNetwork=digest;
     const quota=env.NETWORK_QUOTA.get(env.NETWORK_QUOTA.idFromName(digest));
     const limited=await quotaFetch(quota,sessionCreation?'session':'request');
     if(limited.status!==204)return finish(limited.status===429?limited:response(503,'Gateway unavailable.'));
