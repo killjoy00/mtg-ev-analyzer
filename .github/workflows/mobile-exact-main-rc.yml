@@ -1,6 +1,11 @@
 name: Mobile exact-main RC smoke
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/mobile-exact-main-rc.yml'
   workflow_dispatch:
 
 permissions:
