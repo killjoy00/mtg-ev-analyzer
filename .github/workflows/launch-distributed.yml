@@ -1,7 +1,7 @@
 name: isolated distributed launch acceptance
 on:
   pull_request:
-    paths: ['scripts/launch-distributed*', '.github/workflows/launch-distributed.yml']
+    paths: ['scripts/launch-distributed*', 'tests/launch-distributed-capacity.test.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -9,14 +9,26 @@ concurrency:
   group: pack1-gateway-preview
   cancel-in-progress: false
 jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Behavior, safety and monitoring regressions before provisioning
+        run: |
+          node --test tests/launch-distributed-capacity.test.mjs tests/launch-alert.test.mjs tests/launch-controls.test.mjs
+          npm run test:js
   setup:
+    needs: regression
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
       branch: ${{ steps.neon.outputs.branch_id }}
       created: ${{ steps.neon.outputs.created }}
-      start_at: ${{ steps.ready.outputs.start_at }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -28,7 +40,11 @@ jobs:
         run: node scripts/edge-control.mjs preflight
       - name: Set emergency expiry
         id: expiry
-        run: echo "expires_at=$(date -u --date '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+        run: echo "expires_at=$(date -u --date '+75 minutes' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+      - name: Record pre-provisioning whole-project usage baseline
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+        run: node scripts/launch-distributed-setup.mjs budget
       - name: Create disposable production-sized branch
         id: neon
         uses: neondatabase/create-branch-action@v6
@@ -82,6 +98,18 @@ jobs:
           PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
         run: node scripts/edge-control.mjs deploy
+      - name: Prove retained private-preview telemetry before gameplay
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: node scripts/launch-distributed-setup.mjs telemetry
+      - name: Initialize exact-run isolated coordinator and resource guards
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: ${{ steps.neon.outputs.created }}
+          LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
+        run: node scripts/launch-distributed-control.mjs
       - name: Encrypt isolated fixture credentials for the generator jobs
         env:
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
@@ -93,17 +121,15 @@ jobs:
           path: artifacts/load-private
           retention-days: 1
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          name: distributed-fixture-evidence
+          name: distributed-capacity-setup
           path: artifacts/launch-load
           retention-days: 30
-      - name: Schedule synchronized initial arrival window
-        id: ready
-        run: node --input-type=module -e "import fs from 'node:fs';fs.appendFileSync(process.env.GITHUB_OUTPUT,'start_at='+(Date.now()+150000)+'\n')"
-  stage_25:
-    needs: [setup]
+  cohort:
+    needs: setup
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       max-parallel: 5
@@ -111,11 +137,10 @@ jobs:
         shard: [0, 1, 2, 3, 4]
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      CLOUDFLARE_EDGE_TOKEN: ${{ matrix.shard == 0 && secrets.CLOUDFLARE_EDGE_TOKEN || '' }}
       PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
       LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
-      LOAD_TARGET: '25'
       LOAD_SHARD: ${{ matrix.shard }}
-      LOAD_START_AT: ${{ needs.setup.outputs.start_at }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -126,238 +151,50 @@ jobs:
           name: isolated-encrypted-fixtures
           path: artifacts/load-private
       - run: node scripts/launch-distributed-bundle.mjs unpack
-      - run: node scripts/launch-distributed-run.mjs
+      - name: Persistent real-egress cohort, live barriers, gated 25/50/100 holds
+        run: node scripts/launch-distributed-run.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: distributed-25-${{ matrix.shard }}
+          name: distributed-capacity-runner-${{ matrix.shard }}
           path: artifacts/launch-load
           retention-days: 30
-  collect_25:
-    needs: [setup, stage_25]
-    if: always() && needs.setup.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      start_at: ${{ steps.collect.outputs.start_at }}
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      LOAD_TARGET: '25'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: distributed-25-*
-          path: artifacts/distributed-results
-      - id: collect
-        run: node scripts/launch-distributed-collect.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-25-summary
-          path: artifacts/launch-load
-          retention-days: 30
-  stage_100:
-    needs: [setup, collect_25]
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    strategy:
-      fail-fast: false
-      max-parallel: 20
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
-      LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
-      LOAD_TARGET: '100'
-      LOAD_SHARD: ${{ matrix.shard }}
-      LOAD_START_AT: ${{ needs.collect_25.outputs.start_at }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          name: isolated-encrypted-fixtures
-          path: artifacts/load-private
-      - run: node scripts/launch-distributed-bundle.mjs unpack
-      - run: node scripts/launch-distributed-run.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-100-${{ matrix.shard }}
-          path: artifacts/launch-load
-          retention-days: 30
-  collect_100:
-    needs: [setup, stage_100, collect_25]
-    if: always() && needs.setup.result == 'success' && needs.collect_25.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      start_at: ${{ steps.collect.outputs.start_at }}
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      LOAD_TARGET: '100'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: distributed-100-*
-          path: artifacts/distributed-results
-      - id: collect
-        run: node scripts/launch-distributed-collect.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-100-summary
-          path: artifacts/launch-load
-          retention-days: 30
-  stage_500:
-    needs: [setup, collect_100]
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    strategy:
-      fail-fast: false
-      max-parallel: 20
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
-      LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
-      LOAD_TARGET: '500'
-      LOAD_SHARD: ${{ matrix.shard }}
-      LOAD_START_AT: ${{ needs.collect_100.outputs.start_at }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          name: isolated-encrypted-fixtures
-          path: artifacts/load-private
-      - run: node scripts/launch-distributed-bundle.mjs unpack
-      - run: node scripts/launch-distributed-run.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-500-${{ matrix.shard }}
-          path: artifacts/launch-load
-          retention-days: 30
-  collect_500:
-    needs: [setup, stage_500, collect_100]
-    if: always() && needs.setup.result == 'success' && needs.collect_100.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      start_at: ${{ steps.collect.outputs.start_at }}
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      LOAD_TARGET: '500'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: distributed-500-*
-          path: artifacts/distributed-results
-      - id: collect
-        run: node scripts/launch-distributed-collect.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-500-summary
-          path: artifacts/launch-load
-          retention-days: 30
-  stage_1000:
-    needs: [setup, collect_500]
-    runs-on: ubuntu-latest
-    timeout-minutes: 8
-    strategy:
-      fail-fast: false
-      max-parallel: 20
-      matrix:
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
-      LOAD_FIXTURE_FILE: /tmp/pack1-launch-fixtures.json
-      LOAD_TARGET: '1000'
-      LOAD_SHARD: ${{ matrix.shard }}
-      LOAD_START_AT: ${{ needs.collect_500.outputs.start_at }}
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          name: isolated-encrypted-fixtures
-          path: artifacts/load-private
-      - run: node scripts/launch-distributed-bundle.mjs unpack
-      - run: node scripts/launch-distributed-run.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-1000-${{ matrix.shard }}
-          path: artifacts/launch-load
-          retention-days: 30
-  collect_1000:
-    needs: [setup, stage_1000, collect_500]
-    if: always() && needs.setup.result == 'success' && needs.collect_500.result == 'success'
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      start_at: ${{ steps.collect.outputs.start_at }}
-    env:
-      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-      LOAD_TARGET: '1000'
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 24
-      - uses: actions/download-artifact@v4
-        with:
-          pattern: distributed-1000-*
-          path: artifacts/distributed-results
-      - id: collect
-        run: node scripts/launch-distributed-collect.mjs
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: distributed-1000-summary
-          path: artifacts/launch-load
-          retention-days: 30
-  cleanup:
-    needs: [setup, collect_25, collect_100, collect_500, collect_1000]
+  collect_cleanup:
+    needs: [setup, cohort]
     if: always() && needs.setup.outputs.created == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 8
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+      PREVIEW_BRANCH: ${{ needs.setup.outputs.branch }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Disable the private preview route
-        env:
-          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: distributed-capacity-*
+          path: artifacts/distributed-results
+      - name: Independently recompute cohort and complete-stage acceptance
+        run: node scripts/launch-distributed-collect.mjs
+      - name: Disable the private preview route even after a failed gate
+        if: always()
         run: node scripts/edge-control.mjs disable
-      - name: Delete the disposable branch
+      - name: Delete the disposable branch even after failed collection or disable
         if: always()
         uses: neondatabase/delete-branch-action@v3
         with:
           project_id: patient-shadow-91417882
           api_key: ${{ secrets.NEON_API_KEY }}
           branch: ${{ needs.setup.outputs.branch }}
+      - name: Verify preview mapping absence and branch GET 404
+        if: always()
+        run: node scripts/launch-distributed-setup.mjs cleanup
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: distributed-capacity-final
+          path: artifacts/launch-load
+          retention-days: 30
