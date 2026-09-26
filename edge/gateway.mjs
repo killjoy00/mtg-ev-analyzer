@@ -50,6 +50,7 @@ function permitted(service,path,method,search,mode) {
       '/v1/stats','/v1/profile/me','/v1/profile/history','/v1/patreon/status',
     ].includes(path))return true;
     if(method==='GET'&&/^\/v1\/profile\/[a-f0-9]{16}(?:\/history)?$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
     return method==='PATCH'&&path==='/v1/profile';
   }
   if(service==='draft') {
@@ -129,6 +130,7 @@ function mobileSessionRoute(service,path,method) {
       '/v1/mobile/account/google/finish','/v1/mobile/account/signout',
       '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
     ].includes(path))return true;
+    if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
   if(service!=='draft')return false;
@@ -140,6 +142,7 @@ function mobileSessionRoute(service,path,method) {
 function mobileAccountRoute(service,path,method) {
   if(service==='growth') {
     if(method==='POST'&&['/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete'].includes(path))return true;
+    if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
   if(service!=='draft')return false;

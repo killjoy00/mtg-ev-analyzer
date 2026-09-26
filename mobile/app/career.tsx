@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   FlatList,
   Pressable,
+  Share,
   StyleSheet,
   Text,
   View,
@@ -20,6 +21,7 @@ import {
 import { ApiError } from '@/src/api/client';
 import { DAILY_ENVIRONMENT_META, isDailyEnvironment } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
+import { ProfileOverview } from '@/src/components/ProfileOverview';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import type { MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
@@ -45,15 +47,6 @@ function formatDate(value: string) {
   return Number.isNaN(date.valueOf())
     ? value
     : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
-}
-
-function Stat({ label, value }: { label: string; value: string | number }) {
-  return (
-    <View style={styles.stat}>
-      <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statLabel}>{label}</Text>
-    </View>
-  );
 }
 
 function HistoryRow({ item }: { item: CareerHistoryRow }) {
@@ -83,6 +76,7 @@ export default function CareerScreen() {
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [loadingMore, setLoadingMore] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  const [shareError, setShareError] = useState<string | null>(null);
   const requestId = useRef(0);
 
   useAppResume(() => {
@@ -119,7 +113,7 @@ export default function CareerScreen() {
       }
       setState({
         status: 'error',
-        message: error instanceof Error ? error.message : 'Career is unavailable.',
+        message: error instanceof Error ? error.message : 'My Pack One is unavailable.',
       });
     }
   };
@@ -151,12 +145,29 @@ export default function CareerScreen() {
     }
   };
 
+  const shareProfile = async () => {
+    if (state.status !== 'ready') return;
+    setShareError(null);
+    const profile = state.profile;
+    const publicUrl = profile.player.profile_public && profile.player.profile_key
+      ? `https://packone.pro/?profile=${encodeURIComponent(profile.player.profile_key)}`
+      : null;
+    const copy = publicUrl
+      ? `${profile.player.display_name}'s Pack One profile\n${publicUrl}`
+      : `${profile.player.display_name} on Pack One · ${profile.summary.games} games · ${Number(profile.summary.average_score || 0).toFixed(1)} average · best ${profile.summary.best_score}\nhttps://packone.pro`;
+    try {
+      await Share.share({ message: copy });
+    } catch {
+      setShareError('Could not open sharing.');
+    }
+  };
+
   if (state.status === 'loading') {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <ActivityIndicator accessibilityLabel="Loading career" color={colors.accent} />
-          <Text style={styles.body}>Loading your Pack One career…</Text>
+          <ActivityIndicator accessibilityLabel="Loading My Pack One" color={colors.accent} />
+          <Text style={styles.body}>Loading My Pack One…</Text>
         </View>
       </SafeAreaView>
     );
@@ -166,10 +177,10 @@ export default function CareerScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Text style={styles.eyebrow}>YOUR CAREER</Text>
-          <Text style={styles.title}>Sign in to see your history.</Text>
+          <Text style={styles.eyebrow}>MY PACK ONE</Text>
+          <Text style={styles.title}>Sign in to see your full career.</Text>
           <Text style={styles.body}>
-            Your Pack One account keeps the same scores and career across web, iPhone, and Android.
+            Your Pack One account keeps the same scores, achievements, season standings, and history across web, iPhone, iPad, and Android.
           </Text>
           <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Sign in or create an account</Text>
@@ -183,7 +194,7 @@ export default function CareerScreen() {
     return (
       <SafeAreaView style={styles.safe}>
         <View style={styles.center}>
-          <Text style={styles.title}>Couldn&apos;t load your career.</Text>
+          <Text style={styles.title}>Couldn&apos;t load My Pack One.</Text>
           <Text style={styles.body}>{state.message}</Text>
           <Pressable accessibilityRole="button" onPress={() => void load()} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Try again</Text>
@@ -193,21 +204,21 @@ export default function CareerScreen() {
     );
   }
 
-  const { summary } = state.profile;
   const header = (
     <View style={styles.header}>
-      <Text style={styles.eyebrow}>YOUR CAREER</Text>
-      <Text style={styles.title}>{state.profile.player.display_name}</Text>
-      <Text style={styles.body}>Your server-authoritative Pack One results across web and mobile.</Text>
-      <View style={styles.statsGrid}>
-        <Stat label="Games" value={summary.games} />
-        <Stat label="Average" value={summary.average_score} />
-        <Stat label="Best" value={summary.best_score} />
-        <Stat label="Dailies" value={summary.daily_games} />
-        <Stat label="Current streak" value={summary.current_streak} />
-        <Stat label="Best streak" value={summary.best_streak} />
+      <ProfileOverview profile={state.profile} />
+      <View style={styles.actions}>
+        <Pressable accessibilityRole="button" onPress={() => void shareProfile()} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>
+            {state.profile.player.profile_public ? 'Share public profile' : 'Share my record'}
+          </Text>
+        </Pressable>
+        <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>Account & profile settings</Text>
+        </Pressable>
       </View>
-      <Text style={styles.sectionTitle}>Recent history</Text>
+      {shareError ? <Text accessibilityRole="alert" style={styles.error}>{shareError}</Text> : null}
+      <Text style={styles.sectionTitle}>Recent Games</Text>
     </View>
   );
 
@@ -230,26 +241,14 @@ export default function CareerScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  list: { paddingBottom: spacing.xxl },
-  header: { padding: spacing.lg, gap: spacing.md },
+  list: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
+  header: { padding: spacing.lg, gap: spacing.lg },
   center: { flex: 1, padding: spacing.xl, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
   title: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7, textAlign: 'center' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  stat: {
-    width: '31%',
-    minWidth: 96,
-    flexGrow: 1,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.line,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  statValue: { color: colors.ink, fontSize: 22, fontWeight: '800' },
-  statLabel: { color: colors.muted, fontSize: 11, fontWeight: '700' },
-  sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: '800', marginTop: spacing.sm },
+  actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  sectionTitle: { color: colors.ink, fontSize: 19, fontWeight: '800' },
   historyRow: {
     minHeight: 68,
     marginHorizontal: spacing.lg,
@@ -273,6 +272,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   primaryButtonText: { color: colors.surface, fontSize: 15, fontWeight: '800' },
+  secondaryButton: {
+    minHeight: 46,
+    borderWidth: 1,
+    borderColor: colors.accent,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  secondaryButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800' },
+  error: { color: colors.danger, fontSize: 13 },
   empty: { color: colors.muted, fontSize: 15, textAlign: 'center', padding: spacing.xl },
   footer: { padding: spacing.lg },
 });

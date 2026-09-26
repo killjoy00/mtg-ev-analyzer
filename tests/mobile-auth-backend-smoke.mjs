@@ -72,6 +72,17 @@ const profile=await call('/v1/mobile/profile/me',undefined,{
 });
 assert.equal(profile.player.claimed,true);
 assert.equal(typeof profile.player.display_name,'string');
+assert.ok(Array.isArray(profile.achievements));
+assert.ok(Array.isArray(profile.best_environments));
+assert.ok(Array.isArray(profile.daily_history));
+assert.equal(typeof profile.environment_total,'number');
+
+await query('UPDATE players SET profile_public=true WHERE id=$1::uuid',[guest.playerId]);
+const publicProfile=await call('/v1/mobile/profile/'+profile.player.profile_key,undefined,{
+  playerToken:signed.linked.token,
+});
+assert.equal(publicProfile.player.display_name,profile.player.display_name);
+assert.equal(publicProfile.player.claimed,undefined);
 
 const history=await call('/v1/mobile/profile/history?limit=5',undefined,{
   playerToken:signed.linked.token,accountToken:signed.session.token,
@@ -90,4 +101,4 @@ await call('/v1/mobile/account/session',undefined,{
   playerToken:signed.linked.token,accountToken:signed.session.token,status:401,
 });
 
-console.log('Mobile auth passed: guest-bound one-use OAuth handoff, linked native session, exact player/account binding, private career reads, and revocation.');
+console.log('Mobile auth passed: guest-bound OAuth, linked native session, rich private/public profile reads, exact player/account binding, and revocation.');

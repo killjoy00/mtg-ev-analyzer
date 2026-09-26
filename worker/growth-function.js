@@ -2105,6 +2105,8 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/profile/history') return handleMyHistory(request);
   if (request.method === 'POST' && url.pathname === '/v1/profile-lookup') return handleProfileLookup(request);
 
+  const mobileProfileMatch = url.pathname.match(/^\/v1\/mobile\/profile\/([a-f0-9]{16})$/);
+  if (request.method === 'GET' && mobileProfileMatch) return handlePublicProfile(mobileProfileMatch[1]);
   const historyMatch = url.pathname.match(/^\/v1\/profile\/([a-f0-9]{16})\/history$/);
   if (request.method === 'GET' && historyMatch) return handlePublicHistory(historyMatch[1], request);
   const profileMatch = url.pathname.match(/^\/v1\/profile\/([a-f0-9]{16})$/);

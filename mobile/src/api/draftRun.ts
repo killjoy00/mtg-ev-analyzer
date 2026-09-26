@@ -115,6 +115,25 @@ export type PracticeSet = {
   regular_run?: boolean;
 };
 
+export type DailyStatus = {
+  day: string;
+  capabilities: string[];
+  player: { claimed: boolean };
+  membership?: { connected?: boolean; capabilities?: string[] } | null;
+  ranking_identity?: { eligible: boolean; reason?: string | null } | null;
+  daily_streak: number;
+  daily_history: ({
+    date: string;
+    set_id: string;
+    mode: string;
+    score: number;
+    rank?: number | null;
+    total?: number | null;
+    percentile?: number | null;
+    final?: boolean;
+  })[];
+};
+
 export type DraftRunHealth = {
   ok: boolean;
   service?: string;
@@ -126,6 +145,14 @@ export type DraftRunHealth = {
 
 export function loadDraftRunHealth() {
   return requestJson<DraftRunHealth>('/draft/health?quick=1', { timeoutMs: 10_000 });
+}
+
+export function loadDailyStatus(session: MobileSession) {
+  return requestJson<DailyStatus>('/draft/v1/daily-status', {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
 }
 
 export function startDailyDraftRun(

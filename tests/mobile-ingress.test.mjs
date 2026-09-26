@@ -89,6 +89,31 @@ test('native player surfaces are limited to linked mobile profile aliases',async
   assert.equal(blocked.status,403);
 });
 
+test('native public profile aliases are readable without exposing browser profile routes',async()=>{
+  const profileKey='0123456789abcdef';
+  for(const accountHeader of [null,account]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro/growth/v1/mobile/profile/'+profileKey,{
+      headers:headers({
+        'x-pack1-mobile-session':token,
+        ...(accountHeader?{'x-pack1-mobile-account':accountHeader}:{}),
+      }),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      forwarded={url,authorization:new Headers(options.headers).get('authorization')};
+      return Response.json({player:{profile_key:profileKey}});
+    });
+    assert.equal(response.status,200);
+    assert.ok(forwarded.url.endsWith('/v1/mobile/profile/'+profileKey));
+    assert.equal(forwarded.authorization,'Bearer '+token);
+  }
+
+  const blocked=new Request('https://api.packone.pro/growth/v1/profile/'+profileKey,{
+    headers:headers({'x-pack1-mobile-session':token}),
+  });
+  assert.equal((await gateway(blocked,env(),async()=>{throw Error('must not reach upstream')})).status,403);
+});
+
 test('practice idempotency is only forwarded to Draft Run creation',async()=>{
   const key='practice_'+('k'.repeat(32));
   let forwarded=null;
