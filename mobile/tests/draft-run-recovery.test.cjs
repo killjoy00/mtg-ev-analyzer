@@ -133,6 +133,7 @@ async function fixture(options = {}) {
       AccessibilityInfo: { announceForAccessibility() {} },
       ActivityIndicator: host('ActivityIndicator'), Modal: host('Modal'),
       Pressable: host('Pressable'), ScrollView, Share: { share: async () => {} },
+      Linking: { openURL: options.openURL ?? (async () => {}) },
       StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
@@ -254,5 +255,54 @@ test('finishing an old practice-key cleanup cannot restore a previous run after 
     assert.doesNotMatch(screen.text(), /You chose/);
     const progress = screen.root.root.findAll((node) => node.type === 'View' && node.props.accessibilityRole === 'progressbar')[0];
     assert.equal(progress.props.accessibilityValue.now, 0);
+  } finally { await screen.close(); }
+});
+
+
+test('TCGplayer affiliate destinations stay hidden until score analysis is opened', async () => {
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  const screen = await fixture({ submitPick: async () => completedPick });
+  try {
+    assert.doesNotMatch(screen.text(), /TCGplayer/);
+    await screen.chooseAndConfirm();
+    assert.doesNotMatch(screen.text(), /TCGplayer/, 'compact reveal must not contain affiliate links');
+    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
+    assert.ok(why);
+    await act(async () => why.props.onPress());
+    assert.equal(screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link').length, 2);
+    assert.match(screen.text(), /Affiliate links\. Pack One may earn a commission/);
+  } finally { await screen.close(); }
+});
+
+test('revealed-card affiliate link opens the approved card-specific Impact destination', async () => {
+  const opened = [];
+  const custom = puzzle(0);
+  custom.candidates = [{ id: 'a', name: 'Black Lotus & Co' }, { id: 'b', name: 'Mox Pearl' }];
+  const selected = { ...answer(0, 'a', 88), selectedName: 'Black Lotus & Co', historicalName: 'Mox Pearl', puzzle: custom };
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [selected], current: puzzle(1) };
+  const screen = await fixture({ submitPick: async () => completedPick, openURL: async (url) => { opened.push(url); } });
+  try {
+    await screen.chooseAndConfirm();
+    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
+    await act(async () => why.props.onPress());
+    const link = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Black Lotus & Co on TCGplayer, affiliate link')[0];
+    assert.ok(link);
+    await act(async () => { link.props.onPress(); await flush(); });
+    assert.equal(opened.length, 1);
+    assert.equal(opened[0], 'https://partner.tcgplayer.com/c/7742974/1780961/21018?u=https%3A%2F%2Fwww.tcgplayer.com%2Fsearch%2Fmagic%2Fproduct%3Fq%3DBlack%2520Lotus%2520%2526%2520Co%26view%3Dgrid');
+  } finally { await screen.close(); }
+});
+
+test('failed revealed-card affiliate handoff stays in analysis and offers a retryable error', async () => {
+  const completedPick = { ...runZero(), revision: 5, round: 1, answers: [answer(0, 'a', 88)], current: puzzle(1) };
+  const screen = await fixture({ submitPick: async () => completedPick, openURL: async () => { throw new Error('no handler'); } });
+  try {
+    await screen.chooseAndConfirm();
+    const why = screen.root.root.findAll((node) => node.type === 'Pressable' && renderedText(node).includes('Why this score?'))[0];
+    await act(async () => why.props.onPress());
+    const link = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Card A on TCGplayer, affiliate link')[0];
+    await act(async () => { link.props.onPress(); await flush(); });
+    assert.match(screen.text(), /Could not open TCGplayer\. You can try the affiliate link again\./);
+    assert.match(screen.text(), /Why this score/);
   } finally { await screen.close(); }
 });
