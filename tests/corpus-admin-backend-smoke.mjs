@@ -21,6 +21,7 @@ const fixtureSets=[snapshotSet,historicalSet];
 const snapshotA=randomBytes(32).toString('hex'),snapshotB=randomBytes(32).toString('hex'),historicalSnapshot=randomBytes(32).toString('hex');
 const componentVersion=TRADITIONAL_V4_PHASE2_COMPONENT_VERSION;
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
+const yes=x=>x===true||x==='t';
 const findSet=(report,setId)=>{const row=report.sets.find(set=>set.set_id===setId);assert.ok(row,`${setId}: admin row missing`);return row;};
 
 async function insertFixtureSet(setId,name,activeSnapshotId,manifest) {
@@ -124,11 +125,11 @@ async function snapshotReportingFixture() {
  assert.equal(row.active_snapshot_excluded_count,1);
  assert.equal(row.staged_count,4);
  assert.equal(row.staged_eligible_count,3);
- assert.equal(row.ready,true);
- assert.equal(row.health_current,false);
+ assert.equal(yes(row.ready),true);
+ assert.equal(yes(row.health_current),false);
  assert.equal(row.report.fixture,'active-a');
  assert.ok(candidate);
- assert.equal(candidate.ready,false);
+ assert.equal(yes(candidate.ready),false);
  assert.equal(candidate.serving_count,0);
  assert.equal(candidate.retained_count,4);
  assert.equal(candidate.report.fixture,'candidate-b-failed');
