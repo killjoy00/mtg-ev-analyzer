@@ -161,15 +161,15 @@ Pack One is unofficial Fan Content permitted under the Wizards Fan Content Polic
 
 ### App content declarations
 
-- Ads: **No** for the native Android app. The mobile binary has no ad SDK and no native display-ad feature.
+- Ads: **Yes**. Native Pack One intentionally renders clearly disclosed TCGplayer affiliate promotional links (the Daily-home fallback and reviewed revealed-card destinations). The binary still has no third-party ad SDK and does not use an advertising ID.
 - App access: Some features are available without login; account and Elite features require access. Supply one non-expiring Elite reviewer account in Play Console Sign-in details. Do not store its password in Git.
 - Privacy policy: https://packone.pro/privacy/
 - Account deletion URL: https://packone.pro/privacy/#delete-account
 - Target audience: default recommendation is ages 13 and over; do not select under-13 groups unless the product is intentionally redesigned for children.
 - Content rating: complete IARC from the actual content. No gambling/wagering/chat. Card art may contain fantasy violence and must be reflected accurately.
 - Data safety: use the declaration below.
-- Contains ads: No.
-- In-app purchases: No for v1.
+- Contains ads: **Yes** for Play's declaration because the app contains disclosed third-party affiliate promotional surfaces; this is true even though there is no ad SDK.
+- In-app purchases: No for v1; Pack One does not sell digital access in the Android app.
 
 ### Data safety - conservative v1 declaration
 
@@ -191,6 +191,8 @@ Do not declare collection of location, contacts, photos/videos, audio, health, f
 The app uses Apple/Google identity providers and infrastructure/service providers to operate the service. Re-evaluate Play's current definition/exclusions for "data sharing" in the console against the exact provider relationships at submission time; do not mark data as sold or used for advertising/tracking.
 
 ### Reviewer instructions
+
+Commercial-content note for review: Pack One includes disclosed TCGplayer affiliate links to a third-party marketplace for physical cards. Pack One does not process those purchases, does not use an ad SDK or advertising ID, and does not place the Daily-home promotion inside active gameplay/results.
 
 Guest path:
 1. Launch app.
