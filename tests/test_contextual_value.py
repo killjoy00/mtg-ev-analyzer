@@ -313,7 +313,8 @@ class OutcomeBaselineTests(unittest.TestCase):
 
 
 class EvaluationGateTests(unittest.TestCase):
-    def test_gate_requires_ci_and_environment_harm_check_to_be_decisive(self):
+    @staticmethod
+    def _policies():
         candidate = []
         incumbent = []
         for index in range(100):
@@ -327,15 +328,92 @@ class EvaluationGateTests(unittest.TestCase):
             )
             candidate.append(PolicyObservation(target={"A": 1.0, "B": 0.0}, **shared))
             incumbent.append(PolicyObservation(target={"A": 0.0, "B": 1.0}, **shared))
+        return candidate, incumbent
+
+    @staticmethod
+    def _environment_evidence():
+        return {
+            "MSH": (-0.01, 0.20),
+            "SOS": (-0.02, 0.18),
+            "ECL": (-0.03, 0.16),
+            "TLA": (-0.04, 0.14),
+        }
+
+    def _complete_kwargs(self):
+        return dict(
+            ci95=(1.0, 3.0),
+            environment_deltas=self._environment_evidence(),
+            ablations_coherent=True,
+            out_of_environment_ci95=(-0.04, 0.10),
+        )
+
+    def test_gate_requires_all_written_research_evidence(self):
+        candidate, incumbent = self._policies()
         incomplete = compare_policies(candidate, incumbent)
         self.assertEqual(incomplete["status"], "incomplete")
-        complete = compare_policies(
+        complete = compare_policies(candidate, incumbent, **self._complete_kwargs())
+        self.assertEqual(complete["status"], "pass")
+        self.assertFalse(complete["production_promotion"]["decisive"])
+        self.assertEqual(complete["production_promotion"]["status"], "incomplete")
+
+    def test_empty_environment_evidence_is_incomplete(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        kwargs["environment_deltas"] = {}
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertFalse(result["checks"]["development_environment_evidence_complete"])
+
+    def test_missing_required_environment_is_incomplete(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        evidence = self._environment_evidence()
+        evidence.pop("TLA")
+        kwargs["environment_deltas"] = evidence
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIn("TLA", result["evidence"]["development_environments"]["missing"])
+
+    def test_malformed_environment_interval_is_incomplete(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        evidence = self._environment_evidence()
+        evidence["SOS"] = (0.2, -0.2)
+        kwargs["environment_deltas"] = evidence
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIn("SOS", result["evidence"]["development_environments"]["malformed"])
+
+    def test_missing_ablation_or_holdout_evidence_is_incomplete(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        kwargs["ablations_coherent"] = None
+        self.assertEqual(compare_policies(candidate, incumbent, **kwargs)["status"], "incomplete")
+        kwargs = self._complete_kwargs()
+        kwargs["out_of_environment_ci95"] = None
+        self.assertEqual(compare_policies(candidate, incumbent, **kwargs)["status"], "incomplete")
+
+    def test_complete_harm_evidence_can_fail_gate(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        evidence = self._environment_evidence()
+        evidence["ECL"] = (-0.20, -0.06)
+        kwargs["environment_deltas"] = evidence
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "fail")
+        self.assertFalse(result["checks"]["no_concentrated_harm"])
+
+    def test_prospective_environment_is_separate_production_gate(self):
+        candidate, incumbent = self._policies()
+        result = compare_policies(
             candidate,
             incumbent,
-            ci95=(1.0, 3.0),
-            environment_deltas={"holdout": (-0.01, 0.20)},
+            **self._complete_kwargs(),
+            prospective_environment_delta=0.03,
+            prospective_environment_ci95=(-0.02, 0.08),
         )
-        self.assertEqual(complete["status"], "pass")
+        self.assertEqual(result["status"], "pass")
+        self.assertTrue(result["production_promotion"]["passed"])
 
 
 if __name__ == "__main__":
