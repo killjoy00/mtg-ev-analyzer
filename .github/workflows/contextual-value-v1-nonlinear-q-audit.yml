@@ -1,0 +1,60 @@
+name: contextual-value-v1-nonlinear-q-audit
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned research dependency
+        run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1'
+      - name: Download successful development cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: 36256947308
+          github-token: ${{ github.token }}
+      - name: Download fold -1 training feature shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-feature-fold--1-*
+          path: precomputed-features
+          merge-multiple: true
+          run-id: 36256947308
+          github-token: ${{ github.token }}
+      - name: Run validation-only nonlinear Q audit
+        run: |
+          python3 research/contextual_value_q_challenger.py \
+            --cohort-dir preprocessed-core \
+            --feature-shard precomputed-features/train-feature-fold--1-MSH.jsonl.gz \
+            --feature-shard precomputed-features/train-feature-fold--1-SOS.jsonl.gz \
+            --feature-shard precomputed-features/train-feature-fold--1-ECL.jsonl.gz \
+            --feature-shard precomputed-features/train-feature-fold--1-TLA.jsonl.gz \
+            --source-sha aa5b17d96b43f3ce08f52fad55ba17f327472c1b \
+            --out results/contextual-value-v1/nonlinear-q-audit.json
+      - name: Assert assessment remains sealed
+        run: |
+          python3 - <<'PY'
+          import json
+          report = json.load(open("results/contextual-value-v1/nonlinear-q-audit.json"))
+          assert report["scope"] == "development_only"
+          assert report["assessment_opened"] is False
+          assert report["assessment_outcomes_used"] is False
+          PY
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-nonlinear-q-audit
+          path: results/contextual-value-v1/nonlinear-q-audit.json
+          retention-days: 30
