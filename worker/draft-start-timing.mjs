@@ -3,9 +3,11 @@
 const rounded=value=>Math.round(value*100)/100;
 const family=sql=>/pack1_serving_snapshot/.test(sql)?'snapshot':
   /WITH chosen AS/i.test(sql)?'candidate':
-  /draft_run_serving_revision/.test(sql)?'revision':'other';
+  /draft_run_serving_revision/.test(sql)?'revision':
+  /ORDER BY p\.distance/i.test(sql)?'reroll':
+  /p\.puzzle_id=ANY/i.test(sql)?'metadata':'other';
 
-export function draftStartTiming(enabled,{clock=()=>performance.now()}={}) {
+export function draftStartTiming(enabled,{clock=()=>performance.now(),header='x-pack1-start-timing'}={}) {
   if(!enabled)return {step:(_name,action)=>action(),selectionQuery:query=>query,finish:response=>response};
   const started=clock(),phases={},selector={};
   const step=async(name,action)=>{
@@ -25,7 +27,7 @@ export function draftStartTiming(enabled,{clock=()=>performance.now()}={}) {
       }
     },
     finish(response) {
-      response.headers.set('x-pack1-start-timing',JSON.stringify({v:1,total_ms:rounded(clock()-started),phases,selector}));
+      response.headers.set(header,JSON.stringify({v:1,total_ms:rounded(clock()-started),phases,selector}));
       return response;
     },
   };

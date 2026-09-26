@@ -279,7 +279,8 @@ async function start(request) {
 }
 
 async function change(request,id,action) {
-  const owner=await player(request),body=await readJson(request),s=await session(id,owner);
+  const timing=draftStartTiming(action==='reroll'&&process.env.PACK1_CAPACITY_DIAGNOSTICS==='1',{header:'x-pack1-reroll-timing'});
+  const owner=await timing.step('player',()=>player(request)),body=await timing.step('body',()=>readJson(request)),s=await timing.step('session',()=>session(id,owner));
   const round=Number(body.round);
   // Exact retry of a committed answer is safe; changing it never is.
   if(action==='pick' && Number.isInteger(round) && s.answers[round]?.selectedId===body.cardId && s.answers[round]?.puzzle.puzzle_id===body.puzzleId) return json(await responseFor(s));
@@ -300,18 +301,18 @@ async function change(request,id,action) {
     if(!['set','pack'].includes(type)) fail('Invalid reroll.');
     if(environmentOf(s)==='powered-cube' && type==='set') fail('Powered Cube has two pack rerolls and no set reroll.');
     if(!Number.isInteger(s.rerolls[type]) || s.rerolls[type]<1) fail('That reroll has already been used.',409);
-    const [current]=await loadPuzzleMetadata(query,s.corpus_version,[body.puzzleId]);
+    const [current]=await timing.step('metadata',()=>loadPuzzleMetadata(timing.selectionQuery(query),s.corpus_version,[body.puzzleId]));
     if(!current) fail('This puzzle is unavailable.',503);
     
-    const replacement=await selectDatabaseReroll(query,s.corpus_version,current,{type,round,seed:s.seed,excludedSources:s.seen_sources,environment:environmentOf(s),difficultyVersion:s.difficulty_version||LEGACY_DIFFICULTY_VERSION,selectionVersion:s.selection_version||PREVIOUS_SELECTION_VERSION,daily:Boolean(s.day),day:s.day||gameDateKey(),anchor:s.difficulty_anchors[round],setIds:s.custom_set_ids});
+    const replacement=await timing.step('selection',()=>selectDatabaseReroll(timing.selectionQuery(query),s.corpus_version,current,{type,round,seed:s.seed,excludedSources:s.seen_sources,environment:environmentOf(s),difficultyVersion:s.difficulty_version||LEGACY_DIFFICULTY_VERSION,selectionVersion:s.selection_version||PREVIOUS_SELECTION_VERSION,daily:Boolean(s.day),day:s.day||gameDateKey(),anchor:s.difficulty_anchors[round],setIds:s.custom_set_ids}));
     if(!replacement) fail('No comparable replacement is available. Your reroll is still yours.',409);
     s.puzzle_ids[round]=replacement.puzzle_id;s.seen_sources.push(replacement.source_draft_hash);s.rerolls[type]-=1;
   }
   const answer=action==='pick'?s.answers.at(-1):null,{viewId,activeMs}=measurementInput(body);
-  const updated=await query(`WITH changed AS (UPDATE draft_run_sessions SET puzzle_ids=$3::jsonb,answers=$4::jsonb,rerolls=$5::jsonb,seen_sources=$6::jsonb,score=$7::int,revision=revision+1,updated_at=now() WHERE id=$1::uuid AND revision=$2::int AND player_id=$8::uuid RETURNING *),
-    ${MEASUREMENT_CTE} SELECT * FROM changed`,[id,s.revision,JSON.stringify(s.puzzle_ids),JSON.stringify(s.answers),JSON.stringify(s.rerolls),JSON.stringify(s.seen_sources),s.score,owner,round+1,body.puzzleId,action==='pick'?'pick':body.type,answer?.selectedId||null,answer?.score??null,answer?.historicalMatch??null,viewId,activeMs]);
+  const updated=await timing.step('update',()=>query(`WITH changed AS (UPDATE draft_run_sessions SET puzzle_ids=$3::jsonb,answers=$4::jsonb,rerolls=$5::jsonb,seen_sources=$6::jsonb,score=$7::int,revision=revision+1,updated_at=now() WHERE id=$1::uuid AND revision=$2::int AND player_id=$8::uuid RETURNING *),
+    ${MEASUREMENT_CTE} SELECT * FROM changed`,[id,s.revision,JSON.stringify(s.puzzle_ids),JSON.stringify(s.answers),JSON.stringify(s.rerolls),JSON.stringify(s.seen_sources),s.score,owner,round+1,body.puzzleId,action==='pick'?'pick':body.type,answer?.selectedId||null,answer?.score??null,answer?.historicalMatch??null,viewId,activeMs]));
   if(!updated.rows[0]) fail('Your run changed in another tab. Reload to continue.',409);
-  return json(await responseFor(decode(updated.rows[0])));
+  return timing.finish(json(await timing.step('response',()=>responseFor(decode(updated.rows[0])))));
 }
 
 async function createShare(request,id) {

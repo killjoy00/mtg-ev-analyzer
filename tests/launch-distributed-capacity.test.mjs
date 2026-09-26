@@ -143,6 +143,9 @@ test('runner retains bounded preview timings beside unsampled client duration',a
  assert.equal(report.requests.length,1);assert.equal(report.requests[0].diagnostics.origin.phases.selection,60);
  assert.ok(report.requests[0].ms>=0);
  assert.equal(parseStartDiagnostics(new Headers({'x-pack1-start-timing':'not json'})),null);
+ const reroll=new Headers({'x-pack1-gateway-timing':headers.get('x-pack1-gateway-timing'),
+   'x-pack1-reroll-timing':JSON.stringify({v:1,total_ms:120,phases:{session:30,selection:80,private:200},selector:{metadata:{count:1,sum_ms:10,max_ms:10},reroll:{count:1,sum_ms:75,max_ms:75}}})});
+ assert.deepEqual(parseStartDiagnostics(reroll,'reroll'),{gateway:{duration_ms:130,quota_ms:20,upstream_ms:90},origin:{total_ms:120,phases:{session:30,selection:80},selector:{metadata:{count:1,sum_ms:10,max_ms:10},reroll:{count:1,sum_ms:75,max_ms:75}}}});
 });
 const event=(extra={})=>({id:'event',release:scope.sha,status:200,duration_ms:50,quota_ms:5,upstream_ms:40,...extra});
 test('telemetry bins keep ambient preview boundary rejects distinct from cohort and system failures',()=>{

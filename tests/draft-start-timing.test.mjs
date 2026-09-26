@@ -23,3 +23,12 @@ test('production start timing adds no response header',async()=>{
   await timing.step('selection',async()=>timing.selectionQuery(async()=>({rows:[]}))('SELECT 1',[]));
   assert.equal(timing.finish(Response.json({ok:true})).headers.get('x-pack1-start-timing'),null);
 });
+test('isolated reroll timings classify its two read families without payloads',async()=>{
+  let now=0;const timing=draftStartTiming(true,{clock:()=>now,header:'x-pack1-reroll-timing'});
+  const query=timing.selectionQuery(async()=>{now+=25;return {rows:[]};});
+  await timing.step('metadata',()=>query('SELECT p.puzzle_id FROM puzzles p WHERE p.puzzle_id=ANY($1)',['private']));
+  await timing.step('selection',()=>query('SELECT p.distance FROM puzzles p ORDER BY p.distance',['private']));
+  const response=timing.finish(Response.json({ok:true}));
+  assert.equal(response.headers.get('x-pack1-start-timing'),null);
+  assert.deepEqual(JSON.parse(response.headers.get('x-pack1-reroll-timing')),{v:1,total_ms:50,phases:{metadata:25,selection:25},selector:{metadata:{count:1,sum_ms:25,max_ms:25},reroll:{count:1,sum_ms:25,max_ms:25}}});
+});
