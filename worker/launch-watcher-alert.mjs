@@ -61,7 +61,7 @@ async function saveState(query,state) {
 
 function alertConfig(env) {
   const apiKey=String(env.PACK1_ACCOUNT_DELETE_RESEND_API_KEY||'');
-  const destination=String(env.PACK1_DELETION_ADMIN_EMAIL||'').trim();
+  const destination=String(env.PACK1_LAUNCH_ALERT_EMAIL||'').trim();
   if(!apiKey.startsWith('re_')||apiKey.length<=3)throw Error('Launch watcher operator email key is unavailable');
   if(!/^[^@\s]+@[^@\s]+$/.test(destination))throw Error('Launch watcher operator email destination is unavailable');
   return {apiKey,destination};
