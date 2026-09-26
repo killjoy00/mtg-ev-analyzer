@@ -9,6 +9,8 @@ const NATIVE_PATHS = new Set([
   '/leaderboard',
   '/method',
   '/practice',
+  '/profile',
+  '/historical-challenge',
   '/scoring',
   '/sets',
 ]);
@@ -84,6 +86,16 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     return `?${next.toString()}`;
   }
 
+  if (pathname === '/profile') {
+    const key = searchParams.get('key');
+    return key && /^[a-f0-9]{16}$/.test(key) ? `?key=${key}` : '';
+  }
+
+  if (pathname === '/historical-challenge') {
+    const challenge = searchParams.get('challenge');
+    return challenge && /^[a-f0-9]{12}$/.test(challenge) ? `?challenge=${challenge}` : '';
+  }
+
   if (pathname === '/leaderboard') {
     const next = new URLSearchParams();
     next.set('environment', environmentFromSet(searchParams.get('environment')));
@@ -104,6 +116,19 @@ export function rewriteIncomingPath(path: string) {
     if (!parsed) return '/';
 
     const { pathname, searchParams } = parsed;
+
+    if (pathname === '/open/profile/' || pathname === '/open/profile') {
+      const key = searchParams.get('key');
+      return key && /^[a-f0-9]{16}$/.test(key) ? `/profile?key=${key}` : '/';
+    }
+    if (pathname === '/open/shared/' || pathname === '/open/shared') {
+      const id = searchParams.get('id');
+      return id && /^[a-f0-9]{24}$/.test(id) ? `/draft-run?shared=${id}` : '/';
+    }
+    if (pathname === '/open/daily/' || pathname === '/open/daily') {
+      return `/draft-run?environment=${environmentFromSet(searchParams.get('environment'))}`;
+    }
+
     const article = directArticlePath(pathname);
     if (article) return article;
 
@@ -113,6 +138,20 @@ export function rewriteIncomingPath(path: string) {
     if (pathname !== '/') return '/';
 
     if (searchParams.get('account') === '1') return '/account';
+
+    const publicProfile = searchParams.get('profile');
+    if (publicProfile && /^[a-f0-9]{16}$/.test(publicProfile)) {
+      return `/profile?key=${publicProfile}`;
+    }
+
+    const legacyChallenge = searchParams.get('challenge');
+    if (
+      legacyChallenge
+      && /^[a-f0-9]{12}$/.test(legacyChallenge)
+      && searchParams.get('game') !== 'draft-run'
+    ) {
+      return `/historical-challenge?challenge=${legacyChallenge}`;
+    }
 
     if (searchParams.get('game') === 'draft-run') {
       const environment = environmentFromSet(searchParams.get('set'));
@@ -130,9 +169,10 @@ export function rewriteIncomingPath(path: string) {
         return `/draft-run?environment=${environment}`;
       }
 
-      // Stored friend challenges are not silently converted into a different
-      // native run. Until the native challenge surface lands, route safely home.
-      if (searchParams.has('shared') || searchParams.has('challenge')) return '/';
+      const shared = searchParams.get('shared') || searchParams.get('challenge');
+      if (shared) {
+        return /^[a-f0-9]{24}$/.test(shared) ? `/draft-run?shared=${shared}` : '/';
+      }
 
       if (searchParams.get('custom') === '1') return '/practice';
 
