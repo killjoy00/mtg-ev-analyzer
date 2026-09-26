@@ -172,6 +172,31 @@ test('native account parity routes stay inside the mobile bridge',async()=>{
   assert.equal((await gateway(browserProfile,env(),async()=>{throw Error('must not reach upstream')})).status,403);
 });
 
+test('native stored friend-run reads use only exact 24-hex share ids',async()=>{
+  const share='0123456789abcdef01234567';
+  for(const accountHeader of [null,account]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro/draft/v1/shared-runs/'+share,{
+      headers:headers({
+        'x-pack1-mobile-session':token,
+        ...(accountHeader?{'x-pack1-mobile-account':accountHeader}:{}),
+      }),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      forwarded={url,authorization:new Headers(options.headers).get('authorization')};
+      return Response.json({id:share,run_length:8});
+    });
+    assert.equal(response.status,200);
+    assert.ok(forwarded.url.endsWith('/v1/shared-runs/'+share));
+    assert.equal(forwarded.authorization,'Bearer '+token);
+  }
+
+  const invalid=new Request('https://api.packone.pro/draft/v1/shared-runs/not-a-share',{
+    headers:headers({'x-pack1-mobile-session':token}),
+  });
+  assert.equal((await gateway(invalid,env(),async()=>{throw Error('must not reach upstream')})).status,403);
+});
+
 test('practice idempotency is only forwarded to Draft Run creation',async()=>{
   const key='practice_'+('k'.repeat(32));
   let forwarded=null;
