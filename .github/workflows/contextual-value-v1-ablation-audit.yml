@@ -1,0 +1,240 @@
+name: contextual-value-v1-ablation-audit
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-ablation-audit-529
+    paths:
+      - '.github/workflows/contextual-value-v1-ablation-audit.yml'
+      - 'research/contextual_value_ablation_audit.py'
+      - 'research/contextual_value_propensity_lbfgs.py'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN: '36256947308'
+  SOURCE_SHA: aa5b17d96b43f3ce08f52fad55ba17f327472c1b
+  BASELINE_POOLED_RUN: '36276431003'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  materialize-held:
+    name: held-fold-${{ matrix.fold }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        fold: [-1, 0, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned audit dependency
+        run: python -m pip install --disable-pip-version-check 'scipy==1.18.1'
+      - name: Compile audit scripts
+        run: python -m py_compile research/contextual_value_ablation_audit.py research/contextual_value_propensity_lbfgs.py
+      - name: Download frozen development cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download converged baseline pooled artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-converged-propensity-pooled
+          path: baseline-pooled
+          run-id: ${{ env.BASELINE_POOLED_RUN }}
+          github-token: ${{ github.token }}
+      - name: Materialize held-draft feature map
+        run: |
+          FOLD='${{ matrix.fold }}'
+          python3 research/contextual_value_ablation_audit.py materialize-held \
+            --fold "$FOLD" \
+            --cohort-dir preprocessed-core \
+            --baseline-train baseline-pooled/train-nuisance.jsonl.gz \
+            --baseline-validation baseline-pooled/validation-nuisance.jsonl.gz \
+            --source-sha "$SOURCE_SHA" \
+            --out "results/contextual-value-v1/ablation-held-$FOLD"
+      - name: Assert assessment boundary
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          reports=list(pathlib.Path("results/contextual-value-v1").glob("ablation-held-*/held-features-fold-*-report.json"))
+          assert len(reports)==1
+          r=json.loads(reports[0].read_text())
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          PY
+      - name: Upload held feature checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-held-${{ matrix.fold }}
+          path: results/contextual-value-v1/ablation-held-${{ matrix.fold }}/
+          retention-days: 30
+
+  fit-profile:
+    name: ${{ matrix.profile }}-fold-${{ matrix.fold }}
+    needs: materialize-held
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 18
+      matrix:
+        fold: [-1, 0, 1, 2, 3, 4]
+        profile:
+          - no_strong_entirely
+          - strong_offset_only
+          - strong_feature_only
+          - no_gih
+          - no_iwd
+          - no_gnd
+          - no_deck_fit
+          - no_pool_context
+          - no_skill_controls
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned audit dependency
+        run: python -m pip install --disable-pip-version-check 'scipy==1.18.1'
+      - name: Download frozen development cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download retained nuisance-training feature shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-feature-fold-${{ matrix.fold }}-*
+          path: precomputed-features
+          merge-multiple: true
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download held feature checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-held-${{ matrix.fold }}
+          path: held-features
+      - name: Fit one ablation nuisance profile
+        run: |
+          FOLD='${{ matrix.fold }}'
+          PROFILE='${{ matrix.profile }}'
+          python3 research/contextual_value_ablation_audit.py fit-profile \
+            --fold "$FOLD" \
+            --profile "$PROFILE" \
+            --cohort-dir preprocessed-core \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-MSH.jsonl.gz" \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-SOS.jsonl.gz" \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-ECL.jsonl.gz" \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-TLA.jsonl.gz" \
+            --held-features "held-features/held-features-fold-$FOLD.jsonl.gz" \
+            --source-sha "$SOURCE_SHA" \
+            --out "results/contextual-value-v1/ablation-$PROFILE-$FOLD"
+      - name: Assert profile boundaries
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          reports=list(pathlib.Path("results/contextual-value-v1").glob("ablation-*/*-report.json"))
+          assert len(reports)==1
+          r=json.loads(reports[0].read_text())
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          if r["profile_spec"]["behavior_refit"]:
+              s=r["propensity_solver"]
+              assert s["success"] is True
+              assert s["gradient_max_abs"] <= 1e-6
+              assert s["gradient_self_check"]["max_abs_error"] <= 2e-6
+          PY
+      - name: Upload profile checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-${{ matrix.profile }}-fold-${{ matrix.fold }}
+          path: results/contextual-value-v1/ablation-${{ matrix.profile }}-${{ matrix.fold }}/
+          retention-days: 30
+
+  aggregate:
+    needs: fit-profile
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned audit dependency
+        run: python -m pip install --disable-pip-version-check 'scipy==1.18.1'
+      - name: Download frozen development cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download converged baseline report
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-converged-propensity-pooled
+          path: baseline-pooled
+          run-id: ${{ env.BASELINE_POOLED_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download all held feature checkpoints
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-held-*
+          path: held
+          merge-multiple: true
+      - name: Download all ablation nuisance checkpoints
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-*-fold-*
+          path: profiles
+          merge-multiple: true
+      - name: Aggregate ablations at fixed baseline policy temperature
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=()
+          for p in held/held-features-fold-*.jsonl.gz; do
+            ARGS+=(--held-feature "$p")
+          done
+          for p in profiles/*-fold-*.jsonl.gz; do
+            ARGS+=(--profile-prediction "$p")
+          done
+          for p in profiles/*-fold-*-report.json; do
+            ARGS+=(--profile-report "$p")
+          done
+          python3 research/contextual_value_ablation_audit.py aggregate \
+            --cohort-dir preprocessed-core \
+            "${ARGS[@]}" \
+            --baseline-report baseline-pooled/development-report.json \
+            --source-sha "$SOURCE_SHA" \
+            --out results/contextual-value-v1/ablation-audit
+      - name: Assert assessment remains sealed
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open("results/contextual-value-v1/ablation-audit/ablation-report.json"))
+          assert r["assessment_opened"] is False
+          b=r["assessment_boundary"]
+          assert b["outcomes_loaded_into_pipeline"] is False
+          assert b["outcomes_used_for_fit"] is False
+          assert b["outcomes_scored"] is False
+          PY
+      - name: Upload ablation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-audit
+          path: results/contextual-value-v1/ablation-audit/
+          retention-days: 30
