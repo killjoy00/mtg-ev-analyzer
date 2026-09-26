@@ -2,26 +2,31 @@ import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
 import {unseal} from './launch-distributed-bundle.mjs';
-import {summarize} from './practice-performance.mjs';
-const target=Number(process.env.LOAD_TARGET),generators=target===25?5:20;
-assert.ok([25,100,500,1000].includes(target));
-const directory='artifacts/distributed-results';
-const files=(fs.existsSync(directory)?fs.readdirSync(directory,{recursive:true}):[]).filter(n=>new RegExp('distributed-'+target+'-\\d+\\.json$').test(n));
-const reports=files.map(n=>JSON.parse(fs.readFileSync(path.join(directory,n),'utf8')));
-const policy=JSON.parse(fs.readFileSync('scripts/launch-load-policy.json','utf8'));
-const requests=reports.flatMap(r=>r.stages.flatMap(s=>s.requests));
-const networks=reports.map(r=>unseal(r.egress).network);
-const identityVerified=networks.every(n=>/^[a-f0-9]{64}$/.test(n||''))&&new Set(networks).size===generators;
-const summary={target,generators,received_generators:reports.length,distinct_real_egress:identityVerified?generators:null,
-  code_sha:process.env.GITHUB_SHA,completed:reports.reduce((n,r)=>n+r.stages[0].completed,0),requests:requests.length,
-  statuses:Object.fromEntries([...new Set(requests.map(r=>r.status))].map(s=>[s,requests.filter(r=>r.status===s).length])),routes:{},passed:false};
-for(const route of Object.keys(policy.route_budgets_ms))summary.routes[route]=summarize(requests.filter(r=>r.route===route).map(r=>r.ms));
-summary.passed=reports.length===generators&&new Set(reports.map(r=>r.generator)).size===generators&&
-  reports.every(r=>r.sha===process.env.GITHUB_SHA&&r.passed&&r.stages[0].arrival_delay.p99_ms<=5000)&&identityVerified&&summary.completed===target&&
-  requests.filter(r=>r.status<200||r.status>=400).length/Math.max(1,requests.length)<=policy.maximum_error_fraction&&
-  !summary.statuses[429]&&Object.entries(summary.routes).every(([route,s])=>!s.samples||s.p95_ms<=policy.route_budgets_ms[route].p95&&s.p99_ms<=policy.route_budgets_ms[route].p99);
-fs.mkdirSync('artifacts/launch-load',{recursive:true});
-fs.writeFileSync('artifacts/launch-load/distributed-stage-'+target+'.json',JSON.stringify(summary,null,2));
-console.log(JSON.stringify(summary));
-if(summary.passed&&target!==1000)fs.appendFileSync(process.env.GITHUB_OUTPUT,'start_at='+(Date.now()+150000)+'\n');
-if(!summary.passed)process.exitCode=1;
+import {policy} from './launch-distributed-control.mjs';
+import {evaluateStage,fingerprint} from './launch-distributed-core.mjs';
+const root='artifacts/distributed-results',files=fs.existsSync(root)?fs.readdirSync(root,{recursive:true}):[];
+const named=pattern=>files.filter(f=>pattern.test(path.basename(f))).map(f=>JSON.parse(fs.readFileSync(path.join(root,f),'utf8')));
+const declarations=named(/^experiment-declaration\.json$/),cohorts=named(/^cohort-\d\.json$/),summaries=named(/^distributed-stage-\d+\.json$/),reasons=[];
+const reject=reason=>reasons.push(reason);
+const declaration=declarations[0],scope=declaration?.scope;
+if(declarations.length!==1||scope?.sha!==process.env.GITHUB_SHA||scope?.run_id!==process.env.GITHUB_RUN_ID||scope?.attempt!==process.env.GITHUB_RUN_ATTEMPT||scope?.policy_hash!==fingerprint(policy))reject('declaration_missing_or_wrong_revision');
+if(cohorts.length!==policy.generators||new Set(cohorts.map(r=>r.shard)).size!==policy.generators||cohorts.some(r=>fingerprint(r.scope)!==fingerprint(scope)||!r.passed))reject('cohort_incomplete_or_failed');
+const stages=[];
+for(let stage=0;stage<policy.stages.length;stage++) {
+  try {
+    const retained=summaries.filter(s=>s.stage===stage);assert.equal(retained.length,1);
+    const reports=named(new RegExp('^distributed-'+stage+'-\\d\\.json$')).map(r=>({...r,network:unseal(r.egress).network}));
+    const networks=Object.fromEntries(reports.map(r=>[r.shard,r.network])),recomputed=evaluateStage(reports,{scope,stage,start_at:retained[0].start_at,networks},policy);
+    assert.equal(recomputed.passed,true);assert.equal(retained[0].passed,true);assert.equal(retained[0].telemetry.passed,true);assert.equal(retained[0].usage.passed,true);
+    assert.equal(recomputed.requests,retained[0].requests);assert.deepEqual(recomputed.routes,retained[0].routes);
+    assert.ok(cohorts.every(c=>c.history?.[stage]?.digest===fingerprint(retained[0])),'stage_decision_digest');stages.push(retained[0]);
+  } catch {reject('stage_'+policy.stages[stage].players+'_missing_or_failed');}
+}
+const budget=cohorts.reduce((n,c)=>{for(const key of Object.keys(n))n[key]+=c.budget?.[key]||0;return n;},{gateway_requests:60,response_bytes:0,coordinator_queries:0});
+if(budget.gateway_requests>policy.maximum_requests||budget.response_bytes>policy.maximum_response_bytes||budget.coordinator_queries>policy.maximum_coordinator_queries)reject('aggregate_resource_ceiling');
+const report={scope,policy,verified:declaration?.verified,budget,stages,reasons,passed:!reasons.length,
+  historical_supported_distributed_players:25,candidate_distributed_players:!reasons.length?100:null,
+  capacity_claim:'Not promoted until private ingress removal and disposable branch deletion are separately verified. Five-network finite mixed-lifecycle evidence only; not universal backend capacity or indefinite endurance.'};
+fs.mkdirSync('artifacts/launch-load',{recursive:true});fs.writeFileSync('artifacts/launch-load/distributed-acceptance.json',JSON.stringify(report,null,2));
+console.log(JSON.stringify({passed:report.passed,reasons,budget,passed_stages:stages.map(s=>s.target)}));
+if(!report.passed)process.exitCode=1;
