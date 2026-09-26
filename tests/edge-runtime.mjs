@@ -17,26 +17,26 @@ try {
   mf=new Miniflare(options);
   let ns=await mf.getDurableObjectNamespace('NETWORK_QUOTA','gateway');
   const id=ns.idFromName('concurrent-network');
-  const statuses=await Promise.all(Array.from({length:25},async()=>{
+  const statuses=await Promise.all(Array.from({length:121},async()=>{
     const r=await ns.get(id).fetch('https://quota/session',{method:'POST'});
     if(r.status===429){assert.ok(Number(r.headers.get('retry-after'))>0);assert.deepEqual(await r.json(),{error:'Too many requests.',code:'network_rate_limited',scopes:['session']});}
     return r.status;
   }));
-  assert.equal(statuses.filter(x=>x===204).length,10);assert.equal(statuses.filter(x=>x===429).length,15);
+  assert.equal(statuses.filter(x=>x===204).length,120);assert.equal(statuses.filter(x=>x===429).length,1);
   assert.equal((await ns.get(id).fetch('https://quota/request',{method:'POST'})).status,204,'normal play has a separate budget');
   const playId=ns.idFromName('play-network');
-  const playStatuses=await Promise.all(Array.from({length:121},async()=>
+  const playStatuses=await Promise.all(Array.from({length:601},async()=>
     (await ns.get(playId).fetch('https://quota/request',{method:'POST'})).status));
-  assert.equal(playStatuses.filter(x=>x===204).length,120);assert.equal(playStatuses.filter(x=>x===429).length,1);
+  assert.equal(playStatuses.filter(x=>x===204).length,600);assert.equal(playStatuses.filter(x=>x===429).length,1);
   const missing=ns.get(ns.idFromName('invalid-cookie-network'));
-  for(let i=0;i<10;i++) {
+  for(let i=0;i<120;i++) {
     assert.equal((await missing.fetch('https://quota/request',{method:'POST'})).status,204);
     assert.equal((await missing.fetch('https://quota/session-only',{method:'POST'})).status,204);
   }
   const creationDenied=await missing.fetch('https://quota/session-only',{method:'POST'});
   assert.equal(creationDenied.status,429);assert.deepEqual((await creationDenied.json()).scopes,['session']);
-  // Ten request+creation pairs must consume ten, not twenty, general requests.
-  for(let i=0;i<110;i++)assert.equal((await missing.fetch('https://quota/request',{method:'POST'})).status,204);
+  // 120 request+creation pairs consume 120, not 240, burst requests.
+  for(let i=0;i<480;i++)assert.equal((await missing.fetch('https://quota/request',{method:'POST'})).status,204);
   const requestDenied=await missing.fetch('https://quota/request',{method:'POST'});
   assert.equal(requestDenied.status,429);assert.deepEqual((await requestDenied.json()).scopes,['request']);
   const bothDenied=await missing.fetch('https://quota/session',{method:'POST'});
