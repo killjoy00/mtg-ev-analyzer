@@ -11,7 +11,7 @@ import csv
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Iterable, Mapping, Sequence
+from typing import Callable, Dict, Iterable, Mapping, Sequence
 
 from build_replays import (
     CountStore,
@@ -30,7 +30,15 @@ from deck_fit import (
     estimate,
     observe_examples,
 )
-from contextual_value.dataset import Decision, draft_split, parse_decision
+from contextual_value.dataset import (
+    Decision,
+    _count,
+    _games_lower_bound,
+    _int,
+    _number,
+    draft_split,
+    parse_decision,
+)
 from contextual_value.features import CardSignals
 from contextual_value.schema import open_text, validate_header
 
@@ -73,29 +81,168 @@ def limit_decisions(
     )
 
 
+
+def scan_eligible_draft_ids(
+    archive: Path,
+    *,
+    progress_callback: Callable[[int, int], None] | None = None,
+) -> set[str]:
+    """Stream one draft archive and retain only IDs eligible for load_decisions().
+
+    This mirrors parse_decision's eligibility checks without materializing pool
+    state or Decision objects. It is used only to choose the existing global
+    stable-hash cohort before the expensive full parse.
+    """
+    with open_text(archive) as handle:
+        reader = csv.reader(handle)
+        header = tuple(next(reader))
+        validate_header(header, "draft")
+        positions = {name: index for index, name in enumerate(header)}
+        required = (
+            "draft_id",
+            "event_type",
+            "pick",
+            "pack_number",
+            "pick_number",
+            "event_match_wins",
+            "user_game_win_rate_bucket",
+            "user_n_games_bucket",
+        )
+        missing = [name for name in required if name not in positions]
+        if missing:
+            raise ValueError(f"draft data is missing required columns: {missing}")
+        pack_positions = [
+            (column[len("pack_card_"):], index)
+            for index, column in enumerate(header)
+            if column.startswith("pack_card_")
+        ]
+
+        eligible: set[str] = set()
+        rows_scanned = 0
+        last_report = 0
+        for values in reader:
+            rows_scanned += 1
+            if len(values) != len(header):
+                continue
+            draft_id = values[positions["draft_id"]].strip()
+            selected = values[positions["pick"]].strip()
+            if not draft_id or not selected:
+                continue
+            if values[positions["event_type"]].strip() != "PremierDraft":
+                continue
+            pack_number = _int(values[positions["pack_number"]])
+            pick_number = _int(values[positions["pick_number"]])
+            wins = _int(values[positions["event_match_wins"]])
+            rate = _number(values[positions["user_game_win_rate_bucket"]])
+            games = _games_lower_bound(values[positions["user_n_games_bucket"]])
+            if pack_number is None or pick_number is None or wins is None:
+                continue
+            if rate is None or games is None or not 0 <= rate <= 1:
+                continue
+
+            seen: set[str] = set()
+            selected_present = False
+            duplicate_candidate = False
+            for card, position in pack_positions:
+                if _count(values[position]) <= 0:
+                    continue
+                if card in seen:
+                    duplicate_candidate = True
+                    break
+                seen.add(card)
+                if card == selected:
+                    selected_present = True
+            if duplicate_candidate or not seen or not selected_present:
+                continue
+            eligible.add(draft_id)
+
+            if progress_callback is not None and rows_scanned - last_report >= 50000:
+                progress_callback(rows_scanned, len(eligible))
+                last_report = rows_scanned
+
+        if progress_callback is not None and rows_scanned != last_report:
+            progress_callback(rows_scanned, len(eligible))
+        return eligible
+
+
+def select_global_draft_ids(
+    archives: Sequence[Path],
+    max_drafts: int,
+    *,
+    progress_callback: Callable[[Path, int, int], None] | None = None,
+) -> frozenset[str]:
+    """Choose the exact existing global stable-hash cohort without full parsing."""
+    if max_drafts <= 0:
+        raise ValueError("max_drafts must be positive")
+    all_ids: set[str] = set()
+    source_by_draft: dict[str, str] = {}
+    for archive in archives:
+        callback = (
+            (lambda rows, eligible, archive=archive: progress_callback(
+                archive, rows, eligible
+            ))
+            if progress_callback is not None
+            else None
+        )
+        current = scan_eligible_draft_ids(archive, progress_callback=callback)
+        overlap = current & set(source_by_draft)
+        if overlap:
+            raise ValueError(
+                f"draft archives contain duplicate draft IDs: {sorted(overlap)[:3]}"
+            )
+        for draft_id in current:
+            source_by_draft[draft_id] = str(archive)
+        all_ids.update(current)
+
+    ordered = sorted(
+        all_ids,
+        key=lambda draft_id: stable_score(f"contextual-value-v1-sample:{draft_id}"),
+    )
+    return frozenset(ordered[:max_drafts])
+
+
 def load_decisions(
     archive: Path,
     *,
     split: str | None = None,
     max_drafts: int | None = None,
+    keep_ids: Iterable[str] | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> list[Decision]:
-    """Parse the broad outcome population from one 17Lands draft archive.
+    """Parse broad-population decisions, optionally filtering IDs before parsing.
 
-    The optional cap is deterministic and exists only for development/smoke
-    runs. It never changes split assignment and therefore cannot leak one draft
-    across train/validation/assessment.
+    keep_ids is intentionally applied before constructing row dictionaries or
+    Decision objects. This lets the pooled workflow preserve the globally
+    selected cohort while bounding memory during the second archive pass.
     """
     if split not in {None, "train", "validation", "assessment"}:
         raise ValueError("split must be train, validation, assessment, or None")
+    keep = set(keep_ids) if keep_ids is not None else None
     with open_text(archive) as handle:
-        reader = csv.DictReader(handle)
-        header = tuple(reader.fieldnames or ())
+        reader = csv.reader(handle)
+        header = tuple(next(reader))
         validate_header(header, "draft")
+        try:
+            draft_at = header.index("draft_id")
+        except ValueError as exc:
+            raise ValueError("draft data is missing draft_id") from exc
+
         decisions: dict[str, Decision] = {}
-        by_draft: dict[str, list[str]] = defaultdict(list)
         draft_signature: dict[str, tuple] = {}
-        for row in reader:
-            decision = parse_decision(row, header)
+        rows_scanned = 0
+        last_report = 0
+        for values in reader:
+            rows_scanned += 1
+            if len(values) != len(header):
+                continue
+            draft_id = values[draft_at].strip()
+            if keep is not None and draft_id not in keep:
+                if progress_callback is not None and rows_scanned - last_report >= 50000:
+                    progress_callback(rows_scanned, len(decisions))
+                    last_report = rows_scanned
+                continue
+
+            decision = parse_decision(dict(zip(header, values)), header)
             if decision is None:
                 continue
             if decision.event_type != "PremierDraft":
@@ -119,7 +266,13 @@ def load_decisions(
             if existing is not None and existing != decision:
                 raise ValueError(f"{decision.decision_id}: conflicting duplicate decision")
             decisions[decision.decision_id] = decision
-            by_draft[decision.draft_id].append(decision.decision_id)
+
+            if progress_callback is not None and rows_scanned - last_report >= 50000:
+                progress_callback(rows_scanned, len(decisions))
+                last_report = rows_scanned
+
+        if progress_callback is not None and rows_scanned != last_report:
+            progress_callback(rows_scanned, len(decisions))
 
     return limit_decisions(list(decisions.values()), max_drafts)
 

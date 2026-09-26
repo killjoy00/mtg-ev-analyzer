@@ -1,13 +1,9 @@
 name: contextual-value-v1-development
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - '.github/workflows/contextual-value-v1-development.yml'
-      - 'scripts/contextual_value/**'
-      - 'scripts/contextual_value_phase1.py'
-      - 'research/CONTEXTUAL-VALUE-V1-RUN.md'
+  # Exploratory/thin-data validation is intentionally manual. HOB/TMT are
+  # stress-test environments only and must not auto-run or compete with the
+  # authoritative MSH/SOS/ECL/TLA pooled development workflow on every merge.
   workflow_dispatch:
     inputs:
       max_drafts:
