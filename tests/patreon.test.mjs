@@ -55,6 +55,62 @@ test('Patreon connect keeps the Phase 0 approved identity scope',async()=>{
   }
 });
 
+test('native Patreon connect uses mobile account identity and a mobile-scoped OAuth state',async()=>{
+  const prior=Object.fromEntries(['PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_WEBHOOK_SECRET'].map(k=>[k,process.env[k]]));
+  Object.assign(process.env,{PATREON_CLIENT_ID:'fixture-client',PATREON_CLIENT_SECRET:'fixture-secret',PATREON_WEBHOOK_SECRET:'fixture-webhook'});
+  try {
+    let insertedHash=null;
+    const response=await handlePatreon(new Request('https://packone.pro/v1/mobile/patreon/connect',{method:'POST'}),{
+      query:async(sql,params)=>{
+        if(sql.startsWith('DELETE FROM provider_oauth_states'))return {rows:[]};
+        if(sql.includes('INSERT INTO provider_oauth_states')){insertedHash=params[0];return {rows:[{state_hash:'fixture'}]};}
+        throw Error('Unexpected query: '+sql.slice(0,60));
+      },
+      authSession:async()=>{throw Error('browser auth must not be used');},
+      mobileAccountIdentity:async()=>({auth:{user_id:'11111111-1111-4111-8111-111111111111'}}),
+      json:(d,s)=>Response.json(d,{status:s||200}),
+    });
+    assert.equal(response.status,200);
+    const target=new URL((await response.json()).url);
+    const state=target.searchParams.get('state');
+    assert.match(state,/^m[a-f0-9]{64}$/);
+    assert.equal(insertedHash,createHash('sha256').update(state).digest('hex'));
+    assert.equal(target.searchParams.get('scope'),'identity');
+  } finally {
+    for(const [key,value] of Object.entries(prior)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+  }
+});
+
+test('mobile Patreon callback returns only to the Pack One account deep link',async()=>{
+  const priorEnv=Object.fromEntries(['PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_WEBHOOK_SECRET'].map(k=>[k,process.env[k]]));
+  const priorFetch=globalThis.fetch;
+  Object.assign(process.env,{PATREON_CLIENT_ID:'fixture-client',PATREON_CLIENT_SECRET:'fixture-secret',PATREON_WEBHOOK_SECRET:'fixture-webhook'});
+  globalThis.fetch=async url=>{
+    if(String(url).includes('/api/oauth2/token'))return Response.json({access_token:'fixture-token'});
+    return Response.json({data:{type:'user',id:'new-patreon',relationships:{memberships:{data:[]}}},included:[]});
+  };
+  try {
+    const query=async(sql)=>{
+      if(sql.startsWith('UPDATE provider_oauth_states SET consumed_at'))return {rows:[{auth_user_id:'11111111-1111-4111-8111-111111111111'}]};
+      if(sql.startsWith('SELECT provider_user_id'))return {rows:[{provider_user_id:'original-patreon'}]};
+      if(sql.startsWith('DELETE FROM provider_oauth_states'))return {rows:[]};
+      throw Error('Unexpected query: '+sql.slice(0,60));
+    };
+    const state='m'+('c'.repeat(64));
+    const response=await handlePatreon(new Request('https://packone.pro/v1/patreon/callback?state='+state+'&code=fixture'),{
+      query,
+      authSession:async()=>null,
+      mobileAccountIdentity:async()=>null,
+      json:(d,s)=>Response.json(d,{status:s||200}),
+    });
+    assert.equal(response.status,302);
+    assert.equal(response.headers.get('location'),'packone://account?patreon=identity-mismatch');
+  } finally {
+    globalThis.fetch=priorFetch;
+    for(const [key,value] of Object.entries(priorEnv)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+  }
+});
+
 test('Patreon callback refuses to silently replace an existing linked Patreon identity',async()=>{
   const priorEnv=Object.fromEntries(['PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_WEBHOOK_SECRET'].map(k=>[k,process.env[k]]));
   const priorFetch=globalThis.fetch;
