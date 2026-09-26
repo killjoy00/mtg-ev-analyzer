@@ -2,7 +2,22 @@ import { readFileSync } from 'node:fs';
 
 const token = process.env.PLAY_ACCESS_TOKEN?.trim();
 const packageName = process.env.PACKONE_ANDROID_PACKAGE?.trim() || 'pro.packone.app';
+const releaseTarget = process.env.PACKONE_PLAY_TARGET?.trim() || 'internal';
+const track = process.env.PACKONE_PLAY_TRACK?.trim() || 'internal';
 const bundlePath = process.argv[2];
+
+if (!['internal', 'closed'].includes(releaseTarget)) {
+  throw new Error('PACKONE_PLAY_TARGET must be internal or closed.');
+}
+if (!/^[A-Za-z0-9._-]{1,100}$/.test(track)) {
+  throw new Error('PACKONE_PLAY_TRACK is malformed.');
+}
+if (releaseTarget === 'internal' && track !== 'internal') {
+  throw new Error('Internal releases must target the internal track.');
+}
+if (releaseTarget === 'closed' && ['internal', 'production', 'beta', 'qa'].includes(track)) {
+  throw new Error('Closed releases require an explicit custom closed-testing track.');
+}
 
 if (!token) throw new Error('PLAY_ACCESS_TOKEN is required.');
 if (!bundlePath) throw new Error('Usage: node play-internal-release.mjs /path/to/app-release.aab');
@@ -59,13 +74,13 @@ try {
   const versionCode = String(uploaded?.versionCode ?? '');
   if (!versionCode) throw new Error('Google Play did not return an uploaded version code.');
 
-  const releaseName = `Pack One internal ${process.env.GITHUB_SHA?.slice(0, 7) || versionCode}`;
+  const releaseName = `Pack One ${releaseTarget} ${process.env.GITHUB_SHA?.slice(0, 7) || versionCode}`;
   await request(
-    `${apiBase}/edits/${encodeURIComponent(editId)}/tracks/internal`,
+    `${apiBase}/edits/${encodeURIComponent(editId)}/tracks/${encodeURIComponent(track)}`,
     {
       method: 'PUT',
       body: JSON.stringify({
-        track: 'internal',
+        track,
         releases: [
           {
             name: releaseName,
@@ -86,7 +101,8 @@ try {
   process.stdout.write(
     JSON.stringify({
       packageName,
-      track: 'internal',
+      target: releaseTarget,
+      track,
       versionCode,
       releaseName,
       releaseStatus: 'draft',
