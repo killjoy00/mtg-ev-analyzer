@@ -26,6 +26,7 @@
   "telemetry_bin_seconds": 60,
   "telemetry_settlement_seconds": 120,
   "telemetry_timeout_seconds": 240,
+  "telemetry_preflight_requests": 60,
   "minimum_telemetry_sample_fraction": 0.02,
   "maximum_experiment_minutes": 45,
   "maximum_branch_lifetime_minutes": 75,
