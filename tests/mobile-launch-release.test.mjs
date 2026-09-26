@@ -85,9 +85,11 @@ test('privacy page exposes the stable Play deletion resource and fallback reques
 });
 
 
-test('v1 contains a cold-start and resume forced-update gate with fail-open outage behavior', () => {
+test('v1 cold-start gate keeps navigation mounted across foreground revalidation', () => {
   const layout = read('mobile/app/_layout.tsx');
   const gate = read('mobile/src/components/VersionGate.tsx');
+  const boundary = read('mobile/src/components/VersionGateBoundary.js');
+  const lifecycle = read('mobile/tests/version-gate-lifecycle.test.cjs');
   const policy = read('mobile/src/versionPolicy.ts');
   const gateway = read('edge/gateway.mjs');
   const releaseWorkflow = read('.github/workflows/secure-auth-release.yml');
@@ -95,9 +97,19 @@ test('v1 contains a cold-start and resume forced-update gate with fail-open outa
 
   assert.match(layout, /<VersionGate>/);
   assert.equal(pkg.dependencies['expo-application'], '~57.0.3');
+  assert.equal(pkg.devDependencies['react-test-renderer'], '19.2.3');
+  assert.match(pkg.scripts['test:lifecycle'], /node --test/);
+  assert.match(pkg.scripts.test, /test:lifecycle/);
   assert.match(gate, /Application\.nativeApplicationVersion/);
   assert.match(gate, /Application\.nativeBuildVersion/);
-  assert.match(gate, /AppState\.addEventListener\('change'/);
+  assert.match(gate, /VersionGateBoundary/);
+  assert.match(gate, /initialAppState=\{AppState\.currentState\}/);
+  assert.match(boundary, /requestIdRef/);
+  assert.match(boundary, /requestId === requestIdRef\.current/);
+  assert.match(boundary, /Foreground checks intentionally do not clear the current decision/);
+  assert.match(lifecycle, /foreground allowed, delayed, and failed checks preserve mounted child state/);
+  assert.match(lifecycle, /newer foreground decision wins over an older overlapping check/);
+  assert.match(lifecycle, /validated update-required foreground decision blocks/);
   assert.match(gate, /\/growth\/v1\/mobile\/version/);
   assert.match(policy, /catch \{\s*return \{ status: 'allowed' \};\s*\}/);
   assert.match(policy, /apps\.apple\.com/);
