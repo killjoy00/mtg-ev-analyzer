@@ -1,13 +1,6 @@
 name: contextual-value-v1-ablation-audit
 
 on:
-  push:
-    branches:
-      - research/contextual-value-v1-ablation-audit-529
-    paths:
-      - '.github/workflows/contextual-value-v1-ablation-audit.yml'
-      - 'research/contextual_value_ablation_audit.py'
-      - 'research/contextual_value_propensity_lbfgs.py'
   workflow_dispatch:
 
 permissions:
