@@ -47,6 +47,18 @@ class NuisanceFit:
     outcome: RidgeOutcomeModel
 
 
+@dataclass(frozen=True)
+class NuisanceTrainingRow:
+    decision_id: str
+    draft_id: str
+    expansion: str
+    features: Mapping[str, Mapping[str, float]]
+    selected_action: str
+    sample_weight: float
+    offsets: Mapping[str, float] | None
+    outcome: float
+
+
 SignalProvider = Callable[[Decision, frozenset[str]], Mapping[str, CardSignals]]
 
 
@@ -98,27 +110,31 @@ def _training_feature_complement(
     return allowed
 
 
-def fit_fold(
+def build_fold_training_rows(
     decisions: Sequence[Decision],
     training_ids: frozenset[str],
     *,
     signal_provider: SignalProvider | None = None,
-    propensity_l2: float = 1.0,
-    outcome_l2: float = 10.0,
     inner_feature_folds: int = 5,
-    fold: int = -1,
-) -> NuisanceFit:
-    """Fit broad propensity and direct-Q on an explicit draft complement."""
+    expansion: str | None = None,
+) -> list[NuisanceTrainingRow]:
+    """Materialize nuisance-training rows, optionally for one environment shard.
+
+    Per-decision weights are always computed from the complete outer-fold
+    training complement before any environment filter is applied. Recombining
+    environment shards is therefore algebraically identical to the monolithic
+    fit.
+    """
     training = [decision for decision in decisions if decision.draft_id in training_ids]
     if not training:
         raise ValueError("no decisions belong to the requested training complement")
-
     per_decision_weight = normalized_draft_weights(training)
-    propensity_examples: list[PropensityExample] = []
-    outcome_rows: list[Mapping[str, float]] = []
-    outcomes: list[float] = []
-    outcome_weights: list[float] = []
+    if expansion is not None:
+        training = [decision for decision in training if decision.expansion == expansion]
+        if not training:
+            raise ValueError(f"no nuisance-training decisions for expansion {expansion}")
 
+    rows: list[NuisanceTrainingRow] = []
     for decision in training:
         feature_ids = (
             _training_feature_complement(
@@ -130,16 +146,44 @@ def fit_fold(
             else frozenset()
         )
         features, offsets = _feature_bundle(decision, feature_ids, signal_provider)
-        propensity_examples.append(PropensityExample(
+        rows.append(NuisanceTrainingRow(
+            decision_id=decision.decision_id,
+            draft_id=decision.draft_id,
+            expansion=decision.expansion,
             features=features,
             selected_action=decision.selected_card,
             sample_weight=per_decision_weight[decision.decision_id],
             offsets=offsets,
+            outcome=float(decision.event_match_wins),
         ))
-        outcome_rows.append(features[decision.selected_card])
-        outcomes.append(float(decision.event_match_wins))
-        outcome_weights.append(per_decision_weight[decision.decision_id])
+    return rows
 
+
+def fit_fold_from_training_rows(
+    rows: Sequence[NuisanceTrainingRow],
+    training_ids: frozenset[str],
+    *,
+    propensity_l2: float = 1.0,
+    outcome_l2: float = 10.0,
+    fold: int = -1,
+) -> NuisanceFit:
+    """Fit the unchanged nuisance models from precomputed feature rows."""
+    if not rows:
+        raise ValueError("at least one nuisance-training row is required")
+    if any(row.draft_id not in training_ids for row in rows):
+        raise ValueError("nuisance-training row falls outside the outer training complement")
+    propensity_examples = [
+        PropensityExample(
+            features=row.features,
+            selected_action=row.selected_action,
+            sample_weight=row.sample_weight,
+            offsets=row.offsets,
+        )
+        for row in rows
+    ]
+    outcome_rows = [row.features[row.selected_action] for row in rows]
+    outcomes = [row.outcome for row in rows]
+    outcome_weights = [row.sample_weight for row in rows]
     propensity = LinearSoftmaxPropensityModel.fit(
         propensity_examples,
         l2=propensity_l2,
@@ -155,6 +199,32 @@ def fit_fold(
         training_ids=training_ids,
         propensity=propensity,
         outcome=outcome,
+    )
+
+
+def fit_fold(
+    decisions: Sequence[Decision],
+    training_ids: frozenset[str],
+    *,
+    signal_provider: SignalProvider | None = None,
+    propensity_l2: float = 1.0,
+    outcome_l2: float = 10.0,
+    inner_feature_folds: int = 5,
+    fold: int = -1,
+) -> NuisanceFit:
+    """Fit broad propensity and direct-Q on an explicit draft complement."""
+    rows = build_fold_training_rows(
+        decisions,
+        training_ids,
+        signal_provider=signal_provider,
+        inner_feature_folds=inner_feature_folds,
+    )
+    return fit_fold_from_training_rows(
+        rows,
+        training_ids,
+        propensity_l2=propensity_l2,
+        outcome_l2=outcome_l2,
+        fold=fold,
     )
 
 

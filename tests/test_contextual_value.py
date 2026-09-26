@@ -21,7 +21,14 @@ from contextual_value.dataset import (
 from contextual_value.dr import PolicyObservation, aipw_candidate_values, evaluate_policy
 from contextual_value.evaluate import compare_policies
 from contextual_value.features import validate_feature_map
-from contextual_value.nuisance import crossfit_nuisance, crossfit_nuisance_fold
+from contextual_value.nuisance import (
+    build_fold_training_rows,
+    crossfit_nuisance,
+    crossfit_nuisance_fold,
+    fit_fold_from_training_rows,
+    nuisance_fold,
+    predict_fold,
+)
 from contextual_value.outcome import RidgeOutcomeModel
 from contextual_value.propensity import softmax, support_threshold, validate_distribution
 from contextual_value.schema import inspect_archive, validate_header
@@ -37,9 +44,9 @@ DRAFT_HEADER = [
 ]
 
 
-def row(draft_id="d1", pick="A", pick_number="0", wins="5"):
+def row(draft_id="d1", pick="A", pick_number="0", wins="5", expansion="TST"):
     values = [
-        "TST", "PremierDraft", draft_id, "2026-09-01T00:00:00Z", "Gold",
+        expansion, "PremierDraft", draft_id, "2026-09-01T00:00:00Z", "Gold",
         wins, "2", "0", pick_number, pick, "100-200", "55-60%",
         "1", "1", "0", "0",
     ]
@@ -157,6 +164,46 @@ class NuisanceCheckpointTests(unittest.TestCase):
         self.assertEqual(
             [asdict(item) for item in checkpointed],
             [asdict(item) for item in full],
+        )
+
+
+    def test_environment_feature_shards_recombine_to_exact_outer_fold(self):
+        decisions = []
+        for index in range(40):
+            decision = parse_decision(
+                row(
+                    draft_id=f"shard-draft-{index}",
+                    pick="A" if index % 2 else "B",
+                    wins=str(index % 8),
+                    expansion="AAA" if index % 2 else "BBB",
+                ),
+                DRAFT_HEADER,
+            )
+            self.assertIsNotNone(decision)
+            decisions.append(decision)
+
+        fold = 1
+        folds = 3
+        all_ids = frozenset(decision.draft_id for decision in decisions)
+        held_ids = frozenset(
+            draft_id for draft_id in all_ids
+            if nuisance_fold(draft_id, folds) == fold
+        )
+        training_ids = frozenset(all_ids - held_ids)
+        rows = []
+        for expansion in ("AAA", "BBB"):
+            rows.extend(build_fold_training_rows(
+                decisions,
+                training_ids,
+                expansion=expansion,
+            ))
+        fit = fit_fold_from_training_rows(rows, training_ids, fold=fold)
+        held = [decision for decision in decisions if decision.draft_id in held_ids]
+        sharded = sorted(predict_fold(fit, held), key=lambda item: item.decision_id)
+        monolithic = crossfit_nuisance_fold(decisions, fold, folds=folds)
+        self.assertEqual(
+            [asdict(item) for item in sharded],
+            [asdict(item) for item in monolithic],
         )
 
 
