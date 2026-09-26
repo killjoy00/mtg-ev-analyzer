@@ -14,7 +14,7 @@ const ACCOUNT = '11111111-1111-4111-8111-111111111111';
 const OTHER = '33333333-3333-4333-8333-333333333333';
 const session = (id = ACCOUNT) => ({ playerToken: `p1_${PLAYER}.${'A'.repeat(43)}`, subjectId: PLAYER,
   accountToken: (id === ACCOUNT ? 'B' : 'C').repeat(43), accountUser: { id } });
-const data = (overrides = {}) => ({ configured: true, connected: false, capabilities: [],
+const data = (overrides = {}) => ({ configured: true, connected: false, ad_free: false, ads_allowed: true, capabilities: [],
   account_capabilities: ['account', 'unlimited_regular_practice', 'custom_corpus', 'unlimited_cube_practice'],
   account_user_id: ACCOUNT, player_id: PLAYER, checked_at: '2026-09-26T17:00:00Z', membership: null, ...overrides });
 const connected = (overrides = {}) => data({ connected: true, capabilities: ['custom_corpus', 'unlimited_cube_practice'],
