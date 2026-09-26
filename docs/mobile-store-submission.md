@@ -129,7 +129,7 @@ Use real screenshots from the exact 1.0 release candidate. Recommended order:
 4. Practice screen — `Keep drafting between Dailies.`
 5. Career/leaderboard — `Track your Pack One career.`
 
-Apple allows 1-10 screenshots per supported device size. Because `ios.supportsTablet` is currently true, iPad screenshots/QA remain required unless tablet support is deliberately removed in a later release-candidate build.
+Apple allows 1-10 screenshots per supported device size. Pack One v1 supports iPad (`ios.supportsTablet=true`), so iPad-specific QA and the required iPad App Store screenshots are mandatory for the accepted 1.0 release candidate.
 
 ## Google Play
 
