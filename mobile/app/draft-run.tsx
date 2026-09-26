@@ -45,6 +45,20 @@ type LoadState =
 
 type ViewMode = 'pick' | 'feedback' | 'result';
 
+type ReadyState = Extract<LoadState, { status: 'ready' }>;
+
+type RunResponseToken = {
+  request: number;
+  mutation: number;
+  session: string;
+  runId: string;
+  revision: number;
+};
+
+function mobileSessionIdentity(session: MobileSession) {
+  return `${session.playerToken}\n${session.accountToken ?? ''}`;
+}
+
 function Progress({ run }: { run: DraftRunState }) {
   return (
     <View
@@ -387,6 +401,9 @@ export default function DraftRunScreen() {
       }
     : dailyMeta;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
+  const stateRef = useRef<LoadState>(state);
+  const refreshGeneration = useRef(0);
+  const mutationGeneration = useRef(0);
   const [mode, setMode] = useState<ViewMode>('pick');
   const [selected, setSelected] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -398,15 +415,66 @@ export default function DraftRunScreen() {
   const [showPackReview, setShowPackReview] = useState(false);
   const scroll = useRef<ScrollView>(null);
 
+  const commitState = (next: LoadState) => {
+    stateRef.current = next;
+    setState(next);
+  };
+
+  const beginRefresh = (current: ReadyState): RunResponseToken => ({
+    request: ++refreshGeneration.current,
+    mutation: mutationGeneration.current,
+    session: mobileSessionIdentity(current.session),
+    runId: current.run.id,
+    revision: current.run.revision,
+  });
+
+  const refreshStillCurrent = (token: RunResponseToken, run: DraftRunState) => {
+    const current = stateRef.current;
+    return current.status === 'ready'
+      && token.request === refreshGeneration.current
+      && token.mutation === mutationGeneration.current
+      && mobileSessionIdentity(current.session) === token.session
+      && current.run.id === token.runId
+      && current.run.revision === token.revision
+      && run.id === token.runId
+      && run.revision >= token.revision;
+  };
+
+  const beginMutation = (current: ReadyState): RunResponseToken => {
+    const token = {
+      request: ++refreshGeneration.current,
+      mutation: ++mutationGeneration.current,
+      session: mobileSessionIdentity(current.session),
+      runId: current.run.id,
+      revision: current.run.revision,
+    };
+    return token;
+  };
+
+  const mutationStillCurrent = (token: RunResponseToken, run?: DraftRunState) => {
+    const current = stateRef.current;
+    return current.status === 'ready'
+      && token.mutation === mutationGeneration.current
+      && mobileSessionIdentity(current.session) === token.session
+      && current.run.id === token.runId
+      && current.run.revision === token.revision
+      && (!run || (run.id === token.runId && run.revision >= token.revision));
+  };
+
   useAppResume(async () => {
-    if (state.status !== 'ready' || busy) return;
+    const current = stateRef.current;
+    if (current.status !== 'ready' || busy) return;
+    const token = beginRefresh(current);
     try {
-      const previousRun = state.run;
+      const previousRun = current.run;
       const run = practice
-        ? await loadDraftRun(previousRun.id, state.session)
-        : await startDailyDraftRun(state.session, environment);
-      setState({ status: 'ready', run, session: state.session });
-      setSelected(null);
+        ? await loadDraftRun(previousRun.id, current.session)
+        : await startDailyDraftRun(current.session, environment);
+      if (!refreshStillCurrent(token, run)) return;
+      commitState({ status: 'ready', run, session: current.session });
+      setSelected((selection) => (
+        run.current?.puzzle_id === previousRun.current?.puzzle_id ? selection : null
+      ));
       setMode((currentMode) => {
         if (
           currentMode === 'feedback'
@@ -428,39 +496,43 @@ export default function DraftRunScreen() {
       .then((loaded) => {
         if (!active) return;
         if (loaded.status === 'signin-required') {
-          setState({ status: 'signin-required' });
+          commitState({ status: 'signin-required' });
           return;
         }
         setMode(loaded.run.complete ? 'result' : 'pick');
-        setState({ status: 'ready', run: loaded.run, session: loaded.session });
+        commitState({ status: 'ready', run: loaded.run, session: loaded.session });
       })
       .catch((error: unknown) => {
         if (!active) return;
-        setState({
+        commitState({
           status: 'error',
           message: error instanceof Error ? error.message : 'Draft Run is unavailable.',
         });
       });
     return () => {
       active = false;
+      refreshGeneration.current += 1;
+      mutationGeneration.current += 1;
     };
   }, [environment, practice, setIds]);
 
   const retry = async () => {
-    setState({ status: 'loading' });
+    refreshGeneration.current += 1;
+    mutationGeneration.current += 1;
+    commitState({ status: 'loading' });
     setSelected(null);
     setActionError(null);
     setMode('pick');
     try {
       const loaded = await loadDraftSurface(environment, practice, setIds);
       if (loaded.status === 'signin-required') {
-        setState({ status: 'signin-required' });
+        commitState({ status: 'signin-required' });
         return;
       }
       setMode(loaded.run.complete ? 'result' : 'pick');
-      setState({ status: 'ready', run: loaded.run, session: loaded.session });
+      commitState({ status: 'ready', run: loaded.run, session: loaded.session });
     } catch (error: unknown) {
-      setState({
+      commitState({
         status: 'error',
         message: error instanceof Error ? error.message : 'Draft Run is unavailable.',
       });
@@ -475,10 +547,13 @@ export default function DraftRunScreen() {
   };
 
   const confirm = async () => {
-    if (state.status !== 'ready' || !selected || !state.run.current || busy) return;
+    const current = stateRef.current;
+    if (current.status !== 'ready' || !selected || !current.run.current || busy) return;
+    const token = beginMutation(current);
     setBusy(true);
     try {
-      const run = await submitDraftRunPick(state.run, selected, state.session);
+      const run = await submitDraftRunPick(current.run, selected, current.session);
+      if (!mutationStillCurrent(token, run)) return;
       if (run.current) {
         const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
         if (urls.length) void Image.prefetch(urls);
@@ -486,7 +561,7 @@ export default function DraftRunScreen() {
       if (run.complete && practice) {
         await clearPracticeIdempotencyKey().catch(() => undefined);
       }
-      setState({ status: 'ready', run, session: state.session });
+      commitState({ status: 'ready', run, session: current.session });
       setActionError(null);
       setReviewIndex(run.answers.length - 1);
       setShowAnalysis(false);
@@ -503,10 +578,12 @@ export default function DraftRunScreen() {
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       scroll.current?.scrollTo({ y: 0, animated: true });
     } catch (error: unknown) {
-      setState({
-        status: 'error',
-        message: error instanceof Error ? error.message : 'Your pick could not be saved.',
-      });
+      if (mutationStillCurrent(token)) {
+        commitState({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Your pick could not be saved.',
+        });
+      }
     } finally {
       setBusy(false);
     }
@@ -535,21 +612,26 @@ export default function DraftRunScreen() {
   };
 
   const reroll = async (type: 'set' | 'pack') => {
-    if (state.status !== 'ready' || !practice || mode !== 'pick' || !state.run.current || busy) return;
+    const current = stateRef.current;
+    if (current.status !== 'ready' || !practice || mode !== 'pick' || !current.run.current || busy) return;
+    const token = beginMutation(current);
     setBusy(true);
     setSelected(null);
     setActionError(null);
     try {
-      const run = await rerollDraftRun(state.run, type, state.session);
+      const run = await rerollDraftRun(current.run, type, current.session);
+      if (!mutationStillCurrent(token, run)) return;
       if (run.current) {
         const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
         if (urls.length) void Image.prefetch(urls);
       }
-      setState({ status: 'ready', run, session: state.session });
+      commitState({ status: 'ready', run, session: current.session });
       void Haptics.selectionAsync();
       scroll.current?.scrollTo({ y: 0, animated: true });
     } catch (error: unknown) {
-      setActionError(error instanceof Error ? error.message : 'That reroll could not be saved.');
+      if (mutationStillCurrent(token)) {
+        setActionError(error instanceof Error ? error.message : 'That reroll could not be saved.');
+      }
     } finally {
       setBusy(false);
     }
