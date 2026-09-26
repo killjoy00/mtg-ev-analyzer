@@ -141,7 +141,9 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
       },
     },
     '@/src/api/guest': { ensureGuestSession: async () => guest },
+    '@/src/api/patreon': { loadNativePatreonStatus: async () => ({ ads_allowed: false }) },
     '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://example.invalid/magic' },
     '@/src/theme': theme,
   };
 
