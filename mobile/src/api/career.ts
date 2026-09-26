@@ -70,7 +70,7 @@ export type CareerProfile = {
   summary: CareerSummary;
   environment_total: number;
   by_set: ProfileEnvironment[];
-  by_mode: Array<{ mode: string; games: number; average_score: number; best_score: number }>;
+  by_mode: ({ mode: string; games: number; average_score: number; best_score: number })[];
   best_environments: ProfileEnvironment[];
   cube?: ProfileEnvironment | null;
   best_final_percentile?: number | null;
@@ -80,16 +80,16 @@ export type CareerProfile = {
     name: string;
     start_date?: string | null;
     end_date?: string | null;
-    standings: Array<{
+    standings: ({
       environment: string;
       rank: number;
       average: number;
       days: number;
-    }>;
+    })[];
   } | null;
   daily_history: DailyHistoryRow[];
   recent: CareerHistoryRow[];
-  trend: Array<{ played_at: string; score: number; set_id: string; mode: string }>;
+  trend: ({ played_at: string; score: number; set_id: string; mode: string })[];
   achievements: ProfileAchievement[];
 };
 
