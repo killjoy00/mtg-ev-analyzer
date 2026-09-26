@@ -32,7 +32,7 @@ jobs:
           distribution: temurin
           java-version: '17'
       - name: Install mobile dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
       - name: Set store version code
         shell: bash
         run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
@@ -62,6 +62,13 @@ jobs:
       - name: Build release app bundle
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon
+      - name: Verify minimal Android release permissions
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find android/app/build/intermediates/merged_manifests -type f -path '*release*' -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          node ./scripts/verify-android-release-manifest.mjs "$manifest"
       - name: Verify bundle is signed
         working-directory: mobile/android
         shell: bash
