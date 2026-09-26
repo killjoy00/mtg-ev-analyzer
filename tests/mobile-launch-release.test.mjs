@@ -167,3 +167,25 @@ test('Apple launch hardening blocks pre-hijack, separates token keys, and uses A
   assert.match(mobile, /appleButton: \{ width: '100%', height: 52 \}/);
   assert.match(mobile, /googleButton: \{ minHeight: 52/);
 });
+
+
+test('v1 native friend challenges preserve the web shared-run identity and comparison flow', () => {
+  const linking = read('mobile/src/linking.ts');
+  const api = read('mobile/src/api/draftRun.ts');
+  const run = read('mobile/app/draft-run.tsx');
+  const account = read('mobile/app/account.tsx');
+  const gateway = read('edge/gateway.mjs');
+
+  assert.match(linking, /searchParams\.get\('shared'\) \|\| searchParams\.get\('challenge'\)/);
+  assert.match(linking, /\/draft-run\?environment=\$\{environment\}&shared=\$\{shared\}/);
+  assert.doesNotMatch(linking, /route safely home/);
+  assert.match(api, /loadSharedDraftRunInfo/);
+  assert.match(api, /startSharedDraftRun/);
+  assert.match(api, /body: \{ challenge: id \}/);
+  assert.match(run, /Play this run and compare\./);
+  assert.match(run, /Same eight decisions\. Same trophy-draft context\. No rerolls\./);
+  assert.match(run, /run\.comparison\?\.exact/);
+  assert.match(account, /returnTo === 'challenge'/);
+  assert.match(account, /pathname: '\/draft-run'[\s\S]*shared: returnShared/);
+  assert.match(gateway, /\(\?:challenges\|shared-runs\)\\\/\[a-f0-9\]\{24\}/);
+});
