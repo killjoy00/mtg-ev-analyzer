@@ -14,7 +14,7 @@ from typing import Iterable, Mapping, Sequence
 
 from .archive import GameDraftSummary, GameStore
 from .dataset import Decision, draft_split
-from .nuisance import nuisance_fold
+from .nuisance import FEATURE_SPLIT_SALT, feature_fold, nuisance_fold
 from .schema import ArchiveManifest, file_sha256
 
 COHORT_SCHEMA_VERSION = 1
@@ -79,7 +79,7 @@ def _summary_from_dict(payload: Mapping[str, object]) -> GameDraftSummary:
 def _write_gzip_jsonl(path: Path, rows: Sequence[Mapping[str, object]]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("wb") as raw:
-        with gzip.GzipFile(fileobj=raw, mode="wb", mtime=0) as zipped:
+        with gzip.GzipFile(filename="", fileobj=raw, mode="wb", mtime=0) as zipped:
             with io.TextIOWrapper(zipped, encoding="utf-8") as handle:
                 for row in rows:
                     handle.write(json.dumps(row, sort_keys=True, separators=(",", ":")) + "\n")
@@ -247,6 +247,32 @@ def load_preprocessed_cohort(root: Path) -> tuple[list[Decision], GameStore, dic
     return decisions, GameStore(game_map), manifest
 
 
+
+def feature_complements_sha256(
+    training_ids: Iterable[str],
+    inner_feature_folds: int,
+) -> str:
+    ids = frozenset(training_ids)
+    if len(ids) < 2:
+        raise ValueError("feature complements require at least two training drafts")
+    folds = max(2, min(int(inner_feature_folds), len(ids)))
+    groups = []
+    for fold in range(folds):
+        held = frozenset(draft_id for draft_id in ids if feature_fold(draft_id, folds) == fold)
+        if not held:
+            continue
+        complement = frozenset(ids - held)
+        groups.append({
+            "fold": fold,
+            "held_drafts_sha256": draft_id_sha256(held),
+            "complement_drafts_sha256": draft_id_sha256(complement),
+        })
+    return canonical_sha256({
+        "salt": FEATURE_SPLIT_SALT,
+        "inner_feature_folds": folds,
+        "groups": groups,
+    })
+
 def checkpoint_meta_path(payload_path: Path) -> Path:
     name = payload_path.name
     for suffix in (".jsonl.gz", ".json.gz", ".gz"):
@@ -285,6 +311,10 @@ def write_checkpoint_metadata(
         "expansion": expansion,
         "training_drafts_sha256": draft_id_sha256(training_ids),
         "held_drafts_sha256": draft_id_sha256(held_ids),
+        "feature_complements_sha256": feature_complements_sha256(
+            training_ids,
+            int(configuration["inner_feature_folds"]),
+        ),
         "configuration": dict(configuration),
         "row_count": int(row_count),
         "payload_sha256": file_sha256(payload_path),
@@ -319,10 +349,21 @@ def verify_checkpoint_metadata(
         "kind": kind,
         "cohort_id": cohort_manifest["cohort_id"],
         "selected_drafts_sha256": cohort_manifest["selected_drafts_sha256"],
+        "archive_sha256": [
+            {
+                "kind": row["kind"],
+                "sha256": row["sha256"],
+            }
+            for row in cohort_manifest["archives"]
+        ],
         "fold": int(fold),
         "expansion": expansion,
         "training_drafts_sha256": draft_id_sha256(training_ids),
         "held_drafts_sha256": draft_id_sha256(held_ids),
+        "feature_complements_sha256": feature_complements_sha256(
+            training_ids,
+            int(configuration["inner_feature_folds"]),
+        ),
         "configuration": dict(configuration),
     }
     for key, value in expected.items():
