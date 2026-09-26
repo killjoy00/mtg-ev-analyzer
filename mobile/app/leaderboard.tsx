@@ -1,4 +1,4 @@
-import { useLocalSearchParams } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -86,17 +86,40 @@ function RankingRow({
     ? `, ${item.days} day${item.days === 1 ? '' : 's'}`
     : '';
 
-  return (
-    <View
-      accessible
-      accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, score ${item.score}${daysLabel}`}
-      style={[styles.rankingRow, item.rank <= 3 && styles.topRankingRow]}
-    >
+  const row = (
+    <>
       <Text style={styles.rank}>{item.rank}</Text>
       <Text style={styles.player} numberOfLines={1}>{item.display_name}</Text>
       <Text style={styles.score}>{item.score}</Text>
       {showDays ? <Text style={styles.days}>{item.days}</Text> : null}
-    </View>
+    </>
+  );
+
+  if (!item.profile_key) {
+    return (
+      <View
+        accessible
+        accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, score ${item.score}${daysLabel}`}
+        style={[styles.rankingRow, item.rank <= 3 && styles.topRankingRow]}
+      >
+        {row}
+      </View>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`Rank ${item.rank}, ${item.display_name}, score ${item.score}${daysLabel}. Open public profile.`}
+      onPress={() => router.push({ pathname: '/profile', params: { key: item.profile_key } })}
+      style={({ pressed }) => [
+        styles.rankingRow,
+        item.rank <= 3 && styles.topRankingRow,
+        pressed && styles.pressed,
+      ]}
+    >
+      {row}
+    </Pressable>
   );
 }
 
@@ -278,7 +301,7 @@ export default function LeaderboardScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  list: { paddingBottom: spacing.xxl },
+  list: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
   header: { padding: spacing.lg, gap: spacing.md },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
   title: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7 },
@@ -321,6 +344,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   topRankingRow: { borderLeftWidth: 3, borderLeftColor: colors.accent },
+  pressed: { opacity: 0.72 },
   rank: { width: 39, color: colors.ink, fontSize: 16, fontWeight: '800' },
   player: { flex: 1, color: colors.ink, fontSize: 15, fontWeight: '700' },
   score: { width: 64, textAlign: 'right', color: colors.ink, fontSize: 16, fontWeight: '800' },
