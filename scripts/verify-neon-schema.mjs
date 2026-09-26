@@ -6,7 +6,12 @@ const result=await query(`SELECT
   EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_reroll_set_window_idx' AND i.indisvalid) reroll_set_window,
   to_regprocedure('pack1_serving_snapshot(text,text,text)') IS NOT NULL practice_snapshot,
   to_regclass('draft_run_serving_inventory') IS NOT NULL practice_inventory,
-  (SELECT count(*)=8 FROM pg_trigger WHERE tgname IN ('serving_puzzle_rows','serving_puzzle_metadata','serving_ratings','serving_exclusions','serving_components','serving_policy','serving_version_rows','serving_version_identity') AND tgenabled='O') practice_invalidation,
+  (SELECT count(*)=13 FROM pg_trigger WHERE tgname IN (
+    'serving_puzzle_insert','serving_puzzle_delete','serving_puzzle_metadata','serving_puzzle_truncate',
+    'serving_ratings_insert','serving_ratings_delete','serving_ratings','serving_ratings_truncate',
+    'serving_exclusions','serving_components','serving_policy','serving_version_rows','serving_version_identity'
+  ) AND tgenabled='O') practice_invalidation,
+  to_regprocedure('pack1_puzzle_can_affect_serving(text,text)') IS NOT NULL snapshot_aware_practice_invalidation,
   (SELECT count(*)=2 FROM pg_constraint WHERE conname IN ('draft_run_sessions_environment_check','draft_run_schedules_environment_check') AND pg_get_constraintdef(oid) LIKE '%latest%') latest_daily,
   (SELECT count(*)=2 FROM information_schema.columns WHERE table_name IN ('draft_run_sessions','draft_run_schedules') AND column_name='serving_policy_version') serving_policy,
   to_regclass('draft_run_rating_serving_lookup_idx') IS NOT NULL serving_quality_lookup,
@@ -87,6 +92,6 @@ const result=await query(`SELECT
   position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0041 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0042 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');
