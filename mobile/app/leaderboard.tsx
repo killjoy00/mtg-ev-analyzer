@@ -27,14 +27,25 @@ import { useAppResume } from '@/src/hooks/useAppResume';
 import { colors, spacing } from '@/src/theme';
 
 const periods: { id: LeaderboardPeriod; label: string }[] = [
-  { id: 'daily', label: 'Daily' },
-  { id: 'week', label: 'Week' },
-  { id: 'month', label: 'Month' },
-  { id: 'all', label: 'All-time' },
+  { id: 'daily', label: 'Today' },
+  { id: 'week', label: 'This week' },
+  { id: 'season', label: 'This season' },
+  { id: 'all', label: 'All time' },
 ];
 
 function isLeaderboardPeriod(value: string): value is LeaderboardPeriod {
   return periods.some((period) => period.id === value);
+}
+
+function canonicalLeaderboardPeriod(value: string) {
+  return value === 'month' ? 'season' : value;
+}
+
+function shortDate(value?: string | null) {
+  if (!value) return '';
+  const date = new Date(`${value}T12:00:00Z`);
+  if (Number.isNaN(date.valueOf())) return value;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', timeZone: 'UTC' });
 }
 
 type LoadState =
@@ -92,7 +103,7 @@ function RankingRow({
 export default function LeaderboardScreen() {
   const params = useLocalSearchParams<{ environment?: string; period?: string }>();
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
-  const requestedPeriod = typeof params.period === 'string' ? params.period : 'daily';
+  const requestedPeriod = canonicalLeaderboardPeriod(typeof params.period === 'string' ? params.period : 'daily');
   const deepLinkEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const deepLinkPeriod = isLeaderboardPeriod(requestedPeriod) ? requestedPeriod : 'daily';
   const [period, setPeriod] = useState<LeaderboardPeriod>(deepLinkPeriod);
@@ -196,6 +207,12 @@ export default function LeaderboardScreen() {
 
       {state.status === 'ready' ? (
         <>
+          {period === 'season' && state.data.season ? (
+            <Text style={styles.seasonContext}>
+              {state.data.season.name} Season · {shortDate(state.data.season.start_date)}
+              {state.data.season.end_date ? `–${shortDate(state.data.season.end_date)}` : '–present'}
+            </Text>
+          ) : null}
           <Text style={styles.range}>
             {state.data.start === state.data.today
               ? state.data.today
@@ -281,6 +298,7 @@ const styles = StyleSheet.create({
   filterButtonActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
   filterText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
   filterTextActive: { color: colors.accentDark },
+  seasonContext: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   range: { color: colors.muted, fontSize: 12, fontWeight: '700' },
   tableHeader: {
     flexDirection: 'row',
