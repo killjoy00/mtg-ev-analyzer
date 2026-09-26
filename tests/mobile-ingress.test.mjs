@@ -172,6 +172,47 @@ test('native account parity routes stay inside the mobile bridge',async()=>{
   assert.equal((await gateway(browserProfile,env(),async()=>{throw Error('must not reach upstream')})).status,403);
 });
 
+test('native shared-run bridge preserves exact challenge identity',async()=>{
+  const shareId='a'.repeat(24);
+  for(const route of ['shared-runs','challenges']) {
+    for(const accountHeader of [null,account]) {
+      let forwarded=null;
+      const request=new Request('https://api.packone.pro/draft/v1/'+route+'/'+shareId,{
+        headers:headers({
+          'x-pack1-mobile-session':token,
+          ...(accountHeader?{'x-pack1-mobile-account':accountHeader}:{}),
+        }),
+      });
+      const response=await gateway(request,env(),async(url,options)=>{
+        const h=new Headers(options.headers);
+        forwarded={url,player:h.get('authorization'),account:h.get('x-pack1-mobile-account')};
+        return Response.json({id:shareId,name:'A friend',score:88,environment:'mixed',run_length:8,scores:[]});
+      });
+      assert.equal(response.status,200,route);
+      assert.ok(forwarded.url.endsWith('/v1/'+route+'/'+shareId));
+      assert.equal(forwarded.player,'Bearer '+token);
+      assert.equal(forwarded.account,accountHeader);
+    }
+  }
+
+  let body=null;
+  const start=new Request('https://api.packone.pro/draft/v1/runs',{
+    method:'POST',
+    headers:headers({
+      'content-type':'application/json',
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+    }),
+    body:JSON.stringify({challenge:shareId}),
+  });
+  const response=await gateway(start,env(),async(_url,options)=>{
+    body=JSON.parse(options.body);
+    return Response.json({id:'123e4567-e89b-12d3-a456-426614174000'});
+  });
+  assert.equal(response.status,200);
+  assert.deepEqual(body,{challenge:shareId});
+});
+
 test('practice idempotency is only forwarded to Draft Run creation',async()=>{
   const key='practice_'+('k'.repeat(32));
   let forwarded=null;
