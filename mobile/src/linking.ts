@@ -7,6 +7,10 @@ const NATIVE_PATHS = new Set([
   '/draft-run',
   '/how-to',
   '/leaderboard',
+  '/learn',
+  '/guide',
+  '/about',
+  '/legal',
   '/method',
   '/practice',
   '/profile',
@@ -24,6 +28,13 @@ function directArticlePath(pathname: string) {
     ? pathname.slice(0, -1)
     : pathname;
   if (normalized === '/how-it-works') return '/how-to';
+  if (normalized === '/learn') return '/learn';
+  const guide = normalized.match(/^\/learn\/(first-pick-discipline|reading-consensus|staying-open|card-strength-vs-fit)$/);
+  if (guide) return `/guide?slug=${guide[1]}`;
+  if (normalized === '/about' || normalized === '/contact') return '/about';
+  if (normalized === '/privacy') return '/legal?doc=privacy';
+  if (normalized === '/terms') return '/legal?doc=terms';
+  if (normalized === '/disclosure') return '/legal?doc=disclosure';
   if (normalized === '/methodology') return '/method';
   if (normalized === '/scoring') return '/scoring';
   if (normalized === '/sets') return '/sets';
@@ -90,6 +101,18 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
   if (pathname === '/profile') {
     const key = searchParams.get('key');
     return key && /^[a-f0-9]{16}$/.test(key) ? `?key=${key}` : '';
+  }
+
+  if (pathname === '/guide') {
+    const slug = searchParams.get('slug');
+    return slug && ['first-pick-discipline', 'reading-consensus', 'staying-open', 'card-strength-vs-fit'].includes(slug)
+      ? `?slug=${slug}`
+      : '';
+  }
+
+  if (pathname === '/legal') {
+    const doc = searchParams.get('doc');
+    return doc && ['privacy', 'terms', 'disclosure'].includes(doc) ? `?doc=${doc}` : '';
   }
 
   if (pathname === '/leaderboard') {
