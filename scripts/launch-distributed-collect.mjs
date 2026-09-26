@@ -9,7 +9,9 @@ const named=pattern=>files.filter(f=>pattern.test(path.basename(f))).map(f=>JSON
 const declarations=named(/^experiment-declaration\.json$/),preflights=named(/^telemetry-preflight\.json$/),cohorts=named(/^cohort-\d\.json$/),summaries=named(/^distributed-stage-\d+\.json$/),reasons=[];
 const reject=reason=>reasons.push(reason);
 const declaration=declarations[0],scope=declaration?.scope;
-if(declarations.length!==1||scope?.sha!==process.env.GITHUB_SHA||scope?.run_id!==process.env.GITHUB_RUN_ID||scope?.attempt!==process.env.GITHUB_RUN_ATTEMPT||scope?.policy_hash!==fingerprint(policy))reject('declaration_missing_or_wrong_revision');\nconst preflight=preflights[0];\nif(preflights.length!==1||preflight?.passed!==true||preflight?.sha!==scope?.sha||preflight?.health_requests!==policy.telemetry_preflight_requests)reject('telemetry_preflight_missing_or_failed');
+if(declarations.length!==1||scope?.sha!==process.env.GITHUB_SHA||scope?.run_id!==process.env.GITHUB_RUN_ID||scope?.attempt!==process.env.GITHUB_RUN_ATTEMPT||scope?.policy_hash!==fingerprint(policy))reject('declaration_missing_or_wrong_revision');
+const preflight=preflights[0];
+if(preflights.length!==1||preflight?.passed!==true||preflight?.sha!==scope?.sha||preflight?.health_requests!==policy.telemetry_preflight_requests)reject('telemetry_preflight_missing_or_failed');
 if(cohorts.length!==policy.generators||new Set(cohorts.map(r=>r.shard)).size!==policy.generators||cohorts.some(r=>fingerprint(r.scope)!==fingerprint(scope)||!r.passed))reject('cohort_incomplete_or_failed');
 const stages=[];
 for(let stage=0;stage<policy.stages.length;stage++) {
