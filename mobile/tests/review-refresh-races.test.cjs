@@ -266,6 +266,10 @@ test('Career rejects a stale pagination page after account identity changes', as
         return sessionCalls === 1 ? sessionA : sessionB;
       },
     },
+    '@/src/storage/session': {
+      readSession: async () => sessionCalls <= 1 ? sessionA : sessionB,
+      subscribeSession: () => () => {},
+    },
     '@/src/components/ProfileOverview': { ProfileOverview: host('ProfileOverview') },
     '@/src/hooks/useAppResume': { useAppResume() {} },
     '@/src/theme': theme,
