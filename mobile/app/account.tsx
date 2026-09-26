@@ -43,7 +43,11 @@ import {
   updateMobileProfile,
   type CareerProfile,
 } from '@/src/api/career';
-import { isDailyEnvironment } from '@/src/api/draftRun';
+import {
+  isDailyEnvironment,
+  loadSetCatalog,
+  type PracticeSet,
+} from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
 import { type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
@@ -72,6 +76,7 @@ export default function AccountScreen() {
   const [session, setSession] = useState<MobileSession | null>(null);
   const [account, setAccount] = useState<AccountState | null>(null);
   const [profile, setProfile] = useState<CareerProfile | null>(null);
+  const [catalogSets, setCatalogSets] = useState<PracticeSet[]>([]);
   const [mode, setMode] = useState<Mode>('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -105,13 +110,15 @@ export default function AccountScreen() {
         setSession(current);
         if (!current.accountToken) return;
         try {
-          const [state, nextProfile] = await Promise.all([
+          const [state, nextProfile, catalog] = await Promise.all([
             loadMobileAccount(current),
             loadMobileCareer(current),
+            loadSetCatalog(current),
           ]);
           if (active) {
             setAccount(state);
             applyProfile(nextProfile);
+            setCatalogSets(catalog.sets);
           }
         } catch (error: unknown) {
           if (!active) return;
@@ -137,12 +144,14 @@ export default function AccountScreen() {
 
   const finish = async (next: MobileSession, result: MobileAuthResponse) => {
     setSession(next);
-    const [state, nextProfile] = await Promise.all([
+    const [state, nextProfile, catalog] = await Promise.all([
       loadMobileAccount(next),
       loadMobileCareer(next),
+      loadSetCatalog(next),
     ]);
     setAccount(state);
     applyProfile(nextProfile);
+    setCatalogSets(catalog.sets);
     setPassword('');
     setMessage(
       result.linked.validatedDailyScore
@@ -282,6 +291,7 @@ export default function AccountScreen() {
       setSession(fresh);
       setAccount(null);
       applyProfile(null);
+      setCatalogSets([]);
       setMessage('Signed out.');
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Could not sign out.');
@@ -366,6 +376,7 @@ export default function AccountScreen() {
       setSession(guest);
       setAccount(null);
       applyProfile(null);
+      setCatalogSets([]);
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
@@ -423,6 +434,7 @@ export default function AccountScreen() {
       setSession(fresh);
       setAccount(null);
       applyProfile(null);
+      setCatalogSets([]);
       setDeletePassword('');
       setDeleteCode('');
       setDeleteCodeSent(false);
@@ -446,6 +458,11 @@ export default function AccountScreen() {
   };
 
   const signedInLabel = account?.user.email ?? account?.user.name ?? 'Pack One account';
+  const favoriteOptions = [...catalogSets].sort((a, b) => (
+    String(b.release_date ?? '').localeCompare(String(a.release_date ?? ''))
+      || a.set_name.localeCompare(b.set_name)
+  ));
+  const unlockedAchievements = (profile?.achievements ?? []).filter((item) => item.unlocked);
 
   return (
     <SafeAreaView style={styles.safe}>
