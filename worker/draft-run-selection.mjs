@@ -146,7 +146,9 @@ export async function selectDatabaseReroll(query,version,source,options) {
   if(selectionVersion===DAILY_SELECTION_VERSION)where+=" AND EXISTS(SELECT 1 FROM draft_run_environment_policy e WHERE e.set_id=p.set_id AND e.status='Live' AND (e.regular_run OR e.set_id='powered-cube'))";
   params.push(source.set_id);where+=` AND p.set_id${type==='set'?'<>':'='}$${params.length}`;
   if(!previous&&round>=earlyRoundsForSelection(selectionVersion))ratingWhere+=" AND r.band<>'easy'";
-  if(options.daily&&isEightPickVersion(selectionVersion)&&environment==='mixed') {
+  // The current Daily is restricted by Live environment metadata above; only older
+  // eight-pick versions consult the checked-in release list.
+  if(options.daily&&isEightPickVersion(selectionVersion)&&selectionVersion!==DAILY_SELECTION_VERSION&&environment==='mixed') {
     params.push(toPgArray(releasedRunSets(options.day||gameDateKey())));where+=` AND p.set_id=ANY($${params.length}::text[])`;
   }
   if(difficultyVersion!==LEGACY_DIFFICULTY_VERSION) {

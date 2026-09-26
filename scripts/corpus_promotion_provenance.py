@@ -39,6 +39,7 @@ INGESTION_RELEVANT_PATHS = (
     'scripts/register-corpus-sources.mjs',
     'scripts/run_import_all_trophies.py',
     'scripts/set_policy.py',
+    'scripts/source-snapshot-manifest.mjs',
     'scripts/verify-neon-schema.mjs',
     'worker/serving-statistics.mjs',
     'worker/trophy-import.mjs',
