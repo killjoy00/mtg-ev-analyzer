@@ -50,6 +50,39 @@ def encoded(value):
     return json.dumps(value, sort_keys=True, separators=(',', ':'), ensure_ascii=False).encode()
 
 
+_DECISION_NAMESPACE_FIELDS = frozenset({'puzzle_id', 'source_snapshot_id'})
+
+
+def decision_semantics(value):
+    """Canonical gameplay payload without snapshot-local identity fields."""
+    return {key: item for key, item in value.items() if key not in _DECISION_NAMESPACE_FIELDS}
+
+
+def decision_semantics_digest(values):
+    """Stable digest for rebuild parity independent of snapshot/ID namespace."""
+    h = hashlib.sha256()
+    for payload in sorted(encoded(decision_semantics(value)) for value in values):
+        h.update(payload)
+        h.update(b'\n')
+    return h.hexdigest()
+
+
+def read_gzip_jsonl(path):
+    with gzip.open(path, 'rt', encoding='utf-8') as handle:
+        return [json.loads(line) for line in handle if line.strip()]
+
+
+def verify_rebuild_determinism(sid, previous, rebuilt):
+    """Fail closed when identical importer inputs change decision semantics."""
+    before = decision_semantics_digest(previous)
+    after = decision_semantics_digest(rebuilt)
+    if before != after:
+        raise ValueError(
+            f'{sid}: unchanged source/model rebuild changed decision payload semantics '
+            f'({before} != {after})')
+    return after
+
+
 def digest(path):
     h = hashlib.sha256()
     with Path(path).open('rb') as f:
@@ -352,7 +385,32 @@ def check_training_cap(sid, training_cap, published_decisions):
         raise ValueError(f'{sid}: training cap {training_cap} differs from the published baseline cap {TRAINING_DRAFT_CAP}; {published_decisions} existing decisions would keep their original scores. Bump the corpus version and regenerate instead of mixing models.')
 
 
-LEGACY_SCHEMA_SETS = {'stx','mid','vow'}
+HISTORICAL_FROZEN_SETS = frozenset({'stx', 'mid', 'vow'})
+LEGACY_SCHEMA_SETS = HISTORICAL_FROZEN_SETS
+
+
+def select_import_sets(sources, requested='all', allow_historical_frozen=False):
+    """Choose prospective imports without silently rebuilding frozen history.
+
+    --sets all is always prospective and excludes the historical-frozen sets.
+    Reproducibility work must name a frozen set explicitly and opt in.
+    """
+    if requested == 'all':
+        return [sid for sid in sources if sid not in HISTORICAL_FROZEN_SETS]
+    ids = [sid.strip() for sid in requested.split(',') if sid.strip()]
+    if not ids:
+        raise ValueError('No sets requested')
+    if any(sid not in sources for sid in ids):
+        raise ValueError('Requested set has no official Premier archive')
+    ids = list(dict.fromkeys(ids))
+    frozen = [sid for sid in ids if sid in HISTORICAL_FROZEN_SETS]
+    if frozen and not allow_historical_frozen:
+        raise ValueError(
+            'Historical-frozen sets may not be rebuilt into first-class snapshots: '
+            + ','.join(frozen)
+            + '. Use --allow-historical-frozen-rebuild only for explicit reproducibility work.')
+    return ids
+
 
 def classify_source_schema(header, sid):
     required = {'expansion','event_type','draft_id','draft_time','rank','event_match_wins','pack_number','pick_number'}
@@ -448,6 +506,13 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     skill_source = archive(game_url, directory/'games.csv.gz', refresh)
     snapshot_id = source_snapshot_identity(sid, schema_version, source, skill_source)
     signature = input_signature(root, source, skill_source, base_entry, manifest, training_cap)
+    previous_decisions = None
+    if completed.exists():
+        previous = json.loads(completed.read_text())
+        previous_file = directory / previous.get('puzzle_file', 'puzzles.jsonl.gz')
+        if (previous.get('input_signature') == signature and previous_file.exists()
+                and digest(previous_file) == previous.get('puzzle_file_sha256')):
+            previous_decisions = read_gzip_jsonl(previous_file)
     if not refresh and completed.exists():
         old = json.loads(completed.read_text())
         if old.get('input_signature') == signature and all((directory/old[k]).exists() and digest(directory/old[k]) == old[k+'_sha256'] for k in ['puzzle_file','ledger_file']):
@@ -538,9 +603,11 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     # deterministic ID recipe and the loader's conflicting-payload rejection.
     trophy_count=sum(d['wins']==7 for d in drafts.values())
     if len(dispositions)!=trophy_count: raise ValueError('Incomplete trophy accounting')
+    semantics_sha256=(verify_rebuild_determinism(sid,previous_decisions,additions)
+                      if previous_decisions is not None else decision_semantics_digest(additions))
     puzzle_file=directory/'puzzles.jsonl.gz';ledger_file=directory/'trophies.jsonl.gz'
     write_gzip_jsonl(puzzle_file,sorted(additions,key=lambda p:p['puzzle_id']));write_gzip_jsonl(ledger_file,sorted(dispositions,key=lambda d:d['draft_id']))
-    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'source_snapshot_id':snapshot_id,'schema_version':schema_version,'input_signature':signature,'source_archive':source,'skill_source':skill_source,'schema_verified':True,'source_event_type':'PremierDraft','qualified_drafts':sum(1 for did,d in drafts.items() if did not in conflicts and (d.get('games') or 0)>=100 and (d.get('rank') in ('diamond','mythic') if legacy else d.get('rate') is not None and d['rate'] >= (cutoff or .6))),'trophy_outcomes':dict(Counter(f"7-{d.get('losses') if d.get('losses') is not None else 'unknown'}" for d in drafts.values() if d['wins']==7)),'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':ISOLATED_MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
+    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'source_snapshot_id':snapshot_id,'schema_version':schema_version,'input_signature':signature,'decision_semantics_sha256':semantics_sha256,'source_archive':source,'skill_source':skill_source,'schema_verified':True,'source_event_type':'PremierDraft','qualified_drafts':sum(1 for did,d in drafts.items() if did not in conflicts and (d.get('games') or 0)>=100 and (d.get('rank') in ('diamond','mythic') if legacy else d.get('rate') is not None and d['rate'] >= (cutoff or .6))),'trophy_outcomes':dict(Counter(f"7-{d.get('losses') if d.get('losses') is not None else 'unknown'}" for d in drafts.values() if d['wins']==7)),'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':ISOLATED_MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
     atomic_json(completed,info);print(json.dumps(info),flush=True);return info
 
 
@@ -549,12 +616,13 @@ def main():
     parser.add_argument('--sets',default='all');parser.add_argument('--workers',type=int,default=3)
     parser.add_argument('--output',default='generated/trophy-import');parser.add_argument('--refresh',action='store_true')
     parser.add_argument('--training-cap',type=int,default=TRAINING_DRAFT_CAP,help='training drafts per set; changing it from the published value is refused for sets that already have puzzles')
+    parser.add_argument('--allow-historical-frozen-rebuild',action='store_true',
+                        help='reproducibility only: allow explicitly named STX/MID/VOW; --sets all still excludes them')
     args=parser.parse_args()
     sources,discovery=discover()
     atomic_json(Path(args.output)/'discovery.json',discovery)
-    ids=list(sources) if args.sets=='all' else args.sets.split(',')
-    if any(sid not in sources for sid in ids): raise ValueError('Requested set has no official Premier archive')
-    ids=list(dict.fromkeys(ids));results=[];errors={}
+    ids=select_import_sets(sources,args.sets,args.allow_historical_frozen_rebuild)
+    results=[];errors={}
     with ProcessPoolExecutor(max_workers=args.workers) as executor:
         jobs={executor.submit(build_set,sid,args.output,args.refresh,sources[sid],args.training_cap):sid for sid in ids}
         for future in as_completed(jobs):
