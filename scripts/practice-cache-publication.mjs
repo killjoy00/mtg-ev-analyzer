@@ -33,13 +33,13 @@ try {
  // statement and row count. Every update and trigger toggle rolls back.
  for(let repeat=0;repeat<3;repeat++)for(const enabled of [false,true]) {
    const disable=enabled?'':`ALTER TABLE draft_run_verified_puzzles DISABLE TRIGGER serving_puzzle_metadata;ALTER TABLE draft_run_puzzle_ratings DISABLE TRIGGER serving_ratings;`;
-   const sql=`BEGIN;${disable} EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) UPDATE draft_run_verified_puzzles SET interesting=interesting WHERE puzzle_id IN (SELECT puzzle_id FROM draft_run_verified_puzzles ORDER BY puzzle_id LIMIT 1000);ROLLBACK;`;
+   const sql=`BEGIN;${disable} EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) UPDATE draft_run_verified_puzzles SET interesting=NOT interesting WHERE puzzle_id IN (SELECT puzzle_id FROM draft_run_verified_puzzles ORDER BY puzzle_id LIMIT 1000);ROLLBACK;`;
    const out=execFileSync('psql',['-X','-q','-A','-t','-d',connection,'-v','ON_ERROR_STOP=1'],{input:sql,encoding:'utf8',stdio:['pipe','pipe','pipe'],timeout:120000});
    const plan=JSON.parse(out)[0];report.bulk_samples.push({repeat,cache_triggers:enabled,execution_ms:plan['Execution Time'],triggers:plan.Triggers||[]});
  }
  // Measure the known singleton contention explicitly: a writer holding its
  // transaction open also holds the revision row until commit.
- const holder=query(`DO $$ BEGIN UPDATE draft_run_puzzle_ratings SET rating=rating WHERE false;
+ const holder=query(`DO $$ BEGIN UPDATE draft_run_environment_policy SET status=status WHERE false;
    PERFORM pg_advisory_xact_lock(516,3);PERFORM pg_sleep(2);END $$`);
  let writerHeld=false;
  for(let i=0;i<50&&!writerHeld;i++)writerHeld=(await query("SELECT EXISTS(SELECT 1 FROM pg_locks WHERE locktype='advisory' AND classid=516 AND objid=3 AND granted) held")).rows[0].held==='t';
