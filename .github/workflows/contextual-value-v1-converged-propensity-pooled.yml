@@ -84,6 +84,7 @@ jobs:
           assert report["assessment_outcomes_used"] is False
           assert report["q_values_preserved"] is True
           assert report["solver"]["gradient_max_abs"] <= 1e-6
+          assert report["solver"]["gradient_self_check"]["max_abs_error"] <= 2e-6
           PY
       - name: Upload converged nuisance fold
         uses: actions/upload-artifact@v4
