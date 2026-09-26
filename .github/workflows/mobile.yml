@@ -17,7 +17,7 @@ on:
       - '.github/workflows/mobile.yml'
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: mobile-${{ github.event.pull_request.number || github.ref }}
@@ -43,5 +43,19 @@ jobs:
           path: mobile/package-lock.json
           if-no-files-found: error
           retention-days: 1
+      - name: Commit resolved lock candidate to this temporary branch
+        if: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo "Lockfile already matches the resolved candidate."
+            exit 0
+          fi
+          git commit -m "Capture runner-resolved mobile package lock"
+          git push origin "HEAD:${{ github.head_ref }}"
       - name: Lint, typecheck and validate Expo config
         run: npm test
