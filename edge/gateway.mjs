@@ -132,6 +132,7 @@ function mobileSessionRoute(service,path,method) {
       '/v1/mobile/account/request-password-reset','/v1/mobile/account/send-verification-email','/v1/mobile/account/reset-password','/v1/mobile/account/password-change',
       '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
     ].includes(path))return true;
+    if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
     if(method==='GET'&&/^\/v1\/mobile\/profile\/[a-f0-9]{16}$/.test(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
