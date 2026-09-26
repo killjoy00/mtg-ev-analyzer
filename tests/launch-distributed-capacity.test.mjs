@@ -105,6 +105,11 @@ test('request routing never permits production, provider, email or arbitrary mut
  assert.equal(permittedRequest('/draft/v1/daily-status').hostname,'api-preview.packone.pro');
  assert.throws(()=>permittedRequest('/draft/v1/daily-status',{}));
 });
+test('request ceiling reserves exactly the machine-declared telemetry preflight budget',async()=>{
+ const budget={gateway_requests:Math.floor((policy.maximum_requests-policy.telemetry_preflight_requests)/policy.generators),response_bytes:0};
+ const client=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:new AbortController().signal,fetcher:async()=>Response.json({ok:true})});
+ await assert.rejects(()=>client(null,'read','/draft/v1/daily-status'),/request_ceiling/);
+});
 test('client really preserves cookies, CSRF and idempotency without forwarding-header spoofing or retries',async()=>{
  const budget={gateway_requests:0,response_bytes:0},actor={cookies:new Map([['__Host-pack1_player','fixture']]),csrf:'csrf'},requests=[];
  const client=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:new AbortController().signal,fetcher:async(url,options)=>{
@@ -117,8 +122,10 @@ test('client really preserves cookies, CSRF and idempotency without forwarding-h
  await assert.rejects(()=>broken(actor,'start','/draft/v1/runs',{environment:'mixed'}),/http_503/);assert.equal(failures,1);
 });
 const event=(extra={})=>({id:'event',release:scope.sha,status:200,duration_ms:50,quota_ms:5,upstream_ms:40,...extra});
-test('telemetry bins require positive correct-release evidence and reject errors and absence',()=>{
- assert.equal(inspectBin([event()],{sha:scope.sha,requests:25,from:0,to:60},policy).passed,true);
+test('telemetry bins keep ambient preview boundary rejects distinct from cohort and system failures',()=>{
+ const clean=inspectBin([event()],{sha:scope.sha,requests:25,from:0,to:60},policy);assert.equal(clean.passed,true);assert.deepEqual(clean.status_counts,{'200':1});
+ const ambient=inspectBin([event(),event({id:'ambient',status:403,route:'other'})],{sha:scope.sha,requests:25,from:0,to:60},policy);
+ assert.equal(ambient.passed,true);assert.equal(ambient.boundary_rejections,1);assert.equal(ambient.route_status_counts['other:403'],1);
  for(const events of [[],[event({release:'b'.repeat(40)})],[event({status:503})],[event({status:429})]])assert.equal(inspectBin(events,{sha:scope.sha,requests:25,from:0,to:60},policy).passed,false);
 });
 test('preview log query uses the real retained-event parser, exact service filtering and deduplication',async()=>{
