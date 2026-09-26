@@ -1,5 +1,9 @@
 # Launch hardening (#527)
 
+Final measurements, supported capacity and release evidence are maintained in
+[the #516/#527 acceptance report](reports/PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md).
+The first-increment notes below describe the original rollout sequence.
+
 ## First increment: verified session refresh
 
 Cookie presence no longer authorizes the session-quota exemption. A browser
@@ -42,14 +46,13 @@ that they are suitable for a launch or shared Wi-Fi.
 
 No database migration or token rotation is needed for this increment.
 
-## Remaining launch gates
+## Launch acceptance record
 
-The revised issue #527 tracks shared-network burst/sustained budgets, persistent
+The acceptance report records shared-network burst/sustained budgets, persistent
 quota identity across routine deployments, telemetry/alerts, isolated distributed
-and NAT load tests, public-cache policy, query capacity, bounded overload
-behavior and the final incident runbook. This document is an implementation
-note, not a completed launch-capacity report. #516 separately owns consistent
-practice selection caching and before/after timing evidence.
+and NAT load tests, public-read plans and the supported capacity limit. The
+[incident runbook](LAUNCH-OPERATIONS.md) covers production response. #516 owns
+consistent practice selection caching and its separate SQL/browser evidence.
 
 ## Quota identity and minimum gateway telemetry
 
@@ -80,7 +83,8 @@ supports a tighter policy. A caller abort does not promise server cancellation.
 
 The Cloudflare configuration enables storage, but a successful dry run is not
 proof that production logs/alerts are live. The reviewed release must verify
-stored events and alert delivery. Capacity and alert acceptance remain open.
+stored events and alert delivery. See the acceptance report for the tested
+revision, retained release event and limits of the capacity claim.
 
 ## Measured NAT failure and candidate launch budgets
 

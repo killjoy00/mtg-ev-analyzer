@@ -1,5 +1,9 @@
 # Reroll latency diagnosis — 2026-09-25
 
+This is the initial index-only diagnosis. Subsequent ordered-candidate SQL and
+42-case exact parity evidence are documented in the
+[final acceptance report](../../docs/reports/PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md).
+
 [Workflow 36176646803](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36176646803) / code `9f01ba4ba28121b5b8af5928e7e6f4968e6dfea5` / disposable clone `br-aged-haze-ayjl6t6b`.
 
 The corrected NAT workload completed 25/25 players and 539/539 requests successfully, but reroll p95 3.35 s missed the unchanged 2 s budget. This serial SQL experiment uses the same query before/after a set/pick-first covering index; all 12 reroll results match exactly. Full plans are retained in the workflow artifact. This is diagnosis, not gateway-capacity evidence.
