@@ -167,3 +167,35 @@ test('Apple launch hardening blocks pre-hijack, separates token keys, and uses A
   assert.match(mobile, /appleButton: \{ width: '100%', height: 52 \}/);
   assert.match(mobile, /googleButton: \{ minHeight: 52/);
 });
+
+
+test('v1 routes stored friend runs and public profiles through the native parity surface', () => {
+  const app = JSON.parse(read('mobile/app.json'));
+  const linking = read('mobile/src/linking.ts');
+  const draft = read('mobile/app/draft-run.tsx');
+  const draftApi = read('mobile/src/api/draftRun.ts');
+  const account = read('mobile/app/account.tsx');
+  const gateway = read('edge/gateway.mjs');
+
+  assert.ok(app.expo.ios.associatedDomains.includes('applinks:packone.pro'));
+  const filter = app.expo.android.intentFilters.find((item) => item.action === 'VIEW' && item.autoVerify === true);
+  assert.ok(filter);
+  assert.ok(filter.data.some((item) => item.scheme === 'https' && item.host === 'packone.pro'));
+
+  assert.match(linking, /\^\[a-f0-9\]\{24\}\$/);
+  assert.match(linking, /\/draft-run\?shared=\$\{shared\}/);
+  assert.match(linking, /\^\[a-f0-9\]\{16\}\$/);
+  assert.match(linking, /\/profile\?key=\$\{publicProfile\}/);
+
+  assert.match(draftApi, /loadSharedRun/);
+  assert.match(draftApi, /startSharedDraftRun/);
+  assert.match(draftApi, /\/draft\/v1\/shared-runs\//);
+  assert.match(draft, /Play this run and compare/);
+  assert.match(draft, /Scores so far/);
+  assert.match(draft, /startSharedDraftRun/);
+  assert.match(account, /returnToShared/);
+  assert.match(account, /params: \{ shared: returnToShared \}/);
+
+  assert.match(gateway, /shared-runs/);
+  assert.match(gateway, /\[a-f0-9\]\{24\}/);
+});
