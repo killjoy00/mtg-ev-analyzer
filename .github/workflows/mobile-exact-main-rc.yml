@@ -171,6 +171,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Reconfirm exact current main after both builds
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "RC evidence is allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "RC source $head_sha became stale while builds ran; current main is $main_sha." >&2
+            exit 1
+          }
+          echo "Reconfirmed exact current main after native builds: $head_sha"
       - name: Write exact-main RC manifest
         shell: bash
         run: |
