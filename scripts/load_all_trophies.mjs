@@ -9,6 +9,7 @@ import {createHash} from 'node:crypto';
 import {validateDraftRunPuzzle, interestingDraftRunPuzzle, draftRunDifficulty, DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {refreshServingStatistics} from '../worker/serving-statistics.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
+import {sameSourceSnapshotManifest} from './source-snapshot-manifest.mjs';
 if(process.argv[2]?.startsWith('https://'))throw Error('Remote trophy import is disabled; pass a reviewed direct connection file.');
 const directory=process.argv[3]||'generated/trophy-import';
 const catalog=JSON.parse(fs.readFileSync(path.join(directory,'catalog.json')));
@@ -66,8 +67,7 @@ async function loadSet(s) {
      s.source_archive.etag||null,s.skill_source.etag||null,s.source_archive.last_modified||null,s.skill_source.last_modified||null,
      s.import_version,s.model_version,snapshotManifest])).rows[0]
     ||(await query('SELECT source_snapshot_id,manifest FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[s.source_snapshot_id])).rows[0];
-  const existingManifest=typeof snapshot?.manifest==='string'?JSON.parse(snapshot.manifest):snapshot?.manifest;
-  if(snapshot?.source_snapshot_id!==s.source_snapshot_id||JSON.stringify(existingManifest)!==JSON.stringify(JSON.parse(snapshotManifest)))throw Error('Existing source snapshot differs; immutable snapshot cannot be rewritten: '+s.id);
+  if(snapshot?.source_snapshot_id!==s.source_snapshot_id||!sameSourceSnapshotManifest(snapshot?.manifest,snapshotManifest))throw Error('Existing source snapshot differs; immutable snapshot cannot be rewritten: '+s.id);
   let batch=[],added=0;
   for await(const p of records(fileFor(s,'puzzle_file'))) {batch.push(p);if(batch.length===250){added+=await batchInsert(batch,s.source_snapshot_id);batch=[];}}
   if(batch.length)added+=await batchInsert(batch,s.source_snapshot_id);
