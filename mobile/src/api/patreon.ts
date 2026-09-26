@@ -31,7 +31,8 @@ export function membershipSessionKey(session: MobileSession | null) {
 export function checkedPatreonStatus(value: unknown, session: MobileSession): NativePatreonStatus {
   if (!membershipSessionKey(session) || !value || typeof value !== 'object') throw new Error('Membership status could not be verified.');
   const data = value as Partial<NativePatreonStatus>;
-  const player = session.playerToken.slice(3).split('.')[0].toLowerCase();
+  // membershipSessionKey has validated the p1_<36-character UUID>.<signature> form.
+  const player = session.playerToken.slice(3, 39).toLowerCase();
   const strings = (items: unknown): items is string[] => Array.isArray(items)
     && items.every((item) => typeof item === 'string' && /^[a-z_]{3,60}$/.test(item));
   if (typeof data.configured !== 'boolean' || typeof data.connected !== 'boolean'
