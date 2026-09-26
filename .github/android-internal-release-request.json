@@ -1,1 +1,1 @@
-{"operation":"upload-android-internal","reason":"Upload the first signed Pack One 1.0 Android Internal Testing release candidate from current main after the Sign in with Apple production launch work."}
+{"operation":"upload-android-internal","reason":"Retry the signed Pack One 1.0 Android Internal Testing release candidate from current main after the prior request was invalidated by a newer main revision."}
