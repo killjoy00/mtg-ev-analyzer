@@ -82,7 +82,7 @@ export const articleStyles = StyleSheet.create({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl },
+  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.xl, alignSelf: 'center', width: '100%', maxWidth: 860 },
   header: { gap: spacing.sm, paddingTop: spacing.sm },
   kicker: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
   title: { color: colors.ink, fontSize: 36, lineHeight: 40, fontWeight: '800', letterSpacing: -0.8 },
