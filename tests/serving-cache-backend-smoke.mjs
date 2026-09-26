@@ -70,21 +70,23 @@ await query('DELETE FROM draft_run_verified_puzzles WHERE source_snapshot_id=$1'
 assert.equal(await revision(),cleanupBefore,'deleting the now-non-serving staged snapshot does not churn Practice');
 await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[stagedSnapshot]);
 
-// Empty/non-serving puzzle and rating statements no longer invalidate. Small
-// registries remain conservatively statement-invalidated because each can alter
-// membership or metadata independently of puzzle snapshot identity.
+// Empty/non-serving puzzle and rating statements no longer invalidate.
+// Readiness publication registries also distinguish rejected/empty statements,
+// so an admission failure cannot supersede an already-ready generation.
 for(const sql of [
   'UPDATE draft_run_verified_puzzles SET interesting=interesting WHERE false',
   'DELETE FROM draft_run_verified_puzzles WHERE false',
   'UPDATE draft_run_puzzle_ratings SET rating=rating WHERE false',
+  'DELETE FROM corpus_source_exclusions WHERE false',
+  'UPDATE corpus_components SET status=status WHERE false',
+  'UPDATE draft_run_environment_policy SET release_date=release_date WHERE false',
 ]) {
   const before=await revision();await query(sql);
   assert.equal(await revision(),before,sql);
 }
+// Version registry changes retain the existing conservative statement-level
+// invalidation because they can change parent/component membership globally.
 for(const sql of [
-  'DELETE FROM corpus_source_exclusions WHERE false',
-  'UPDATE corpus_components SET status=status WHERE false',
-  'UPDATE draft_run_environment_policy SET release_date=release_date WHERE false',
   'UPDATE corpus_set_versions SET corpus_version=corpus_version WHERE false',
   'DELETE FROM corpus_set_versions WHERE false',
 ]) {
