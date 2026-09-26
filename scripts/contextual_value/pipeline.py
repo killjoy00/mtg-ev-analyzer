@@ -16,7 +16,10 @@ from .dataset import Decision, choose_primary_decision, draft_split
 from .diagnostics import (
     outcome_diagnostics,
     paired_dr_delta_ci,
+    paired_policy_delta_slices,
     policy_overlap_diagnostics,
+    policy_overlap_slices,
+    propensity_diagnostics,
 )
 from .dr import PolicyObservation, evaluate_policy
 from .features import CardSignals, model_feature_map
@@ -186,6 +189,8 @@ def run_development(
     blend_lambdas: Sequence[float] = (0.0, 0.25, 0.5, 0.75, 1.0),
     blend_weights: Sequence[float] = (0.0, 0.25, 0.5, 0.75, 1.0),
     train_predictions: Sequence[NuisancePrediction] | None = None,
+    validation_predictions: Sequence[NuisancePrediction] | None = None,
+    assessment_draft_count: int | None = None,
 ) -> tuple[dict, list[NuisancePrediction], list[NuisancePrediction], ContextualValueModel]:
     """Fit on train and tune only on validation; assessment remains unopened."""
     train = [row for row in decisions if draft_split(row.draft_id) == "train"]
@@ -226,20 +231,34 @@ def run_development(
     )
 
     train_ids = frozenset(row.draft_id for row in train)
-    validation_fit = fit_fold(
-        train,
-        train_ids,
-        signal_provider=signal_provider,
-        propensity_l2=propensity_l2,
-        outcome_l2=outcome_l2,
-        inner_feature_folds=inner_feature_folds,
-        fold=-1,
-    )
-    validation_predictions = predict_fold(
-        validation_fit,
-        validation,
-        signal_provider=signal_provider,
-    )
+    if validation_predictions is None:
+        validation_fit = fit_fold(
+            train,
+            train_ids,
+            signal_provider=signal_provider,
+            propensity_l2=propensity_l2,
+            outcome_l2=outcome_l2,
+            inner_feature_folds=inner_feature_folds,
+            fold=-1,
+        )
+        validation_predictions = predict_fold(
+            validation_fit,
+            validation,
+            signal_provider=signal_provider,
+        )
+    else:
+        validation_predictions = list(validation_predictions)
+        expected_validation = {row.decision_id for row in validation}
+        observed_validation = {row.decision_id for row in validation_predictions}
+        if len(observed_validation) != len(validation_predictions):
+            raise ValueError("precomputed validation nuisance predictions contain duplicate decisions")
+        if observed_validation != expected_validation:
+            missing = sorted(expected_validation - observed_validation)[:3]
+            extra = sorted(observed_validation - expected_validation)[:3]
+            raise ValueError(
+                "precomputed validation nuisance predictions do not match validation decisions; "
+                f"missing={missing} extra={extra}"
+            )
     by_prediction = {row.decision_id: row for row in validation_predictions}
     primary = _group_primary(validation)
     if not primary:
@@ -257,6 +276,7 @@ def run_development(
     gih_observations = []
     iwd_observations = []
     direct_q_observations = []
+    contextual_argmax_observations = []
     contextual_by_temperature: list[tuple[str, list[PolicyObservation]]] = [
         (f"T={temperature:g}", []) for temperature in temperature_grid
     ]
@@ -282,11 +302,16 @@ def run_development(
         gih_target = argmax_policy(_signal_axis(signals, decision.candidates, "gih_wr"))
         iwd_target = argmax_policy(_signal_axis(signals, decision.candidates, "iwd"))
         q_target = argmax_policy(prediction.q_values)
+        contextual_scores = value_model.scores(features)
+        contextual_argmax_target = argmax_policy(contextual_scores)
 
         incumbent_observations.append(_observation(decision, prediction, incumbent_target))
         gih_observations.append(_observation(decision, prediction, gih_target))
         iwd_observations.append(_observation(decision, prediction, iwd_target))
         direct_q_observations.append(_observation(decision, prediction, q_target))
+        contextual_argmax_observations.append(
+            _observation(decision, prediction, contextual_argmax_target)
+        )
 
         for label, observations in contextual_by_temperature:
             temperature = float(label.split("=", 1)[1])
@@ -314,7 +339,7 @@ def run_development(
                 "gih": max(gih_target, key=gih_target.get),
                 "iwd": max(iwd_target, key=iwd_target.get),
                 "direct_q": max(q_target, key=q_target.get),
-                "contextual_scores": value_model.scores(features),
+                "contextual_scores": contextual_scores,
             })
 
     selected_temperature, temperature_search = _best_validation_policy(contextual_by_temperature)
@@ -323,6 +348,11 @@ def run_development(
     selected_blend_observations = dict(blend_grid)[selected_blend]
     validation_contextual_ci = paired_dr_delta_ci(
         selected_contextual,
+        incumbent_observations,
+        weight_cap=WEIGHT_CAPS[1],
+    )
+    validation_contextual_argmax_ci = paired_dr_delta_ci(
+        contextual_argmax_observations,
         incumbent_observations,
         weight_cap=WEIGHT_CAPS[1],
     )
@@ -340,19 +370,35 @@ def run_development(
             return None
         return sum(int(row[name] == row["selected"]) for row in trophy_rows) / len(trophy_rows)
 
+    observed_assessment_count = len({row.draft_id for row in assessment})
+    if assessment_draft_count is not None and assessment_draft_count < 0:
+        raise ValueError("assessment_draft_count must be non-negative")
     report = {
         "scope": "development_only",
         "assessment_opened": False,
+        "assessment_boundary": {
+            "outcomes_loaded_into_pipeline": bool(assessment),
+            "outcomes_used_for_fit": False,
+            "outcomes_scored": False,
+        },
         "drafts": {
             "train": len({row.draft_id for row in train}),
             "validation": len({row.draft_id for row in validation}),
-            "assessment_withheld": len({row.draft_id for row in assessment}),
+            "assessment_withheld": (
+                int(assessment_draft_count)
+                if assessment_draft_count is not None
+                else observed_assessment_count
+            ),
             "validation_primary_ope": len(primary),
         },
         "diagnostics": {
             "outcome_q": {
                 "train_oof": outcome_diagnostics(train, train_predictions),
                 "validation": outcome_diagnostics(validation, validation_predictions),
+            },
+            "propensity": {
+                "train_oof": propensity_diagnostics(train, train_predictions),
+                "validation": propensity_diagnostics(validation, validation_predictions),
             },
             "overlap": {
                 "A_current_v4_strong_player": policy_overlap_diagnostics(
@@ -361,9 +407,61 @@ def run_development(
                 "G_contextual_value": policy_overlap_diagnostics(
                     selected_contextual
                 ),
+                "G_contextual_value_top_ranked_argmax_secondary": (
+                    policy_overlap_diagnostics(contextual_argmax_observations)
+                ),
+            },
+            "local_overlap": {
+                "G_contextual_value": policy_overlap_slices(primary, selected_contextual),
+                "G_contextual_value_top_ranked_argmax_secondary": (
+                    policy_overlap_slices(primary, contextual_argmax_observations)
+                ),
+            },
+            "stability_slices": {
+                "G_contextual_value_vs_A": paired_policy_delta_slices(
+                    primary,
+                    selected_contextual,
+                    incumbent_observations,
+                    weight_cap=WEIGHT_CAPS[1],
+                ),
+                "G_top_ranked_argmax_vs_A": paired_policy_delta_slices(
+                    primary,
+                    contextual_argmax_observations,
+                    incumbent_observations,
+                    weight_cap=WEIGHT_CAPS[1],
+                ),
             },
             "validation_selected_contextual_vs_v4_dr_ci95": validation_contextual_ci,
+            "validation_top_ranked_argmax_vs_v4_dr_ci95": validation_contextual_argmax_ci,
             "validation_ci_is_selection_biased": True,
+            "validation_ci_interpretation": (
+                "exploratory development uncertainty after validation-visible model/policy choices; "
+                "not a locked confirmatory assessment"
+            ),
+        },
+        "policy_estimands": {
+            "A_current_v4_strong_player": {
+                "target_policy": "deterministic_argmax",
+                "implementation": "leakage_safe_v4_style_strong_player_refit",
+                "exact_deployed_model_snapshot": False,
+                "note": (
+                    "This comparator rebuilds the v4-style strong-player signal from the "
+                    "research training complement; it is not evidence that the exact deployed "
+                    "production model snapshot was evaluated."
+                ),
+            },
+            "G_contextual_value_primary": {
+                "target_policy": "temperature_softened_stochastic_policy",
+                "note": (
+                    "The frozen primary OPE estimates the selected stochastic target policy; "
+                    "it does not by itself establish the value of always taking G's top-ranked card."
+                ),
+            },
+            "G_contextual_value_top_ranked_argmax_secondary": {
+                "target_policy": "deterministic_argmax_of_contextual_scores",
+                "role": "secondary_development_diagnostic_not_primary_endpoint",
+                "fallback_rule": "not_yet_frozen",
+            },
         },
         "models": {
             "A_current_v4_strong_player": _estimate_by_cap(incumbent_observations),
@@ -394,6 +492,12 @@ def run_development(
                 "selected_validation_temperature": selected_temperature,
                 "selected_estimates": _estimate_by_cap(selected_contextual),
                 "search": temperature_search,
+                "top_ranked_argmax_secondary": {
+                    "role": "secondary_development_diagnostic_not_primary_endpoint",
+                    "estimates": _estimate_by_cap(contextual_argmax_observations),
+                    "vs_A_dr_ci95": validation_contextual_argmax_ci,
+                    "fallback_rule": "not_yet_frozen",
+                },
                 "value_model": {
                     "training_drafts": value_model.training_draft_count,
                     "pseudo_outcome_weight_cap": value_model.training_weight_cap,

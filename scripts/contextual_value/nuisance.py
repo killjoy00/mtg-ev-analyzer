@@ -117,6 +117,7 @@ def build_fold_training_rows(
     signal_provider: SignalProvider | None = None,
     inner_feature_folds: int = 5,
     expansion: str | None = None,
+    progress_callback: Callable[[int, int], None] | None = None,
 ) -> list[NuisanceTrainingRow]:
     """Materialize nuisance-training rows, optionally for one environment shard.
 
@@ -135,7 +136,8 @@ def build_fold_training_rows(
             raise ValueError(f"no nuisance-training decisions for expansion {expansion}")
 
     rows: list[NuisanceTrainingRow] = []
-    for decision in training:
+    total = len(training)
+    for index, decision in enumerate(training, start=1):
         feature_ids = (
             _training_feature_complement(
                 decision.draft_id,
@@ -156,6 +158,8 @@ def build_fold_training_rows(
             offsets=offsets,
             outcome=float(decision.event_match_wins),
         ))
+        if progress_callback is not None and (index == total or index % 250 == 0):
+            progress_callback(index, total)
     return rows
 
 

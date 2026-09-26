@@ -10,65 +10,94 @@ on:
       - 'research/CONTEXTUAL-VALUE-V1-PROTOCOL.md'
       - 'research/CONTEXTUAL-VALUE-V1-CORE-POOL.md'
   workflow_dispatch:
-    inputs:
-      max_drafts:
-        description: 'Deterministic pooled draft cap across MSH/SOS/ECL/TLA'
-        required: true
-        default: '8000'
-        type: string
 
 permissions:
   contents: read
 
 env:
-  MAX_DRAFTS: ${{ inputs.max_drafts || '8000' }}
+  MAX_DRAFTS: '8000'
   BASE: https://17lands-public.s3.amazonaws.com/analysis_data
   PYTHONUNBUFFERED: '1'
 
 jobs:
-  nuisance-feature-shard:
-    name: nuisance-fold-${{ matrix.fold }}-${{ matrix.expansion }}
+  prepare-cohort:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
-    strategy:
-      fail-fast: false
-      max-parallel: 5
-      matrix:
-        fold: [0, 1, 2, 3, 4]
-        expansion: [MSH, SOS, ECL, TLA]
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate research inputs
+      - name: Validate frozen research inputs
         run: |
-          [[ "$MAX_DRAFTS" =~ ^[0-9]+$ ]] || { echo 'Invalid MAX_DRAFTS'; exit 1; }
-          test "$MAX_DRAFTS" -ge 2000 || { echo 'MAX_DRAFTS must be at least 2000'; exit 1; }
-      - name: Download core 17Lands Premier archives
+          test "$MAX_DRAFTS" = "8000"
+      - name: Download core 17Lands Premier archives once
         run: |
           mkdir -p raw-data
           for EXPANSION in MSH SOS ECL TLA; do
             curl --fail --location --retry 5 --retry-delay 3 --output "raw-data/draft-$EXPANSION.csv.gz" "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
             curl --fail --location --retry 5 --retry-delay 3 --output "raw-data/game-$EXPANSION.csv.gz" "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
           done
-      - name: Materialize one environment feature shard
+      - name: Build immutable development cohort
         run: |
-          OUT="results/contextual-value-v1/feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}"
+          OUT="results/contextual-value-v1/preprocessed-core"
           python3 scripts/contextual_value_phase1.py \
             --draft-archive raw-data/draft-MSH.csv.gz --game-archive raw-data/game-MSH.csv.gz \
             --draft-archive raw-data/draft-SOS.csv.gz --game-archive raw-data/game-SOS.csv.gz \
             --draft-archive raw-data/draft-ECL.csv.gz --game-archive raw-data/game-ECL.csv.gz \
             --draft-archive raw-data/draft-TLA.csv.gz --game-archive raw-data/game-TLA.csv.gz \
             --max-drafts "$MAX_DRAFTS" \
+            --prepare-development-cohort \
+            --out "$OUT"
+      - name: Upload immutable cohort
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-${{ env.MAX_DRAFTS }}
+          path: |
+            results/contextual-value-v1/preprocessed-core/archive-manifest.json
+            results/contextual-value-v1/preprocessed-core/cohort-manifest.json
+            results/contextual-value-v1/preprocessed-core/development-decisions.jsonl.gz
+            results/contextual-value-v1/preprocessed-core/development-games.jsonl.gz
+          retention-days: 30
+
+  nuisance-feature-shard:
+    name: nuisance-fold-${{ matrix.fold }}-${{ matrix.expansion }}
+    needs: prepare-cohort
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        fold: [-1, 0, 1, 2, 3, 4]
+        expansion: [MSH, SOS, ECL, TLA]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download immutable cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-${{ env.MAX_DRAFTS }}
+          path: preprocessed-core
+      - name: Materialize one environment feature shard
+        run: |
+          OUT="results/contextual-value-v1/feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}"
+          python3 scripts/contextual_value_phase1.py \
+            --preprocessed-cohort preprocessed-core \
+            --max-drafts "$MAX_DRAFTS" \
             --train-nuisance-feature-shard "${{ matrix.fold }}" \
             --train-nuisance-expansion "${{ matrix.expansion }}" \
             --out "$OUT"
-      - name: Upload feature checkpoint
+      - name: Upload feature checkpoint with provenance
         uses: actions/upload-artifact@v4
         with:
           name: contextual-value-v1-feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}
-          path: results/contextual-value-v1/feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}/train-feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}.jsonl.gz
+          path: |
+            results/contextual-value-v1/feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}/train-feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}.jsonl.gz
+            results/contextual-value-v1/feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}/train-feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}.meta.json
+            results/contextual-value-v1/feature-fold-${{ matrix.fold }}-${{ matrix.expansion }}/feature-shard-report.json
           retention-days: 7
 
   nuisance-fold:
@@ -79,38 +108,34 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        fold: [0, 1, 2, 3, 4]
+        fold: [-1, 0, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Download immutable cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-${{ env.MAX_DRAFTS }}
+          path: preprocessed-core
       - name: Download this fold's feature checkpoints
         uses: actions/download-artifact@v4
         with:
           pattern: contextual-value-v1-feature-fold-${{ matrix.fold }}-*
           path: precomputed-features
           merge-multiple: true
-      - name: Verify all environment feature checkpoints are present
+      - name: Verify all environment checkpoint files are present
         run: |
           for EXPANSION in MSH SOS ECL TLA; do
             test -s "precomputed-features/train-feature-fold-${{ matrix.fold }}-$EXPANSION.jsonl.gz"
+            test -s "precomputed-features/train-feature-fold-${{ matrix.fold }}-$EXPANSION.meta.json"
           done
-      - name: Download core 17Lands Premier archives
-        run: |
-          mkdir -p raw-data
-          for EXPANSION in MSH SOS ECL TLA; do
-            curl --fail --location --retry 5 --retry-delay 3 --output "raw-data/draft-$EXPANSION.csv.gz" "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
-            curl --fail --location --retry 5 --retry-delay 3 --output "raw-data/game-$EXPANSION.csv.gz" "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
-          done
-      - name: Fit and predict one nuisance fold
+      - name: Fit and predict one nuisance checkpoint
         run: |
           OUT="results/contextual-value-v1/nuisance-fold-${{ matrix.fold }}"
           python3 scripts/contextual_value_phase1.py \
-            --draft-archive raw-data/draft-MSH.csv.gz --game-archive raw-data/game-MSH.csv.gz \
-            --draft-archive raw-data/draft-SOS.csv.gz --game-archive raw-data/game-SOS.csv.gz \
-            --draft-archive raw-data/draft-ECL.csv.gz --game-archive raw-data/game-ECL.csv.gz \
-            --draft-archive raw-data/draft-TLA.csv.gz --game-archive raw-data/game-TLA.csv.gz \
+            --preprocessed-cohort preprocessed-core \
             --max-drafts "$MAX_DRAFTS" \
             --assemble-train-nuisance-fold "${{ matrix.fold }}" \
             --precomputed-train-feature-shard "precomputed-features/train-feature-fold-${{ matrix.fold }}-MSH.jsonl.gz" \
@@ -118,12 +143,13 @@ jobs:
             --precomputed-train-feature-shard "precomputed-features/train-feature-fold-${{ matrix.fold }}-ECL.jsonl.gz" \
             --precomputed-train-feature-shard "precomputed-features/train-feature-fold-${{ matrix.fold }}-TLA.jsonl.gz" \
             --out "$OUT"
-      - name: Upload nuisance checkpoint
+      - name: Upload nuisance checkpoint with provenance
         uses: actions/upload-artifact@v4
         with:
           name: contextual-value-v1-nuisance-fold-${{ matrix.fold }}
           path: |
-            results/contextual-value-v1/nuisance-fold-${{ matrix.fold }}/train-nuisance-fold-${{ matrix.fold }}.jsonl.gz
+            results/contextual-value-v1/nuisance-fold-${{ matrix.fold }}/*.jsonl.gz
+            results/contextual-value-v1/nuisance-fold-${{ matrix.fold }}/*.meta.json
             results/contextual-value-v1/nuisance-fold-${{ matrix.fold }}/fold-report.json
           retention-days: 7
 
@@ -136,33 +162,39 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Validate research inputs
-        run: |
-          [[ "$MAX_DRAFTS" =~ ^[0-9]+$ ]] || { echo 'Invalid MAX_DRAFTS'; exit 1; }
-          test "$MAX_DRAFTS" -ge 2000 || { echo 'MAX_DRAFTS must be at least 2000'; exit 1; }
+      - name: Download immutable cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-${{ env.MAX_DRAFTS }}
+          path: preprocessed-core
       - name: Download nuisance checkpoints
         uses: actions/download-artifact@v4
         with:
           pattern: contextual-value-v1-nuisance-fold-*
           path: precomputed-nuisance
           merge-multiple: true
-      - name: Verify all nuisance checkpoints are present
+      - name: Verify all nuisance checkpoint files are present
         run: |
           for FOLD in 0 1 2 3 4; do
             test -s "precomputed-nuisance/train-nuisance-fold-$FOLD.jsonl.gz"
+            test -s "precomputed-nuisance/train-nuisance-fold-$FOLD.meta.json"
           done
-      - name: Download core 17Lands Premier archives
-        run: |
-          mkdir -p raw-data
-          for EXPANSION in MSH SOS ECL TLA; do
-            curl --fail --location --retry 5 --retry-delay 3               --output "raw-data/draft-$EXPANSION.csv.gz"               "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
-            curl --fail --location --retry 5 --retry-delay 3               --output "raw-data/game-$EXPANSION.csv.gz"               "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
-          done
+          test -s "precomputed-nuisance/validation-nuisance.jsonl.gz"
+          test -s "precomputed-nuisance/validation-nuisance.meta.json"
       - name: Run pooled contextual-value-v1 core development validation
         run: |
           mkdir -p results/contextual-value-v1/pooled-msh-sos-ecl-tla
-          python3 scripts/contextual_value_phase1.py             --draft-archive raw-data/draft-MSH.csv.gz             --game-archive raw-data/game-MSH.csv.gz             --draft-archive raw-data/draft-SOS.csv.gz             --game-archive raw-data/game-SOS.csv.gz             --draft-archive raw-data/draft-ECL.csv.gz             --game-archive raw-data/game-ECL.csv.gz             --draft-archive raw-data/draft-TLA.csv.gz             --game-archive raw-data/game-TLA.csv.gz             --max-drafts "$MAX_DRAFTS"             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-0.jsonl.gz             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-1.jsonl.gz             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-2.jsonl.gz             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-3.jsonl.gz             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-4.jsonl.gz             --out results/contextual-value-v1/pooled-msh-sos-ecl-tla
-      - name: Assert assessment stayed sealed and summarize selection
+          python3 scripts/contextual_value_phase1.py \
+            --preprocessed-cohort preprocessed-core \
+            --max-drafts "$MAX_DRAFTS" \
+            --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-0.jsonl.gz \
+            --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-1.jsonl.gz \
+            --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-2.jsonl.gz \
+            --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-3.jsonl.gz \
+            --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-4.jsonl.gz \
+            --precomputed-validation-nuisance precomputed-nuisance/validation-nuisance.jsonl.gz \
+            --out results/contextual-value-v1/pooled-msh-sos-ecl-tla
+      - name: Assert assessment stayed unavailable and summarize selection
         run: |
           python3 - <<'PY'
           import json
@@ -173,15 +205,22 @@ jobs:
               raise SystemExit("assessment partition was opened")
           if report.get("scope") != "development_only":
               raise SystemExit("unexpected report scope")
+          boundary = report.get("assessment_boundary") or {}
+          if boundary.get("outcomes_loaded_into_pipeline") is not False:
+              raise SystemExit("assessment outcomes were loaded into development pipeline")
+          if boundary.get("outcomes_used_for_fit") is not False or boundary.get("outcomes_scored") is not False:
+              raise SystemExit("assessment outcomes reached development fit/scoring")
           print(json.dumps({
               "core_pool": ["MSH", "SOS", "ECL", "TLA"],
               "drafts": report["drafts"],
+              "cohort": report["cohort"],
               "selected_temperature": report["models"]["G_contextual_value"]["selected_validation_temperature"],
               "selected_simple_blend": report["models"]["E_simple_behavior_outcome_blend"]["selected_validation_config"],
               "A_cap20": report["models"]["A_current_v4_strong_player"]["20"],
               "G_cap20": report["models"]["G_contextual_value"]["selected_estimates"]["20"],
               "delta_ci95": report["diagnostics"]["validation_selected_contextual_vs_v4_dr_ci95"],
               "assessment_opened": report["assessment_opened"],
+              "assessment_boundary": boundary,
           }, indent=2))
           PY
       - name: Upload pooled development artifacts
