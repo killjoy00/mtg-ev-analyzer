@@ -1,5 +1,5 @@
-import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { router, useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -15,6 +15,17 @@ import { useAppResume } from '@/src/hooks/useAppResume';
 import { colors, spacing } from '@/src/theme';
 
 const dailyEnvironments: DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
+
+function pacificDay(date = new Date()) {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Los_Angeles',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(date);
+  const values = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${values.year}-${values.month}-${values.day}`;
+}
 
 function Brand() {
   return (
@@ -39,25 +50,39 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
 
 export default function HomeScreen() {
   const [status, setStatus] = useState<DailyStatus | null>(null);
-  const [reloadKey, setReloadKey] = useState(0);
+  const statusRef = useRef<DailyStatus | null>(null);
+  const requestId = useRef(0);
 
-  useAppResume(() => setReloadKey((value) => value + 1));
+  const refresh = useCallback(async () => {
+    const id = ++requestId.current;
+    try {
+      const session = await ensureGuestSession();
+      const next = await loadDailyStatus(session);
+      if (id !== requestId.current) return;
+      statusRef.current = next;
+      setStatus(next);
+    } catch {
+      // Daily state is enrichment. Keep the last loaded UI while revalidating;
+      // starting a Daily remains server-authoritative and safely resumes.
+    }
+  }, []);
+
+  useFocusEffect(useCallback(() => {
+    void refresh();
+    return () => {
+      requestId.current += 1;
+    };
+  }, [refresh]));
+
+  useAppResume(() => refresh());
 
   useEffect(() => {
-    let active = true;
-    void ensureGuestSession()
-      .then((session) => loadDailyStatus(session))
-      .then((next) => {
-        if (active) setStatus(next);
-      })
-      .catch(() => {
-        // Daily state is enrichment. Starting a Daily remains server-authoritative
-        // and safely resumes the existing attempt if status cannot be loaded.
-      });
-    return () => {
-      active = false;
-    };
-  }, [reloadKey]);
+    const timer = setInterval(() => {
+      const current = statusRef.current;
+      if (current?.day && current.day !== pacificDay()) void refresh();
+    }, 30_000);
+    return () => clearInterval(timer);
+  }, [refresh]);
 
   const dailies = useMemo(() => [...dailyEnvironments].sort((a, b) => (
     Number(completed(status, a)) - Number(completed(status, b))
