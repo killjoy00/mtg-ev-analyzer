@@ -140,6 +140,7 @@ function mobileSessionRoute(service,path,method) {
   if(method==='POST'&&path==='/v1/runs')return true;
   if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/(?:challenges|shared-runs)\/[a-f0-9]{24}$/.test(path))return true;
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
 }
 function mobileAccountRoute(service,path,method) {
@@ -152,6 +153,7 @@ function mobileAccountRoute(service,path,method) {
   if(method==='POST'&&path==='/v1/runs')return true;
   if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
   if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/(?:challenges|shared-runs)\/[a-f0-9]{24}$/.test(path))return true;
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
 }
 function safeRedirect(value,{mobileOAuth=false}={}) {
@@ -195,6 +197,7 @@ export function routeFamily(path) {
   if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share)$/.test(path))return 'draft_'+path.split('/').at(-1);
   if(path==='/draft/v1/runs')return 'draft_start';
   if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';
+  if(/^\/draft\/v1\/(?:challenges|shared-runs)\/[^/]+$/.test(path))return 'draft_shared_read';
   for(const name of ['leaderboard','daily-status','capabilities','practice-sets','set-catalog'])if(path==='/draft/v1/'+name)return 'draft_'+name.replaceAll('-','_');
   if(path==='/growth/v1/mobile/version')return 'mobile_version';
   if(/^\/growth\/v1\/(player\/)?session$/.test(path))return 'player_session';
