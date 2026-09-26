@@ -185,6 +185,49 @@ def predict_fold(
     return predictions
 
 
+def crossfit_nuisance_fold(
+    decisions: Sequence[Decision],
+    fold: int,
+    *,
+    folds: int = 5,
+    signal_provider: SignalProvider | None = None,
+    propensity_l2: float = 1.0,
+    outcome_l2: float = 10.0,
+    inner_feature_folds: int = 5,
+) -> list[NuisancePrediction]:
+    """Return held-draft predictions for exactly one deterministic outer fold."""
+    if folds < 2:
+        raise ValueError("at least two nuisance folds are required")
+    if fold < 0 or fold >= folds:
+        raise ValueError("fold must be in [0, folds)")
+    if not decisions:
+        return []
+    all_ids = frozenset(decision.draft_id for decision in decisions)
+    held_ids = frozenset(
+        draft_id for draft_id in all_ids
+        if nuisance_fold(draft_id, folds) == fold
+    )
+    if not held_ids:
+        return []
+    training_ids = frozenset(all_ids - held_ids)
+    if training_ids & held_ids:
+        raise AssertionError("nuisance training and held draft IDs overlap")
+    fit = fit_fold(
+        decisions,
+        training_ids,
+        signal_provider=signal_provider,
+        propensity_l2=propensity_l2,
+        outcome_l2=outcome_l2,
+        inner_feature_folds=inner_feature_folds,
+        fold=fold,
+    )
+    held = [decision for decision in decisions if decision.draft_id in held_ids]
+    return sorted(
+        predict_fold(fit, held, signal_provider=signal_provider),
+        key=lambda item: item.decision_id,
+    )
+
+
 def crossfit_nuisance(
     decisions: Sequence[Decision],
     *,
@@ -199,31 +242,19 @@ def crossfit_nuisance(
         raise ValueError("at least two nuisance folds are required")
     if not decisions:
         return []
-    all_ids = frozenset(decision.draft_id for decision in decisions)
     predictions: list[NuisancePrediction] = []
     seen: set[str] = set()
 
     for fold in range(folds):
-        held_ids = frozenset(
-            draft_id for draft_id in all_ids
-            if nuisance_fold(draft_id, folds) == fold
-        )
-        if not held_ids:
-            continue
-        training_ids = frozenset(all_ids - held_ids)
-        if training_ids & held_ids:
-            raise AssertionError("nuisance training and held draft IDs overlap")
-        fit = fit_fold(
+        for prediction in crossfit_nuisance_fold(
             decisions,
-            training_ids,
+            fold,
+            folds=folds,
             signal_provider=signal_provider,
             propensity_l2=propensity_l2,
             outcome_l2=outcome_l2,
             inner_feature_folds=inner_feature_folds,
-            fold=fold,
-        )
-        held = [decision for decision in decisions if decision.draft_id in held_ids]
-        for prediction in predict_fold(fit, held, signal_provider=signal_provider):
+        ):
             if prediction.decision_id in seen:
                 raise AssertionError("decision received multiple nuisance predictions")
             seen.add(prediction.decision_id)
