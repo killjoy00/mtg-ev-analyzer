@@ -14,6 +14,7 @@ test('current retention views use the Pacific product calendar without rewriting
 });
 
 
+// Migration 0042 is the serving-revision snapshot boundary.
 test('release schema verification requires Pacific retention views', () => {
   const source = fs.readFileSync('scripts/verify-neon-schema.mjs', 'utf8');
   assert.ok(source.includes('analytics_retention_cohorts'));
