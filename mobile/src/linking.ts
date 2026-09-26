@@ -5,6 +5,7 @@ const NATIVE_PATHS = new Set([
   '/account',
   '/career',
   '/draft-run',
+  '/shared-run',
   '/how-to',
   '/leaderboard',
   '/method',
@@ -41,6 +42,7 @@ function nativeDirectPath(pathname: string) {
 function parseIncomingPath(path: string) {
   if (path.startsWith('/')) {
     const url = new URL(path, 'https://packone.pro');
+    if (!PACKONE_HOSTS.has(url.hostname)) return null;
     return { pathname: url.pathname, searchParams: url.searchParams, search: url.search };
   }
 
@@ -86,6 +88,11 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     return `?${next.toString()}`;
   }
 
+  if (pathname === '/shared-run') {
+    const shared = searchParams.get('shared');
+    return shared && /^[a-f0-9]{24}$/.test(shared) ? `?shared=${shared}` : '';
+  }
+
   if (pathname === '/profile') {
     const key = searchParams.get('key');
     return key && /^[a-f0-9]{16}$/.test(key) ? `?key=${key}` : '';
@@ -123,7 +130,7 @@ export function rewriteIncomingPath(path: string) {
     }
     if (pathname === '/open/shared/' || pathname === '/open/shared') {
       const id = searchParams.get('id');
-      return id && /^[a-f0-9]{24}$/.test(id) ? `/draft-run?shared=${id}` : '/';
+      return id && /^[a-f0-9]{24}$/.test(id) ? `/shared-run?shared=${id}` : '/';
     }
     if (pathname === '/open/daily/' || pathname === '/open/daily') {
       return `/draft-run?environment=${environmentFromSet(searchParams.get('environment'))}`;
@@ -133,6 +140,10 @@ export function rewriteIncomingPath(path: string) {
     if (article) return article;
 
     const direct = nativeDirectPath(pathname);
+    if (direct === '/draft-run' && (searchParams.has('shared') || searchParams.has('challenge'))) {
+      const shared = searchParams.get('shared') || searchParams.get('challenge');
+      return shared && /^[a-f0-9]{24}$/.test(shared) ? `/shared-run?shared=${shared}` : '/shared-run';
+    }
     if (direct && direct !== '/') return `${direct}${safeNativeSearch(direct, searchParams)}`;
 
     if (pathname !== '/') return '/';
@@ -155,6 +166,10 @@ export function rewriteIncomingPath(path: string) {
 
     if (searchParams.get('game') === 'draft-run') {
       const environment = environmentFromSet(searchParams.get('set'));
+      if (searchParams.has('shared') || searchParams.has('challenge')) {
+        const shared = searchParams.get('shared') || searchParams.get('challenge');
+        return shared && /^[a-f0-9]{24}$/.test(shared) ? `/shared-run?shared=${shared}` : '/';
+      }
 
       if (searchParams.has('board')) {
         const requestedPeriod = searchParams.get('board');
@@ -167,11 +182,6 @@ export function rewriteIncomingPath(path: string) {
 
       if (searchParams.get('daily') === '1') {
         return `/draft-run?environment=${environment}`;
-      }
-
-      const shared = searchParams.get('shared') || searchParams.get('challenge');
-      if (shared) {
-        return /^[a-f0-9]{24}$/.test(shared) ? `/draft-run?shared=${shared}` : '/';
       }
 
       if (searchParams.get('custom') === '1') return '/practice';

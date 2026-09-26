@@ -17,6 +17,22 @@ export type MobileSession = {
   accountUser?: MobileAccountUser;
 };
 
+const sessionListeners = new Set<(session: MobileSession | null) => void>();
+
+/** Notifications follow successful persistence; subscribers must still revalidate before IO. */
+export function subscribeSession(listener: (session: MobileSession | null) => void) {
+  sessionListeners.add(listener);
+  return () => { sessionListeners.delete(listener); };
+}
+
+function notifySession(session: MobileSession | null) {
+  for (const listener of sessionListeners) {
+    try { listener(session); } catch {
+      // A view observer must never turn a successful authentication into a failure.
+    }
+  }
+}
+
 function validPlayerToken(value: unknown): value is string {
   return typeof value === 'string'
     && /^p1_[a-f0-9-]{36}\.[A-Za-z0-9_-]{43}$/i.test(value);
@@ -72,6 +88,7 @@ export async function writeSession(session: MobileSession) {
   await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session), {
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
+  notifySession(session);
 }
 
 export async function clearSession() {
@@ -79,4 +96,5 @@ export async function clearSession() {
     SecureStore.deleteItemAsync(SESSION_KEY),
     SecureStore.deleteItemAsync(LEGACY_SESSION_KEY),
   ]);
+  notifySession(null);
 }

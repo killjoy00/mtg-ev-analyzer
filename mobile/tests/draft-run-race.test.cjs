@@ -251,3 +251,106 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
 
   await act(async () => root.unmount());
 });
+
+
+test('a committed pick with a lost response is reconciled into feedback', async () => {
+  const session = {
+    playerToken: 'p1_11111111-1111-4111-8111-111111111111.AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA',
+  };
+  let loadCalls = 0;
+
+  const Image = host('Image');
+  Image.prefetch = async () => {};
+
+  const mocks = {
+    'expo-haptics': {
+      selectionAsync: async () => {},
+      notificationAsync: async () => {},
+      NotificationFeedbackType: { Success: 'success' },
+    },
+    'expo-image': { Image },
+    'expo-router': {
+      router: { push() {}, replace() {} },
+      useLocalSearchParams: () => ({ environment: 'mixed' }),
+    },
+    'react-native': {
+      AccessibilityInfo: { announceForAccessibility() {} },
+      ActivityIndicator: host('ActivityIndicator'),
+      Modal: host('Modal'),
+      Pressable: host('Pressable'),
+      ScrollView,
+      Share: { share: async () => {} },
+      StyleSheet: { create: (value) => value },
+      Text: host('Text'),
+      View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/guest': { ensureGuestSession: async () => session },
+    '@/src/api/draftRun': {
+      createDraftRunShare: async () => ({ id: 'a'.repeat(24) }),
+      DAILY_ENVIRONMENT_META: {
+        mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '', resultTitle: 'Your Draft Run.' },
+        'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '', resultTitle: 'Your Powered Cube.' },
+        latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '', resultTitle: 'Your Latest Set run.' },
+      },
+      isDailyEnvironment: (value) => ['mixed', 'powered-cube', 'latest'].includes(value),
+      loadDraftRun: async () => {
+        loadCalls += 1;
+        return runAfterPick();
+      },
+      rerollDraftRun: async () => runZero(),
+      startDailyDraftRun: async () => runZero(),
+      startPracticeDraftRun: async () => runZero(),
+      submitDraftRunPick: async () => {
+        throw new Error('Network interrupted after the server committed the pick.');
+      },
+    },
+    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/storage/idempotency': {
+      clearPracticeIdempotencyKey: async () => {},
+      practiceIdempotencyKey: async () => 'practice_' + 'k'.repeat(32),
+    },
+    '@/src/theme': {
+      colors: new Proxy({}, { get: () => '#000' }),
+      spacing: new Proxy({}, { get: () => 8 }),
+    },
+  };
+
+  const DraftRunScreen = compileDraftRunScreen(mocks);
+  let root;
+
+  await act(async () => {
+    root = TestRenderer.create(React.createElement(DraftRunScreen));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  const pick = root.root.findAll(
+    (node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Pick Card A',
+  )[0];
+  assert.ok(pick, 'pick button should be mounted');
+  await act(async () => {
+    pick.props.onPress();
+  });
+
+  const confirm = root.root.findAll((node) => (
+    node.type === 'Pressable'
+    && node.findAll((child) => child.type === 'Text' && child.props.children === 'Confirm pick').length > 0
+  ))[0];
+  assert.ok(confirm, 'confirm button should be mounted');
+
+  await act(async () => {
+    confirm.props.onPress();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+
+  assert.equal(loadCalls, 1, 'ambiguous mutation should reconcile the authoritative run exactly once');
+  assert.ok(root.toJSON(), 'the run must stay mounted after the lost mutation response');
+  const text = renderedText(root.toJSON());
+  assert.match(text, /88/, 'the committed pick should be shown as feedback');
+  assert.doesNotMatch(text, /Network interrupted/, 'transport failure should not replace recovered server state');
+
+  await act(async () => root.unmount());
+});
