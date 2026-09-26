@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
 const destination=process.env.LOAD_FIXTURE_FILE;
 // Two independently validated fixture batches provide unique identities for
-// every 25/100/500/1000 stage, with no between-stage quota resets or DB deletes.
+// the bounded 25/50/100 stages and realistic history, without quota resets or DB deletes.
 const batches=[],reports=[];
 for(let i=0;i<2;i++) {
   execFileSync(process.execPath,['scripts/launch-load-fixtures.mjs'],{env:process.env,stdio:'inherit'});

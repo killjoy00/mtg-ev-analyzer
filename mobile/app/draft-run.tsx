@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   AccessibilityInfo,
   ActivityIndicator,
+  Linking,
   Modal,
   Pressable,
   ScrollView,
@@ -36,6 +37,7 @@ import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import type { MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
+import { tcgplayerUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 
 type LoadState =
@@ -151,44 +153,62 @@ function FeedbackCard({
   card,
   label,
   onZoom,
+  affiliate = false,
+  onAffiliatePress,
 }: {
   card: DraftRunCard | undefined;
   label: string;
   onZoom: (card: DraftRunCard) => void;
+  affiliate?: boolean;
+  onAffiliatePress?: (card: DraftRunCard) => void;
 }) {
   if (!card) return null;
   return (
-    <Pressable
-      accessibilityRole="button"
-      accessibilityLabel={`${label}: ${card.name}. Open enlarged card.`}
-      onPress={() => onZoom(card)}
-      style={styles.feedbackCard}
-    >
-      <Text style={styles.feedbackCardLabel}>{label}</Text>
-      {card.image_url ? (
-        <Image
-          source={card.image_url}
-          style={styles.feedbackCardImage}
-          contentFit="cover"
-          cachePolicy="memory-disk"
-          accessibilityLabel={card.name}
-        />
-      ) : (
-        <View style={styles.feedbackCardFallback}>
-          <Text style={styles.cardFallbackText}>{card.name}</Text>
-        </View>
-      )}
-      <Text style={styles.feedbackCardName} numberOfLines={2}>{card.name}</Text>
-    </Pressable>
+    <View style={styles.feedbackCard}>
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${label}: ${card.name}. Open enlarged card.`}
+        onPress={() => onZoom(card)}
+        style={styles.feedbackCardZoom}
+      >
+        <Text style={styles.feedbackCardLabel}>{label}</Text>
+        {card.image_url ? (
+          <Image
+            source={card.image_url}
+            style={styles.feedbackCardImage}
+            contentFit="cover"
+            cachePolicy="memory-disk"
+            accessibilityLabel={card.name}
+          />
+        ) : (
+          <View style={styles.feedbackCardFallback}>
+            <Text style={styles.cardFallbackText}>{card.name}</Text>
+          </View>
+        )}
+        <Text style={styles.feedbackCardName} numberOfLines={2}>{card.name}</Text>
+      </Pressable>
+      {affiliate && onAffiliatePress ? (
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel={`Find ${card.name} on TCGplayer, affiliate link`}
+          onPress={() => onAffiliatePress(card)}
+          style={styles.shopLink}
+        >
+          <Text style={styles.shopLinkText}>Find on TCGplayer (affiliate link)</Text>
+        </Pressable>
+      ) : null}
+    </View>
   );
 }
 
 function FeedbackAnalysis({
   answer,
   onZoom,
+  onAffiliatePress,
 }: {
   answer: DraftRunAnswer;
   onZoom: (card: DraftRunCard) => void;
+  onAffiliatePress: (card: DraftRunCard) => void;
 }) {
   const candidates = answer.puzzle.candidates;
   const selected = candidates.find((card) => card.id === answer.selectedId);
@@ -211,12 +231,19 @@ function FeedbackAnalysis({
     <View style={styles.analysisPanel}>
       <View style={styles.feedbackComparison}>
         <FeedbackCard
+          affiliate
           card={selected}
           label={answer.historicalMatch ? 'Your pick · Trophy pick' : 'Your pick'}
+          onAffiliatePress={onAffiliatePress}
           onZoom={onZoom}
         />
-        {!answer.historicalMatch ? <FeedbackCard card={trophy} label="Trophy pick" onZoom={onZoom} /> : null}
+        {!answer.historicalMatch ? (
+          <FeedbackCard affiliate card={trophy} label="Trophy pick" onAffiliatePress={onAffiliatePress} onZoom={onZoom} />
+        ) : null}
       </View>
+      <Text style={styles.affiliateDisclosure}>
+        Affiliate links. Pack One may earn a commission from eligible TCGplayer purchases at no added cost to you.
+      </Text>
 
       {compactFeedback(answer) ? <Text style={styles.analysisLead}>{compactFeedback(answer)}</Text> : null}
 
@@ -413,6 +440,7 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
   const [busy, setBusy] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [affiliateError, setAffiliateError] = useState<string | null>(null);
   const [zoomedCard, setZoomedCard] = useState<DraftRunCard | null>(null);
   const [reviewIndex, setReviewIndex] = useState<number | null>(null);
   const [showAnalysis, setShowAnalysis] = useState(false);
@@ -558,6 +586,7 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
     if (busy || mode !== 'pick') return;
     setSelected(id);
     setActionError(null);
+    setAffiliateError(null);
     void Haptics.selectionAsync();
   };
 
@@ -638,6 +667,20 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
     }
   };
 
+  const openAffiliateCard = (card: DraftRunCard) => {
+    setAffiliateError(null);
+    let url: string;
+    try {
+      url = tcgplayerUrl(card.name);
+    } catch {
+      setAffiliateError('This card could not be opened on TCGplayer.');
+      return;
+    }
+    void Linking.openURL(url).catch(() => {
+      setAffiliateError('Could not open TCGplayer. You can try the affiliate link again.');
+    });
+  };
+
   const shareResult = async () => {
     if (state.status !== 'ready' || !state.run.complete) return;
     const matches = state.run.answers.filter((item) => item.historicalMatch).length;
@@ -692,6 +735,7 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
     setReviewIndex(null);
     setShowAnalysis(false);
     setShowPackReview(false);
+    setAffiliateError(null);
     if (state.run.complete) {
       setMode('result');
     } else {
@@ -705,6 +749,7 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
     setReviewIndex(index);
     setShowAnalysis(false);
     setShowPackReview(false);
+    setAffiliateError(null);
     setSelected(null);
     setMode('feedback');
     scroll.current?.scrollTo({ y: 0, animated: true });
@@ -906,7 +951,12 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
               >
                 <Text style={styles.disclosureText}>{showAnalysis ? 'Hide score analysis' : 'Why this score?'}</Text>
               </Pressable>
-              {showAnalysis ? <FeedbackAnalysis answer={answer} onZoom={setZoomedCard} /> : null}
+              {showAnalysis ? (
+                <>
+                  <FeedbackAnalysis answer={answer} onAffiliatePress={openAffiliateCard} onZoom={setZoomedCard} />
+                  {affiliateError ? <Text accessibilityRole="alert" style={styles.actionError}>{affiliateError}</Text> : null}
+                </>
+              ) : null}
 
               <Pressable
                 accessibilityRole="button"
@@ -1047,7 +1097,7 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   shell: { flex: 1 },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 980 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   loadingText: { color: colors.muted, fontSize: 15 },
   errorTitle: { color: colors.ink, fontSize: 24, fontWeight: '800', textAlign: 'center' },
@@ -1166,6 +1216,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disclosureText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
+  feedbackCardZoom: { gap: spacing.xs },
+  shopLink: { minHeight: 40, justifyContent: 'center', paddingVertical: spacing.xs },
+  shopLinkText: { color: colors.accentDark, fontSize: 12, lineHeight: 16, fontWeight: '800', textDecorationLine: 'underline' },
+  affiliateDisclosure: { color: colors.muted, fontSize: 11, lineHeight: 16 },
   analysisPanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.md },
   analysisLead: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: '700' },
   analysisTitle: { color: colors.ink, fontSize: 18, lineHeight: 23, fontWeight: '800' },
@@ -1190,7 +1244,7 @@ const styles = StyleSheet.create({
   resultReviewCopy: { flex: 1, gap: 2 },
   resultReviewTitle: { color: colors.ink, fontSize: 14, lineHeight: 19, fontWeight: '800' },
   resultReviewScore: { color: colors.ink, fontSize: 18, fontWeight: '800' },
-  resultPage: { padding: spacing.lg, paddingTop: spacing.xxl, gap: spacing.lg },
+  resultPage: { padding: spacing.lg, paddingTop: spacing.xxl, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 980 },
   scoreBlock: { borderTopWidth: 3, borderColor: colors.accent, backgroundColor: colors.surface, padding: spacing.xl },
   score: { color: colors.ink, fontSize: 72, lineHeight: 76, fontWeight: '800', letterSpacing: -2 },
   scoreMeta: { color: colors.muted, fontSize: 15, fontWeight: '700' },

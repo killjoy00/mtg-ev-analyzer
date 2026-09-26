@@ -116,6 +116,7 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
   globalThis.clearInterval = () => {};
 
   const mocks = {
+    'expo-image': { Image: host('Image') },
     'expo-router': {
       router: { push() {} },
       useFocusEffect: focus.useFocusEffect,
@@ -140,7 +141,9 @@ test('Home refreshes loaded Daily state on focus and Pacific rollover without bl
       },
     },
     '@/src/api/guest': { ensureGuestSession: async () => guest },
+    '@/src/api/patreon': { loadNativePatreonStatus: async () => ({ ads_allowed: false }) },
     '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://example.invalid/magic' },
     '@/src/theme': theme,
   };
 
@@ -457,4 +460,315 @@ test('successful authentication returns to Practice even when optional profile/c
   assert.match(renderedText(root.toJSON()), /profile details could not refresh/i);
 
   await act(async () => root.unmount());
+});
+
+
+test('Learn keeps core education native and opens canonical guides, support, and policy pages', async () => {
+  const pushed = [];
+  const opened = [];
+  const mocks = {
+    'expo-router': { router: { push(value) { pushed.push(value); } } },
+    'expo-web-browser': { openBrowserAsync: async (url) => { opened.push(url); } },
+    'react-native': {
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/contentLinks': {
+      canonicalContentUrl: (key) => ({
+        learn: 'https://packone.pro/learn/', about: 'https://packone.pro/about/', contact: 'https://packone.pro/contact/',
+        privacy: 'https://packone.pro/privacy/', terms: 'https://packone.pro/terms/',
+      })[key],
+    },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/learn.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  const press = async (label) => {
+    const node = root.root.findAll((item) => item.type === 'Pressable' && item.props.accessibilityLabel === label)[0];
+    assert.ok(node, label); await act(async () => { node.props.onPress(); await Promise.resolve(); });
+  };
+  await press('Open How to Play');
+  assert.deepEqual(pushed, ['/how-to']);
+  await press('Open Drafting guides on packone.pro');
+  await press('Open Support & contact on packone.pro');
+  await press('Open Privacy on packone.pro');
+  await press('Open Terms on packone.pro');
+  assert.deepEqual(opened, [
+    'https://packone.pro/learn/', 'https://packone.pro/contact/', 'https://packone.pro/privacy/', 'https://packone.pro/terms/',
+  ]);
+  assert.match(renderedText(root.toJSON()), /Editorial guides and policy pages open their canonical Pack One web versions/);
+  await act(async () => root.unmount());
+});
+
+test('Learn exposes a visible retry message when the canonical browser handoff fails', async () => {
+  const mocks = {
+    'expo-router': { router: { push() {} } },
+    'expo-web-browser': { openBrowserAsync: async () => { throw new Error('browser unavailable'); } },
+    'react-native': {
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/contentLinks': { canonicalContentUrl: () => 'https://packone.pro/contact/' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/learn.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  const contact = root.root.findAll((item) => item.type === 'Pressable' && item.props.accessibilityLabel === 'Open Support & contact on packone.pro')[0];
+  await act(async () => { contact.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
+  assert.match(renderedText(root.toJSON()), /Could not open Support & contact\. Try again when your browser is available\./);
+  await act(async () => root.unmount());
+});
+
+
+test('published set archive renders current editorial evidence and exact disclosed TCGplayer links', async () => {
+  const opened = [];
+  const archive = {
+    setId: 'msh', replaySeats: 300, trainingDrafts: 5000, trainingPicks: 209999,
+    experiencedCohortDrafts: 40480, winRateCutoff: '60%', averageTopSupport: '48.8%',
+    withinTenPoints: '24%', historicalTopMatch: '68%', averageGap: '27.9%', thirtyPointGap: '42%',
+    topCards: [{ name: 'Cosmic Cube', imageUrl: 'https://cards.example/cube.jpg' }],
+    closeDecisions: [{ first: 'Cosmic Cube', second: 'The Mighty Thor, Jane Foster', firstSupport: '37.7%', secondSupport: '37.6%', gap: '0.1%' }],
+  };
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { replace() {}, push() {} }, useLocalSearchParams: () => ({ setId: 'msh' }) },
+    'react-native': {
+      Linking: { openURL: async (url) => { opened.push(url); } },
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/content/setArchives': { setArchive: () => archive },
+    '@/src/tcgplayer': { tcgplayerUrl: (name) => `https://partner.example/?card=${encodeURIComponent(name)}` },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/set-archive.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  const text = renderedText(root.toJSON());
+  assert.match(text, /300\s+historical replay seats/);
+  assert.match(text, /209,999\s+picks/);
+  assert.match(text, /48.8%/);
+  assert.match(text, /Cosmic Cube/);
+  assert.match(text, /37\.7%\s+support/);
+  assert.match(text, /Affiliate disclosure/);
+  const link = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Cosmic Cube on TCGplayer, affiliate link')[0];
+  assert.ok(link);
+  await act(async () => { link.props.onPress(); await Promise.resolve(); });
+  assert.deepEqual(opened, ['https://partner.example/?card=Cosmic%20Cube']);
+  await act(async () => root.unmount());
+});
+
+test('published set archive keeps the analysis mounted when affiliate browser handoff fails', async () => {
+  const archive = {
+    setId: 'msh', replaySeats: 300, trainingDrafts: 5000, trainingPicks: 209999,
+    experiencedCohortDrafts: 40480, winRateCutoff: '60%', averageTopSupport: '48.8%',
+    withinTenPoints: '24%', historicalTopMatch: '68%', averageGap: '27.9%', thirtyPointGap: '42%',
+    topCards: [{ name: 'Cosmic Cube', imageUrl: 'https://cards.example/cube.jpg' }], closeDecisions: [],
+  };
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { replace() {}, push() {} }, useLocalSearchParams: () => ({ setId: 'msh' }) },
+    'react-native': {
+      Linking: { openURL: async () => { throw new Error('no browser'); } },
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/content/setArchives': { setArchive: () => archive },
+    '@/src/tcgplayer': { tcgplayerUrl: () => 'https://partner.example/card' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/set-archive.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  const link = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link')[0];
+  await act(async () => { link.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
+  assert.match(renderedText(root.toJSON()), /Could not open TCGplayer for Cosmic Cube\. Try the affiliate link again\./);
+  assert.match(renderedText(root.toJSON()), /MSH\s+Pack One archive/);
+  await act(async () => root.unmount());
+});
+
+test('published set web URLs rewrite only the four reviewed archives into native detail routes', () => {
+  const filename = path.join(process.cwd(), 'src', 'linking.ts');
+  const output = ts.transpileModule(fs.readFileSync(filename, 'utf8'), {
+    compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS },
+    fileName: filename,
+  }).outputText;
+  const compiled = new Module(filename, module);
+  compiled.filename = filename;
+  compiled.paths = Module._nodeModulePaths(path.dirname(filename));
+  compiled._compile(output, filename);
+  for (const setId of ['msh', 'ecl', 'tmt', 'sos']) {
+    assert.equal(compiled.exports.rewriteIncomingPath(`https://packone.pro/sets/${setId}/`), `/set-archive?setId=${setId}`);
+  }
+  assert.equal(compiled.exports.rewriteIncomingPath('https://packone.pro/sets/unknown/'), '/');
+});
+
+
+test('Daily home shows the disclosed TCGplayer fallback to guests without a membership lookup', async () => {
+  const focus = focusControl();
+  let membershipCalls = 0;
+  const opened = [];
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
+    'react-native': {
+      Linking: { openURL: async (url) => { opened.push(url); } },
+      Pressable: host('Pressable'), ScrollView, StyleSheet: { create: (value) => value },
+      Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/draftRun': {
+      DAILY_ENVIRONMENT_META: {
+        mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '' },
+        'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '' },
+        latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '' },
+      },
+      loadDailyStatus: async () => dailyStatus('2026-09-26', false),
+    },
+    '@/src/api/guest': { ensureGuestSession: async () => ({ playerToken: 'guest-token' }) },
+    '@/src/api/patreon': { loadNativePatreonStatus: async () => { membershipCalls += 1; return { ads_allowed: false }; } },
+    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/index.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); await Promise.resolve(); });
+  assert.equal(membershipCalls, 0);
+  const promo = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link')[0];
+  assert.ok(promo);
+  assert.match(renderedText(root.toJSON()), /Affiliate link\. Pack One may earn a commission/);
+  await act(async () => { promo.props.onPress(); await Promise.resolve(); });
+  assert.deepEqual(opened, ['https://partner.example/magic']);
+  await act(async () => root.unmount());
+});
+
+test('Daily home hides promotion for signed-in ad-free, failed, or unverified membership status', async () => {
+  for (const membership of [
+    async () => ({ ads_allowed: false }),
+    async () => { throw new Error('offline'); },
+    async () => ({ ads_allowed: null }),
+  ]) {
+    const focus = focusControl();
+    const mocks = {
+      'expo-image': { Image: host('Image') },
+      'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
+      'react-native': {
+        Linking: { openURL: async () => {} }, Pressable: host('Pressable'), ScrollView,
+        StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
+      },
+      'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+      '@/src/api/draftRun': {
+        DAILY_ENVIRONMENT_META: {
+          mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '' },
+          'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '' },
+          latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '' },
+        },
+        loadDailyStatus: async () => dailyStatus('2026-09-26', false),
+      },
+      '@/src/api/guest': { ensureGuestSession: async () => ({ playerToken: 'player', accountToken: 'account' }) },
+      '@/src/api/patreon': { loadNativePatreonStatus: membership },
+      '@/src/hooks/useAppResume': { useAppResume() {} },
+      '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
+      '@/src/theme': theme,
+    };
+    const Screen = compileScreen('app/index.tsx', mocks);
+    let root;
+    await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); await Promise.resolve(); });
+    assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 0);
+    await act(async () => root.unmount());
+  }
+});
+
+test('Daily home rejects late promotion eligibility from a previous signed-in account', async () => {
+  const focus = focusControl();
+  const firstMembership = deferred();
+  let sessions = 0;
+  const accountA = { playerToken: 'player-a', accountToken: 'account-a' };
+  const accountB = { playerToken: 'player-b', accountToken: 'account-b' };
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
+    'react-native': {
+      Linking: { openURL: async () => {} }, Pressable: host('Pressable'), ScrollView,
+      StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/draftRun': {
+      DAILY_ENVIRONMENT_META: {
+        mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '' },
+        'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '' },
+        latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '' },
+      },
+      loadDailyStatus: async () => dailyStatus('2026-09-26', false),
+    },
+    '@/src/api/guest': { ensureGuestSession: async () => (++sessions === 1 ? accountA : accountB) },
+    '@/src/api/patreon': {
+      loadNativePatreonStatus: async (session) => session === accountA ? firstMembership.promise : { ads_allowed: false },
+    },
+    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/index.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
+  await act(async () => { focus.trigger(); await Promise.resolve(); await Promise.resolve(); });
+  assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 0);
+  await act(async () => { firstMembership.resolve({ ads_allowed: true }); await firstMembership.promise; await Promise.resolve(); });
+  assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 0);
+  await act(async () => root.unmount());
+});
+
+test('Daily home keeps the promo mounted and reports a retryable error when TCGplayer handoff fails', async () => {
+  const focus = focusControl();
+  const mocks = {
+    'expo-image': { Image: host('Image') },
+    'expo-router': { router: { push() {} }, useFocusEffect: focus.useFocusEffect },
+    'react-native': {
+      Linking: { openURL: async () => { throw new Error('no browser'); } }, Pressable: host('Pressable'), ScrollView,
+      StyleSheet: { create: (value) => value }, Text: host('Text'), View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/draftRun': {
+      DAILY_ENVIRONMENT_META: {
+        mixed: { title: 'Draft Run', eyebrow: 'DAILY DRAFT RUN', description: '' },
+        'powered-cube': { title: 'Powered Cube', eyebrow: 'POWERED CUBE DAILY', description: '' },
+        latest: { title: 'Latest Set', eyebrow: 'LATEST SET DAILY', description: '' },
+      },
+      loadDailyStatus: async () => dailyStatus('2026-09-26', false),
+    },
+    '@/src/api/guest': { ensureGuestSession: async () => ({ playerToken: 'guest-token' }) },
+    '@/src/api/patreon': { loadNativePatreonStatus: async () => ({ ads_allowed: false }) },
+    '@/src/hooks/useAppResume': { useAppResume() {} },
+    '@/src/tcgplayer': { tcgplayerMagicUrl: () => 'https://partner.example/magic' },
+    '@/src/theme': theme,
+  };
+  const Screen = compileScreen('app/index.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); await Promise.resolve(); });
+  const promo = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link')[0];
+  await act(async () => { promo.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
+  assert.match(renderedText(root.toJSON()), /Could not open TCGplayer\. Try the affiliate link again\./);
+  assert.equal(root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Shop Magic on TCGplayer, affiliate link').length, 1);
+  await act(async () => root.unmount());
+});
+
+
+test('first-class tablet content stays bounded on Practice, Draft Run/results, and article screens', () => {
+  const article = fs.readFileSync(path.join(process.cwd(), 'src', 'components', 'ArticleScreen.tsx'), 'utf8');
+  const practice = fs.readFileSync(path.join(process.cwd(), 'app', 'practice.tsx'), 'utf8');
+  const draft = fs.readFileSync(path.join(process.cwd(), 'app', 'draft-run.tsx'), 'utf8');
+  assert.match(article, /maxWidth: 840/);
+  assert.match(article, /alignSelf: 'center'/);
+  assert.match(practice, /maxWidth: 860/);
+  assert.match(practice, /alignSelf: 'center'/);
+  assert.ok((draft.match(/maxWidth: 980/g) || []).length >= 2, 'Draft Run play and result surfaces should both be bounded');
+  assert.ok((draft.match(/alignSelf: 'center'/g) || []).length >= 2, 'Draft Run play and result surfaces should both be centered');
 });

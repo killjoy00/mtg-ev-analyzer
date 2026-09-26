@@ -4,7 +4,7 @@ import {pathToFileURL} from 'node:url';
 
 function key() {
   if(!process.env.NEON_API_KEY||!/^\d+$/.test(process.env.GITHUB_RUN_ID||''))throw Error('Missing isolated bundle encryption context.');
-  return createHmac('sha256',process.env.NEON_API_KEY).update('pack1-load-bundle:'+process.env.GITHUB_RUN_ID).digest();
+  return createHmac('sha256',process.env.NEON_API_KEY).update('pack1-load-bundle:'+process.env.GITHUB_RUN_ID+':'+(process.env.GITHUB_RUN_ATTEMPT||'1')).digest();
 }
 export function seal(value) {
   const iv=randomBytes(12),cipher=createCipheriv('aes-256-gcm',key(),iv);
@@ -25,6 +25,7 @@ function main() {
     const fixture=unseal(fs.readFileSync('artifacts/load-private/fixtures.enc','utf8'));
     if(!/^[a-f0-9]{64}$/.test(fixture.preview||''))throw Error('Invalid isolated preview access.');
     console.log('::add-mask::'+fixture.preview);
+    if(fixture.connection)console.log('::add-mask::'+fixture.connection);
     fs.appendFileSync(process.env.GITHUB_ENV,'PREVIEW_ACCESS_KEY='+fixture.preview+'\n');
     fs.writeFileSync(process.env.LOAD_FIXTURE_FILE,JSON.stringify(fixture),{mode:0o600});
   } else throw Error('Unknown bundle operation.');

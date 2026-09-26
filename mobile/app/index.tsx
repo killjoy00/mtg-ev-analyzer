@@ -1,6 +1,7 @@
+import { Image } from 'expo-image';
 import { router, useFocusEffect } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,7 +12,9 @@ import {
   type DailyStatus,
 } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
+import { loadNativePatreonStatus } from '@/src/api/patreon';
 import { useAppResume } from '@/src/hooks/useAppResume';
+import { tcgplayerMagicUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 
 const dailyEnvironments: DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
@@ -50,18 +53,30 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
 
 export default function HomeScreen() {
   const [status, setStatus] = useState<DailyStatus | null>(null);
+  const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
+  const [promotionError, setPromotionError] = useState<string | null>(null);
   const statusRef = useRef<DailyStatus | null>(null);
   const requestId = useRef(0);
 
   const refresh = useCallback(async () => {
     const id = ++requestId.current;
+    setPromotionAllowed(null);
     try {
       const session = await ensureGuestSession();
-      const next = await loadDailyStatus(session);
+      const [dailyResult, promotionResult] = await Promise.allSettled([
+        loadDailyStatus(session),
+        session.accountToken
+          ? loadNativePatreonStatus(session).then((membership) => membership.ads_allowed === true)
+          : Promise.resolve(true),
+      ]);
       if (id !== requestId.current) return;
-      statusRef.current = next;
-      setStatus(next);
+      if (dailyResult.status === 'fulfilled') {
+        statusRef.current = dailyResult.value;
+        setStatus(dailyResult.value);
+      }
+      setPromotionAllowed(promotionResult.status === 'fulfilled' && promotionResult.value === true);
     } catch {
+      if (id === requestId.current) setPromotionAllowed(false);
       // Daily state is enrichment. Keep the last loaded UI while revalidating;
       // starting a Daily remains server-authoritative and safely resumes.
     }
@@ -90,6 +105,14 @@ export default function HomeScreen() {
 
   const completedCount = dailyEnvironments.filter((environment) => completed(status, environment)).length;
   const rankingReason = status?.ranking_identity?.reason;
+  const openPromotion = async () => {
+    setPromotionError(null);
+    try {
+      await Linking.openURL(tcgplayerMagicUrl());
+    } catch {
+      setPromotionError('Could not open TCGplayer. Try the affiliate link again.');
+    }
+  };
   const usernameAttention = rankingReason === 'username_taken' || rankingReason === 'username_required';
 
   return (
@@ -171,6 +194,31 @@ export default function HomeScreen() {
           </View>
         ) : null}
 
+        {promotionAllowed ? (
+          <View style={styles.affiliatePromo}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Shop Magic on TCGplayer, affiliate link"
+              onPress={() => void openPromotion()}
+              style={({ pressed }) => [styles.affiliateLink, pressed && styles.pressed]}
+            >
+              <Image
+                source="https://packone.pro/assets/tcgplayer-logo-primary-stroke.webp"
+                style={styles.affiliateLogo}
+                contentFit="contain"
+                accessibilityLabel="TCGplayer"
+              />
+              <View style={styles.affiliateCopy}>
+                <Text style={styles.affiliateTitle}>Shop Magic on TCGplayer</Text>
+                <Text style={styles.affiliateDetail}>Singles, sealed product, and more</Text>
+              </View>
+              <Text style={styles.affiliateAction}>Shop TCGplayer →</Text>
+            </Pressable>
+            <Text style={styles.affiliateDisclosure}>Affiliate link. Pack One may earn a commission from purchases.</Text>
+            {promotionError ? <Text accessibilityRole="alert" style={styles.promotionError}>{promotionError}</Text> : null}
+          </View>
+        ) : null}
+
         <Pressable
           accessibilityRole="button"
           accessibilityLabel="Open practice"
@@ -221,14 +269,14 @@ export default function HomeScreen() {
 
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Open How to Play"
-          onPress={() => router.push('/how-to')}
+          accessibilityLabel="Open Learn"
+          onPress={() => router.push('/learn')}
           style={({ pressed }) => [styles.utilityCard, pressed && styles.pressed]}
         >
           <Text style={styles.cardKicker}>LEARN</Text>
-          <Text style={styles.utilityTitle}>How to Play</Text>
-          <Text style={styles.cardBody}>Learn the eight-decision format, scoring, methodology, and current supported sets.</Text>
-          <Text style={styles.cardAction}>Open guide →</Text>
+          <Text style={styles.utilityTitle}>Learn Pack One</Text>
+          <Text style={styles.cardBody}>Start with the native rules, scoring, method, and set coverage, then open the current drafting guides.</Text>
+          <Text style={styles.cardAction}>Open Learn →</Text>
         </Pressable>
 
         <Pressable
@@ -311,6 +359,15 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   resetCue: { color: colors.accentDark, fontSize: 13, fontWeight: '800' },
+  affiliatePromo: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.md, gap: spacing.xs },
+  affiliateLink: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  affiliateLogo: { width: 92, height: 42 },
+  affiliateCopy: { flex: 1, gap: 2 },
+  affiliateTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  affiliateDetail: { color: colors.muted, fontSize: 12 },
+  affiliateAction: { color: colors.accentDark, fontSize: 12, fontWeight: '800' },
+  affiliateDisclosure: { color: colors.muted, fontSize: 10, lineHeight: 15 },
+  promotionError: { color: colors.danger, fontSize: 12, lineHeight: 17 },
   utilityCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
