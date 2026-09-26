@@ -14,7 +14,6 @@ import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,dele
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
-import {syncLaunchWatcherOperatorAlert} from './launch-watcher-operator-alert.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
