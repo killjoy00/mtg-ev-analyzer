@@ -201,3 +201,29 @@ test('v1 native friend challenges preserve the web shared-run identity and compa
   assert.match(account, /pathname: '\/draft-run'[\s\S]*shared: returnShared/);
   assert.match(gateway, /\(\?:challenges\|shared-runs\)\\\/\[a-f0-9\]\{24\}/);
 });
+
+
+test('v1 manages existing Patreon Elite access without purchase steering', () => {
+  const account = read('mobile/app/account.tsx');
+  const api = read('mobile/src/api/patreon.ts');
+  const worker = read('worker/patreon.mjs');
+  const growth = read('worker/growth-function.js');
+  const gateway = read('edge/gateway.mjs');
+
+  assert.match(api, /loadMobilePatreonStatus/);
+  assert.match(api, /startMobilePatreonConnect/);
+  assert.match(api, /disconnectMobilePatreon/);
+  assert.match(api, /\/growth\/v1\/mobile\/patreon\/status/);
+  assert.match(account, /Connect existing Patreon membership/);
+  assert.match(account, /Refresh Patreon access/);
+  assert.match(account, /Disconnect Patreon/);
+  assert.match(account, /Membership purchases and upgrades are not sold inside Pack One mobile/);
+  assert.match(account, /openBrowserAsync\(start\.url\)/);
+  assert.doesNotMatch(worker, /packone:\/\/account.*patreon/);
+  assert.match(worker, /mobileAccountIdentity/);
+  assert.match(worker, /provider_oauth_states/);
+  assert.match(worker, /entitlement_grants/);
+  assert.match(growth, /\/v1\/mobile\/patreon\//);
+  assert.match(gateway, /\/v1\/mobile\/patreon\/connect/);
+  assert.match(gateway, /\/v1\/mobile\/patreon\/disconnect/);
+});
