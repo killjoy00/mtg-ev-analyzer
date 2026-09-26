@@ -54,6 +54,8 @@ export function observeReadiness(root,request,{afterRevision=null}={}) {
    const result=await request(`/v1/admin/corpus/readiness/${button.dataset.readinessRetry}/retry`,{});
    if(stopped||root.querySelector('#corpus-readiness')!==panel)return;
    show(result.readiness);
+   const summary=root.querySelector('#corpus-status');
+   if(summary)summary.textContent=readinessMessage(result.readiness);
    clearTimeout(timer);timer=setTimeout(poll,1000);
   } catch(cause) {
    if(stopped)return;

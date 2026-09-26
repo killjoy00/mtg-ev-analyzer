@@ -180,9 +180,9 @@ export async function selectDatabaseReroll(query,version,source,options) {
 
 
 export const servingCacheUnavailable=()=>Object.assign(Error('Practice is refreshing. Please retry shortly.'),{status:503,retryAfter:2});
-export async function loadServingSnapshot(query,version) {
+export async function loadServingSnapshot(query,version,{readiness=false}={}) {
   let row;
-  try {row=(await query('SELECT pack1_serving_snapshot($1,$2,$3) snapshot',
+  try {row=(await query(readiness?'SELECT pack1_build_serving_snapshot($1,$2,$3) snapshot':'SELECT pack1_serving_snapshot($1,$2,$3) snapshot',
     [version,DRAFT_RUN_DIFFICULTY_VERSION,SERVING_POLICY_VERSION])).rows[0];}
   catch(error){if(error.pgCode==='40001')throw servingCacheUnavailable();throw error;}
   const snapshot=typeof row?.snapshot==='string'?JSON.parse(row.snapshot):row?.snapshot;
@@ -209,7 +209,7 @@ export async function selectCachedDatabaseRun(query,version,seed,environment='mi
   if(options.daily||options.selectionVersion&&options.selectionVersion!==DRAFT_RUN_SELECTION_VERSION)
     return selectDatabaseRun(query,version,seed,environment,options);
   for(let attempt=0;attempt<2;attempt++) {
-    const snapshot=await loadServingSnapshot(query,version);
+    const snapshot=await loadServingSnapshot(query,version,{readiness:options.readiness===true});
     let selected,error;
     try {selected=await selectDatabaseRun(query,version,seed,environment,{...options,snapshot});}
     catch(e){error=e;}

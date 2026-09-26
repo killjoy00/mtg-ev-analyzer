@@ -103,13 +103,13 @@ BEGIN
 END;
 $$;
 
-CREATE OR REPLACE FUNCTION pack1_claim_readiness(p_key bigint,p_release text)
+CREATE OR REPLACE FUNCTION pack1_claim_readiness(p_key bigint,p_release text,p_expected_id bigint DEFAULT NULL)
 RETURNS jsonb LANGUAGE plpgsql AS $$
 DECLARE rev bigint; j draft_run_readiness_jobs%ROWTYPE;
 BEGIN
  SELECT revision INTO rev FROM draft_run_serving_revision WHERE singleton FOR SHARE;
  SELECT * INTO j FROM draft_run_readiness_jobs WHERE key_id=p_key AND revision=rev FOR UPDATE;
- IF NOT FOUND THEN RETURN NULL; END IF;
+ IF NOT FOUND OR (p_expected_id IS NOT NULL AND j.id<>p_expected_id) THEN RETURN NULL; END IF;
  IF j.state='ready' AND NOT EXISTS(SELECT 1 FROM draft_run_serving_snapshots WHERE id=j.cache_snapshot_id AND revision=rev) THEN
   UPDATE draft_run_readiness_jobs SET state='queued',attempts=0,evidence=NULL,cache_snapshot_id=NULL,
    next_attempt_at=clock_timestamp(),finished_at=NULL WHERE id=j.id RETURNING * INTO j;
@@ -215,7 +215,7 @@ END;
 $$;
 CREATE OR REPLACE FUNCTION pack1_serving_snapshot(p_parent_version text,p_difficulty text,p_policy_version text)
 RETURNS jsonb LANGUAGE plpgsql VOLATILE AS $$
-DECLARE k bigint; rev bigint;
+DECLARE k bigint; rev bigint; snapshot draft_run_serving_snapshots%ROWTYPE;
 BEGIN
  -- pack1_readiness_gate: registered release keys never let a player become the
  -- builder, or expose an unverified generation. Unregistered legacy/test keys
@@ -224,10 +224,12 @@ BEGIN
   AND difficulty_version=p_difficulty AND serving_policy_version=p_policy_version AND cache_schema='serving-cache-v1';
  IF k IS NOT NULL THEN
   SELECT revision INTO rev FROM draft_run_serving_revision WHERE singleton;
-  IF NOT EXISTS(SELECT 1 FROM draft_run_readiness_jobs j JOIN draft_run_serving_snapshots s ON s.id=j.cache_snapshot_id
+  SELECT s.* INTO snapshot FROM draft_run_readiness_jobs j JOIN draft_run_serving_snapshots s ON s.id=j.cache_snapshot_id
    WHERE j.key_id=k AND j.revision=rev AND j.state='ready' AND s.revision=rev
     AND s.corpus_version=p_parent_version AND s.difficulty_version=p_difficulty
-    AND s.serving_policy_version=p_policy_version AND s.cache_schema='serving-cache-v1') THEN RETURN NULL; END IF;
+    AND s.serving_policy_version=p_policy_version AND s.cache_schema='serving-cache-v1';
+  IF NOT FOUND THEN RETURN NULL; END IF;
+  RETURN jsonb_build_object('id',snapshot.id::text,'revision',snapshot.revision::text,'metadata',snapshot.metadata,'groups',snapshot.groups);
  END IF;
  RETURN pack1_build_serving_snapshot(p_parent_version,p_difficulty,p_policy_version);
 END;

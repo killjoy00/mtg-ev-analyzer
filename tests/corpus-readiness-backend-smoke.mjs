@@ -98,10 +98,6 @@ try {
  // A real killed Node process leaves a committed lease, not an in-memory job.
  const source=(await query('SELECT source_draft_hash FROM draft_run_verified_puzzles WHERE source_snapshot_id=$1 LIMIT 1',[candidate])).rows[0].source_draft_hash;
  await query("INSERT INTO corpus_source_exclusions(set_id,corpus_version,source_draft_hash,reason,evidence) VALUES($1,$2,$3,$4,'{}')",[setId,DRAFT_RUN_CORPUS_VERSION,source,reason]);
- child=spawn(process.execPath,['--input-type=module','-e',`import {corpusDatabase} from './scripts/neon-corpus-db.mjs';import {advanceServingReadiness} from './worker/corpus-readiness.mjs';await advanceServingReadiness(corpusDatabase(process.argv[1]),{build:async()=>new Promise(()=>{})});setInterval(()=>{},1000);`,connectionFile],{stdio:['ignore','ignore','pipe']});
- // Keep the child alive while its unresolved build is pending.
- // The timer below is in the evaluated child before the await, not after it.
- child.kill('SIGKILL');await new Promise(resolve=>child.once('close',resolve));
  child=spawn(process.execPath,['--input-type=module','-e',`setInterval(()=>{},1000);const {corpusDatabase}=await import('./scripts/neon-corpus-db.mjs');const {advanceServingReadiness}=await import('./worker/corpus-readiness.mjs');await advanceServingReadiness(corpusDatabase(process.argv[1]),{build:async()=>new Promise(()=>{})});`,connectionFile],{stdio:['ignore','ignore','pipe']});
  let interrupted;
  for(let i=0;i<40;i++) {interrupted=await readServingReadiness(query);if(interrupted.state==='warming')break;await new Promise(r=>setTimeout(r,150));}

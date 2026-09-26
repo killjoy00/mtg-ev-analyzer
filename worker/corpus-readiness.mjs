@@ -5,7 +5,7 @@ import {SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs
 import {gameDateKey} from '../game-date.mjs';
 import {corpusMembership} from './corpus-components.mjs';
 import {customSetsFromSnapshot,loadServingSnapshot,selectCachedDatabaseRun,servingRevisionMatches,toPgArray} from './draft-run-selection.mjs';
-import {runActivatedSnapshotSmoke} from '../scripts/activated-snapshot-smoke.mjs';
+import {runActivatedSnapshotSmoke} from './activated-snapshot-smoke.mjs';
 
 export const READINESS_CACHE_SCHEMA='serving-cache-v1';
 export const readinessKey=[DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION,SERVING_POLICY_VERSION,READINESS_CACHE_SCHEMA];
@@ -121,7 +121,7 @@ export async function advanceServingReadiness(query,{operationId=null,release=pr
  if(operationId&&!before.current)return before;
  if(!before.key_id||!before.operation_id)return before;
  if(before.ready)return before;
- const job=parse(first(await query('SELECT pack1_claim_readiness($1::bigint,$2) job',[before.key_id,release]))?.job);
+ const job=parse(first(await query('SELECT pack1_claim_readiness($1::bigint,$2,$3::bigint) job',[before.key_id,release,before.operation_id]))?.job);
  if(!job)return readServingReadiness(query,{operationId:before.operation_id});
  try {
   const cache=await build(query);
@@ -145,7 +145,7 @@ export async function advanceServingReadiness(query,{operationId=null,release=pr
 export async function retryServingReadiness(query,operationId,identity) {
  if(!/^[1-9][0-9]{0,18}$/.test(String(operationId)))throw error('Invalid readiness operation.');
  const accepted=yes(first(await query('SELECT pack1_retry_readiness($1::bigint,$2::jsonb) accepted',[operationId,JSON.stringify(identity)])).accepted);
- if(!accepted)throw error('This operation is current, running, already ready, or superseded. Refresh readiness before retrying.');
+ if(!accepted)throw error('This operation is not retryable: it is running, already ready, or superseded. Refresh readiness before retrying.');
  return advanceServingReadiness(query,{operationId});
 }
 

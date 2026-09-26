@@ -1,3 +1,4 @@
+import {readinessMarkup,readinessMessage,observeReadiness} from './corpus-readiness.mjs';
 const esc=x=>String(x??'N/A').replaceAll('&','&amp;').replaceAll('<','&lt;').replaceAll('>','&gt;').replaceAll('"','&quot;').replaceAll("'",'&#39;');
 const yes=x=>x===true||x==='t';
 const date=x=>x?new Date(x).toLocaleString():'Not recorded';
@@ -33,7 +34,7 @@ function setDetails(s,data){const m=s.manifest||{},f=m.full_import||{},q=s.repor
 export async function renderCorpus(root,request){
  const data=await request('/v1/admin/corpus'),sets=data.sets||[];
  const totals=Object.fromEntries(['Live','Candidate','Paused','Retired'].map(status=>[status,sets.filter(s=>s.status===status).length]));
- root.innerHTML=`<h1>Corpus operations</h1><p class="muted">${esc(data.corpus_version)} · Serving revision ${esc(data.serving_revision)} · Select a set to inspect active, staged and retained inventory.</p><div class="corpus-overview">${Object.entries(totals).map(([name,n])=>`<div><strong>${n}</strong><span>${name}</span></div>`).join('')}</div><p id="corpus-status" role="status"></p>
+ root.innerHTML=`<h1>Corpus operations</h1><p class="muted">${esc(data.corpus_version)} · Serving revision ${esc(data.serving_revision)} · Select a set to inspect active, staged and retained inventory.</p><div class="corpus-overview">${Object.entries(totals).map(([name,n])=>`<div><strong>${n}</strong><span>${name}</span></div>`).join('')}</div><p id="corpus-status" role="status"></p><section id="corpus-readiness" aria-label="Serving readiness">${readinessMarkup(data.readiness)}</section>
  <div class="filters corpus-filters"><label>Find a set<input type="search" id="corpus-search" placeholder="Name or code"></label><label>Serving status<select id="corpus-filter"><option value="">All statuses</option>${['Live','Candidate','Paused','Retired','Awaiting corpus'].map(s=>`<option>${s}</option>`).join('')}</select></label><label>Quality<select id="corpus-quality"><option value="">All checks</option><option>Ready</option><option>Verified</option><option>Blocked</option><option>Check needed</option></select></label><span id="corpus-row-count" class="muted" aria-live="polite"></span></div>
  <div class="scroll corpus-table-wrap" tabindex="0" aria-label="Corpus sets; scroll horizontally for all columns"><table class="corpus-table"><thead><tr>${[['set_name','Set'],['status','Status'],['serving_count','Serving'],['staged_count','Staged'],['under_floor_count','Below 20'],['health','Live quality'],['release_date','Release'],['import_status','Import']].map(([key,label])=>`<th scope="col"><button type="button" class="corpus-sort" data-sort="${key}">${label}<span aria-hidden="true"></span></button></th>`).join('')}</tr></thead><tbody id="corpus-rows"></tbody></table></div><p class="muted corpus-table-note">Serving exactly matches the current runtime membership predicate: the active Premier snapshot plus separately Live supplemental components, after source exclusions and the score floor. Staged and retained snapshots never inflate that number. Fixed Dailies and historical runs remain unchanged.</p><dialog id="corpus-detail" aria-label="Set operations"></dialog>`;
  const body=root.querySelector('#corpus-rows'),dialog=root.querySelector('#corpus-detail');let sort='release_date',direction=-1;
@@ -46,7 +47,25 @@ export async function renderCorpus(root,request){
  root.querySelectorAll('.corpus-filters input,.corpus-filters select').forEach(e=>e.addEventListener('input',draw));
  root.querySelectorAll('[data-sort]').forEach(b=>b.onclick=()=>{direction=sort===b.dataset.sort?-direction:1;sort=b.dataset.sort;draw();});
  body.onclick=e=>{const b=e.target.closest('[data-open-set]');if(!b)return;const s=sets.find(s=>s.set_id===b.dataset.openSet);dialog.innerHTML=setDetails(s,data);dialog.showModal();dialog.querySelector('#close-corpus-detail').onclick=()=>dialog.close();};
- dialog.onsubmit=async e=>{const form=e.target.closest('[data-status-form],[data-snapshot-form]');if(!form)return;e.preventDefault();const component=form.dataset.component,s=component?data.components.find(c=>c.set_id===form.dataset.set&&c.component_version===component):sets.find(s=>s.set_id===form.dataset.set),b=Object.fromEntries(new FormData(form));form.querySelector('button').disabled=true;
-  try{if(form.matches('[data-snapshot-form]')){if(!b.sourceSnapshotId)return;await request(`/v1/admin/corpus/${s.set_id}/snapshot`,{...b,corpusVersion:data.corpus_version});}else{if(!b.status)return;await request(`/v1/admin/corpus/${s.set_id}${component?`/components/${component}`:''}/status`,{...b,oldStatus:s.status,corpusVersion:data.corpus_version});}dialog.close();await renderCorpus(root,request);root.querySelector('#corpus-status').textContent=form.matches('[data-snapshot-form]')?`${s.set_id}: source snapshot activated. Existing games are preserved.`:`${s.set_id}: ${b.status}. Existing games are preserved.`;}catch(err){let error=dialog.querySelector('.corpus-action-error');if(!error){error=document.createElement('p');error.className='error corpus-action-error';error.setAttribute('role','alert');form.after(error);}error.textContent=err.message;form.querySelector('button').disabled=false;}
- };draw();
+ dialog.onsubmit=async e=>{
+  const form=e.target.closest('[data-status-form],[data-snapshot-form]');if(!form)return;e.preventDefault();
+  const component=form.dataset.component,s=component?data.components.find(c=>c.set_id===form.dataset.set&&c.component_version===component):sets.find(s=>s.set_id===form.dataset.set);
+  const b=Object.fromEntries(new FormData(form)),snapshot=form.matches('[data-snapshot-form]');
+  if(snapshot?!b.sourceSnapshotId:!b.status)return;
+  form.querySelector('button').disabled=true;
+  let message=dialog.querySelector('.corpus-action-error');
+  if(!message){message=document.createElement('p');message.className='corpus-action-error';message.setAttribute('role','status');form.after(message);}
+  message.textContent='Applying the change, then warming and verifying the current serving revision. Publication and readiness are separate steps.';
+  const stop=observeReadiness(root,request,{afterRevision:data.serving_revision});
+  try {
+   const result=snapshot?await request(`/v1/admin/corpus/${s.set_id}/snapshot`,{...b,corpusVersion:data.corpus_version,expectedActiveSnapshotId:s.active_snapshot_id}):
+    await request(`/v1/admin/corpus/${s.set_id}${component?`/components/${component}`:''}/status`,{...b,oldStatus:s.status,corpusVersion:data.corpus_version});
+   dialog.close();await renderCorpus(root,request);
+   root.querySelector('#corpus-status').textContent=`${s.set_id}: ${readinessMessage(result.readiness)}`;
+  } catch(cause) {
+   message.className='error corpus-action-error';message.setAttribute('role','alert');
+   message.textContent=`${cause.message} Check readiness and status history before repeating activation; a lost response does not prove rollback.`;
+   form.querySelector('button').disabled=false;
+  } finally {stop();}
+ };draw();observeReadiness(root,request);
 }

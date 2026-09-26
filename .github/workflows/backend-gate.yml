@@ -113,7 +113,7 @@ jobs:
           # backlog until those migrations are promoted, then add migrations introduced
           # by this PR. This keeps merged-but-not-deployed schema prerequisites available
           # without blindly replaying historical migrations.
-          release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql migrations/0040_mobile_minimum_version.sql migrations/0040_practice_reroll_index.sql migrations/0041_corpus_source_snapshots.sql migrations/0041_apple_auth.sql migrations/0042_serving_revision_snapshot_staging.sql)
+          release_backlog=(migrations/0037_mobile_oauth_handoffs.sql migrations/0038_mobile_practice_idempotency.sql migrations/0039_practice_serving_cache.sql migrations/0040_mobile_minimum_version.sql migrations/0040_practice_reroll_index.sql migrations/0041_corpus_source_snapshots.sql migrations/0041_apple_auth.sql migrations/0042_serving_revision_snapshot_staging.sql migrations/0043_corpus_activation_readiness.sql)
           mapfile -t pending < <(
             {
               for migration in "${release_backlog[@]}"; do
@@ -134,11 +134,14 @@ jobs:
       - name: Run SQL-backed integration suites
         shell: bash
         env:
+          PACK1_CI_BRANCH_ID: ${{ steps.neon.outputs.branch_id }}
           BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           DATABASE_URL="$(cat "$PACK1_CI_CONNECTION")" node scripts/verify-neon-schema.mjs
+          # Legacy primitive fixtures bypass readiness; the dedicated suite below enables and proves the production gate.
+          psql "$(cat "$PACK1_CI_CONNECTION")" -v ON_ERROR_STOP=1 -c "DELETE FROM draft_run_readiness_keys"
           node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --production-bootstrap
           # A corpus bump (or loader/import change) must still prove that the
           # checked-in corpus can be loaded before production serves it. For
@@ -178,8 +181,17 @@ jobs:
           node tests/capabilities-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/eight-pick-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/request-integrity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/corpus-readiness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           # Destructive season edge cases run last because this isolated branch is deleted next.
           node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corpus-readiness-isolated-${{ github.run_id }}
+          path: artifacts/corpus-readiness
+          if-no-files-found: ignore
+          retention-days: 30
 
       - name: Delete isolated Neon branch
         if: always() && steps.neon.outputs.branch_id != ''

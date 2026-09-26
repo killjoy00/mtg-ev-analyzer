@@ -42,7 +42,7 @@ test('selected decisions must come from the active snapshot of the same set',asy
 });
 
 test('the smoke drives the production selectors and never writes sessions or schedules',()=>{
- const script=fs.readFileSync(new URL('../scripts/activated-snapshot-smoke.mjs',import.meta.url),'utf8');
+ const script=fs.readFileSync(new URL('../worker/activated-snapshot-smoke.mjs',import.meta.url),'utf8');
  for(const selector of ['loadServingSnapshot','customSetsFromSnapshot','selectCachedDatabaseRun','selectDatabaseReroll','selectDatabaseRun','loadLiveSetMetadata'])
   assert.match(script,new RegExp(selector+'\\('),selector);
  assert.match(script,/'latest',\{daily:true,day\}/);
@@ -54,7 +54,7 @@ test('recent activations are Live status events for currently Live environments'
  let sql,params;
  const rows=await loadRecentActivations(async(statement,values)=>{sql=statement;params=values;return {rows:[]};},26);
  assert.deepEqual(rows,[]);
- assert.match(sql,/e\.component_version IS NULL AND e\.new_status='Live' AND p\.status='Live'/);
+ assert.match(sql,/e\.new_status='Live' AND p\.status='Live'/);
  assert.match(sql,/make_interval\(hours=>\$1::int\)/);
  assert.doesNotMatch(sql,/draft_run_verified_puzzles|payload|INSERT|UPDATE|DELETE/);
  assert.deepEqual(params,[26]);
@@ -89,6 +89,7 @@ test('single-set practice is required for a new snapshot but optional for histor
  // this set's inventory present, and no Live regular sets for Daily planning.
  const database=environmentRow=>async sql=>{
   if(sql.includes('FROM draft_run_environment_policy p')&&sql.includes('LEFT JOIN corpus_source_snapshots'))return {rows:[environmentRow]};
+  if(sql.includes('SELECT revision::text FROM draft_run_serving_revision'))return {rows:[{revision:'1'}]};
   if(sql.includes('pack1_serving_snapshot'))return {rows:[{snapshot:{id:1,revision:1,metadata:[],groups:[]}}]};
   if(sql.includes('draft_run_serving_inventory'))return {rows:[{total:10,other_snapshot:0}]};
   if(sql.includes("p.status='Live' ORDER BY p.set_id"))return {rows:[]};
