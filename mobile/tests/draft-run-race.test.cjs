@@ -39,7 +39,7 @@ function renderedText(node) {
 }
 
 function compileDraftRunScreen(mocks) {
-  const filename = path.join(__dirname, '..', 'app', 'draft-run.tsx');
+  const filename = path.join(process.cwd(), 'app', 'draft-run.tsx');
   const source = fs.readFileSync(filename, 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: {
