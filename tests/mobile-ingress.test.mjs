@@ -114,6 +114,64 @@ test('native public profile aliases are readable without exposing browser profil
   assert.equal((await gateway(blocked,env(),async()=>{throw Error('must not reach upstream')})).status,403);
 });
 
+test('native account parity routes stay inside the mobile bridge',async()=>{
+  for(const path of [
+    '/growth/v1/mobile/account/request-password-reset',
+    '/growth/v1/mobile/account/send-verification-email',
+    '/growth/v1/mobile/account/reset-password',
+  ]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro'+path,{
+      method:'POST',
+      headers:headers({'content-type':'application/json','x-pack1-mobile-session':token}),
+      body:JSON.stringify(path.endsWith('/reset-password')
+        ? {token:'r'.repeat(32),newPassword:'new-password'}
+        : {email:'qa@example.invalid'}),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      forwarded={url,player:new Headers(options.headers).get('authorization')};
+      return Response.json({ok:true});
+    });
+    assert.equal(response.status,200,path);
+    assert.ok(forwarded.url.includes('/v1/mobile/account/'));
+    assert.equal(forwarded.player,'Bearer '+token);
+  }
+
+  for(const [path,method,body] of [
+    ['/growth/v1/mobile/profile','PATCH',{displayName:'Native Player'}],
+    ['/growth/v1/mobile/account/password-change','POST',{currentPassword:'old-password',newPassword:'new-password'}],
+  ]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro'+path,{
+      method,
+      headers:headers({
+        'content-type':'application/json',
+        'x-pack1-mobile-session':token,
+        'x-pack1-mobile-account':account,
+      }),
+      body:JSON.stringify(body),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      forwarded={url,player:new Headers(options.headers).get('authorization'),account:new Headers(options.headers).get('x-pack1-mobile-account')};
+      return Response.json({ok:true});
+    });
+    assert.equal(response.status,200,path);
+    assert.equal(forwarded.player,'Bearer '+token);
+    assert.equal(forwarded.account,account);
+  }
+
+  const browserProfile=new Request('https://api.packone.pro/growth/v1/profile',{
+    method:'PATCH',
+    headers:headers({
+      'content-type':'application/json',
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+    }),
+    body:JSON.stringify({displayName:'Nope'}),
+  });
+  assert.equal((await gateway(browserProfile,env(),async()=>{throw Error('must not reach upstream')})).status,403);
+});
+
 test('practice idempotency is only forwarded to Draft Run creation',async()=>{
   const key='practice_'+('k'.repeat(32));
   let forwarded=null;
