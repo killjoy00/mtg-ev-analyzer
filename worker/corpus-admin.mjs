@@ -112,7 +112,7 @@ export async function handleCorpusAdmin(request,query,readJson,accountId,automat
     LEFT JOIN LATERAL (
      SELECT * FROM corpus_health_checks c
      WHERE CASE WHEN a.source_snapshot_id IS NOT NULL THEN c.source_snapshot_id=a.source_snapshot_id
-      ELSE c.set_id=k.set_id AND c.corpus_version=$1 END
+      ELSE c.set_id=k.set_id AND c.corpus_version=$1 AND c.source_snapshot_id IS NULL END
      ORDER BY checked_at DESC,id DESC LIMIT 1
     ) h ON true
     ORDER BY coalesce(p.release_date,s.release_date) DESC NULLS LAST,k.set_id,s.event_type`,[DRAFT_RUN_CORPUS_VERSION,CORPUS_GATE_VERSION]),
