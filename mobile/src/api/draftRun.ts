@@ -106,6 +106,20 @@ export type DraftRunState = {
     percentile?: number | null;
     final?: boolean;
   } | null;
+  comparison?: {
+    name: string;
+    score: number;
+    exact: boolean;
+  } | null;
+};
+
+export type SharedDraftRunInfo = {
+  id: string;
+  name: string;
+  score: number;
+  scores: { name: string; score: number }[];
+  environment: string;
+  run_length: number;
 };
 
 export type PracticeSet = {
@@ -190,6 +204,25 @@ export function loadPracticeSets(session: MobileSession) {
   return requestJson<{ sets: PracticeSet[] }>('/draft/v1/practice-sets', {
     mobileSessionToken: session.playerToken,
     mobileAccountToken: session.accountToken,
+    timeoutMs: 30_000,
+  });
+}
+
+export function loadSharedDraftRunInfo(id: string, session: MobileSession) {
+  return requestJson<SharedDraftRunInfo>(`/draft/v1/shared-runs/${encodeURIComponent(id)}`, {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
+}
+
+export function startSharedDraftRun(session: MobileSession, id: string) {
+  if (!session.accountToken) throw new Error('Sign in to play a shared Pack One run.');
+  return requestJson<DraftRunState>('/draft/v1/runs', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: { challenge: id },
     timeoutMs: 30_000,
   });
 }
