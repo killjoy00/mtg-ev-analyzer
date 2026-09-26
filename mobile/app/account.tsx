@@ -1,9 +1,11 @@
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -17,12 +19,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ApiError } from '@/src/api/client';
 import {
   deleteMobileAccount,
+  finishAppleDeletion,
+  finishAppleSignIn,
   finishGoogleSignIn,
+  finishNativeAppleSignIn,
   forgetAccountLocally,
   loadMobileAccount,
   signInWithEmail,
   signOutMobileAccount,
   signUpWithEmail,
+  startAppleDeletionVerification,
+  startAppleSignIn,
   startDeletionVerification,
   startGoogleSignIn,
   type AccountState,
@@ -173,6 +180,63 @@ export default function AccountScreen() {
     }
   };
 
+  const openApple = async () => {
+    if (!session || busy) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const start = await startAppleSignIn(session);
+      if (Platform.OS === 'ios') {
+        if (!await AppleAuthentication.isAvailableAsync()) {
+          throw new Error('Sign in with Apple is not available on this device.');
+        }
+        const credential = await AppleAuthentication.signInAsync({
+          requestedScopes: [
+            AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+            AppleAuthentication.AppleAuthenticationScope.EMAIL,
+          ],
+          state: start.flowToken,
+          nonce: start.flowToken,
+        });
+        if (credential.state !== start.flowToken) throw new Error('Apple sign in could not be verified.');
+        if (!credential.identityToken || !credential.authorizationCode) {
+          throw new Error('Apple sign in did not return the required credentials.');
+        }
+        const next = await finishNativeAppleSignIn(session, {
+          flowToken: start.flowToken,
+          identityToken: credential.identityToken,
+          authorizationCode: credential.authorizationCode,
+          firstName: credential.fullName?.givenName ?? null,
+          lastName: credential.fullName?.familyName ?? null,
+        }, validateDailyRunId);
+        await finish(next.session, next.result);
+      } else {
+        const result = await WebBrowser.openAuthSessionAsync(start.url, 'packone://account');
+        if (result.type !== 'success') {
+          throw new Error(result.type === 'cancel' ? 'Apple sign in was cancelled.' : 'Apple sign in did not finish.');
+        }
+        const callback = new URL(result.url);
+        if (callback.searchParams.get('apple') === 'error') {
+          const code = callback.searchParams.get('appleErrorCode');
+          throw new Error(code === 'APPLE_EXISTING_ACCOUNT_UNVERIFIED'
+            ? 'An unverified Pack One account already uses this email. Reset its password from that inbox, verify the account, then try Apple again.'
+            : 'Apple sign in did not finish.');
+        }
+        const handoff = callback.searchParams.get('appleHandoff');
+        if (!handoff) throw new Error('Apple sign in did not return a Pack One handoff.');
+        const next = await finishAppleSignIn(session, handoff, validateDailyRunId);
+        await finish(next.session, next.result);
+      }
+    } catch (error: unknown) {
+      const code = error && typeof error === 'object' && 'code' in error ? String(error.code) : '';
+      setMessage(code === 'ERR_REQUEST_CANCELED'
+        ? 'Apple sign in was cancelled.'
+        : error instanceof Error ? error.message : 'Apple sign in failed.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const signOut = async () => {
     if (!session || busy) return;
     setBusy(true);
@@ -210,12 +274,27 @@ export default function AccountScreen() {
     setBusy(true);
     setMessage(null);
     try {
-      await deleteMobileAccount(
-        session,
-        account.deletion.method === 'password'
-          ? { currentPassword: deletePassword }
-          : { code: deleteCode },
-      );
+      if (account.deletion.method === 'apple') {
+        const start = await startAppleDeletionVerification(session);
+        const result = await WebBrowser.openAuthSessionAsync(start.url, 'packone://account');
+        if (result.type !== 'success') {
+          throw new Error(result.type === 'cancel' ? 'Apple verification was cancelled.' : 'Apple verification did not finish.');
+        }
+        const callback = new URL(result.url);
+        if (callback.searchParams.get('appleDelete') === 'error') {
+          throw new Error('Apple verification did not finish.');
+        }
+        const handoff = callback.searchParams.get('appleDeleteHandoff');
+        if (!handoff) throw new Error('Apple verification did not return a deletion proof.');
+        await finishAppleDeletion(session, handoff);
+      } else {
+        await deleteMobileAccount(
+          session,
+          account.deletion.method === 'password'
+            ? { currentPassword: deletePassword }
+            : { code: deleteCode },
+        );
+      }
       const fresh = await ensureGuestSession();
       setSession(fresh);
       setAccount(null);
@@ -292,6 +371,18 @@ export default function AccountScreen() {
                     <Text style={styles.dangerButtonText}>Permanently delete account</Text>
                   </Pressable>
                 </>
+              ) : account.deletion.method === 'apple' ? (
+                <>
+                  <Text style={styles.body}>Verify with Apple again to confirm permanent deletion. No email code is required.</Text>
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy}
+                    onPress={confirmDelete}
+                    style={[styles.dangerButton, busy && styles.disabled]}
+                  >
+                    <Text style={styles.dangerButtonText}>Verify with Apple and delete account</Text>
+                  </Pressable>
+                </>
               ) : account.deletion.method === 'email' ? (
                 <>
                   <Pressable
@@ -332,6 +423,20 @@ export default function AccountScreen() {
           </View>
         ) : (
           <View style={styles.panel}>
+            {Platform.OS === 'ios' ? (
+              <AppleAuthentication.AppleAuthenticationButton
+                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                cornerRadius={6}
+                onPress={() => void openApple()}
+                style={[styles.appleButton, busy && styles.disabled]}
+              />
+            ) : (
+              <Pressable accessibilityRole="button" disabled={busy} onPress={() => void openApple()} style={[styles.appleWebButton, busy && styles.disabled]}>
+                <Text style={styles.appleWebButtonText}>Continue with Apple</Text>
+              </Pressable>
+            )}
+
             <Pressable accessibilityRole="button" disabled={busy} onPress={() => void openGoogle()} style={[styles.googleButton, busy && styles.disabled]}>
               <Text style={styles.googleButtonText}>Continue with Google</Text>
             </Pressable>
@@ -400,12 +505,6 @@ export default function AccountScreen() {
 
         {message ? <Text style={styles.message}>{message}</Text> : null}
 
-        <View style={styles.providerNote}>
-          <Text style={styles.panelTitle}>Sign in with Apple</Text>
-          <Text style={styles.body}>
-            Apple is not exposed yet because the current Pack One Neon Auth provider configuration does not support Apple. The native identity/session design is provider-neutral, so Apple can join this same account model once that provider is available.
-          </Text>
-        </View>
       </ScrollView>
     </SafeAreaView>
   );
@@ -419,6 +518,9 @@ const styles = StyleSheet.create({
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md },
   panelTitle: { color: colors.ink, fontSize: 17, fontWeight: '800' },
+  appleButton: { width: '100%', height: 52 },
+  appleWebButton: { minHeight: 52, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' },
+  appleWebButtonText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   googleButton: { minHeight: 52, borderWidth: 1, borderColor: colors.lineStrong, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center' },
   googleButtonText: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
@@ -448,5 +550,4 @@ const styles = StyleSheet.create({
   dangerTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
   dangerButton: { minHeight: 50, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
   dangerButtonText: { color: colors.danger, fontSize: 15, fontWeight: '800' },
-  providerNote: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.xs },
 });

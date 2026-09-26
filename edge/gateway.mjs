@@ -28,6 +28,7 @@ function adminPath(path,method) {
   if(/^\/v1\/admin\/users(?:\/[a-f0-9-]{36})?$/.test(path)&&method==='GET')return true;
   if(path==='/v1/admin/corpus'&&method==='GET')return true;
   if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}(?:\/components\/[a-z0-9_.-]{2,120})?\/status$/.test(path)&&method==='POST')return true;
+  if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}\/snapshot$/.test(path)&&method==='POST')return true;
   return false;
 }
 
@@ -36,10 +37,10 @@ function permitted(service,path,method,search,mode) {
   if(service==='growth') {
     if(method==='POST'&&[
       '/v1/session','/v1/player/session','/v1/player/migrate',
-      '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete/verification/start','/v1/account/delete','/v1/account/migrate',
-      '/v1/account/link','/v1/account/link-browser','/v1/account/signout',
-      '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/google/start','/v1/mobile/account/google/finish',
-      '/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete',
+      '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete/verification/start','/v1/account/delete/apple/start','/v1/account/delete/apple/finish','/v1/account/delete','/v1/account/migrate',
+      '/v1/account/link','/v1/account/link-browser','/v1/account/signout','/v1/account/apple/start','/v1/account/apple/finish','/v1/account/apple/callback',
+      '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/apple/start','/v1/mobile/account/apple/finish','/v1/mobile/account/apple/native','/v1/mobile/account/google/start','/v1/mobile/account/google/finish',
+      '/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
       '/v1/events','/v1/results','/v1/profile-lookup','/v1/patreon/connect','/v1/patreon/disconnect',
     ].includes(path))return true;
     if(method==='GET'&&[
@@ -123,9 +124,10 @@ function validMobileAccount(value) {
 function mobileSessionRoute(service,path,method) {
   if(service==='growth') {
     if(method==='POST'&&[
-      '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/google/start',
+      '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/apple/start',
+      '/v1/mobile/account/apple/finish','/v1/mobile/account/apple/native','/v1/mobile/account/google/start',
       '/v1/mobile/account/google/finish','/v1/mobile/account/signout',
-      '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete',
+      '/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete',
     ].includes(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
@@ -137,7 +139,7 @@ function mobileSessionRoute(service,path,method) {
 }
 function mobileAccountRoute(service,path,method) {
   if(service==='growth') {
-    if(method==='POST'&&['/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete'].includes(path))return true;
+    if(method==='POST'&&['/v1/mobile/account/signout','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete'].includes(path))return true;
     return method==='GET'&&['/v1/mobile/account/session','/v1/mobile/profile/me','/v1/mobile/profile/history'].includes(path);
   }
   if(service!=='draft')return false;
@@ -244,7 +246,8 @@ export async function gateway(request,env,fetcher=fetch) {
       (env.ORIGIN_SECRET!==undefined&&env.ORIGIN_SECRET!==''&&!secret(env.ORIGIN_SECRET)))
       return finish(response(503,'Gateway not configured.'));
     if(url.protocol!=='https:'||url.hostname!==expectedHost)return finish(response(404,'Not found.'));
-    if(origin&&!ORIGINS.has(origin))return finish(response(403,'Origin not allowed.'));
+    const appleCallbackOrigin=request.method==='POST'&&url.pathname==='/growth/v1/account/apple/callback'&&origin==='https://appleid.apple.com';
+    if(origin&&!ORIGINS.has(origin)&&!appleCallbackOrigin)return finish(response(403,'Origin not allowed.'));
     const match=url.pathname.match(/^\/(legacy|growth|draft)(\/.*)$/);
     const method=request.method==='OPTIONS'?request.headers.get('access-control-request-method'):request.method;
     if(!match||!permitted(match[1],match[2],method,url.search,mode))return finish(response(404,'Not found.'));
@@ -314,7 +317,18 @@ export async function gateway(request,env,fetcher=fetch) {
       headers.set('x-pack1-player-session',request.headers.get('x-pack1-player-session'));
 
     let body;
-    if(['POST','PATCH'].includes(method)) {body=JSON.stringify(await readJson(request));headers.set('content-type','application/json');}
+    const appleCallback=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/account/apple/callback';
+    if(appleCallback) {
+      const contentType=String(request.headers.get('content-type')||'').toLowerCase();
+      if(!contentType.includes('application/x-www-form-urlencoded'))
+        throw Object.assign(Error('Apple callback is invalid.'),{status:415});
+      body=await request.text();
+      if(body.length>20000)throw Object.assign(Error('Apple callback is invalid.'),{status:413});
+      headers.set('content-type','application/x-www-form-urlencoded');
+    } else if(['POST','PATCH'].includes(method)) {
+      body=JSON.stringify(await readJson(request));
+      headers.set('content-type','application/json');
+    }
     const upstreamOrigin=`https://${branch}-${SERVICES[match[1]]}.compute.c-5.us-east-2.aws.neon.tech`;
     const refresh=method==='POST'&&match[1]==='growth'&&match[2]==='/v1/player/session'&&Boolean(playerToken);
     // A cookie is untrusted until the origin verifies it. This endpoint only
@@ -338,7 +352,7 @@ export async function gateway(request,env,fetcher=fetch) {
     if(match[1]==='growth')for(const line of upstreamSetCookies(result.headers))if(publicCookie(line))publicHeaders.append('set-cookie',scopedCookie(line));
     if(result.status>=300&&result.status<400) {
       const target=safeRedirect(result.headers.get('location'),{
-        mobileOAuth:match[1]==='growth'&&match[2]==='/v1/mobile/account/google/callback',
+        mobileOAuth:match[1]==='growth'&&['/v1/mobile/account/google/callback','/v1/account/apple/callback'].includes(match[2]),
       });
       if(!target)return finish(response(502,'Unexpected upstream redirect.'));
       publicHeaders.set('location',target);

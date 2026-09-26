@@ -177,13 +177,13 @@ class RetiredQueueEntryTests(unittest.TestCase):
 class BacklogRoutingTests(unittest.TestCase):
     BACKLOG = ROOT / ".github" / "workflows" / "build-more-sets.yml"
 
-    def test_the_daily_run_looks_for_new_releases(self):
+    def test_legacy_backlog_no_longer_discovers_prospective_releases(self):
         text = self.BACKLOG.read_text()
-        self.assertIn("scripts/refresh_import_queue.py", text)
-        self.assertIn("Queue newly released environments", text)
-        discovery = text.index("Queue newly released environments")
-        route = text.index("Route catalog ownership")
-        self.assertLess(discovery, route, "discovery must run before pending is counted")
+        triggers = text.split("permissions:", 1)[0]
+        self.assertNotIn("schedule:", triggers)
+        self.assertNotIn("scripts/refresh_import_queue.py", text)
+        self.assertIn("Prospective environment discovery is owned exclusively by Corpus Operations", text)
+        self.assertIn("Legacy importer cannot admit prospective environments", text)
 
     def test_pending_is_counted_from_the_queue_not_a_rewritten_status_file(self):
         text = self.BACKLOG.read_text()

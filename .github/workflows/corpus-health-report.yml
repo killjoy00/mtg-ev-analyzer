@@ -1,0 +1,47 @@
+name: Corpus health evidence report
+# Metadata only: reads snapshot, policy and health rows, never puzzle payloads,
+# and never writes. Stale evidence is reported, not failed - it only matters
+# when an administrator is about to activate or reactivate a snapshot.
+on:
+  schedule:
+    - cron: '37 8 * * *'
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: packone-corpus-health-report
+  cancel-in-progress: false
+jobs:
+  report:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      TARGET: ${{ inputs.target || 'production' }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require reviewed code
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      - name: Report health evidence without reading puzzle payloads
+        run: |
+          set -euo pipefail
+          umask 077
+          case "$TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/health-report.connection"
+          node scripts/corpus-health-freshness.mjs "$RUNNER_TEMP/health-report.connection" --summary "$GITHUB_STEP_SUMMARY"

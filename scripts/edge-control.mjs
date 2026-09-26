@@ -37,8 +37,10 @@ async function cf(route,{method='GET',body,allow404=false}={}) {
   try {r=await fetch('https://api.cloudflare.com/client/v4'+route,{method,redirect:'error',headers:{authorization:`Bearer ${process.env.CLOUDFLARE_EDGE_TOKEN}`,'content-type':'application/json'},body:body===undefined?undefined:JSON.stringify(body),signal:AbortSignal.timeout(30000)});}catch{throw Error('Cloudflare control request failed.');}
   if(allow404&&r.status===404)return null;
   if(!r.ok)throw Error(`Cloudflare control HTTP ${r.status}; check the scoped deployment token.`);
-  if(r.status===204&&method==='DELETE')return {success:true};
-  const result=await r.json();if(!result.success)throw Error('Cloudflare rejected the control request.');
+  const bodyText=await r.text();
+  if(method==='DELETE'&&!bodyText.trim())return {success:true};
+  let result;try{result=JSON.parse(bodyText);}catch{throw Error('Cloudflare control returned invalid JSON.');}
+  if(!result?.success)throw Error('Cloudflare rejected the control request.');
   return result;
 }
 async function context() {
@@ -81,6 +83,7 @@ async function main(action) {
       if(!/^[A-Za-z0-9_-]{1,128}$/.test(domain.id))throw Error('Unexpected custom-domain identifier.');
       await cf(`/accounts/${zone.account.id}/workers/domains/${encodeURIComponent(domain.id)}`,{method:'DELETE'});
     }
+    const remaining=await context();if(remaining.domain)throw Error('Preview hostname remains attached after deletion.');
     console.log('Preview custom domain disabled. Backend guards remain enabled; the isolated branch expires automatically.');return;
   }
   if(action!=='deploy')throw Error('Unknown preview operation.');
@@ -138,5 +141,6 @@ if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url)main(p
   // this control process; never print a provider response or process arguments.
   const message=String(error.message||'');
   console.error(/^(Add repository|Invalid preview|An isolated|Cloudflare control|Cloudflare rejected|Neon control|Expected the|Invalid Cloudflare|Cannot verify|Preview hostname|Preview DNS|Existing Worker|Unexpected custom|Unknown preview|Require a newly|Unexpected inherited|Origin did|Origin revision|Origin closure|neon failed|wrangler failed)/.test(message)?message:'Preview operation failed; inspect the sanitized step status.');
+  console.error(JSON.stringify({error_class:error.name||'Error',line:String(error.stack).match(/edge-control.mjs:(\d+)/)?.[1]||null}));
   process.exitCode=1;
 });
