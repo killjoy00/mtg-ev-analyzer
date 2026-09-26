@@ -39,6 +39,7 @@ jobs:
       PACK1_DELETION_ADMIN_EMAIL: ${{ secrets.PACK1_DELETION_ADMIN_EMAIL }}
       PACK1_DELETION_ADMIN_PASSWORD: ${{ secrets.PACK1_DELETION_ADMIN_PASSWORD }}
       PACK1_ACCOUNT_DELETE_RESEND_API_KEY: ${{ secrets.PACK1_ACCOUNT_DELETE_RESEND_API_KEY }}
+      PACK1_LAUNCH_ALERT_EMAIL: ${{ secrets.PACK1_LAUNCH_ALERT_EMAIL }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -67,6 +68,7 @@ jobs:
             production)
               branch=br-orange-feather-ayps8kep
               [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
+              [[ "$PACK1_LAUNCH_ALERT_EMAIL" == *@* ]] || { echo '::error::PACK1_LAUNCH_ALERT_EMAIL is missing or malformed.'; exit 1; }
               deletion_email_expected=true
               ;;
             *) exit 1 ;;
@@ -123,7 +125,7 @@ jobs:
                 --env "PACK1_ACCOUNT_DELETION_ENABLED=1"
                 --env "PACK1_VERIFICATION_SWEEP_ENABLED=1")
               if [[ "$RELEASE_TARGET" == production ]]; then
-                extra+=(--env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY")
+                extra+=(--env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" --env "PACK1_LAUNCH_ALERT_EMAIL=$PACK1_LAUNCH_ALERT_EMAIL")
               fi
               if [[ "$RELEASE_TARGET" == production && "$PATREON_RUNTIME_ENABLED" == true ]]; then
                 extra+=(--env "PATREON_CLIENT_ID=$PATREON_CLIENT_ID" --env "PATREON_CLIENT_SECRET=$PATREON_CLIENT_SECRET" --env "PATREON_WEBHOOK_SECRET=$PATREON_WEBHOOK_SECRET")
