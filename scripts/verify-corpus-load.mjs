@@ -15,9 +15,14 @@ assert.equal(imported.corpus_version,DRAFT_RUN_CORPUS_VERSION);
 assert.equal(imported.complete,true);
 assert.deepEqual(imported.errors,{});
 const bySet=new Map(imported.sets.map(s=>[s.id,s]));
+// Historical-frozen environments are never rebuilt into first-class snapshots
+// (import_all_trophies.py HISTORICAL_FROZEN_SETS), so a complete prospective
+// import finishes every other baseline environment.
+const HISTORICAL_FROZEN_SETS=new Set(['stx','mid','vow']);
 if(process.argv.includes('--complete')) {
   // Discovery maps the official Cube_-_Powered archive to powered-cube.
-  assert.ok(baseline.sets.every(s=>bySet.has(s.id)),'Every baseline environment, including Cube, must finish before release');
+  const missing=baseline.sets.filter(s=>!HISTORICAL_FROZEN_SETS.has(s.id)&&!bySet.has(s.id)).map(s=>s.id);
+  assert.deepEqual(missing,[],'Every non-frozen baseline environment, including Cube, must finish before release');
 }
 const result=await query(`SELECT p.set_id,count(*)::int puzzles,
   count(*) FILTER(WHERE r.puzzle_id IS NULL)::int unrated,
