@@ -88,9 +88,9 @@ Status vocabulary:
 - Archive/Home affiliate/Learn/iPad work added mounted production-screen or release guards instead of source-only assertions.
 - The integrated mobile command now exercises **150 mounted tests** before lint, strict TypeScript, Expo config and release preflight.
 
-### Pending deterministic-build evidence
+### Deterministic-build evidence
 
-PR #637 pins Node/npm and npm lock inputs, uses `npm ci` in mobile/iOS/Android workflows and pins the Expo SDK 57-compatible React DOM / Reanimated / Worklets peer set. Its exact integrated head has test, E2E, mobile, Android-internal and iOS archive green; Android production bundle remains the final gate at the time of this document.
+PR #637 merged as `aeba264e00466991a2fd2ec5806f621cfe18a430` after all six exact-head workflows passed. It pins Node/npm and npm lock inputs, uses `npm ci` in mobile/iOS/Android workflows, pins the Expo SDK 57-compatible React DOM / Reanimated / Worklets peer set, and the integrated mobile run executed 150/150 mounted tests before lint, strict TypeScript, Expo config and production preflight.
 
 ### Pending exact-main RC evidence
 
