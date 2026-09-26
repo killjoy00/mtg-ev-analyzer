@@ -144,7 +144,7 @@ jobs:
           IFS=',' read -r -a set_args <<< "$sets"
           node scripts/check-corpus-health.mjs "$RUNNER_TEMP/corpus.connection" "${set_args[@]}"
           if [[ "$TARGET" == development ]]; then
-            node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/corpus.connection"
+            node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/corpus.connection" "${set_args[@]}"
           fi
       - name: Verify current run owns promotable artifact
         id: artifact
