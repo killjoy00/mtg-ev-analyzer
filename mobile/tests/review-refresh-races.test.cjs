@@ -547,11 +547,11 @@ test('published set archive renders current editorial evidence and exact disclos
   let root;
   await act(async () => { root = TestRenderer.create(React.createElement(Screen)); await Promise.resolve(); });
   const text = renderedText(root.toJSON());
-  assert.match(text, /300 historical replay seats/);
-  assert.match(text, /209,999 picks/);
+  assert.match(text, /300\s+historical replay seats/);
+  assert.match(text, /209,999\s+picks/);
   assert.match(text, /48.8%/);
   assert.match(text, /Cosmic Cube/);
-  assert.match(text, /37.7% support/);
+  assert.match(text, /37\.7%\s+support/);
   assert.match(text, /Affiliate disclosure/);
   const link = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Cosmic Cube on TCGplayer, affiliate link')[0];
   assert.ok(link);
@@ -586,7 +586,7 @@ test('published set archive keeps the analysis mounted when affiliate browser ha
   const link = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'link')[0];
   await act(async () => { link.props.onPress(); await Promise.resolve(); await Promise.resolve(); });
   assert.match(renderedText(root.toJSON()), /Could not open TCGplayer for Cosmic Cube\. Try the affiliate link again\./);
-  assert.match(renderedText(root.toJSON()), /MSH Pack One archive/);
+  assert.match(renderedText(root.toJSON()), /MSH\s+Pack One archive/);
   await act(async () => root.unmount());
 });
 
