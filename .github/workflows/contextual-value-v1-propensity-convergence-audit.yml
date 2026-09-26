@@ -1,0 +1,65 @@
+name: contextual-value-v1-propensity-convergence-audit
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-propensity-convergence-529
+    paths:
+      - '.github/workflows/contextual-value-v1-propensity-convergence-audit.yml'
+      - 'research/contextual_value_propensity_audit.py'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download successful development cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: 36256947308
+          github-token: ${{ github.token }}
+      - name: Download fold -1 training feature shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-feature-fold--1-*
+          path: precomputed-features
+          merge-multiple: true
+          run-id: 36256947308
+          github-token: ${{ github.token }}
+      - name: Run validation-only convergence audit
+        run: |
+          python3 research/contextual_value_propensity_audit.py \
+            --cohort-dir preprocessed-core \
+            --feature-shard precomputed-features/train-feature-fold--1-MSH.jsonl.gz \
+            --feature-shard precomputed-features/train-feature-fold--1-SOS.jsonl.gz \
+            --feature-shard precomputed-features/train-feature-fold--1-ECL.jsonl.gz \
+            --feature-shard precomputed-features/train-feature-fold--1-TLA.jsonl.gz \
+            --source-sha aa5b17d96b43f3ce08f52fad55ba17f327472c1b \
+            --epochs 250,500,1000 \
+            --out results/contextual-value-v1/propensity-convergence-audit.json
+      - name: Assert assessment remains sealed
+        run: |
+          python3 - <<'PY'
+          import json
+          report = json.load(open("results/contextual-value-v1/propensity-convergence-audit.json"))
+          assert report["scope"] == "development_only"
+          assert report["assessment_opened"] is False
+          assert report["assessment_outcomes_used"] is False
+          PY
+      - name: Upload audit artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-propensity-convergence-audit
+          path: results/contextual-value-v1/propensity-convergence-audit.json
+          retention-days: 30
