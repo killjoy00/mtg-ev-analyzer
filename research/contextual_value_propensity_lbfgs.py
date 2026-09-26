@@ -376,12 +376,12 @@ def main():
         return _objective_gradient(beta, compiled, total_weight, L2)
 
     def callback(intermediate_result):
-        value, gradient = objective(intermediate_result.x)
+        # L-BFGS already evaluated the accepted iterate. Avoid a duplicate full
+        # objective+gradient pass here; final convergence is explicitly checked
+        # after minimize() returns.
         entry = {
             "iteration": len(iteration_log) + 1,
-            "objective": float(value),
-            "gradient_l2": float(np.linalg.norm(gradient)),
-            "gradient_max_abs": float(np.max(np.abs(gradient))) if len(gradient) else 0.0,
+            "objective": float(intermediate_result.fun),
         }
         iteration_log.append(entry)
         if len(iteration_log) % 5 == 0:
