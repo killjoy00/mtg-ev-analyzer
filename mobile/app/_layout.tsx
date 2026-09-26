@@ -1,9 +1,19 @@
-import { Stack } from 'expo-router';
+import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Pressable, Text } from 'react-native';
 
 import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
 import { VersionGate } from '@/src/components/VersionGate';
 import { colors } from '@/src/theme';
+
+function MembershipEntry() {
+  return (
+    <Pressable accessibilityRole="button" accessibilityLabel="Open membership and account access"
+      onPress={() => router.push('/membership')} style={{ minHeight: 44, minWidth: 44, justifyContent: 'center' }}>
+      <Text style={{ color: colors.accentDark, fontWeight: '700' }}>Membership</Text>
+    </Pressable>
+  );
+}
 
 export default function RootLayout() {
   return (
@@ -23,7 +33,7 @@ export default function RootLayout() {
           <Stack.Screen name="draft-run" options={{ title: 'Draft Run' }} />
           <Stack.Screen name="shared-run" options={{ title: 'Shared Draft Run' }} />
           <Stack.Screen name="resume-shared-run" options={{ title: 'Saved Shared Run' }} />
-          <Stack.Screen name="practice" options={{ title: 'Practice' }} />
+          <Stack.Screen name="practice" options={{ title: 'Practice', headerRight: MembershipEntry }} />
           <Stack.Screen name="leaderboard" options={{ title: 'Leaderboard' }} />
           <Stack.Screen name="career" options={{ title: 'My Pack One' }} />
           <Stack.Screen name="profile" options={{ title: 'Player Profile' }} />
@@ -32,7 +42,8 @@ export default function RootLayout() {
           <Stack.Screen name="scoring" options={{ title: 'Scoring' }} />
           <Stack.Screen name="method" options={{ title: 'Method' }} />
           <Stack.Screen name="sets" options={{ title: 'Sets' }} />
-          <Stack.Screen name="account" options={{ title: 'Account' }} />
+          <Stack.Screen name="account" options={{ title: 'Account', headerRight: MembershipEntry }} />
+          <Stack.Screen name="membership" options={{ title: 'Membership' }} />
         </Stack>
       </>
     </VersionGate>

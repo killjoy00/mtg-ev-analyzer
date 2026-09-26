@@ -61,3 +61,5 @@ try {
   await query('DELETE FROM neon_auth."user" WHERE id IN ($1::uuid,$2::uuid)',[user,other]);
   await query('DELETE FROM players WHERE id=$1::uuid',[playerId]);
 }
+
+await import('./patreon-mobile-backend-smoke.mjs');
