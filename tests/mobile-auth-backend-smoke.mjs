@@ -8,9 +8,9 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {query}=await import('../worker/growth-function.js');
 const growth=(await import('../worker/growth-function.js')).default;
 
-async function call(path,body,{playerToken,accountToken,status=200}={}) {
+async function call(path,body,{playerToken,accountToken,status=200,method}={}) {
   const response=await growth.fetch(new Request('https://packone.pro'+path,{
-    method:body===undefined?'GET':'POST',
+    method:method||(body===undefined?'GET':'POST'),
     headers:{
       ...(body===undefined?{}:{'content-type':'application/json'}),
       ...(playerToken?{authorization:'Bearer '+playerToken}:{}),
@@ -77,11 +77,25 @@ assert.ok(Array.isArray(profile.best_environments));
 assert.ok(Array.isArray(profile.daily_history));
 assert.equal(typeof profile.environment_total,'number');
 
-await query('UPDATE players SET profile_public=true WHERE id=$1::uuid',[guest.playerId]);
-const publicProfile=await call('/v1/mobile/profile/'+profile.player.profile_key,undefined,{
+const renamed='Mobile '+userId.slice(0,8);
+const updatedProfile=await call('/v1/mobile/profile',{
+  displayName:renamed,
+  profilePublic:true,
+},{playerToken:signed.linked.token,accountToken:signed.session.token,method:'PATCH'});
+assert.equal(updatedProfile.player.display_name,renamed);
+assert.equal(updatedProfile.player.profile_public,true);
+assert.equal(updatedProfile.player.username_owned,true);
+
+await call('/v1/mobile/account/password-change',{
+  currentPassword:'not-a-password',
+  newPassword:'different-password',
+},{playerToken:signed.linked.token,accountToken:signed.session.token,status:409});
+
+
+const publicProfile=await call('/v1/mobile/profile/'+updatedProfile.player.profile_key,undefined,{
   playerToken:signed.linked.token,
 });
-assert.equal(publicProfile.player.display_name,profile.player.display_name);
+assert.equal(publicProfile.player.display_name,renamed);
 assert.equal(publicProfile.player.claimed,undefined);
 
 const history=await call('/v1/mobile/profile/history?limit=5',undefined,{
