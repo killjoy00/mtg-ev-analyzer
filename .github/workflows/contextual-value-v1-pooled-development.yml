@@ -20,13 +20,19 @@ on:
 permissions:
   contents: read
 
+env:
+  MAX_DRAFTS: ${{ inputs.max_drafts || '8000' }}
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+
 jobs:
-  pooled-validation:
+  nuisance-fold:
+    name: nuisance-fold-${{ matrix.fold }}
     runs-on: ubuntu-latest
-    timeout-minutes: 360
-    env:
-      MAX_DRAFTS: ${{ inputs.max_drafts || '8000' }}
-      BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      matrix:
+        fold: [0, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -40,27 +46,57 @@ jobs:
         run: |
           mkdir -p raw-data
           for EXPANSION in MSH SOS ECL TLA; do
-            curl --fail --location --retry 5 --retry-delay 3 \
-              --output "raw-data/draft-$EXPANSION.csv.gz" \
-              "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
-            curl --fail --location --retry 5 --retry-delay 3 \
-              --output "raw-data/game-$EXPANSION.csv.gz" \
-              "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+            curl --fail --location --retry 5 --retry-delay 3               --output "raw-data/draft-$EXPANSION.csv.gz"               "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+            curl --fail --location --retry 5 --retry-delay 3               --output "raw-data/game-$EXPANSION.csv.gz"               "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+          done
+      - name: Compute one train nuisance fold
+        run: |
+          OUT="results/contextual-value-v1/nuisance-fold-${{ matrix.fold }}"
+          python3 scripts/contextual_value_phase1.py             --draft-archive raw-data/draft-MSH.csv.gz             --game-archive raw-data/game-MSH.csv.gz             --draft-archive raw-data/draft-SOS.csv.gz             --game-archive raw-data/game-SOS.csv.gz             --draft-archive raw-data/draft-ECL.csv.gz             --game-archive raw-data/game-ECL.csv.gz             --draft-archive raw-data/draft-TLA.csv.gz             --game-archive raw-data/game-TLA.csv.gz             --max-drafts "$MAX_DRAFTS"             --train-nuisance-fold "${{ matrix.fold }}"             --out "$OUT"
+      - name: Upload nuisance checkpoint
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-nuisance-fold-${{ matrix.fold }}
+          path: |
+            results/contextual-value-v1/nuisance-fold-${{ matrix.fold }}/train-nuisance-fold-${{ matrix.fold }}.jsonl.gz
+            results/contextual-value-v1/nuisance-fold-${{ matrix.fold }}/fold-report.json
+          retention-days: 7
+
+  pooled-validation:
+    needs: nuisance-fold
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Validate research inputs
+        run: |
+          [[ "$MAX_DRAFTS" =~ ^[0-9]+$ ]] || { echo 'Invalid MAX_DRAFTS'; exit 1; }
+          test "$MAX_DRAFTS" -ge 2000 || { echo 'MAX_DRAFTS must be at least 2000'; exit 1; }
+      - name: Download nuisance checkpoints
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-nuisance-fold-*
+          path: precomputed-nuisance
+          merge-multiple: true
+      - name: Verify all nuisance checkpoints are present
+        run: |
+          for FOLD in 0 1 2 3 4; do
+            test -s "precomputed-nuisance/train-nuisance-fold-$FOLD.jsonl.gz"
+          done
+      - name: Download core 17Lands Premier archives
+        run: |
+          mkdir -p raw-data
+          for EXPANSION in MSH SOS ECL TLA; do
+            curl --fail --location --retry 5 --retry-delay 3               --output "raw-data/draft-$EXPANSION.csv.gz"               "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+            curl --fail --location --retry 5 --retry-delay 3               --output "raw-data/game-$EXPANSION.csv.gz"               "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
           done
       - name: Run pooled contextual-value-v1 core development validation
         run: |
           mkdir -p results/contextual-value-v1/pooled-msh-sos-ecl-tla
-          python3 scripts/contextual_value_phase1.py \
-            --draft-archive raw-data/draft-MSH.csv.gz \
-            --game-archive raw-data/game-MSH.csv.gz \
-            --draft-archive raw-data/draft-SOS.csv.gz \
-            --game-archive raw-data/game-SOS.csv.gz \
-            --draft-archive raw-data/draft-ECL.csv.gz \
-            --game-archive raw-data/game-ECL.csv.gz \
-            --draft-archive raw-data/draft-TLA.csv.gz \
-            --game-archive raw-data/game-TLA.csv.gz \
-            --max-drafts "$MAX_DRAFTS" \
-            --out results/contextual-value-v1/pooled-msh-sos-ecl-tla
+          python3 scripts/contextual_value_phase1.py             --draft-archive raw-data/draft-MSH.csv.gz             --game-archive raw-data/game-MSH.csv.gz             --draft-archive raw-data/draft-SOS.csv.gz             --game-archive raw-data/game-SOS.csv.gz             --draft-archive raw-data/draft-ECL.csv.gz             --game-archive raw-data/game-ECL.csv.gz             --draft-archive raw-data/draft-TLA.csv.gz             --game-archive raw-data/game-TLA.csv.gz             --max-drafts "$MAX_DRAFTS"             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-0.jsonl.gz             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-1.jsonl.gz             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-2.jsonl.gz             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-3.jsonl.gz             --precomputed-train-nuisance precomputed-nuisance/train-nuisance-fold-4.jsonl.gz             --out results/contextual-value-v1/pooled-msh-sos-ecl-tla
       - name: Assert assessment stayed sealed and summarize selection
         run: |
           python3 - <<'PY'
