@@ -27,6 +27,8 @@ function adminPath(path,method) {
   if(method==='GET'&&/^\/v1\/admin\/decisions\/[a-z0-9_-]{6,120}$/.test(path))return true;
   if(/^\/v1\/admin\/users(?:\/[a-f0-9-]{36})?$/.test(path)&&method==='GET')return true;
   if(path==='/v1/admin/corpus'&&method==='GET')return true;
+  if(path==='/v1/admin/corpus/readiness'&&method==='GET')return true;
+  if(/^\/v1\/admin\/corpus\/readiness\/[1-9][0-9]{0,18}\/retry$/.test(path)&&method==='POST')return true;
   if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}(?:\/components\/[a-z0-9_.-]{2,120})?\/status$/.test(path)&&method==='POST')return true;
   if(/^\/v1\/admin\/corpus\/[a-z0-9-]{2,80}\/snapshot$/.test(path)&&method==='POST')return true;
   return false;
@@ -59,7 +61,7 @@ function permitted(service,path,method,search,mode) {
     if(method==='POST'&&/^\/v1\/runs\/[a-f0-9-]+\/(pick|reroll|share|view)$/.test(path))return true;
     if(method==='GET'&&['/v1/leaderboard','/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path))return true;
     if(method==='GET'&&/^\/v1\/runs\/[a-f0-9-]+$/.test(path))return true;
-    if(method==='GET'&&/^\/v1\/(?:challenges|shared-runs)\/[a-f0-9]{24}$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/challenges\/[a-f0-9]{24}$/.test(path))return true;
     return mode==='production'&&adminPath(path,method);
   }
   return (method==='POST'&&['/v1/session','/v1/scores','/v1/challenges'].includes(path))||
