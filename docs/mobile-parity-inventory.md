@@ -1,6 +1,6 @@
 # Mobile web/native parity inventory
 
-Tracking: #575. Rebuilt from current main cf729490fd56bd34fa323cd58e9502891327d8ab on September 26, 2026.
+Tracking: #575. Rebuilt from current main 2b1da5574835a82caa6e350b7b1fe8d1512ba389 on September 26, 2026.
 
 This document replaces blanket source-string parity claims with an A–E inventory. **Implemented** means reviewed product code is present on main. It does not mean physical-device acceptance, live association-file verification, store-console approval, or public-release authorization.
 
@@ -92,9 +92,9 @@ Status vocabulary:
 
 PR #637 merged as `aeba264e00466991a2fd2ec5806f621cfe18a430` after all six exact-head workflows passed. It pins Node/npm and npm lock inputs, uses `npm ci` in mobile/iOS/Android workflows, pins the Expo SDK 57-compatible React DOM / Reanimated / Worklets peer set, and the integrated mobile run executed 150/150 mounted tests before lint, strict TypeScript, Expo config and production preflight.
 
-### Pending exact-main RC evidence
+### Exact-main RC mechanism and current recertification
 
-PR #648 adds a store-free exact-main RC smoke workflow. It:
+PR #648 merged as `528ed80a0c15afb9760ba2b71d8c4693e342324a` and adds a store-free exact-main RC smoke workflow. It:
 - refuses non-main or stale-main execution;
 - re-checks that the source SHA is still current main after both native builds finish;
 - runs deterministic mobile validation;
@@ -102,8 +102,11 @@ PR #648 adds a store-free exact-main RC smoke workflow. It:
 - uploads GitHub Actions artifacts plus a SHA/version manifest; and
 - has no App Store Connect, Google Play, release-environment or store-publishing credentials.
 
+The first main run began on `528ed80a...`, then #651 advanced main to `2b1da5574835a82caa6e350b7b1fe8d1512ba389` while those native builds were still running. That earlier run therefore cannot be the final exact-main certificate; the manifest is designed to fail closed if its source SHA is no longer current main. A fresh final run is required after the remaining docs/policy freeze so its manifest identifies the actual release-candidate main SHA.
+
 ### Release evidence still open
 
+- Completion of the guarded #651 card-image normalization / production gameplay smoke after the Titania display-art fix.
 - Physical iPhone acceptance on the exact signed TestFlight RC.
 - Physical iPad portrait/landscape/accessibility acceptance and App Store screenshots.
 - Physical Android acceptance on the exact Play Internal/Closed Testing RC.

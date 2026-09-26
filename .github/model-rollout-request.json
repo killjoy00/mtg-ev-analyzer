@@ -1,7 +1,5 @@
 {
-  "operation": "deploy",
-  "request_id": "season-hardening-deploy-production-20260924",
-  "reason": "Deploy reviewed Pack One season hardening revision to production after successful development acceptance and production migration 0038 verification.",
-  "commit": "9763e7caf87f20ca4bc77d82b8513a3d365db5c9",
-  "target": "production"
+  "operation": "card-images",
+  "request_id": "refresh-titania-main-art-20260926",
+  "reason": "Re-run guarded display-only Pack One image normalization after a live Powered Cube Titania report and verify all served cards remain on deterministic readable main art."
 }
