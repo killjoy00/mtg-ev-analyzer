@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex">
+  <title>Open Pack One</title>
+</head>
+<body>
+  <p>Opening Pack One…</p>
+  <script type="module">
+    const params=new URLSearchParams(location.search);
+    const kind="shared";
+    let target='/';
+    if(kind==='profile'){
+      const key=params.get('key')||'';
+      if(/^[a-f0-9]{16}$/.test(key)) target='/?profile='+encodeURIComponent(key);
+    }else if(kind==='shared'){
+      const id=params.get('id')||'';
+      if(/^[a-f0-9]{24}$/.test(id)) target='/?game=draft-run&shared='+encodeURIComponent(id);
+    }else if(kind==='daily'){
+      const environment=params.get('environment')||'mixed';
+      const set=environment==='powered-cube'||environment==='latest'?environment:'mixed';
+      target='/?game=draft-run&daily=1'+(set==='mixed'?'':'&set='+encodeURIComponent(set));
+    }
+    location.replace(target);
+  </script>
+</body>
+</html>

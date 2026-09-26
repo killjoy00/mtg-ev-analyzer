@@ -5,10 +5,13 @@ const NATIVE_PATHS = new Set([
   '/account',
   '/career',
   '/draft-run',
+  '/shared-run',
   '/how-to',
   '/leaderboard',
   '/method',
   '/practice',
+  '/profile',
+  '/historical-challenge',
   '/scoring',
   '/sets',
 ]);
@@ -39,6 +42,7 @@ function nativeDirectPath(pathname: string) {
 function parseIncomingPath(path: string) {
   if (path.startsWith('/')) {
     const url = new URL(path, 'https://packone.pro');
+    if (!PACKONE_HOSTS.has(url.hostname)) return null;
     return { pathname: url.pathname, searchParams: url.searchParams, search: url.search };
   }
 
@@ -84,6 +88,21 @@ function safeNativeSearch(pathname: string, searchParams: URLSearchParams) {
     return `?${next.toString()}`;
   }
 
+  if (pathname === '/shared-run') {
+    const shared = searchParams.get('shared');
+    return shared && /^[a-f0-9]{24}$/.test(shared) ? `?shared=${shared}` : '';
+  }
+
+  if (pathname === '/profile') {
+    const key = searchParams.get('key');
+    return key && /^[a-f0-9]{16}$/.test(key) ? `?key=${key}` : '';
+  }
+
+  if (pathname === '/historical-challenge') {
+    const challenge = searchParams.get('challenge');
+    return challenge && /^[a-f0-9]{12}$/.test(challenge) ? `?challenge=${challenge}` : '';
+  }
+
   if (pathname === '/leaderboard') {
     const next = new URLSearchParams();
     next.set('environment', environmentFromSet(searchParams.get('environment')));
@@ -104,18 +123,53 @@ export function rewriteIncomingPath(path: string) {
     if (!parsed) return '/';
 
     const { pathname, searchParams } = parsed;
+
+    if (pathname === '/open/profile/' || pathname === '/open/profile') {
+      const key = searchParams.get('key');
+      return key && /^[a-f0-9]{16}$/.test(key) ? `/profile?key=${key}` : '/';
+    }
+    if (pathname === '/open/shared/' || pathname === '/open/shared') {
+      const id = searchParams.get('id');
+      return id && /^[a-f0-9]{24}$/.test(id) ? `/shared-run?shared=${id}` : '/';
+    }
+    if (pathname === '/open/daily/' || pathname === '/open/daily') {
+      return `/draft-run?environment=${environmentFromSet(searchParams.get('environment'))}`;
+    }
+
     const article = directArticlePath(pathname);
     if (article) return article;
 
     const direct = nativeDirectPath(pathname);
+    if (direct === '/draft-run' && (searchParams.has('shared') || searchParams.has('challenge'))) {
+      const shared = searchParams.get('shared') || searchParams.get('challenge');
+      return shared && /^[a-f0-9]{24}$/.test(shared) ? `/shared-run?shared=${shared}` : '/shared-run';
+    }
     if (direct && direct !== '/') return `${direct}${safeNativeSearch(direct, searchParams)}`;
 
     if (pathname !== '/') return '/';
 
     if (searchParams.get('account') === '1') return '/account';
 
+    const publicProfile = searchParams.get('profile');
+    if (publicProfile && /^[a-f0-9]{16}$/.test(publicProfile)) {
+      return `/profile?key=${publicProfile}`;
+    }
+
+    const legacyChallenge = searchParams.get('challenge');
+    if (
+      legacyChallenge
+      && /^[a-f0-9]{12}$/.test(legacyChallenge)
+      && searchParams.get('game') !== 'draft-run'
+    ) {
+      return `/historical-challenge?challenge=${legacyChallenge}`;
+    }
+
     if (searchParams.get('game') === 'draft-run') {
       const environment = environmentFromSet(searchParams.get('set'));
+      if (searchParams.has('shared') || searchParams.has('challenge')) {
+        const shared = searchParams.get('shared') || searchParams.get('challenge');
+        return shared && /^[a-f0-9]{24}$/.test(shared) ? `/shared-run?shared=${shared}` : '/';
+      }
 
       if (searchParams.has('board')) {
         const requestedPeriod = searchParams.get('board');
@@ -129,10 +183,6 @@ export function rewriteIncomingPath(path: string) {
       if (searchParams.get('daily') === '1') {
         return `/draft-run?environment=${environment}`;
       }
-
-      // Stored friend challenges are not silently converted into a different
-      // native run. Until the native challenge surface lands, route safely home.
-      if (searchParams.has('shared') || searchParams.has('challenge')) return '/';
 
       if (searchParams.get('custom') === '1') return '/practice';
 

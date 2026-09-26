@@ -10,7 +10,14 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
-from contextual_value.archive import ArchiveSignalProvider, GameDraftSummary, GameStore, load_decisions
+from contextual_value.archive import (
+    ArchiveSignalProvider,
+    GameDraftSummary,
+    GameStore,
+    limit_decisions,
+    load_decisions,
+    select_global_draft_ids,
+)
 from contextual_value.checkpoint import (
     build_cohort_manifest,
     load_preprocessed_cohort,
@@ -274,6 +281,79 @@ class ArchiveSignalTests(unittest.TestCase):
             {row.draft_id for row in second},
         )
         self.assertEqual(len({row.draft_id for row in first}), 3)
+
+
+    def test_streaming_global_cap_matches_full_materialization(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        paths = []
+        for expansion in ("AAA", "BBB"):
+            path = root / f"draft-{expansion}.csv.gz"
+            paths.append(path)
+            with gzip.open(path, "wt", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=DRAFT_HEADER)
+                writer.writeheader()
+                for index in range(8):
+                    draft_id = f"{expansion.lower()}-{index}"
+                    for pick_number in range(1 + index % 3):
+                        row = _draft_row(
+                            draft_id,
+                            "A" if (index + pick_number) % 2 == 0 else "B",
+                            (index + 1) % 8,
+                            pick_number,
+                        )
+                        row["expansion"] = expansion
+                        writer.writerow(row)
+
+                # Validly parseable but outside the Premier population.
+                quick = _draft_row(f"{expansion.lower()}-quick", "A", 3, 0)
+                quick["expansion"] = expansion
+                quick["event_type"] = "QuickDraft"
+                writer.writerow(quick)
+
+                # Invalid because the selected card is not in the offered pack.
+                invalid = _draft_row(f"{expansion.lower()}-invalid", "A", 3, 0)
+                invalid["expansion"] = expansion
+                invalid["pack_card_A"] = "0"
+                writer.writerow(invalid)
+
+        full = []
+        for path in paths:
+            full.extend(load_decisions(path))
+        expected = limit_decisions(full, 7)
+        selected_ids = select_global_draft_ids(paths, 7)
+        actual = []
+        progress = []
+        for path in paths:
+            actual.extend(load_decisions(
+                path,
+                keep_ids=selected_ids,
+                progress_callback=lambda scanned, retained: progress.append(
+                    (scanned, retained)
+                ),
+            ))
+        actual = sorted(
+            actual,
+            key=lambda row: (row.draft_id, row.pack_number, row.pick_number),
+        )
+
+        self.assertEqual(
+            [asdict(row) for row in actual],
+            [asdict(row) for row in expected],
+        )
+        self.assertEqual(
+            selected_ids,
+            frozenset(row.draft_id for row in expected),
+        )
+        self.assertEqual(
+            {draft_id: draft_split(draft_id) for draft_id in selected_ids},
+            {
+                row.draft_id: draft_split(row.draft_id)
+                for row in expected
+            },
+        )
+        self.assertTrue(progress)
 
 
 def _decision(draft_id, selected, wins):

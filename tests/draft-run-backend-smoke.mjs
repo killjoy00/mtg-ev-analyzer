@@ -75,6 +75,46 @@ await query('UPDATE draft_run_sessions SET result_persisted_at=NULL WHERE id=$1:
 await call(runApi,`/v1/runs/${s.id}`,undefined,guest.token);
 assert.ok((await query('SELECT result_persisted_at FROM draft_run_sessions WHERE id=$1::uuid',[s.id])).rows[0].result_persisted_at,'Unacknowledged completion is recoverable');
 assert.equal((await query('SELECT count(*) n FROM game_results WHERE player_id=$1::uuid AND client_result_id=$2',[guest.playerId,`draft-run:${s.id}`])).rows[0].n,'1');
+
+const shared=await call(runApi,`/v1/runs/${s.id}/share`,{},guest.token);
+assert.match(shared.id,/^[a-f0-9]{24}$/);
+const creatorReopen=await call(runApi,'/v1/runs',{challenge:shared.id},guest.token);
+assert.equal(creatorReopen.id,s.id,'The creator reopening a share must recover the original completed run');
+assert.equal(
+  Number((await query(
+    'SELECT count(*) n FROM draft_run_sessions WHERE player_id=$1::uuid AND challenge_id=$2',
+    [guest.playerId,shared.id],
+  )).rows[0].n),
+  0,
+  'The creator reopening a share must not create a self-challenge row',
+);
+const challengeAuth=crypto.randomUUID();
+await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[
+  challengeAuth,'QA challenge retry',`qa-challenge-${challengeAuth}@example.invalid`,
+]);
+await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[challengeAuth,owner.playerId]);
+const [challenged,challengeRetry]=await Promise.all([
+  call(runApi,'/v1/runs',{challenge:shared.id},owner.token),
+  call(runApi,'/v1/runs',{challenge:shared.id},owner.token),
+]);
+assert.equal(challengeRetry.id,challenged.id,'Concurrent shared starts must recover the same server run');
+const challengeRows=await query(
+  'SELECT id,start_idempotency_hash FROM draft_run_sessions WHERE player_id=$1::uuid AND challenge_id=$2 ORDER BY created_at,id',
+  [owner.playerId,shared.id],
+);
+assert.equal(challengeRows.rows.length,1,'Concurrent shared starts must create one challenge session');
+assert.equal(challengeRows.rows[0].start_idempotency_hash,digest(`shared:${shared.id}`));
+assert.equal(
+  Number((await query(
+    "SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='game_started' AND event_props->>'run_id'=$2",
+    [owner.playerId,challenged.id],
+  )).rows[0].n),
+  1,
+  'Recovered shared starts must not emit a second game_started event',
+);
+await query('DELETE FROM account_links WHERE auth_user_id=$1::uuid',[challengeAuth]);
+await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[challengeAuth]);
+
 await call(growth,'/v1/results',{mode:'draft_run',score:100,clientResultId:'forged-'+tag},guest.token,403);
 const privateProfile=await call(growth,'/v1/profile/me',undefined,guest.token);
 assert.equal(privateProfile.player.profile_public,false);

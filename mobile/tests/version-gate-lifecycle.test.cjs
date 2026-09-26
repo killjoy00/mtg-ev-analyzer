@@ -292,3 +292,6 @@ test('a validated update-required foreground decision blocks with the supplied s
 
   await act(async () => root.unmount());
 });
+
+// Additional mounted screen regressions share the lifecycle test entrypoint.
+require('./review-refresh-races.test.cjs');

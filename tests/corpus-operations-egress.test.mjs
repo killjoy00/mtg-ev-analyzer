@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {workflowRunBlocks} from './workflow-run-blocks.mjs';
 
 test('scheduled corpus operations only deep-scan newly ingested sets',()=>{
   const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
@@ -21,7 +22,6 @@ test('explicit reviewed corpus health remains a manual-only full deep audit',()=
   assert.match(workflow,/TARGET: \$\{\{ inputs\.target \}\}/);
   assert.match(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/health\.connection" \| tee corpus-health-summary\.jsonl/);
 });
-
 
 test('production promotion proves builder run provenance without pinning the whole repository SHA',()=>{
   const workflow=fs.readFileSync(new URL('../.github/workflows/corpus-operations.yml',import.meta.url),'utf8');
@@ -50,20 +50,33 @@ test('no-pending development rerun cannot mint a promotable artifact and has an 
   assert.match(workflow,/Referenced development run has no promotable corpus artifact\. Dispatch development with recovery_sets=<set-id>/);
 });
 
-
 test('no scheduled workflow deep-scans retained corpus payloads',()=>{
   const directory=new URL('../.github/workflows/',import.meta.url);
   for(const name of fs.readdirSync(directory).filter(file=>file.endsWith('.yml'))) {
     const workflow=fs.readFileSync(new URL(name,directory),'utf8');
     if(!/^\s+schedule:/m.test(workflow))continue;
+    // A trigger path that requests fixture coverage is not a payload command.
+    // Continue inspecting all actual inline, literal and folded shell blocks.
+    const commands=workflowRunBlocks(workflow);
     if(name==='corpus-operations.yml') {
-      // Only newly ingested sets are scanned, always with explicit set arguments.
-      for(const call of workflow.match(/node scripts\/check-corpus-health\.mjs[^\n]*/g)||[])
+      for(const call of commands.match(/node scripts\/check-corpus-health\.mjs[^\n]*/g)||[])
         assert.match(call,/"\$\{set_args\[@\]\}"/,name+': '+call);
       continue;
     }
-    assert.doesNotMatch(workflow,/check-corpus-health\.mjs|candidate-gameplay-canary|plan-corpus-health-refresh/,name);
+    assert.doesNotMatch(commands,/check-corpus-health\.mjs|candidate-gameplay-canary|plan-corpus-health-refresh/,name);
   }
+});
+
+test('scheduled-scan guard ignores trigger metadata but detects actual shell scans',()=>{
+  const fixture="on:\n  schedule:\n    - cron: '0 0 * * *'\n  push:\n    paths: ['scripts/check-corpus-health.mjs']\njobs:\n  verify:\n    steps:\n      - name: check-corpus-health.mjs is a trigger\n        run: |\n          node scripts/neon-egress-evidence.mjs\n      - run: echo ready\n";
+  const forbidden=/check-corpus-health\.mjs|candidate-gameplay-canary|plan-corpus-health-refresh/;
+  assert.doesNotMatch(workflowRunBlocks(fixture),forbidden);
+  for(const script of ['check-corpus-health.mjs','candidate-gameplay-canary.mjs','plan-corpus-health-refresh.mjs']) {
+    for(const run of [`node scripts/${script}`,`|\n          node scripts/${script}`,`>-\n          node scripts/${script}`]) {
+      assert.match(workflowRunBlocks(`jobs:\n  x:\n    steps:\n      - run: ${run}\n`),forbidden);
+    }
+  }
+  assert.doesNotMatch(workflowRunBlocks('jobs:\n  x:\n    steps:\n      - run: |\n          echo ready\n        env:\n          PATH_LABEL: check-corpus-health.mjs\n'),forbidden);
 });
 
 test('snapshot health check is manual and scans exactly one named snapshot',()=>{
@@ -74,7 +87,6 @@ test('snapshot health check is manual and scans exactly one named snapshot',()=>
   assert.match(workflow,/default: development/);
   assert.match(workflow,/\[\[ "\$SNAPSHOT_ID" =~ \^\(\[a-f0-9\]\{64\}\|historical-\[a-f0-9\]\{32\}\)\$ \]\]/);
   assert.match(workflow,/node scripts\/check-corpus-health\.mjs "\$RUNNER_TEMP\/snapshot-health\.connection" --snapshot "\$SNAPSHOT_ID"/);
-  // The operator-supplied ID reaches the shell only through the validated env var.
   assert.deepEqual(workflow.match(/\$\{\{ inputs\.snapshot_id \}\}/g),['${{ inputs.snapshot_id }}']);
   assert.match(workflow,/SNAPSHOT_ID: \$\{\{ inputs\.snapshot_id \}\}/);
   assert.doesNotMatch(workflow,/load_all_trophies|register-corpus-sources|candidate-gameplay-canary|plan-corpus-health-refresh|\/v1\/admin\/corpus/);
