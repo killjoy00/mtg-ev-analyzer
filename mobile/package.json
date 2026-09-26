@@ -13,7 +13,7 @@
     "test": "npm run test:lifecycle && npm run test:draft-run && npm run test:shared-run-storage && npm run lint && npm run typecheck && npm run config:check && npm run release:check",
     "release:check": "node ./scripts/release-preflight.mjs",
     "test:lifecycle": "node --test ./tests/version-gate-lifecycle.test.cjs",
-    "test:draft-run": "node --test ./tests/draft-run-race.test.cjs",
+    "test:draft-run": "node --test ./tests/draft-run-race.test.cjs ./tests/draft-run-recovery.test.cjs",
     "test:shared-run-storage": "node --test ./tests/shared-run-storage.test.cjs"
   },
   "dependencies": {

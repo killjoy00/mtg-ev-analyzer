@@ -546,6 +546,40 @@ export default function DraftRunScreen() {
     void Haptics.selectionAsync();
   };
 
+  const showCommittedPick = async (
+    run: DraftRunState,
+    session: MobileSession,
+    feedbackIndex: number,
+    token: RunResponseToken,
+  ) => {
+    if (run.current) {
+      const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
+      if (urls.length) void Image.prefetch(urls);
+    }
+    if (run.complete && practice) {
+      await clearPracticeIdempotencyKey().catch(() => undefined);
+    }
+    // Clearing a completed practice key is asynchronous too. A route change
+    // during that wait must not bring the previous run back onto the screen.
+    if (!mutationStillCurrent(token, run)) return;
+    commitState({ status: 'ready', run, session });
+    setActionError(null);
+    setReviewIndex(feedbackIndex);
+    setShowAnalysis(false);
+    setShowPackReview(false);
+    setMode('feedback');
+    const latestAnswer = run.answers[feedbackIndex];
+    if (latestAnswer) {
+      AccessibilityInfo.announceForAccessibility(
+        `${latestAnswer.score} out of 100. ${latestAnswer.historicalMatch
+          ? 'You matched the trophy drafter.'
+          : `The trophy drafter took ${latestAnswer.historicalName ?? 'another card'}.`}`,
+      );
+    }
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    scroll.current?.scrollTo({ y: 0, animated: true });
+  };
+
   const confirm = async () => {
     const current = stateRef.current;
     if (current.status !== 'ready' || !selected || !current.run.current || busy) return;
@@ -554,36 +588,34 @@ export default function DraftRunScreen() {
     try {
       const run = await submitDraftRunPick(current.run, selected, current.session);
       if (!mutationStillCurrent(token, run)) return;
-      if (run.current) {
-        const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
-        if (urls.length) void Image.prefetch(urls);
-      }
-      if (run.complete && practice) {
-        await clearPracticeIdempotencyKey().catch(() => undefined);
-      }
-      commitState({ status: 'ready', run, session: current.session });
-      setActionError(null);
-      setReviewIndex(run.answers.length - 1);
-      setShowAnalysis(false);
-      setShowPackReview(false);
-      setMode('feedback');
-      const latestAnswer = run.answers.at(-1);
-      if (latestAnswer) {
-        AccessibilityInfo.announceForAccessibility(
-          `${latestAnswer.score} out of 100. ${latestAnswer.historicalMatch
-            ? 'You matched the trophy drafter.'
-            : `The trophy drafter took ${latestAnswer.historicalName ?? 'another card'}.`}`,
-        );
-      }
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      scroll.current?.scrollTo({ y: 0, animated: true });
+      await showCommittedPick(run, current.session, current.run.answers.length, token);
     } catch (error: unknown) {
-      if (mutationStillCurrent(token)) {
-        commitState({
-          status: 'error',
-          message: error instanceof Error ? error.message : 'Your pick could not be saved.',
-        });
+      if (!mutationStillCurrent(token)) return;
+      const message = error instanceof Error ? error.message : 'Your pick could not be saved.';
+      try {
+        const reconciled = await loadDraftRun(current.run.id, current.session);
+        if (!mutationStillCurrent(token, reconciled)) return;
+        const expectedRound = current.run.answers.length;
+        const recovered = reconciled.answers[expectedRound];
+        if (
+          recovered
+          && recovered.puzzle.puzzle_id === current.run.current.puzzle_id
+          && recovered.selectedId === selected
+        ) {
+          await showCommittedPick(reconciled, current.session, expectedRound, token);
+          return;
+        }
+        if (reconciled.revision !== current.run.revision) {
+          commitState({ status: 'ready', run: reconciled, session: current.session });
+          setSelected(null);
+          setMode(reconciled.complete ? 'result' : 'pick');
+          setActionError('Your run changed elsewhere. The latest server state is loaded.');
+          return;
+        }
+      } catch {
+        // A failed reconciliation does not erase the still-valid mounted run.
       }
+      if (mutationStillCurrent(token)) setActionError(message);
     } finally {
       setBusy(false);
     }
