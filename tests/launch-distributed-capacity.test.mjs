@@ -1,0 +1,167 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy} from '../scripts/launch-distributed-core.mjs';
+import {policy,heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
+import {inspectBin,inspectPreviewTelemetry,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
+import {requestClient} from '../scripts/launch-distributed-player.mjs';
+const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
+const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
+const formed=()=>{let s=initialControl(scope,start,policy);for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,policy);return s;};
+const released=()=>{let s=formed();for(let i=0;i<5;i++)s=transition(s,msg(i,{ack:0}),start+200,policy);return s;};
+
+test('committed policy is bounded and cannot silently claim 100 or launch 500 players',()=>{
+ assert.equal(validatePolicy(policy),policy);
+ for(const patch of [{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120}])assert.throws(()=>validatePolicy({...policy,...patch}));
+ assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:500,hold_seconds:600}]}));
+ assert.throws(()=>initialControl({...scope,branch:'br-orange-feather-ayps8kep'},start,policy));
+});
+test('a late fifth runner cannot miss a pre-scheduled start: no start exists until all are ready',()=>{
+ let s=initialControl(scope,start,policy);
+ for(let i=0;i<4;i++)s=transition(s,msg(i),start+100,policy);
+ assert.equal(s.phase,'forming');assert.equal(s.start_at,undefined);
+ for(let i=0;i<4;i++)s=transition(s,msg(i),start+240000,policy);
+ assert.equal(s.start_at,undefined);
+ s=transition(s,msg(4),start+240100,policy);assert.equal(s.phase,'armed');assert.equal(s.start_at,start+270100);
+ for(let i=0;i<4;i++)s=transition(s,msg(i,{ack:0}),start+240200,policy);
+ assert.equal(s.phase,'armed');s=transition(s,msg(4,{ack:0}),start+240300,policy);assert.equal(s.phase,'released');
+});
+test('missing, duplicated, changed and spoof-free network evidence fail closed',()=>{
+ let s=initialControl(scope,start,policy);s=transition(s,msg(0),start+100,policy);
+ assert.equal(transition(s,msg(1,{network:msg(0).network}),start+200,policy).failure.reason,'duplicate_real_egress');
+ assert.equal(transition(s,msg(1,{network:null}),start+200,policy).failure.reason,'missing_real_egress');
+ assert.equal(transition(s,msg(0,{network:'f'.repeat(64)}),start+200,policy).failure.reason,'egress_changed');
+ assert.equal(transition(s,msg(0,{nonce:'11111111-1111-4111-8111-111111111111'}),start+200,policy).failure.reason,'duplicate_generator');
+ assert.equal(transition(s,msg(1,{scope:{...scope,attempt:'1'}}),start+200,policy).failure.reason,'scope_mismatch');
+ assert.equal(transition(s,msg(1),start+481000,policy).failure.reason,'incomplete_cohort');
+});
+test('lost heartbeat cannot be erased by the late runner refreshing itself',()=>{
+ let s=released();
+ for(let i=1;i<5;i++)s=transition(s,msg(i,{ack:0}),start+19000,policy);
+ assert.equal(transition(s,msg(0,{ack:0}),start+21000,policy).failure.reason,'lost_heartbeat');
+});
+test('all start acknowledgements are required, and stage failure cannot escalate',()=>{
+ const s=formed();
+ let waiting=s;for(let i=0;i<5;i++)waiting=transition(waiting,msg(i,{ack:i<4?0:null}),start+19000,policy);
+ assert.equal(transition(waiting,msg(0,{ack:0}),s.start_at-policy.ack_margin_seconds*1000,policy).failure.reason,'missing_start_ack');
+ const aborted=transition(released(),msg(0,{failure:{category:'application',reason:'http_503'}}),start+300,policy);
+ assert.equal(aborted.phase,'aborted');assert.equal(aborted.stage,0);
+ assert.deepEqual(transition(aborted,msg(0,{decision:{stage:0,passed:true}}),start+400,policy),aborted);
+});
+test('positive application, telemetry and usage decisions are all required between stages',()=>{
+ let s=released();
+ for(let i=0;i<5;i++)s=transition(s,msg(i,{ack:0,done:0}),start+300,policy);
+ assert.equal(s.phase,'checking');
+ assert.equal(transition(s,msg(0,{done:0,decision:{stage:0,passed:true,telemetry_passed:false,usage_passed:true}}),start+400,policy).phase,'aborted');
+ s=transition(s,msg(0,{done:0,decision:{stage:0,passed:true,telemetry_passed:true,usage_passed:true}}),start+400,policy);
+ assert.equal(s.stage,1);assert.equal(s.phase,'forming');assert.equal(s.start_at,undefined);
+ assert.equal(transition(s,msg(0,{ready:1}),start+500,policy).phase,'forming');
+});
+test('CAS heartbeat handles simultaneous actual asynchronous contenders without losing registrations',async()=>{
+ let state=initialControl(scope,start,policy),revision=0,misses=0;
+ const sql=async(query,params=[])=>{
+   if(query.startsWith('SELECT')){const snapshot={revision:String(revision),state:JSON.stringify(state),now_ms:String(start+100)};await new Promise(r=>setTimeout(r,2));return [snapshot];}
+   if(Number(params[1])!==revision){misses++;return [];}
+   state=JSON.parse(params[0]);revision++;return [{revision:String(revision)}];
+ };
+ await Promise.all(Array.from({length:5},(_,i)=>heartbeat(sql,msg(i))));
+ assert.equal(Object.keys(state.cohort).length,5);assert.equal(state.phase,'armed');assert.ok(misses>0);
+});
+test('SQL transport binds the verified database connection and rejects application SQL',async()=>{
+ const connection='postgresql://fixture:private@ep-test.us-east-2.aws.neon.tech/pack1';let calls=0;
+ const sql=coordinatorSQL(connection,{fetcher:async(url,options)=>{
+   calls++;assert.equal(url,'https://api.us-east-2.aws.neon.tech/sql');assert.equal(options.headers['Neon-Connection-String'],connection);assert.equal(options.redirect,'error');
+   return Response.json({fields:[{name:'revision'}],rows:[['3']]});
+ }});
+ assert.deepEqual(await sql('SELECT revision FROM pack1_load_control_v2'),[{revision:'3'}]);
+ await assert.rejects(()=>sql('DELETE FROM players'));assert.equal(calls,1);
+});
+function completeReports() {
+ const windows=timing(start,policy.stages[0],policy),reports=[];
+ for(let shard=0;shard<5;shard++) {
+  const r={scope,stage:0,shard,start_at:start,network:msg(shard).network,start_lateness_ms:0,started:5,initial_completed:5,correctness_failures:0,failures:[],arrival_delay_ms:[0,0,0,0,0],actors:[],requests:[],daily:{mixed:['a'.repeat(64)],'powered-cube':['b'.repeat(64)],latest:['c'.repeat(64)]},recovery_started_at:windows.recovery,recovery_ended_at:windows.end};
+  r.actors=Array.from({length:5},(_,i)=>({id:shard*5+i,guest:false,hold_runs:1,hold_reads:2,hold_entered_at:windows.hold,hold_exited_at:windows.drain}));
+  for(const [route,count] of Object.entries(policy.minimum_route_samples))for(let i=0;i<Math.ceil(count/5);i++)r.requests.push({route,phase:'initial',at:start+1,status:200,ms:50,bytes:10});
+  for(const route of ['pick','reroll','read'])r.requests.push({route,phase:'hold',at:windows.hold+1,status:200,ms:50,bytes:10});
+  r.requests.push({route:'read',phase:'recovery',at:windows.recovery+1,status:200,ms:50,bytes:10});reports.push(r);
+ }
+ return reports;
+}
+const evaluate=reports=>evaluateStage(reports,{scope,stage:0,start_at:start,networks:Object.fromEntries(reports.map(r=>[r.shard,r.network]))},policy);
+test('complete route, actor, sustained hold, recovery and cross-generator Daily evidence passes',()=>{
+ const result=evaluate(completeReports());assert.equal(result.passed,true);assert.equal(result.target,25);assert.equal(result.distinct_real_egress,5);assert.equal(result.correctness_failures,0);assert.equal(result.routes.pick.p99_ms,50);
+});
+for(const [name,mutate] of [
+ ['absent runner',r=>r.pop()],['duplicate runner',r=>r[1].shard=0],['missing route',r=>r.forEach(x=>x.requests=x.requests.filter(y=>y.route!=='reroll'))],
+ ['incorrect Daily',r=>r[1].daily.mixed=['f'.repeat(64)]],['incomplete hold',r=>r[1].actors[0].hold_runs=0],['absent recovery',r=>delete r[1].recovery_ended_at],
+ ['missing hold writes',r=>r.forEach(x=>x.requests=x.requests.filter(y=>y.phase!=='hold'))],['late arrival',r=>r[2].arrival_delay_ms[0]=2000],
+ ['missing clock',r=>delete r[0].start_lateness_ms],['wrong attempt',r=>r[0].scope={...scope,attempt:'1'}],['duplicate actors',r=>r[1].actors[0].id=0],
+ ['application 503',r=>r[0].requests[0].status=503],['unintended 429',r=>r[0].requests[0].status=429],['failed correctness',r=>r[0].correctness_failures=1],
+ ['latency failure',r=>r.forEach(x=>x.requests.filter(y=>y.route==='start').forEach(y=>y.ms=9000))],
+])test('capacity evaluator rejects '+name,()=>{const reports=completeReports();mutate(reports);assert.equal(evaluate(reports).passed,false);});
+test('missing samples are unknown, never zero-millisecond latency',()=>{assert.deepEqual(quantiles([]),{samples:0,p50_ms:null,p95_ms:null,p99_ms:null,max_ms:null});});
+test('request routing never permits production, provider, email or arbitrary mutations',()=>{
+ for(const path of ['https://api.packone.pro/draft/v1/runs','https://packone.pro/draft/v1/runs','/growth/v1/auth/send-email','/growth/v1/patreon/connect','/billing','/draft/v1/admin'])assert.throws(()=>permittedRequest(path,{}));
+ assert.equal(permittedRequest('/draft/v1/daily-status').hostname,'api-preview.packone.pro');
+ assert.throws(()=>permittedRequest('/draft/v1/daily-status',{}));
+});
+test('client really preserves cookies, CSRF and idempotency without forwarding-header spoofing or retries',async()=>{
+ const budget={gateway_requests:0,response_bytes:0},actor={cookies:new Map([['__Host-pack1_player','fixture']]),csrf:'csrf'},requests=[];
+ const client=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:new AbortController().signal,fetcher:async(url,options)=>{
+  requests.push(options);return Response.json({ok:true},{headers:{'set-cookie':'__Host-pack1_player=updated; Secure; HttpOnly'}});
+ }});
+ await client(actor,'start','/draft/v1/runs',{environment:'mixed'});
+ assert.equal(actor.cookies.get('__Host-pack1_player'),'updated');assert.equal(requests[0].headers['x-pack1-csrf'],'csrf');assert.match(requests[0].headers['x-idempotency-key'],/^[a-f0-9-]{36}$/);
+ for(const key of Object.keys(requests[0].headers))assert.doesNotMatch(key,/forwarded|connecting-ip|real-ip/);
+ let failures=0;const broken=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:new AbortController().signal,fetcher:async()=>{failures++;return Response.json({error:'busy'},{status:503});}});
+ await assert.rejects(()=>broken(actor,'start','/draft/v1/runs',{environment:'mixed'}),/http_503/);assert.equal(failures,1);
+});
+const event=(extra={})=>({id:'event',release:scope.sha,status:200,duration_ms:50,quota_ms:5,upstream_ms:40,...extra});
+test('telemetry bins require positive correct-release evidence and reject errors and absence',()=>{
+ assert.equal(inspectBin([event()],{sha:scope.sha,requests:25,from:0,to:60},policy).passed,true);
+ for(const events of [[],[event({release:'b'.repeat(40)})],[event({status:503})],[event({status:429})]])assert.equal(inspectBin(events,{sha:scope.sha,requests:25,from:0,to:60},policy).passed,false);
+});
+test('preview log query uses the real retained-event parser, exact service filtering and deduplication',async()=>{
+ const row={$metadata:{id:'retained-1'},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:.1,route:'draft_pick'}};
+ const fetcher=async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.parameters.filters[0].value,'pack1-gateway-preview');return Response.json({success:true,result:{events:{events:[row,row]}}});};
+ const result=await queryPreviewEvents(fetcher,'token','account',0,60000);assert.equal(result.length,1);
+ await assert.rejects(()=>queryPreviewEvents(async()=>Response.json({success:true,result:{events:{events:[{source:{}}]}}}),'t','a',0,60),/invalid_retained/);
+});
+test('inaccessible, truncated and schema-invalid retained preview telemetry cannot produce a pass',async()=>{
+ for(const fetcher of [async()=>Response.json({}, {status:403}),async()=>Response.json({result:{}}),async()=>Response.json({result:{events:{events:Array(200).fill({})}}})])await assert.rejects(()=>queryPreviewEvents(fetcher,'t','a',0,500));
+});
+test('complete preview inspection rejects a missing active minute, not just an empty full-run result',async()=>{
+ const to=120000,requests=[{at:1},{at:60001}],row={$metadata:{id:'retained'},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:.1,route:'draft_pick'}};
+ const report=await inspectPreviewTelemetry({reports:[{requests}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>to+120000,fetcher:async(url,options)=>Response.json({result:{events:{events:JSON.parse(options.body).timeframe.from===0?[row]:[]}}})});
+ assert.equal(report.passed,false);assert.equal(report.bins[0].passed,true);assert.equal(report.bins[1].passed,false);
+});
+
+test('paced harness executes eight picks, repeated practice/rerolls and recovery against a stateful application fixture',async()=>{
+ const {runPlayerStage}=await import('../scripts/launch-distributed-player.mjs');
+ const mini={...policy,ramp_seconds:0,initial_seconds:2,stages:[{players:25,hold_seconds:.2}],drain_seconds:.5,recovery_seconds:.05,think_time_ms:[1,2],guest_read_interval_ms:5,recovery_read_interval_ms:5,minimum_rolling_route_samples:10000};
+ const users=Array.from({length:100},(_,i)=>({token:'player'+i,account:'account'+i,csrf:'csrf'+i}));
+ const fixture={users,sets:['a','b','c'],preview:'a'.repeat(64)},budget={gateway_requests:0,response_bytes:0},runs=new Map(),calls=[],controller=new AbortController();
+ let pickCount=0,rerolls=0;const render=run=>({...run,current:{puzzle_id:(run.day?run.environment:run.id)+'-'+run.round,candidates:[{id:'card'}]},run_length:8,complete:run.round===8,score:run.round===8?80:undefined});
+ const client=requestClient({fixture,policy:mini,budget,now:Date.now,signal:controller.signal,fetcher:async(url,options)=>{
+  const pathname=new URL(url).pathname,body=options.body?JSON.parse(options.body):null;calls.push({pathname,body});
+  if(pathname==='/growth/v1/player/session')return Response.json({ok:true});
+  if(pathname==='/draft/v1/daily-status')return Response.json({ranking_identity:{eligible:true}});
+  if(pathname==='/draft/v1/practice-sets'||pathname==='/growth/v1/profile/me'||pathname==='/draft/v1/leaderboard')return Response.json({rows:[]});
+  if(pathname==='/draft/v1/runs') {
+   const run={id:crypto.randomUUID(),revision:0,round:0,day:body.daily?'2026-09-26':null,environment:body.environment,leaderboard_eligible:true,answers:[]};runs.set(run.id,run);return Response.json(render(run),{status:201});
+  }
+  const match=pathname.match(/^\/draft\/v1\/runs\/([^/]+)\/(view|pick|reroll|share)$/);assert.ok(match,'no other mutation is allowed');
+  const run=runs.get(match[1]);assert.ok(run);
+  if(match[2]==='view'){assert.equal(body.revision,run.revision);run.view=body.viewId;return Response.json({ok:true});}
+  if(match[2]==='reroll'){assert.equal(run.day,null);assert.equal(body.revision,run.revision);run.revision++;rerolls++;return Response.json(render(run));}
+  if(match[2]==='pick') {
+   assert.equal(body.viewId,run.view);assert.equal(body.revision,run.revision);assert.equal(body.round,run.round);assert.equal(body.puzzleId,render(run).current.puzzle_id);
+   run.answers.push({score:80});run.round++;run.revision++;pickCount++;return Response.json(render(run));
+  }
+  assert.equal(run.round,8);return Response.json(run.day?{daily:true,url:'/draft/?daily=1'}:{id:'a'.repeat(24)});
+ }});
+ const failures=[],report=await runPlayerStage({fixture,policy:mini,scope,stage:0,shard:1,start_at:Date.now()+10,network:msg(1).network,now:Date.now,signal:controller.signal,client,onFailure:f=>{failures.push(f);controller.abort();}});
+ assert.deepEqual(failures,[]);assert.equal(report.initial_completed,5);assert.ok(report.actors.every(a=>a.hold_runs>0));
+ assert.ok(pickCount>=80);assert.ok(rerolls>=7);assert.ok(report.requests.some(r=>r.phase==='recovery'));assert.ok(report.requests.some(r=>r.phase==='hold'&&r.route==='pick'));
+ assert.equal(report.correctness_failures,0);assert.ok(report.recovery_ended_at>=report.windows.end);
+ assert.equal(calls.filter(c=>c.pathname==='/growth/v1/player/session').length,5,'no identity creation during hold');
+});
