@@ -22,15 +22,18 @@ import {
   DAILY_ENVIRONMENT_META,
   isDailyEnvironment,
   loadDraftRun,
+  loadSharedDraftRunInfo,
   rerollDraftRun,
   startDailyDraftRun,
   startPracticeDraftRun,
+  startSharedDraftRun,
   submitDraftRunPick,
   type DailyEnvironment,
   type DraftRunAnswer,
   type DraftRunCard,
   type DraftRunState,
   type PracticeEnvironment,
+  type SharedDraftRunInfo,
 } from '@/src/api/draftRun';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
@@ -40,6 +43,7 @@ import { colors, spacing } from '@/src/theme';
 type LoadState =
   | { status: 'loading' }
   | { status: 'signin-required' }
+  | { status: 'challenge-invite'; info: SharedDraftRunInfo; session: MobileSession }
   | { status: 'ready'; run: DraftRunState; session: MobileSession }
   | { status: 'error'; message: string };
 
@@ -346,8 +350,13 @@ async function loadDraftSurface(
   environment: DailyEnvironment,
   practice: boolean,
   setIds: string[],
+  sharedId?: string | null,
 ) {
   const session = await ensureGuestSession();
+  if (sharedId) {
+    const info = await loadSharedDraftRunInfo(sharedId, session);
+    return { status: 'challenge-invite' as const, info, session };
+  }
   if (practice) {
     if (!session.accountToken) return { status: 'signin-required' as const };
     const practiceEnvironment: PracticeEnvironment = environment === 'powered-cube' ? 'powered-cube' : 'mixed';
@@ -366,8 +375,11 @@ async function loadDraftSurface(
 }
 
 export default function DraftRunScreen() {
-  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string }>();
+  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; shared?: string }>();
   const practice = params.mode === 'practice';
+  const rawShared = typeof params.shared === 'string' ? params.shared : '';
+  const sharedId = /^[a-f0-9]{24}$/.test(rawShared) ? rawShared : '';
+  const challenge = Boolean(sharedId);
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const practiceEnvironment: PracticeEnvironment = requestedEnvironment === 'powered-cube' ? 'powered-cube' : 'mixed';
   const environment: DailyEnvironment = practice
@@ -376,16 +388,21 @@ export default function DraftRunScreen() {
   const setIdsParam = practice && typeof params.setIds === 'string' ? params.setIds : '';
   const setIds = useMemo(() => parsePracticeSets(setIdsParam), [setIdsParam]);
   const dailyMeta = DAILY_ENVIRONMENT_META[environment];
-  const surfaceMeta = practice
+  const surfaceMeta = challenge
     ? {
-        eyebrow: setIds.length
-          ? 'CUSTOM SET PRACTICE'
-          : environment === 'powered-cube' ? 'POWERED CUBE PRACTICE' : 'PRACTICE DRAFT RUN',
-        resultTitle: setIds.length
-          ? 'Custom practice complete.'
-          : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
+        eyebrow: 'SHARED DRAFT RUN',
+        resultTitle: 'Shared run complete.',
       }
-    : dailyMeta;
+    : practice
+      ? {
+          eyebrow: setIds.length
+            ? 'CUSTOM SET PRACTICE'
+            : environment === 'powered-cube' ? 'POWERED CUBE PRACTICE' : 'PRACTICE DRAFT RUN',
+          resultTitle: setIds.length
+            ? 'Custom practice complete.'
+            : environment === 'powered-cube' ? 'Powered Cube practice complete.' : 'Practice complete.',
+        }
+      : dailyMeta;
   const [state, setState] = useState<LoadState>({ status: 'loading' });
   const [mode, setMode] = useState<ViewMode>('pick');
   const [selected, setSelected] = useState<string | null>(null);
@@ -402,7 +419,7 @@ export default function DraftRunScreen() {
     if (state.status !== 'ready' || busy) return;
     try {
       const previousRun = state.run;
-      const run = practice
+      const run = practice || challenge
         ? await loadDraftRun(previousRun.id, state.session)
         : await startDailyDraftRun(state.session, environment);
       setState({ status: 'ready', run, session: state.session });
@@ -424,11 +441,15 @@ export default function DraftRunScreen() {
 
   useEffect(() => {
     let active = true;
-    void loadDraftSurface(environment, practice, setIds)
+    void loadDraftSurface(environment, practice, setIds, sharedId || null)
       .then((loaded) => {
         if (!active) return;
         if (loaded.status === 'signin-required') {
           setState({ status: 'signin-required' });
+          return;
+        }
+        if (loaded.status === 'challenge-invite') {
+          setState(loaded);
           return;
         }
         setMode(loaded.run.complete ? 'result' : 'pick');
@@ -444,7 +465,7 @@ export default function DraftRunScreen() {
     return () => {
       active = false;
     };
-  }, [environment, practice, setIds]);
+  }, [challenge, environment, practice, setIds, sharedId]);
 
   const retry = async () => {
     setState({ status: 'loading' });
@@ -452,9 +473,13 @@ export default function DraftRunScreen() {
     setActionError(null);
     setMode('pick');
     try {
-      const loaded = await loadDraftSurface(environment, practice, setIds);
+      const loaded = await loadDraftSurface(environment, practice, setIds, sharedId || null);
       if (loaded.status === 'signin-required') {
         setState({ status: 'signin-required' });
+        return;
+      }
+      if (loaded.status === 'challenge-invite') {
+        setState(loaded);
         return;
       }
       setMode(loaded.run.complete ? 'result' : 'pick');
@@ -464,6 +489,29 @@ export default function DraftRunScreen() {
         status: 'error',
         message: error instanceof Error ? error.message : 'Draft Run is unavailable.',
       });
+    }
+  };
+
+  const acceptSharedRun = async () => {
+    if (state.status !== 'challenge-invite' || busy) return;
+    if (!state.session.accountToken) {
+      router.push({
+        pathname: '/account',
+        params: { returnTo: 'challenge', shared: state.info.id },
+      });
+      return;
+    }
+    setBusy(true);
+    setActionError(null);
+    try {
+      const run = await startSharedDraftRun(state.session, state.info.id);
+      setMode(run.complete ? 'result' : 'pick');
+      setSelected(null);
+      setState({ status: 'ready', run, session: state.session });
+    } catch (error: unknown) {
+      setActionError(error instanceof Error ? error.message : 'This shared run could not be started.');
+    } finally {
+      setBusy(false);
     }
   };
 
@@ -515,13 +563,14 @@ export default function DraftRunScreen() {
   const shareResult = async () => {
     if (state.status !== 'ready' || !state.run.complete) return;
     const matches = state.run.answers.filter((item) => item.historicalMatch).length;
-    const label = environment === 'latest' ? 'Latest Set' : environment === 'powered-cube' ? 'Powered Cube' : 'Draft Run';
+    const resultEnvironment = run.environment === 'latest' ? 'latest' : run.environment === 'powered-cube' ? 'powered-cube' : 'mixed';
+    const label = resultEnvironment === 'latest' ? 'Latest Set' : resultEnvironment === 'powered-cube' ? 'Powered Cube' : 'Draft Run';
     const squares = state.run.answers.map((item) => (
       item.historicalMatch ? '🟩' : item.score >= 85 ? '🟦' : item.score >= 60 ? '🟨' : item.score >= 25 ? '🟧' : '⬛'
     )).join('');
     setShareError(null);
     try {
-      const setParam = environment === 'mixed' ? '' : `&set=${environment}`;
+      const setParam = resultEnvironment === 'mixed' ? '' : `&set=${resultEnvironment}`;
       const url = state.run.day
         ? `https://packone.pro/?game=draft-run${setParam}&daily=1&ref=result_share`
         : `https://packone.pro/?game=draft-run${setParam}&shared=${(await createDraftRunShare(state.run.id, state.session)).id}`;
@@ -577,6 +626,52 @@ export default function DraftRunScreen() {
     setMode('feedback');
     scroll.current?.scrollTo({ y: 0, animated: true });
   };
+
+  if (state.status === 'challenge-invite') {
+    const cubeInvite = state.info.environment === 'powered-cube';
+    return (
+      <SafeAreaView style={styles.safe}>
+        <ScrollView contentContainerStyle={styles.invitePage}>
+          <Text style={styles.eyebrow}>{cubeInvite ? 'A FRIEND’S POWERED CUBE' : 'A FRIEND’S DRAFT RUN'}</Text>
+          <Text style={styles.title}>Play this run and compare.</Text>
+          <Text style={styles.resultBody}>
+            {state.info.name} sent you {state.info.run_length} real decisions from trophy drafts. You’ll see the same packs and the same earlier picks.
+          </Text>
+          <View style={styles.inviteScore}>
+            <Text style={styles.inviteScoreLabel}>{state.info.name}</Text>
+            <Text style={styles.inviteScoreValue}>{state.info.score}/100</Text>
+          </View>
+          {state.info.scores.length ? (
+            <View style={styles.inviteScores}>
+              <Text style={styles.analysisTitle}>Players on this shared run</Text>
+              {state.info.scores.slice(0, 12).map((item, index) => (
+                <View key={`${item.name}:${index}`} style={styles.inviteScoreRow}>
+                  <Text style={styles.rankingName}>{item.name}</Text>
+                  <Text style={styles.resultReviewScore}>{item.score}</Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+          <Text style={styles.sectionBody}>
+            {cubeInvite ? 'Powered Cube practice access is required.' : 'A free Pack One account includes regular practice.'}
+          </Text>
+          <Pressable
+            accessibilityRole="button"
+            disabled={busy}
+            onPress={() => void acceptSharedRun()}
+            style={[styles.primaryButton, busy && styles.primaryButtonDisabled]}
+          >
+            {busy ? <ActivityIndicator color="#fff" /> : (
+              <Text style={styles.primaryButtonText}>
+                {state.session.accountToken ? 'Play this run' : 'Sign in to play this run'}
+              </Text>
+            )}
+          </Pressable>
+          {actionError ? <Text accessibilityRole="alert" style={styles.actionError}>{actionError}</Text> : null}
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   if (state.status === 'loading') {
     return (
@@ -648,6 +743,21 @@ export default function DraftRunScreen() {
               {run.standing.percentile ? ` · Top ${run.standing.percentile}%` : ''}
             </Text>
           ) : null}
+          {run.comparison?.exact ? (
+            <View style={styles.comparisonPanel}>
+              <Text style={styles.analysisTitle}>
+                {Number(run.score ?? 0) > run.comparison.score
+                  ? `You beat ${run.comparison.name}.`
+                  : Number(run.score ?? 0) < run.comparison.score
+                    ? `${run.comparison.name} won this one.`
+                    : `You tied ${run.comparison.name}.`}
+              </Text>
+              <Text style={styles.comparisonScore}>
+                You {run.score ?? 0} · {run.comparison.name} {run.comparison.score}
+              </Text>
+              <Text style={styles.resultBody}>Same eight decisions. Same trophy-draft context. No rerolls.</Text>
+            </View>
+          ) : null}
           <View style={styles.resultReview}>
             <Text style={styles.analysisTitle}>Your {run.run_length} picks</Text>
             {run.answers.map((item, index) => (
@@ -682,12 +792,14 @@ export default function DraftRunScreen() {
           {shareError ? <Text accessibilityRole="alert" style={styles.actionError}>{shareError}</Text> : null}
           <View style={styles.guestNote}>
             <Text style={styles.guestNoteTitle}>
-              {practice ? 'Saved to your career' : state.session.accountToken ? 'Saved to your account' : 'Guest result'}
+              {challenge ? 'Shared run saved to your career' : practice ? 'Saved to your career' : state.session.accountToken ? 'Saved to your account' : 'Guest result'}
             </Text>
             <Text style={styles.resultBody}>
-              {practice
-                ? 'Practice uses your signed-in Pack One identity and does not enter the Daily leaderboard.'
-                : state.session.accountToken
+              {challenge
+                ? 'This shared run uses the exact decisions from the original share and records the comparison in your Pack One career.'
+                : practice
+                  ? 'Practice uses your signed-in Pack One identity and does not enter the Daily leaderboard.'
+                  : state.session.accountToken
                   ? 'This result used your signed-in Pack One identity and the same server eligibility rules as web.'
                   : 'Sign in or create your Pack One account to validate this Daily score and keep your career across devices.'}
             </Text>
@@ -717,7 +829,7 @@ export default function DraftRunScreen() {
       <View style={styles.shell}>
         <ScrollView ref={scroll} contentContainerStyle={styles.page}>
           <Text style={styles.eyebrow}>
-            {practice ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
+            {challenge ? surfaceMeta.eyebrow : practice ? surfaceMeta.eyebrow : `${dailyMeta.eyebrow} · ${run.day ?? 'TODAY'}`}
           </Text>
           <Text style={styles.title}>
             {puzzle.set_id.toUpperCase()} <Text style={styles.titleMeta}>· Pack 1 · Pick {puzzle.pick_number}</Text>
@@ -899,7 +1011,8 @@ export default function DraftRunScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   shell: { flex: 1 },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md },
+  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.md, alignSelf: 'center', width: '100%', maxWidth: 980 },
+  invitePage: { padding: spacing.xl, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 760 },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl, gap: spacing.md },
   loadingText: { color: colors.muted, fontSize: 15 },
   errorTitle: { color: colors.ink, fontSize: 24, fontWeight: '800', textAlign: 'center' },
@@ -954,6 +1067,13 @@ const styles = StyleSheet.create({
   },
   rerollButtonText: { color: colors.accentDark, fontSize: 13, fontWeight: '800' },
   actionError: { color: colors.danger, fontSize: 13, lineHeight: 18 },
+  inviteScore: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.xs },
+  inviteScoreLabel: { color: colors.muted, fontSize: 12, fontWeight: '800', textTransform: 'uppercase' },
+  inviteScoreValue: { color: colors.ink, fontSize: 34, fontWeight: '800' },
+  inviteScores: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.sm },
+  inviteScoreRow: { minHeight: 38, flexDirection: 'row', alignItems: 'center', borderBottomWidth: 1, borderColor: colors.line, gap: spacing.md },
+  comparisonPanel: { borderWidth: 1, borderTopWidth: 3, borderColor: colors.line, borderTopColor: colors.accent, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.sm },
+  comparisonScore: { color: colors.ink, fontSize: 21, fontWeight: '800' },
   actionDock: {
     borderTopWidth: 1,
     borderColor: colors.line,
