@@ -236,3 +236,32 @@ test('v1 exposes the approved TCGplayer card destination only inside revealed sc
   assert.match(draft, /<FeedbackAnalysis/);
   assert.doesNotMatch(read('mobile/app/index.tsx'), /TCGplayer/);
 });
+
+
+test('v1 includes the current Pack One Learn guides and conscious support/legal routing', () => {
+  const layout = read('mobile/app/_layout.tsx');
+  const home = read('mobile/app/index.tsx');
+  const learn = read('mobile/app/learn.tsx');
+  const guide = read('mobile/app/guide.tsx');
+  const content = read('mobile/src/content/learning.ts');
+  const article = read('mobile/src/components/ArticleScreen.tsx');
+  const linking = read('mobile/src/linking.ts');
+  const about = read('mobile/app/about.tsx');
+
+  for (const slug of ['first-pick-discipline','reading-consensus','staying-open','card-strength-vs-fit']) {
+    assert.match(content, new RegExp("slug: '"+slug+"'"));
+    assert.match(linking, new RegExp(slug));
+  }
+  assert.match(layout, /name="learn"/);
+  assert.match(layout, /name="guide"/);
+  assert.match(layout, /name="about"/);
+  assert.match(layout, /name="legal"/);
+  assert.match(home, /router\.push\('\/learn'\)/);
+  assert.match(learn, /Go deeper on Pack One/);
+  assert.match(guide, /learningGuide/);
+  assert.match(article, /maxWidth: 860/);
+  assert.match(about, /admin@packone\.pro/);
+  assert.match(about, /partner@packone\.pro/);
+  assert.match(linking, /\/legal\?doc=privacy/);
+  assert.match(linking, /\/legal\?doc=terms/);
+});
