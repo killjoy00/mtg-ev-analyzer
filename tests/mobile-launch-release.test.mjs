@@ -289,3 +289,22 @@ test('v1 includes all four published web set archive analyses natively', () => {
   assert.match(detail, /maxWidth: 980/);
   assert.match(linking, /\/set-archive\?setId=/);
 });
+
+
+test('v1 mirrors the live Daily-home TCGplayer fallback without adding a native ad SDK', () => {
+  const home = read('mobile/app/index.tsx');
+  const helper = read('mobile/src/tcgplayer.ts');
+  const api = read('mobile/src/api/account.ts');
+  const pkg = JSON.parse(read('mobile/package.json'));
+
+  assert.match(home, /Shop Magic on TCGplayer/);
+  assert.match(home, /Affiliate link\. Pack One may earn a commission from purchases/);
+  assert.match(home, /loadMobilePatreonStatus/);
+  assert.match(home, /membership\.ads_allowed/);
+  assert.match(home, /catch\(\(\) => false\)/);
+  assert.match(helper, /magic-the-gathering/);
+  assert.match(helper, /tcgplayerMagicUrl/);
+  assert.match(api, /ads_allowed: boolean/);
+  assert.equal(pkg.dependencies['react-native-google-mobile-ads'], undefined);
+  assert.equal(pkg.dependencies['expo-ads-admob'], undefined);
+});
