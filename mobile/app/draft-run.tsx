@@ -546,7 +546,12 @@ export default function DraftRunScreen() {
     void Haptics.selectionAsync();
   };
 
-  const showCommittedPick = async (run: DraftRunState, session: MobileSession) => {
+  const showCommittedPick = async (
+    run: DraftRunState,
+    session: MobileSession,
+    feedbackIndex: number,
+    token: RunResponseToken,
+  ) => {
     if (run.current) {
       const urls = run.current.candidates.map((card) => card.image_url).filter((url): url is string => Boolean(url));
       if (urls.length) void Image.prefetch(urls);
@@ -554,13 +559,16 @@ export default function DraftRunScreen() {
     if (run.complete && practice) {
       await clearPracticeIdempotencyKey().catch(() => undefined);
     }
+    // Clearing a completed practice key is asynchronous too. A route change
+    // during that wait must not bring the previous run back onto the screen.
+    if (!mutationStillCurrent(token, run)) return;
     commitState({ status: 'ready', run, session });
     setActionError(null);
-    setReviewIndex(run.answers.length - 1);
+    setReviewIndex(feedbackIndex);
     setShowAnalysis(false);
     setShowPackReview(false);
     setMode('feedback');
-    const latestAnswer = run.answers.at(-1);
+    const latestAnswer = run.answers[feedbackIndex];
     if (latestAnswer) {
       AccessibilityInfo.announceForAccessibility(
         `${latestAnswer.score} out of 100. ${latestAnswer.historicalMatch
@@ -580,7 +588,7 @@ export default function DraftRunScreen() {
     try {
       const run = await submitDraftRunPick(current.run, selected, current.session);
       if (!mutationStillCurrent(token, run)) return;
-      await showCommittedPick(run, current.session);
+      await showCommittedPick(run, current.session, current.run.answers.length, token);
     } catch (error: unknown) {
       if (!mutationStillCurrent(token)) return;
       const message = error instanceof Error ? error.message : 'Your pick could not be saved.';
@@ -594,7 +602,7 @@ export default function DraftRunScreen() {
           && recovered.puzzle.puzzle_id === current.run.current.puzzle_id
           && recovered.selectedId === selected
         ) {
-          await showCommittedPick(reconciled, current.session);
+          await showCommittedPick(reconciled, current.session, expectedRound, token);
           return;
         }
         if (reconciled.revision !== current.run.revision) {
@@ -607,7 +615,7 @@ export default function DraftRunScreen() {
       } catch {
         // A failed reconciliation does not erase the still-valid mounted run.
       }
-      setActionError(message);
+      if (mutationStillCurrent(token)) setActionError(message);
     } finally {
       setBusy(false);
     }
