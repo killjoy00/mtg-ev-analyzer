@@ -9,12 +9,13 @@ import {
 export type AccountState = {
   user: MobileAccountUser;
   session: { expiresAt?: string };
-  credentials: { password: boolean; google: boolean };
+  credentials: { password: boolean; google: boolean; apple: boolean };
   deletion: {
     enabled: boolean;
     available: boolean;
     googleOnly: boolean;
-    method: 'password' | 'email' | null;
+    socialOnly?: boolean;
+    method: 'password' | 'email' | 'apple' | null;
   };
 };
 
@@ -107,6 +108,46 @@ export async function finishGoogleSignIn(
   return { result, session: await persistAccount(result) };
 }
 
+export async function startAppleSignIn(current: MobileSession) {
+  return requestJson<{ flowToken: string; url: string }>('/growth/v1/mobile/account/apple/start', {
+    method: 'POST',
+    mobileSessionToken: current.playerToken,
+    body: {},
+  });
+}
+
+export async function finishAppleSignIn(
+  current: MobileSession,
+  handoffToken: string,
+  validateDailyRunId?: string,
+) {
+  const result = await requestJson<MobileAuthResponse>('/growth/v1/mobile/account/apple/finish', {
+    method: 'POST',
+    mobileSessionToken: current.playerToken,
+    body: { handoffToken, validateDailyRunId },
+  });
+  return { result, session: await persistAccount(result) };
+}
+
+export async function finishNativeAppleSignIn(
+  current: MobileSession,
+  credential: {
+    flowToken: string;
+    identityToken: string;
+    authorizationCode: string;
+    firstName?: string | null;
+    lastName?: string | null;
+  },
+  validateDailyRunId?: string,
+) {
+  const result = await requestJson<MobileAuthResponse>('/growth/v1/mobile/account/apple/native', {
+    method: 'POST',
+    mobileSessionToken: current.playerToken,
+    body: { ...credential, validateDailyRunId },
+  });
+  return { result, session: await persistAccount(result) };
+}
+
 export async function loadMobileAccount(session: MobileSession) {
   if (!session.accountToken) return null;
   return requestJson<AccountState>('/growth/v1/mobile/account/session', {
@@ -134,6 +175,35 @@ export async function signOutMobileAccount(session: MobileSession) {
     });
   }
   return forgetAccountLocally(session);
+}
+
+export async function startAppleDeletionVerification(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in before deleting your account.');
+  return requestJson<{ flowToken: string; url: string }>('/growth/v1/mobile/account/delete/apple/start', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: { confirm: true },
+  });
+}
+
+export async function finishAppleDeletion(
+  session: MobileSession,
+  handoffToken: string,
+) {
+  if (!session.accountToken) throw new Error('Sign in before deleting your account.');
+  const result = await requestJson<{ ok: boolean; deletion: 'complete' | 'accepted'; operationId?: string }>(
+    '/growth/v1/mobile/account/delete/apple/finish',
+    {
+      method: 'POST',
+      mobileSessionToken: session.playerToken,
+      mobileAccountToken: session.accountToken,
+      body: { confirm: true, handoffToken },
+      timeoutMs: 30_000,
+    },
+  );
+  await clearSession();
+  return result;
 }
 
 export async function startDeletionVerification(session: MobileSession) {

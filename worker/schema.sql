@@ -195,6 +195,7 @@ CREATE TABLE IF NOT EXISTS mobile_oauth_handoffs (
   guest_player_id uuid NOT NULL REFERENCES players(id) ON DELETE CASCADE,
   auth_user_id uuid REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
   provider text NOT NULL CHECK(provider IN ('google','apple')),
+  flow_kind text NOT NULL DEFAULT 'mobile' CHECK(flow_kind IN ('mobile','web')),
   created_at timestamptz NOT NULL DEFAULT now(),
   expires_at timestamptz NOT NULL,
   authenticated_at timestamptz,
@@ -208,3 +209,24 @@ CREATE TABLE IF NOT EXISTS mobile_oauth_handoffs (
 );
 CREATE INDEX IF NOT EXISTS mobile_oauth_handoffs_expiry_idx
   ON mobile_oauth_handoffs(expires_at) WHERE consumed_at IS NULL;
+
+CREATE TABLE IF NOT EXISTS apple_auth_identities (
+  apple_subject text PRIMARY KEY CHECK(length(apple_subject) BETWEEN 1 AND 255),
+  auth_user_id uuid NOT NULL UNIQUE REFERENCES neon_auth."user"(id) ON DELETE CASCADE,
+  email text NOT NULL CHECK(length(email) BETWEEN 3 AND 254),
+  first_name text,
+  last_name text,
+  synthetic_password boolean NOT NULL DEFAULT false,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+CREATE TABLE IF NOT EXISTS apple_auth_tokens (
+  apple_subject text NOT NULL REFERENCES apple_auth_identities(apple_subject) ON DELETE CASCADE,
+  client_id text NOT NULL CHECK(client_id IN ('pro.packone.app','pro.packone.web')),
+  refresh_token_ciphertext text NOT NULL,
+  updated_at timestamptz NOT NULL DEFAULT now(),
+  revoked_at timestamptz,
+  PRIMARY KEY(apple_subject,client_id)
+);
+CREATE INDEX IF NOT EXISTS apple_auth_tokens_active_idx
+  ON apple_auth_tokens(apple_subject,client_id) WHERE revoked_at IS NULL;

@@ -12,8 +12,9 @@ const columns = `p.puzzle_id,p.set_id,p.corpus_version,p.source_draft_hash,p.pac
 const from = `FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r
   ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'`;
 const base = `(${corpusMembership()}) AND p.interesting AND p.pack_number=1`;
-const servingBase = `${SERVING_QUALITY_SQL} AND (${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
+const servingCandidatesBase = `(${corpusMembership({serving:true})}) AND p.interesting AND p.pack_number=1 AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x
   WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash)`;
+const servingBase = `${SERVING_QUALITY_SQL} AND ${servingCandidatesBase}`;
 export function decodePuzzleMetadata(p) {
   return {...p, rating:Number(p.rating), top_two_ratio:Number(p.top_two_ratio),
     target_support_ratio:p.target_support_ratio==null?null:Number(p.target_support_ratio),
@@ -139,18 +140,19 @@ export async function selectDatabaseReroll(query,version,source,options) {
   const picks=Array.from({length:12},(_,i)=>i+1).filter(p=>eligiblePickForRound(round,p,environment,selectionVersion)&&Math.abs(p-source.pick_number)<=1);
   if(!picks.length)return null;
   const params=[version,picks[0],picks.at(-1),toPgArray([...new Set([...(options.excludedSources||[]),source.source_draft_hash])])];
-  let where=`${servingBase} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params,previous)}`;
+  let ratingWhere=SERVING_QUALITY_SQL;
+  let where=`${servingCandidatesBase} AND p.pick_number BETWEEN $2::int AND $3::int AND p.source_draft_hash<>ALL($4::text[]) AND ${environmentFilter(environment,params,previous)}`;
   if(options.setIds?.length){params.push(toPgArray(options.setIds));where+=` AND p.set_id=ANY($${params.length}::text[])`;}
   if(selectionVersion===DAILY_SELECTION_VERSION)where+=" AND EXISTS(SELECT 1 FROM draft_run_environment_policy e WHERE e.set_id=p.set_id AND e.status='Live' AND (e.regular_run OR e.set_id='powered-cube'))";
   params.push(source.set_id);where+=` AND p.set_id${type==='set'?'<>':'='}$${params.length}`;
-  if(!previous&&round>=earlyRoundsForSelection(selectionVersion))where+=" AND r.band<>'easy'";
+  if(!previous&&round>=earlyRoundsForSelection(selectionVersion))ratingWhere+=" AND r.band<>'easy'";
   if(options.daily&&isEightPickVersion(selectionVersion)&&environment==='mixed') {
     params.push(toPgArray(releasedRunSets(options.day||gameDateKey())));where+=` AND p.set_id=ANY($${params.length}::text[])`;
   }
   if(difficultyVersion!==LEGACY_DIFFICULTY_VERSION) {
     if(a.band!==origin.band)return null;
     params.push(a.band,Math.max(a.rating,origin.rating)-MAX_REROLL_RATING_DELTA,Math.min(a.rating,origin.rating)+MAX_REROLL_RATING_DELTA);
-    where+=` AND r.band=$${params.length-2} AND r.rating BETWEEN $${params.length-1}::int AND $${params.length}::int`;
+    ratingWhere+=` AND r.band=$${params.length-2} AND r.rating BETWEEN $${params.length-1}::int AND $${params.length}::int`;
   }
   params.push(a.pickNumber,a.candidateCount,a.topGap,a.entropy,a.priorPoolSize);
   const n=params.length;
@@ -161,8 +163,18 @@ export async function selectDatabaseReroll(query,version,source,options) {
     +abs(p.consensus_top_gap::text::float8-$${n-2}::float8)*0.25
     +abs(p.support_entropy::text::float8-$${n-1}::float8)*0.15
     +(abs((p.pick_number-1)-$${n}::float8)/greatest(1,p.pick_number-1,$${n}::float8))*0.10`;
-  const result=await query(`SELECT * FROM (SELECT ${columns},${distance} distance ${from} WHERE ${where}) candidates
-    WHERE distance<=0.16 ORDER BY distance,puzzle_id COLLATE "C" LIMIT 20`,params);
+  // Sort the eligible puzzle geometry first, then test rating eligibility in
+  // that exact order. The lateral barrier permits LIMIT to stop after 20
+  // eligible rows instead of looking up ratings for every distant candidate.
+  // Neither the distance threshold nor the tie ordering/RNG policy changes.
+  const puzzleColumns=columns.slice(0,columns.indexOf(',r.difficulty_version'));
+  const result=await query(`SELECT ${columns},p.distance FROM (
+    SELECT ${puzzleColumns},${distance} distance FROM draft_run_verified_puzzles p
+    WHERE ${where} AND (${distance})<=0.16 ORDER BY distance,p.puzzle_id COLLATE "C" OFFSET 0
+  ) p JOIN LATERAL (
+    SELECT r.* FROM draft_run_puzzle_ratings r WHERE r.puzzle_id=p.puzzle_id
+    AND r.difficulty_version='support-ratio-v1' AND ${ratingWhere} OFFSET 0
+  ) r ON true ORDER BY p.distance,p.puzzle_id COLLATE "C" LIMIT 20`,params);
   return selectDraftRunReroll(result.rows.map(decodePuzzleMetadata),source,options);
 }
 

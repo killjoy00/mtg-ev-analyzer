@@ -1,5 +1,5 @@
 import fs from 'node:fs';
-import {orderedRerollQuery} from './reroll-query-experiment.mjs';
+import {referenceRerollQuery} from './reroll-query-experiment.mjs';
 import assert from 'node:assert/strict';
 import {verifyTarget,summarize} from './practice-performance.mjs';
 import {selectCachedDatabaseRun,selectDatabaseReroll,loadCachedCustomSetMetadata} from '../worker/draft-run-selection.mjs';
@@ -16,27 +16,29 @@ const sets=(await loadCachedCustomSetMetadata(query,version)).slice(0,3).map(s=>
 const report={branch,sha:process.env.GITHUB_SHA,sets,scope:'serial SQL diagnosis on disposable clone, not gateway capacity',samples:[],index_bytes:null,passed:false};
 const dir='artifacts/practice-performance';fs.mkdirSync(dir,{recursive:true});
 const cases=[];
+await query("CREATE INDEX IF NOT EXISTS draft_run_reroll_set_window_idx ON draft_run_verified_puzzles(set_id,pick_number,corpus_version,puzzle_id) INCLUDE(source_draft_hash,candidate_count,consensus_top_gap,support_entropy,pack_number) WHERE interesting AND pack_number=1");
 for(const kind of ['mixed','powered-cube','custom-single','custom-multi'])for(let i=0;i<3;i++) {
  const environment=kind==='powered-cube'?kind:'mixed',setIds=kind==='custom-single'?sets.slice(0,1):kind==='custom-multi'?sets:[];
  const seed='reroll-diagnosis-'+kind+'-'+i,started=performance.now();
  const selected=await selectCachedDatabaseRun(query,version,seed,environment,{setIds});
- cases.push({kind,seed,source:selected[0],options:{environment,setIds,type:'pack',round:0,seed,excludedSources:selected.map(p=>p.source_draft_hash),anchor:draftRunDifficulty(selected[0])},start_ms:Math.round(performance.now()-started)});
+ for(const round of [0,4])for(const type of (environment==='powered-cube'?['pack']:['pack','set']))
+  cases.push({kind,seed:seed+'-'+round+'-'+type,source:selected[round],options:{environment,setIds,type,round,seed,excludedSources:selected.map(p=>p.source_draft_hash),anchor:draftRunDifficulty(selected[round])},start_ms:Math.round(performance.now()-started)});
+
 }
 try {
- for(const phase of ['before','set_first_index','ordered_candidates']) {
-  if(phase==='set_first_index')await query("CREATE INDEX qa_reroll_set_window_idx ON draft_run_verified_puzzles(set_id,pick_number,corpus_version,puzzle_id) INCLUDE(source_draft_hash,candidate_count,consensus_top_gap,support_entropy,pack_number) WHERE interesting AND pack_number=1");
+ for(const phase of ['reference_indexed','ordered_candidates']) {
   for(const c of cases) {
-   let statement;const measured=async(sql,params)=>{if(phase==='ordered_candidates')sql=orderedRerollQuery(sql);statement={sql,params};return query(sql,params);};
+   let statement;const measured=async(sql,params)=>{if(phase==='reference_indexed')sql=referenceRerollQuery(sql);statement={sql,params};const result=await query(sql,params);if(phase==='reference_indexed')c.expectedRows=result.rows;else assert.deepEqual(result.rows,c.expectedRows,'all 20 candidate rows and order match');return result;};
    const start=performance.now(),selected=await selectDatabaseReroll(measured,version,c.source,c.options),ms=Math.round(performance.now()-start);
-   if(phase==='before')c.expected=selected;else assert.deepEqual(selected,c.expected,'index preserves exact reroll');
+   if(phase==='reference_indexed')c.expected=selected;else assert.deepEqual(selected,c.expected,'ordered plan preserves exact reroll');
    report.samples.push({phase,case:c.kind,seed:c.seed,start_ms:c.start_ms,reroll_ms:ms});
-   if(c.seed.endsWith('-0')) {
+   if(c.seed.endsWith('-0-0-pack')) {
     const plan=await query('EXPLAIN (ANALYZE,BUFFERS,FORMAT JSON) '+statement.sql,statement.params);
     fs.writeFileSync(dir+'/reroll-'+phase+'-'+c.kind+'.json',JSON.stringify(plan.rows,null,2));
    }
   }
  }
- report.index_bytes=Number((await query("SELECT pg_relation_size('qa_reroll_set_window_idx') bytes")).rows[0].bytes);
- report.summary=Object.fromEntries(['before','set_first_index','ordered_candidates'].map(p=>[p,Object.fromEntries([...new Set(cases.map(c=>c.kind))].map(k=>[k,summarize(report.samples.filter(s=>s.phase===p&&s.case===k).map(s=>s.reroll_ms))]))]));
+ report.index_bytes=Number((await query("SELECT pg_relation_size('draft_run_reroll_set_window_idx') bytes")).rows[0].bytes);
+ report.summary=Object.fromEntries(['reference_indexed','ordered_candidates'].map(p=>[p,Object.fromEntries([...new Set(cases.map(c=>c.kind))].map(k=>[k,summarize(report.samples.filter(s=>s.phase===p&&s.case===k).map(s=>s.reroll_ms))]))]));
  report.passed=true;console.log(JSON.stringify(report));
 } finally {fs.writeFileSync(dir+'/reroll-report.json',JSON.stringify(report,null,2));}

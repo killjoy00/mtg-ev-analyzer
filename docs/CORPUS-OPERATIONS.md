@@ -6,7 +6,7 @@ The authenticated `/admin/?area=corpus` area complements the existing decision-q
 
 Every registered corpus set has one operational status: Candidate, Live, Paused or Retired. Discovery records without an ingested corpus are displayed as “Awaiting corpus.” A newly ingested set becomes Candidate only after the complete quality report passes. Failed or unfinished imports remain discovery/import records and appear as Awaiting corpus with their blocking reasons. Candidate health can subsequently expire or fail a later check; promotion always requires current passing evidence. A discovered archive never grants publication.
 
-Allowed actions are Candidate → Live, Live → Paused, Paused → Live, and any non-retired state → Retired. Retirement is terminal in the admin UI. Promotion/reactivation requires passing, fresh health evidence for the serving corpus and exact manifest. A conditional update and audit insertion execute atomically; stale dashboard actions fail with 409. Events retain the administrator account ID, timestamp, previous/new status and optional reason.
+Allowed actions are Candidate → Live, Live → Paused, Paused → Live, and any non-retired state → Retired. Retirement is terminal in the admin UI. Promotion/reactivation requires passing, fresh health evidence for the serving corpus and exact manifest. Freshness is a pre-flight requirement only: serving never reads health evidence, and an unchanged Live corpus is not rescanned. When an action finds evidence older than seven days, run `Corpus snapshot health check` for that one snapshot, then act. A conditional update and audit insertion execute atomically; stale dashboard actions fail with 409. Events retain the administrator account ID, timestamp, previous/new status and optional reason.
 
 No lifecycle action deletes or changes puzzles, results, shares, sessions or schedules. New games filter Live sets; existing Daily schedules and sessions resolve their pinned versions and IDs. Historical sources are retained. The destructive retirement migrations from the former product are not the production migration path for this rebuild.
 
@@ -24,7 +24,7 @@ Regular chronology comes from set release metadata and Live eligibility. Powered
 
 ## Publication gates (`corpus-gates-v2`)
 
-Thresholds are code-defined in `corpus-quality.mjs`, returned by the admin API and displayed with observed values and individual failure reasons. A check must be no older than seven days and match the exact manifest hash and gate version.
+Thresholds are code-defined in `corpus-quality.mjs`, returned by the admin API and displayed with observed values and individual failure reasons. A check used for promotion, activation or reactivation must be no older than seven days and match the exact manifest hash and gate version. The admin table shows a Live corpus whose last check passed as Verified however old the check is; Check needed marks an action waiting on a fresh check. The daily `Corpus health evidence report` lists waiting Candidate and Paused snapshots from metadata only, without reading puzzle payloads. See [corpus health evidence and Neon egress](ALL_TROPHY_IMPORT.md#corpus-health-evidence-and-neon-egress).
 
 | Gate | Requirement |
 |---|---|

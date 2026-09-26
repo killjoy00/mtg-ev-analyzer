@@ -37,6 +37,10 @@ function installFetch({
         );
       if(sql.includes('bool_or("providerId"='))
         return dbResponse(['has_password','has_google'],[[hasPassword?'t':'f',hasGoogle?'t':'f']],1);
+      if(sql.includes('SELECT synthetic_password FROM apple_auth_identities'))
+        return dbResponse(['synthetic_password'],[],0);
+      if(sql.startsWith('UPDATE apple_auth_identities SET synthetic_password=false'))
+        return dbResponse([],[],0);
       if(sql.startsWith('DELETE FROM account_credential_rate_limits WHERE expires_at'))
         return dbResponse([],[],1);
       if(sql.includes('INSERT INTO account_credential_rate_limits')) {

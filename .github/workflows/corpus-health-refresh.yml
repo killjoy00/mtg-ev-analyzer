@@ -1,0 +1,64 @@
+name: Corpus snapshot health check
+# Manual, one exact snapshot. Run it before activating or reactivating a snapshot
+# whose evidence is older than the seven-day gate. Serving never depends on
+# health evidence, so nothing here runs on a schedule.
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Database branch to verify'
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+      snapshot_id:
+        description: 'Exact source snapshot ID from the admin Corpus area or the health evidence report'
+        type: string
+        required: true
+permissions:
+  contents: read
+concurrency:
+  group: packone-corpus-health
+  cancel-in-progress: false
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      TARGET: ${{ inputs.target }}
+      SNAPSHOT_ID: ${{ inputs.snapshot_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require reviewed code
+        run: test "$GITHUB_REF" = refs/heads/main
+      - name: Require one exact snapshot
+        run: |
+          [[ "$SNAPSHOT_ID" =~ ^([a-f0-9]{64}|historical-[a-f0-9]{32})$ ]] || {
+            echo 'snapshot_id must be one exact source snapshot ID' >&2
+            exit 1
+          }
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: npm install -g neon@4.17.4
+      - name: Deep-scan exactly one snapshot
+        run: |
+          set -euo pipefail
+          umask 077
+          case "$TARGET" in
+            development) branch=br-twilight-hill-ayffyd2b ;;
+            production) branch=br-orange-feather-ayps8kep ;;
+            *) exit 1 ;;
+          esac
+          connection=$(neon connection-string "$branch" --project-id patient-shadow-91417882 --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/snapshot-health.connection"
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          node scripts/check-corpus-health.mjs "$RUNNER_TEMP/snapshot-health.connection" --snapshot "$SNAPSHOT_ID" | tee corpus-snapshot-health.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: corpus-snapshot-health-${{ inputs.target }}-${{ github.run_id }}
+          retention-days: 30
+          path: corpus-snapshot-health.jsonl
