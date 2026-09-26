@@ -25,6 +25,8 @@ The parser enforces that rank, user-game-win-rate bucket, and experience bucket 
 
 Before freezing a propensity specification, the source documentation/schema contract must establish that those skill fields summarize information available before the draft rather than outcomes updated by games after the draft. Until then they should be described as presumed pre-treatment source fields whose upstream timing still requires verification.
 
+External verification on 2026-09-26 did not resolve this: the official 17Lands public-datasets page says draft rows include the user's overall win rate, but does not define the temporal cutoff used to build `user_game_win_rate_bucket` / `user_n_games_bucket`. The public schema listings identify those columns but likewise do not establish that the current event is excluded. Do not upgrade the causal claim until that upstream definition is confirmed. Source: https://www.17lands.com/public_datasets
+
 Even if their timing is valid, the public archive does not provide a stable player identifier here. Draft-level clustering handles repeated picks inside one draft but cannot cluster repeated drafts by player. Unobserved player preference/skill confounding therefore remains an identification limitation.
 
 ## Policy estimand clarification
