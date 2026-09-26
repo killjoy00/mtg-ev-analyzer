@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError } from '@/src/api/client';
 import {
+  changeMobilePassword,
   deleteMobileAccount,
   finishAppleDeletion,
   finishAppleSignIn,
@@ -25,6 +26,8 @@ import {
   finishNativeAppleSignIn,
   forgetAccountLocally,
   loadMobileAccount,
+  requestMobilePasswordReset,
+  requestMobileVerificationEmail,
   signInWithEmail,
   signOutMobileAccount,
   signUpWithEmail,
@@ -35,7 +38,16 @@ import {
   type AccountState,
   type MobileAuthResponse,
 } from '@/src/api/account';
-import { isDailyEnvironment } from '@/src/api/draftRun';
+import {
+  loadMobileCareer,
+  updateMobileProfile,
+  type CareerProfile,
+} from '@/src/api/career';
+import {
+  isDailyEnvironment,
+  loadSetCatalog,
+  type PracticeSet,
+} from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
 import { type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
@@ -63,15 +75,32 @@ export default function AccountScreen() {
   const returnToPractice = params.returnTo === 'practice';
   const [session, setSession] = useState<MobileSession | null>(null);
   const [account, setAccount] = useState<AccountState | null>(null);
+  const [profile, setProfile] = useState<CareerProfile | null>(null);
+  const [catalogSets, setCatalogSets] = useState<PracticeSet[]>([]);
   const [mode, setMode] = useState<Mode>('signin');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [profileName, setProfileName] = useState('');
+  const [profilePublic, setProfilePublic] = useState(false);
+  const [favoriteSetId, setFavoriteSetId] = useState('');
+  const [showcaseAchievement, setShowcaseAchievement] = useState('');
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteCode, setDeleteCode] = useState('');
   const [deleteCodeSent, setDeleteCodeSent] = useState(false);
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState<string | null>(null);
+
+  const applyProfile = (next: CareerProfile | null) => {
+    setProfile(next);
+    setProfileName(next?.player.display_name ?? '');
+    setProfilePublic(Boolean(next?.player.profile_public));
+    setFavoriteSetId(next?.player.favorite_set_id ?? '');
+    setShowcaseAchievement(next?.player.showcase_achievement ?? '');
+  };
 
   useEffect(() => {
     let active = true;
@@ -81,8 +110,16 @@ export default function AccountScreen() {
         setSession(current);
         if (!current.accountToken) return;
         try {
-          const state = await loadMobileAccount(current);
-          if (active) setAccount(state);
+          const [state, nextProfile, catalog] = await Promise.all([
+            loadMobileAccount(current),
+            loadMobileCareer(current),
+            loadSetCatalog(current),
+          ]);
+          if (active) {
+            setAccount(state);
+            applyProfile(nextProfile);
+            setCatalogSets(catalog.sets);
+          }
         } catch (error: unknown) {
           if (!active) return;
           if (error instanceof ApiError && error.status === 401) {
@@ -90,6 +127,7 @@ export default function AccountScreen() {
             if (!active) return;
             setSession(guest);
             setAccount(null);
+            applyProfile(null);
             setMessage('Your account session expired. Sign in again.');
           } else {
             setMessage(error instanceof Error ? error.message : 'Could not restore your account session.');
@@ -106,14 +144,20 @@ export default function AccountScreen() {
 
   const finish = async (next: MobileSession, result: MobileAuthResponse) => {
     setSession(next);
-    const state = await loadMobileAccount(next);
+    const [state, nextProfile, catalog] = await Promise.all([
+      loadMobileAccount(next),
+      loadMobileCareer(next),
+      loadSetCatalog(next),
+    ]);
     setAccount(state);
+    applyProfile(nextProfile);
+    setCatalogSets(catalog.sets);
     setPassword('');
     setMessage(
       result.linked.validatedDailyScore
         ? 'Signed in. Today\'s guest Daily was validated for this account.'
         : result.linked.rankingIdentity?.eligible === false
-          ? 'Signed in. Choose a unique player name on Pack One before using ranked public identity.'
+          ? 'Signed in. Choose a unique leaderboard name below before using ranked public identity.'
           : 'Signed in to your Pack One account.',
     );
     if (result.linked.validatedDailyScore) {
@@ -246,9 +290,100 @@ export default function AccountScreen() {
       const fresh = await ensureGuestSession();
       setSession(fresh);
       setAccount(null);
+      applyProfile(null);
+      setCatalogSets([]);
       setMessage('Signed out.');
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Could not sign out.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const saveProfile = async () => {
+    if (!session?.accountToken || busy || !profile) return;
+    setBusy(true);
+    setMessage(null);
+    try {
+      const updated = await updateMobileProfile(session, {
+        displayName: profileName.trim(),
+        profilePublic,
+        favoriteSetId: favoriteSetId || null,
+        showcaseAchievement: showcaseAchievement || null,
+      });
+      applyProfile(updated);
+      setMessage(updated.player.username_owned === false
+        ? 'Profile saved. Choose a different unique leaderboard name to become rank-eligible.'
+        : 'Profile settings saved.');
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Could not save profile settings.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const forgotPassword = async () => {
+    if (!session || busy) return;
+    if (!email.trim()) {
+      setMessage('Enter your account email first.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await requestMobilePasswordReset(session, email.trim());
+      setMessage(result.message);
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Password recovery is temporarily unavailable.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const resendVerification = async () => {
+    if (!session || busy) return;
+    if (!email.trim()) {
+      setMessage('Enter your account email first.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      const result = await requestMobileVerificationEmail(session, email.trim());
+      setMessage(result.message);
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Email verification is temporarily unavailable.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const changePassword = async () => {
+    if (!session?.accountToken || busy || !account?.credentials.password) return;
+    if (newPassword !== confirmPassword) {
+      setMessage('New passwords do not match.');
+      return;
+    }
+    if (newPassword.length < 8) {
+      setMessage('New password must be at least 8 characters.');
+      return;
+    }
+    setBusy(true);
+    setMessage(null);
+    try {
+      await changeMobilePassword(session, currentPassword, newPassword);
+      const guest = await forgetAccountLocally(session);
+      setSession(guest);
+      setAccount(null);
+      applyProfile(null);
+      setCatalogSets([]);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setPassword('');
+      setMessage('Password changed. Pack One signed out every account session; sign in again with your new password.');
+    } catch (error: unknown) {
+      setMessage(error instanceof Error ? error.message : 'Could not change your password.');
     } finally {
       setBusy(false);
     }
@@ -298,6 +433,8 @@ export default function AccountScreen() {
       const fresh = await ensureGuestSession();
       setSession(fresh);
       setAccount(null);
+      applyProfile(null);
+      setCatalogSets([]);
       setDeletePassword('');
       setDeleteCode('');
       setDeleteCodeSent(false);
@@ -321,6 +458,11 @@ export default function AccountScreen() {
   };
 
   const signedInLabel = account?.user.email ?? account?.user.name ?? 'Pack One account';
+  const favoriteOptions = [...catalogSets].sort((a, b) => (
+    String(b.release_date ?? '').localeCompare(String(a.release_date ?? ''))
+      || a.set_name.localeCompare(b.set_name)
+  ));
+  const unlockedAchievements = (profile?.achievements ?? []).filter((item) => item.unlocked);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -339,6 +481,185 @@ export default function AccountScreen() {
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>{signedInLabel}</Text>
             <Text style={styles.body}>This device has a revocable Pack One account session stored in the platform secure store.</Text>
+
+            {profile ? (
+              <View style={styles.settingsSection}>
+                <Text style={styles.sectionTitle}>Profile settings</Text>
+                {profile.player.username_owned === false ? (
+                  <View style={styles.warning}>
+                    <Text style={styles.warningTitle}>Username needs attention</Text>
+                    <Text style={styles.body}>
+                      Choose a unique leaderboard name below before this account can appear in ranked public identity.
+                    </Text>
+                  </View>
+                ) : null}
+
+                <Text style={styles.fieldLabel}>Leaderboard name</Text>
+                <TextInput
+                  accessibilityLabel="Leaderboard name"
+                  autoCapitalize="words"
+                  autoComplete="nickname"
+                  maxLength={24}
+                  onChangeText={setProfileName}
+                  placeholder="Leaderboard name"
+                  placeholderTextColor={colors.faint}
+                  style={styles.input}
+                  value={profileName}
+                />
+                <Text style={styles.fieldHelp}>Shown on Pack One Daily leaderboards.</Text>
+
+                <Pressable
+                  accessibilityRole="switch"
+                  accessibilityState={{ checked: profilePublic }}
+                  onPress={() => setProfilePublic((value) => !value)}
+                  style={[styles.toggle, profilePublic && styles.toggleActive]}
+                >
+                  <View style={styles.toggleCopy}>
+                    <Text style={styles.toggleTitle}>Public profile</Text>
+                    <Text style={styles.fieldHelp}>Allows leaderboard visitors and shared links to open your Pack One record.</Text>
+                  </View>
+                  <Text style={[styles.toggleValue, profilePublic && styles.toggleValueActive]}>
+                    {profilePublic ? 'ON' : 'OFF'}
+                  </Text>
+                </Pressable>
+
+                <Text style={styles.fieldLabel}>Favorite environment</Text>
+                <View style={styles.optionGrid}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: favoriteSetId === '' }}
+                    onPress={() => setFavoriteSetId('')}
+                    style={[styles.optionChip, favoriteSetId === '' && styles.optionChipSelected]}
+                  >
+                    <Text style={[styles.optionChipText, favoriteSetId === '' && styles.optionChipTextSelected]}>No favorite</Text>
+                  </Pressable>
+                  {favoriteOptions.map((item) => (
+                    <Pressable
+                      key={item.set_id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: favoriteSetId === item.set_id }}
+                      onPress={() => setFavoriteSetId(item.set_id)}
+                      style={[styles.optionChip, favoriteSetId === item.set_id && styles.optionChipSelected]}
+                    >
+                      <Text style={[styles.optionChipText, favoriteSetId === item.set_id && styles.optionChipTextSelected]}>
+                        {item.set_name}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Text style={styles.fieldLabel}>Showcase achievement</Text>
+                <View style={styles.optionGrid}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: showcaseAchievement === '' }}
+                    onPress={() => setShowcaseAchievement('')}
+                    style={[styles.optionChip, showcaseAchievement === '' && styles.optionChipSelected]}
+                  >
+                    <Text style={[styles.optionChipText, showcaseAchievement === '' && styles.optionChipTextSelected]}>No showcase</Text>
+                  </Pressable>
+                  {unlockedAchievements.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      accessibilityRole="button"
+                      accessibilityState={{ selected: showcaseAchievement === item.id }}
+                      onPress={() => setShowcaseAchievement(item.id)}
+                      style={[styles.optionChip, showcaseAchievement === item.id && styles.optionChipSelected]}
+                    >
+                      <Text style={[styles.optionChipText, showcaseAchievement === item.id && styles.optionChipTextSelected]}>
+                        ◆ {item.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </View>
+
+                <Pressable
+                  accessibilityRole="button"
+                  disabled={busy || profileName.trim().length < 2}
+                  onPress={() => void saveProfile()}
+                  style={[styles.primaryButton, (busy || profileName.trim().length < 2) && styles.disabled]}
+                >
+                  <Text style={styles.primaryButtonText}>Save profile</Text>
+                </Pressable>
+
+                <Pressable accessibilityRole="button" onPress={() => router.push('/career')} style={styles.secondaryButton}>
+                  <Text style={styles.secondaryButtonText}>Open My Pack One</Text>
+                </Pressable>
+              </View>
+            ) : null}
+
+            <View style={styles.settingsSection}>
+              <Text style={styles.sectionTitle}>Sign-in credentials</Text>
+              <Text style={styles.credentialLine}>
+                {account.credentials.password ? 'Password · connected' : 'Password · not configured'}
+              </Text>
+              <Text style={styles.credentialLine}>
+                {account.credentials.google ? 'Google · connected' : 'Google · not connected'}
+              </Text>
+              <Text style={styles.credentialLine}>
+                {account.credentials.apple ? 'Apple · connected' : 'Apple · not connected'}
+              </Text>
+
+              {account.credentials.password ? (
+                <View style={styles.passwordBox}>
+                  <Text style={styles.fieldLabel}>Change password</Text>
+                  <Text style={styles.fieldHelp}>Changing your password signs out every Pack One account session, including this device.</Text>
+                  <TextInput
+                    accessibilityLabel="Current password"
+                    autoCapitalize="none"
+                    autoComplete="current-password"
+                    onChangeText={setCurrentPassword}
+                    placeholder="Current password"
+                    placeholderTextColor={colors.faint}
+                    secureTextEntry
+                    style={styles.input}
+                    value={currentPassword}
+                  />
+                  <TextInput
+                    accessibilityLabel="New password"
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    onChangeText={setNewPassword}
+                    placeholder="New password"
+                    placeholderTextColor={colors.faint}
+                    secureTextEntry
+                    style={styles.input}
+                    value={newPassword}
+                  />
+                  <TextInput
+                    accessibilityLabel="Confirm new password"
+                    autoCapitalize="none"
+                    autoComplete="new-password"
+                    onChangeText={setConfirmPassword}
+                    placeholder="Confirm new password"
+                    placeholderTextColor={colors.faint}
+                    secureTextEntry
+                    style={styles.input}
+                    value={confirmPassword}
+                  />
+                  <Pressable
+                    accessibilityRole="button"
+                    disabled={busy || !currentPassword || newPassword.length < 8 || !confirmPassword}
+                    onPress={() => void changePassword()}
+                    style={[
+                      styles.secondaryButton,
+                      (busy || !currentPassword || newPassword.length < 8 || !confirmPassword) && styles.disabled,
+                    ]}
+                  >
+                    <Text style={styles.secondaryButtonText}>Change password</Text>
+                  </Pressable>
+                </View>
+              ) : (
+                <Text style={styles.fieldHelp}>
+                  {account.credentials.apple
+                    ? 'This account signs in with Apple and does not have a Pack One password to change.'
+                    : account.credentials.google
+                      ? 'This account signs in with Google and does not have a Pack One password to change.'
+                      : 'This account does not have a password credential to change.'}
+                </Text>
+              )}
+            </View>
+
             <Pressable accessibilityRole="button" disabled={busy} onPress={() => void signOut()} style={styles.secondaryButton}>
               <Text style={styles.secondaryButtonText}>Sign out</Text>
             </Pressable>
@@ -500,6 +821,24 @@ export default function AccountScreen() {
                 <Text style={styles.primaryButtonText}>{mode === 'signin' ? 'Sign in' : 'Create account'}</Text>
               )}
             </Pressable>
+            {mode === 'signin' ? (
+              <Pressable
+                accessibilityRole="button"
+                disabled={busy}
+                onPress={() => void forgotPassword()}
+                style={styles.textButton}
+              >
+                <Text style={styles.textButtonText}>Forgot password?</Text>
+              </Pressable>
+            ) : null}
+            <Pressable
+              accessibilityRole="button"
+              disabled={busy}
+              onPress={() => void resendVerification()}
+              style={styles.textButton}
+            >
+              <Text style={styles.textButtonText}>Resend verification email</Text>
+            </Pressable>
           </View>
         )}
 
@@ -512,7 +851,7 @@ export default function AccountScreen() {
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
-  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg },
+  page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 760 },
   eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
   title: { color: colors.ink, fontSize: 34, lineHeight: 38, fontWeight: '800', letterSpacing: -0.8 },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
@@ -546,6 +885,43 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   disabled: { opacity: 0.42 },
   message: { color: colors.accentDark, fontSize: 14, lineHeight: 21, fontWeight: '700' },
+  settingsSection: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.md },
+  sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
+  fieldLabel: { color: colors.ink, fontSize: 13, fontWeight: '800' },
+  fieldHelp: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  warning: { borderWidth: 1, borderLeftWidth: 4, borderColor: colors.accent, padding: spacing.md, gap: spacing.xs },
+  warningTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  toggle: {
+    minHeight: 62,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    padding: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  toggleActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  toggleCopy: { flex: 1, gap: 3 },
+  toggleTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
+  toggleValue: { color: colors.muted, fontSize: 12, fontWeight: '900' },
+  toggleValueActive: { color: colors.accentDark },
+  optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  optionChip: {
+    minHeight: 40,
+    maxWidth: '100%',
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  optionChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  optionChipText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  optionChipTextSelected: { color: colors.accentDark },
+  credentialLine: { color: colors.ink, fontSize: 13, fontWeight: '700' },
+  passwordBox: { gap: spacing.md },
+  textButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center' },
+  textButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
   dangerZone: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.md },
   dangerTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
   dangerButton: { minHeight: 50, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
