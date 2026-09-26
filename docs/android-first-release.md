@@ -47,7 +47,7 @@ The first authenticated release was uploaded successfully on 2026-09-24:
 
 The owner then completed the first rollout in Google Play Console. A live Google Play API status probe confirmed the same release and version code on the `internal` track with status `completed`.
 
-The release workflow intentionally creates draft releases for the unpublished app. The reusable read-only status workflow `.github/workflows/android-internal-status.yml` can verify the current Internal Testing track without uploading a new bundle.
+The release workflow intentionally creates draft releases for the unpublished app. It can be started either by an explicit manual dispatch from current `main` or by a reviewed change to `.github/android-internal-release-request.json` on `main`; both paths retain the protected `pack-one-mobile-release` environment and exact-current-main guard. The reusable read-only status workflow `.github/workflows/android-internal-status.yml` can verify the current Internal Testing track without uploading a new bundle.
 
 ## Build numbering
 
