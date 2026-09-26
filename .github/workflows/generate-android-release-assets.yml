@@ -5,6 +5,7 @@ on:
     branches: ['chatgpt/android-release-hardening']
     paths:
       - '.github/workflows/generate-android-release-assets.yml'
+      - 'mobile/package.json'
 
 permissions:
   contents: write
