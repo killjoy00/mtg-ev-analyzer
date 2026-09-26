@@ -18,6 +18,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ensureGuestSession } from '@/src/api/guest';
 import {
+  createDraftRunShare,
   DAILY_ENVIRONMENT_META,
   isDailyEnvironment,
   loadDraftRun,
@@ -26,6 +27,7 @@ import {
   startPracticeDraftRun,
   submitDraftRunPick,
   type DailyEnvironment,
+  type DraftRunAnswer,
   type DraftRunCard,
   type DraftRunState,
   type PracticeEnvironment,
@@ -115,6 +117,223 @@ function CardTile({
   );
 }
 
+
+function relativeSupport(support: number | undefined, leader: number) {
+  if (!Number.isFinite(Number(support)) || leader <= 0) return 'Unavailable';
+  return `${Math.round(100 * Number(support) / leader)}%`;
+}
+
+function compactFeedback(answer: DraftRunAnswer) {
+  if (answer.historicalMatch) return '';
+  const prefix = answer.selectedName ? `You chose ${answer.selectedName}. ` : '';
+  if (answer.modelTargetDisagreement) return `${prefix}The trophy drafter made an unusual choice relative to the model.`;
+  if (answer.score >= 85) return `${prefix}A strongly supported alternative.`;
+  if (answer.score >= 60) return `${prefix}A plausible alternative.`;
+  return `${prefix}The model found less support for this choice.`;
+}
+
+function FeedbackCard({
+  card,
+  label,
+  onZoom,
+}: {
+  card: DraftRunCard | undefined;
+  label: string;
+  onZoom: (card: DraftRunCard) => void;
+}) {
+  if (!card) return null;
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${card.name}. Open enlarged card.`}
+      onPress={() => onZoom(card)}
+      style={styles.feedbackCard}
+    >
+      <Text style={styles.feedbackCardLabel}>{label}</Text>
+      {card.image_url ? (
+        <Image
+          source={card.image_url}
+          style={styles.feedbackCardImage}
+          contentFit="cover"
+          cachePolicy="memory-disk"
+          accessibilityLabel={card.name}
+        />
+      ) : (
+        <View style={styles.feedbackCardFallback}>
+          <Text style={styles.cardFallbackText}>{card.name}</Text>
+        </View>
+      )}
+      <Text style={styles.feedbackCardName} numberOfLines={2}>{card.name}</Text>
+    </Pressable>
+  );
+}
+
+function FeedbackAnalysis({
+  answer,
+  onZoom,
+}: {
+  answer: DraftRunAnswer;
+  onZoom: (card: DraftRunCard) => void;
+}) {
+  const candidates = answer.puzzle.candidates;
+  const selected = candidates.find((card) => card.id === answer.selectedId);
+  const trophy = candidates.find((card) => card.id === answer.historicalId);
+  const supportRanking = [...(answer.ranking ?? [])].sort((a, b) => Number(b.support) - Number(a.support));
+  const displayRanking = [...(answer.ranking ?? [])].sort(
+    (a, b) => Number(b.id === answer.historicalId) - Number(a.id === answer.historicalId)
+      || Number(b.support) - Number(a.support),
+  );
+  const leaderSupport = Number(answer.consensusSupport ?? supportRanking[0]?.support ?? 0);
+  const leader = supportRanking[0];
+  const modelLeaderName = answer.consensusName ?? leader?.name;
+  const disagreement = Boolean(
+    answer.historicalId
+      && (answer.consensusId ?? leader?.id)
+      && (answer.consensusId ?? leader?.id) !== answer.historicalId,
+  );
+
+  return (
+    <View style={styles.analysisPanel}>
+      <View style={styles.feedbackComparison}>
+        <FeedbackCard
+          card={selected}
+          label={answer.historicalMatch ? 'Your pick · Trophy pick' : 'Your pick'}
+          onZoom={onZoom}
+        />
+        {!answer.historicalMatch ? <FeedbackCard card={trophy} label="Trophy pick" onZoom={onZoom} /> : null}
+      </View>
+
+      {compactFeedback(answer) ? <Text style={styles.analysisLead}>{compactFeedback(answer)}</Text> : null}
+
+      {modelLeaderName ? (
+        <>
+          <Text style={styles.analysisTitle}>Model&apos;s strongest choice: {modelLeaderName}</Text>
+          {answer.historicalName ? (
+            <Text style={styles.analysisBody}>
+              Trophy drafter: {answer.historicalName}: 100.
+              {disagreement
+                ? ` Model's strongest alternative: ${modelLeaderName}: 95. This was an excellent alternative according to the model; ${answer.historicalName} was the choice in this successful trophy draft.`
+                : ''}
+            </Text>
+          ) : null}
+          <Text style={styles.analysisBody}>
+            {answer.historicalId && answer.selectedId === answer.historicalId
+              ? 'You matched the trophy pick.'
+              : `Your pick has ${relativeSupport(answer.selectedSupport, leaderSupport)} of the leading model support.`}
+            {' '}Matching the trophy drafter is the goal of this game: trophy matches earn 100 regardless of model support. Other choices receive partial credit, up to 95, based on how strongly the model supports them.
+          </Text>
+        </>
+      ) : null}
+
+      {displayRanking.length ? (
+        <>
+          <Text style={styles.analysisSubhead}>Leading choices</Text>
+          {displayRanking.slice(0, 3).map((item) => (
+            <View key={item.id} style={styles.rankingLine}>
+              <Text style={styles.rankingName}>
+                {item.name}
+                {item.id === answer.selectedId ? ' · Your pick' : ''}
+                {item.id === answer.historicalId ? ' · Trophy pick' : ''}
+              </Text>
+              <Text style={styles.rankingMeta}>
+                {item.id === answer.historicalId
+                  ? '100 points'
+                  : `${relativeSupport(item.support, leaderSupport)} of leader · ${item.score} points`}
+              </Text>
+            </View>
+          ))}
+          <Text style={styles.analysisSubhead}>Compare all {displayRanking.length} choices</Text>
+          {supportRanking.map((item) => (
+            <View key={`all-${item.id}`} style={styles.rankingLine}>
+              <Text style={styles.rankingName}>
+                {item.name}
+                {item.id === answer.selectedId ? ' · Your pick' : ''}
+                {item.id === answer.historicalId ? ' · Trophy pick' : ''}
+              </Text>
+              <Text style={styles.rankingMeta}>
+                {item.id === answer.historicalId ? 'N/A support' : `${relativeSupport(item.support, leaderSupport)} support`}
+                {' · '}{item.score} points
+              </Text>
+            </View>
+          ))}
+        </>
+      ) : null}
+
+      <Text style={styles.modelNote}>
+        Model support reflects held-out strong-player choices. It does not establish a correct pick or predict a win rate.
+      </Text>
+    </View>
+  );
+}
+
+function PackReview({
+  answer,
+  onZoom,
+}: {
+  answer: DraftRunAnswer;
+  onZoom: (card: DraftRunCard) => void;
+}) {
+  return (
+    <View style={styles.packReview}>
+      {answer.puzzle.prior_picks.length ? (
+        <>
+          <Text style={styles.analysisSubhead}>Previous cards</Text>
+          <Text style={styles.sectionBody}>Already selected by this drafter.</Text>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.poolRow}>
+            {answer.puzzle.prior_picks.map((card, index) => (
+              <Pressable
+                key={`${card.id}-review-${index}`}
+                accessibilityRole="button"
+                accessibilityLabel={`View previous pick ${index + 1}: ${card.name}`}
+                onPress={() => onZoom(card)}
+                style={styles.poolCard}
+              >
+                {card.image_url ? (
+                  <Image source={card.image_url} style={styles.poolImage} contentFit="cover" cachePolicy="memory-disk" />
+                ) : null}
+                <Text style={styles.poolName} numberOfLines={2}>{index + 1}. {card.name}</Text>
+              </Pressable>
+            ))}
+          </ScrollView>
+        </>
+      ) : null}
+      <Text style={styles.analysisSubhead}>Revealed pack</Text>
+      <View style={styles.grid}>
+        {answer.puzzle.candidates.map((card) => (
+          <Pressable
+            key={`review-${card.id}`}
+            accessibilityRole="button"
+            accessibilityLabel={`${card.name}${card.id === answer.selectedId ? ', your pick' : ''}${card.id === answer.historicalId ? ', trophy pick' : ''}. Open enlarged card.`}
+            onPress={() => onZoom(card)}
+            style={[
+              styles.card,
+              card.id === answer.selectedId && styles.reviewYourPick,
+              card.id === answer.historicalId && styles.reviewTrophyPick,
+            ]}
+          >
+            {card.image_url ? (
+              <Image
+                source={card.image_url}
+                style={styles.cardImage}
+                contentFit="cover"
+                cachePolicy="memory-disk"
+                accessibilityLabel={card.name}
+              />
+            ) : (
+              <View style={styles.cardFallback}>
+                <Text style={styles.cardFallbackText}>{card.name}</Text>
+              </View>
+            )}
+            <Text style={styles.cardName} numberOfLines={2}>{card.name}</Text>
+            {card.id === answer.selectedId ? <Text style={styles.reviewBadge}>YOUR PICK</Text> : null}
+            {card.id === answer.historicalId ? <Text style={styles.reviewBadge}>TROPHY PICK</Text> : null}
+          </Pressable>
+        ))}
+      </View>
+    </View>
+  );
+}
+
 function parsePracticeSets(value: string) {
   const sets = value
     .split(',')
@@ -174,6 +393,9 @@ export default function DraftRunScreen() {
   const [actionError, setActionError] = useState<string | null>(null);
   const [shareError, setShareError] = useState<string | null>(null);
   const [zoomedCard, setZoomedCard] = useState<DraftRunCard | null>(null);
+  const [reviewIndex, setReviewIndex] = useState<number | null>(null);
+  const [showAnalysis, setShowAnalysis] = useState(false);
+  const [showPackReview, setShowPackReview] = useState(false);
   const scroll = useRef<ScrollView>(null);
 
   useAppResume(async () => {
@@ -266,6 +488,9 @@ export default function DraftRunScreen() {
       }
       setState({ status: 'ready', run, session: state.session });
       setActionError(null);
+      setReviewIndex(run.answers.length - 1);
+      setShowAnalysis(false);
+      setShowPackReview(false);
       setMode('feedback');
       const latestAnswer = run.answers.at(-1);
       if (latestAnswer) {
@@ -290,18 +515,20 @@ export default function DraftRunScreen() {
   const shareResult = async () => {
     if (state.status !== 'ready' || !state.run.complete) return;
     const matches = state.run.answers.filter((item) => item.historicalMatch).length;
-    const label = practice
-      ? setIds.length
-        ? 'custom practice'
-        : environment === 'powered-cube'
-          ? 'Powered Cube practice'
-          : 'Draft Run practice'
-      : `${dailyMeta.title} Daily`;
+    const label = environment === 'latest' ? 'Latest Set' : environment === 'powered-cube' ? 'Powered Cube' : 'Draft Run';
+    const squares = state.run.answers.map((item) => (
+      item.historicalMatch ? '🟩' : item.score >= 85 ? '🟦' : item.score >= 60 ? '🟨' : item.score >= 25 ? '🟧' : '⬛'
+    )).join('');
     setShareError(null);
     try {
-      await Share.share({
-        message: `I scored ${state.run.score ?? 0}/100 on Pack One ${label} and matched ${matches} of ${state.run.run_length} trophy picks.\n\nhttps://packone.pro`,
-      });
+      const setParam = environment === 'mixed' ? '' : `&set=${environment}`;
+      const url = state.run.day
+        ? `https://packone.pro/?game=draft-run${setParam}&daily=1&ref=result_share`
+        : `https://packone.pro/?game=draft-run${setParam}&shared=${(await createDraftRunShare(state.run.id, state.session)).id}`;
+      const text = state.run.day
+        ? `I scored ${state.run.score ?? 0}/100 on today’s Pack One ${label}. Can you beat it?\n${squares}\n${matches}/${state.run.run_length} trophy picks matched · Daily ${state.run.day}`
+        : `Pack One · ${label} · Practice\n${state.run.score ?? 0}/100  ${squares}\n${matches}/${state.run.run_length} trophy picks matched. Play this run and compare.`;
+      await Share.share({ message: `${text}\n${url}` });
     } catch {
       setShareError('Could not open sharing. Your result is still saved.');
     }
@@ -330,12 +557,24 @@ export default function DraftRunScreen() {
 
   const next = () => {
     if (state.status !== 'ready') return;
+    setReviewIndex(null);
+    setShowAnalysis(false);
+    setShowPackReview(false);
     if (state.run.complete) {
       setMode('result');
     } else {
       setSelected(null);
       setMode('pick');
     }
+    scroll.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const reviewAnswer = (index: number) => {
+    setReviewIndex(index);
+    setShowAnalysis(false);
+    setShowPackReview(false);
+    setSelected(null);
+    setMode('feedback');
     scroll.current?.scrollTo({ y: 0, animated: true });
   };
 
@@ -388,7 +627,9 @@ export default function DraftRunScreen() {
   }
 
   const { run } = state;
-  const answer = run.answers.at(-1);
+  const answer = mode === 'feedback' && reviewIndex !== null
+    ? run.answers[reviewIndex]
+    : run.answers.at(-1);
 
   if (mode === 'result') {
     const matches = run.answers.filter((item) => item.historicalMatch).length;
@@ -407,6 +648,29 @@ export default function DraftRunScreen() {
               {run.standing.percentile ? ` · Top ${run.standing.percentile}%` : ''}
             </Text>
           ) : null}
+          <View style={styles.resultReview}>
+            <Text style={styles.analysisTitle}>Your {run.run_length} picks</Text>
+            {run.answers.map((item, index) => (
+              <Pressable
+                key={`${item.puzzle.puzzle_id}-result-review`}
+                accessibilityRole="button"
+                accessibilityLabel={`Review pick ${index + 1}, ${item.selectedName}, ${item.score} points`}
+                onPress={() => reviewAnswer(index)}
+                style={styles.resultReviewRow}
+              >
+                <Text style={styles.resultReviewIndex}>{index + 1}</Text>
+                <View style={styles.resultReviewCopy}>
+                  <Text style={styles.resultReviewTitle}>
+                    {item.puzzle.set_id.toUpperCase()} · Pick {item.pickNumber ?? item.puzzle.pick_number}
+                  </Text>
+                  <Text style={styles.rankingMeta}>
+                    {item.selectedName}{item.historicalMatch ? ' · Trophy match' : ''}
+                  </Text>
+                </View>
+                <Text style={styles.resultReviewScore}>{item.score}</Text>
+              </Pressable>
+            ))}
+          </View>
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Share Pack One result"
@@ -461,22 +725,57 @@ export default function DraftRunScreen() {
           <Progress run={run} />
 
           {mode === 'feedback' && answer ? (
-            <View style={styles.feedback}>
-              <View style={styles.feedbackScore}>
-                <Text style={styles.feedbackScoreNumber}>{answer.score}</Text>
-                <Text style={styles.feedbackScoreSuffix}>/100</Text>
+            <>
+              <View style={styles.feedback}>
+                <View style={styles.feedbackScore}>
+                  <Text style={styles.feedbackScoreNumber}>{answer.score}</Text>
+                  <Text style={styles.feedbackScoreSuffix}>/100</Text>
+                </View>
+                <View style={styles.feedbackCopy}>
+                  <Text style={styles.feedbackTitle}>
+                    {answer.historicalMatch
+                      ? 'You matched the trophy drafter.'
+                      : `The trophy drafter took ${answer.historicalName ?? 'another card'}.`}
+                  </Text>
+                  <Text style={styles.feedbackBody}>You chose {answer.selectedName}.</Text>
+                </View>
               </View>
-              <View style={styles.feedbackCopy}>
-                <Text style={styles.feedbackTitle}>
-                  {answer.historicalMatch
-                    ? 'You matched the trophy drafter.'
-                    : `The trophy drafter took ${answer.historicalName ?? 'another card'}.`}
-                </Text>
-                <Text style={styles.feedbackBody}>
-                  You chose {answer.selectedName}.
-                </Text>
+
+              <View style={styles.feedbackComparison}>
+                <FeedbackCard
+                  card={puzzle.candidates.find((card) => card.id === answer.selectedId)}
+                  label={answer.historicalMatch ? 'Trophy and Your Pick' : 'Your Pick'}
+                  onZoom={setZoomedCard}
+                />
+                {!answer.historicalMatch ? (
+                  <FeedbackCard
+                    card={puzzle.candidates.find((card) => card.id === answer.historicalId)}
+                    label="Trophy Pick"
+                    onZoom={setZoomedCard}
+                  />
+                ) : null}
               </View>
-            </View>
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showAnalysis }}
+                onPress={() => setShowAnalysis((value) => !value)}
+                style={styles.disclosureButton}
+              >
+                <Text style={styles.disclosureText}>{showAnalysis ? 'Hide score analysis' : 'Why this score?'}</Text>
+              </Pressable>
+              {showAnalysis ? <FeedbackAnalysis answer={answer} onZoom={setZoomedCard} /> : null}
+
+              <Pressable
+                accessibilityRole="button"
+                accessibilityState={{ expanded: showPackReview }}
+                onPress={() => setShowPackReview((value) => !value)}
+                style={styles.disclosureButton}
+              >
+                <Text style={styles.disclosureText}>{showPackReview ? 'Hide revealed pack' : 'Review the pack'}</Text>
+              </Pressable>
+              {showPackReview ? <PackReview answer={answer} onZoom={setZoomedCard} /> : null}
+            </>
           ) : (
             <>
               {puzzle.prior_picks.length ? (
@@ -628,6 +927,9 @@ const styles = StyleSheet.create({
     padding: 3,
   },
   cardSelected: { borderColor: colors.accent },
+  reviewYourPick: { borderColor: colors.accent },
+  reviewTrophyPick: { borderColor: colors.lineStrong },
+  reviewBadge: { color: colors.accentDark, fontSize: 9, fontWeight: '800', paddingHorizontal: 5, paddingBottom: 4 },
   cardImage: { width: '100%', aspectRatio: 0.716, backgroundColor: colors.surfaceSoft },
   cardFallback: {
     width: '100%',
@@ -685,6 +987,61 @@ const styles = StyleSheet.create({
   feedbackCopy: { flex: 1, minWidth: 220, gap: spacing.xs, justifyContent: 'center' },
   feedbackTitle: { color: colors.ink, fontSize: 17, lineHeight: 22, fontWeight: '800' },
   feedbackBody: { color: colors.muted, fontSize: 14, lineHeight: 20 },
+  feedbackComparison: { flexDirection: 'row', gap: spacing.md, alignItems: 'flex-start' },
+  feedbackCard: {
+    flex: 1,
+    minWidth: 0,
+    borderWidth: 1,
+    borderColor: colors.line,
+    backgroundColor: colors.surface,
+    padding: spacing.sm,
+    gap: spacing.xs,
+  },
+  feedbackCardLabel: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 0.8 },
+  feedbackCardImage: { width: '100%', aspectRatio: 0.716, backgroundColor: colors.surfaceSoft },
+  feedbackCardFallback: {
+    width: '100%',
+    aspectRatio: 0.716,
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: spacing.sm,
+    backgroundColor: colors.surfaceSoft,
+  },
+  feedbackCardName: { color: colors.ink, fontSize: 12, lineHeight: 16, fontWeight: '700' },
+  disclosureButton: {
+    minHeight: 48,
+    borderWidth: 1,
+    borderColor: colors.lineStrong,
+    backgroundColor: colors.surface,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  disclosureText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
+  analysisPanel: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.md },
+  analysisLead: { color: colors.ink, fontSize: 15, lineHeight: 22, fontWeight: '700' },
+  analysisTitle: { color: colors.ink, fontSize: 18, lineHeight: 23, fontWeight: '800' },
+  analysisSubhead: { color: colors.ink, fontSize: 15, lineHeight: 20, fontWeight: '800' },
+  analysisBody: { color: colors.muted, fontSize: 14, lineHeight: 21 },
+  rankingLine: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.sm, gap: 2 },
+  rankingName: { color: colors.ink, fontSize: 14, lineHeight: 19, fontWeight: '700' },
+  rankingMeta: { color: colors.muted, fontSize: 12, lineHeight: 17 },
+  modelNote: { color: colors.muted, fontSize: 12, lineHeight: 18, fontStyle: 'italic' },
+  packReview: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface, padding: spacing.md, gap: spacing.md },
+  resultReview: { borderWidth: 1, borderColor: colors.line, backgroundColor: colors.surface },
+  resultReviewRow: {
+    minHeight: 60,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderColor: colors.line,
+  },
+  resultReviewIndex: { width: 28, color: colors.accentDark, fontSize: 16, fontWeight: '800' },
+  resultReviewCopy: { flex: 1, gap: 2 },
+  resultReviewTitle: { color: colors.ink, fontSize: 14, lineHeight: 19, fontWeight: '800' },
+  resultReviewScore: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   resultPage: { padding: spacing.lg, paddingTop: spacing.xxl, gap: spacing.lg },
   scoreBlock: { borderTopWidth: 3, borderColor: colors.accent, backgroundColor: colors.surface, padding: spacing.xl },
   score: { color: colors.ink, fontSize: 72, lineHeight: 76, fontWeight: '800', letterSpacing: -2 },
