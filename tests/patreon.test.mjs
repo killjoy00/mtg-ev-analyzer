@@ -55,6 +55,45 @@ test('Patreon connect keeps the Phase 0 approved identity scope',async()=>{
   }
 });
 
+test('native Patreon aliases use the exact mobile account identity',async()=>{
+  const prior=Object.fromEntries(['PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_WEBHOOK_SECRET'].map(k=>[k,process.env[k]]));
+  Object.assign(process.env,{PATREON_CLIENT_ID:'fixture-client',PATREON_CLIENT_SECRET:'fixture-secret',PATREON_WEBHOOK_SECRET:'fixture-webhook'});
+  const authUserId='11111111-1111-4111-8111-111111111111';
+  let browserAuthCalls=0,mobileAuthCalls=0;
+  const query=async sql=>{
+    if(sql.includes('INSERT INTO provider_oauth_states'))return {rows:[{state_hash:'fixture'}]};
+    if(sql.includes('FROM provider_accounts WHERE auth_user_id'))return {rows:[]};
+    if(sql.includes('FROM entitlement_grants WHERE auth_user_id'))return {rows:[]};
+    return {rows:[]};
+  };
+  const deps={
+    query,
+    authSession:async()=>{browserAuthCalls++;throw Error('browser auth must not run');},
+    mobileAccountIdentity:async()=>{mobileAuthCalls++;return {owner:'22222222-2222-4222-8222-222222222222',auth:{user_id:authUserId}};},
+    json:(d,s)=>Response.json(d,{status:s||200}),
+  };
+  try {
+    const status=await handlePatreon(new Request('https://packone.pro/v1/mobile/patreon/status'),deps);
+    assert.equal(status.status,200);
+    assert.equal((await status.json()).connected,false);
+
+    const connect=await handlePatreon(new Request('https://packone.pro/v1/mobile/patreon/connect',{method:'POST'}),deps);
+    assert.equal(connect.status,200);
+    const target=new URL((await connect.json()).url);
+    assert.equal(target.hostname,'www.patreon.com');
+    assert.equal(target.searchParams.get('scope'),'identity');
+
+    const disconnect=await handlePatreon(new Request('https://packone.pro/v1/mobile/patreon/disconnect',{method:'POST'}),deps);
+    assert.equal(disconnect.status,200);
+    assert.equal((await disconnect.json()).ok,true);
+
+    assert.equal(browserAuthCalls,0);
+    assert.equal(mobileAuthCalls,3);
+  } finally {
+    for(const [key,value] of Object.entries(prior)){if(value===undefined)delete process.env[key];else process.env[key]=value;}
+  }
+});
+
 test('Patreon callback refuses to silently replace an existing linked Patreon identity',async()=>{
   const priorEnv=Object.fromEntries(['PATREON_CLIENT_ID','PATREON_CLIENT_SECRET','PATREON_WEBHOOK_SECRET'].map(k=>[k,process.env[k]]));
   const priorFetch=globalThis.fetch;
