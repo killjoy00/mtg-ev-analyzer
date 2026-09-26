@@ -1,7 +1,7 @@
 import { requestJson } from '@/src/api/client';
 import type { DailyEnvironment } from '@/src/api/draftRun';
 
-export type LeaderboardPeriod = 'daily' | 'week' | 'month' | 'all';
+export type LeaderboardPeriod = 'daily' | 'week' | 'season' | 'all';
 
 export type LeaderboardRow = {
   rank: number;
@@ -17,6 +17,13 @@ export type DraftRunLeaderboard = {
   start: string;
   today: string;
   rows: LeaderboardRow[];
+  season?: {
+    id: string;
+    name: string;
+    set_id: string;
+    start_date: string;
+    end_date?: string | null;
+  } | null;
 };
 
 export function loadDraftRunLeaderboard(
