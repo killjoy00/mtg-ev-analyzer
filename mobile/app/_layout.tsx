@@ -22,6 +22,7 @@ export default function RootLayout() {
           <Stack.Screen name="index" options={{ headerShown: false }} />
           <Stack.Screen name="draft-run" options={{ title: 'Draft Run' }} />
           <Stack.Screen name="shared-run" options={{ title: 'Shared Draft Run' }} />
+          <Stack.Screen name="resume-shared-run" options={{ title: 'Saved Shared Run' }} />
           <Stack.Screen name="practice" options={{ title: 'Practice' }} />
           <Stack.Screen name="leaderboard" options={{ title: 'Leaderboard' }} />
           <Stack.Screen name="career" options={{ title: 'My Pack One' }} />

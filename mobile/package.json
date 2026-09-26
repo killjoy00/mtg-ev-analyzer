@@ -15,7 +15,7 @@
     "test:lifecycle": "node --test ./tests/version-gate-lifecycle.test.cjs",
     "test:draft-run": "node --test ./tests/draft-run-race.test.cjs ./tests/draft-run-recovery.test.cjs",
     "test:shared-run-storage": "node --test ./tests/shared-run-storage.test.cjs",
-    "test:shared-run-screen": "node --test ./tests/shared-run-screen.test.cjs"
+    "test:shared-run-screen": "node --test ./tests/shared-run-screen.test.cjs ./tests/shared-run-home-resume.test.cjs"
   },
   "dependencies": {
     "expo": "~57.0.24",
