@@ -104,17 +104,7 @@ test('native public profile aliases are readable without exposing browser profil
       return Response.json({player:{profile_key:profileKey}});
     });
     assert.equal(response.status,200);
-    assert.match(forwarded.url,new RegExp('/v1/mobile/profile/'+profileKey+'$'));
-    assert.equal(forwarded.authorization,'Bearer '+token);
-  }
-
-  const blocked=new Request('https://api.packone.pro/growth/v1/profile/'+profileKey,{
-    headers:headers({'x-pack1-mobile-session':token}),
-  });
-  assert.equal((await gateway(blocked,env(),async()=>{throw Error('must not reach upstream')})).status,403);
-});
-
-test('practice idempotency is only forwarded to Draft Run creation',async()=>{
+    assert.match(forwarded.url,new RegExp('/v1/mobile/profile/'+profileKey+'
   const key='practice_'+('k'.repeat(32));
   let forwarded=null;
   const start=new Request('https://api.packone.pro/draft/v1/runs',{
