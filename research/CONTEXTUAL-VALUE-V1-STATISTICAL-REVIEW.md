@@ -37,7 +37,7 @@ The frozen primary G endpoint is the validation-selected temperature-softened st
 
 The development report should therefore retain the stochastic G endpoint as primary and report deterministic argmax(G score) only as a clearly secondary diagnostic. A production fallback/eligibility rule must be explicitly frozen before it can be evaluated as a target policy.
 
-The A comparator is reconstructed from the research training complement. Unless an exact deployed model snapshot is loaded and scored leakage-safely, it must not be described as the literal deployed production model.
+The A comparator is reconstructed from the research training complement. The checked-in MSH/SOS/ECL/TLA production manifests use the same high-level strong-cohort rule (100+ prior-games bucket, top 15% parsed user win-rate buckets, up to 5,000 training drafts) and the same `strong-player-colour-stage-v4` model family. However, research A is re-fit inside each research training complement selected by the 8,000-draft development cohort; it is not the frozen full-set production training artifact. Before freeze, either (a) establish and test a leakage-safe exact incumbent reconstruction on the research evaluation decisions or (b) explicitly define A as the complement-refit incumbent analogue and justify why that is the protocol comparator. It must not be described as the literal deployed production snapshot without that evidence.
 
 ## Smallest useful propensity experiment
 
