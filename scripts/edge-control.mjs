@@ -114,7 +114,7 @@ async function main(action) {
   }
   variable('PREVIEW_SEALED_FUNCTIONS',sealed.join(','));
   for(const slug of ['pack1api','pack1growth','draftrunapi']) {
-    await deployPreviewFunction({branch,slug,directory:path.join(process.env.RUNNER_TEMP,'pack1-bundles',slug),environment:{PACK1_REQUIRE_INGRESS:'1',PACK1_INGRESS_SECRET:origin},apiKey:process.env.NEON_API_KEY});
+    await deployPreviewFunction({branch,slug,directory:path.join(process.env.RUNNER_TEMP,'pack1-bundles',slug),environment:{PACK1_REQUIRE_INGRESS:'1',PACK1_INGRESS_SECRET:origin,...(slug==='draftrunapi'?{PACK1_CAPACITY_DIAGNOSTICS:'1'}:{})},apiKey:process.env.NEON_API_KEY});
     const base=`https://${branch}-${slug}.compute.c-5.us-east-2.aws.neon.tech`;
     const unauth=await fetch(base+'/health?quick=1',{redirect:'error',signal:AbortSignal.timeout(30000)});
     if(unauth.status!==403)throw Error('Origin did not reject direct access; preview has not been attached.');

@@ -4,6 +4,17 @@ import {pathToFileURL} from 'node:url';
 import {policy,metadata} from './launch-distributed-control.mjs';
 import {PROJECT,projectSnapshot} from './neon-egress-evidence.mjs';
 import {previewAccount,queryPreviewEvents} from './launch-distributed-telemetry.mjs';
+export function inspectPreflightEvents(events,sha) {
+  const status_counts=Object.fromEntries([...new Set(events.map(e=>e.status))].sort((a,b)=>a-b).map(status=>[status,events.filter(e=>e.status===status).length]));
+  const route_status_counts={};
+  for(const e of events) {const k=(e.route||'other')+':'+e.status;route_status_counts[k]=(route_status_counts[k]||0)+1;}
+  const matching=events.filter(e=>e.release===sha&&e.status===200&&e.route==='health');
+  const wrong_release=events.filter(e=>e.release!==sha).length;
+  const system_errors=events.filter(e=>e.status===429||e.status>=500).length;
+  const boundary_rejections=events.filter(e=>e.status>=400&&e.status<500&&e.status!==429).length;
+  return {matching_events:matching.length,wrong_release,system_errors,boundary_rejections,status_counts,route_status_counts,
+    passed:wrong_release===0&&system_errors===0&&matching.length>0};
+}
 export async function preflightTelemetry({fetcher=fetch,sleep=ms=>new Promise(r=>setTimeout(r,ms)),clock=Date.now}={}) {
   const sha=process.env.GITHUB_SHA,key=process.env.PREVIEW_ACCESS_KEY,account=await previewAccount({fetcher});
   assert.match(sha||'',/^[a-f0-9]{40}$/);assert.match(key||'',/^[a-f0-9]{64}$/);
@@ -18,14 +29,14 @@ export async function preflightTelemetry({fetcher=fetch,sleep=ms=>new Promise(r=
   const to=clock(),deadline=to+policy.telemetry_timeout_seconds*1000,checks=[];
   await sleep(policy.telemetry_settlement_seconds*1000);
   for(;;) {
-    const queriedAt=clock(),events=await queryPreviewEvents(fetcher,process.env.CLOUDFLARE_EDGE_TOKEN,account,from,to);
-    const matching=events.filter(e=>e.release===sha&&e.status===200),unexpected=events.filter(e=>e.release!==sha||e.status!==200);
-    checks.push({queried_at:new Date(queriedAt).toISOString(),retained_events:events.length,matching_events:matching.length,unexpected_events:unexpected.length});
+    const queriedAt=clock(),events=await queryPreviewEvents(fetcher,process.env.CLOUDFLARE_EDGE_TOKEN,account,from,to),inspection=inspectPreflightEvents(events,sha);
+    checks.push({queried_at:new Date(queriedAt).toISOString(),retained_events:events.length,...inspection});
     const report={sha,service:'pack1-gateway-preview',from,to,health_requests:healthRequests,
       settlement_seconds:policy.telemetry_settlement_seconds,timeout_seconds:policy.telemetry_timeout_seconds,
       retained_events:events.length,checks};
-    if(unexpected.length)return {...report,passed:false,reason:'unexpected_preview_telemetry'};
-    if(matching.length)return {...report,passed:true};
+    if(inspection.wrong_release)return {...report,passed:false,reason:'wrong_release_preview_telemetry'};
+    if(inspection.system_errors)return {...report,passed:false,reason:'retained_preview_system_error'};
+    if(inspection.matching_events)return {...report,passed:true};
     if(queriedAt>=deadline)return {...report,passed:false,reason:'positive_preview_telemetry_missing'};
     await sleep(Math.min(15000,Math.max(1,deadline-queriedAt)));
   }

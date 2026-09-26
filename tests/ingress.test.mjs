@@ -47,6 +47,22 @@ test('gateway constructs a fixed upstream and strips caller-controlled infrastru
   assert.equal(result.headers.get('x-pack1-ingress-secret'),null);assert.equal(result.headers.get('cache-control'),'no-store');
   assert.equal(result.headers.get('access-control-allow-origin'),'https://packone.pro');
 });
+test('start timing is relayed only from the protected draft origin in private preview',async()=>{
+  const timing=JSON.stringify({v:1,total_ms:80,phases:{selection:60},selector:{}});
+  const preview=await gateway(req('/draft/v1/runs',{headers:{'x-pack1-start-timing':'caller-spoof'}}),env,async(_url,options)=>{
+    assert.equal(options.headers.get('x-pack1-start-timing'),null);
+    return Response.json({ok:true},{headers:{'x-pack1-start-timing':timing}});
+  });
+  assert.equal(preview.status,200);
+  assert.equal(preview.headers.get('x-pack1-start-timing'),timing);
+  assert.ok(JSON.parse(preview.headers.get('x-pack1-gateway-timing')).upstream_ms>=0);
+  const other=await gateway(req('/growth/v1/session'),env,async()=>Response.json({ok:true},{headers:{'x-pack1-start-timing':timing}}));
+  assert.equal(other.headers.get('x-pack1-start-timing'),null);
+  const production={...env,MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep'};
+  const prod=await gateway(new Request('https://api.packone.pro/draft/v1/runs',{method:'POST',headers:{'cf-connecting-ip':'192.0.2.1','content-type':'application/json'},body:'{}'}),production,async()=>Response.json({ok:true},{headers:{'x-pack1-start-timing':timing}}));
+  assert.equal(prod.headers.get('x-pack1-start-timing'),null);
+  assert.equal(prod.headers.get('x-pack1-gateway-timing'),null);
+});
 
 test('production gateway turns Pack One cookies into upstream identity and relays only Pack One cookies',async()=>{
   const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),

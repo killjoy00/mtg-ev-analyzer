@@ -1,7 +1,7 @@
 name: isolated distributed launch acceptance
 on:
   pull_request:
-    paths: ['scripts/launch-distributed*', 'tests/launch-distributed-capacity.test.mjs', '.github/workflows/launch-distributed.yml']
+    paths: ['scripts/launch-distributed*', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read

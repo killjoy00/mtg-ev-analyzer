@@ -12,6 +12,27 @@ export const wait=async(ms,signal)=>{
     signal?.addEventListener('abort',abort,{once:true});
   });
 };
+// Treat response diagnostics as untrusted input and retain only fixed numeric
+// fields. They are evidence alongside, not a replacement for, client timings.
+export function parseStartDiagnostics(headers) {
+  const number=value=>typeof value==='number'&&Number.isFinite(value)&&value>=0&&value<=30000?value:null;
+  const bounded=(input,keys)=>Object.fromEntries(keys.map(key=>[key,number(input?.[key])]).filter(([,value])=>value!==null));
+  let gateway,origin;
+  try {gateway=JSON.parse(headers.get('x-pack1-gateway-timing')||'null');}catch{}
+  try {origin=JSON.parse(headers.get('x-pack1-start-timing')||'null');}catch{}
+  const result={};
+  if(gateway)result.gateway=bounded(gateway,['duration_ms','quota_ms','upstream_ms']);
+  if(origin?.v===1) {
+    const phases=bounded(origin.phases,['player','body','identity','capability','idempotency','quota','selection','session_insert','analytics_insert','response','first_puzzle']);
+    const selector={};
+    for(const key of ['snapshot','candidate','revision','other']) {
+      const values=bounded(origin.selector?.[key],['count','sum_ms','max_ms']);
+      if(Object.keys(values).length===3&&Number.isInteger(values.count)&&values.count<=20)selector[key]=values;
+    }
+    if(number(origin.total_ms)!==null)result.origin={total_ms:origin.total_ms,phases,selector};
+  }
+  return Object.keys(result).length?result:null;
+}
 export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch}) {
   return async(actor,route,path,body,{report=null,windows=null}={})=>{
     const url=permittedRequest(path,body);
@@ -26,6 +47,7 @@ export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch}) 
     try {
       const r=await fetcher(url,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(30000)])});
       record.status=r.status;const text=await r.text();record.bytes=Buffer.byteLength(text);budget.response_bytes+=record.bytes;
+      if(route==='start')record.diagnostics=parseStartDiagnostics(r.headers);
       if(record.bytes>2*1024**2||budget.response_bytes>Math.floor(policy.maximum_response_bytes/policy.generators))throw Object.assign(Error('response_byte_ceiling'),{category:'cost'});
       const data=JSON.parse(text);
       if(r.status===429){record.scopes=data.scopes||[];record.retry_after=Number(r.headers.get('retry-after'));}

@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy} from '../scripts/launch-distributed-core.mjs';
 import {policy,heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
 import {inspectBin,inspectPreviewTelemetry,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
-import {requestClient} from '../scripts/launch-distributed-player.mjs';
-import {preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
+import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
+import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
 const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
 const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
 const formed=()=>{let s=initialControl(scope,start,policy);for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,policy);return s;};
@@ -128,6 +128,22 @@ test('client really preserves cookies, CSRF and idempotency without forwarding-h
  let failures=0;const broken=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:new AbortController().signal,fetcher:async()=>{failures++;return Response.json({error:'busy'},{status:503});}});
  await assert.rejects(()=>broken(actor,'start','/draft/v1/runs',{environment:'mixed'}),/http_503/);assert.equal(failures,1);
 });
+test('runner retains bounded preview timings beside unsampled client duration',async()=>{
+ const headers=new Headers({
+   'x-pack1-gateway-timing':JSON.stringify({duration_ms:130,quota_ms:20,upstream_ms:90,secret:'discard'}),
+   'x-pack1-start-timing':JSON.stringify({v:1,total_ms:75,phases:{selection:60,private:88},selector:{candidate:{count:8,sum_ms:55,max_ms:20},other:{count:999,sum_ms:1,max_ms:1}}}),
+ });
+ assert.deepEqual(parseStartDiagnostics(headers),{gateway:{duration_ms:130,quota_ms:20,upstream_ms:90},origin:{
+   total_ms:75,phases:{selection:60},selector:{candidate:{count:8,sum_ms:55,max_ms:20}},
+ }});
+ const budget={gateway_requests:0,response_bytes:0},report={requests:[]};
+ const client=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:new AbortController().signal,
+   fetcher:async()=>Response.json({ok:true},{headers})});
+ await client(null,'start','/draft/v1/runs',{environment:'mixed'},{report});
+ assert.equal(report.requests.length,1);assert.equal(report.requests[0].diagnostics.origin.phases.selection,60);
+ assert.ok(report.requests[0].ms>=0);
+ assert.equal(parseStartDiagnostics(new Headers({'x-pack1-start-timing':'not json'})),null);
+});
 const event=(extra={})=>({id:'event',release:scope.sha,status:200,duration_ms:50,quota_ms:5,upstream_ms:40,...extra});
 test('telemetry bins keep ambient preview boundary rejects distinct from cohort and system failures',()=>{
  const clean=inspectBin([event()],{sha:scope.sha,requests:25,from:0,to:60},policy);assert.equal(clean.passed,true);assert.deepEqual(clean.status_counts,{'200':1});
@@ -143,6 +159,13 @@ test('preview log query uses the real retained-event parser, exact service filte
 });
 test('inaccessible, truncated and schema-invalid retained preview telemetry cannot produce a pass',async()=>{
  for(const fetcher of [async()=>Response.json({}, {status:403}),async()=>Response.json({result:{}}),async()=>Response.json({result:{events:{events:Array(200).fill({})}}})])await assert.rejects(()=>queryPreviewEvents(fetcher,'t','a',0,500));
+});
+test('telemetry preflight requires exact health evidence but tolerates ambient boundary rejects',()=>{
+ const health=event({route:'health'}),ambient=event({id:'ambient',status:403,route:'other'});
+ const accepted=inspectPreflightEvents([health,ambient],scope.sha);
+ assert.equal(accepted.passed,true);assert.equal(accepted.matching_events,1);assert.equal(accepted.boundary_rejections,1);assert.equal(accepted.system_errors,0);
+ for(const bad of [event({id:'old',route:'health',release:'b'.repeat(40)}),event({id:'quota',route:'health',status:429}),event({id:'server',route:'health',status:503})])assert.equal(inspectPreflightEvents([health,bad],scope.sha).passed,false);
+ assert.equal(inspectPreflightEvents([ambient],scope.sha).passed,false,'ambient traffic alone is not positive instrumentation evidence');
 });
 test('preview telemetry preflight waits beyond initial settlement but still fails at the declared timeout',async()=>{
  const saved={sha:process.env.GITHUB_SHA,key:process.env.PREVIEW_ACCESS_KEY,token:process.env.CLOUDFLARE_EDGE_TOKEN};
