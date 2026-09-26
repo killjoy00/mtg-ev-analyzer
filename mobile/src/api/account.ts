@@ -182,6 +182,54 @@ export function changeMobilePassword(session: MobileSession, currentPassword: st
   });
 }
 
+export type PatreonStatus = {
+  configured: boolean;
+  support_url: string;
+  connected: boolean;
+  ad_free: boolean;
+  ads_allowed: boolean;
+  membership: {
+    status?: string | null;
+    entitled_amount_cents?: number;
+    is_free_trial?: boolean;
+    is_gifted?: boolean;
+    effective_state?: string | null;
+    sync_pending?: boolean;
+  } | null;
+  capabilities: string[];
+};
+
+export function loadMobilePatreonStatus(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in to manage Patreon access.');
+  return requestJson<PatreonStatus>('/growth/v1/mobile/patreon/status', {
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    timeoutMs: 15_000,
+  });
+}
+
+export function startMobilePatreonConnect(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in to connect Patreon.');
+  return requestJson<{ url: string }>('/growth/v1/mobile/patreon/connect', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: {},
+    timeoutMs: 15_000,
+  });
+}
+
+export function disconnectMobilePatreon(session: MobileSession) {
+  if (!session.accountToken) throw new Error('Sign in to disconnect Patreon.');
+  return requestJson<{ ok: boolean }>('/growth/v1/mobile/patreon/disconnect', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: {},
+    timeoutMs: 15_000,
+  });
+}
+
 export async function loadMobileAccount(session: MobileSession) {
   if (!session.accountToken) return null;
   return requestJson<AccountState>('/growth/v1/mobile/account/session', {
