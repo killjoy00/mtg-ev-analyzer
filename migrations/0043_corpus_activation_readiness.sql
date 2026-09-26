@@ -234,3 +234,46 @@ BEGIN
  RETURN pack1_build_serving_snapshot(p_parent_version,p_difficulty,p_policy_version);
 END;
 $$;
+
+-- An AFTER STATEMENT trigger also fires when a guarded UPDATE affects zero rows.
+-- Such a rejected activation must not supersede a ready revision or enqueue a
+-- build. Transition tables preserve once-per-statement bulk behavior while
+-- distinguishing real writes from rejected, empty and exact no-op mutations.
+-- Puzzle/rating triggers remain snapshot-aware as defined by migration 0042.
+CREATE OR REPLACE FUNCTION pack1_invalidate_changed_serving_rows()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE changed boolean;
+BEGIN
+ IF TG_OP='INSERT' THEN
+  SELECT EXISTS(SELECT 1 FROM new_inputs) INTO changed;
+ ELSIF TG_OP='DELETE' THEN
+  SELECT EXISTS(SELECT 1 FROM old_inputs) INTO changed;
+ ELSIF TG_OP='UPDATE' THEN
+  SELECT EXISTS(
+   (SELECT to_jsonb(o) FROM old_inputs o EXCEPT SELECT to_jsonb(n) FROM new_inputs n)
+   UNION ALL
+   (SELECT to_jsonb(n) FROM new_inputs n EXCEPT SELECT to_jsonb(o) FROM old_inputs o)
+  ) INTO changed;
+ ELSE
+  RAISE EXCEPTION 'Unexpected serving transition operation: %',TG_OP;
+ END IF;
+ IF changed THEN PERFORM pack1_bump_serving_revision(); END IF;
+ RETURN NULL;
+END;
+$$;
+DO $$
+DECLARE dependency record;
+BEGIN
+ FOR dependency IN SELECT * FROM (VALUES
+  ('draft_run_environment_policy','serving_policy'),
+  ('corpus_components','serving_components'),
+  ('corpus_source_exclusions','serving_exclusions')
+ ) AS dependencies(table_name,trigger_name) LOOP
+  EXECUTE format('DROP TRIGGER IF EXISTS %I ON %I',dependency.trigger_name,dependency.table_name);
+  EXECUTE format('CREATE OR REPLACE TRIGGER %I AFTER INSERT ON %I REFERENCING NEW TABLE AS new_inputs FOR EACH STATEMENT EXECUTE FUNCTION pack1_invalidate_changed_serving_rows()',dependency.trigger_name||'_insert',dependency.table_name);
+  EXECUTE format('CREATE OR REPLACE TRIGGER %I AFTER DELETE ON %I REFERENCING OLD TABLE AS old_inputs FOR EACH STATEMENT EXECUTE FUNCTION pack1_invalidate_changed_serving_rows()',dependency.trigger_name||'_delete',dependency.table_name);
+  EXECUTE format('CREATE OR REPLACE TRIGGER %I AFTER UPDATE ON %I REFERENCING OLD TABLE AS old_inputs NEW TABLE AS new_inputs FOR EACH STATEMENT EXECUTE FUNCTION pack1_invalidate_changed_serving_rows()',dependency.trigger_name||'_update',dependency.table_name);
+  EXECUTE format('CREATE OR REPLACE TRIGGER %I AFTER TRUNCATE ON %I FOR EACH STATEMENT EXECUTE FUNCTION pack1_invalidate_serving_inputs()',dependency.trigger_name||'_truncate',dependency.table_name);
+ END LOOP;
+END;
+$$;
