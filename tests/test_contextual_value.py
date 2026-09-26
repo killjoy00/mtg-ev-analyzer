@@ -19,7 +19,7 @@ from contextual_value.dataset import (
     parse_decision,
 )
 from contextual_value.dr import PolicyObservation, aipw_candidate_values, evaluate_policy
-from contextual_value.evaluate import compare_policies
+from contextual_value.evaluate import REQUIRED_ABLATIONS, compare_policies
 from contextual_value.features import validate_feature_map
 from contextual_value.nuisance import (
     build_fold_training_rows,
@@ -30,7 +30,7 @@ from contextual_value.nuisance import (
     predict_fold,
 )
 from contextual_value.outcome import RidgeOutcomeModel
-from contextual_value.propensity import softmax, support_threshold, validate_distribution
+from contextual_value.propensity import LinearSoftmaxPropensityModel, softmax, support_threshold, validate_distribution
 from contextual_value.schema import inspect_archive, validate_header
 from contextual_value.uncertainty import cluster_bootstrap
 from contextual_value_experiment import protocol
@@ -219,6 +219,42 @@ class PropensityTests(unittest.TestCase):
         self.assertEqual(support_threshold(2), 0.05)
         self.assertEqual(support_threshold(20), 0.01)
 
+    def test_action_invariant_skill_terms_cancel_from_conditional_logit(self):
+        model = LinearSoftmaxPropensityModel(
+            feature_names=("candidate_signal", "user_game_win_rate", "rank=Gold"),
+            coefficients=(1.0, 7.0, -3.0),
+            l2=1.0,
+        )
+        low_skill = {
+            "A": {"candidate_signal": 0.8, "user_game_win_rate": 0.52, "rank=Gold": 1.0},
+            "B": {"candidate_signal": 0.2, "user_game_win_rate": 0.52, "rank=Gold": 1.0},
+        }
+        high_skill = {
+            "A": {"candidate_signal": 0.8, "user_game_win_rate": 0.68, "rank=Gold": 1.0},
+            "B": {"candidate_signal": 0.2, "user_game_win_rate": 0.68, "rank=Gold": 1.0},
+        }
+        low = model.probabilities(low_skill)
+        high = model.probabilities(high_skill)
+        self.assertEqual(set(low), set(high))
+        for action in low:
+            self.assertAlmostEqual(low[action], high[action], places=15)
+
+    def test_candidate_specific_skill_interaction_can_change_choice_probabilities(self):
+        model = LinearSoftmaxPropensityModel(
+            feature_names=("skill_x_candidate_signal",),
+            coefficients=(2.0,),
+            l2=1.0,
+        )
+        low_skill = {
+            "A": {"skill_x_candidate_signal": 0.52 * 0.8},
+            "B": {"skill_x_candidate_signal": 0.52 * 0.2},
+        }
+        high_skill = {
+            "A": {"skill_x_candidate_signal": 0.68 * 0.8},
+            "B": {"skill_x_candidate_signal": 0.68 * 0.2},
+        }
+        self.assertNotEqual(model.probabilities(low_skill), model.probabilities(high_skill))
+
 
 class DoublyRobustTests(unittest.TestCase):
     def test_candidate_aipw_corrects_only_observed_action(self):
@@ -313,7 +349,8 @@ class OutcomeBaselineTests(unittest.TestCase):
 
 
 class EvaluationGateTests(unittest.TestCase):
-    def test_gate_requires_ci_and_environment_harm_check_to_be_decisive(self):
+    @staticmethod
+    def _policies():
         candidate = []
         incumbent = []
         for index in range(100):
@@ -327,15 +364,146 @@ class EvaluationGateTests(unittest.TestCase):
             )
             candidate.append(PolicyObservation(target={"A": 1.0, "B": 0.0}, **shared))
             incumbent.append(PolicyObservation(target={"A": 0.0, "B": 1.0}, **shared))
+        return candidate, incumbent
+
+    @staticmethod
+    def _environment_evidence():
+        return {
+            "MSH": (-0.01, 0.20),
+            "SOS": (-0.02, 0.18),
+            "ECL": (-0.03, 0.16),
+            "TLA": (-0.04, 0.14),
+        }
+
+    @staticmethod
+    def _powered():
+        return {"MSH": True, "SOS": True, "ECL": True, "TLA": True}
+
+    @staticmethod
+    def _ablations():
+        return {name: True for name in REQUIRED_ABLATIONS}
+
+    def _complete_kwargs(self):
+        return dict(
+            ci95=(1.0, 3.0),
+            environment_deltas=self._environment_evidence(),
+            environment_powered=self._powered(),
+            ablation_evidence=self._ablations(),
+            out_of_environment_name="predeclared-holdout",
+            out_of_environment_ci95=(-0.04, 0.10),
+            out_of_environment_excluded_from_development=True,
+        )
+
+    def test_gate_requires_all_written_research_evidence(self):
+        candidate, incumbent = self._policies()
         incomplete = compare_policies(candidate, incumbent)
         self.assertEqual(incomplete["status"], "incomplete")
-        complete = compare_policies(
+        complete = compare_policies(candidate, incumbent, **self._complete_kwargs())
+        self.assertEqual(complete["status"], "pass")
+        self.assertFalse(complete["production_promotion"]["decisive"])
+        self.assertEqual(complete["production_promotion"]["status"], "incomplete")
+
+    def test_empty_environment_evidence_is_incomplete(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        kwargs["environment_deltas"] = {}
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertFalse(result["checks"]["development_environment_evidence_complete"])
+
+    def test_missing_required_environment_is_incomplete(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        evidence = self._environment_evidence()
+        evidence.pop("TLA")
+        kwargs["environment_deltas"] = evidence
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIn(
+            "TLA",
+            result["evidence"]["development_environments"]["missing_intervals"],
+        )
+
+    def test_malformed_environment_interval_is_incomplete(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        evidence = self._environment_evidence()
+        evidence["SOS"] = (0.2, -0.2)
+        kwargs["environment_deltas"] = evidence
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIn("SOS", result["evidence"]["development_environments"]["malformed"])
+
+    def test_no_powered_environment_is_incomplete_not_vacuous_pass(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        kwargs["environment_powered"] = {
+            "MSH": False, "SOS": False, "ECL": False, "TLA": False
+        }
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIsNone(result["checks"]["no_concentrated_harm"])
+
+    def test_missing_or_malformed_ablation_evidence_is_incomplete(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        ablations = self._ablations()
+        missing = REQUIRED_ABLATIONS[0]
+        ablations.pop(missing)
+        kwargs["ablation_evidence"] = ablations
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "incomplete")
+        self.assertIn(missing, result["evidence"]["ablations"]["missing"])
+
+        kwargs = self._complete_kwargs()
+        ablations = self._ablations()
+        ablations[REQUIRED_ABLATIONS[1]] = "yes"
+        kwargs["ablation_evidence"] = ablations
+        self.assertEqual(compare_policies(candidate, incumbent, **kwargs)["status"], "incomplete")
+
+    def test_failed_required_ablation_is_a_gate_failure(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        ablations = self._ablations()
+        ablations["remove_propensity_correction"] = False
+        kwargs["ablation_evidence"] = ablations
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "fail")
+        self.assertFalse(result["checks"]["ablations_coherent_no_leakage_proxy"])
+
+    def test_missing_or_nonexcluded_holdout_is_not_a_pass(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        kwargs["out_of_environment_name"] = None
+        self.assertEqual(compare_policies(candidate, incumbent, **kwargs)["status"], "incomplete")
+
+        kwargs = self._complete_kwargs()
+        kwargs["out_of_environment_excluded_from_development"] = False
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "fail")
+        self.assertFalse(result["checks"]["out_of_environment_excluded_from_development"])
+
+    def test_complete_harm_evidence_can_fail_gate(self):
+        candidate, incumbent = self._policies()
+        kwargs = self._complete_kwargs()
+        evidence = self._environment_evidence()
+        evidence["ECL"] = (-0.20, -0.06)
+        kwargs["environment_deltas"] = evidence
+        result = compare_policies(candidate, incumbent, **kwargs)
+        self.assertEqual(result["status"], "fail")
+        self.assertFalse(result["checks"]["no_concentrated_harm"])
+
+    def test_prospective_environment_is_separate_production_gate(self):
+        candidate, incumbent = self._policies()
+        result = compare_policies(
             candidate,
             incumbent,
-            ci95=(1.0, 3.0),
-            environment_deltas={"holdout": (-0.01, 0.20)},
+            **self._complete_kwargs(),
+            prospective_environment_delta=0.03,
+            prospective_environment_ci95=(-0.02, 0.08),
         )
-        self.assertEqual(complete["status"], "pass")
+        self.assertEqual(result["status"], "pass")
+        self.assertTrue(result["production_promotion"]["passed"])
 
 
 if __name__ == "__main__":

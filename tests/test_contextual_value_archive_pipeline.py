@@ -1,16 +1,36 @@
 import csv
+import gzip
+import json
 import sys
 import tempfile
 import unittest
 from collections import Counter
+from dataclasses import asdict, replace
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 
 from contextual_value.archive import ArchiveSignalProvider, GameDraftSummary, GameStore, load_decisions
+from contextual_value.checkpoint import (
+    build_cohort_manifest,
+    load_preprocessed_cohort,
+    verify_checkpoint_metadata,
+    write_checkpoint_metadata,
+    write_preprocessed_cohort,
+)
 from contextual_value.dataset import Decision, draft_split
+from contextual_value.dr import PolicyObservation, evaluate_policy
 from contextual_value.features import CardSignals
+from contextual_value.nuisance import (
+    NuisanceTrainingRow,
+    build_fold_training_rows,
+    fit_fold_from_training_rows,
+    nuisance_fold,
+    predict_fold,
+)
 from contextual_value.pipeline import run_development
+from contextual_value.schema import ArchiveManifest
+from contextual_value.value import argmax_policy
 
 
 DRAFT_HEADER = [
@@ -336,6 +356,9 @@ class DevelopmentPipelineTests(unittest.TestCase):
         self.assertTrue(calls)
         self.assertFalse(any(draft_id in assessment_ids for draft_id, _ in calls))
         self.assertFalse(report["assessment_opened"])
+        self.assertTrue(report["assessment_boundary"]["outcomes_loaded_into_pipeline"])
+        self.assertFalse(report["assessment_boundary"]["outcomes_used_for_fit"])
+        self.assertFalse(report["assessment_boundary"]["outcomes_scored"])
         self.assertEqual(
             set(report["models"]),
             {
@@ -354,6 +377,342 @@ class DevelopmentPipelineTests(unittest.TestCase):
             value_model.training_draft_count,
             report["drafts"]["train"],
         )
+
+class CheckpointIntegrityTests(unittest.TestCase):
+    @staticmethod
+    def _fixed_provider(row, training_ids):
+        return {
+            "A": CardSignals(
+                strong_choice_probability=0.7,
+                gih_wr=0.60,
+                gnd_wr=0.50,
+                iwd=0.10,
+                gih_games=1000,
+                gnd_games=900,
+                deck_inclusion_probability=0.8,
+                ata=2.0,
+                alsa=3.0,
+            ),
+            "B": CardSignals(
+                strong_choice_probability=0.3,
+                gih_wr=0.50,
+                gnd_wr=0.52,
+                iwd=-0.02,
+                gih_games=900,
+                gnd_games=1000,
+                deck_inclusion_probability=0.7,
+                ata=4.0,
+                alsa=5.0,
+            ),
+        }
+
+    def _cohort_fixture(self):
+        rows = [
+            _decision(
+                f"cohort-{index}",
+                "A" if index % 2 == 0 else "B",
+                7 if index % 2 == 0 else 1,
+            )
+            for index in range(100)
+        ]
+        manifests = [
+            ArchiveManifest("draft.csv.gz", "a" * 64, 100, tuple(DRAFT_HEADER), "draft"),
+            ArchiveManifest("game.csv.gz", "b" * 64, 100, tuple(GAME_HEADER), "game"),
+        ]
+        manifest = build_cohort_manifest(
+            manifests,
+            rows,
+            max_drafts=100,
+            nuisance_folds=3,
+            inner_feature_folds=3,
+        )
+        return rows, manifest
+
+    def test_assessment_outcome_changes_cannot_change_preprocessed_development_fit(self):
+        rows, manifest = self._cohort_fixture()
+        assessment_ids = {
+            row["draft_id"] for row in manifest["selected_drafts"]
+            if row["split"] == "assessment"
+        }
+        self.assertTrue(assessment_ids)
+        mutated = [
+            replace(
+                row,
+                event_match_wins=(0 if row.event_match_wins else 7),
+                event_match_losses=3,
+            )
+            if row.draft_id in assessment_ids else row
+            for row in rows
+        ]
+
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        left = Path(temp.name) / "left"
+        right = Path(temp.name) / "right"
+        write_preprocessed_cohort(left, rows, GameStore({}), manifest)
+        write_preprocessed_cohort(right, mutated, GameStore({}), manifest)
+
+        self.assertEqual(
+            (left / "development-decisions.jsonl.gz").read_bytes(),
+            (right / "development-decisions.jsonl.gz").read_bytes(),
+        )
+        left_rows, _, left_manifest = load_preprocessed_cohort(left)
+        right_rows, _, right_manifest = load_preprocessed_cohort(right)
+        self.assertEqual(left_manifest["cohort_id"], right_manifest["cohort_id"])
+        self.assertFalse(any(draft_split(row.draft_id) == "assessment" for row in left_rows))
+        self.assertEqual(
+            [asdict(row) for row in left_rows],
+            [asdict(row) for row in right_rows],
+        )
+
+        kwargs = dict(
+            signal_provider=self._fixed_provider,
+            nuisance_folds=3,
+            inner_feature_folds=3,
+            propensity_l2=0.5,
+            outcome_l2=1.0,
+            value_l2=1.0,
+            temperature_grid=(0.5, 1.0),
+            blend_lambdas=(0.0, 0.5, 1.0),
+            blend_weights=(0.0, 0.5, 1.0),
+            assessment_draft_count=manifest["split_counts"]["assessment"],
+        )
+        left_report, _, _, left_model = run_development(left_rows, **kwargs)
+        right_report, _, _, right_model = run_development(right_rows, **kwargs)
+        self.assertEqual(left_report, right_report)
+        self.assertEqual(left_model, right_model)
+        self.assertFalse(left_report["assessment_boundary"]["outcomes_loaded_into_pipeline"])
+        self.assertEqual(
+            left_report["drafts"]["assessment_withheld"],
+            manifest["split_counts"]["assessment"],
+        )
+
+    def test_corrupt_or_incompatible_checkpoint_is_rejected(self):
+        rows, manifest = self._cohort_fixture()
+        train_ids = frozenset(
+            row.draft_id for row in rows if draft_split(row.draft_id) == "train"
+        )
+        held_ids = frozenset(
+            row.draft_id for row in rows if draft_split(row.draft_id) == "validation"
+        )
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        payload = Path(temp.name) / "payload.jsonl.gz"
+        with gzip.open(payload, "wt", encoding="utf-8") as handle:
+            handle.write('{"ok":true}\n')
+        config = {
+            "max_drafts": 100,
+            "nuisance_folds": 3,
+            "inner_feature_folds": 3,
+            "propensity_l2": 1.0,
+            "outcome_l2": 10.0,
+            "value_l2": 10.0,
+        }
+        write_checkpoint_metadata(
+            payload,
+            kind="nuisance_predictions",
+            cohort_manifest=manifest,
+            fold=-1,
+            expansion=None,
+            training_ids=train_ids,
+            held_ids=held_ids,
+            configuration=config,
+            row_count=1,
+        )
+        verify_checkpoint_metadata(
+            payload,
+            cohort_manifest=manifest,
+            kind="nuisance_predictions",
+            fold=-1,
+            expansion=None,
+            training_ids=train_ids,
+            held_ids=held_ids,
+            configuration=config,
+        )
+        with self.assertRaisesRegex(ValueError, "incompatible checkpoint fold"):
+            verify_checkpoint_metadata(
+                payload,
+                cohort_manifest=manifest,
+                kind="nuisance_predictions",
+                fold=0,
+                expansion=None,
+                training_ids=train_ids,
+                held_ids=held_ids,
+                configuration=config,
+            )
+        with payload.open("ab") as handle:
+            handle.write(b"corruption")
+        with self.assertRaisesRegex(ValueError, "payload hash mismatch"):
+            verify_checkpoint_metadata(
+                payload,
+                cohort_manifest=manifest,
+                kind="nuisance_predictions",
+                fold=-1,
+                expansion=None,
+                training_ids=train_ids,
+                held_ids=held_ids,
+                configuration=config,
+            )
+
+
+class ArchiveSignalShardEquivalenceTests(unittest.TestCase):
+    def test_multi_environment_gzip_signal_shards_match_monolithic_path(self):
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        draft_header = DRAFT_HEADER + ["pack_card_C", "pool_C"]
+        game_header = GAME_HEADER + [
+            "deck_C", "opening_hand_C", "drawn_C", "tutored_C",
+        ]
+        draft_paths = []
+        game_paths = []
+
+        for expansion in ("AAA", "BBB"):
+            draft_path = root / f"draft-{expansion}.csv.gz"
+            game_path = root / f"game-{expansion}.csv.gz"
+            draft_paths.append(draft_path)
+            game_paths.append(game_path)
+            with gzip.open(draft_path, "wt", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=draft_header)
+                writer.writeheader()
+                for index in range(12):
+                    draft_id = f"{expansion.lower()}-{index}"
+                    pick_count = 1 + (index % 3)
+                    for pick_number in range(pick_count):
+                        selected = "A" if (index + pick_number) % 2 == 0 else "B"
+                        row = _draft_row(draft_id, selected, (index + 2) % 8, pick_number)
+                        row["expansion"] = expansion
+                        row["pack_card_C"] = "1" if pick_number == 0 else "0"
+                        row["pool_C"] = "0"
+                        writer.writerow(row)
+            with gzip.open(game_path, "wt", newline="", encoding="utf-8") as handle:
+                writer = csv.DictWriter(handle, fieldnames=game_header)
+                writer.writeheader()
+                for index in range(12):
+                    draft_id = f"{expansion.lower()}-{index}"
+                    for game in _game_rows(draft_id, flip=(index % 4 == 0)):
+                        game["deck_C"] = "0"
+                        game["opening_hand_C"] = "0"
+                        game["drawn_C"] = "0"
+                        game["tutored_C"] = "0"
+                        writer.writerow(game)
+
+        decisions = []
+        for path in draft_paths:
+            decisions.extend(load_decisions(path))
+        games = GameStore.from_archives(game_paths, {row.draft_id for row in decisions})
+        provider = ArchiveSignalProvider(decisions, games, strong_training_cap=None)
+
+        folds = 3
+        fold = 1
+        all_ids = frozenset(row.draft_id for row in decisions)
+        held_ids = frozenset(
+            draft_id for draft_id in all_ids
+            if nuisance_fold(draft_id, folds) == fold
+        )
+        training_ids = frozenset(all_ids - held_ids)
+        monolithic_rows = build_fold_training_rows(
+            decisions,
+            training_ids,
+            signal_provider=provider,
+            inner_feature_folds=3,
+        )
+
+        sharded_rows = []
+        for expansion in ("AAA", "BBB"):
+            rows = build_fold_training_rows(
+                decisions,
+                training_ids,
+                signal_provider=provider,
+                inner_feature_folds=3,
+                expansion=expansion,
+            )
+            path = root / f"feature-{expansion}.jsonl.gz"
+            with gzip.open(path, "wt", encoding="utf-8") as handle:
+                for row in rows:
+                    handle.write(json.dumps(asdict(row), sort_keys=True) + "\n")
+            with gzip.open(path, "rt", encoding="utf-8") as handle:
+                for line in handle:
+                    payload = json.loads(line)
+                    sharded_rows.append(NuisanceTrainingRow(**payload))
+
+        mono = sorted(monolithic_rows, key=lambda row: row.decision_id)
+        shard = sorted(sharded_rows, key=lambda row: row.decision_id)
+        self.assertEqual(len(mono), len(shard))
+        for left, right in zip(mono, shard):
+            self.assertEqual(left.decision_id, right.decision_id)
+            self.assertEqual(left.features, right.features)
+            self.assertEqual(left.offsets, right.offsets)
+            self.assertAlmostEqual(left.sample_weight, right.sample_weight, places=15)
+            self.assertEqual(left.outcome, right.outcome)
+
+        rare = next(row for row in mono if "C" in row.features)
+        self.assertIn("C", rare.features)
+        self.assertNotIn("gih_wr", rare.features["C"])
+
+        monolithic_fit = fit_fold_from_training_rows(
+            monolithic_rows, training_ids, propensity_l2=0.5, outcome_l2=1.0, fold=fold
+        )
+        sharded_fit = fit_fold_from_training_rows(
+            sharded_rows, training_ids, propensity_l2=0.5, outcome_l2=1.0, fold=fold
+        )
+        self.assertEqual(monolithic_fit.propensity.feature_names, sharded_fit.propensity.feature_names)
+        self.assertEqual(monolithic_fit.outcome.feature_names, sharded_fit.outcome.feature_names)
+        for left, right in zip(
+            monolithic_fit.propensity.coefficients,
+            sharded_fit.propensity.coefficients,
+        ):
+            self.assertAlmostEqual(left, right, places=12)
+        for left, right in zip(
+            monolithic_fit.outcome.coefficients,
+            sharded_fit.outcome.coefficients,
+        ):
+            self.assertAlmostEqual(left, right, places=12)
+
+        held = [row for row in decisions if row.draft_id in held_ids]
+        mono_predictions = sorted(
+            predict_fold(monolithic_fit, held, signal_provider=provider),
+            key=lambda row: row.decision_id,
+        )
+        shard_predictions = sorted(
+            predict_fold(sharded_fit, held, signal_provider=provider),
+            key=lambda row: row.decision_id,
+        )
+        self.assertEqual(
+            [row.decision_id for row in mono_predictions],
+            [row.decision_id for row in shard_predictions],
+        )
+        by_decision = {row.decision_id: row for row in held}
+        mono_observations = []
+        shard_observations = []
+        for left, right in zip(mono_predictions, shard_predictions):
+            decision = by_decision[left.decision_id]
+            for action in decision.candidates:
+                self.assertAlmostEqual(left.behavior[action], right.behavior[action], places=12)
+                self.assertAlmostEqual(left.q_values[action], right.q_values[action], places=12)
+            target = argmax_policy({action: -index for index, action in enumerate(decision.candidates)})
+            mono_observations.append(PolicyObservation(
+                action=decision.selected_card,
+                outcome=float(decision.event_match_wins),
+                behavior=left.behavior,
+                target=target,
+                q_values=left.q_values,
+                cluster=decision.draft_id,
+            ))
+            shard_observations.append(PolicyObservation(
+                action=decision.selected_card,
+                outcome=float(decision.event_match_wins),
+                behavior=right.behavior,
+                target=target,
+                q_values=right.q_values,
+                cluster=decision.draft_id,
+            ))
+        mono_estimate = evaluate_policy(mono_observations, weight_cap=20)
+        shard_estimate = evaluate_policy(shard_observations, weight_cap=20)
+        self.assertAlmostEqual(mono_estimate.dr, shard_estimate.dr, places=12)
+        self.assertAlmostEqual(mono_estimate.direct, shard_estimate.direct, places=12)
+        self.assertAlmostEqual(mono_estimate.snips, shard_estimate.snips, places=12)
+
 
 
 if __name__ == "__main__":
