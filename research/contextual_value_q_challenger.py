@@ -286,6 +286,7 @@ def _report_model(rows, predictions):
 
 def main():
     args = parse_args()
+    import scipy
     import sklearn
 
     if sklearn.__version__ != SKLEARN_VERSION:
@@ -382,7 +383,11 @@ def main():
         "validation_drafts": len(validation_ids),
         "training_rows": len(rows),
         "validation_decisions": len(validation),
-        "sklearn_version": sklearn.__version__,
+        "environment": {
+            "sklearn_version": sklearn.__version__,
+            "numpy_version": np.__version__,
+            "scipy_version": scipy.__version__,
+        },
         "baseline": {
             "family": "RidgeOutcomeModel",
             "l2": 10.0,
