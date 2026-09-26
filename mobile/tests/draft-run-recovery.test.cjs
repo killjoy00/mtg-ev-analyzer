@@ -307,7 +307,7 @@ test('failed revealed-card affiliate handoff stays in analysis and offers a retr
     const link = screen.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Find Card A on TCGplayer, affiliate link')[0];
     await act(async () => { link.props.onPress(); await flush(); });
     assert.match(screen.text(), /Could not open TCGplayer\. You can try the affiliate link again\./);
-    assert.match(screen.text(), /Why this score/);
+    assert.match(screen.text(), /Hide score analysis/);
   } finally { await screen.close(); }
 });
 
