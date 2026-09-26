@@ -164,6 +164,9 @@ def verify_cohort_manifest(manifest: Mapping[str, object]) -> None:
         raise ValueError("cohort manifest is not development-only")
     if payload.get("assessment_outcomes_serialized") is not False:
         raise ValueError("cohort manifest does not seal assessment outcomes")
+    expected_revision = os.environ.get("GITHUB_SHA")
+    if expected_revision is not None and payload.get("code_revision") != expected_revision:
+        raise ValueError("cohort manifest code revision mismatch")
     selected = payload.get("selected_drafts")
     if not isinstance(selected, list) or not selected:
         raise ValueError("cohort manifest has no selected drafts")
