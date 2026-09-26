@@ -10,6 +10,7 @@ permissions:
 env:
   SOURCE_RUN: '36256947308'
   SOURCE_SHA: aa5b17d96b43f3ce08f52fad55ba17f327472c1b
+  PRIOR_FOLD_NEG1_RUN: '36276305563'
   PYTHONUNBUFFERED: '1'
 
 jobs:
@@ -21,7 +22,7 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix:
-        fold: [-1, 0, 1, 2, 3, 4]
+        fold: [0, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -118,7 +119,14 @@ jobs:
           path: original-pooled
           run-id: ${{ env.SOURCE_RUN }}
           github-token: ${{ github.token }}
-      - name: Download converged nuisance folds
+      - name: Download preserved fold -1 from prior run
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-lbfgs-nuisance-fold--1
+          path: converged-nuisance
+          run-id: ${{ env.PRIOR_FOLD_NEG1_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download recovered folds 0-4
         uses: actions/download-artifact@v4
         with:
           pattern: contextual-value-v1-lbfgs-nuisance-fold-*
