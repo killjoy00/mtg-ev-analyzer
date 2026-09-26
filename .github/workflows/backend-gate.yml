@@ -168,6 +168,7 @@ jobs:
           node tests/corpus-admin-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/corpus-health-freshness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/activated-snapshot-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          node tests/health-serving-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/account-session-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/mobile-auth-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           node tests/username-uniqueness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
