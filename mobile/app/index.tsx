@@ -1,9 +1,11 @@
 import { router } from 'expo-router';
+import { Image } from 'expo-image';
 import { useEffect, useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { loadMobilePatreonStatus } from '@/src/api/account';
 import {
   DAILY_ENVIRONMENT_META,
   loadDailyStatus,
@@ -12,6 +14,7 @@ import {
 } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
 import { useAppResume } from '@/src/hooks/useAppResume';
+import { tcgplayerMagicUrl } from '@/src/tcgplayer';
 import { colors, spacing } from '@/src/theme';
 
 const dailyEnvironments: DailyEnvironment[] = ['mixed', 'powered-cube', 'latest'];
@@ -39,20 +42,30 @@ function completed(status: DailyStatus | null, environment: DailyEnvironment) {
 
 export default function HomeScreen() {
   const [status, setStatus] = useState<DailyStatus | null>(null);
+  const [promotionAllowed, setPromotionAllowed] = useState<boolean | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
 
   useAppResume(() => setReloadKey((value) => value + 1));
 
   useEffect(() => {
     let active = true;
+    setPromotionAllowed(null);
     void ensureGuestSession()
-      .then((session) => loadDailyStatus(session))
-      .then((next) => {
-        if (active) setStatus(next);
+      .then(async (session) => {
+        const [next, allowed] = await Promise.all([
+          loadDailyStatus(session).catch(() => null),
+          session.accountToken
+            ? loadMobilePatreonStatus(session).then((membership) => membership.ads_allowed).catch(() => false)
+            : Promise.resolve(true),
+        ]);
+        if (!active) return;
+        if (next) setStatus(next);
+        setPromotionAllowed(allowed);
       })
       .catch(() => {
-        // Daily state is enrichment. Starting a Daily remains server-authoritative
-        // and safely resumes the existing attempt if status cannot be loaded.
+        if (active) setPromotionAllowed(null);
+        // Daily state and promotional eligibility are enrichment. Starting a
+        // Daily remains server-authoritative even when either lookup fails.
       });
     return () => {
       active = false;
@@ -157,6 +170,30 @@ export default function HomeScreen() {
           <Text style={styles.cardBody}>Regular practice is included with a free account. Existing Elite access unlocks Cube and custom-set practice.</Text>
           <Text style={styles.cardAction}>Choose practice →</Text>
         </Pressable>
+
+        {promotionAllowed ? (
+          <View style={styles.affiliatePromo}>
+            <Pressable
+              accessibilityRole="link"
+              accessibilityLabel="Shop Magic on TCGplayer, affiliate link"
+              onPress={() => void Linking.openURL(tcgplayerMagicUrl())}
+              style={({ pressed }) => [styles.affiliateLink, pressed && styles.pressed]}
+            >
+              <Image
+                source="https://packone.pro/assets/tcgplayer-logo-primary-stroke.webp"
+                style={styles.affiliateLogo}
+                contentFit="contain"
+                accessibilityLabel="TCGplayer"
+              />
+              <View style={styles.affiliateCopy}>
+                <Text style={styles.affiliateTitle}>Shop Magic on TCGplayer</Text>
+                <Text style={styles.affiliateDetail}>Singles, sealed product, and more</Text>
+              </View>
+              <Text style={styles.affiliateAction}>Shop TCGplayer →</Text>
+            </Pressable>
+            <Text style={styles.affiliateDisclosure}>Affiliate link. Pack One may earn a commission from purchases.</Text>
+          </View>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"
@@ -286,6 +323,20 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   resetCue: { color: colors.accentDark, fontSize: 13, fontWeight: '800' },
+  affiliatePromo: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.line,
+    padding: spacing.md,
+    gap: spacing.xs,
+  },
+  affiliateLink: { minHeight: 72, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  affiliateLogo: { width: 92, height: 42 },
+  affiliateCopy: { flex: 1, gap: 2 },
+  affiliateTitle: { color: colors.ink, fontSize: 15, fontWeight: '800' },
+  affiliateDetail: { color: colors.muted, fontSize: 12 },
+  affiliateAction: { color: colors.accentDark, fontSize: 12, fontWeight: '800' },
+  affiliateDisclosure: { color: colors.muted, fontSize: 10, lineHeight: 15 },
   utilityCard: {
     backgroundColor: colors.surface,
     borderWidth: 1,
