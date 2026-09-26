@@ -71,9 +71,15 @@ jobs:
             connection=$(neon connection-string "$branch" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
             echo "::add-mask::$connection"
             DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
-            admin_count=$(psql "$connection" -v ON_ERROR_STOP=1 -Atc 'SELECT count(*) FROM pack1_admins')
-            test "$admin_count" -ge 1 || { echo "::error::$branch has no Pack One admin identity for authenticated acceptance."; exit 1; }
-            echo "$branch schema and admin preflight passed"
+            if [[ "$branch" == "$DEV_BRANCH" ]]; then
+              user_count=$(psql "$connection" -v ON_ERROR_STOP=1 -Atc 'SELECT count(*) FROM neon_auth."user"')
+              test "$user_count" -ge 1 || { echo "::error::$branch has no auth user available for a temporary development-only admin fixture."; exit 1; }
+              echo "$branch schema and auth-user preflight passed"
+            else
+              admin_count=$(psql "$connection" -v ON_ERROR_STOP=1 -Atc 'SELECT count(*) FROM pack1_admins')
+              test "$admin_count" -ge 1 || { echo "::error::$branch has no real Pack One admin identity for authenticated production acceptance."; exit 1; }
+              echo "$branch schema and production-admin preflight passed"
+            fi
           done
 
       - name: Require the corrected static admin module before backend promotion
@@ -139,12 +145,31 @@ jobs:
           echo "::add-mask::$csrf"
           session_hash=$(printf '%s' "$token" | sha256sum | cut -d' ' -f1)
           csrf_hash=$(printf '%s' "$csrf" | sha256sum | cut -d' ' -f1)
-          admin_id=$(psql "$connection" -v ON_ERROR_STOP=1 -Atc 'SELECT auth_user_id::text FROM pack1_admins ORDER BY auth_user_id LIMIT 1')
+          admin_id=$(psql "$connection" -v ON_ERROR_STOP=1 -Atc 'SELECT COALESCE((SELECT auth_user_id::text FROM pack1_admins ORDER BY auth_user_id LIMIT 1),(SELECT id::text FROM neon_auth."user" ORDER BY id LIMIT 1))')
           test -n "$admin_id"
+          temporary_admin=$(psql "$connection" -v ON_ERROR_STOP=1 -At --set=auth_user_id="$admin_id" <<'SQL'
+          WITH inserted AS (
+            INSERT INTO pack1_admins(auth_user_id)
+            VALUES (:'auth_user_id'::uuid)
+            ON CONFLICT DO NOTHING
+            RETURNING 1
+          )
+          SELECT COALESCE((SELECT 1 FROM inserted),0);
+          SQL
+          )
           cleanup() {
+            status=$?
+            trap - EXIT
+            set +e
             psql "$connection" -v ON_ERROR_STOP=1 --set=session_hash="$session_hash" >/dev/null <<'SQL'
           DELETE FROM account_sessions WHERE session_hash=:'session_hash';
           SQL
+            if [[ "$temporary_admin" == 1 ]]; then
+              psql "$connection" -v ON_ERROR_STOP=1 --set=auth_user_id="$admin_id" >/dev/null <<'SQL'
+          DELETE FROM pack1_admins WHERE auth_user_id=:'auth_user_id'::uuid;
+          SQL
+            fi
+            exit "$status"
           }
           trap cleanup EXIT
           psql "$connection" -v ON_ERROR_STOP=1 --set=session_hash="$session_hash" --set=auth_user_id="$admin_id" --set=csrf_hash="$csrf_hash" >/dev/null <<'SQL'
