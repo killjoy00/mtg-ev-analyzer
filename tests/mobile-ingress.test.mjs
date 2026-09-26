@@ -432,6 +432,45 @@ test('mobile Apple deletion re-auth routes require and forward both mobile ident
   assert.equal((await gateway(invalid,env(),async()=>{throw Error('must not reach upstream')})).status,403);
 });
 
+test('native Patreon management requires both mobile identities and cannot open browser provider routes',async()=>{
+  for(const [path,method] of [
+    ['/growth/v1/mobile/patreon/status','GET'],
+    ['/growth/v1/mobile/patreon/connect','POST'],
+    ['/growth/v1/mobile/patreon/disconnect','POST'],
+  ]) {
+    let forwarded=null;
+    const request=new Request('https://api.packone.pro'+path,{
+      method,
+      headers:headers({
+        ...(method==='POST'?{'content-type':'application/json'}:{}),
+        'x-pack1-mobile-session':token,
+        'x-pack1-mobile-account':account,
+      }),
+      ...(method==='POST'?{body:'{}'}:{}),
+    });
+    const response=await gateway(request,env(),async(url,options)=>{
+      const next=new Headers(options.headers);
+      forwarded={url,player:next.get('authorization'),account:next.get('x-pack1-mobile-account')};
+      return Response.json({connected:false,capabilities:[]});
+    });
+    assert.equal(response.status,200,path);
+    assert.equal(forwarded.player,'Bearer '+token);
+    assert.equal(forwarded.account,account);
+    assert.match(forwarded.url,/\/v1\/mobile\/patreon\/(?:status|connect|disconnect)$/);
+  }
+
+  const browserConnect=new Request('https://api.packone.pro/growth/v1/patreon/connect',{
+    method:'POST',
+    headers:headers({
+      'content-type':'application/json',
+      'x-pack1-mobile-session':token,
+      'x-pack1-mobile-account':account,
+    }),
+    body:'{}',
+  });
+  assert.equal((await gateway(browserConnect,env(),async()=>{throw Error('must not reach upstream')})).status,403);
+});
+
 test('practice idempotency is only forwarded to Draft Run creation',async()=>{
   const key='practice_'+('k'.repeat(32));
   let forwarded=null;
