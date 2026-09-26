@@ -190,6 +190,10 @@ test('delayed foreground zero-answer response cannot overwrite a successful pick
       clearPracticeIdempotencyKey: async () => {},
       practiceIdempotencyKey: async () => 'practice_' + 'k'.repeat(32),
     },
+    '@/src/tcgplayer': {
+      tcgplayerUrl: (name) => 'https://partner.tcgplayer.com/c/7742974/1780961/21018?u='
+        + encodeURIComponent('https://www.tcgplayer.com/search/magic/product?q=' + encodeURIComponent(String(name).trim()) + '&view=grid'),
+    },
     '@/src/theme': {
       colors: new Proxy({}, { get: () => '#000' }),
       spacing: new Proxy({}, { get: () => 8 }),
@@ -309,6 +313,10 @@ test('a committed pick with a lost response is reconciled into feedback', async 
     '@/src/storage/idempotency': {
       clearPracticeIdempotencyKey: async () => {},
       practiceIdempotencyKey: async () => 'practice_' + 'k'.repeat(32),
+    },
+    '@/src/tcgplayer': {
+      tcgplayerUrl: (name) => 'https://partner.tcgplayer.com/c/7742974/1780961/21018?u='
+        + encodeURIComponent('https://www.tcgplayer.com/search/magic/product?q=' + encodeURIComponent(String(name).trim()) + '&view=grid'),
     },
     '@/src/theme': {
       colors: new Proxy({}, { get: () => '#000' }),
