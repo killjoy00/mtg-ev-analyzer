@@ -3,6 +3,7 @@ const active=new WeakMap();
 export function readinessMessage(status) {
  if(status?.ready===true&&status?.current===true)return `Ready: revision ${status.revision} was built and serving-verified.`;
  const state=status?.state;
+ if(state==='submitting')return 'Activation was requested. Commitment and serving readiness are not yet confirmed.';
  if(state==='queued')return 'Activation is committed. Cache warmup is queued; serving readiness is not complete.';
  if(state==='warming')return 'Activation is committed. The current cache is warming; serving readiness is not complete.';
  if(state==='verifying')return 'The cache is built. Serving and active-source verification are still running.';
@@ -21,16 +22,23 @@ export function readinessMarkup(status) {
  <p class="muted">Quality admission, committed lifecycle state and serving readiness are separate. Fixed Dailies and historical games are unchanged.</p>`;
 }
 
-// Return a cancellation function, and stop on navigation/re-render or a terminal
-// result. Reads are lightweight; polling never starts a build or replays a POST.
+// A lost mutation response does not cancel observation. Only navigation,
+// re-render, an explicit stop or a terminal result ends these lightweight reads.
 export function observeReadiness(root,request,{afterRevision=null}={}) {
  active.get(root)?.();
  const panel=root.querySelector('#corpus-readiness');
  if(!panel)return ()=>{};
  let stopped=false,timer=null;
- const stop=()=>{stopped=true;clearTimeout(timer);};
+ const began=Date.now(),stop=()=>{stopped=true;clearTimeout(timer);};
  active.set(root,stop);
- const show=status=>{panel.innerHTML=readinessMarkup(status);};
+ const show=status=>{
+  panel.innerHTML=readinessMarkup(status);
+  const text=readinessMessage(status),summary=root.querySelector('#corpus-status');
+  if(summary)summary.textContent=text;
+  const modalStatus=root.querySelector('.corpus-action-error');
+  if(modalStatus){modalStatus.textContent=text;modalStatus.className='corpus-action-error';modalStatus.setAttribute('role','status');}
+ };
+ if(afterRevision!==null)show({state:'submitting',ready:false,current_revision:afterRevision});
  async function poll() {
   if(stopped||!root.isConnected||root.querySelector('#corpus-readiness')!==panel)return stop();
   if(typeof document!=='undefined'&&document.hidden){timer=setTimeout(poll,10000);return;}
@@ -38,11 +46,13 @@ export function observeReadiness(root,request,{afterRevision=null}={}) {
    const status=await request('/v1/admin/corpus/readiness');
    if(stopped||root.querySelector('#corpus-readiness')!==panel)return;
    const awaitingCommit=afterRevision!==null&&String(status.current_revision)===String(afterRevision);
+   if(awaitingCommit&&Date.now()-began>10*60*1000){show({state:'unavailable',ready:false});return stop();}
    if(!awaitingCommit){afterRevision=null;show(status);}
    if(awaitingCommit||['queued','warming','verifying','retry_wait'].includes(status.state))timer=setTimeout(poll,3000);
   } catch {
    if(stopped)return;
-   panel.innerHTML=readinessMarkup({state:'unavailable'});
+   show({state:'unavailable',ready:false});
+   if(Date.now()-began>10*60*1000)return stop();
    timer=setTimeout(poll,10000);
   }
  }
@@ -50,17 +60,19 @@ export function observeReadiness(root,request,{afterRevision=null}={}) {
   const button=event.target.closest('[data-readiness-retry]');
   if(!button)return;
   button.disabled=true;
+  // Observe independently while the one authorized retry attempt runs. This
+  // remains active even if its HTTP response is lost or exceeds the client budget.
+  clearTimeout(timer);timer=setTimeout(poll,1000);
   try {
    const result=await request(`/v1/admin/corpus/readiness/${button.dataset.readinessRetry}/retry`,{});
    if(stopped||root.querySelector('#corpus-readiness')!==panel)return;
    show(result.readiness);
-   const summary=root.querySelector('#corpus-status');
-   if(summary)summary.textContent=readinessMessage(result.readiness);
    clearTimeout(timer);timer=setTimeout(poll,1000);
   } catch(cause) {
    if(stopped)return;
    const message=document.createElement('p');message.className='error';message.setAttribute('role','alert');
-   message.textContent=cause.message;panel.append(message);button.disabled=false;
+   message.textContent=`${cause.message} The response was not confirmed; status polling does not repeat the retry.`;panel.append(message);
+   clearTimeout(timer);timer=setTimeout(poll,1000);
   }
  };
  timer=setTimeout(poll,1000);

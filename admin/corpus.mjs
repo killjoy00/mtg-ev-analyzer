@@ -65,7 +65,12 @@ export async function renderCorpus(root,request){
   } catch(cause) {
    message.className='error corpus-action-error';message.setAttribute('role','alert');
    message.textContent=`${cause.message} Check readiness and status history before repeating activation; a lost response does not prove rollback.`;
-   form.querySelector('button').disabled=false;
-  } finally {stop();}
+   if(cause.status>=400&&cause.status<500){stop();form.querySelector('button').disabled=false;}
+   // Ambiguous network/timeout/server responses keep the submission disabled and
+   // continue observation. A new GET may prove completion; never replay the POST.
+   const refresh=document.createElement('button');refresh.type='button';refresh.className='secondary';
+   refresh.textContent='Refresh committed status';refresh.onclick=async()=>{dialog.close();await renderCorpus(root,request);};
+   message.after(refresh);
+  }
  };draw();observeReadiness(root,request);
 }

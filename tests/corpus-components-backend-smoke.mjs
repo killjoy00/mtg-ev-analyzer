@@ -54,4 +54,9 @@ try {
  await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[user]);
  await query('DELETE FROM neon_auth.session WHERE token=$1',[token]);
  await query('DELETE FROM neon_auth."user" WHERE id=$1::uuid',[user]);
+ // This one-pick admission fixture registers the runtime key via admin calls.
+ // Its raw cleanup invalidates inventory; do not leak pending readiness into the
+ // next independent legacy fixture. The full readiness suite registers and
+ // exercises the production gate separately on this disposable branch.
+ await query('DELETE FROM draft_run_readiness_keys');
 }

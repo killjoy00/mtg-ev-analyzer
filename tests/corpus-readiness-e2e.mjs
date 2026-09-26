@@ -18,17 +18,22 @@ for(const [name,engine] of Object.entries({chromium,webkit})) {
     sets:[{set_id:'qa',set_name:'Readiness fixture',status:'Live',active_snapshot_id:a,health_current:true,ready:true,serving_count:500,serving_parent_count:500,serving_component_count:0,staged_count:512,under_floor_count:0,manifest:{},report:{gates:[]}}],
     snapshots:[{set_id:'qa',source_snapshot_id:a,active:true,environment_status:'Live',lifecycle_status:'Approved',ready:true,health_current:true},
      {set_id:'qa',source_snapshot_id:b,active:false,environment_status:'Live',lifecycle_status:'Candidate',ready:true,health_current:true,created_at:'2026-09-26T12:00:00Z'}]};
+   window.originalFixture=structuredClone(window.corpusFixture);
    window.fixtureRequest=async(path,body)=>{
     window.calls.push({path,body});
     if(path==='/v1/admin/corpus/readiness')return structuredClone(window.readiness);
     if(path==='/v1/admin/corpus')return structuredClone({...window.corpusFixture,readiness:window.readiness});
     if(path==='/v1/admin/corpus/qa/snapshot') {
-     window.readiness={...window.readiness,operation_id:'2',current_operation_id:'2',revision:'2',current_revision:'2',state:'warming',ready:false,cache_snapshot_id:null};
-     window.corpusFixture.serving_revision='2';window.corpusFixture.sets[0].active_snapshot_id=b;
-     return new Promise(resolve=>{window.finishActivation=()=>{
-      window.readiness={...window.readiness,state:'failed',last_error:{code:'verification_failed',message:'Fixture source verification failed'}};
-      resolve({ok:false,activation_committed:true,activation_event_id:'2',readiness:structuredClone(window.readiness)});
-     };});
+     const next=String(Number(window.readiness.current_revision)+1);
+     window.readiness={...window.readiness,operation_id:next,current_operation_id:next,revision:next,current_revision:next,state:'warming',ready:false,cache_snapshot_id:null};
+     window.corpusFixture.serving_revision=next;window.corpusFixture.sets[0].active_snapshot_id=b;
+     return new Promise((resolve,reject)=>{
+      window.loseActivation=()=>reject(new DOMException('Fixture response lost after commit','TimeoutError'));
+      window.finishActivation=()=>{
+       window.readiness={...window.readiness,state:'failed',last_error:{code:'verification_failed',message:'Fixture source verification failed'}};
+       resolve({ok:false,activation_committed:true,activation_event_id:next,readiness:structuredClone(window.readiness)});
+      };
+     });
     }
     if(path==='/v1/admin/corpus/readiness/2/retry') {
      window.readiness={...window.readiness,state:'verifying',ready:false,last_error:null};
@@ -40,12 +45,13 @@ for(const [name,engine] of Object.entries({chromium,webkit})) {
    await renderCorpus(document.querySelector('#fixture'),window.fixtureRequest);
   });
   const panel=page.locator('#corpus-readiness');
-  await page.getByRole('button',{name:'Readiness fixture QA'}).click();
+  await page.locator('[data-open-set="qa"]').click();
   await page.locator('select[name="sourceSnapshotId"]').selectOption('b'.repeat(64));
   await page.getByRole('button',{name:'Activate snapshot',exact:true}).click();
+  assert.doesNotMatch(await panel.innerText(),/Ready: revision/,'Old readiness is not a success for a new pending activation');
   await page.waitForFunction(()=>document.querySelector('#corpus-readiness')?.textContent.includes('cache is warming'));
   assert.doesNotMatch(await panel.innerText(),/Ready: revision/);
-  assert.match(await page.locator('.corpus-action-error').innerText(),/warming and verifying/);
+  assert.match(await page.locator('.corpus-action-error').innerText(),/cache is warming/);
   const posts=await page.evaluate(()=>window.calls.filter(c=>c.body));
   assert.equal(posts.length,1);assert.equal(posts[0].body.expectedActiveSnapshotId,'a'.repeat(64));
   await page.screenshot({path:`artifacts/ui-readiness-${name}-warming.png`,fullPage:true});
@@ -72,11 +78,36 @@ for(const [name,engine] of Object.entries({chromium,webkit})) {
   await page.waitForFunction(()=>document.querySelector('#corpus-readiness')?.textContent.includes('newer serving revision'));
   assert.doesNotMatch(await panel.innerText(),/Ready: revision/);
   assert.equal(await panel.locator('[data-readiness-retry]').count(),0);
+
+  // The HTTP client may stop waiting before the durable operation finishes.
+  // Losing that response must neither stop status recovery nor replay activation.
+  await page.evaluate(async()=>{
+   window.corpusFixture=structuredClone(window.originalFixture);window.corpusFixture.serving_revision='3';
+   window.readiness={operation_id:'3',current_operation_id:'3',revision:'3',current_revision:'3',state:'ready',ready:true,current:true,attempts:1,cache_snapshot_id:'3'};
+   window.calls=[];
+   const {renderCorpus}=await import('/admin/corpus.mjs');
+   await renderCorpus(document.querySelector('#fixture'),window.fixtureRequest);
+  });
+  await page.locator('[data-open-set="qa"]').click();
+  await page.locator('select[name="sourceSnapshotId"]').selectOption('b'.repeat(64));
+  await page.getByRole('button',{name:'Activate snapshot',exact:true}).click();
+  await page.waitForFunction(()=>document.querySelector('#corpus-readiness')?.textContent.includes('cache is warming'));
+  await page.evaluate(()=>window.loseActivation());
+  await page.getByRole('button',{name:'Refresh committed status',exact:true}).waitFor();
+  assert.equal(await page.getByRole('button',{name:'Activate snapshot',exact:true}).isDisabled(),true);
+  await page.evaluate(()=>{window.readiness={...window.readiness,state:'ready',ready:true,current:true,cache_snapshot_id:'4'};});
+  await page.waitForFunction(()=>document.querySelector('.corpus-action-error')?.textContent.includes('Ready: revision 4'));
+  assert.match(await panel.innerText(),/Ready: revision 4/);
+  assert.equal((await page.evaluate(()=>window.calls.filter(c=>c.body&&c.path.endsWith('/snapshot')))).length,1,'Lost response recovery never repeats publication');
+  await page.screenshot({path:`artifacts/ui-readiness-${name}-lost-response.png`,fullPage:true});
+  await page.getByRole('button',{name:'Refresh committed status',exact:true}).click();
+  assert.match(await panel.innerText(),/Ready: revision 4/);
+
   for(const width of [320,390,1440]) {
    await page.setViewportSize({width,height:844});
    assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1),'Readiness must not introduce horizontal page overflow');
   }
   assert.deepEqual(errors,[]);
-  console.log(`${name}: actual Corpus UI distinguishes committed, warming, failed, retry, ready and superseded without replaying activation.`);
+  console.log(`${name}: actual Corpus UI proves pending, failure, retry, ready, supersession and lost-response recovery without replaying activation.`);
  } finally {await browser.close();}
 }
