@@ -55,6 +55,7 @@ export function renderCoverageState(state) {
   const normalized=normalizeCoverageState(state);
   return [
     'Machine-managed, sanitized production launch-watcher coverage watermark. Do not use this issue as an incident; category alerts remain separate issues.',
+    `Coverage through: ${normalized.covered_through||'uninitialized'}.`,
     '',
     `<!-- ${COVERAGE_MARKER}`,
     JSON.stringify(normalized),
