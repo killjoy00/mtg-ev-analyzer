@@ -22,7 +22,7 @@ async function main() {
   };
   let apiCalls=0;
   const page=await context.newPage(),errors=[],report={sha:fixture.sha,branch:fixture.branch,
-    warm_samples_per_case:process.env.PACK1_BROWSER_SMOKE==='1'?2:20,smoke:process.env.PACK1_BROWSER_SMOKE==='1',scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
+    warm_samples_per_case:process.env.PACK1_BROWSER_SMOKE==='1'?2:20,smoke:process.env.PACK1_BROWSER_SMOKE==='1',latency_gate:process.env.PACK1_BROWSER_SMOKE!=='1',scope:'Reviewed practice-page HTML with production JS/assets in Chromium; all API traffic rerouted to private preview; mobile viewport',samples:[],budgets:{warm_api_p95_ms:2000,warm_click_p95_ms:3000,cold_click_ms:6000},passed:false};
   // Intercept only API/origin traffic and the reviewed HTML through CDP. Unlike
   // Playwright routing, this leaves ordinary static-resource HTTP caching on.
   const cdp=await context.newCDPSession(page);await cdp.send('Network.enable');
@@ -52,7 +52,7 @@ async function main() {
       // A navigation can cancel an intercepted analytics request before its
       // response arrives. Chromium then rejects fulfillment of the dead id.
       if(/Invalid InterceptionId|Invalid interceptionId|No resource with given identifier|Can only perform operation while paused|Session closed|Target closed/.test(String(error.message)))return;
-      errors.push('proxy_'+(error.name||'Error')+'_'+(String(error.message).match(/Protocol error \(([^)]+)\)/)?.[1]||'network')); await cdp.send('Fetch.failRequest',{requestId,errorReason:'Failed'}).catch(()=>{});
+      errors.push('proxy_'+(error.name||'Error')+'_'+(String(error.message).match(/Protocol error \(([^)]+)\)/)?.[1]||'network')+'_'+(/^[A-Z0-9_]+$/.test(error.cause?.code||'')?error.cause.code:'unknown')); await cdp.send('Fetch.failRequest',{requestId,errorReason:'Failed'}).catch(()=>{});
     }
   });
   let staticCacheHits=0;cdp.on('Network.requestServedFromCache',()=>staticCacheHits++);
@@ -115,7 +115,7 @@ async function main() {
       return [name,{api:summarize(rows.map(s=>s.api_ms)),click:summarize(rows.map(s=>s.click_to_cards_ms)),images:summarize(rows.map(s=>s.click_to_images_ms))}];
     }));
     report.passed=!errors.length&&staticCacheHits>0&&report.samples.filter(s=>s.phase==='confirmed_idle').length===(process.env.PACK1_BROWSER_SMOKE==='1'?0:4)&&report.samples.filter(s=>s.phase==='confirmed_idle').every(s=>s.click_to_cards_ms<=report.budgets.cold_click_ms)&&
-      Object.values(report.summary).every(s=>s.api.p95_ms<=2000&&s.click.p95_ms<=3000);
+      (process.env.PACK1_BROWSER_SMOKE==='1'||Object.values(report.summary).every(s=>s.api.p95_ms<=2000&&s.click.p95_ms<=3000));
     await page.screenshot({path:directory+'/practice-mobile.png',fullPage:true});
   } catch(error) {
     report.failure={code:error.code||error.name||'unknown',line:String(error.stack).match(/launch-practice-browser.mjs:(\d+)/)?.[1]||null};

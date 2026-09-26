@@ -112,7 +112,7 @@ jobs:
           path: artifacts/launch-load
           retention-days: 30
       - name: Remove this private preview route
-        if: always() && steps.deploy.outcome == 'success'
+        if: always() && (steps.deploy.outcome == 'success' || steps.deploy.outcome == 'failure')
         env:
           CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
         run: node scripts/edge-control.mjs disable
