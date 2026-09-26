@@ -122,7 +122,7 @@ export type DailyStatus = {
   membership?: { connected?: boolean; capabilities?: string[] } | null;
   ranking_identity?: { eligible: boolean; reason?: string | null } | null;
   daily_streak: number;
-  daily_history: Array<{
+  daily_history: ({
     date: string;
     set_id: string;
     mode: string;
@@ -131,7 +131,7 @@ export type DailyStatus = {
     total?: number | null;
     percentile?: number | null;
     final?: boolean;
-  }>;
+  })[];
 };
 
 export type DraftRunHealth = {
