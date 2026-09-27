@@ -131,7 +131,7 @@ BEGIN
       WHERE p.corpus_version IN (SELECT p_parent_version UNION SELECT c.component_version FROM corpus_components c WHERE c.parent_version=p_parent_version)
         AND (p.corpus_version=p_parent_version OR EXISTS(SELECT 1 FROM corpus_components c WHERE c.parent_version=p_parent_version AND c.component_version=p.corpus_version AND c.set_id=p.set_id))
         AND p.interesting AND p.pack_number=1 AND r.target_support_ratio>=0.20526315789473684::float8
-    ), selected_row AS (SELECT to_jsonb(t)-'selected_id' item FROM trajectory t WHERE t.puzzle_id=t.selected_id LIMIT 1),
+    ), selected_row AS (SELECT to_jsonb(t) item FROM trajectory t WHERE t.puzzle_id=t.selected_id LIMIT 1),
     delta AS (
       SELECT COALESCE(jsonb_object_agg(d.key,d.n),'{}'::jsonb) items FROM (
         SELECT t.set_id||':'||t.pick_number||':'||t.band key,count(*)::integer n FROM trajectory t
