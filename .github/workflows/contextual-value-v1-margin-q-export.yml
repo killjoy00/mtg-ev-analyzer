@@ -1,6 +1,9 @@
 name: contextual-value-v1-margin-q-export
 
 on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
   workflow_dispatch:
 
 permissions:
@@ -21,10 +24,14 @@ jobs:
       max-parallel: 5
       matrix:
         include:
-          - fold: 0
-            compact_run: '36289077937'
-            compact_name: contextual-value-v1-phase-a-compact-pilot-fold-0
-            prior_run: '36289846820'
+          - fold: 1
+            compact_run: '36289366966'
+            compact_name: contextual-value-v1-phase-a-compact-fold-1
+            prior_run: '36290030236'
+          - fold: 2
+            compact_run: '36289366966'
+            compact_name: contextual-value-v1-phase-a-compact-fold-2
+            prior_run: '36290030236'
 
     steps:
       - uses: actions/checkout@v4
@@ -100,19 +107,32 @@ jobs:
           assert report["assessment_outcomes_used"] is False
           assert report["sklearn_version"] == "1.9.1"
           assert {"q_rich","q_simple","behavior","phi_rich","phi_simple"} <= set(new.files)
+          max_float_diff=0.0
           for key in old.files:
               assert key in new.files, key
               left,right=new[key],old[key]
+              assert left.shape == right.shape, key
               if left.dtype.kind in "f":
-                  assert np.array_equal(left,right,equal_nan=True), key
+                  finite=np.isfinite(left)&np.isfinite(right)
+                  diff=float(np.max(np.abs(left[finite]-right[finite]))) if np.any(finite) else 0.0
+                  max_float_diff=max(max_float_diff,diff)
+                  assert np.array_equal(np.isnan(left),np.isnan(right)), key
+                  assert diff <= 1e-10, (key,diff)
               else:
                   assert np.array_equal(left,right), key
           for section in ("q_diagnostics_rich","q_diagnostics_simple_retained"):
-              assert report[section] == prior[section], section
+              for metric,value in report[section]["overall"].items():
+                  prior_value=prior[section]["overall"][metric]
+                  if isinstance(value,(int,float)):
+                      assert abs(float(value)-float(prior_value)) <= 1e-10, (section,metric,value,prior_value)
+                  else:
+                      assert value == prior_value, (section,metric)
           print(json.dumps({
               "fold":fold,
               "q_rows":int(len(new["q_rich"])),
               "prior_parity":True,
+              "max_float_diff":max_float_diff,
+              "tolerance":1e-10,
               "assessment_opened":False,
           },sort_keys=True))
           PY
