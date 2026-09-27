@@ -1,0 +1,91 @@
+name: contextual-value-v1-phase-a2-bakeoff-pilot
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-rich-features-529
+    paths:
+      - '.github/workflows/contextual-value-v1-phase-a2-bakeoff-pilot.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  COMPACT_RUN: '36289077937'
+  ABLATION_RUN: '36280148906'
+  FOLD: '0'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  fit-fold:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned model dependency
+        run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1'
+      - name: Compile bake-off script
+        run: python -m py_compile research/contextual_value_phase_a_bakeoff.py
+      - name: Download compact fold
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-compact-pilot-fold-0
+          path: compact
+          run-id: ${{ env.COMPACT_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download strong-offset-only nuisance
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-strong_offset_only-fold-0
+          path: behavior
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download held feature checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-held-0
+          path: held
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Fit shared rich Q and build fold shard
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 research/contextual_value_phase_a_bakeoff.py fit-fold \
+            --fold "$FOLD" \
+            --compact-db compact/phase-a-compact-fold-0.sqlite \
+            --compact-schema compact/phase-a-compact-fold-0-schema.json \
+            --behavior-predictions behavior/strong_offset_only-fold-0.jsonl.gz \
+            --held-features held/held-features-fold-0.jsonl.gz \
+            --out results/contextual-value-v1/phase-a2-fold-0
+      - name: Assert fold contract
+        run: |
+          python3 - <<'PY'
+          import json, numpy as np
+          r=json.load(open("results/contextual-value-v1/phase-a2-fold-0/phase-a2-fold-0-report.json"))
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          assert r["sklearn_version"] == "1.9.1"
+          assert r["fold"] == 0
+          assert r["held_decisions"] > 0
+          assert all(
+              name not in r["nonlinear_state_feature_names"]
+              for name in ("base:user_game_win_rate","base:log1p_user_games")
+          )
+          assert not any(name.startswith("base:rank=") for name in r["nonlinear_state_feature_names"])
+          d=np.load("results/contextual-value-v1/phase-a2-fold-0/phase-a2-fold-0.npz",allow_pickle=False)
+          assert int(d["fold"][0]) == 0
+          assert len(d["phi_rich"]) == int(d["offsets"][-1])
+          assert len(d["phi_simple"]) == int(d["offsets"][-1])
+          PY
+      - name: Upload pilot fold shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-0
+          path: results/contextual-value-v1/phase-a2-fold-0/
+          retention-days: 30
