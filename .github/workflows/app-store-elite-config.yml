@@ -1,0 +1,49 @@
+name: App Store Elite configuration
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/app-store-elite-request.json'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: app-store-elite-configuration
+  cancel-in-progress: false
+jobs:
+  configure:
+    name: configure Pack One Elite in App Store Connect
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve reviewed request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('.github/app-store-elite-request.json').read_text())
+          if set(r) != {'operation','reason'} or r.get('operation') != 'configure-pack-one-elite':
+              raise SystemExit('Invalid App Store Elite request.')
+          if not isinstance(r.get('reason'),str) or not r['reason'].strip():
+              raise SystemExit('Request reason is required.')
+          PY
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Configure Pack One Elite subscription structure and notifications
+        run: node .github/scripts/app-store-elite-config.mjs
