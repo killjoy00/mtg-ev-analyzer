@@ -121,6 +121,28 @@ def collect_checked_in_inventory(catalog: dict, card_name: str) -> tuple[dict[st
     return names_by_set, names_by_id, target_cards_by_set
 
 
+def collect_shard_inventory(
+    catalog: dict,
+    card_name: str,
+    environments: list[str],
+    names_by_id: dict[str, set[str]],
+) -> dict[str, list[dict]]:
+    target_environments = set(environments)
+    target_cards_by_set = {sid: [] for sid in environments}
+    for entry in catalog.get("sets") or []:
+        sid = str(entry.get("id") or "")
+        if not sid:
+            continue
+        for card in cards_in_shards(sid):
+            name = str(card.get("name") or "")
+            card_id = str(card.get("id") or "")
+            if name and card_id:
+                names_by_id.setdefault(card_id, set()).add(name)
+            if sid in target_environments and name == card_name:
+                target_cards_by_set[sid].append(card)
+    return target_cards_by_set
+
+
 def validate_served_name(
     card_name: str,
     environments: list[str],
@@ -247,17 +269,7 @@ def run_repair(card_name: str, raw_environments: str, *, dry_run: bool = False) 
     environments = parse_environments(raw_environments, catalog)
 
     checked_in_names, names_by_id, checked_in_targets = collect_checked_in_inventory(catalog, card_name)
-    shard_targets: dict[str, list[dict]] = {}
-    for sid in environments:
-        target_cards: list[dict] = []
-        for card in cards_in_shards(sid):
-            name = str(card.get("name") or "")
-            card_id = str(card.get("id") or "")
-            if name and card_id:
-                names_by_id.setdefault(card_id, set()).add(name)
-            if name == card_name:
-                target_cards.append(card)
-        shard_targets[sid] = target_cards
+    shard_targets = collect_shard_inventory(catalog, card_name, environments, names_by_id)
     validate_served_name(card_name, environments, checked_in_targets, shard_targets)
 
     # card-images.json is a global card-id source of truth, so patch every id
