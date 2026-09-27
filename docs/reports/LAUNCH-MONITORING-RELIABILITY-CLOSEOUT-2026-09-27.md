@@ -169,7 +169,9 @@ This was a distinct stale episode, not a duplicate dispatch from the 22:39 episo
 
 `covered_through=2026-09-27T23:05:00Z`
 
-This repeat demonstrates that recovery remains reusable after the first episode rather than being a one-shot repair. The first complete stale→dispatch→fresh cycle plus the following normal interval remain the formal acceptance basis above.
+At **2026-09-27T23:19:01Z**, the next Neon maintenance interval recorded a second `launch_watcher_recovered` event with coverage age **14 minutes**. Both persisted launch-watcher states reset to `fresh`, and recovery attempts reset to zero again. Resend reported both the **23:09:02Z** stale notification and the **23:19:01Z** recovery notification as **delivered**.
+
+This second complete stale→dispatch→fresh cycle demonstrates that recovery is reusable rather than a one-shot repair. The earlier cycle plus the 22:59 normal interval were already sufficient for acceptance; this later cycle adds independent repeat evidence under the same live scheduler failure mode.
 
 ## Preserved behavior
 
