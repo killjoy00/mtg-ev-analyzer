@@ -132,7 +132,11 @@ class _JsonlGzWriter:
 
     def __exit__(self, exc_type, exc, tb):
         assert self.handle is not None
+        assert self.raw is not None
         self.handle.close()
+        if not self.raw.closed:
+            self.raw.flush()
+            self.raw.close()
         return False
 
 
