@@ -45,17 +45,17 @@ The refresh always uploads `generated/card-image-refresh-report.json` and per-en
 
 Use targeted repair for a known, isolated display regression on an exact served card name and explicit environment list when the shared selector/policy itself has not changed. Use the full refresh for resolver or printing-policy changes, bulk drift, audits, uncertain scope, or any case where more than a bounded named repair is intended.
 
-Run the targeted repair dry-run before dispatching live mutation. Hydrate only the environments you intend to repair, then resolve and inspect the retained report without changing shards or checked-in source:
+Run the targeted repair dry-run before dispatching live mutation. Hydrate all replay shards read-only so the repair can apply the same global card-id/name collision check as the full refresh, then resolve and inspect the retained report without changing shards or checked-in source:
 
 ```bash
-REPLAY_SETS='powered-cube' bash scripts/r2_replay_shards.sh hydrate
+bash scripts/r2_replay_shards.sh hydrate
 CARD_NAME='Titania, Protector of Argoth' \
 REPAIR_ENVIRONMENTS='powered-cube' \
 python scripts/repair_card_image.py --dry-run
 cat generated/card-image-repair/report.json
 ```
 
-The dry-run requires the same R2 read credentials as shard hydration. It validates exact catalog environment ids, exact case-sensitive served-name presence in both checked-in corpus and hydrated shards, card-id/name collisions, and the deterministic bulk selector. Targeted mode never sends operator card text through Scryfall named/fuzzy resolution; a bulk miss fails closed and should be handled through the full refresh path instead.
+The dry-run requires the same R2 read credentials as shard hydration. It validates exact catalog environment ids, exact case-sensitive served-name presence in both checked-in corpus and the selected environments' hydrated shards, global card-id/name collisions across every hydrated environment, and the deterministic bulk selector. Targeted mode never sends operator card text through Scryfall named/fuzzy resolution; a bulk miss fails closed and should be handled through the full refresh path instead.
 
 Dispatch the existing pinned workflow in targeted mode; do not create or use a second image-maintenance workflow:
 
@@ -68,7 +68,11 @@ gh workflow run refresh-powered-cube-images.yml \
   -f code_commit='<reviewed-main-commit>'
 ```
 
-Targeted verification proves that only the listed environments receive one-entry backend mappings, the second image-page pass would update zero cards on every page, image markers are normalized only for those environments, development gameplay passes before production is touched, production gameplay passes, and the backend release marker remains on the requested reviewed revision. R2 hydrate/upload/verify is scoped with `REPLAY_SETS`.
+Targeted verification proves that only the listed environments receive one-entry backend mappings, the second image-page pass reports zero updates on every page, image markers are normalized only for those environments, development gameplay passes before production is touched, production gameplay passes, and the backend release marker remains on the requested reviewed revision. The zero-update pass proves there is no remaining drift among payloads scanned by the backend, but the current backend response does not expose a positive card-match count, so it does not independently prove that the card exists in backend storage. The verification pass uses the same idempotent refresh endpoint; if it discovers drift, that page may be repaired before the pass fails.
+
+Targeted workflow hydration is intentionally all-environment and read-only so the full production-data audit and global collision check have complete shards. Only R2 upload/verify and backend propagation are scoped to the validated environment list. The workflow derives `REPLAY_SETS` from the validated repair report, so whitespace in the dispatch input cannot change shard scope after validation.
+
+Backend repair and verification summaries are retained under `generated/card-image-repair/backend/*.json` in the repair artifact, including stage, page counts, update totals, verification outcome, and failures. The targeted job has a 45-minute timeout; this is a ceiling, not an expected runtime.
 
 The final protected-branch handoff uses an `automation/card-image-repair-...` branch and never pushes to `main` or creates a pull request from Actions. A no-op source publication is expected when checked-in/R2 display metadata was already correct and only the live backend state had drifted.
 
