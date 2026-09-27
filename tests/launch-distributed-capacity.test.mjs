@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy} from '../scripts/launch-distributed-core.mjs';
 import {policy,heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
-import {inspectBin,inspectPreviewTelemetry,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
+import {inspectBin,inspectPreviewTelemetry,previewTelemetryFailure,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
 import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
 const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
@@ -154,14 +154,32 @@ test('telemetry bins keep ambient preview boundary rejects distinct from cohort 
  assert.equal(ambient.passed,true);assert.equal(ambient.boundary_rejections,1);assert.equal(ambient.route_status_counts['other:403'],1);
  for(const events of [[],[event({release:'b'.repeat(40)})],[event({status:503})],[event({status:429})]])assert.equal(inspectBin(events,{sha:scope.sha,requests:25,from:0,to:60},policy).passed,false);
 });
-test('preview log query uses the real retained-event parser, exact service filtering and deduplication',async()=>{
- const row={$metadata:{id:'retained-1'},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:.1,route:'draft_pick'}};
- const fetcher=async(url,options)=>{const body=JSON.parse(options.body);assert.equal(body.parameters.filters[0].value,'pack1-gateway-preview');return Response.json({success:true,result:{events:{events:[row,row]}}});};
- const result=await queryPreviewEvents(fetcher,'token','account',0,60000);assert.equal(result.length,1);
- await assert.rejects(()=>queryPreviewEvents(async()=>Response.json({success:true,result:{events:{events:[{source:{}}]}}}),'t','a',0,60),/invalid_retained/);
+test('preview log query uses bounded cursor pages, the real retained-event parser and exact service filtering',async()=>{
+ const row=id=>({$metadata:{id},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:1,route:'draft_pick'}});
+ const first=Array.from({length:2000},(_,i)=>row('retained-'+i)),calls=[];
+ const fetcher=async(url,options)=>{
+  const body=JSON.parse(options.body);calls.push(body);
+  assert.equal(url,'https://api.cloudflare.com/client/v4/accounts/account/workers/observability/telemetry/query');
+  assert.equal(body.limit,2000);assert.equal(body.view,'events');assert.equal(body.parameters.filters[0].value,'pack1-gateway-preview');
+  assert.equal(body.parameters.filters[1].value,'gateway_request');
+  return Response.json({success:true,result:{events:{events:calls.length===1?first:[row('retained-1999'),row('retained-2000')]}}});
+ };
+ const result=await queryPreviewEvents(fetcher,'token','account',0,60000);
+ assert.equal(calls.length,2);assert.equal(calls[0].offset,undefined);assert.equal(calls[1].offset,'retained-1999');assert.equal(calls[1].offsetDirection,'next');
+ assert.equal(result.length,2001);assert.equal(new Set(result.map(e=>e.id)).size,2001);
 });
-test('inaccessible, truncated and schema-invalid retained preview telemetry cannot produce a pass',async()=>{
- for(const fetcher of [async()=>Response.json({}, {status:403}),async()=>Response.json({result:{}}),async()=>Response.json({result:{events:{events:Array(200).fill({})}}})])await assert.rejects(()=>queryPreviewEvents(fetcher,'t','a',0,500));
+test('inaccessible, stuck-cursor and schema-invalid retained preview telemetry cannot produce a pass',async()=>{
+ await assert.rejects(()=>queryPreviewEvents(async()=>Response.json({}, {status:403}),'t','a',0,500),/preview_telemetry_http_403/);
+ await assert.rejects(()=>queryPreviewEvents(async()=>Response.json({result:{}}),'t','a',0,500),/invalid_preview_log_schema/);
+ await assert.rejects(()=>queryPreviewEvents(async()=>Response.json({success:true,result:{events:{events:[{source:{}}]}}}),'t','a',0,500),/invalid_retained_preview_event/);
+ const row=id=>({$metadata:{id},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:1,route:'draft_pick'}});
+ const stuck=Array.from({length:2000},(_,i)=>row('stuck-'+i));
+ await assert.rejects(()=>queryPreviewEvents(async()=>Response.json({success:true,result:{events:{events:stuck}}}),'t','a',0,500),/invalid_preview_log_cursor/);
+});
+test('telemetry artifact exposes only bounded failure codes',()=>{
+ assert.equal(previewTelemetryFailure(Error('preview_telemetry_http_429')),'preview_telemetry_http_429');
+ assert.equal(previewTelemetryFailure(Error('invalid_preview_log_schema')),'invalid_preview_log_schema');
+ assert.equal(previewTelemetryFailure(Error('credential secret text')),'preview_telemetry_unclassified');
 });
 test('telemetry preflight requires exact health evidence but tolerates ambient boundary rejects',()=>{
  const health=event({route:'health'}),ambient=event({id:'ambient',status:403,route:'other'});
