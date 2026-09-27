@@ -1,8 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
 
-import { config } from '@/src/config';
-import { screenshotSession } from '@/src/screenshots/fixtures';
-
 const SESSION_KEY = 'packone.mobile.session.v2';
 const LEGACY_SESSION_KEY = 'packone.mobile.session.v1';
 
@@ -75,8 +72,14 @@ async function migrateLegacy(): Promise<MobileSession | null> {
   }
 }
 
+function screenshotMode() {
+  return process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_MODE === '1'
+    && process.env.EXPO_PUBLIC_PACKONE_ENV !== 'production';
+}
+
 export async function readSession(): Promise<MobileSession | null> {
-  if (config.screenshots.enabled) {
+  if (screenshotMode()) {
+    const { screenshotSession } = await import('@/src/screenshots/fixtures');
     return { ...screenshotSession, accountUser: { ...screenshotSession.accountUser } } as MobileSession;
   }
   const raw = await SecureStore.getItemAsync(SESSION_KEY);
@@ -91,7 +94,7 @@ export async function readSession(): Promise<MobileSession | null> {
 
 export async function writeSession(session: MobileSession) {
   if (!validSession(session)) throw new Error('Invalid Pack One mobile session.');
-  if (config.screenshots.enabled) {
+  if (screenshotMode()) {
     notifySession(session);
     return;
   }
@@ -102,7 +105,7 @@ export async function writeSession(session: MobileSession) {
 }
 
 export async function clearSession() {
-  if (config.screenshots.enabled) {
+  if (screenshotMode()) {
     notifySession(null);
     return;
   }
