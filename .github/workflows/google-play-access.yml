@@ -5,6 +5,8 @@ on:
     types: [opened, synchronize, reopened, edited]
     paths:
       - '.github/workflows/google-play-access.yml'
+      - '.well-known/**'
+      - '_config.yml'
       - 'docs/mobile-release-config.md'
   workflow_dispatch:
 
@@ -69,3 +71,117 @@ jobs:
             >/dev/null
 
           echo "Verified temporary-edit and track-read access for $PACKAGE_NAME."
+
+      - name: Discover Play app-signing fingerprints
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKAGE_NAME: pro.packone.app
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import base64
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.request
+          from pathlib import Path
+
+          token = os.environ["PLAY_ACCESS_TOKEN"]
+          package = os.environ["PACKAGE_NAME"]
+          root = f"https://androidpublisher.googleapis.com/androidpublisher/v3/applications/{package}"
+          edit_id = None
+
+          def request_json(url, method="GET", body=None):
+              data = None if body is None else json.dumps(body).encode()
+              req = urllib.request.Request(
+                  url,
+                  data=data,
+                  method=method,
+                  headers={
+                      "Authorization": f"Bearer {token}",
+                      "Accept": "application/json",
+                      "Content-Type": "application/json",
+                  },
+              )
+              with urllib.request.urlopen(req, timeout=60) as response:
+                  raw = response.read()
+                  return response.status, (json.loads(raw) if raw else None)
+
+          def normalize(value):
+              value = value.strip()
+              compact = value.replace(":", "")
+              if re.fullmatch(r"[0-9A-Fa-f]{64}", compact):
+                  return ":".join(compact[i:i+2] for i in range(0, 64, 2)).upper()
+              padded = value + "=" * (-len(value) % 4)
+              raw = base64.urlsafe_b64decode(padded)
+              if len(raw) != 32:
+                  raise RuntimeError(f"Unrecognized SHA-256 fingerprint: {value!r}")
+              return ":".join(f"{byte:02X}" for byte in raw)
+
+          try:
+              status, edit = request_json(f"{root}/edits", method="POST", body={})
+              if status not in (200, 201) or not edit or not edit.get("id"):
+                  raise RuntimeError("Could not create a read-only Google Play edit")
+              edit_id = edit["id"]
+
+              _, tracks = request_json(f"{root}/edits/{edit_id}/tracks")
+              _, bundles = request_json(f"{root}/edits/{edit_id}/bundles")
+              versions = []
+              for track in (tracks or {}).get("tracks", []):
+                  for release in track.get("releases", []):
+                      for code in release.get("versionCodes", []):
+                          if str(code) not in versions:
+                              versions.append(str(code))
+              for bundle in (bundles or {}).get("bundles", []):
+                  code = bundle.get("versionCode")
+                  if code is not None and str(code) not in versions:
+                      versions.append(str(code))
+              if not versions:
+                  raise RuntimeError("No Google Play version codes were found")
+
+              fingerprints = []
+              for version in versions:
+                  try:
+                      _, generated = request_json(f"{root}/generatedApks/{version}")
+                  except urllib.error.HTTPError:
+                      continue
+                  for item in (generated or {}).get("generatedApks", []):
+                      raw = item.get("certificateSha256Hash")
+                      if raw:
+                          fp = normalize(raw)
+                          if fp not in fingerprints:
+                              fingerprints.append(fp)
+              if not fingerprints:
+                  raise RuntimeError("Google Play returned no app-signing fingerprints")
+
+              print("Google Play app-signing SHA-256 fingerprints:")
+              for fp in fingerprints:
+                  print(f"  {fp}")
+
+              asset = Path(".well-known/assetlinks.json")
+              if asset.exists():
+                  statements = json.loads(asset.read_text(encoding="utf-8"))
+                  published = []
+                  for statement in statements:
+                      target = statement.get("target", {})
+                      if target.get("namespace") != "android_app" or target.get("package_name") != package:
+                          continue
+                      for raw in target.get("sha256_cert_fingerprints", []):
+                          fp = normalize(raw)
+                          if fp not in published:
+                              published.append(fp)
+                  missing = [fp for fp in fingerprints if fp not in published]
+                  if missing:
+                      raise RuntimeError("assetlinks.json is missing Play signing fingerprint(s): " + ", ".join(missing))
+                  print("assetlinks.json matches every discovered Play signing fingerprint.")
+              else:
+                  print("assetlinks.json is not present yet; discovery only.")
+          finally:
+              if edit_id:
+                  try:
+                      request_json(f"{root}/edits/{edit_id}", method="DELETE")
+                  except Exception:
+                      pass
+          PY
