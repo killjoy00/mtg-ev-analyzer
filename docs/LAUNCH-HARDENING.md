@@ -1,6 +1,6 @@
 # Launch hardening (#527)
 
-Current distributed release qualification is recorded in [the #629 evidence report](reports/DISTRIBUTED-CAPACITY-629.md). As of 2026-09-27, the current-practice selector is accepted for release, 50 players have passed the full five-egress stage, and 100 remains promising but not formally certified after one 3,210.81 ms view outlier tripped the unchanged conservative rolling p99 gate. Formal promoted distributed capacity remains 25; further selector tuning is not a v1 release blocker.
+Current distributed release qualification is recorded in [the #629 evidence report](reports/DISTRIBUTED-CAPACITY-629.md). As of 2026-09-27, the current-practice selector is accepted for release, 50 players have passed the full five-egress stage, and 100 remains promising but not formally certified after one 3,210.81 ms view outlier tripped the unchanged conservative rolling p99 gate. Formal promoted distributed capacity remains 25; further selector tuning is not a v1 release blocker, and formal 100-player certification is tracked in #685.
 
 Final measurements, supported capacity and release evidence are maintained in
 [the #516/#527 acceptance report](reports/PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md).

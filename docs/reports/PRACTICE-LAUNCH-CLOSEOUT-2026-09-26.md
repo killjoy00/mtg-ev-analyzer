@@ -10,7 +10,7 @@ Exact-head run [36326543142](https://github.com/killjoy00/mtg-ev-analyzer/action
 - 100 reached all 100 session/start requests with start p95/p99 318.68/478.46 ms and zero recorded correctness failures, then aborted on one 3,210.81 ms initial view request. That single request crossed the unchanged per-runner rolling 3,000 ms view-p99 gate while the aggregate partial 380-view p99 was 322.84 ms. Because the sustained hold/recovery/final telemetry did not complete, 100 is **not** certified.
 - Cleanup passed.
 
-Release decision: accept the current-practice batched selector plus frozen source-decrement cache and stop treating further selector optimization as a v1 blocker. Keep the **formal supported distributed target at 25** under the original promotion rule, record **50 as a demonstrated passing stage**, and treat 100 certification as deferred follow-up rather than silently weakening the gate.
+Release decision: accept the current-practice batched selector plus frozen source-decrement cache and stop treating further selector optimization as a v1 blocker. Keep the **formal supported distributed target at 25** under the original promotion rule, record **50 as a demonstrated passing stage**, and treat 100 certification as deferred follow-up in #685 rather than silently weakening the gate.
 
 The final browser and shared-network gates passed, and the supported 25-player distributed target passed. This report retains exact test revisions, measurement limits and the guarded production release record.
 
