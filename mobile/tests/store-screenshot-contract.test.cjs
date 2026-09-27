@@ -45,9 +45,14 @@ test('store screenshot and App Store configuration encode reviewed release decis
   assert.match(iosStore, /displayPrice: '\$7\.00'/);
   assert.match(asc, /const targetTerritories=\['USA','CAN'\]/);
   assert.match(asc, /const targetUsPrice=7/);
-  assert.match(asc, /const planType='MONTHLY'/);
+  assert.match(asc, /subscriptionAvailability/);
+  assert.match(asc, /subscriptionAvailabilities/);
+  assert.match(asc, /\/equalizations\?/);
   assert.match(asc, /availableInNewTerritories:false/);
   assert.match(asc, /Refusing to replace an existing/);
+  assert.doesNotMatch(asc, /subscriptionPlanAvailabilities/);
+  assert.doesNotMatch(asc, /adjustedEqualizations/);
+  assert.doesNotMatch(asc, /const planType='MONTHLY'/);
   assert.equal(request.operation, 'configure-pack-one-elite');
   assert.match(request.reason, /United States and Canada only/);
   assert.match(request.reason, /exact United States customer price to \$7\.00/);
