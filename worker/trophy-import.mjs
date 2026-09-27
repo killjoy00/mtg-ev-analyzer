@@ -68,7 +68,22 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
   const mapping=normalizeImageMapping(rawMapping);
   const after=String(rawAfter||'');
   const page=await query(
-    'SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND puzzle_id>$3 ORDER BY puzzle_id LIMIT $4',
+    `SELECT p.puzzle_id,p.payload
+     FROM draft_run_verified_puzzles p
+     WHERE p.set_id=$1
+       AND (
+         p.corpus_version=$2
+         OR EXISTS (
+           SELECT 1 FROM corpus_components c
+           WHERE c.set_id=p.set_id
+             AND c.parent_version=$2
+             AND c.component_version=p.corpus_version
+             AND c.status='Live'
+         )
+       )
+       AND p.puzzle_id>$3
+     ORDER BY p.puzzle_id
+     LIMIT $4`,
     [setId,VERSION,after,IMAGE_REFRESH_PAGE_SIZE],
   );
   if(!page.rows.length)return {
@@ -106,7 +121,18 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
       UPDATE draft_run_verified_puzzles p
       SET payload=i.payload
       FROM incoming i
-      WHERE p.puzzle_id=i.puzzle_id AND p.set_id=$2 AND p.corpus_version=$3
+      WHERE p.puzzle_id=i.puzzle_id
+        AND p.set_id=$2
+        AND (
+          p.corpus_version=$3
+          OR EXISTS (
+            SELECT 1 FROM corpus_components c
+            WHERE c.set_id=p.set_id
+              AND c.parent_version=$3
+              AND c.component_version=p.corpus_version
+              AND c.status='Live'
+          )
+        )
       RETURNING p.puzzle_id`,
       [JSON.stringify(updates),setId,VERSION],
     );
