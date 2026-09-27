@@ -72,19 +72,18 @@ class CardImageRepairTests(unittest.TestCase):
             "https://img/cosmogrand-eoe-9.jpg",
             collector_number="9",
         )
-        borderless = self.card(
-            "d68d891d-333f-46c9-b5a3-3b1d4d3e4563",
+        art_series = self.card(
+            "c194815b-79cd-4745-8aa9-8f5c10803953",
             name,
-            "eoe",
+            "aeoe",
             "2025-08-01",
-            "https://img/cosmogrand-eoe-304.jpg",
-            collector_number="304",
-            border_color="borderless",
-            frame_effects=["inverted"],
+            "https://img/cosmogrand-art-series.jpg",
+            collector_number="2",
+            set_type="art_series",
         )
-        with mock.patch.object(refresh, "all_printings", return_value=iter([borderless, standard])):
+        with mock.patch.object(refresh, "all_printings", return_value=iter([art_series, standard])):
             full = refresh.resolve_inventory({"eoe": {name}})[0]
-        with mock.patch.object(refresh, "all_printings", return_value=iter([borderless, standard])):
+        with mock.patch.object(refresh, "all_printings", return_value=iter([art_series, standard])):
             targeted = repair.resolve_target(name, ["eoe"])[0]
         self.assertEqual(targeted, full)
         self.assertEqual(targeted["eoe"][name]["image_url"], "https://img/cosmogrand-eoe-9.jpg")
