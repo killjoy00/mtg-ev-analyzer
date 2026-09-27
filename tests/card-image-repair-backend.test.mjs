@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {repairBackendImages} from '../scripts/repair_card_backend_image.mjs';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
+import {repairBackendImages,runBackendRepair} from '../scripts/repair_card_backend_image.mjs';
 
 const dev='https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech';
 const prod='https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech';
@@ -116,4 +119,57 @@ test('development failure prevents the caller from touching production',async()=
   };
   await assert.rejects(run(),/development failed/);
   assert.deepEqual(bases,[dev]);
+});
+
+
+test('backend diagnostics retain page counts and verification outcomes',async()=>{
+  const dir=fs.mkdtempSync(path.join(os.tmpdir(),'card-image-repair-'));
+  const oneSet={
+    environments:['powered-cube'],
+    environment_results:{'powered-cube':report.environment_results['powered-cube']},
+  };
+  try {
+    const successPath=path.join(dir,'development-verify.json');
+    const clean=async(_base,body)=>({
+      set_id:body.setId,
+      mapping_entries:1,
+      puzzles:3,
+      updated_puzzles:0,
+      updated_cards:0,
+      next_after:null,
+      done:true,
+    });
+    await runBackendRepair(dev,{
+      report:oneSet,
+      request:clean,
+      verify:true,
+      diagnosticsPath:successPath,
+      stage:'development-verify',
+    });
+    const success=JSON.parse(fs.readFileSync(successPath,'utf8'));
+    assert.equal(success.status,'success');
+    assert.equal(success.stage,'development-verify');
+    assert.equal(success.verify,true);
+    assert.equal(success.results[0].pages,1);
+    assert.equal(success.results[0].puzzles,3);
+    assert.equal(success.results[0].verified_zero_updates,true);
+    assert.equal(success.events[0].phase,'page');
+
+    const failurePath=path.join(dir,'production-repair.json');
+    await assert.rejects(
+      runBackendRepair(prod,{
+        report:oneSet,
+        request:async()=>{throw new Error('backend unavailable');},
+        diagnosticsPath:failurePath,
+        stage:'production-repair',
+      }),
+      /backend unavailable/,
+    );
+    const failure=JSON.parse(fs.readFileSync(failurePath,'utf8'));
+    assert.equal(failure.status,'error');
+    assert.equal(failure.stage,'production-repair');
+    assert.equal(failure.error,'backend unavailable');
+  } finally {
+    fs.rmSync(dir,{recursive:true,force:true});
+  }
 });
