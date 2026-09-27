@@ -1,0 +1,116 @@
+name: contextual-value-v1-q-influence-audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+    paths:
+      - research/contextual_value_q_influence_audit.py
+      - research/CONTEXTUAL-VALUE-V1-Q-INFLUENCE-AUDIT.md
+      - .github/workflows/contextual-value-v1-q-influence-audit.yml
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  CORE_RUN: '36256947308'
+  FROZEN_RUN: '36337059424'
+  ASSESSMENT_RUN: '36344151426'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2' 'scikit-learn==1.9.1'
+
+      - name: Compile diagnostic audit
+        run: python -m py_compile research/contextual_value_q_influence_audit.py research/contextual_value_four_way_assessment.py research/contextual_value_four_way_fresh.py
+
+      - name: Download original immutable cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: frozen-cohort
+          run-id: ${{ env.CORE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download frozen Q bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-freeze
+          path: frozen-models
+          run-id: ${{ env.FROZEN_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download retained locked assessment report
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-assessment
+          path: locked-assessment
+          run-id: ${{ env.ASSESSMENT_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Verify retained report identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'cab250488d85e485a17b4cac4a03898740cebb4314a22f49bb3e1ad81d45ebd5  locked-assessment/report.json' | sha256sum -c -
+
+      - name: Download exact original core archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p raw-data
+          for EXPANSION in MSH SOS ECL TLA; do
+            curl --fail --location --retry 5 --retry-delay 3 --output "raw-data/draft-$EXPANSION.csv.gz" "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+            curl --fail --location --retry 5 --retry-delay 3 --output "raw-data/game-$EXPANSION.csv.gz" "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+          done
+
+      - name: Run Q-vs-A influence and support audit
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 research/contextual_value_q_influence_audit.py \
+            --draft-archive raw-data/draft-MSH.csv.gz --game-archive raw-data/game-MSH.csv.gz \
+            --draft-archive raw-data/draft-SOS.csv.gz --game-archive raw-data/game-SOS.csv.gz \
+            --draft-archive raw-data/draft-ECL.csv.gz --game-archive raw-data/game-ECL.csv.gz \
+            --draft-archive raw-data/draft-TLA.csv.gz --game-archive raw-data/game-TLA.csv.gz \
+            --cohort-manifest frozen-cohort/cohort-manifest.json \
+            --archive-manifest frozen-cohort/archive-manifest.json \
+            --freeze-json frozen-models/four-way-freeze.json \
+            --freeze-q-pickle frozen-models/four-way-rich-q.pkl \
+            --locked-report locked-assessment/report.json \
+            --output results/contextual-value-v1/q-influence-audit/report.json
+
+      - name: Assert audit boundaries
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/contextual-value-v1/q-influence-audit/report.json'))
+          assert r['phase']=='q_vs_a_post_assessment_influence_audit'
+          assert r['assessment_outcomes_used_for_fit'] is False
+          assert r['model_tuning_authorized'] is False
+          assert r['model_selection_authorized'] is False
+          assert r['primary_comparison']=='Q_vs_A_only'
+          assert all(x['abs_error'] <= 1e-12 for x in r['locked_aggregate_parity'].values())
+          print(json.dumps({'parity':r['locked_aggregate_parity'],'power':r['power_planning_from_locked_cap20_draft_variance']},sort_keys=True))
+          PY
+
+      - name: Upload Q-vs-A diagnostic report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-q-influence-audit
+          path: results/contextual-value-v1/q-influence-audit/report.json
+          retention-days: 90
