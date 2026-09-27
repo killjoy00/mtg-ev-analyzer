@@ -122,7 +122,13 @@ export async function main() {
     if(cached) {
       const start=performance.now();cachedSnapshot=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
       report.cache_build={ms:elapsed(start),id:cachedSnapshot.id,revision:cachedSnapshot.revision,groups:cachedSnapshot.groups.length};
-      report.cache_storage=(await query("SELECT pg_total_relation_size('draft_run_serving_inventory')::text inventory_bytes,(SELECT count(*) FROM draft_run_serving_inventory)::text rows")).rows[0];
+      report.cache_storage=(await query(`SELECT
+        pg_total_relation_size('draft_run_serving_inventory')::text inventory_bytes,
+        pg_total_relation_size('draft_run_serving_source_groups')::text source_group_bytes,
+        (SELECT count(*)::text FROM draft_run_serving_inventory WHERE snapshot_id=$1::bigint) rows,
+        (SELECT count(DISTINCT source_draft_hash)::text FROM draft_run_serving_inventory WHERE snapshot_id=$1::bigint) inventory_sources,
+        (SELECT count(*)::text FROM draft_run_serving_source_groups WHERE snapshot_id=$1::bigint) source_group_sources`,[cachedSnapshot.id])).rows[0];
+      assert.equal(report.cache_storage.source_group_sources,report.cache_storage.inventory_sources,'Serving source-group cache is incomplete.');
     }
     const discovery=recordQueries(query),started=performance.now();
     const custom=await (cached?loadCachedCustomSetMetadata:loadCustomSetMetadata)(discovery.query,DRAFT_RUN_CORPUS_VERSION,day);

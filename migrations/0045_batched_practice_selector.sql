@@ -1,6 +1,49 @@
 -- Current-practice-only bounded selector experiment for #629.
 -- JS retains policy planning and RNG; this function executes only the eight
 -- dependent snapshot-scoped source selections and broader trajectory decrements.
+-- Materialize broader source-trajectory group decrements at snapshot-build time.
+-- This is deliberately separate from draw inventory: a later inventory repair or
+-- corruption must not change trajectory decrement semantics frozen at build.
+CREATE TABLE IF NOT EXISTS draft_run_serving_source_groups (
+  snapshot_id bigint NOT NULL REFERENCES draft_run_serving_snapshots(id) ON DELETE CASCADE,
+  source_draft_hash text NOT NULL,
+  group_counts jsonb NOT NULL CHECK (jsonb_typeof(group_counts)='object'),
+  PRIMARY KEY(snapshot_id,source_draft_hash)
+);
+
+CREATE OR REPLACE FUNCTION pack1_capture_serving_source_groups()
+RETURNS trigger LANGUAGE plpgsql AS $capture$
+BEGIN
+  INSERT INTO draft_run_serving_source_groups(snapshot_id,source_draft_hash,group_counts)
+  SELECT snapshot_id,source_draft_hash,jsonb_object_agg(group_key,n ORDER BY group_key)
+  FROM (
+    SELECT snapshot_id,source_draft_hash,set_id||':'||pick_number||':'||band group_key,count(*)::integer n
+    FROM new_inventory
+    GROUP BY snapshot_id,source_draft_hash,set_id,pick_number,band
+  ) grouped
+  GROUP BY snapshot_id,source_draft_hash
+  ON CONFLICT(snapshot_id,source_draft_hash) DO NOTHING;
+  RETURN NULL;
+END;
+$capture$;
+DROP TRIGGER IF EXISTS serving_inventory_source_groups ON draft_run_serving_inventory;
+CREATE TRIGGER serving_inventory_source_groups
+AFTER INSERT ON draft_run_serving_inventory
+REFERENCING NEW TABLE AS new_inventory
+FOR EACH STATEMENT EXECUTE FUNCTION pack1_capture_serving_source_groups();
+
+-- Backfill retained coherent snapshots once. Subsequent snapshot builds populate
+-- the compact cache from the builder's single bulk inventory INSERT above.
+INSERT INTO draft_run_serving_source_groups(snapshot_id,source_draft_hash,group_counts)
+SELECT snapshot_id,source_draft_hash,jsonb_object_agg(group_key,n ORDER BY group_key)
+FROM (
+  SELECT snapshot_id,source_draft_hash,set_id||':'||pick_number||':'||band group_key,count(*)::integer n
+  FROM draft_run_serving_inventory
+  GROUP BY snapshot_id,source_draft_hash,set_id,pick_number,band
+) grouped
+GROUP BY snapshot_id,source_draft_hash
+ON CONFLICT(snapshot_id,source_draft_hash) DO NOTHING;
+
 CREATE OR REPLACE FUNCTION public.pack1_select_serving_run_v1(p_snapshot_id bigint, p_snapshot_revision bigint, p_parent_version text, p_difficulty_version text, p_policy_version text, p_plan jsonb)
  RETURNS jsonb
  LANGUAGE plpgsql
@@ -118,30 +161,48 @@ BEGIN
       RETURN jsonb_build_object('ok',false,'error','not_enough_verified_puzzles','round',round_index,'draws_used',round_index*2+1);
     END IF;
     chosen_offset := floor(offset_random*chosen_count::double precision)::integer;
-    WITH chosen AS (
-      SELECT i.puzzle_id,i.source_draft_hash FROM draft_run_serving_inventory i
-      WHERE i.snapshot_id=p_snapshot_id AND i.pick_number BETWEEN window_start AND window_end
-        AND i.source_draft_hash<>ALL(selected_sources) AND i.set_id=chosen_set AND i.band=chosen_band
-      ORDER BY i.puzzle_id COLLATE "C" LIMIT 1 OFFSET chosen_offset
-    ), trajectory AS (
+    SELECT i.puzzle_id,i.source_draft_hash
+      INTO chosen_puzzle_id,chosen_source
+    FROM draft_run_serving_inventory i
+    WHERE i.snapshot_id=p_snapshot_id AND i.pick_number BETWEEN window_start AND window_end
+      AND i.source_draft_hash<>ALL(selected_sources) AND i.set_id=chosen_set AND i.band=chosen_band
+    ORDER BY i.puzzle_id COLLATE "C" LIMIT 1 OFFSET chosen_offset;
+
+    SELECT to_jsonb(t) INTO chosen_metadata
+    FROM (
       SELECT p.puzzle_id,p.set_id,p.corpus_version,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,
-        p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band,chosen.puzzle_id selected_id
-      FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
-      JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash
-      WHERE p.corpus_version IN (SELECT p_parent_version UNION SELECT c.component_version FROM corpus_components c WHERE c.parent_version=p_parent_version)
+        p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band
+      FROM draft_run_verified_puzzles p
+      JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
+      WHERE p.puzzle_id=chosen_puzzle_id
+        AND p.corpus_version IN (SELECT p_parent_version UNION SELECT c.component_version FROM corpus_components c WHERE c.parent_version=p_parent_version)
         AND (p.corpus_version=p_parent_version OR EXISTS(SELECT 1 FROM corpus_components c WHERE c.parent_version=p_parent_version AND c.component_version=p.corpus_version AND c.set_id=p.set_id))
         AND p.interesting AND p.pack_number=1 AND r.target_support_ratio>=0.20526315789473684::float8
-    ), selected_row AS (SELECT to_jsonb(t) item FROM trajectory t WHERE t.puzzle_id=t.selected_id LIMIT 1),
-    delta AS (
-      SELECT COALESCE(jsonb_object_agg(d.key,d.n),'{}'::jsonb) items FROM (
-        SELECT t.set_id||':'||t.pick_number||':'||t.band key,count(*)::integer n FROM trajectory t
-        WHERE EXISTS (SELECT 1 FROM jsonb_to_recordset(p_plan->'groups') AS g(set_id text,pick_number integer,band text,n integer)
-          WHERE g.set_id=t.set_id AND g.pick_number=t.pick_number AND g.band=t.band)
+      LIMIT 1
+    ) t;
+
+    SELECT group_counts INTO round_delta
+    FROM draft_run_serving_source_groups
+    WHERE snapshot_id=p_snapshot_id AND source_draft_hash=chosen_source;
+    IF round_delta IS NULL THEN
+      -- Fail-safe compatibility path for a legacy/incomplete derived cache. It
+      -- preserves the original broader raw-trajectory decrement semantics.
+      WITH trajectory AS (
+        SELECT p.set_id,p.pick_number,r.band
+        FROM draft_run_verified_puzzles p
+        JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
+        WHERE p.source_draft_hash=chosen_source
+          AND p.corpus_version IN (SELECT p_parent_version UNION SELECT c.component_version FROM corpus_components c WHERE c.parent_version=p_parent_version)
+          AND (p.corpus_version=p_parent_version OR EXISTS(SELECT 1 FROM corpus_components c WHERE c.parent_version=p_parent_version AND c.component_version=p.corpus_version AND c.set_id=p.set_id))
+          AND p.interesting AND p.pack_number=1 AND r.target_support_ratio>=0.20526315789473684::float8
+      )
+      SELECT COALESCE(jsonb_object_agg(d.key,d.n),'{}'::jsonb) INTO round_delta
+      FROM (
+        SELECT t.set_id||':'||t.pick_number||':'||t.band key,count(*)::integer n
+        FROM trajectory t
         GROUP BY t.set_id,t.pick_number,t.band
-      ) d
-    )
-    SELECT c.puzzle_id,c.source_draft_hash,s.item,d.items INTO chosen_puzzle_id,chosen_source,chosen_metadata,round_delta
-    FROM chosen c LEFT JOIN selected_row s ON true LEFT JOIN delta d ON true;
+      ) d;
+    END IF;
     IF chosen_puzzle_id IS NULL OR chosen_metadata IS NULL THEN
       RETURN jsonb_build_object('ok',false,'error','corpus_changed','round',round_index,'draws_used',round_index*2+2);
     END IF;
