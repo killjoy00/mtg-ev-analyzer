@@ -166,6 +166,7 @@ try {
     const body=bodies[index%bodies.length];
     const headers={
       origin:'https://packone.pro','content-type':'application/json',
+      authorization:'Bearer '+user.token,
       cookie:`__Host-pack1_player=${user.token}; __Host-pack1_account=${user.account}; __Secure-pack1_csrf=${user.csrf}`,
       'x-pack1-csrf':user.csrf,'x-idempotency-key':randomBytes(18).toString('base64url'),
     };
