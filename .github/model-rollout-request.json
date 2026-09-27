@@ -1,7 +1,7 @@
 {
-  "operation": "card-image-repair",
-  "request_id": "repair-cosmogrand-zenith-eoe-20260927",
-  "reason": "Repair the live EOE Cosmogrand Zenith display metadata through the reviewed targeted card-image path so deterministic ordinary main art replaces escaped special-treatment metadata without changing gameplay data.",
-  "card_name": "Cosmogrand Zenith",
-  "environments": "eoe"
+  "operation": "deploy",
+  "request_id": "egress-image-refresh-541-dev-20260927",
+  "reason": "Deploy the reviewed #697 image-refresh egress fix to development before production promotion.",
+  "commit": "4e39399ff0481fe11636546c2e1cf5a1e2407c96",
+  "target": "development"
 }
