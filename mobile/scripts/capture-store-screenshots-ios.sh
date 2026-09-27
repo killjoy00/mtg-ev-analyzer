@@ -58,7 +58,9 @@ capture() {
   xcrun simctl openurl "$udid" "$url"
 
   for _ in 1 2 3 4 5 6 7 8 9 10; do
-    if xcrun simctl spawn "$udid" launchctl print system 2>/dev/null | grep -Fq "UIKitApplication:$bundle_id"; then
+    # Consume the full listing: grep -q can SIGPIPE launchctl under pipefail,
+    # incorrectly reporting a failed launch when the app is already running.
+    if xcrun simctl spawn "$udid" launchctl print system 2>/dev/null | grep -F "UIKitApplication:$bundle_id" >/dev/null; then
       running=1
       break
     fi
