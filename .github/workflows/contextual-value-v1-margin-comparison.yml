@@ -1,1 +1,143 @@
-The requested file reference is not currently visible. Use files.search or files.list to rediscover the file, then retry with a returned ref_id or file_id.
+name: contextual-value-v1-margin-comparison
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PHASE_A1_RUN: '36286752890'
+  PHASE_A2_PILOT_RUN: '36289846820'
+  PHASE_A2_FULL_RUN: '36290030236'
+  ABLATION_RUN: '36280148906'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile comparison
+        run: python -m py_compile research/contextual_value_margin_comparison.py
+
+      - name: Download Phase A1 feature contract
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold--1
+          path: feature-report
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download Phase A2 fold 0
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-0
+          path: folds
+          run-id: ${{ env.PHASE_A2_PILOT_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download remaining Phase A2 folds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-phase-a2-fold-*
+          path: folds
+          merge-multiple: true
+          run-id: ${{ env.PHASE_A2_FULL_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download strong-offset-only nuisance predictions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-strong_offset_only-fold-*
+          path: strong
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download no-strong nuisance predictions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-no_strong_entirely-fold-*
+          path: no-strong
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download held feature checkpoints
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-held-*
+          path: held
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download retained ablation report
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-audit
+          path: ablation
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Run bounded four-way comparison
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRAIN_ARGS=()
+          STRONG_ARGS=()
+          NO_STRONG_ARGS=()
+          HELD_ARGS=()
+          for f in 0 1 2 3 4; do
+            TRAIN_ARGS+=(--train-shard "folds/phase-a2-fold-$f.npz")
+          done
+          for f in -1 0 1 2 3 4; do
+            STRONG_ARGS+=(--strong-prediction "strong/strong_offset_only-fold-$f.jsonl.gz")
+            NO_STRONG_ARGS+=(--no-strong-prediction "no-strong/no_strong_entirely-fold-$f.jsonl.gz")
+            HELD_ARGS+=(--held-feature "held/held-features-fold-$f.jsonl.gz")
+          done
+          mkdir -p results/contextual-value-v1/margin-comparison
+          python3 research/contextual_value_margin_comparison.py \
+            "${TRAIN_ARGS[@]}" \
+            --validation-shard folds/phase-a2-fold--1.npz \
+            --feature-report feature-report/phase-a-rich-fold--1-report.json \
+            "${STRONG_ARGS[@]}" \
+            "${NO_STRONG_ARGS[@]}" \
+            "${HELD_ARGS[@]}" \
+            --ablation-report ablation/ablation-report.json \
+            --output results/contextual-value-v1/margin-comparison/report.json
+
+      - name: Assert research boundaries and parity
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/contextual-value-v1/margin-comparison/report.json'))
+          assert r['assessment_opened'] is False
+          assert r['assessment_outcomes_used'] is False
+          assert r['assessment_authorized'] is False
+          assert r['parity']['passed'] is True
+          assert r['models']['candidates'] == ['H','J','N','Q']
+          assert r['models']['benchmarks'] == ['A','GIH']
+          assert r['models']['J_l2'] == 10000.0
+          assert r['next_gate']['fresh_confirmation_required'] is True
+          assert r['next_gate']['assessment_authorized'] is False
+          assert 'B0_pre_pick_state' in r['incremental_prediction']
+          assert 'B1_shared_simple_Q' in r['incremental_prediction']
+          PY
+
+      - name: Upload comparison report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-margin-comparison
+          path: results/contextual-value-v1/margin-comparison/
+          retention-days: 30
