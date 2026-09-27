@@ -115,7 +115,7 @@ async function dispatchLaunchWatcher(fetcher,env) {
   } catch {
     throw Object.assign(Error('Launch watcher GitHub dispatch request failed'),{code:'dispatch_request_failed'});
   }
-  if(response.status!==204)
+  if(![200,204].includes(response.status))
     throw Object.assign(Error('Launch watcher GitHub dispatch was rejected'),{code:'dispatch_http_'+response.status,status:response.status});
 }
 
