@@ -19,7 +19,8 @@ Model family and regularization are fixed before validation:
 - weighted conditional softmax likelihood;
 - candidate features standardized from the fit partition only;
 - L2 = 1.0 on the standardized correction coefficients;
-- L-BFGS-B, max 40 iterations;
+- L-BFGS-B, max 200 iterations (raised only after all five first-pass fits hit
+  the 40-iteration ceiling; model, regularization, features, and gate unchanged);
 - no hyperparameter search.
 
 A five-fold training-only gate is required before validation:
@@ -69,7 +70,7 @@ from contextual_value_h_freeze_audit import (
 )
 
 CORRECTION_L2 = 1.0
-MAX_ITER = 40
+MAX_ITER = 200
 MIN_IMPROVED_FOLDS = 3
 PROB_FLOOR = 1e-12
 
