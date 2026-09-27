@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
   LAUNCH_WATCHER_DISPATCH_MAX_ATTEMPTS,
   LAUNCH_WATCHER_DISPATCH_STATE_KEY,
@@ -153,4 +154,21 @@ test('independent recovery is capped at three roots per stale episode',async()=>
   assert.equal(exhausted.action,'exhausted');
   assert.equal(exhausted.attempts,LAUNCH_WATCHER_DISPATCH_MAX_ATTEMPTS);
   assert.equal(calls,LAUNCH_WATCHER_DISPATCH_MAX_ATTEMPTS);
+});
+
+
+test('release control keeps the watchdog credential production-only and verifies both environments',()=>{
+  const flow=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
+  const devStart=flow.indexOf('Deploy exact revision to development');
+  const prodStart=flow.indexOf('Deploy the development-tested revision to production');
+  const prodEnd=flow.indexOf('Deploy dedicated production recovery webhook Worker',prodStart);
+  assert.ok(devStart>=0&&prodStart>devStart&&prodEnd>prodStart);
+  const dev=flow.slice(devStart,prodStart);
+  const prod=flow.slice(prodStart,prodEnd);
+  assert.doesNotMatch(dev,/PACK1_LAUNCH_WATCHER_GITHUB_TOKEN/);
+  assert.match(prod,/secrets\.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN/);
+  assert.match(prod,/--env "PACK1_LAUNCH_WATCHER_GITHUB_TOKEN=\$PACK1_LAUNCH_WATCHER_GITHUB_TOKEN"/);
+  assert.match(flow,/fine-grained GitHub token for this repository with Actions write access/);
+  assert.match(flow,/--expect-launch-recovery=false/);
+  assert.match(flow,/--expect-launch-recovery=true/);
 });
