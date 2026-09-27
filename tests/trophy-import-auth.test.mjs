@@ -180,7 +180,7 @@ test('a blank mapped type line cannot erase stored metadata during image refresh
   const target={...original.candidates[0],type_line:'Artifact'};
   let stored={...structuredClone(original),candidates:[target,...structuredClone(original.candidates.slice(1))]};
   const query=async(sql,params=[])=>{
-    if(sql.startsWith('SELECT puzzle_id,payload'))return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
+    if(sql.includes('SELECT p.puzzle_id,p.payload'))return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
     if(sql.includes('UPDATE draft_run_verified_puzzles')){stored=JSON.parse(params[0])[0].payload;return {rows:[{puzzle_id:stored.puzzle_id}]};}
     throw new Error('Unexpected SQL in image refresh test: '+sql);
   };
