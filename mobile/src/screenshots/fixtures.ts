@@ -239,6 +239,10 @@ const historyPage: CareerHistoryPage = {
   next_cursor: null,
 };
 
+function clone<T>(value: T): T {
+  return JSON.parse(JSON.stringify(value)) as T;
+}
+
 function parseBody(options: ScreenshotRequestOptions): Record<string, unknown> {
   return options.body && typeof options.body === 'object' ? options.body as Record<string, unknown> : {};
 }
@@ -257,25 +261,25 @@ export async function requestScreenshotFixture<T>(
       profileKey: 'a1b2c3d4e5f60718',
     } as T;
   }
-  if (path === '/draft/v1/daily-status') return structuredClone(dailyStatus) as T;
+  if (path === '/draft/v1/daily-status') return clone(dailyStatus) as T;
   if (path === '/draft/v1/capabilities') {
     return { capabilities: ['account', 'unlimited_regular_practice', 'unlimited_cube_practice', 'custom_corpus'] } as T;
   }
   if (path === '/draft/v1/set-catalog' || path === '/draft/v1/practice-sets') {
-    return { sets: structuredClone(practiceSets) } as T;
+    return { sets: clone(practiceSets) } as T;
   }
-  if (path === '/draft/v1/runs' && method === 'POST') return structuredClone(initialRun) as T;
-  if (path === '/draft/v1/runs/screenshot-run') return structuredClone(initialRun) as T;
+  if (path === '/draft/v1/runs' && method === 'POST') return clone(initialRun) as T;
+  if (path === '/draft/v1/runs/screenshot-run') return clone(initialRun) as T;
   if (path === '/draft/v1/runs/screenshot-run/pick' && method === 'POST') {
     const selected = String(parseBody(options).cardId || 'black-lotus');
-    return structuredClone(feedbackRun(selected)) as T;
+    return clone(feedbackRun(selected)) as T;
   }
-  if (path === '/draft/v1/runs/screenshot-run/reroll' && method === 'POST') return structuredClone(initialRun) as T;
+  if (path === '/draft/v1/runs/screenshot-run/reroll' && method === 'POST') return clone(initialRun) as T;
   if (path === '/draft/v1/runs/screenshot-run/share' && method === 'POST') return { id: '0123456789abcdef01234567' } as T;
-  if (path === '/growth/v1/patreon/mobile/status') return structuredClone(membershipStatus) as T;
-  if (path === '/growth/v1/apple-subscriptions/mobile/status') return structuredClone(appleStatus) as T;
-  if (path === '/growth/v1/mobile/profile/me') return structuredClone(careerProfile) as T;
-  if (path.startsWith('/growth/v1/mobile/profile/history?')) return structuredClone(historyPage) as T;
+  if (path === '/growth/v1/patreon/mobile/status') return clone(membershipStatus) as T;
+  if (path === '/growth/v1/apple-subscriptions/mobile/status') return clone(appleStatus) as T;
+  if (path === '/growth/v1/mobile/profile/me') return clone(careerProfile) as T;
+  if (path.startsWith('/growth/v1/mobile/profile/history?')) return clone(historyPage) as T;
   if (path === '/draft/health?quick=1') {
     return { ok: true, service: 'draft-run', release: 'screenshot-fixtures', run_length: 8 } as T;
   }
