@@ -142,6 +142,7 @@ test('card image refresh changes display metadata only for registered environmen
   assert.equal(page.updated_puzzles,1);
   assert.equal(page.done,true);
   assert.equal(page.next_after,null);
+  assert.equal(page.corpus_available,true);
   stored=structuredClone(original);
 
   const result=await refreshTrophyImages(query,'powered-cube',mapping);
