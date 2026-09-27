@@ -75,7 +75,8 @@ try {
       const seed='issue629-batched-parity-v1:'+configuration.name+':'+i;
       const baseline=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds,snapshot});
       const candidate=await selectBatchedDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds,snapshot});
-      assert.deepEqual(candidate,baseline,configuration.name+' parity mismatch for '+seed);
+      try { assert.deepEqual(candidate,baseline,configuration.name+' parity mismatch for '+seed); }
+      catch(error) { report.parity.first_mismatch={name:configuration.name,seed,baseline,candidate};save();throw error; }
       item.seeds.push({seed,puzzle_ids:candidate.map(p=>p.puzzle_id),fingerprint:createHash('sha256').update(JSON.stringify(candidate)).digest('hex')});
     }
   }
