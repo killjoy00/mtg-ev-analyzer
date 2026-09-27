@@ -1,5 +1,7 @@
 # Launch hardening (#527)
 
+Current distributed release qualification is recorded in [the #629 evidence report](reports/DISTRIBUTED-CAPACITY-629.md). As of 2026-09-27, the current-practice selector is accepted for release, 50 players have passed the full five-egress stage, and 100 remains promising but not formally certified after one 3,210.81 ms view outlier tripped the unchanged conservative rolling p99 gate. Formal promoted distributed capacity remains 25; further selector tuning is not a v1 release blocker.
+
 Final measurements, supported capacity and release evidence are maintained in
 [the #516/#527 acceptance report](reports/PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md).
 The first-increment notes below describe the original rollout sequence.
@@ -106,8 +108,10 @@ burst resets. The limits bound abuse; they do not establish capacity by
 arithmetic. Real Workers tests verify concurrency/persistence; the isolated NAT
 workload must pass its predefined gates before production uses this policy.
 
-The workload selects a supported launch target of 25 active players, with
-25/50/100 NAT stages and 25/100/500/1,000 distributed targets. Stage escalation
+The original workload selected a supported launch target of 25 active players, with
+25/50/100 NAT stages and 25/100/500/1,000 distributed targets. The #629 follow-up
+replaced the distributed escalation path with a persistent five-runner 25/50/100
+ladder and stricter sustained/telemetry/cleanup evidence. Stage escalation still
 stops on the first failed gate. The NAT run uses 50% new guests, 30% established
 accounts and 20% entitled practice, all three Dailies, 3–8-second decision times,
 eight view/pick pairs, rerolls, sharing, boards and a guest-to-ranked cohort.
@@ -121,6 +125,8 @@ limit and a two-hour branch expiry. Confirmed-idle browser timing is a separate
 acceptance record; a warm-up is not labeled a cold start. Twenty warm browser samples per case retain every observation, with p95/p99 and raw samples. Four isolated fixture accounts keep each case below the unchanged 30-starts/10-minute per-player limit. One confirmed-idle sample per case remains a cold regression check, not a stable population p95.
 
 ## Distributed acceptance
+
+The paragraphs immediately below describe the original #527 workflow. The current #629 protocol uses five persistent runners across 25/50/100 stages; its exact result and release interpretation are authoritative in `reports/DISTRIBUTED-CAPACITY-629.md`.
 
 The distributed workflow uses five independent runners for 25 actors, then
 20 runners for 100/500/1,000 actors. All use real outbound addresses. Private

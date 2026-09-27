@@ -1,5 +1,18 @@
 # Next distributed capacity evidence (#629)
 
+## Release decision — 2026-09-27
+
+The current-practice selector work is accepted for the release path. No further selector/model tuning is a v1 release blocker on the evidence below. This decision does **not** retroactively change the predeclared capacity gates or call the 100-player stage a pass.
+
+Exact-head evidence is PR #655 head `dcb543da1abc4777d1e36bf3ad599e4af4454671`, tested merge SHA `0ea8e67bbfd969dd7a49e3c2f3264bca43894752`, workflow run [36326543142](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36326543142). Normal exact-head test, E2E, gateway-runtime, backend-schema and isolated-practice-performance workflows also passed; isolated practice performance is run [36326543143](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36326543143).
+
+- **25 players: PASS.** 1,543 requests, zero correctness failures. Start p95/p99 1,638.03/1,788.31 ms; reroll p95/p99 959.98/1,134.17 ms.
+- **50 players: PASS.** 3,968 requests, 3,943 HTTP 200 + 25 HTTP 201, zero correctness failures. Start p95/p99 1,602.65/2,188.32 ms; synchronized-hold start p95 1,898.40 ms; reroll p95/p99 1,217.49/1,867.57 ms; view p99 383.79 ms; read p99 900.66 ms. This is the first complete five-egress 50-player pass under the unchanged #629 policy.
+- **100 players: NOT CERTIFIED.** All 100 session/start requests were observed before abort. Partial aggregate start p95/p99 was 318.68/478.46 ms, reroll p95 616.92 ms, read p95 264.67 ms, and there were zero recorded correctness failures. One shard recorded a single 3,210.81 ms initial `view` request; with 74 local view samples at that point, that outlier pushed the conservative per-runner rolling view p99 above the unchanged 3,000 ms limit and stopped the cohort. Across the 380 partial view samples, aggregate p99 was 322.84 ms. The 600-second hold, recovery, final telemetry and complete-stage gates therefore did not finish, so 100 is not a pass.
+- **Cleanup: PASS.** The private preview mapping was removed and disposable Neon branch `br-bitter-scene-ay6jerfh` was deleted.
+
+The release interpretation is intentionally split: **formal supported distributed capacity remains 25** because the predeclared protocol requires a complete 25→50→100 ladder before promotion; **50-player distributed capacity has now been directly demonstrated**; and the partial 100-player evidence is strong but not a certification. Product/release work may proceed with the current selector implementation. A future 100-player certification run is follow-up work, not a reason to keep optimizing the selector for v1.
+
 ## Status and historical claims
 
 This is the implementation and measurement protocol, **not a new supported-capacity claim**. Historical #516/#527 remain completed. Read `PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md` and `results/launch-closeout-2026-09-26`: 25 players on five verified real independent egress networks passed; 100 players on one shared network passed separately. The incomplete distributed 100 experiment admitted 18/20 generators and completed 90 players successfully. It was not measured backend saturation, and short paced runs were not endurance tests.

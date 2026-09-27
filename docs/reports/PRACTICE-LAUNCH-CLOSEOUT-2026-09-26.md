@@ -1,5 +1,17 @@
 # Practice and launch acceptance: issues #516 and #527
 
+## 2026-09-27 distributed qualification update (#629)
+
+The original #516/#527 evidence below remains historical and valid. A later persistent five-egress 25→50→100 qualification on PR #655 materially improves the distributed evidence without changing its predeclared SLOs.
+
+Exact-head run [36326543142](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36326543142), PR head `dcb543da1abc4777d1e36bf3ad599e4af4454671`, tested merge `0ea8e67bbfd969dd7a49e3c2f3264bca43894752`:
+- 25 passed completely.
+- 50 passed completely across five verified egress networks: 3,968 requests, zero correctness failures, start p95/p99 1,602.65/2,188.32 ms, hold-start p95 1,898.40 ms, reroll p95/p99 1,217.49/1,867.57 ms.
+- 100 reached all 100 session/start requests with start p95/p99 318.68/478.46 ms and zero recorded correctness failures, then aborted on one 3,210.81 ms initial view request. That single request crossed the unchanged per-runner rolling 3,000 ms view-p99 gate while the aggregate partial 380-view p99 was 322.84 ms. Because the sustained hold/recovery/final telemetry did not complete, 100 is **not** certified.
+- Cleanup passed.
+
+Release decision: accept the current-practice batched selector plus frozen source-decrement cache and stop treating further selector optimization as a v1 blocker. Keep the **formal supported distributed target at 25** under the original promotion rule, record **50 as a demonstrated passing stage**, and treat 100 certification as deferred follow-up rather than silently weakening the gate.
+
 The final browser and shared-network gates passed, and the supported 25-player distributed target passed. This report retains exact test revisions, measurement limits and the guarded production release record.
 
 ## Implementation
@@ -60,13 +72,13 @@ All NAT stages passed without resetting quota state. Each stage completed one pa
 | 50 | 50 | 1078 | 586.32/965.27 | 197.16/245.81 | 1007.55/1007.55 | 216.72/557.5 |
 | 100 | 100 | 2157 | 603.9/986.63 | 223.08/362.73 | 867.14/937.81 | 238.66/404.59 |
 
-This validates the tested 100-player shared-network scenario. The overall supported launch target remains 25 because independent-egress testing above 25 was incomplete. Neither scenario establishes indefinite endurance or a universal capacity ceiling.
+This validates the tested 100-player shared-network scenario. The formal supported distributed launch target remains 25 under the stricter independent-egress promotion rule. The later #629 qualification has since produced a complete passing 50-player five-egress stage and strong but incomplete 100-player evidence, as recorded above. Neither scenario establishes indefinite endurance or a universal capacity ceiling.
 
 ## Distributed gateway acceptance
 
 [Run 36213206670](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36213206670), tested merge revision `11f263c382b27efe971bbb73daa42b69f16839cf`, passed the supported 25-player stage across five verified distinct real egress networks. All 25 players completed; all 539 requests returned 200/201. Route p95/p99 in milliseconds: session 514/724, start 516/944, view 175/385, pick 204/377, reroll 1,100/1,100, reads 285/720. Correctness, arrival timing and quota gates passed.
 
-The 100-player experiment did not establish capacity: two of 20 GitHub runners started more than 60 seconds after the common scheduled start and failed before sending gameplay. The other 18 runners completed 90 players and 1,941 successful requests, but the collector correctly rejected the incomplete cohort. Stages 500 and 1,000 were skipped. This is a generator scheduling limitation, not a demonstrated backend saturation point. Retained summaries include the failed stage; only 25 distributed players are validated.
+The original 100-player experiment did not establish capacity: two of 20 GitHub runners started more than 60 seconds after the common scheduled start and failed before sending gameplay. The other 18 runners completed 90 players and 1,941 successful requests, but the collector correctly rejected the incomplete cohort. Stages 500 and 1,000 were skipped. This is a generator scheduling limitation, not a demonstrated backend saturation point. The later #629 persistent five-runner protocol supersedes this as the current distributed qualification record: 50 passed completely; 100 produced strong partial evidence but did not complete its unchanged rolling/final gates. Formal promoted capacity therefore remains 25.
 
 ## Production operations and limits
 
