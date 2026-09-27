@@ -30,7 +30,7 @@ function errorMessage(body: unknown, status: number) {
 }
 
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  if (process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1') {
+  if (config.screenshots.fixtures) {
     const { requestScreenshotFixture } = await import('../screenshots/fixtures');
     return requestScreenshotFixture<T>(path, options);
   }
