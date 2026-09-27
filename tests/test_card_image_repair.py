@@ -62,6 +62,33 @@ class CardImageRepairTests(unittest.TestCase):
         self.assertEqual(targeted, full)
         self.assertEqual(targeted["powered-cube"][name]["image_url"], "https://img/titania-c14.jpg")
 
+    def test_targeted_selection_prefers_cosmogrand_base_eoe_printing(self):
+        name = "Cosmogrand Zenith"
+        standard = self.card(
+            "b3c1e5e3-4e6b-456a-958c-7a75c38f8183",
+            name,
+            "eoe",
+            "2025-08-01",
+            "https://img/cosmogrand-eoe-9.jpg",
+            collector_number="9",
+        )
+        borderless = self.card(
+            "d68d891d-333f-46c9-b5a3-3b1d4d3e4563",
+            name,
+            "eoe",
+            "2025-08-01",
+            "https://img/cosmogrand-eoe-304.jpg",
+            collector_number="304",
+            border_color="borderless",
+            frame_effects=["inverted"],
+        )
+        with mock.patch.object(refresh, "all_printings", return_value=iter([borderless, standard])):
+            full = refresh.resolve_inventory({"eoe": {name}})[0]
+        with mock.patch.object(refresh, "all_printings", return_value=iter([borderless, standard])):
+            targeted = repair.resolve_target(name, ["eoe"])[0]
+        self.assertEqual(targeted, full)
+        self.assertEqual(targeted["eoe"][name]["image_url"], "https://img/cosmogrand-eoe-9.jpg")
+
     def test_targeted_selection_matches_full_refresh_for_regular_preferred_set(self):
         name = "Alpha"
         older = self.card("old", name, "old", "2001-01-01", "https://img/old.jpg")
