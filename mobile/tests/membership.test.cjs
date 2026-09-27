@@ -19,6 +19,10 @@ const data = (overrides = {}) => ({ configured: true, connected: false, ad_free:
   account_user_id: ACCOUNT, player_id: PLAYER, checked_at: '2026-09-26T17:00:00Z', membership: null, ...overrides });
 const connected = (overrides = {}) => data({ connected: true, capabilities: ['custom_corpus', 'unlimited_cube_practice'],
   membership: { effective_state: 'elite_entitled', sync_pending: false, last_synced_at: '2026-09-26T17:00:00Z' }, ...overrides });
+const APPLE_PRODUCT = 'pro.packone.app.elite.monthly';
+const appleData = (overrides = {}) => ({ configured: true, product_id: APPLE_PRODUCT,
+  subscription: { linked: false, active: false, provider: 'apple-app-store', productId: APPLE_PRODUCT },
+  account_capabilities: ['account', 'unlimited_regular_practice'], checked_at: '2026-09-26T17:00:00Z', ...overrides });
 const authorize = () => 'https://www.patreon.com/oauth2/authorize?' + new URLSearchParams({ response_type: 'code',
   client_id: 'fixture', scope: 'identity', state: 'm_' + 'a'.repeat(64),
   redirect_uri: 'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/patreon/callback' });
@@ -30,15 +34,42 @@ const drain = () => new Promise((resolve) => setImmediate(resolve));
 async function mount(t, options = {}) {
   const listeners = new Set();
   const h = { current: options.session === undefined ? session() : options.session, value: options.data || data(),
-    calls: [], opened: [], alerts: [], routes: [], resumes: [], handler: options.handler, browser: options.browser };
+    appleValue: options.appleData || appleData(), calls: [], opened: [], alerts: [], routes: [], resumes: [],
+    handler: options.handler, browser: options.browser, platform: options.platform || 'ios', links: [],
+    iapFetches: [], iapRequests: [], iapFinishes: [], iapRestores: [], iapAvailable: options.iapAvailable || [],
+    iapSubscriptions: options.iapSubscriptions || [{ id: APPLE_PRODUCT, platform: 'ios', displayPrice: '$4.99',
+      subscriptionPeriodNumberIOS: '1', subscriptionPeriodUnitIOS: 'month' }], iapEvents: [] };
+  h.iap = {
+    connected: options.iapConnected !== false,
+    subscriptions: h.iapSubscriptions,
+    fetchProducts: async (request) => { h.iapFetches.push(request); },
+    requestPurchase: async (request) => {
+      h.iapRequests.push(request);
+      h.iapEvents.push('request');
+      if (options.purchaseError) {
+        h.iapOptions?.onPurchaseError?.(options.purchaseError);
+        return null;
+      }
+      if (options.purchase) h.iapOptions?.onPurchaseSuccess?.(options.purchase);
+      return options.purchase || null;
+    },
+    finishTransaction: async ({ purchase }) => { h.iapEvents.push('finish'); h.iapFinishes.push(purchase); },
+    restorePurchases: async (request) => { h.iapEvents.push('restore'); h.iapRestores.push(request); },
+  };
   const mocks = {
+    'expo-iap': {
+      useIAP: (iapOptions) => { h.iapOptions = iapOptions; return h.iap; },
+      getAvailablePurchases: async () => h.iapAvailable,
+      deepLinkToSubscriptions: async () => { h.links.push('apple-subscriptions'); },
+    },
     'expo-router': { router: { push: (route) => h.routes.push(route) },
       useFocusEffect: (callback) => React.useEffect(callback, [callback]),
       Stack: Object.assign(host('Stack'), { Screen: host('Screen') }) },
     'expo-status-bar': { StatusBar: host('StatusBar') },
     'expo-web-browser': { openBrowserAsync: async (url) => { h.opened.push(url); return h.browser ? h.browser(url) : { type: 'cancel' }; } },
     'react-native': { ActivityIndicator: host('ActivityIndicator'), Pressable: host('Pressable'), ScrollView: host('ScrollView'),
-      Text: host('Text'), View: host('View'), StyleSheet: { create: (value) => value }, Alert: { alert: (...args) => h.alerts.push(args) } },
+      Text: host('Text'), View: host('View'), StyleSheet: { create: (value) => value }, Alert: { alert: (...args) => h.alerts.push(args) },
+      Platform: { OS: h.platform }, Linking: { openURL: async (url) => { h.links.push(url); return true; } } },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
     '@/src/hooks/useAppResume': { useAppResume: (callback) => { h.resumes[0] = callback; } },
     '@/src/storage/session': { readSession: async () => h.current,
@@ -46,6 +77,11 @@ async function mount(t, options = {}) {
     '@/src/api/client': { requestJson: async (route, config) => {
       h.calls.push({ route, config });
       if (h.handler) { const result = h.handler(route, config); if (result !== undefined) return result; }
+      if (route.includes('/apple-subscriptions/')) {
+        if (route.endsWith('/verify')) h.iapEvents.push('verify');
+        if (route.endsWith('/verify')) return { ...h.appleValue, verified: true };
+        return h.appleValue;
+      }
       if (route.endsWith('/status')) return h.value;
       if (route.endsWith('/connect')) return { url: authorize() };
       return { ok: true, requested: true };
@@ -136,14 +172,16 @@ test('failed refresh is exposed and access becomes unverified rather than Free',
   assert.match(h.text(), /Account access not verified/);
 });
 
-test('native membership UI stays passive and purchase-neutral', async (t) => {
+test('Patreon stays passive while iOS exposes Apple-native Elite billing', async (t) => {
   const h = await mount(t);
   const copy = h.text();
+  assert.match(copy, /Pack One Elite with Apple/);
+  assert.match(copy, /Subscribe with Apple/);
   assert.match(copy, /Sign in with Patreon connects an existing Patreon account/);
-  assert.match(copy, /Membership changes are managed through your subscription provider/);
-  assert.doesNotMatch(copy, /\bElite\b|upgrade|subscribe|join Patreon|price/i);
-  const button = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Sign in with Patreon')[0];
-  assert.ok(button);
+  assert.match(copy, /Patreon membership changes remain managed through Patreon/);
+  assert.doesNotMatch(copy, /join Patreon|upgrade with Patreon/i);
+  const patreon = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Sign in with Patreon')[0];
+  assert.ok(patreon);
 });
 
 test('browser cancellation is not reported as successful connection', async (t) => {
@@ -234,7 +272,8 @@ test('malformed and wrong-account payloads are never interpreted as entitlements
 test('membership browser return does not request or overwrite Account profile enrichment', async (t) => {
   const h = await mount(t);
   await h.press('Sign in with Patreon');
-  assert.ok(h.calls.every(({ route }) => route.startsWith('/growth/v1/patreon/mobile/')));
+  assert.ok(h.calls.filter(({ route }) => route.includes('/patreon/')).every(({ route }) => route.startsWith('/growth/v1/patreon/mobile/')));
+  assert.equal(h.calls.filter(({ route, config }) => route.includes('/apple-subscriptions/') && config.method === 'POST').length, 0);
   const layout = h.compile('app/_layout.tsx').default;
   let tree;
   await act(async () => { tree = Renderer.create(React.createElement(layout)); });
@@ -244,4 +283,56 @@ test('membership browser return does not request or overwrite Account profile en
   entry.props.onPress();
   assert.equal(h.routes.at(-1), '/membership');
   await act(async () => tree.unmount());
+});
+
+
+test('iOS Apple purchase binds StoreKit to the Pack One account and finishes only after server verification', async (t) => {
+  const purchase = { id: 'tx-1', transactionId: '200000000000001', productId: APPLE_PRODUCT,
+    purchaseToken: 'a'.repeat(80) + '.' + 'b'.repeat(80) + '.' + 'c'.repeat(80), appAccountToken: ACCOUNT,
+    isAutoRenewing: true, purchaseState: 'purchased', quantity: 1, store: 'apple', transactionDate: Date.now() };
+  const h = await mount(t, { data: data({ account_capabilities: ['account', 'unlimited_regular_practice'] }), purchase });
+  h.appleValue = appleData({ subscription: { linked: true, active: true, provider: 'apple-app-store',
+    productId: APPLE_PRODUCT, status: 'active', expiresAt: '2026-10-26T17:00:00Z' },
+    account_capabilities: ['account', 'unlimited_regular_practice', 'custom_corpus', 'unlimited_cube_practice'] });
+  await h.press('Subscribe to Pack One Elite with Apple');
+  assert.equal(h.iapRequests.length, 1);
+  assert.equal(h.iapRequests[0].type, 'subs');
+  assert.equal(h.iapRequests[0].request.apple.sku, APPLE_PRODUCT);
+  assert.equal(h.iapRequests[0].request.apple.appAccountToken, ACCOUNT);
+  assert.equal(h.iapRequests[0].request.google, undefined);
+  assert.deepEqual(h.iapEvents.slice(-3), ['request', 'verify', 'finish']);
+  assert.equal(h.iapFinishes.length, 1);
+  assert.match(h.text(), /Elite access is active/);
+});
+
+test('failed Pack One verification leaves the StoreKit transaction unfinished', async (t) => {
+  const purchase = { id: 'tx-2', transactionId: '200000000000002', productId: APPLE_PRODUCT,
+    purchaseToken: 'a'.repeat(80) + '.' + 'b'.repeat(80) + '.' + 'c'.repeat(80), appAccountToken: ACCOUNT,
+    isAutoRenewing: true, purchaseState: 'purchased', quantity: 1, store: 'apple', transactionDate: Date.now() };
+  const h = await mount(t, { data: data({ account_capabilities: ['account', 'unlimited_regular_practice'] }), purchase,
+    handler: (route) => { if (route.endsWith('/apple-subscriptions/mobile/verify')) throw Error('Server verification failed'); } });
+  await h.press('Subscribe to Pack One Elite with Apple');
+  assert.equal(h.iapFinishes.length, 0);
+  assert.match(h.text(), /Server verification failed/);
+});
+
+test('Restore Purchases verifies the signed Apple transaction before finishing it', async (t) => {
+  const purchase = { id: 'tx-3', transactionId: '200000000000003', productId: APPLE_PRODUCT,
+    purchaseToken: 'a'.repeat(80) + '.' + 'b'.repeat(80) + '.' + 'c'.repeat(80), appAccountToken: ACCOUNT,
+    isAutoRenewing: true, purchaseState: 'purchased', quantity: 1, store: 'apple', transactionDate: Date.now() };
+  const h = await mount(t, { data: data({ account_capabilities: ['account', 'unlimited_regular_practice'] }), iapAvailable: [purchase] });
+  h.appleValue = appleData({ subscription: { linked: true, active: true, provider: 'apple-app-store',
+    productId: APPLE_PRODUCT, status: 'active', expiresAt: '2026-10-26T17:00:00Z' },
+    account_capabilities: ['account', 'unlimited_regular_practice', 'custom_corpus', 'unlimited_cube_practice'] });
+  await h.press('Restore Apple purchases');
+  assert.equal(h.iapRestores.length, 1);
+  assert.deepEqual(h.iapEvents.slice(-3), ['restore', 'verify', 'finish']);
+  assert.equal(h.iapFinishes.length, 1);
+  assert.match(h.text(), /restored subscription|Elite access is active/);
+});
+
+test('Android keeps Apple billing out of the native membership surface', async (t) => {
+  const h = await mount(t, { platform: 'android' });
+  assert.doesNotMatch(h.text(), /Pack One Elite with Apple|Subscribe with Apple|Restore Purchases/);
+  assert.match(h.text(), /Sign in with Patreon/);
 });
