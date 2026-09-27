@@ -614,6 +614,7 @@ def run_fit_fold(args):
     args.out.mkdir(parents=True, exist_ok=True)
     shard_path = args.out / f"phase-a2-fold-{args.fold}.npz"
     save = {
+        "fold": np.asarray([args.fold], dtype=np.int16),
         "state_rich": state_rich,
         "cand_rich": cand_rich,
         "state_simple": state_simple,
@@ -657,7 +658,10 @@ def run_fit_fold(args):
         "candidate_feature_count": len(candidate_feature_names),
         "skill_control_feature_names": [state_names[i] for i in control_idx],
         "nonlinear_state_feature_names": [state_names[i] for i in nonlinear_state_idx],
+        "nonlinear_state_indices": list(nonlinear_state_idx),
         "simple_state_feature_names": [state_names[i] for i in simple_state_idx],
+        "simple_state_indices": list(simple_state_idx),
+        "simple_candidate_indices": list(simple_candidate_idx),
         "simple_candidate_feature_names": [candidate_feature_names[i] for i in simple_candidate_idx],
         "q_control": {
             "family": "weighted_ridge_additive_control",
@@ -709,7 +713,9 @@ def _load_train_shards(paths: Sequence[Path], reports: Sequence[Path]):
     loaded = []
     for path in paths:
         data = np.load(path, allow_pickle=False)
-        fold = int(Path(path).stem.rsplit("-", 1)[-1])
+        if "fold" not in data.files or len(data["fold"]) != 1:
+            raise SystemExit("training shard missing scalar fold id")
+        fold = int(data["fold"][0])
         if fold not in report_by_fold:
             raise SystemExit(f"unexpected training shard fold {fold}")
         loaded.append((fold, data))
