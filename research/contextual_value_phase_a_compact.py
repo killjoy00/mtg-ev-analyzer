@@ -345,24 +345,45 @@ def main():
     source_sha = _sha256(args.source)
     expected_source_sha = str(report.get("payload_sha256") or "")
     expected_source_size = int(report.get("payload_size_bytes") or -1)
-    if source_sha != expected_source_sha or args.source.stat().st_size != expected_source_size:
-        actual_size = args.source.stat().st_size
+    actual_size = args.source.stat().st_size
+    source_provenance_mode = "exact_reported_bytes"
+    source_suffix_hex = ""
+    if source_sha != expected_source_sha or actual_size != expected_source_size:
         prefix_sha = (
             _sha256_prefix(args.source, expected_source_size)
             if expected_source_size >= 0 and actual_size >= expected_source_size
             else None
         )
-        suffix_hex = ""
         if expected_source_size >= 0 and actual_size > expected_source_size:
             with args.source.open("rb") as handle:
                 handle.seek(expected_source_size)
-                suffix_hex = handle.read(64).hex()
-        raise SystemExit(
-            "source rich-feature payload provenance mismatch: "
-            f"actual_sha256={source_sha} expected_sha256={expected_source_sha} "
-            f"actual_bytes={actual_size} expected_bytes={expected_source_size} "
-            f"expected_prefix_sha256={prefix_sha} suffix_hex={suffix_hex}"
-        )
+                suffix = handle.read()
+            source_suffix_hex = suffix.hex()
+        else:
+            suffix = b""
+
+        # Phase A1's streaming gzip writer left the underlying BufferedWriter
+        # open after closing GzipFile. The report therefore hashed the exact
+        # payload prefix before the final 10-byte DEFLATE terminator/trailer was
+        # flushed. GitHub artifact upload closed the raw file and preserved the
+        # complete valid gzip. Accept only that precisely proven legacy shape:
+        # the entire reported prefix must hash exactly, and the only additional
+        # bytes must be the 10-byte finalizer. gzip iteration below also checks
+        # the completed stream CRC/trailer while parsing every row.
+        if (
+            actual_size == expected_source_size + 10
+            and prefix_sha == expected_source_sha
+            and len(suffix) == 10
+            and suffix[:2] == b"\\x03\\x00"
+        ):
+            source_provenance_mode = "phase_a1_buffered_gzip_finalizer"
+        else:
+            raise SystemExit(
+                "source rich-feature payload provenance mismatch: "
+                f"actual_sha256={source_sha} expected_sha256={expected_source_sha} "
+                f"actual_bytes={actual_size} expected_bytes={expected_source_size} "
+                f"expected_prefix_sha256={prefix_sha} suffix_hex={source_suffix_hex}"
+            )
 
     state_names = list(report["state_feature_names"])
     candidate_names = list(report["candidate_feature_names"])
@@ -458,6 +479,10 @@ def main():
         "fold": args.fold,
         "source_payload_sha256": source_sha,
         "source_payload_size_bytes": source_bytes,
+        "source_reported_prefix_sha256": expected_source_sha,
+        "source_reported_prefix_size_bytes": expected_source_size,
+        "source_provenance_mode": source_provenance_mode,
+        "source_suffix_hex": source_suffix_hex,
         "compact_payload_sha256": _sha256(db_path),
         "compact_payload_size_bytes": compact_bytes,
         "size_ratio_compact_over_source": compact_bytes / max(1, source_bytes),
