@@ -94,7 +94,7 @@ test('non-Patreon additional access is shown independently from an unconnected P
   assert.equal(h.posts('connect').length, 0);
 });
 
-test('partial capabilities are not mislabeled full Elite or Free', async (t) => {
+test('partial capabilities are not mislabeled full access or Free', async (t) => {
   const h = await mount(t, { data: data({ account_capabilities: ['account', 'unlimited_regular_practice', 'custom_corpus'] }) });
   assert.match(h.text(), /Additional practice access/);
   assert.doesNotMatch(h.text(), /Additional practice access active|Free member/);
@@ -188,7 +188,7 @@ test('signing out during the browser flow discards its late result', async (t) =
   await h.switchAccount({ playerToken: session().playerToken });
   await act(async () => { pending.resolve({ type: 'cancel' }); await drain(); });
   assert.match(h.text(), /Sign in to manage membership/);
-  assert.doesNotMatch(h.text(), /Elite access active|Only the checked account status/);
+  assert.doesNotMatch(h.text(), /Additional practice access active|Only the checked account status/);
 });
 
 test('duplicate connection taps join no second mutation', async (t) => {
