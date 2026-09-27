@@ -39,6 +39,13 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(workflow, /pro\.packone\.preview/);
   assert.doesNotMatch(workflow, /-scheme PackOne\b/);
   assert.doesNotMatch(workflow, /Release-iphonesimulator\/PackOne\.app/);
+  const iosCapture = read('mobile/scripts/capture-store-screenshots-ios.sh');
+  assert.match(iosCapture, /com\.apple\.launchservices\.schemeapproval\.plist/);
+  assert.match(iosCapture, /CoreSimulatorBridge-->/);
+  assert.match(iosCapture, /UIKitApplication:\$bundle_id/);
+  assert.match(workflow, /Enable KVM for Android emulator/);
+  assert.match(workflow, /MODE="0666"/);
+  assert.match(workflow, /test -w \/dev\/kvm/);
   assert.match(workflow, /adb shell service check package/);
   assert.match(workflow, /for attempt in 1 2 3; do/);
   assert.match(workflow, /adb kill-server/);
