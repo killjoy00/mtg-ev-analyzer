@@ -146,7 +146,15 @@ jobs:
           set -euo pipefail
           workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
           test -n "$workspace"
-          xcodebuild             -workspace "$workspace"             -scheme PackOne             -configuration Release             -destination 'generic/platform=iOS Simulator'             -derivedDataPath "$RUNNER_TEMP/PackOneScreenshotDerivedData"             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             build
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme PackOne \
+            -configuration Release \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/PackOneScreenshotDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            build
           app="$(find "$RUNNER_TEMP/PackOneScreenshotDerivedData/Build/Products" -path '*Release-iphonesimulator/PackOne.app' -print -quit)"
           test -d "$app"
           echo "SCREENSHOT_IOS_APP=$app" >> "$GITHUB_ENV"
