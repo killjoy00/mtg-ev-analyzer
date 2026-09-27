@@ -20,6 +20,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   const workflowPaths = [
     '.github/workflows/ios-testflight.yml',
     '.github/workflows/android-internal-testing.yml',
+    '.github/workflows/android-closed-testing.yml',
     '.github/workflows/ios-testflight-status.yml',
     '.github/workflows/android-internal-status.yml',
   ];
@@ -34,6 +35,12 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-release-request\.json'/s, path);
       assert.match(workflow, /request\.get\('operation'\) != 'upload-android-internal'/, path);
+    } else if (path === '.github/workflows/android-closed-testing.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-closed-release-request\.json'/s, path);
+      assert.match(workflow, /request\.get\('operation'\) != 'promote-android-closed'/, path);
+      assert.match(workflow, /Verify live Universal Links and App Links associations/);
+      assert.match(workflow, /Verify Google Play app-signing certificate matches assetlinks\.json/);
     } else if (path === '.github/workflows/android-internal-status.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-status-request\.json'/s, path);
@@ -58,6 +65,23 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.equal(androidRequest.operation, 'upload-android-internal');
   assert.equal(typeof androidRequest.reason, 'string');
   assert.ok(androidRequest.reason.trim().length > 0);
+
+  const androidClosedRequest = JSON.parse(read('.github/android-closed-release-request.json'));
+  assert.deepEqual(Object.keys(androidClosedRequest).sort(), ['operation','reason','track','version_code']);
+  assert.equal(androidClosedRequest.operation, 'promote-android-closed');
+  assert.equal(androidClosedRequest.track, 'alpha');
+  assert.match(String(androidClosedRequest.version_code), /^[1-9][0-9]*$/);
+  assert.equal(typeof androidClosedRequest.reason, 'string');
+  assert.ok(androidClosedRequest.reason.trim().length > 0);
+
+  const closedRelease = read('mobile/scripts/play-closed-release.mjs');
+  assert.match(closedRelease, /status: 'completed'/);
+  assert.match(closedRelease, /:validate/);
+  assert.doesNotMatch(closedRelease, /upload\/androidpublisher/);
+  const liveLinks = read('scripts/verify-live-mobile-links.mjs');
+  assert.match(liveLinks, /app-site-association\.cdn-apple\.com\/a\/v1\/packone\.pro/);
+  assert.match(liveLinks, /3564X3VTDB\.pro\.packone\.app/);
+  assert.match(liveLinks, /7C:4F:B9:F7:0F:C6:A3:3C:94:F4:F9:29:93:22:65:77:34:CB:C0:4E:0B:F9:25:A7:A0:B8:42:51:30:72:3E:8B/);
 
   const androidStatusRequest = JSON.parse(read('.github/android-internal-status-request.json'));
   assert.deepEqual(Object.keys(androidStatusRequest).sort(), ['operation','reason']);
