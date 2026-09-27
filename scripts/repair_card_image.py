@@ -10,9 +10,9 @@ from pathlib import Path
 from typing import Iterable, Optional
 
 try:
-    import refresh_card_images as refresh
-except ModuleNotFoundError:
     from scripts import refresh_card_images as refresh
+except ModuleNotFoundError:
+    import refresh_card_images as refresh
 
 REPORT_PATH = refresh.ROOT / "generated" / "card-image-repair" / "report.json"
 MAX_ENVIRONMENTS = 8
