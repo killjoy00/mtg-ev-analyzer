@@ -3,6 +3,7 @@ import {APPLE_ROOT_CERTIFICATES} from './apple-root-certificates.mjs';
 
 const LEAF_APP_STORE_OID=Buffer.from('060a2a864886f76364060b01','hex');
 const INTERMEDIATE_APPLE_OID=Buffer.from('060a2a864886f76364060201','hex');
+const MAX_SKEW_MS=60_000;
 
 const problem=(message,code='APPLE_JWS_INVALID')=>Object.assign(Error(message),{status:400,code});
 
@@ -17,7 +18,8 @@ function certTime(cert,key) {
 }
 function validAt(cert,at) {
   const time=at.getTime();
-  return time>=certTime(cert,'from')&&time<=certTime(cert,'to');
+  return certTime(cert,'from')<=time+MAX_SKEW_MS
+    && certTime(cert,'to')>=time-MAX_SKEW_MS;
 }
 function trustedCertificates(values) {
   try {
@@ -55,13 +57,14 @@ export async function verifyAppleJws(value,{roots=APPLE_ROOT_CERTIFICATES}={}) {
   } catch {
     throw problem('Apple signing certificate chain is invalid.','APPLE_JWS_CERT');
   }
-  const [leaf,intermediate,suppliedRoot]=chain;
-  const root=trustedCertificates(roots).find(candidate=>candidate.fingerprint256===suppliedRoot.fingerprint256);
+  const [leaf,intermediate]=chain;
+  const root=trustedCertificates(roots).find(candidate=>
+    intermediate.verify(candidate.publicKey)&&intermediate.issuer===candidate.subject);
   const chainValid=Boolean(root)
     && !leaf.ca
     && intermediate.ca
-    && intermediate.verify(root.publicKey)
     && leaf.verify(intermediate.publicKey)
+    && leaf.issuer===intermediate.subject
     && leaf.raw.includes(LEAF_APP_STORE_OID)
     && intermediate.raw.includes(INTERMEDIATE_APPLE_OID);
   if(!chainValid)throw problem('Apple signing certificate chain is invalid.','APPLE_JWS_CERT');
