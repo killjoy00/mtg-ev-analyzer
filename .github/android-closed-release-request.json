@@ -1,1 +1,1 @@
-{"operation":"promote-android-closed","reason":"Promote the signed Pack One 1.0 Android RC uploaded by #677 into Google Play Closed Testing so the production-access qualification period can begin once at least 12 testers opt in.","version_code":"100235","track":"alpha"}
+{"operation":"promote-android-closed","reason":"Retry promotion of signed Pack One 1.0 Android RC versionCode 100235 to Google Play Closed Testing after correcting the AASA verifier to accept the live valid JSON response served as application/octet-stream.","version_code":"100235","track":"alpha"}
