@@ -1,27 +1,355 @@
-import {APPLE_ROOT_CERTIFICATES} from './apple-root-certificates.mjs';
-export const APPLE_BUNDLE_ID='pro.packone.app';
-export const APPLE_APP_ID=6814318676;
-const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
-const ID_RE=/^[A-Za-z0-9._:-]{1,128}$/;
-const JWS_RE=/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/;
+import {accountCapabilities} from './capabilities.mjs';
+import {verifyAppleJws} from './apple-jws.mjs';
+import {
+  APPLE_APP_ID,
+  APPLE_BUNDLE_ID,
+  APPLE_ELITE_PRODUCT_ID,
+  APPLE_IAP_PROVIDER,
+  appleSubscriptionAction,
+} from './apple-subscription-policy.mjs';
+
+const UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ACCOUNT_UUID_RE=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const TX_RE=/^[0-9]{1,40}$/;
+const ENVIRONMENTS=new Set(['Production','Sandbox']);
+const STATUSES=new Set(['active','grace_period','billing_retry','expired','revoked','unknown']);
 const ACTIVE=new Set(['active','grace_period']);
-let libraryPromise=null;
+
 const problem=(message,status=400,code='APPLE_SUBSCRIPTION_INVALID')=>Object.assign(Error(message),{status,code});
-const productIds=(env=process.env)=>new Set(String(env.PACK1_APPLE_ELITE_PRODUCT_IDS||'').split(',').map(x=>x.trim()).filter(Boolean));
-const iso=v=>Number.isFinite(Number(v))&&Number(v)>0?new Date(Number(v)).toISOString():null;
-export function appleSubscriptionConfig(env=process.env){const ids=productIds(env);return{productIds:ids,verifierConfigured:ids.size>0,serverApiConfigured:ids.size>0&&/^[A-Z0-9]{10}$/.test(String(env.APPLE_IAP_KEY_ID||''))&&/^[0-9a-f-]{36}$/i.test(String(env.APPLE_IAP_ISSUER_ID||''))&&String(env.APPLE_IAP_PRIVATE_KEY_P8||'').includes('BEGIN PRIVATE KEY')};}
-async function library(){libraryPromise ||= import('@apple/app-store-server-library');return libraryPromise;}
-function assertJws(v){const s=String(v||'').trim();if(s.length<64||s.length>50000||!JWS_RE.test(s))throw problem('Apple signed data is invalid.',400,'APPLE_JWS_INVALID');return s;}
-async function signed(kind,value,{environment=null}={}){const lib=await library(),jws=assertJws(value);for(const name of environment?[environment]:['Production','Sandbox'])try{const prod=name==='Production';const v=new lib.SignedDataVerifier(APPLE_ROOT_CERTIFICATES,true,prod?lib.Environment.PRODUCTION:lib.Environment.SANDBOX,APPLE_BUNDLE_ID,prod?APPLE_APP_ID:undefined);const decoded=kind==='transaction'?await v.verifyAndDecodeTransaction(jws):kind==='renewal'?await v.verifyAndDecodeRenewalInfo(jws):await v.verifyAndDecodeNotification(jws);return{decoded,environment:name};}catch{}throw problem('Apple signed data could not be verified.',400,'APPLE_JWS_UNVERIFIED');}
-export const appleStatusName=status=>({1:'active',2:'expired',3:'billing_retry',4:'grace_period',5:'revoked'})[Number(status)]||'unknown';
-function normalize(tx,environment,{status=null,renewal=null,eventSignedAt=null,notificationUUID=null}={}){const original=String(tx.originalTransactionId||''),current=String(tx.transactionId||''),product=String(tx.productId||''),account=String(tx.appAccountToken||'').toLowerCase();if(!ID_RE.test(original)||!ID_RE.test(current)||!UUID_RE.test(account))throw problem('Apple subscription is missing its Pack One account binding.',409,'APPLE_ACCOUNT_BINDING');const ids=productIds();if(!ids.size)throw problem('Apple subscriptions are not configured.',503,'APPLE_SUBSCRIPTION_CONFIG');if(!ids.has(product))throw problem('Apple subscription product is not recognized.',400,'APPLE_PRODUCT');if(tx.inAppOwnershipType&&String(tx.inAppOwnershipType)!=='PURCHASED')throw problem('Family-shared subscriptions are not eligible for Pack One Elite.',403,'APPLE_FAMILY_SHARED');const expiresAt=iso(status==='grace_period'&&Number(renewal?.gracePeriodExpiresDate)>Number(tx.expiresDate)?renewal.gracePeriodExpiresDate:tx.expiresDate);const resolved=status||(tx.revocationDate?'revoked':expiresAt&&Date.parse(expiresAt)>Date.now()?'active':'expired');const signedAt=iso(eventSignedAt||tx.signedDate);if(!signedAt)throw problem('Apple subscription payload is incomplete.',400,'APPLE_SUBSCRIPTION_PAYLOAD');return{authUserId:account,appAccountToken:account,originalTransactionId:original,productId:product,environment,status:resolved,expiresAt,autoRenewEnabled:renewal?.autoRenewStatus===undefined?null:Number(renewal.autoRenewStatus)===1,lastTransactionId:current,eventSignedAt:signedAt,notificationUUID};}
-async function apply(query,s){const r=await query(`SELECT * FROM pack1_apply_apple_subscription_state($1::uuid,$2::uuid,$3,$4,$5,$6,$7::timestamptz,$8::boolean,$9,$10::timestamptz,$11::uuid)`,[s.authUserId,s.appAccountToken,s.originalTransactionId,s.productId,s.environment,s.status,s.expiresAt,s.autoRenewEnabled,s.lastTransactionId,s.eventSignedAt,s.notificationUUID]);const row=r.rows[0];if(row?.account_matches==='f'||row?.account_matches===false)throw problem('This subscription is linked to a different Pack One account.',409,'APPLE_ACCOUNT_MISMATCH');return{applied:row?.applied==='t'||row?.applied===true,state:s};}
-export async function appleSubscriptionAccountState(query,auth){const row=(await query(`SELECT product_id,environment,status,expires_at,auto_renew_enabled FROM apple_subscription_entitlements WHERE auth_user_id=$1::uuid ORDER BY (status IN ('active','grace_period') AND expires_at>now()) DESC,updated_at DESC LIMIT 1`,[auth])).rows[0];if(!row)return{linked:false,active:false,source:null};const active=ACTIVE.has(row.status)&&row.expires_at&&new Date(row.expires_at).getTime()>Date.now();return{linked:true,active,source:active?'apple':null,status:row.status,productId:row.product_id,expiresAt:row.expires_at||null,autoRenewEnabled:row.auto_renew_enabled===null?null:Boolean(row.auto_renew_enabled),environment:row.environment};}
-export async function acceptAppleClientTransaction(query,{authUserId,signedTransaction}){const v=await signed('transaction',signedTransaction),s=normalize(v.decoded,v.environment);if(s.authUserId!==String(authUserId||'').toLowerCase())throw problem('This subscription is linked to a different Pack One account.',409,'APPLE_ACCOUNT_MISMATCH');const a=await apply(query,s);return{...a,subscription:await appleSubscriptionAccountState(query,authUserId)};}
-async function api(environment){const env=process.env;if(!appleSubscriptionConfig(env).serverApiConfigured)throw problem('Apple subscription reconciliation is not configured.',503,'APPLE_SERVER_API_CONFIG');const lib=await library();return new lib.AppStoreServerAPIClient(String(env.APPLE_IAP_PRIVATE_KEY_P8),String(env.APPLE_IAP_KEY_ID),String(env.APPLE_IAP_ISSUER_ID),APPLE_BUNDLE_ID,environment==='Production'?lib.Environment.PRODUCTION:lib.Environment.SANDBOX);}
-async function statusItem(environment,transactionId,original){const response=await (await api(environment)).getAllSubscriptionStatuses(transactionId);for(const g of response?.data||[])for(const item of g?.lastTransactions||[])if(String(item?.originalTransactionId||'')===original)return item;return null;}
-async function fromItem(item,environment,notificationUUID=null){if(!item?.signedTransactionInfo)throw problem('Apple subscription status is incomplete.',502,'APPLE_STATUS_INCOMPLETE');const tx=(await signed('transaction',item.signedTransactionInfo,{environment})).decoded,renewal=item.signedRenewalInfo?(await signed('renewal',item.signedRenewalInfo,{environment})).decoded:null;return normalize(tx,environment,{status:appleStatusName(item.status),renewal,eventSignedAt:Math.max(Number(tx.signedDate)||0,Number(renewal?.signedDate)||0),notificationUUID});}
-export async function restoreAppleSubscription(query,{authUserId,signedTransaction}){const v=await signed('transaction',signedTransaction),binding=normalize(v.decoded,v.environment);if(binding.authUserId!==String(authUserId||'').toLowerCase())throw problem('This subscription is linked to a different Pack One account.',409,'APPLE_ACCOUNT_MISMATCH');const item=await statusItem(v.environment,binding.lastTransactionId,binding.originalTransactionId);if(!item)throw problem('Apple could not find this subscription.',404,'APPLE_SUBSCRIPTION_NOT_FOUND');const s=await fromItem(item,v.environment);if(s.authUserId!==String(authUserId).toLowerCase())throw problem('This subscription is linked to a different Pack One account.',409,'APPLE_ACCOUNT_MISMATCH');const a=await apply(query,s);await query('UPDATE apple_subscription_entitlements SET last_reconciled_at=now(),reconcile_attempted_at=now() WHERE original_transaction_id=$1',[s.originalTransactionId]);return{...a,subscription:await appleSubscriptionAccountState(query,authUserId)};}
-async function receipt(query,n,{environment=null,original=null,outcome='received',processed=false}={}){const uuid=String(n.notificationUUID||'').toLowerCase(),signedAt=iso(n.signedDate);if(!UUID_RE.test(uuid)||!signedAt)throw problem('Apple notification metadata is invalid.',400,'APPLE_NOTIFICATION');const r=await query(`INSERT INTO apple_subscription_notifications(notification_uuid,notification_type,notification_subtype,environment,original_transaction_id,signed_at,processed_at,outcome) VALUES($1::uuid,$2,$3,$4,$5,$6::timestamptz,CASE WHEN $7::boolean THEN now() ELSE NULL END,$8) ON CONFLICT(notification_uuid) DO NOTHING RETURNING notification_uuid`,[uuid,String(n.notificationType||'UNKNOWN').slice(0,80),n.subtype?String(n.subtype).slice(0,80):null,environment,original,signedAt,processed,outcome]);return{uuid,inserted:Boolean(r.rows[0])};}
-export async function acceptAppleNotification(query,{signedPayload}){const outer=await signed('notification',signedPayload),n=outer.decoded,data=n.data||{};if(!data.signedTransactionInfo){const r=await receipt(query,n,{environment:outer.environment,outcome:'verified_no_subscription',processed:true});return{duplicate:!r.inserted,processed:true};}const tx=(await signed('transaction',data.signedTransactionInfo,{environment:outer.environment})).decoded,original=String(tx.originalTransactionId||'');const r=await receipt(query,n,{environment:outer.environment,original:ID_RE.test(original)?original:null,outcome:'verified'});if(!r.inserted)return{duplicate:true,processed:true};try{if(!productIds().has(String(tx.productId||''))){await query("UPDATE apple_subscription_notifications SET processed_at=now(),outcome='ignored_product' WHERE notification_uuid=$1::uuid",[r.uuid]);return{duplicate:false,processed:true};}if(tx.inAppOwnershipType&&String(tx.inAppOwnershipType)!=='PURCHASED'){await query("UPDATE apple_subscription_notifications SET processed_at=now(),outcome='ignored_family_shared' WHERE notification_uuid=$1::uuid",[r.uuid]);return{duplicate:false,processed:true};}if(!UUID_RE.test(String(tx.appAccountToken||''))){const existing=ID_RE.test(original)?(await query('SELECT auth_user_id::text FROM apple_subscription_entitlements WHERE original_transaction_id=$1',[original])).rows[0]:null;if(!existing){await query("UPDATE apple_subscription_notifications SET processed_at=now(),outcome='unbound' WHERE notification_uuid=$1::uuid",[r.uuid]);return{duplicate:false,processed:true};}tx.appAccountToken=existing.auth_user_id;}const renewal=data.signedRenewalInfo?(await signed('renewal',data.signedRenewalInfo,{environment:outer.environment})).decoded:null,s=normalize(tx,outer.environment,{status:appleStatusName(data.status),renewal,eventSignedAt:Math.max(Number(n.signedDate)||0,Number(tx.signedDate)||0,Number(renewal?.signedDate)||0),notificationUUID:r.uuid});await apply(query,s);await query("UPDATE apple_subscription_notifications SET processed_at=now(),outcome='applied' WHERE notification_uuid=$1::uuid",[r.uuid]);return{duplicate:false,processed:true};}catch(error){await query("UPDATE apple_subscription_notifications SET outcome='processing_failed' WHERE notification_uuid=$1::uuid",[r.uuid]);throw error;}}
-export async function reconcileDueAppleSubscriptions(query,{limit=5}={}){if(!appleSubscriptionConfig().serverApiConfigured)return{configured:false,attempted:0,updated:0,failed:0};const due=(await query(`SELECT original_transaction_id,last_transaction_id,environment FROM apple_subscription_entitlements WHERE reconcile_attempted_at IS NULL OR reconcile_attempted_at<now()-interval '6 hours' ORDER BY reconcile_attempted_at NULLS FIRST,updated_at LIMIT $1`,[Math.max(1,Math.min(10,Number(limit)||5))])).rows;let updated=0,failed=0;for(const row of due){await query('UPDATE apple_subscription_entitlements SET reconcile_attempted_at=now() WHERE original_transaction_id=$1',[row.original_transaction_id]);try{const item=await statusItem(row.environment,row.last_transaction_id,row.original_transaction_id);if(!item){failed++;continue;}const s=await fromItem(item,row.environment);await apply(query,s);await query('UPDATE apple_subscription_entitlements SET last_reconciled_at=now() WHERE original_transaction_id=$1',[row.original_transaction_id]);updated++;}catch{failed++;}}return{configured:true,attempted:due.length,updated,failed};}
+const pgBool=value=>value===true||value===1||value==='1'||value==='t'||value==='true';
+
+function iso(value) {
+  if(value==null)return null;
+  const n=Number(value);
+  return Number.isFinite(n)&&n>0?new Date(n).toISOString():null;
+}
+function newest(...values) {
+  return Math.max(...values.map(value=>Number(value)||0));
+}
+function validProduct(value) {
+  return String(value||'')===APPLE_ELITE_PRODUCT_ID;
+}
+
+export const appleStatusName=status=>({
+  1:'active',
+  2:'expired',
+  3:'billing_retry',
+  4:'grace_period',
+  5:'revoked',
+})[Number(status)]||null;
+
+export const appleSubscriptionConfig=()=>({
+  configured:true,
+  productId:APPLE_ELITE_PRODUCT_ID,
+});
+
+export function normalizeAppleTransaction(tx,{
+  expectedAccountId=null,
+  status=null,
+  renewal=null,
+  eventSignedAt=null,
+  notificationUUID=null,
+}={}) {
+  if(!tx||typeof tx!=='object')throw problem('Apple subscription payload is incomplete.');
+
+  const environment=String(tx.environment||'');
+  if(!ENVIRONMENTS.has(environment)||String(tx.bundleId||'')!==APPLE_BUNDLE_ID)
+    throw problem('Apple subscription is for another app.');
+  if(!validProduct(tx.productId))
+    throw problem('Apple subscription product is not recognized.',400,'APPLE_PRODUCT');
+  if(tx.type&&String(tx.type)!=='Auto-Renewable Subscription')
+    throw problem('Apple purchase is not a subscription.');
+  if(tx.inAppOwnershipType&&String(tx.inAppOwnershipType)!=='PURCHASED')
+    throw problem('Family-shared subscriptions are not eligible for Pack One Elite.',403,'APPLE_FAMILY_SHARED');
+  if(tx.quantity!=null&&Number(tx.quantity)!==1)
+    throw problem('Apple subscription quantity is invalid.');
+
+  const originalTransactionId=String(tx.originalTransactionId||'');
+  const lastTransactionId=String(tx.transactionId||'');
+  const authUserId=String(tx.appAccountToken||'').toLowerCase();
+  if(!TX_RE.test(originalTransactionId)||!TX_RE.test(lastTransactionId)||!ACCOUNT_UUID_RE.test(authUserId))
+    throw problem('Apple subscription is missing its Pack One account binding.',409,'APPLE_ACCOUNT_BINDING');
+  if(expectedAccountId&&authUserId!==String(expectedAccountId).toLowerCase())
+    throw problem('This subscription is linked to a different Pack One account.',409,'APPLE_ACCOUNT_MISMATCH');
+
+  const transactionSignedAt=iso(tx.signedDate);
+  const purchaseAt=iso(tx.purchaseDate);
+  const baseExpiry=iso(tx.expiresDate);
+  if(!transactionSignedAt||!purchaseAt||!baseExpiry)
+    throw problem('Apple subscription payload is incomplete.');
+  if(Date.parse(baseExpiry)<Date.parse(purchaseAt))
+    throw problem('Apple subscription dates are invalid.');
+
+  let gracePeriodExpiry=null;
+  let autoRenewEnabled=null;
+  if(renewal) {
+    if(renewal.environment&&String(renewal.environment)!==environment)
+      throw problem('Apple renewal environment does not match the transaction.');
+    if(renewal.originalTransactionId&&String(renewal.originalTransactionId)!==originalTransactionId)
+      throw problem('Apple renewal does not match the subscription.');
+    if((renewal.productId||renewal.autoRenewProductId)&&!validProduct(renewal.productId||renewal.autoRenewProductId))
+      throw problem('Apple renewal product does not match the subscription.');
+    gracePeriodExpiry=iso(renewal.gracePeriodExpiresDate);
+    if(renewal.autoRenewStatus!=null)autoRenewEnabled=Number(renewal.autoRenewStatus)===1;
+  }
+
+  const resolvedStatus=status||(
+    tx.revocationDate?'revoked':Date.parse(baseExpiry)>Date.now()?'active':'expired'
+  );
+  if(!STATUSES.has(resolvedStatus))throw problem('Apple subscription status is invalid.');
+  const expiresAt=resolvedStatus==='grace_period'
+    && gracePeriodExpiry
+    && Date.parse(gracePeriodExpiry)>Date.parse(baseExpiry)
+    ?gracePeriodExpiry
+    :baseExpiry;
+  const eventAt=iso(newest(eventSignedAt,tx.signedDate,renewal?.signedDate));
+  if(!eventAt)throw problem('Apple subscription signed date is invalid.');
+
+  return {
+    authUserId,
+    appAccountToken:authUserId,
+    originalTransactionId,
+    productId:APPLE_ELITE_PRODUCT_ID,
+    environment,
+    status:resolvedStatus,
+    expiresAt,
+    autoRenewEnabled,
+    lastTransactionId,
+    eventSignedAt:eventAt,
+    notificationUUID,
+  };
+}
+
+async function apply(query,state) {
+  const result=await query(
+    `SELECT * FROM pack1_apply_apple_subscription_state(
+      $1::uuid,$2::uuid,$3,$4,$5,$6,$7::timestamptz,$8::boolean,$9,$10::timestamptz,$11::uuid)`,
+    [
+      state.authUserId,
+      state.appAccountToken,
+      state.originalTransactionId,
+      state.productId,
+      state.environment,
+      state.status,
+      state.expiresAt,
+      state.autoRenewEnabled,
+      state.lastTransactionId,
+      state.eventSignedAt,
+      state.notificationUUID,
+    ],
+  );
+  const row=result.rows[0];
+  if(row?.account_matches==='f'||row?.account_matches===false)
+    throw problem('This subscription is linked to a different Pack One account.',409,'APPLE_ACCOUNT_MISMATCH');
+  return {applied:row?.applied==='t'||row?.applied===true,state};
+}
+
+export async function appleSubscriptionAccountState(query,authUserId) {
+  const result=await query(
+    `SELECT product_id,environment,status,expires_at,auto_renew_enabled
+     FROM apple_subscription_entitlements
+     WHERE auth_user_id=$1::uuid
+     ORDER BY (status IN ('active','grace_period') AND expires_at>now()) DESC,
+       last_event_signed_at DESC
+     LIMIT 1`,
+    [authUserId],
+  );
+  const row=result.rows[0];
+  if(!row)return {
+    linked:false,
+    active:false,
+    provider:APPLE_IAP_PROVIDER,
+    productId:APPLE_ELITE_PRODUCT_ID,
+  };
+  const active=ACTIVE.has(row.status)
+    && row.expires_at
+    && new Date(row.expires_at).getTime()>Date.now();
+  return {
+    linked:true,
+    active,
+    provider:APPLE_IAP_PROVIDER,
+    productId:row.product_id,
+    status:row.status,
+    expiresAt:row.expires_at||null,
+    autoRenewEnabled:row.auto_renew_enabled==null?null:pgBool(row.auto_renew_enabled),
+    environment:row.environment,
+  };
+}
+
+export async function acceptAppleClientTransaction(query,{
+  authUserId,
+  signedTransaction,
+  verifyJws=verifyAppleJws,
+}) {
+  const transaction=await verifyJws(String(signedTransaction||''));
+  const state=normalizeAppleTransaction(transaction,{expectedAccountId:authUserId});
+  const applied=await apply(query,state);
+  return {
+    ...applied,
+    subscription:await appleSubscriptionAccountState(query,authUserId),
+  };
+}
+
+async function notificationExists(query,uuid) {
+  const result=await query(
+    'SELECT 1 FROM apple_subscription_notifications WHERE notification_uuid=$1::uuid LIMIT 1',
+    [uuid],
+  );
+  return Boolean(result.rows[0]);
+}
+
+async function rememberNotification(query,notification,{
+  environment=null,
+  originalTransactionId=null,
+  outcome,
+}) {
+  const uuid=String(notification.notificationUUID||'').toLowerCase();
+  const signedAt=iso(notification.signedDate);
+  const type=String(notification.notificationType||'');
+  if(!UUID_RE.test(uuid)||!signedAt||!/^[A-Z0-9_]{2,80}$/.test(type))
+    throw problem('Apple notification metadata is invalid.',400,'APPLE_NOTIFICATION');
+
+  const result=await query(
+    `INSERT INTO apple_subscription_notifications(
+       notification_uuid,notification_type,notification_subtype,environment,
+       original_transaction_id,signed_at,processed_at,outcome)
+     VALUES($1::uuid,$2,$3,$4,$5,$6::timestamptz,now(),$7)
+     ON CONFLICT(notification_uuid) DO NOTHING
+     RETURNING notification_uuid`,
+    [
+      uuid,
+      type,
+      notification.subtype?String(notification.subtype).slice(0,80):null,
+      environment,
+      originalTransactionId,
+      signedAt,
+      outcome,
+    ],
+  );
+  return {uuid,inserted:Boolean(result.rows[0])};
+}
+
+export async function acceptAppleNotification(query,{
+  signedPayload,
+  verifyJws=verifyAppleJws,
+}) {
+  const notification=await verifyJws(String(signedPayload||''));
+  const uuid=String(notification.notificationUUID||'').toLowerCase();
+  if(!UUID_RE.test(uuid)||!iso(notification.signedDate))
+    throw problem('Apple notification metadata is invalid.',400,'APPLE_NOTIFICATION');
+  if(await notificationExists(query,uuid))return {duplicate:true,processed:true};
+
+  const data=notification.data||{};
+  if(Object.keys(data).length&&(
+    Number(data.appAppleId)!==APPLE_APP_ID
+    ||String(data.bundleId||'')!==APPLE_BUNDLE_ID
+    ||!ENVIRONMENTS.has(String(data.environment||''))
+  ))throw problem('Apple notification is for another app.');
+
+  if(!data.signedTransactionInfo) {
+    const receipt=await rememberNotification(query,notification,{
+      environment:data.environment||null,
+      outcome:'verified_no_subscription',
+    });
+    return {duplicate:!receipt.inserted,processed:true};
+  }
+
+  let transaction=await verifyJws(String(data.signedTransactionInfo));
+  if(String(transaction.bundleId||'')!==APPLE_BUNDLE_ID
+    ||String(transaction.environment||'')!==String(data.environment||''))
+    throw problem('Apple transaction does not match its notification.');
+
+  const originalTransactionId=String(transaction.originalTransactionId||'');
+  if(!validProduct(transaction.productId)) {
+    const receipt=await rememberNotification(query,notification,{
+      environment:data.environment,
+      originalTransactionId:TX_RE.test(originalTransactionId)?originalTransactionId:null,
+      outcome:'ignored_product',
+    });
+    return {duplicate:!receipt.inserted,processed:true};
+  }
+  if(transaction.inAppOwnershipType&&String(transaction.inAppOwnershipType)!=='PURCHASED') {
+    const receipt=await rememberNotification(query,notification,{
+      environment:data.environment,
+      originalTransactionId:TX_RE.test(originalTransactionId)?originalTransactionId:null,
+      outcome:'ignored_family_shared',
+    });
+    return {duplicate:!receipt.inserted,processed:true};
+  }
+
+  if(!ACCOUNT_UUID_RE.test(String(transaction.appAccountToken||''))) {
+    const existing=TX_RE.test(originalTransactionId)
+      ?(await query(
+        'SELECT auth_user_id::text FROM apple_subscription_entitlements WHERE original_transaction_id=$1',
+        [originalTransactionId],
+      )).rows[0]
+      :null;
+    if(!existing) {
+      const receipt=await rememberNotification(query,notification,{
+        environment:data.environment,
+        originalTransactionId:TX_RE.test(originalTransactionId)?originalTransactionId:null,
+        outcome:'unbound',
+      });
+      return {duplicate:!receipt.inserted,processed:true};
+    }
+    transaction={...transaction,appAccountToken:existing.auth_user_id};
+  }
+
+  const renewal=data.signedRenewalInfo
+    ?await verifyJws(String(data.signedRenewalInfo))
+    :null;
+  const state=normalizeAppleTransaction(transaction,{
+    status:appleStatusName(data.status),
+    renewal,
+    eventSignedAt:newest(notification.signedDate,transaction.signedDate,renewal?.signedDate),
+    notificationUUID:uuid,
+  });
+  await apply(query,state);
+  const receipt=await rememberNotification(query,notification,{
+    environment:data.environment,
+    originalTransactionId:state.originalTransactionId,
+    outcome:'applied',
+  });
+  return {duplicate:!receipt.inserted,processed:true};
+}
+
+export async function handleAppleSubscriptions(request,{
+  query,
+  json,
+  readJson,
+  mobileAccountIdentity,
+  verifyJws=verifyAppleJws,
+}) {
+  const action=appleSubscriptionAction(new URL(request.url).pathname,request.method);
+  if(!action)throw Object.assign(Error('Not found.'),{status:404});
+
+  if(action==='notification') {
+    const body=await readJson(request);
+    return json(await acceptAppleNotification(query,{
+      signedPayload:body.signedPayload,
+      verifyJws,
+    }));
+  }
+
+  const {auth}=await mobileAccountIdentity(request);
+  if(action==='status')return json({
+    configured:true,
+    product_id:APPLE_ELITE_PRODUCT_ID,
+    subscription:await appleSubscriptionAccountState(query,auth.user_id),
+    account_capabilities:await accountCapabilities(auth,query),
+    checked_at:new Date().toISOString(),
+  });
+
+  const body=await readJson(request);
+  const result=await acceptAppleClientTransaction(query,{
+    authUserId:auth.user_id,
+    signedTransaction:body.signedTransaction,
+    verifyJws,
+  });
+  return json({
+    verified:true,
+    product_id:APPLE_ELITE_PRODUCT_ID,
+    subscription:result.subscription,
+    account_capabilities:await accountCapabilities(auth,query),
+  });
+}
