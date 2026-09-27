@@ -41,7 +41,7 @@ const requestEndpoint=path=>{
   if(bare==='/draft/v1/leaderboard')return 'leaderboard';
   if(bare==='/growth/v1/account/link-browser')return 'account_link_browser';
   if(bare==='/growth/v1/profile/me')return 'profile_me';
-  if(/^\\/draft\\/v1\\/runs\\/[^/]+\\/share$/.test(bare))return 'run_share';
+  if(/^\/draft\/v1\/runs\/[^/]+\/share$/.test(bare))return 'run_share';
   return null;
 };
 export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch}) {
