@@ -1,0 +1,201 @@
+name: contextual-value-v1-phase-a-rich-features
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN: '36256947308'
+  SOURCE_SHA: aa5b17d96b43f3ce08f52fad55ba17f327472c1b
+  ABLATION_RUN: '36280148906'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  metadata:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Phase A feature code
+        run: python -m py_compile scripts/contextual_value/rich_features.py research/contextual_value_phase_a_features.py
+      - name: Run rich-feature unit contract
+        run: python -m unittest tests.test_contextual_value_rich_features
+      - name: Download frozen development cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Snapshot rich static card metadata
+        run: |
+          python3 research/contextual_value_phase_a_features.py metadata \
+            --cohort-dir preprocessed-core \
+            --source-sha "$SOURCE_SHA" \
+            --out results/contextual-value-v1/phase-a-metadata
+      - name: Assert metadata boundary
+        run: |
+          python3 - <<'PY'
+          import json
+          p="results/contextual-value-v1/phase-a-metadata/phase-a-card-metadata-report.json"
+          r=json.load(open(p))
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          assert r["overall"]["coverage"] >= .99
+          for row in r["by_environment"].values():
+              assert row["coverage"] >= .98
+          PY
+      - name: Upload Phase A metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-card-metadata
+          path: results/contextual-value-v1/phase-a-metadata/
+          retention-days: 30
+
+  materialize:
+    needs: metadata
+    name: rich-fold-${{ matrix.fold }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        fold: [-1, 0, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile Phase A feature code
+        run: python -m py_compile scripts/contextual_value/rich_features.py research/contextual_value_phase_a_features.py
+      - name: Download frozen development cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download Phase A metadata
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-card-metadata
+          path: phase-a-metadata
+      - name: Download retained cross-fit training features
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-feature-fold-${{ matrix.fold }}-*
+          path: source-features
+          merge-multiple: true
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download leakage-safe held features
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-held-${{ matrix.fold }}
+          path: held-features
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Materialize one reusable rich fold
+        shell: bash
+        run: |
+          set -euo pipefail
+          FOLD='${{ matrix.fold }}'
+          ARGS=()
+          for p in source-features/train-feature-fold-"$FOLD"-*.jsonl.gz; do
+            ARGS+=(--feature-shard "$p")
+          done
+          python3 research/contextual_value_phase_a_features.py materialize-fold \
+            --fold "$FOLD" \
+            --cohort-dir preprocessed-core \
+            --metadata phase-a-metadata/phase-a-card-metadata.json.gz \
+            --metadata-report phase-a-metadata/phase-a-card-metadata-report.json \
+            "${ARGS[@]}" \
+            --held-features "held-features/held-features-fold-$FOLD.jsonl.gz" \
+            --held-report "held-features/held-features-fold-$FOLD-report.json" \
+            --source-sha "$SOURCE_SHA" \
+            --out "results/contextual-value-v1/phase-a-rich-fold-$FOLD"
+      - name: Assert fold boundary and feature contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          reports=list(pathlib.Path("results/contextual-value-v1").glob("phase-a-rich-fold-*/phase-a-rich-fold-*-report.json"))
+          assert len(reports)==1
+          r=json.loads(reports[0].read_text())
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          assert r["ranking_strong_player_features_removed"] is True
+          assert r["factorized_state_features"] is True
+          assert r["candidate_metadata_coverage"] >= .99
+          assert r["pool_metadata_coverage"] >= .99
+          assert not any("strong_choice_probability" in name for name in r["candidate_feature_names"])
+          PY
+      - name: Upload rich fold cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-fold-${{ matrix.fold }}
+          path: results/contextual-value-v1/phase-a-rich-fold-${{ matrix.fold }}/phase-a-rich-fold-${{ matrix.fold }}.jsonl.gz
+          retention-days: 30
+      - name: Upload small fold report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold-${{ matrix.fold }}
+          path: results/contextual-value-v1/phase-a-rich-fold-${{ matrix.fold }}/phase-a-rich-fold-${{ matrix.fold }}-report.json
+          retention-days: 30
+
+  validate:
+    needs: materialize
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download metadata report
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-card-metadata
+          path: phase-a-metadata
+      - name: Download fold reports only
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-phase-a-rich-report-fold-*
+          path: fold-reports
+          merge-multiple: true
+      - name: Validate reusable feature layer
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=()
+          for p in fold-reports/phase-a-rich-fold-*-report.json; do
+            ARGS+=(--fold-report "$p")
+          done
+          python3 research/contextual_value_phase_a_features.py validate \
+            --metadata-report phase-a-metadata/phase-a-card-metadata-report.json \
+            "${ARGS[@]}" \
+            --out results/contextual-value-v1/phase-a-rich-feature-validation
+      - name: Assert Phase A2 readiness
+        run: |
+          python3 - <<'PY'
+          import json
+          p="results/contextual-value-v1/phase-a-rich-feature-validation/phase-a-rich-feature-report.json"
+          r=json.load(open(p))
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          assert r["ready_for_phase_a2_model_bakeoff"] is True
+          assert set(r["folds"]) == {"-1","0","1","2","3","4"}
+          PY
+      - name: Upload Phase A1 validation report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-feature-validation
+          path: results/contextual-value-v1/phase-a-rich-feature-validation/
+          retention-days: 30
