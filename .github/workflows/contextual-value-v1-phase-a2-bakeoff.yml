@@ -1,0 +1,190 @@
+name: contextual-value-v1-phase-a2-bakeoff
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  COMPACT_PILOT_RUN: '36289077937'
+  COMPACT_REMAINING_RUN: '36289779766'
+  ABLATION_RUN: '36280148906'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  fit-fold:
+    name: phase-a2-fold-${{ matrix.fold }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        fold: [-1, 0, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned model dependency
+        run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1'
+      - name: Compile bake-off script
+        run: python -m py_compile research/contextual_value_phase_a_bakeoff.py
+
+      - name: Download compact fold 0
+        if: ${{ matrix.fold == 0 }}
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-compact-pilot-fold-0
+          path: compact
+          run-id: ${{ env.COMPACT_PILOT_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download remaining compact fold
+        if: ${{ matrix.fold != 0 }}
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-compact-fold-${{ matrix.fold }}
+          path: compact
+          run-id: ${{ env.COMPACT_REMAINING_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download strong-offset-only nuisance
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-strong_offset_only-fold-${{ matrix.fold }}
+          path: behavior
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download held feature checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-held-${{ matrix.fold }}
+          path: held
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Fit shared rich Q and build fold shard
+        shell: bash
+        run: |
+          set -euo pipefail
+          FOLD='${{ matrix.fold }}'
+          python3 research/contextual_value_phase_a_bakeoff.py fit-fold \
+            --fold "$FOLD" \
+            --compact-db "compact/phase-a-compact-fold-$FOLD.sqlite" \
+            --compact-schema "compact/phase-a-compact-fold-$FOLD-schema.json" \
+            --behavior-predictions "behavior/strong_offset_only-fold-$FOLD.jsonl.gz" \
+            --held-features "held/held-features-fold-$FOLD.jsonl.gz" \
+            --out "results/contextual-value-v1/phase-a2-fold-$FOLD"
+
+      - name: Assert fold contract
+        shell: bash
+        run: |
+          FOLD='${{ matrix.fold }}'
+          python3 - <<PY
+          import json, numpy as np
+          fold=int("$FOLD")
+          base=f"results/contextual-value-v1/phase-a2-fold-{fold}"
+          r=json.load(open(f"{base}/phase-a2-fold-{fold}-report.json"))
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          assert r["sklearn_version"] == "1.9.1"
+          assert r["fold"] == fold
+          assert r["held_decisions"] > 0
+          assert all(
+              name not in r["nonlinear_state_feature_names"]
+              for name in ("base:user_game_win_rate","base:log1p_user_games")
+          )
+          assert not any(
+              name.startswith("base:rank=")
+              for name in r["nonlinear_state_feature_names"]
+          )
+          d=np.load(f"{base}/phase-a2-fold-{fold}.npz",allow_pickle=False)
+          assert int(d["fold"][0]) == fold
+          assert len(d["candidate_names"]) == int(d["offsets"][-1])
+          if fold == -1:
+              assert "q_rich" in d.files and "q_simple" in d.files and "behavior" in d.files
+              assert "phi_rich" not in d.files
+          else:
+              assert "phi_rich" in d.files and "phi_simple" in d.files
+          PY
+
+      - name: Upload Phase A2 fold shard
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-${{ matrix.fold }}
+          path: results/contextual-value-v1/phase-a2-fold-${{ matrix.fold }}/
+          retention-days: 30
+
+  aggregate:
+    needs: fit-fold
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned model dependency
+        run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1'
+      - name: Download all Phase A2 fold shards
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-phase-a2-fold-*
+          path: folds
+          merge-multiple: true
+      - name: Download prior ablation audit
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-audit
+          path: ablation
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Run frozen H/H1/H2/H3 validation bake-off
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRAIN_ARGS=()
+          REPORT_ARGS=()
+          for f in 0 1 2 3 4; do
+            TRAIN_ARGS+=(--train-shard "folds/phase-a2-fold-$f.npz")
+            REPORT_ARGS+=(--train-report "folds/phase-a2-fold-$f-report.json")
+          done
+          python3 research/contextual_value_phase_a_bakeoff.py aggregate \
+            "${TRAIN_ARGS[@]}" \
+            "${REPORT_ARGS[@]}" \
+            --validation-shard folds/phase-a2-fold--1.npz \
+            --validation-report folds/phase-a2-fold--1-report.json \
+            --ablation-report ablation/ablation-report.json \
+            --out results/contextual-value-v1/phase-a2-bakeoff
+
+      - name: Assert benchmark reproduction and assessment boundary
+        run: |
+          python3 - <<'PY'
+          import json
+          p="results/contextual-value-v1/phase-a2-bakeoff/phase-a2-bakeoff-report.json"
+          r=json.load(open(p))
+          assert r["assessment_opened"] is False
+          b=r["assessment_boundary"]
+          assert b["outcomes_loaded_into_pipeline"] is False
+          assert b["outcomes_used_for_fit"] is False
+          assert b["outcomes_scored"] is False
+          assert r["benchmark_reproduction"]["passed"] is True
+          assert r["benchmark_reproduction"]["max_abs_delta_error"] <= 1e-6
+          assert set(r["models"]) == {
+              "H_simple_deterministic",
+              "H1_rich_nonlinear_value",
+              "H2_direct_pairwise_policy",
+              "H3_conservative_pairwise",
+          }
+          PY
+
+      - name: Upload Phase A2 bake-off report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-bakeoff
+          path: results/contextual-value-v1/phase-a2-bakeoff/
+          retention-days: 30
