@@ -121,6 +121,7 @@ async function fixture(options = {}) {
     return { session, result: { session: {}, linked: {} } };
   };
   const mocks = {
+    '@/src/config': { config: { screenshots: { fixtures: false }, api: { origin: 'https://api.packone.pro' } } },
     'expo-haptics': { selectionAsync: async () => {}, notificationAsync: async () => {}, NotificationFeedbackType: { Success: 'success' } },
     'expo-image': { Image },
     'expo-router': {
