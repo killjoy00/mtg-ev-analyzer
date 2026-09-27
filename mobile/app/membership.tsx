@@ -24,12 +24,12 @@ import { connectNativePatreon, loadNativePatreonStatus, mutateNativePatreon } fr
 import { canonicalContentUrl } from '@/src/contentLinks';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import {
-  getAvailableAppleAppleStorePurchases,
+  getAvailableApplePurchases,
   openAppleSubscriptionManagement,
   useAppleStore,
 } from '@/src/iap/apple-store';
 import type {
-  AppleStoreAppleStorePurchase,
+  AppleStorePurchase,
   AppleStoreSubscription,
 } from '@/src/iap/apple-store';
 import { accountAccessLabel, createMembershipController, initialMembershipState } from '@/src/state/membership';
@@ -72,7 +72,7 @@ function AppleElitePanel({
   const generation = useRef(0);
   const purchaseHandler = useRef<((purchase: AppleStorePurchase) => void) | null>(null);
   const purchaseErrorHandler = useRef<((error: { code?: string; message?: string }) => void) | null>(null);
-  const verifiedAppleStorePurchases = useRef(new Map<string, Promise<{
+  const verifiedPurchases = useRef(new Map<string, Promise<{
     status: NativeAppleSubscriptionStatus;
     accountId: string;
   }>>());
@@ -81,12 +81,12 @@ function AppleElitePanel({
     connected,
     subscriptions,
     fetchProducts,
-    requestAppleStorePurchase,
+    requestPurchase,
     finishTransaction,
-    restoreAppleStorePurchases,
+    restorePurchases,
   } = useAppleStore({
-    onAppleStorePurchaseSuccess: (purchase) => purchaseHandler.current?.(purchase),
-    onAppleStorePurchaseError: (purchaseError) => purchaseErrorHandler.current?.(purchaseError),
+    onPurchaseSuccess: (purchase) => purchaseHandler.current?.(purchase),
+    onPurchaseError: (purchaseError) => purchaseErrorHandler.current?.(purchaseError),
   });
 
   useEffect(() => {
@@ -134,7 +134,7 @@ function AppleElitePanel({
 
   const verifyAndFinish = useCallback((purchase: AppleStorePurchase, fixedSession?: MobileSession) => {
     const key = purchaseKey(purchase);
-    const existing = verifiedAppleStorePurchases.current.get(key);
+    const existing = verifiedPurchases.current.get(key);
     if (existing) return existing;
 
     const operation = (async () => {
@@ -156,8 +156,8 @@ function AppleElitePanel({
       return { status: verified, accountId };
     })();
 
-    verifiedAppleStorePurchases.current.set(key, operation);
-    void operation.catch(() => { verifiedAppleStorePurchases.current.delete(key); });
+    verifiedPurchases.current.set(key, operation);
+    void operation.catch(() => { verifiedPurchases.current.delete(key); });
     return operation;
   }, [finishTransaction]);
 
@@ -197,7 +197,7 @@ function AppleElitePanel({
     setRequesting(false);
     setVerifying(false);
     if (purchaseError.code === 'user-cancelled') {
-      setNotice('AppleStorePurchase canceled. No subscription change was made.');
+      setNotice('Purchase canceled. No subscription change was made.');
       setError(null);
       return;
     }
@@ -229,7 +229,7 @@ function AppleElitePanel({
     setNotice(null);
     setError(null);
     try {
-      await requestAppleStorePurchase({
+      await requestPurchase({
         type: 'subs',
         request: {
           apple: {
@@ -263,8 +263,8 @@ function AppleElitePanel({
     setNotice(null);
     setError(null);
     try {
-      await restoreAppleStorePurchases({ onlyIncludeActiveItemsIOS: true });
-      const purchases = await getAvailableAppleStorePurchases({ onlyIncludeActiveItemsIOS: true });
+      await restorePurchases({ onlyIncludeActiveItemsIOS: true });
+      const purchases = await getAvailableApplePurchases({ onlyIncludeActiveItemsIOS: true });
       const eligible = purchases.filter((item) => item.productId === APPLE_ELITE_PRODUCT_ID);
       if (!eligible.length) {
         setNotice('No active Pack One Elite subscription was found for this Apple Account.');
@@ -335,7 +335,7 @@ function AppleElitePanel({
         onPress={() => void restore()}
         style={[styles.button, (busy || !signedIn || !connected) && styles.disabled]}
       >
-        <Text style={styles.buttonText}>Restore AppleStorePurchases</Text>
+        <Text style={styles.buttonText}>Restore Purchases</Text>
       </Pressable>
 
       {status?.subscription.linked ? (
