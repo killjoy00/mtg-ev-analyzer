@@ -1,0 +1,112 @@
+name: Android closed testing
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/android-closed-release-request.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: android-closed-testing
+  cancel-in-progress: false
+
+jobs:
+  closed-release:
+    name: promote Android closed test
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      PACKONE_ANDROID_PACKAGE: pro.packone.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: request
+        name: Resolve reviewed closed-testing request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          request=json.loads(Path('.github/android-closed-release-request.json').read_text())
+          expected={'operation','reason','version_code','track'}
+          if set(request) != expected:
+              raise SystemExit(f'Invalid Android closed release request keys: {sorted(request)}')
+          if request.get('operation') != 'promote-android-closed':
+              raise SystemExit('Invalid Android closed release operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Android closed release request requires a reason.')
+          version=str(request.get('version_code',''))
+          if not version.isdigit() or version.startswith('0'):
+              raise SystemExit('Android closed release request requires a positive version_code.')
+          track=str(request.get('track',''))
+          if track != 'alpha':
+              raise SystemExit('Pack One production-access qualification must use the reviewed alpha closed-testing track.')
+          print(f'version_code={version}')
+          print(f'track={track}')
+          print('Reviewed Android closed-testing release request:', reason)
+          PY
+
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Closed-testing promotion is allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Verify live Universal Links and App Links associations
+        run: node scripts/verify-live-mobile-links.mjs
+
+      - id: auth
+        name: Authenticate to Google Cloud and Google Play
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Verify Google Play app-signing certificate matches assetlinks.json
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        run: node mobile/scripts/verify-play-signing.mjs "${{ steps.request.outputs.version_code }}"
+
+      - id: promote
+        name: Promote existing bundle to Google Play Closed Testing
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(node mobile/scripts/play-closed-release.mjs             "${{ steps.request.outputs.version_code }}"             "${{ steps.request.outputs.track }}")"
+          echo "$result"
+          {
+            echo "## Pack One Android Closed Testing"
+            echo
+            echo '- Package: `pro.packone.app`'
+            printf -- '- Track: `%s`\n' "${{ steps.request.outputs.track }}"
+            printf -- '- Version code: `%s`\n' "${{ steps.request.outputs.version_code }}"
+            echo '- Release status: `completed`'
+            echo "- Source revision: `$GITHUB_SHA`"
+            echo
+            echo 'Tester enrollment is managed in Google Play Console. Production access requires at least 12 testers continuously opted into the closed test for 14 days.'
+          } >> "$GITHUB_STEP_SUMMARY"
