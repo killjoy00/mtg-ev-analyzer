@@ -6,6 +6,7 @@ import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {currentSeasonForPlayer} from './draft-run-season.mjs';
 import {handlePatreon} from './patreon.mjs';
+import {handleAppleSubscriptions} from './apple-subscriptions.mjs';
 import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,digest,issueAccountSession,requireTrustedOrigin,revokeAccountSession,revokeAllAccountSessions,withAccountCookies,withPlayerCookie} from './account-session.mjs';
 import {accountRuntimeConfig} from './account-config.mjs';
 import {clearCredentialLimit,consumeCredentialLimit,trustedCredentialNetwork} from './account-credential-limits.mjs';
@@ -2122,6 +2123,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/account/apple/callback') return handleAppleCallback(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/version') return handleMobileVersionCheck(request,{query,json});
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
+  if (url.pathname.startsWith('/v1/apple-subscriptions/')) return handleAppleSubscriptions(request,{query,json,readJson,mobileAccountIdentity});
   if (request.method === 'POST' && url.pathname === '/internal/player-session-refresh') return handleBrowserPlayerSession(request,{existingOnly:true});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);
