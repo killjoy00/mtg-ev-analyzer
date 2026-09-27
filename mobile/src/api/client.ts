@@ -11,7 +11,7 @@ export class ApiError extends Error {
   }
 }
 
-type RequestOptions = {
+export type RequestOptions = {
   method?: 'GET' | 'POST' | 'PATCH' | 'DELETE';
   body?: unknown;
   mobileSessionToken?: string | null;
@@ -30,6 +30,11 @@ function errorMessage(body: unknown, status: number) {
 }
 
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  if (config.screenshots.fixtures) {
+    const { requestScreenshotFixture } = await import('../screenshots/fixtures');
+    return requestScreenshotFixture<T>(path, options);
+  }
+
   const method = options.method ?? 'GET';
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), options.timeoutMs ?? 15_000);

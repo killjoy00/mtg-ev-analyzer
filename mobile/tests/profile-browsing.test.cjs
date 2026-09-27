@@ -63,7 +63,7 @@ async function fixture(t, options = {}) {
       async getItemAsync(key) { if (locked) throw new Error('Secure store locked'); return storage.get(key) ?? null; },
       async setItemAsync(key, value) { storage.set(key, value); }, async deleteItemAsync(key) { storage.delete(key); },
     },
-    '@/src/config': { config: { api: { origin: 'https://api.packone.pro' } } },
+    '@/src/config': { config: { screenshots: { fixtures: false }, api: { origin: 'https://api.packone.pro' } } },
     '@/src/hooks/useAppResume': { useAppResume(callback) { resume = callback; } },
     '@/src/theme': { colors: new Proxy({}, { get: () => '#000' }), spacing: new Proxy({}, { get: () => 8 }) },
   };

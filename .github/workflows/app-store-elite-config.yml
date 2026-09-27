@@ -45,5 +45,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Configure Pack One Elite subscription structure and notifications
+      - name: Configure Pack One Elite subscription, pricing, availability, and notifications
         run: node .github/scripts/app-store-elite-config.mjs

@@ -1,0 +1,1 @@
+{"operation":"generate-mobile-store-screenshots","reason":"Generate deterministic Pack One v1 store screenshots from the real native UI using the isolated preview bundle/package IDs and screenshot fixtures. Capture iPhone, iPad, Android, and the Apple subscription review screen; do not publish or upload screenshots to either store."}

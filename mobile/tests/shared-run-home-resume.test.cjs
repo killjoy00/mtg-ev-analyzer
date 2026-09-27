@@ -89,6 +89,7 @@ async function fixture(options = {}) {
     root.update(React.createElement(Navigation));
   }
   const mocks = {
+    '@/src/config': { config: { screenshots: { fixtures: false }, api: { origin: 'https://api.packone.pro' } } },
     'expo-router': {
       router: { push: (value) => navigate('push', value), replace: (value) => navigate('replace', value) },
       useLocalSearchParams: () => params,

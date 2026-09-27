@@ -57,6 +57,7 @@ function compileDraftRunScreen(mocks) {
 
   const priorLoad = Module._load;
   Module._load = function load(request, parent, isMain) {
+    if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
     if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
     return priorLoad.call(this, request, parent, isMain);
   };

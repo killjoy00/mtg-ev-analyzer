@@ -49,6 +49,7 @@ function compileScreen(mocks) {
   compiled.paths = Module._nodeModulePaths(path.dirname(filename));
   const originalLoad = Module._load;
   Module._load = function load(request, parent, isMain) {
+    if (request === '@/src/config') return { config: { screenshots: { fixtures: false } } };
     if (Object.prototype.hasOwnProperty.call(mocks, request)) return mocks[request];
     return originalLoad.call(this, request, parent, isMain);
   };
