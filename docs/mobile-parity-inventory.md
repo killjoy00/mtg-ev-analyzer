@@ -1,6 +1,6 @@
 # Mobile web/native parity inventory
 
-Tracking: #575. Reconciled against main f92fad916c94a1a2bf77299bb3158a53bfb8f845 plus the Apple-IAP release candidate in #673 on September 26, 2026.
+Tracking: #575. Reconciled through production secure-auth revision `a564a207e9f336639636624c366bff55c6a9759f` on September 27, 2026; Apple-IAP release-candidate work remains separately tracked in #673.
 
 This document replaces blanket source-string parity claims with an A–E inventory. **Implemented** means reviewed product code is present on main. It does not mean physical-device acceptance, live association-file verification, store-console approval, or public-release authorization.
 
@@ -33,7 +33,7 @@ Status vocabulary:
 | Published MSH/ECL/TMT/SOS archive analyses | **Implemented** | Native archive screen uses current checked-in web evidence, native routing and disclosed card links. |
 | About / Support / Privacy / Terms | **Deliberate continuation** | First-class native entries open canonical Pack One HTTPS pages; no native credential is placed in the URL. |
 | Daily-home TCGplayer fallback | **Implemented** | Guest visibility; signed-in visibility only when authoritative `ads_allowed===true`; unknown/pending/failure hides it; no gameplay/result placement. |
-| Account sign-in / credential management | **Implemented, device evidence open** | Email/Google/Apple, password recovery/change, verification resend, sign-out/deletion and identity guards exist; exact-device Apple/relay/deletion acceptance remains open. |
+| Account sign-in / credential management | **Implemented, device evidence open** | Email/Google/Apple, password recovery/change, verification resend, sign-out/deletion and identity guards exist. A successfully consumed password-reset link now verifies that exact account email; merely requesting a reset does not. Exact-device Apple/relay/deletion acceptance remains open. |
 
 ## B. Routing, sharing and continuation parity
 
@@ -45,7 +45,7 @@ Status vocabulary:
 | Public profile `profile=<16hex>` | Routes to privacy-safe public profile | **Implemented** |
 | `/open/shared/`, `/open/profile/`, `/open/daily/` HTTPS intents | Native configuration is present | **Release evidence open** — hosted AASA/assetlinks with production signing identities are not yet verified |
 | Published set web routes for MSH/ECL/TMT/SOS | Rewritten to native set archive detail | **Implemented** |
-| Reset-password credential links | Canonical HTTPS browser continuation | **Implemented, device evidence open** — never intercept reset credential in a custom scheme |
+| Reset-password credential links | Canonical HTTPS browser continuation | **Implemented, device evidence open** — never intercept reset credential in a custom scheme; successful browser completion resets the password and verifies the exact Auth account |
 | Learn/support/legal | Canonical HTTPS continuation where single-source content is preferable | **Implemented** |
 | Profile / Daily / achievement / record sharing | Canonical spoiler/privacy-aware share targets | **Implemented** |
 
@@ -62,6 +62,7 @@ Status vocabulary:
 | Invitation open does not create a run before explicit acceptance | **Implemented** |
 | Shared-run async work is bound to player + account + share identity | **Implemented** |
 | Authentication success is not converted to failure by optional enrichment errors | **Implemented** |
+| Successful password-reset completion is mailbox proof for the exact reset-token Auth UUID; reset requests and failed reset attempts do not verify | **Implemented and production-released** |
 | Provider-independent account access is not inferred from Patreon-only grants | **Implemented** |
 | Failed/unknown Patreon status is not presented as Free | **Implemented** |
 | Patreon disconnect removes Patreon grants without deleting other-provider/manual access | **Implemented** |
@@ -86,6 +87,7 @@ Status vocabulary:
 
 ### Merged implementation evidence
 
+- Password-reset mailbox proof shipped through PR #705 and secure-auth release run **36357289329**. Unit coverage verifies exact-user `emailVerified:true` finalization only after provider reset success and session revocation on post-password verification-finalization failure; Chromium/WebKit mobile password-recovery and email-verification contracts passed before release.
 - Shared-run recovery, invitation, Home recovery and actual DraftRun reuse are covered by mounted production-screen suites.
 - Membership has mounted controller/screen/API coverage for provider-independent grants, unknown/error states, OAuth return, disconnect and identity races.
 - Public-profile/Career coverage includes account switching, privacy revocation, pagination, sharing and stale-response guards.
