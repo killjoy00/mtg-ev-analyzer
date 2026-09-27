@@ -1,0 +1,100 @@
+name: contextual-value-v1-choice-quality-pilot
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  CORE_RUN: '36256947308'
+  PHASE_A1_RUN: '36286752890'
+  PHASE_A2_PILOT_RUN: '36289846820'
+  PHASE_A2_FULL_RUN: '36290030236'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned model dependency
+        run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1'
+      - name: Compile choice-quality pilot
+        run: python -m py_compile research/contextual_value_choice_quality_pilot.py
+
+      - name: Download frozen core pooled checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-pooled-msh-sos-ecl-tla-8000
+          path: core
+          run-id: ${{ env.CORE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download Phase A1 feature contract
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold--1
+          path: rich-report
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download Phase A2 fold 0
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-0
+          path: folds
+          run-id: ${{ env.PHASE_A2_PILOT_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download Phase A2 remaining folds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-phase-a2-fold-*
+          path: folds
+          merge-multiple: true
+          run-id: ${{ env.PHASE_A2_FULL_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Run frozen propensity-free choice-quality pilot
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRAIN_ARGS=()
+          for f in 0 1 2 3 4; do
+            TRAIN_ARGS+=(--train-fold "folds/phase-a2-fold-$f.npz")
+          done
+          python3 research/contextual_value_choice_quality_pilot.py \
+            --train-nuisance core/train-nuisance.jsonl.gz \
+            "${TRAIN_ARGS[@]}" \
+            --validation-fold folds/phase-a2-fold--1.npz \
+            --feature-report rich-report/phase-a-rich-fold--1-report.json \
+            --output results/contextual-value-v1/choice-quality/choice-quality-report.json
+
+      - name: Assert research boundaries
+        run: |
+          python3 - <<'PY'
+          import json
+          p="results/contextual-value-v1/choice-quality/choice-quality-report.json"
+          r=json.load(open(p))
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          assert r["propensity_used_for_fit"] is False
+          assert r["propensity_used_for_primary_evidence"] is False
+          assert r["cohort"]["train_drafts"] == 4789
+          assert r["cohort"]["validation_drafts"] == 1218
+          assert r["training_cv"]["chosen_l2"] in r["spec"]["ridge_grid"]
+          assert r["next_gate"]["assessment_authorized"] is False
+          PY
+
+      - name: Upload choice-quality report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-choice-quality-pilot
+          path: results/contextual-value-v1/choice-quality/
+          retention-days: 30
