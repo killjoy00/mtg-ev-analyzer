@@ -501,14 +501,18 @@ def main():
     if validation_loaded["fold"] != -1:
         raise SystemExit("validation shard is not fold -1")
     validation = validation_loaded["data"]
-    candidate_feature_names = list(
-        validation_loaded["report"]["candidate_feature_names"]
+    candidate_feature_count = int(
+        validation_loaded["report"]["candidate_feature_count"]
     )
-    if validation["cand_rich"].shape[1] != len(candidate_feature_names):
+    candidate_feature_names = [
+        f"candidate_feature_index:{index}"
+        for index in range(candidate_feature_count)
+    ]
+    if validation["cand_rich"].shape[1] != candidate_feature_count:
         raise SystemExit("validation rich candidate feature schema mismatch")
     for fold, row in folds.items():
-        if list(row["report"]["candidate_feature_names"]) != candidate_feature_names:
-            raise SystemExit(f"candidate feature schema differs in fold {fold}")
+        if int(row["report"]["candidate_feature_count"]) != candidate_feature_count:
+            raise SystemExit(f"candidate feature count differs in fold {fold}")
 
     behavior = _load_behavior(args.behavior_prediction, args.behavior_report)
     for fold, row in folds.items():
@@ -684,6 +688,10 @@ def main():
                 "elapsed_seconds": final_model["elapsed_seconds"],
                 "active_feature_count": int(np.sum(final_model["active"])),
                 "candidate_feature_count": len(candidate_feature_names),
+                "feature_name_source": (
+                    "A2 shard column index; the A2 fold report retains the frozen "
+                    "feature count/order but not the full 103 candidate names"
+                ),
                 "top_standardized_coefficients": coefficient_rows,
             }
 
