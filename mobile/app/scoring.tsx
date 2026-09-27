@@ -16,8 +16,8 @@ const sections: ArticleSection[] = [
     ],
     extra: (
       <View style={articleStyles.callout}>
-        <Text style={articleStyles.calloutTitle}>Trophy drafter: Card B — 100.</Text>
-        <Text style={articleStyles.calloutBody}>Model’s strongest alternative: Card A — 95.</Text>
+        <Text style={articleStyles.calloutTitle}>Trophy drafter: Card B: 100.</Text>
+        <Text style={articleStyles.calloutBody}>Model’s strongest alternative: Card A: 95.</Text>
         <Text style={articleStyles.calloutBody}>Card A can be an excellent alternative according to broader evidence. Card B is the choice that occurred in the successful trophy trajectory.</Text>
       </View>
     ),
@@ -37,7 +37,7 @@ const sections: ArticleSection[] = [
   {
     title: 'Fixed Dailies make scores comparable.',
     body: [
-      'Everyone plays the same Daily with no rerolls. Durable leaderboard participation requires an authenticated account when starting. Guests still receive and can share their score.',
+      'Everyone plays the same Daily with no rerolls. An eligible account linked before the Daily starts is ranked immediately. Guests still receive and can share their score, and an eligible guest can sign in or link that completed first attempt on the same Pacific date to validate it for the leaderboard. Completed guest runs are not retroactively ranked after that Daily date.',
     ],
   },
   {

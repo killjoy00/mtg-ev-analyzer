@@ -187,16 +187,16 @@ export default function PracticeScreen() {
             pressed && cubeUnlocked && styles.pressed,
           ]}
         >
-          <Text style={styles.cardKicker}>{cubeUnlocked ? 'ELITE UNLOCKED' : 'ELITE'}</Text>
+          <Text style={styles.cardKicker}>ADDITIONAL PRACTICE</Text>
           <Text style={styles.cardTitle}>Powered Cube</Text>
           <Text style={styles.body}>Unlimited Powered Cube practice with two new-pack rerolls.</Text>
           <Text style={cubeUnlocked ? styles.cardAction : styles.lockedText}>
-            {cubeUnlocked ? 'Start Powered Cube →' : 'Elite access required'}
+            {cubeUnlocked ? 'Start Powered Cube →' : 'Additional account access required'}
           </Text>
         </Pressable>
 
         <View style={[styles.optionCard, !customUnlocked && styles.lockedCard]}>
-          <Text style={styles.cardKicker}>{customUnlocked ? 'ELITE UNLOCKED' : 'ELITE'}</Text>
+          <Text style={styles.cardKicker}>ADDITIONAL PRACTICE</Text>
           <Text style={styles.cardTitle}>Choose your sets</Text>
           <Text style={styles.body}>Build an eight-pick practice run from the live sets you select.</Text>
 
@@ -242,14 +242,14 @@ export default function PracticeScreen() {
               </Pressable>
             </>
           ) : (
-            <Text style={styles.lockedText}>Elite access required</Text>
+            <Text style={styles.lockedText}>Additional account access required</Text>
           )}
         </View>
 
         <View style={styles.note}>
           <Text style={styles.noteTitle}>Existing account access only</Text>
           <Text style={styles.body}>
-            The app reads practice access from your Pack One account. It does not sell, grant, or infer Elite access.
+            The app reads practice access from your Pack One account. This screen does not change account capabilities.
           </Text>
         </View>
       </ScrollView>

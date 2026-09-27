@@ -8,12 +8,22 @@ const [
   leaderboardApi,
   leaderboardScreen,
   linking,
+  howToScreen,
+  scoringScreen,
+  accountScreen,
+  webHowTo,
+  webScoring,
 ] = await Promise.all([
   readFile(new URL('../mobile/src/api/draftRun.ts', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/draft-run.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/src/api/leaderboard.ts', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/leaderboard.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/src/linking.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/how-to.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/scoring.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../how-it-works/index.html', import.meta.url), 'utf8'),
+  readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
 ]);
 
 test('native Draft Run keeps web feedback and result-review parity', () => {
@@ -39,4 +49,35 @@ test('native leaderboard uses current competitive season semantics', () => {
   assert.doesNotMatch(leaderboardScreen, /label: 'Month'/);
   assert.match(linking, /requestedPeriod === 'month' \? 'season'/);
   assert.match(linking, /canonicalPeriod/);
+});
+
+
+function normalizeMarkupText(value) {
+  return value
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/&rsquo;/g, '’')
+    .replace(/&amp;/g, '&')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+test('native instructional copy preserves current web Daily eligibility semantics', () => {
+  const webHowToText = normalizeMarkupText(webHowTo);
+  const webScoringText = normalizeMarkupText(webScoring);
+  const dailyIntro = 'Pack One has three fixed Daily challenges.';
+  const howToGuestValidation = 'an eligible guest can also sign in or link the completed first attempt on the same Pacific date to validate it for the leaderboard';
+  const scoringGuestValidation = 'an eligible guest can sign in or link that completed first attempt on the same Pacific date to validate it for the leaderboard';
+
+  assert.ok(webHowToText.includes(dailyIntro));
+  assert.ok(howToScreen.includes(dailyIntro));
+  assert.ok(webHowToText.includes(howToGuestValidation));
+  assert.ok(howToScreen.includes(howToGuestValidation));
+
+  assert.ok(webScoringText.includes(scoringGuestValidation));
+  assert.ok(scoringScreen.includes(scoringGuestValidation));
+  assert.doesNotMatch(scoringScreen, /requires an authenticated account when starting/);
+
+  assert.match(leaderboardScreen, /validated to an eligible account/);
+  assert.doesNotMatch(leaderboardScreen, /signed-in Pack One Daily runs/);
+  assert.match(accountScreen, /web, iPhone, iPad, and Android/);
 });

@@ -27,7 +27,7 @@ Status vocabulary:
 | Public profiles | **Implemented** | Guest-safe public reads, privacy revocation, route changes, pagination, full returned detail and canonical sharing. |
 | Profile activity | **Implemented** | Shared-run/challenge activity plus privacy-bound achievement and Daily sharing. |
 | Membership / Patreon existing access | **Implemented** | Provider-independent account access is separate from Patreon provenance; connect/reconnect, refresh and disconnect are available. Unknown/failure is never labeled Free. |
-| Join/upgrade Patreon membership | **Policy decision open** | Native intentionally does not sell or upgrade memberships. Current store/geography strategy must be chosen before adding purchase steering. |
+| Join/upgrade Patreon membership | **Policy decision open** | Native intentionally does not sell or upgrade memberships and now uses passive existing-account Patreon OAuth wording. For iOS, that alone does not clear 3.1.3(b): if Patreon-derived digital practice remains gated, equivalent IAP or explicit Apple confirmation of another exception is still required. |
 | Learn: How to Play / Scoring / Method / Sets | **Implemented** | Core education is native. |
 | Editorial drafting guides | **Deliberate continuation** | Opens canonical `https://packone.pro/learn/` so article copy remains single-source. |
 | Published MSH/ECL/TMT/SOS archive analyses | **Implemented** | Native archive screen uses current checked-in web evidence, native routing and disclosed card links. |
@@ -71,7 +71,7 @@ Status vocabulary:
 
 | Difference | Rationale / boundary |
 | --- | --- |
-| No native Patreon purchase/upgrade CTA | Existing-access management is implemented; storefront/geography strategy remains a release decision. Apple U.S. and Google U.S. external-purchase rules differ and must not be generalized worldwide. |
+| No native Patreon purchase/upgrade CTA | Existing-account OAuth is implemented with no purchase link, price, or upgrade CTA. This reduces steering risk but is not treated as permission to unlock externally purchased digital features on iOS without IAP; App Store payment classification remains a release blocker. |
 | Guides and policy copy are not duplicated into native source | Canonical HTTPS continuation prevents editorial/legal drift. |
 | External credential reset remains canonical HTTPS | Avoids exposing reset credentials to interceptable custom schemes. |
 | Affiliate links are restricted to reviewed surfaces | Revealed-card links live inside expanded score analysis; Daily-home fallback is outside active gameplay/results and fail-closed for ad-free/unknown signed-in membership. |

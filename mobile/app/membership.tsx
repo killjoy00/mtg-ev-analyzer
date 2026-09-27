@@ -68,20 +68,23 @@ export default function MembershipScreen() {
 
         {current ? (
           <View style={styles.panel}>
-            <Text style={styles.heading}>Patreon connection</Text>
+            <Text style={styles.heading}>Patreon account</Text>
             <Text style={styles.body}>{current.connected ? 'Patreon is connected to this account.' : 'No Patreon account is connected.'}</Text>
             {!current.configured ? <Text style={styles.body}>Patreon connection service is unavailable. Account access above remains a separate check.</Text> : null}
             {current.membership?.sync_pending ? (
               <Text style={styles.body}>Membership reconciliation is pending. A refresh request is not confirmation of a completed sync.</Text>
             ) : current.connected ? (
-              <Text style={styles.body}>Patreon-provided access: {current.capabilities.includes('custom_corpus') && current.capabilities.includes('unlimited_cube_practice')
-                ? 'Elite grants are currently active.' : current.capabilities.length ? 'Some practice grants are active.' : 'no currently active Elite grants.'}</Text>
+              <Text style={styles.body}>{current.capabilities.includes('custom_corpus') && current.capabilities.includes('unlimited_cube_practice')
+                ? 'Patreon-provided account access is active.'
+                : current.capabilities.length
+                  ? 'Some Patreon-provided account access is active.'
+                  : 'No Patreon-provided access is currently active. Manage your membership through your subscription provider.'}</Text>
             ) : null}
             {current.membership?.last_synced_at ? <Text style={styles.help}>Last provider sync: {current.membership.last_synced_at}</Text> : null}
             {current.configured ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="Connect existing Patreon membership" disabled={state.busy}
+              <Pressable accessibilityRole="button" accessibilityLabel="Sign in with Patreon" disabled={state.busy}
                 onPress={() => void controller.connect()} style={[styles.button, state.busy && styles.disabled]}>
-                <Text style={styles.buttonText}>{current.connected ? 'Reconnect existing Patreon membership' : 'Connect existing Patreon membership'}</Text>
+                <Text style={styles.buttonText}>Sign in with Patreon</Text>
               </Pressable>
             ) : null}
             {current.connected && current.configured ? (
@@ -110,7 +113,7 @@ export default function MembershipScreen() {
             <Text style={styles.buttonText}>Sign in to manage membership</Text>
           </Pressable>
         ) : null}
-        <Text style={styles.help}>This screen manages an existing connection and account access. It does not sell memberships or upgrades.</Text>
+        <Text style={styles.help}>Sign in with Patreon connects an existing Patreon account. Membership changes are managed through your subscription provider.</Text>
         <Text style={styles.help}>When authorization finishes, close the browser and return here. Check status verifies the current account; a browser message alone does not grant access.</Text>
       </ScrollView>
     </SafeAreaView>

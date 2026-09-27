@@ -26,7 +26,7 @@ export function accountAccessLabel(state: MembershipState) {
   const caps = state.data.account_capabilities;
   const cube = caps.includes('unlimited_cube_practice');
   const custom = caps.includes('custom_corpus');
-  return cube && custom ? 'Elite access active' : cube || custom ? 'Additional practice access' : 'Regular practice access';
+  return cube && custom ? 'Additional practice access active' : cube || custom ? 'Additional practice access' : 'Regular practice access';
 }
 
 export function createMembershipController(io: MembershipIO) {

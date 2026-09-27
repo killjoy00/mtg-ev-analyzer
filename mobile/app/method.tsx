@@ -40,7 +40,7 @@ const sections: ArticleSection[] = [
   {
     title: 'Provenance and limits.',
     body: [
-      'Public 17Lands datasets are licensed under CC BY 4.0. Pack One adapts them into puzzles, statistics and model evidence. Metadata and images come from Scryfall. Archives are recorded samples, not every draft played, and model support is not proof of the best pick.',
+      'Public 17Lands datasets are licensed under CC BY 4.0. Pack One adapts them into puzzles, statistics and model evidence. Metadata and images come from Scryfall. Archives are recorded samples, not every draft played, and model support is not proof of the best pick. See the Terms for full attribution and source-license information.',
     ],
   },
 ];

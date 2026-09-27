@@ -504,7 +504,7 @@ export default function AccountScreen() {
         <Text style={styles.body}>
           {validateDailyRunId
             ? 'Sign in to attach this device to your Pack One career and validate today\'s completed guest Daily when eligible.'
-            : 'Use the same Pack One identity across web, iPhone, and Android.'}
+            : 'Use the same Pack One identity across web, iPhone, iPad, and Android.'}
         </Text>
 
         {busy && !session ? <ActivityIndicator color={colors.accent} /> : null}

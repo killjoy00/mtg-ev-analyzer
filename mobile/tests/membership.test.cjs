@@ -87,17 +87,17 @@ async function mount(t, options = {}) {
   return h;
 }
 
-test('non-Patreon Elite access is shown independently from an unconnected Patreon', async (t) => {
+test('non-Patreon additional access is shown independently from an unconnected Patreon', async (t) => {
   const h = await mount(t);
-  assert.match(h.text(), /Elite access active/);
+  assert.match(h.text(), /Additional practice access active/);
   assert.match(h.text(), /No Patreon account is connected/);
   assert.equal(h.posts('connect').length, 0);
 });
 
-test('partial capabilities are not mislabeled full Elite or Free', async (t) => {
+test('partial capabilities are not mislabeled full access or Free', async (t) => {
   const h = await mount(t, { data: data({ account_capabilities: ['account', 'unlimited_regular_practice', 'custom_corpus'] }) });
   assert.match(h.text(), /Additional practice access/);
-  assert.doesNotMatch(h.text(), /Elite access active|Free member/);
+  assert.doesNotMatch(h.text(), /Additional practice access active|Free member/);
 });
 
 test('loading, timeout and retry never turn unknown membership into Free', async (t) => {
@@ -106,16 +106,16 @@ test('loading, timeout and retry never turn unknown membership into Free', async
   assert.match(h.text(), /Account access not verified/);
   await act(async () => { pending.reject(Error('Status timeout')); await drain(); });
   assert.match(h.text(), /Status timeout/);
-  assert.doesNotMatch(h.text(), /Elite access active|Free member/);
+  assert.doesNotMatch(h.text(), /Additional practice access active|Free member/);
   h.handler = null;
   await h.press('Check membership status');
-  assert.match(h.text(), /Elite access active/);
+  assert.match(h.text(), /Additional practice access active/);
 });
 
 test('expired or revoked Patreon grants do not erase current grants from another provider', async (t) => {
   const h = await mount(t, { data: connected({ capabilities: [] }) });
-  assert.match(h.text(), /Elite access active/);
-  assert.match(h.text(), /no currently active Elite grants/);
+  assert.match(h.text(), /Additional practice access active/);
+  assert.match(h.text(), /No Patreon-provided access is currently active/);
 });
 
 test('refresh has explicit pending semantics and never reports completed reconciliation', async (t) => {
@@ -136,9 +136,19 @@ test('failed refresh is exposed and access becomes unverified rather than Free',
   assert.match(h.text(), /Account access not verified/);
 });
 
+test('native membership UI stays passive and purchase-neutral', async (t) => {
+  const h = await mount(t);
+  const copy = h.text();
+  assert.match(copy, /Sign in with Patreon connects an existing Patreon account/);
+  assert.match(copy, /Membership changes are managed through your subscription provider/);
+  assert.doesNotMatch(copy, /\bElite\b|upgrade|subscribe|join Patreon|price/i);
+  const button = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Sign in with Patreon')[0];
+  assert.ok(button);
+});
+
 test('browser cancellation is not reported as successful connection', async (t) => {
   const h = await mount(t);
-  await h.press('Connect existing Patreon membership');
+  await h.press('Sign in with Patreon');
   assert.equal(h.opened.length, 1);
   assert.match(h.text(), /No Patreon account is connected/);
   assert.match(h.text(), /Only the checked account status/);
@@ -148,7 +158,7 @@ test('browser cancellation is not reported as successful connection', async (t) 
 test('a failed status read after browser return cannot report a verified connection', async (t) => {
   const h = await mount(t);
   h.browser = async () => { h.handler = (route) => { if (route.endsWith('/status')) throw Error('Read failed after browser'); }; return { type: 'dismiss' }; };
-  await h.press('Connect existing Patreon membership');
+  await h.press('Sign in with Patreon');
   assert.match(h.text(), /Read failed after browser/);
   assert.match(h.text(), /Account access not verified/);
 });
@@ -156,7 +166,7 @@ test('a failed status read after browser return cannot report a verified connect
 test('untrusted authorize destinations are blocked before opening the browser', async (t) => {
   const h = await mount(t);
   h.handler = (route) => route.endsWith('/connect') ? { url: authorize().replace('www.patreon.com', 'attacker.example') } : undefined;
-  await h.press('Connect existing Patreon membership');
+  await h.press('Sign in with Patreon');
   assert.equal(h.opened.length, 0);
   assert.match(h.text(), /could not be verified/);
 });
@@ -168,23 +178,23 @@ test('a stale status result cannot replace a new account result', async (t) => {
   await h.switchAccount(session(OTHER), data({ account_user_id: OTHER, account_capabilities: ['account', 'unlimited_regular_practice'] }));
   await act(async () => { pending.resolve(data()); await drain(); });
   assert.match(h.text(), /Regular practice access/);
-  assert.doesNotMatch(h.text(), /Elite access active/);
+  assert.doesNotMatch(h.text(), /Additional practice access active/);
 });
 
 test('signing out during the browser flow discards its late result', async (t) => {
   const pending = deferred();
   const h = await mount(t, { browser: () => pending.promise });
-  await h.press('Connect existing Patreon membership');
+  await h.press('Sign in with Patreon');
   await h.switchAccount({ playerToken: session().playerToken });
   await act(async () => { pending.resolve({ type: 'cancel' }); await drain(); });
   assert.match(h.text(), /Sign in to manage membership/);
-  assert.doesNotMatch(h.text(), /Elite access active|Only the checked account status/);
+  assert.doesNotMatch(h.text(), /Additional practice access active|Only the checked account status/);
 });
 
 test('duplicate connection taps join no second mutation', async (t) => {
   const pending = deferred();
   const h = await mount(t, { browser: () => pending.promise });
-  const button = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Connect existing Patreon membership')[0];
+  const button = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Sign in with Patreon')[0];
   await act(async () => { button.props.onPress(); button.props.onPress(); await drain(); });
   assert.equal(h.posts('connect').length, 1);
   await act(async () => { pending.resolve({ type: 'cancel' }); await drain(); });
@@ -199,7 +209,7 @@ test('disconnect requires confirmation and preserves other-provider access', asy
   await act(async () => { confirm.onPress(); await drain(); });
   assert.equal(h.posts('disconnect').length, 1);
   assert.match(h.text(), /Patreon disconnected/);
-  assert.match(h.text(), /Elite access active/);
+  assert.match(h.text(), /Additional practice access active/);
 });
 
 test('an old confirmation cannot disconnect a newly signed-in account', async (t) => {
@@ -215,7 +225,7 @@ test('an old confirmation cannot disconnect a newly signed-in account', async (t
 test('malformed and wrong-account payloads are never interpreted as entitlements', async (t) => {
   const h = await mount(t, { data: data({ account_user_id: OTHER }) });
   assert.match(h.text(), /did not match the current account/);
-  assert.doesNotMatch(h.text(), /Elite access active/);
+  assert.doesNotMatch(h.text(), /Additional practice access active/);
   h.value = {};
   await h.press('Check membership status');
   assert.match(h.text(), /Account access not verified/);
@@ -223,7 +233,7 @@ test('malformed and wrong-account payloads are never interpreted as entitlements
 
 test('membership browser return does not request or overwrite Account profile enrichment', async (t) => {
   const h = await mount(t);
-  await h.press('Connect existing Patreon membership');
+  await h.press('Sign in with Patreon');
   assert.ok(h.calls.every(({ route }) => route.startsWith('/growth/v1/patreon/mobile/')));
   const layout = h.compile('app/_layout.tsx').default;
   let tree;
