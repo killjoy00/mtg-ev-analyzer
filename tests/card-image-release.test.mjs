@@ -27,6 +27,9 @@ test('card-image release plan is fixed dev -> prod -> image refresh',()=>{
     },
   ]);
   assert.throws(()=>releasePlan('main'),/full reviewed main commit/);
+  assert.equal('mode' in releasePlan(commit)[2].inputs,false,'release dispatch relies on the workflow default full mode');
+  const refreshWorkflow=fs.readFileSync(new URL('../.github/workflows/refresh-powered-cube-images.yml',import.meta.url),'utf8');
+  assert.match(refreshWorkflow,/mode:\s+description:[^\n]+\s+type: choice\s+required: false\s+default: full/);
 });
 
 test('card-image release workflow cannot deploy directly or select arbitrary children',()=>{

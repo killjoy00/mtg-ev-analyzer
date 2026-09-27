@@ -42,10 +42,15 @@ def read_corpus(path: Path) -> list[dict]:
     return json.loads(gzip.decompress(path.read_bytes()))
 
 
-def write_corpus(path: Path, rows: list[dict]) -> str:
+def encode_corpus(rows: list[dict]) -> bytes:
     payload = json.dumps(rows, separators=(",", ":"), ensure_ascii=False).encode()
-    path.write_bytes(gzip.compress(payload, mtime=0))
-    return hashlib.sha256(path.read_bytes()).hexdigest()
+    return gzip.compress(payload, mtime=0)
+
+
+def write_corpus(path: Path, rows: list[dict]) -> str:
+    payload = encode_corpus(rows)
+    path.write_bytes(payload)
+    return hashlib.sha256(payload).hexdigest()
 
 
 def scrub_card(card: dict) -> dict:
@@ -113,7 +118,12 @@ def collect_inventory(catalog: dict) -> tuple[dict[str, set[str]], dict[str, set
     return names_by_set, names_by_id
 
 
-def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict[str, dict]], dict[str, dict], dict[str, dict]]:
+def resolve_inventory(
+    names_by_set: dict[str, set[str]],
+    *,
+    allow_named_fallback: bool = True,
+    diagnostics: Optional[dict] = None,
+) -> tuple[dict[str, dict[str, dict]], dict[str, dict], dict[str, dict]]:
     sets_by_name: dict[str, set[str]] = {}
     for sid, names in names_by_set.items():
         for name in names:
@@ -126,14 +136,20 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
     set_rank: dict[tuple[str, str], tuple] = {}
     set_has_ordinary: set[tuple[str, str]] = set()
 
+    if diagnostics is not None:
+        diagnostics.setdefault("printings_by_name_image", {})
+
     wanted = set(sets_by_name)
     for card in all_printings():
         matched = set(aliases(card)) & wanted
         if not matched:
             continue
         for alias in matched:
-            if not image_url(card, alias):
+            url = image_url(card, alias)
+            if not url:
                 continue
+            if diagnostics is not None:
+                diagnostics["printings_by_name_image"].setdefault(alias, {}).setdefault(url, []).append(card)
             if not special_flags(card):
                 global_has_ordinary.add(alias)
             rank = printing_rank(card, alias)
@@ -155,29 +171,32 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
     # only those bulk misses through the shared exact-name resolver, which
     # follows the card's prints_search_uri and applies the same main-art policy.
     missing_from_bulk = sorted(wanted - global_best.keys())
-    for name in missing_from_bulk:
-        global_card = fetch_named(name)
-        if global_card and image_url(global_card, name):
-            global_best[name] = global_card
-            global_rank[name] = printing_rank(global_card, name)
-            if not special_flags(global_card):
-                global_has_ordinary.add(name)
-        for sid in sorted(sets_by_name.get(name) or []):
-            preferred = None if sid == "powered-cube" else sid
-            chosen = global_card if preferred is None else fetch_named(name, preferred)
-            if chosen and image_url(chosen, name):
-                key = (sid, name)
-                set_best[key] = chosen
-                set_rank[key] = printing_rank(chosen, name, preferred)
-                if not special_flags(chosen):
-                    set_has_ordinary.add(key)
-            time.sleep(0.15)
-
+    if allow_named_fallback:
+        for name in missing_from_bulk:
+            global_card = fetch_named(name)
+            if global_card and image_url(global_card, name):
+                global_best[name] = global_card
+                global_rank[name] = printing_rank(global_card, name)
+                if not special_flags(global_card):
+                    global_has_ordinary.add(name)
+            for sid in sorted(sets_by_name.get(name) or []):
+                preferred = None if sid == "powered-cube" else sid
+                chosen = global_card if preferred is None else fetch_named(name, preferred)
+                if chosen and image_url(chosen, name):
+                    key = (sid, name)
+                    set_best[key] = chosen
+                    set_rank[key] = printing_rank(chosen, name, preferred)
+                    if not special_flags(chosen):
+                        set_has_ordinary.add(key)
+                time.sleep(0.15)
+    
     records_by_set: dict[str, dict[str, dict]] = {}
     selection_details: dict[str, dict] = {}
     global_records: dict[str, dict] = {}
     for name, card in global_best.items():
         global_records[name] = metadata_for_alias(card, name)
+    if diagnostics is not None:
+        diagnostics.setdefault("selected_by_set", {})
     for sid, names in names_by_set.items():
         records: dict[str, dict] = {}
         details: dict[str, dict] = {}
@@ -186,6 +205,8 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
             if not card:
                 continue
             records[name] = metadata_for_alias(card, name)
+            if diagnostics is not None:
+                diagnostics["selected_by_set"].setdefault(sid, {})[name] = card
             flags = special_flags(card)
             chosen_set = str(card.get("set") or "")
             if flags or (sid != "powered-cube" and chosen_set.lower() != sid.lower()):
@@ -201,7 +222,13 @@ def resolve_inventory(names_by_set: dict[str, set[str]]) -> tuple[dict[str, dict
     return records_by_set, global_records, selection_details
 
 
-def patch_shards(sid: str, records: dict[str, dict], names_by_id: dict[str, set[str]]) -> tuple[int, int]:
+def patch_shards(
+    sid: str,
+    records: dict[str, dict],
+    names_by_id: dict[str, set[str]],
+    *,
+    dry_run: bool = False,
+) -> tuple[int, int]:
     files = sorted((DATA_DIR / sid / "shards").glob("*.json"))
     if not files:
         raise ValueError(f"Hydrated replay shards are missing for {sid}.")
@@ -216,11 +243,18 @@ def patch_shards(sid: str, records: dict[str, dict], names_by_id: dict[str, set[
                     raise ValueError(f"{sid}: shard image refresh changed gameplay metadata.")
                 pick["candidates"] = cards
                 changed_cards += changed
-        path.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
+        if not dry_run:
+            path.write_text(json.dumps(payload, separators=(",", ":"), ensure_ascii=False), encoding="utf-8")
     return len(files), changed_cards
 
 
-def patch_verified_corpus(sid: str, records: dict[str, dict], names_by_id: dict[str, set[str]]) -> tuple[int, int, str]:
+def patch_verified_corpus(
+    sid: str,
+    records: dict[str, dict],
+    names_by_id: dict[str, set[str]],
+    *,
+    dry_run: bool = False,
+) -> tuple[int, int, str]:
     path = CORPUS_DIR / f"{sid}.json.gz"
     rows = read_corpus(path)
     changed_cards = 0
@@ -244,7 +278,11 @@ def patch_verified_corpus(sid: str, records: dict[str, dict], names_by_id: dict[
             raise ValueError(f"{sid}: corpus image refresh changed gameplay metadata.")
         if any(not str(card.get("image_url") or "").startswith("https://") for card in candidates + prior):
             raise ValueError(f"{sid}: corpus image refresh lost an HTTPS image.")
-    return len(rows), changed_cards, write_corpus(path, rows)
+    payload = encode_corpus(rows)
+    sha = hashlib.sha256(payload).hexdigest()
+    if not dry_run:
+        path.write_bytes(payload)
+    return len(rows), changed_cards, sha
 
 
 def mapping_entry(name: str, metadata: dict) -> dict:
