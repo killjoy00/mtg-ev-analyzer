@@ -118,9 +118,10 @@ export async function main() {
     // Activity counters reset on a fresh Neon branch. Planner reltuples survive
     // the clone and are the useful estimate; keep zeroed counters separately.
     report.table_estimates=(await query("SELECT s.relname,c.reltuples::bigint::text estimated_rows,s.n_live_tup::text branch_activity_live_rows,s.last_analyze::text,s.last_autoanalyze::text FROM pg_stat_user_tables s JOIN pg_class c ON c.oid=s.relid WHERE s.schemaname='public' AND s.relname IN ('draft_run_verified_puzzles','draft_run_puzzle_ratings','corpus_components','corpus_source_exclusions') ORDER BY s.relname")).rows;
+    let cachedSnapshot=null;
     if(cached) {
-      const start=performance.now(),snapshot=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
-      report.cache_build={ms:elapsed(start),id:snapshot.id,revision:snapshot.revision,groups:snapshot.groups.length};
+      const start=performance.now();cachedSnapshot=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
+      report.cache_build={ms:elapsed(start),id:cachedSnapshot.id,revision:cachedSnapshot.revision,groups:cachedSnapshot.groups.length};
       report.cache_storage=(await query("SELECT pg_total_relation_size('draft_run_serving_inventory')::text inventory_bytes,(SELECT count(*) FROM draft_run_serving_inventory)::text rows")).rows[0];
     }
     const discovery=recordQueries(query),started=performance.now();
@@ -152,7 +153,7 @@ export async function main() {
           if(i===0)capture(configuration.name,recorder);
           if(cached) {
             const baselineStart=performance.now();
-            const baseline=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds});
+            const baseline=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds,snapshot:cachedSnapshot});
             sample.live_selection_ms=elapsed(baselineStart);
             sample.exact_parity=JSON.stringify(baseline)===JSON.stringify(selected);
             if(!sample.exact_parity)throw Error('Cached selection metadata or RNG parity mismatch.');
