@@ -94,10 +94,6 @@ function AppleElitePanel({
     return () => { active = false; unsubscribe(); };
   }, []);
 
-  const sessionKey = billingSession(session)
-    ? `${session!.accountUser!.id}:${session!.accountToken}`
-    : '';
-
   const refreshStatus = useCallback(async (forSession: MobileSession | null) => {
     const usable = billingSession(forSession);
     const request = ++generation.current;
@@ -124,7 +120,7 @@ function AppleElitePanel({
 
   useEffect(() => {
     void refreshStatus(session);
-  }, [refreshStatus, sessionKey]);
+  }, [refreshStatus, session]);
 
   useEffect(() => {
     if (!connected) return;
