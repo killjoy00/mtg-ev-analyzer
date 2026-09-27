@@ -51,7 +51,6 @@ jobs:
               raise SystemExit('Pack One production-access qualification must use the reviewed alpha closed-testing track.')
           print(f'version_code={version}')
           print(f'track={track}')
-          print('Reviewed Android closed-testing release request:', reason)
           PY
 
       - name: Require current approved main revision
