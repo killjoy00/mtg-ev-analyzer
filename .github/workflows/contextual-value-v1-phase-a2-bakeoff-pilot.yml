@@ -1,11 +1,6 @@
 name: contextual-value-v1-phase-a2-bakeoff-pilot
 
 on:
-  push:
-    branches:
-      - research/contextual-value-v1-rich-features-529
-    paths:
-      - '.github/workflows/contextual-value-v1-phase-a2-bakeoff-pilot.yml'
   workflow_dispatch:
 
 permissions:
