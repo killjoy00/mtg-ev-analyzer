@@ -21,6 +21,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
     '.github/workflows/ios-testflight.yml',
     '.github/workflows/android-internal-testing.yml',
     '.github/workflows/android-closed-testing.yml',
+    '.github/workflows/google-play-access.yml',
     '.github/workflows/ios-testflight-status.yml',
     '.github/workflows/android-internal-status.yml',
   ];
@@ -41,6 +42,11 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /request\.get\('operation'\) != 'promote-android-closed'/, path);
       assert.match(workflow, /Verify live Universal Links and App Links associations/);
       assert.match(workflow, /Verify Google Play app-signing certificate matches assetlinks\.json/);
+    } else if (path === '.github/workflows/google-play-access.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/google-play-access-request\.json'/s, path);
+      assert.match(workflow, /request\.get\('operation'\) != 'check-google-play-access'/, path);
+      assert.doesNotMatch(workflow, /pull_request:/, path);
     } else if (path === '.github/workflows/android-internal-status.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-status-request\.json'/s, path);
@@ -82,6 +88,12 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.match(liveLinks, /app-site-association\.cdn-apple\.com\/a\/v1\/packone\.pro/);
   assert.match(liveLinks, /3564X3VTDB\.pro\.packone\.app/);
   assert.match(liveLinks, /7C:4F:B9:F7:0F:C6:A3:3C:94:F4:F9:29:93:22:65:77:34:CB:C0:4E:0B:F9:25:A7:A0:B8:42:51:30:72:3E:8B/);
+
+  const playAccessRequest = JSON.parse(read('.github/google-play-access-request.json'));
+  assert.deepEqual(Object.keys(playAccessRequest).sort(), ['operation','reason']);
+  assert.equal(playAccessRequest.operation, 'check-google-play-access');
+  assert.equal(typeof playAccessRequest.reason, 'string');
+  assert.ok(playAccessRequest.reason.trim().length > 0);
 
   const androidStatusRequest = JSON.parse(read('.github/android-internal-status-request.json'));
   assert.deepEqual(Object.keys(androidStatusRequest).sort(), ['operation','reason']);
