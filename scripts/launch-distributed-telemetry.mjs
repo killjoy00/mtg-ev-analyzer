@@ -40,7 +40,7 @@ export async function queryPreviewEvents(fetcher,token,account,from,to) {
 
 export function previewTelemetryFailure(error) {
   const message=String(error?.message||'');
-  return /^(?:preview_telemetry_http_[1-5]\\d\\d|preview_telemetry_api_error|invalid_preview_log_schema|invalid_preview_log_cursor|invalid_retained_preview_event|preview_telemetry_page_limit)$/.test(message)
+  return /^(?:preview_telemetry_http_[1-5]\d\d|preview_telemetry_api_error|invalid_preview_log_schema|invalid_preview_log_cursor|invalid_retained_preview_event|preview_telemetry_page_limit)$/.test(message)
     ?message:'preview_telemetry_unclassified';
 }
 
