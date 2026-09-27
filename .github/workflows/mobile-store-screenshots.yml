@@ -146,16 +146,33 @@ jobs:
           set -euo pipefail
           workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
           test -n "$workspace"
+          scheme="$(
+            xcodebuild -list -json -workspace "$workspace" |
+            python3 -c 'import json,sys,pathlib; data=json.load(sys.stdin); schemes=data.get("workspace",{}).get("schemes",[]); preferred=pathlib.Path(sys.argv[1]).stem; candidates=[s for s in schemes if s != "Pods"]; print(preferred if preferred in candidates else (candidates[0] if len(candidates)==1 else ""))' "$workspace"
+          )"
+          if [[ -z "$scheme" ]]; then
+            echo "Could not resolve a unique preview app scheme from $workspace." >&2
+            xcodebuild -list -workspace "$workspace"
+            exit 1
+          fi
+          echo "Building preview scheme: $scheme"
           xcodebuild \
             -workspace "$workspace" \
-            -scheme PackOne \
+            -scheme "$scheme" \
             -configuration Release \
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath "$RUNNER_TEMP/PackOneScreenshotDerivedData" \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             build
-          app="$(find "$RUNNER_TEMP/PackOneScreenshotDerivedData/Build/Products" -path '*Release-iphonesimulator/PackOne.app' -print -quit)"
+          app=""
+          while IFS= read -r candidate; do
+            bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$candidate/Info.plist" 2>/dev/null || true)"
+            if [[ "$bundle_id" == "pro.packone.preview" ]]; then
+              app="$candidate"
+              break
+            fi
+          done < <(find "$RUNNER_TEMP/PackOneScreenshotDerivedData/Build/Products" -path '*Release-iphonesimulator/*.app' -type d -print)
           test -d "$app"
           echo "SCREENSHOT_IOS_APP=$app" >> "$GITHUB_ENV"
       - name: Install preview app on simulators
@@ -227,7 +244,32 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
           script: |
-            adb install -r "$SCREENSHOT_ANDROID_APK"
+            set -euo pipefail
+            adb wait-for-device
+            for attempt in 1 2 3 4 5 6; do
+              if adb shell service check package 2>/dev/null | grep -q 'Service package: found'; then
+                break
+              fi
+              if [[ "$attempt" == 6 ]]; then
+                echo "Android package manager never became ready." >&2
+                exit 1
+              fi
+              sleep 5
+            done
+            installed=0
+            for attempt in 1 2 3; do
+              if adb install -r "$SCREENSHOT_ANDROID_APK"; then
+                installed=1
+                break
+              fi
+              echo "APK install attempt $attempt failed; recovering adb before retry." >&2
+              adb kill-server || true
+              sleep 2
+              adb start-server
+              adb wait-for-device
+              sleep 5
+            done
+            [[ "$installed" == 1 ]]
             cd mobile
             bash ./scripts/capture-store-screenshots-android.sh "$GITHUB_WORKSPACE/store-screenshots"
       - uses: actions/upload-artifact@v4
