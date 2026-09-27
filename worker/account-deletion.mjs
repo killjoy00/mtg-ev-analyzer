@@ -114,6 +114,10 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
   await query('DELETE FROM mobile_oauth_handoffs WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM provider_oauth_states WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM provider_accounts WHERE auth_user_id=$1::uuid',[auth]);
+  await query(`DELETE FROM apple_subscription_notifications WHERE original_transaction_id IN (
+    SELECT original_transaction_id FROM apple_subscription_entitlements WHERE auth_user_id=$1::uuid
+  )`,[auth]);
+  await query('DELETE FROM apple_subscription_entitlements WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM entitlement_grants WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[auth]);
   await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid',[auth]);

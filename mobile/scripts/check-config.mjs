@@ -19,6 +19,25 @@ function loadConfig(profile, extraEnv = {}) {
   return JSON.parse(result.stdout);
 }
 
+
+function autolinkedPackageNames(platform) {
+  const result = spawnSync(npx, ['expo-modules-autolinking', 'resolve', '--platform', platform, '--json'], {
+    cwd: new URL('..', import.meta.url),
+    env: process.env,
+    encoding: 'utf8',
+  });
+  if (result.status !== 0) {
+    throw new Error(result.stderr || result.stdout || `Expo autolinking failed for ${platform}.`);
+  }
+  const resolved = JSON.parse(result.stdout);
+  return new Set((resolved.modules || []).map((module) => module.packageName));
+}
+
+const androidModules = autolinkedPackageNames('android');
+const appleModules = autolinkedPackageNames('apple');
+assert.equal(androidModules.has('expo-iap'), false, 'expo-iap must stay out of Android native autolinking');
+assert.equal(appleModules.has('expo-iap'), true, 'expo-iap must remain linked for Apple StoreKit builds');
+
 const development = loadConfig('development');
 assert.equal(development.name, 'Pack One Dev');
 assert.equal(development.ios.bundleIdentifier, 'pro.packone.development');
@@ -46,4 +65,4 @@ const numberedProduction = loadConfig('production', {
 assert.equal(numberedProduction.ios.buildNumber, '100123');
 assert.equal(numberedProduction.android.versionCode, 100123);
 
-console.log('Expo native release config checks passed without EAS project linkage.');
+console.log('Expo native release config checks passed with iOS-only IAP autolinking and without EAS project linkage.');

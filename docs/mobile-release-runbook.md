@@ -53,6 +53,17 @@ Before either platform's final signed candidate is uploaded:
 
 The store-free smoke proves source/build reproducibility only. It never substitutes for signed store processing or physical-device acceptance.
 
+## Apple Elite subscription prerequisites
+
+Before an iOS candidate can be treated as release-ready:
+
+- App Store Connect must contain an auto-renewable subscription in a Pack One Elite subscription group with product ID `pro.packone.app.elite.monthly`.
+- The App Store, not the binary, owns the live price and billing-period display. Configure the intended territory pricing and localization in App Store Connect and attach the subscription to the app version as required.
+- Configure App Store Server Notifications V2 for both Production and Sandbox to `https://api.packone.pro/growth/v1/apple-subscriptions/notifications`.
+- The subscription must be cleared for sale/testing under the required Apple agreements, tax and banking state.
+- Do not treat a successful StoreKit sheet as entitlement proof. The backend must verify the Apple-signed transaction before the app finishes the transaction; gameplay continues to authorize only through server capabilities.
+- Patreon/manual and Apple grants are independent sources. An Apple cancellation, expiry, refund or revocation must never remove a valid Patreon/manual grant.
+
 ## iOS normal release
 
 1. Merge application changes to reviewed current `main`.
@@ -61,8 +72,8 @@ The store-free smoke proves source/build reproducibility only. It never substitu
 4. The guarded TestFlight workflow allocates a new App Store build number, signs the exact current-main revision, and uploads it to TestFlight Internal Only.
 5. Wait for Apple processing.
 6. Install that exact build on a physical iPhone.
-7. Run the physical acceptance checklist: Dailies, practice, account flows, Apple/Google/email sign-in, career/leaderboard, share, relaunch/resume, slow-network sanity, accessibility basics, deletion, and upgrade continuity.
-8. Confirm Sign in with Apple Hide My Email delivery and Apple-confirmed account deletion/revocation.
+7. Run the physical acceptance checklist: Dailies, practice, account flows, Apple/Google/email sign-in, career/leaderboard, share, relaunch/resume, slow-network sanity, accessibility basics, deletion, upgrade continuity, and Apple Elite subscribe/restore/manage.
+8. Confirm Sign in with Apple Hide My Email delivery and Apple-confirmed account deletion/revocation. Separately exercise StoreKit Sandbox/TestFlight renewal, cancellation-at-period-end, billing grace, refund/revocation, Restore Purchases, same-account binding, wrong-account rejection, and duplicate-provider protection.
 9. In App Store Connect version 1.0, attach that exact build.
 10. Fill metadata from `docs/mobile-store-submission.md`.
 11. Select **Manually release this version**.

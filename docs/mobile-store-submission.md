@@ -13,6 +13,21 @@ Updated 2026-09-26. This file is the source-of-truth submission packet for the f
 - Privacy policy: https://packone.pro/privacy/
 - Privacy choices / account deletion: https://packone.pro/privacy/#delete-account
 - Terms: https://packone.pro/terms/
+
+## Apple Elite subscription
+
+- Product ID: `pro.packone.app.elite.monthly`
+- Type: auto-renewable subscription
+- Display name: Pack One Elite
+- The live price and billing period must come from App Store Connect / StoreKit; do not hardcode them into screenshots or review notes.
+- Benefits: Powered Cube practice and custom-set practice on the signed-in Pack One account. Regular Draft Run practice remains included without Elite.
+- Restore Purchases and Manage Apple Subscription are first-class controls on the native Membership screen.
+- Terms: https://packone.pro/terms/
+- Privacy: https://packone.pro/privacy/
+- App Store Server Notifications V2 Production and Sandbox URL: `https://api.packone.pro/growth/v1/apple-subscriptions/notifications`
+- Review account must be able to sign in to Pack One before purchasing so the StoreKit `appAccountToken` can bind the transaction to the exact Pack One account.
+- Patreon is shown only as an existing-account connection. There is no Patreon purchase, price, join, or upgrade CTA in the iOS app.
+
 - Support email: `admin@packone.pro`
 - Default language: English (U.S.)
 - Recommended initial public region: United States only. Expand after the first release once review/operations are proven.

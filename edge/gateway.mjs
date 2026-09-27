@@ -2,6 +2,7 @@ import {isIP} from 'node:net';
 import {readJson} from '../worker/request-json.mjs';
 import {PROD_ORIGINS} from '../worker/account-config.mjs';
 import {nativePatreonAction} from '../worker/patreon-mobile-policy.mjs';
+import {appleSubscriptionAction,nativeAppleSubscriptionAction} from '../worker/apple-subscription-policy.mjs';
 
 const SERVICES={legacy:'pack1api',growth:'pack1growth',draft:'draftrunapi'};
 const PROD_BRANCH='br-orange-feather-ayps8kep';
@@ -36,7 +37,7 @@ function adminPath(path,method) {
 }
 
 function permitted(service,path,method,search,mode) {
-  if(service==='growth'&&nativePatreonAction(path,method))return true;
+  if(service==='growth'&&(nativePatreonAction(path,method)||appleSubscriptionAction(path,method)))return true;
   if(method==='GET'&&path==='/health')return search==='?quick=1';
   if(service==='growth') {
     if(method==='POST'&&[
@@ -128,7 +129,7 @@ function validMobileAccount(value) {
   return /^[A-Za-z0-9_-]{43}$/.test(String(value||''));
 }
 function mobileSessionRoute(service,path,method) {
-  if(service==='growth'&&nativePatreonAction(path,method))return true;
+  if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
   if(service==='growth') {
     if(method==='POST'&&[
       '/v1/mobile/account/signup','/v1/mobile/account/signin','/v1/mobile/account/apple/start',
@@ -149,7 +150,7 @@ function mobileSessionRoute(service,path,method) {
   return method==='GET'&&['/v1/daily-status','/v1/capabilities','/v1/practice-sets','/v1/set-catalog'].includes(path);
 }
 function mobileAccountRoute(service,path,method) {
-  if(service==='growth'&&nativePatreonAction(path,method))return true;
+  if(service==='growth'&&(nativePatreonAction(path,method)||nativeAppleSubscriptionAction(path,method)))return true;
   if(service==='growth') {
     if(method==='POST'&&['/v1/mobile/account/signout','/v1/mobile/account/password-change','/v1/mobile/account/delete/verification/start','/v1/mobile/account/delete/apple/start','/v1/mobile/account/delete/apple/finish','/v1/mobile/account/delete'].includes(path))return true;
     if(method==='PATCH'&&path==='/v1/mobile/profile')return true;
@@ -205,6 +206,8 @@ export class NetworkQuota {
 
 export function routeFamily(path) {
   if(/^\/growth\/v1\/patreon\/mobile\/(status|connect|refresh|disconnect)$/.test(path))return 'patreon_mobile_'+path.split('/').at(-1);
+  if(/^\/growth\/v1\/apple-subscriptions\/mobile\/(status|verify)$/.test(path))return 'apple_subscription_'+path.split('/').at(-1);
+  if(path==='/growth/v1/apple-subscriptions/notifications')return 'apple_subscription_notification';
   if(path==='/growth/v1/mobile/version')return 'mobile_version';
   if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share)$/.test(path))return 'draft_'+path.split('/').at(-1);
   if(path==='/draft/v1/runs')return 'draft_start';
@@ -286,7 +289,9 @@ export async function gateway(request,env,fetcher=fetch) {
     if(mobileAccount&&(!validMobileAccount(mobileAccount)||!mobileAccountRoute(match[1],match[2],method)))
       return finish(response(validMobileAccount(mobileAccount)?403:401,validMobileAccount(mobileAccount)?'Mobile account session not allowed on this route.':'Invalid mobile account session.'));
     const nativePatreon=match[1]==='growth'&&Boolean(nativePatreonAction(match[2],method));
-    if(nativePatreon&&(!mobileSession||!mobileAccount))return finish(response(401,'Native player and account sessions are required.'));
+    const nativeAppleSubscription=match[1]==='growth'&&Boolean(nativeAppleSubscriptionAction(match[2],method));
+    const nativeProvider=nativePatreon||nativeAppleSubscription;
+    if(nativeProvider&&(!mobileSession||!mobileAccount))return finish(response(401,'Native player and account sessions are required.'));
     const idempotencyKey=request.headers.get('x-idempotency-key');
     const idempotencyRoute=match[1]==='draft'&&match[2]==='/v1/runs'&&method==='POST';
     if(idempotencyKey&&(!/^[A-Za-z0-9_-]{16,128}$/.test(idempotencyKey)||!idempotencyRoute))
@@ -294,7 +299,7 @@ export async function gateway(request,env,fetcher=fetch) {
 
     // Native membership is bound to both explicit native identities. A browser
     // cookie must never override either side of that pair on these routes.
-    const cookies=nativePatreon?'':selectedCookies(request);
+    const cookies=nativeProvider?'':selectedCookies(request);
     const playerToken=cookieValue(cookies,'__Host-pack1_player');
     const sessionCreation=request.method==='POST'&&(
       (match[1]==='legacy'&&match[2]==='/v1/session')||

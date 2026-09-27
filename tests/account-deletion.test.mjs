@@ -219,6 +219,8 @@ test('Pack One cleanup hard-deletes attributable corpus events and preserves ret
   assert.match(text,/DELETE FROM corpus_status_events WHERE auth_user_id=/);
   assert.match(text,/DELETE FROM account_deletion_verifications WHERE auth_user_id=/);
   assert.match(text,/DELETE FROM mobile_oauth_handoffs WHERE auth_user_id=/);
+  assert.match(text,/DELETE FROM apple_subscription_notifications WHERE original_transaction_id IN/);
+  assert.match(text,/DELETE FROM apple_subscription_entitlements WHERE auth_user_id=/);
   assert.doesNotMatch(text,/UPDATE corpus_status_events SET auth_user_id=NULL/);
   const retained=calls.find(row=>row.sql.includes('UPDATE game_results SET challenge_id=NULL,opponent_name=NULL'))?.sql||'';
   assert.ok(retained,'retained cross-player result is scrubbed');
@@ -309,7 +311,7 @@ test('schema and release bookkeeping include deletion migrations in both secure 
   const verify=fs.readFileSync('scripts/verify-neon-schema.mjs','utf8');
   assert.match(verify,/account_deletion_operations/);
   assert.match(verify,/account_deletion_verifications/);
-  assert.match(verify,/through 0042/);
+  assert.match(verify,/through 0045/);
   const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   assert.equal((release.match(/migrations\/0031_account_deletion\.sql/g)||[]).length,2);
   assert.equal((release.match(/migrations\/0034_account_deletion_verification\.sql/g)||[]).length,2);
