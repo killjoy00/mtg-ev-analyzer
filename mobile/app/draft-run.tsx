@@ -38,7 +38,6 @@ import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/stora
 import type { MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { tcgplayerUrl } from '@/src/tcgplayer';
-import { config } from '@/src/config';
 import { colors, spacing } from '@/src/theme';
 
 type LoadState =
@@ -537,7 +536,9 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
           commitState({ status: 'signin-required' });
           return;
         }
-        const screenshotCardId = config.screenshots.enabled && params.screenshot === 'feedback'
+        const screenshotMode = process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_MODE === '1'
+          && process.env.EXPO_PUBLIC_PACKONE_ENV !== 'production';
+        const screenshotCardId = screenshotMode && params.screenshot === 'feedback'
           ? loaded.run.current?.candidates[0]?.id
           : undefined;
         if (screenshotCardId) {
