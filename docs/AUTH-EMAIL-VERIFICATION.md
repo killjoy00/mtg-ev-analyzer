@@ -33,6 +33,24 @@ The final production policy change merged as:
 
 `7255252097787b28250a7458a709ee61d28037fd`
 
+## September 27 password-reset verification closeout
+
+PR #705 changed password recovery so a successfully consumed reset link is also accepted as proof of mailbox possession for that same Auth identity. The implementation merged as `ce61279ffe0ce5d015588d12806fdc79c8306911`.
+
+The guarded release request then merged through PR #710 as `a564a207e9f336639636624c366bff55c6a9759f`. Secure-auth release run **36357289329** completed successfully and deployed that exact revision through development acceptance and then production acceptance.
+
+The production contract is now:
+
+- requesting a password-reset email does **not** verify an account;
+- malformed, expired, reused, policy-rejected, or provider-failed reset attempts do **not** verify an account;
+- only after Managed Neon / Better Auth successfully consumes the reset token and changes the password does Pack One finalize `emailVerified=true` for the exact Auth UUID resolved from that reset token;
+- verification finalization uses the existing authenticated Managed Auth admin boundary and `/admin/update-user`; it does not directly mutate `neon_auth.user`;
+- the admin service principal must be a distinct valid Auth UUID with no Pack One account link;
+- after a successful password change, Pack One updates Apple synthetic-password state where applicable and revokes all Pack One first-party sessions;
+- if provider verification finalization fails after the password has already changed, Pack One still revokes sessions and returns HTTP 503 with `VERIFICATION_FINALIZE`, telling the user to request a verification email before signing in.
+
+This closes the former state where a user could prove mailbox possession by resetting the password yet remain blocked as unverified.
+
 ## Final Pack One policy
 
 For email/password accounts:
@@ -112,7 +130,7 @@ After the four-user migration and full acceptance, Phase 2 changed only `require
 
 ## Delivery contract
 
-The Pack One Auth webhook keeps password recovery and email verification as separate explicit contracts.
+The Pack One Auth webhook keeps password-recovery email delivery and email-verification email delivery as separate explicit contracts. Their delivery event shapes, copy, and idempotency namespaces remain separate, while successful reset-token consumption now converges on the same verified-account state because it proves mailbox possession.
 
 For every signed event it:
 
@@ -134,7 +152,7 @@ Email verification accepts only:
 - an expiry timestamp;
 - an HTTPS `link_url` whose origin and path remain under the configured Neon Auth base.
 
-The verification delivery boundary receives the validated `link_url` but not the separate raw token field. Verification and recovery have separate copy and idempotency namespaces. Verification email copy says **verification link**; recovery copy continues to say **reset link**.
+The verification delivery boundary receives the validated `link_url` but not the separate raw token field. Verification and recovery have separate copy and idempotency namespaces. Verification email copy says **verification link**; recovery copy continues to say **reset link**. The account-state convergence happens later, only when the Pack One reset-completion endpoint successfully redeems the recovery token and finalizes the exact Auth user as verified.
 
 Other signed event/link types remain rejected and observable without logging credentials.
 
@@ -219,7 +237,10 @@ Canonical implementation/operations paths:
 - verification QA workflow: `.github/workflows/auth-verification-qa.yml`;
 - verification QA runner: `scripts/auth-verification-qa-acceptance-v2.mjs`;
 - production policy controller: `scripts/auth-email-verification-policy.mjs`;
-- policy workflow: `.github/workflows/auth-email-verification-policy.yml`.
+- policy workflow: `.github/workflows/auth-email-verification-policy.yml`;
+- reset completion and exact-user resolution: `worker/growth-function.js`;
+- authenticated provider verification finalization: `worker/account-deletion.mjs`;
+- reset/verification regression coverage: `tests/password-recovery.test.mjs` and `tests/password-recovery-e2e.mjs`.
 
 The verification QA workflow supports reviewed push requests and `workflow_dispatch`, so environmental retries do not require another code change. Temporary QA branches must be disposable children with expiry and must never target production or the serving development branch.
 
