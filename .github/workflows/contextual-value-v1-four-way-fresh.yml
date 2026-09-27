@@ -1,11 +1,7 @@
 name: contextual-value-v1-four-way-fresh
 
 on:
-  push:
-    branches:
-      - research/contextual-value-v1-h-freeze-audit-529
   workflow_dispatch:
-
 permissions:
   actions: read
   contents: read
