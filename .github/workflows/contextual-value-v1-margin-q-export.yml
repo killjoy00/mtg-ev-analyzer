@@ -1,6 +1,9 @@
 name: contextual-value-v1-margin-q-export
 
 on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
   workflow_dispatch:
 
 permissions:
@@ -23,19 +26,8 @@ jobs:
         include:
           - fold: 0
             compact_run: '36289077937'
+            compact_name: contextual-value-v1-phase-a-compact-pilot-fold-0
             prior_run: '36289846820'
-          - fold: 1
-            compact_run: '36289366966'
-            prior_run: '36290030236'
-          - fold: 2
-            compact_run: '36289366966'
-            prior_run: '36290030236'
-          - fold: 3
-            compact_run: '36289366966'
-            prior_run: '36290030236'
-          - fold: 4
-            compact_run: '36289366966'
-            prior_run: '36290030236'
 
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +44,7 @@ jobs:
       - name: Download exact compact fold
         uses: actions/download-artifact@v4
         with:
-          name: contextual-value-v1-phase-a-compact-fold-${{ matrix.fold }}
+          name: ${{ matrix.compact_name }}
           path: compact
           run-id: ${{ matrix.compact_run }}
           github-token: ${{ github.token }}
