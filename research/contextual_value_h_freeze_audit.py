@@ -324,12 +324,16 @@ def main():
     if set(alt_raw) != validation_ids:
         raise SystemExit("no-strong predictions do not exactly cover validation decisions")
     alt_behavior = {}
-    expected_training = int(validation_report["training_decisions"])
+    expected_training_drafts = int(no_strong_report["training_drafts"])
     for decision_id, row in alt_raw.items():
         if int(row["fold"]) != -1:
             raise SystemExit("no-strong prediction fold mismatch")
-        if int(row["training_draft_count"]) != expected_training:
-            raise SystemExit("no-strong training provenance mismatch")
+        if int(row["training_draft_count"]) != expected_training_drafts:
+            raise SystemExit(
+                "no-strong training provenance mismatch: "
+                f"prediction={row['training_draft_count']} "
+                f"report={expected_training_drafts}"
+            )
         alt_behavior[decision_id] = row["behavior"]
 
     sensitivity_h = _observations(
