@@ -67,9 +67,33 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
   if(!allowed.has(setId))throw error('Image refresh requires a registered environment');
   const mapping=normalizeImageMapping(rawMapping);
   const after=String(rawAfter||'');
+  const desired=JSON.stringify([...mapping].map(([name,display])=>({name,...display})));
+  // Filter inside Postgres before returning payloads. Image maintenance still
+  // validates every row it changes, but already-correct puzzle JSON never
+  // crosses the Neon proxy merely to prove that it is unchanged.
   const page=await query(
-    'SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND puzzle_id>$3 ORDER BY puzzle_id LIMIT $4',
-    [setId,VERSION,after,IMAGE_REFRESH_PAGE_SIZE],
+    `WITH desired AS (
+       SELECT value AS display FROM jsonb_array_elements($4::jsonb)
+     )
+     SELECT p.puzzle_id,p.payload
+     FROM draft_run_verified_puzzles p
+     WHERE p.set_id=$1 AND p.corpus_version=$2 AND p.puzzle_id>$3
+       AND EXISTS (
+         SELECT 1
+         FROM jsonb_array_elements(
+           COALESCE(p.payload->'candidates','[]'::jsonb) ||
+           COALESCE(p.payload->'prior_picks','[]'::jsonb)
+         ) AS card(value)
+         JOIN desired d ON d.display->>'name'=card.value->>'name'
+         WHERE
+           (card.value->>'image_url') IS DISTINCT FROM (d.display->>'image_url')
+           OR ((d.display ? 'mana_cost') AND (card.value->>'mana_cost') IS DISTINCT FROM (d.display->>'mana_cost'))
+           OR ((d.display ? 'rarity') AND (card.value->>'rarity') IS DISTINCT FROM (d.display->>'rarity'))
+           OR ((d.display ? 'type_line') AND (card.value->>'type_line') IS DISTINCT FROM (d.display->>'type_line'))
+       )
+     ORDER BY p.puzzle_id
+     LIMIT $5`,
+    [setId,VERSION,after,desired,IMAGE_REFRESH_PAGE_SIZE],
   );
   if(!page.rows.length)return {
     set_id:setId,
@@ -137,7 +161,16 @@ export async function refreshTrophyImages(query,setId,rawMapping) {
     if(!page.next_after||page.next_after===after)throw error('Image refresh cursor did not advance',409);
     after=page.next_after;
   }
-  if(!seen)throw error('No verified puzzles are available for image refresh',409);
+  if(!seen) {
+    // A zero-row refresh now means "nothing differs", not necessarily "the
+    // corpus is absent". Preserve the direct action's availability guard with
+    // a metadata-only existence check that never selects payload JSON.
+    const available=await query(
+      'SELECT 1 FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 LIMIT 1',
+      [setId,VERSION],
+    );
+    if(!available.rows.length)throw error('No verified puzzles are available for image refresh',409);
+  }
   return {set_id:setId,mapping_entries:mappingEntries,puzzles:seen,updated_puzzles:updatedPuzzles,updated_cards:updatedCards};
 }
 
