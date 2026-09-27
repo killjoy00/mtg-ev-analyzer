@@ -34,7 +34,7 @@ export function useAppleStore(options?: AppleStoreHookOptions): AppleStoreHook {
       : undefined,
     onPurchaseError: options?.onPurchaseError,
   }) as unknown as AppleStoreHook;
-  if (!config.screenshots.enabled) return liveStore;
+  if (!config.screenshots?.enabled) return liveStore;
   return {
     connected: true,
     subscriptions: SCREENSHOT_SUBSCRIPTIONS,
@@ -48,13 +48,13 @@ export function useAppleStore(options?: AppleStoreHookOptions): AppleStoreHook {
 export async function getAvailableApplePurchases(
   options?: { onlyIncludeActiveItemsIOS?: boolean },
 ): Promise<AppleStorePurchase[]> {
-  if (config.screenshots.enabled) return [];
+  if (config.screenshots?.enabled) return [];
   const purchases = await getAvailablePurchases(options);
   return purchases as unknown as AppleStorePurchase[];
 }
 
 export async function openAppleSubscriptionManagement(): Promise<void> {
-  if (config.screenshots.enabled) return;
+  if (config.screenshots?.enabled) return;
   await deepLinkToSubscriptions();
 }
 
