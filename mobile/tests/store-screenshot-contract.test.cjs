@@ -3,7 +3,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 const test = require('node:test');
 
-const root = path.resolve(__dirname, '..');
+const root = process.cwd();
 const repo = path.resolve(root, '..');
 
 function read(relative) {
