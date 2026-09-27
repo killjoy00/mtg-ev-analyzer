@@ -19,8 +19,11 @@ Model family and regularization are fixed before validation:
 - weighted conditional softmax likelihood;
 - candidate features standardized from the fit partition only;
 - L2 = 1.0 on the standardized correction coefficients;
-- L-BFGS-B, max 200 iterations (raised only after all five first-pass fits hit
-  the 40-iteration ceiling; model, regularization, features, and gate unchanged);
+- L-BFGS-B, max 300 iterations and standardized-gradient tolerance 1e-4.
+  This is a numerical-only correction after all five 200-iteration training
+  fits reached max_iter with terminal max gradients 5.9e-5 to 1.33e-4;
+  validation was still unopened. Model, regularization, features, and gate
+  remain unchanged;
 - no hyperparameter search.
 
 A five-fold training-only gate is required before validation:
@@ -70,7 +73,8 @@ from contextual_value_h_freeze_audit import (
 )
 
 CORRECTION_L2 = 1.0
-MAX_ITER = 200
+MAX_ITER = 300
+OPTIMIZER_GTOL = 1e-4
 MIN_IMPROVED_FOLDS = 3
 PROB_FLOOR = 1e-12
 
@@ -326,7 +330,7 @@ def _fit_correction(data: Mapping[str, np.ndarray]) -> dict:
         options={
             "maxiter": MAX_ITER,
             "ftol": 1e-9,
-            "gtol": 1e-6,
+            "gtol": OPTIMIZER_GTOL,
             "maxls": 20,
         },
     )
@@ -575,6 +579,7 @@ def main():
             "l2": CORRECTION_L2,
             "optimizer": "L-BFGS-B",
             "max_iter": MAX_ITER,
+            "optimizer_gtol": OPTIMIZER_GTOL,
             "hyperparameter_search": False,
             "training_gate": (
                 "aggregate five-fold training-only NLL improves, at least "
