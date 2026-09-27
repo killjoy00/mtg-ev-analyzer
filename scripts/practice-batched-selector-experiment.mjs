@@ -92,13 +92,16 @@ try {
 
   // Synthetic snapshot view of the same immutable inventory exercises easy->medium.
   const fallbackSet=custom[0].set_id;
-  const fallbackSnapshot={...snapshot,groups:snapshot.groups.filter(g=>g.set_id===fallbackSet&&Number(g.pick_number)<=8&&['medium','hard'].includes(g.band))};
+  // Exercise the round-level fallback without forced custom slots: required-set
+  // assignment itself intentionally rejects a missing planned band before the
+  // round loop, so a custom-only fixture would never reach easy->medium.
+  const fallbackSnapshot={...snapshot,groups:snapshot.groups.filter(g=>Number(g.pick_number)<=8&&['medium','hard'].includes(g.band))};
   const fallbackSeed='issue629-easy-fallback-v1';
-  const fallbackPlan=currentPracticeBatchPlan(fallbackSnapshot,fallbackSeed,'mixed',{day,setIds:[fallbackSet]});
+  const fallbackPlan=currentPracticeBatchPlan(fallbackSnapshot,fallbackSeed,'mixed',{day});
   const easyRound=fallbackPlan.plan.bands.findIndex(b=>b==='easy');
   assert.ok(easyRound>=0);
-  const fallbackBaseline=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,fallbackSeed,'mixed',{day,setIds:[fallbackSet],snapshot:fallbackSnapshot});
-  const fallbackCandidate=await selectBatchedDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,fallbackSeed,'mixed',{day,setIds:[fallbackSet],snapshot:fallbackSnapshot});
+  const fallbackBaseline=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,fallbackSeed,'mixed',{day,snapshot:fallbackSnapshot});
+  const fallbackCandidate=await selectBatchedDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,fallbackSeed,'mixed',{day,snapshot:fallbackSnapshot});
   assert.deepEqual(fallbackCandidate,fallbackBaseline);
   assert.equal(fallbackCandidate[easyRound].band,'medium');
   report.parity.targeted.easy_to_medium={round:easyRound,puzzle_id:fallbackCandidate[easyRound].puzzle_id};
