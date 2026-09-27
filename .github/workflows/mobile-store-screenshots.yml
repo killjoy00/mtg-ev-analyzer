@@ -14,11 +14,6 @@ concurrency:
   group: mobile-store-screenshots
   cancel-in-progress: false
 
-env:
-  EXPO_PUBLIC_PACKONE_ENV: preview
-  EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
-  PACKONE_BUILD_PROFILE: preview
-
 jobs:
   validate:
     name: validate screenshot fixture build
@@ -70,6 +65,10 @@ jobs:
     name: capture iPhone and iPad
     needs: validate
     runs-on: macos-latest
+    env:
+      EXPO_PUBLIC_PACKONE_ENV: preview
+      EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
+      PACKONE_BUILD_PROFILE: preview
     defaults:
       run:
         working-directory: mobile
@@ -174,6 +173,10 @@ jobs:
     name: capture Android phone
     needs: validate
     runs-on: ubuntu-latest
+    env:
+      EXPO_PUBLIC_PACKONE_ENV: preview
+      EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'
+      PACKONE_BUILD_PROFILE: preview
     defaults:
       run:
         working-directory: mobile
