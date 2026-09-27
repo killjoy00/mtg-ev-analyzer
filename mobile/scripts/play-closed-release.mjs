@@ -68,7 +68,10 @@ try {
   }
 
   const releaseName = `Pack One closed ${process.env.GITHUB_SHA?.slice(0, 7) || versionCode}`;
-  await request(
+  let releaseStatus = 'completed';
+  let requiresConsoleRollout = false;
+
+  const updateTrack = async (status) => request(
     `${apiBase}/edits/${encodeURIComponent(editId)}/tracks/${encodeURIComponent(track)}`,
     {
       method: 'PUT',
@@ -76,17 +79,32 @@ try {
         track,
         releases: [{
           name: releaseName,
-          status: 'completed',
+          status,
           versionCodes: [versionCode],
         }],
       }),
     },
   );
 
-  await request(`${apiBase}/edits/${encodeURIComponent(editId)}:validate`, {
-    method: 'POST',
-    body: '{}',
-  });
+  await updateTrack(releaseStatus);
+
+  try {
+    await request(`${apiBase}/edits/${encodeURIComponent(editId)}:validate`, {
+      method: 'POST',
+      body: '{}',
+    });
+  } catch (error) {
+    if (!/Only releases with status draft may be created on draft app/i.test(error?.message || '')) {
+      throw error;
+    }
+    releaseStatus = 'draft';
+    requiresConsoleRollout = true;
+    await updateTrack(releaseStatus);
+    await request(`${apiBase}/edits/${encodeURIComponent(editId)}:validate`, {
+      method: 'POST',
+      body: '{}',
+    });
+  }
   await request(`${apiBase}/edits/${encodeURIComponent(editId)}:commit`, {
     method: 'POST',
     body: '{}',
@@ -98,7 +116,8 @@ try {
     track,
     versionCode,
     releaseName,
-    releaseStatus: 'completed',
+    releaseStatus,
+    requiresConsoleRollout,
     committed: true,
     availableTracks: createdTrack ? [...trackNames, track] : trackNames,
     createdTrack,

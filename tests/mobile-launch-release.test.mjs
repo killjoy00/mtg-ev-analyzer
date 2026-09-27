@@ -81,7 +81,10 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.ok(androidClosedRequest.reason.trim().length > 0);
 
   const closedRelease = read('mobile/scripts/play-closed-release.mjs');
-  assert.match(closedRelease, /status: 'completed'/);
+  assert.match(closedRelease, /releaseStatus = 'completed'/);
+  assert.match(closedRelease, /releaseStatus = 'draft'/);
+  assert.match(closedRelease, /requiresConsoleRollout = true/);
+  assert.match(closedRelease, /Only releases with status draft may be created on draft app/);
   assert.match(closedRelease, /:validate/);
   assert.doesNotMatch(closedRelease, /upload\/androidpublisher/);
   const liveLinks = read('scripts/verify-live-mobile-links.mjs');
