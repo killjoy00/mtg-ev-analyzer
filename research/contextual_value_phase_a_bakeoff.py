@@ -1034,6 +1034,8 @@ def run_aggregate(args):
     # H/H1 scalar scores on primary candidates.
     h_chosen = np.empty(len(primary), dtype=np.int16)
     h1_chosen = np.empty(len(primary), dtype=np.int16)
+    h_action_order_by_draft: dict[str, tuple[str, ...]] = {}
+    h1_action_order_by_draft: dict[str, tuple[str, ...]] = {}
     for pos, index in enumerate(primary):
         start, stop = int(validation["offsets"][index]), int(validation["offsets"][index + 1])
         names = validation["candidate_names"][start:stop]
@@ -1046,6 +1048,14 @@ def run_aggregate(args):
         )
         h_scores = _predict_ridge(h_intercept, h_coef, simple_x)
         h_chosen[pos] = _argmax_local(h_scores, names)
+        cluster = str(validation["draft_ids"][index])
+        h_order = sorted(
+            range(len(h_scores)),
+            key=lambda local: (-float(h_scores[local]), str(names[local])),
+        )
+        h_action_order_by_draft[cluster] = tuple(
+            str(names[local]) for local in h_order
+        )
 
         rich_x = np.concatenate(
             [
@@ -1060,6 +1070,13 @@ def run_aggregate(args):
         ).astype(np.float32)
         h1_scores = h1_model.predict(rich_x)
         h1_chosen[pos] = _argmax_local(h1_scores, names)
+        h1_order = sorted(
+            range(len(h1_scores)),
+            key=lambda local: (-float(h1_scores[local]), str(names[local])),
+        )
+        h1_action_order_by_draft[cluster] = tuple(
+            str(names[local]) for local in h1_order
+        )
 
     h2_all_scores = _h2_scores_for_primary(
         h2_model,
@@ -1070,6 +1087,8 @@ def run_aggregate(args):
     h2_chosen = np.empty(len(primary), dtype=np.int16)
     h3_chosen = np.empty(len(primary), dtype=np.int16)
     incumbent_chosen = np.empty(len(primary), dtype=np.int16)
+    h2_action_order_by_draft: dict[str, tuple[str, ...]] = {}
+    h3_action_order_by_draft: dict[str, tuple[str, ...]] = {}
     fallback = Counter()
     h2_margins = []
     for pos, index in enumerate(primary):
@@ -1085,6 +1104,10 @@ def run_aggregate(args):
         h2_chosen[pos] = leader
         incumbent = int(validation["incumbent_ord"][index])
         incumbent_chosen[pos] = incumbent
+        cluster = str(validation["draft_ids"][index])
+        h2_action_order_by_draft[cluster] = tuple(
+            str(names[local]) for local in order
+        )
         margin = float(scores[leader] - scores[runner]) if len(order) > 1 else 1.0
         h2_margins.append(margin)
         threshold = support_threshold(stop - start)
@@ -1102,8 +1125,15 @@ def run_aggregate(args):
             fallback["any"] += 1
             for reason in reasons:
                 fallback[reason] += 1
+            h3_order = [incumbent] + [
+                local for local in order if local != incumbent
+            ]
         else:
             h3_chosen[pos] = leader
+            h3_order = list(order)
+        h3_action_order_by_draft[cluster] = tuple(
+            str(names[local]) for local in h3_order
+        )
 
     # OPE under shared rich nuisance.
     rich_a = _policy_observations(
@@ -1170,6 +1200,12 @@ def run_aggregate(args):
         validation["candidate_names"],
         validation["offsets"],
     )
+    action_orders = {
+        "H_simple_deterministic": h_action_order_by_draft,
+        "H1_rich_nonlinear_value": h1_action_order_by_draft,
+        "H2_direct_pairwise_policy": h2_action_order_by_draft,
+        "H3_conservative_pairwise": h3_action_order_by_draft,
+    }
     results = {}
     for name, observations in policies.items():
         results[name] = {
@@ -1190,8 +1226,15 @@ def run_aggregate(args):
                     ),
                 }
             ),
-            "overlap": policy_overlap_diagnostics(observations),
-            "local_overlap": policy_overlap_slices(primary_decisions, observations),
+            "overlap": policy_overlap_diagnostics(
+                observations,
+                action_order_by_cluster=action_orders[name],
+            ),
+            "local_overlap": policy_overlap_slices(
+                primary_decisions,
+                observations,
+                action_order_by_cluster=action_orders[name],
+            ),
             "stability_vs_A": paired_policy_delta_slices(
                 primary_decisions,
                 observations,

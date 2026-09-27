@@ -155,8 +155,17 @@ def outcome_diagnostics(
     }
 
 
-def policy_overlap_diagnostics(observations: Sequence[PolicyObservation]) -> dict:
-    """Overlap/support diagnostics for one target policy on one OPE sample."""
+def policy_overlap_diagnostics(
+    observations: Sequence[PolicyObservation],
+    *,
+    action_order_by_cluster: Mapping[str, Sequence[str]] | None = None,
+) -> dict:
+    """Overlap/support diagnostics for one target policy on one OPE sample.
+
+    The target distribution is used for OPE and does not necessarily preserve
+    the score ordering behind a deterministic policy. Pass action_order_by_cluster
+    when rank support should follow the model's actual score/order.
+    """
     if not observations:
         raise ValueError("at least one policy observation is required")
     selected_propensities = []
@@ -164,6 +173,7 @@ def policy_overlap_diagnostics(observations: Sequence[PolicyObservation]) -> dic
     leader_support = []
     runner_support = []
     rank_supported: dict[str, list[bool]] = defaultdict(list)
+    truncated_target_tie_rankings = 0
 
     for observation in observations:
         behavior = observation.behavior
@@ -172,10 +182,34 @@ def policy_overlap_diagnostics(observations: Sequence[PolicyObservation]) -> dic
         selected_propensities.append(float(behavior[chosen]))
         raw_weights.append(float(target[chosen]) / float(behavior[chosen]))
         threshold = support_threshold(len(behavior))
-        ranked = sorted(
-            target,
-            key=lambda action: (-float(target[action]), action),
-        )
+        if action_order_by_cluster is not None:
+            if observation.cluster is None:
+                raise ValueError("explicit action order requires observation clusters")
+            ranked = [
+                str(action)
+                for action in action_order_by_cluster.get(str(observation.cluster), ())
+            ]
+            if (
+                len(ranked) != len(target)
+                or len(set(ranked)) != len(ranked)
+                or set(ranked) != set(target)
+            ):
+                raise ValueError(
+                    "explicit action order must cover each offered action exactly once"
+                )
+        else:
+            ranked = sorted(
+                target,
+                key=lambda action: (-float(target[action]), action),
+            )
+            # Do not manufacture rank-2/rank-3 order from target-probability
+            # ties. Keep only the uniquely ordered prefix unless the caller
+            # supplies the actual model score/order.
+            for index in range(1, len(ranked)):
+                if float(target[ranked[index]]) == float(target[ranked[index - 1]]):
+                    ranked = ranked[:index]
+                    truncated_target_tie_rankings += 1
+                    break
         if ranked:
             leader_support.append(float(behavior[ranked[0]]))
         if len(ranked) > 1:
@@ -194,6 +228,14 @@ def policy_overlap_diagnostics(observations: Sequence[PolicyObservation]) -> dic
             rank: sum(flags) / len(flags)
             for rank, flags in sorted(rank_supported.items())
             if flags
+        },
+        "candidate_ranking": {
+            "source": (
+                "explicit_policy_score_order"
+                if action_order_by_cluster is not None
+                else "target_probability"
+            ),
+            "truncated_target_tie_decisions": truncated_target_tie_rankings,
         },
         "cap20": {
             "ess": primary.ess,
@@ -348,6 +390,8 @@ def propensity_diagnostics(
 def policy_overlap_slices(
     decisions: Sequence[Decision],
     observations: Sequence[PolicyObservation],
+    *,
+    action_order_by_cluster: Mapping[str, Sequence[str]] | None = None,
 ) -> dict:
     """Local overlap diagnostics for one-primary-decision-per-draft OPE."""
     by_draft = {decision.draft_id: decision for decision in decisions}
@@ -367,7 +411,10 @@ def policy_overlap_slices(
         grouped["experience"][experience_group(decision.user_games_lower_bound)].append(observation)
     return {
         axis: {
-            label: policy_overlap_diagnostics(rows)
+            label: policy_overlap_diagnostics(
+                rows,
+                action_order_by_cluster=action_order_by_cluster,
+            )
             for label, rows in sorted(groups.items())
         }
         for axis, groups in grouped.items()

@@ -80,6 +80,28 @@ class PolicyDiagnosticsTests(unittest.TestCase):
         self.assertAlmostEqual(report["cap20"]["ess_ratio"], 0.7352941176470589)
         self.assertEqual(report["candidate_rank_supported_fraction"]["1"], 1.0)
 
+    def test_overlap_uses_explicit_model_order_for_deterministic_runner_up(self):
+        observation = PolicyObservation(
+            action="Leader",
+            outcome=2.0,
+            behavior={"Leader": 0.60, "Alpha": 0.05, "Zulu": 0.35},
+            target={"Leader": 1.0, "Alpha": 0.0, "Zulu": 0.0},
+            q_values={"Leader": 2.0, "Alpha": 0.0, "Zulu": 1.0},
+            cluster="d0",
+        )
+        report = policy_overlap_diagnostics(
+            [observation],
+            action_order_by_cluster={
+                "d0": ("Leader", "Zulu", "Alpha"),
+            },
+        )
+        self.assertAlmostEqual(report["runner_up_behavior_support"]["mean"], 0.35)
+        self.assertEqual(report["candidate_rank_supported_fraction"]["2"], 1.0)
+        self.assertEqual(
+            report["candidate_ranking"]["source"],
+            "explicit_policy_score_order",
+        )
+
     def test_paired_cluster_bootstrap_preserves_positive_exact_q_delta(self):
         candidate = self._observations(1.0)
         incumbent = self._observations(0.0)

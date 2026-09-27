@@ -293,6 +293,7 @@ def main():
 
     h_chosen = np.empty(len(primary), dtype=np.int16)
     incumbent_chosen = np.empty(len(primary), dtype=np.int16)
+    h_action_order_by_draft: dict[str, tuple[str, ...]] = {}
     for pos, index in enumerate(primary):
         start, stop = int(validation["offsets"][index]), int(validation["offsets"][index + 1])
         names = validation["candidate_names"][start:stop]
@@ -305,6 +306,12 @@ def main():
         )
         scores = _predict_ridge(h_intercept, h_coef, x)
         h_chosen[pos] = _argmax_local(scores, names)
+        cluster = str(validation["draft_ids"][index])
+        order = sorted(
+            range(len(scores)),
+            key=lambda local: (-float(scores[local]), str(names[local])),
+        )
+        h_action_order_by_draft[cluster] = tuple(str(names[local]) for local in order)
         incumbent_chosen[pos] = int(validation["incumbent_ord"][index])
 
     baseline_h = _observations(validation, primary, h_chosen)
@@ -399,7 +406,10 @@ def main():
                 **baseline_delta,
                 "dr_ci95": list(baseline_ci),
             },
-            "H_overlap": policy_overlap_diagnostics(baseline_h),
+            "H_overlap": policy_overlap_diagnostics(
+                baseline_h,
+                action_order_by_cluster=h_action_order_by_draft,
+            ),
         },
         "behavior_nuisance_sensitivity": {
             "alternate_nuisance": "no_strong_entirely",
@@ -412,7 +422,10 @@ def main():
                 **_delta(sensitivity_h, sensitivity_a),
                 "dr_ci95": list(sensitivity_ci),
             },
-            "H_overlap": policy_overlap_diagnostics(sensitivity_h),
+            "H_overlap": policy_overlap_diagnostics(
+                sensitivity_h,
+                action_order_by_cluster=h_action_order_by_draft,
+            ),
         },
         "slice_uncertainty_frozen_behavior": baseline_slices,
         "environment_power": {

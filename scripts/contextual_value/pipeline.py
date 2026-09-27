@@ -277,6 +277,8 @@ def run_development(
     iwd_observations = []
     direct_q_observations = []
     contextual_argmax_observations = []
+    incumbent_action_order_by_draft: dict[str, tuple[str, ...]] = {}
+    contextual_action_order_by_draft: dict[str, tuple[str, ...]] = {}
     contextual_by_temperature: list[tuple[str, list[PolicyObservation]]] = [
         (f"T={temperature:g}", []) for temperature in temperature_grid
     ]
@@ -304,6 +306,15 @@ def run_development(
         q_target = argmax_policy(prediction.q_values)
         contextual_scores = value_model.scores(features)
         contextual_argmax_target = argmax_policy(contextual_scores)
+        cluster = str(decision.draft_id)
+        incumbent_action_order_by_draft[cluster] = tuple(sorted(
+            decision.candidates,
+            key=lambda action: (-float(incumbent_values[action]), action),
+        ))
+        contextual_action_order_by_draft[cluster] = tuple(sorted(
+            decision.candidates,
+            key=lambda action: (-float(contextual_scores[action]), action),
+        ))
 
         incumbent_observations.append(_observation(decision, prediction, incumbent_target))
         gih_observations.append(_observation(decision, prediction, gih_target))
@@ -402,19 +413,27 @@ def run_development(
             },
             "overlap": {
                 "A_current_v4_strong_player": policy_overlap_diagnostics(
-                    incumbent_observations
+                    incumbent_observations,
+                    action_order_by_cluster=incumbent_action_order_by_draft,
                 ),
                 "G_contextual_value": policy_overlap_diagnostics(
                     selected_contextual
                 ),
                 "G_contextual_value_top_ranked_argmax_secondary": (
-                    policy_overlap_diagnostics(contextual_argmax_observations)
+                    policy_overlap_diagnostics(
+                        contextual_argmax_observations,
+                        action_order_by_cluster=contextual_action_order_by_draft,
+                    )
                 ),
             },
             "local_overlap": {
                 "G_contextual_value": policy_overlap_slices(primary, selected_contextual),
                 "G_contextual_value_top_ranked_argmax_secondary": (
-                    policy_overlap_slices(primary, contextual_argmax_observations)
+                    policy_overlap_slices(
+                        primary,
+                        contextual_argmax_observations,
+                        action_order_by_cluster=contextual_action_order_by_draft,
+                    )
                 ),
             },
             "stability_slices": {
