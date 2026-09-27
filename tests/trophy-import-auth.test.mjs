@@ -117,10 +117,19 @@ test('card image refresh changes display metadata only for registered environmen
   const original=structuredClone(sample);
   let stored=sample;
   const query=async(sql,params=[])=>{
-    if(sql.startsWith('SELECT puzzle_id,payload')){
+    if(sql.includes('SELECT p.puzzle_id,p.payload')){
+      assert.match(sql,/corpus_components/);
+      assert.match(sql,/c\.parent_version=\$2/);
+      assert.match(sql,/c\.component_version=p\.corpus_version/);
+      assert.match(sql,/c\.status='Live'/);
+      assert.equal(params[1],DRAFT_RUN_CORPUS_VERSION);
       return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
     }
     if(sql.includes('UPDATE draft_run_verified_puzzles')){
+      assert.match(sql,/corpus_components/);
+      assert.match(sql,/c\.parent_version=\$3/);
+      assert.match(sql,/c\.component_version=p\.corpus_version/);
+      assert.match(sql,/c\.status='Live'/);
       const updates=JSON.parse(params[0]);
       assert.equal(updates.length,1);
       stored=updates[0].payload;
