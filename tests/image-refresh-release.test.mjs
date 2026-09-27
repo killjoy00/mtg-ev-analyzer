@@ -58,3 +58,51 @@ test('image maintenance cannot deploy functions and checks revisions before remo
   assert.match(acceptance.slice(acceptance.lastIndexOf('await verifyMarkers(')),/^await verifyMarkers\(\)/,
     'The closing marker check must not be given a settle window');
 });
+
+test('targeted image repair is scoped, ordered and keeps dispatch inputs out of run scripts',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/refresh-powered-cube-images.yml',import.meta.url),'utf8');
+  assert.match(workflow,/mode:\s+description:[^\n]+\s+type: choice\s+required: false\s+default: full\s+options:\s+- full\s+- targeted/);
+  assert.match(workflow,/refresh:\s+if: inputs\.mode != 'targeted'/);
+  const repair=workflow.slice(workflow.indexOf('\n  repair:\n'));
+  assert.match(repair,/if: inputs\.mode == 'targeted'/);
+  assert.doesNotMatch(repair,/python scripts\/refresh_card_images\.py/);
+  assert.doesNotMatch(repair,/scripts\/refresh_card_backend_images\.mjs/);
+  assert.match(repair,/name: Hydrate targeted replay shards from R2[\s\S]*?REPLAY_SETS: \$\{\{ inputs\.environments \}\}[\s\S]*?r2_replay_shards\.sh hydrate/);
+  assert.match(repair,/name: Publish targeted replay shards to R2[\s\S]*?REPLAY_SETS: \$\{\{ inputs\.environments \}\}[\s\S]*?r2_replay_shards\.sh upload[\s\S]*?r2_replay_shards\.sh verify/);
+  assert.ok(
+    repair.indexOf('node scripts/verify-image-refresh-release.mjs "$EXPECTED_COMMIT"') <
+    repair.indexOf('bash scripts/r2_replay_shards.sh upload'),
+  );
+  assert.ok(
+    repair.indexOf('Repair development Draft Run image metadata') <
+    repair.indexOf('Verify development targeted image metadata and gameplay'),
+  );
+  assert.ok(
+    repair.indexOf('Verify development targeted image metadata and gameplay') <
+    repair.indexOf('Re-verify marked, matching backend releases'),
+  );
+  assert.ok(
+    repair.indexOf('Re-verify marked, matching backend releases') <
+    repair.indexOf('Repair production Draft Run image metadata'),
+  );
+  assert.match(repair,/automation\/card-image-repair-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}/);
+  assert.match(repair,/push origin "HEAD:refs\/heads\/\$branch"/);
+  assert.doesNotMatch(repair,/gh pr create|push origin HEAD:main/);
+
+  const lines=repair.split('\n');
+  let runIndent=null;
+  for(const line of lines) {
+    const indent=line.match(/^\s*/)[0].length;
+    const run=line.match(/^(\s*)run:\s*(.*)$/);
+    if(run) {
+      runIndent=run[1].length;
+      assert.doesNotMatch(line,/\$\{\{\s*inputs\./);
+      if(!['|','>'].includes(run[2].trim()))runIndent=null;
+      continue;
+    }
+    if(runIndent!==null) {
+      if(line.trim()&&indent<=runIndent)runIndent=null;
+      else assert.doesNotMatch(line,/\$\{\{\s*inputs\./);
+    }
+  }
+});
