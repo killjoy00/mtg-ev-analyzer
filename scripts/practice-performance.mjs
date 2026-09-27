@@ -155,8 +155,8 @@ export async function main() {
             const baselineStart=performance.now();
             const baseline=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,seed,configuration.environment,{day,setIds:configuration.setIds,snapshot:cachedSnapshot});
             sample.live_selection_ms=elapsed(baselineStart);
-            sample.exact_parity=JSON.stringify(baseline)===JSON.stringify(selected);
-            if(!sample.exact_parity)throw Error('Cached selection metadata or RNG parity mismatch.');
+            assert.deepEqual(selected,baseline,'Cached selection metadata or RNG parity mismatch.');
+            sample.exact_parity=true;
           }
         } catch(error) {sample.error=errorCode(error);throw error;}
         finally {sample.elapsed_ms=elapsed(start);}
