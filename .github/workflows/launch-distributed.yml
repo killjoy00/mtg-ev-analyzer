@@ -1,7 +1,7 @@
 name: isolated distributed launch acceptance
 on:
   pull_request:
-    paths: ['scripts/launch-distributed*', 'tests/launch-distributed-capacity.test.mjs', '.github/workflows/launch-distributed.yml']
+    paths: ['scripts/launch-distributed*', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -79,6 +79,8 @@ jobs:
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_corpus_source_snapshots.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0041_apple_auth.sql
           psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0042_serving_revision_snapshot_staging.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
+          psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
           node scripts/verify-neon-schema.mjs
           node scripts/build-neon-functions.mjs "$RUNNER_TEMP/pack1-bundles" "$GITHUB_SHA"
       - name: Prepare accounts, entitlements, score history and query plans

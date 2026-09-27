@@ -12,6 +12,9 @@ const COOKIE_NAMES=new Set(['__Host-pack1_account','__Secure-pack1_csrf','__Host
 const response=(status,error,headers={})=>Response.json({error},{status,headers:{'cache-control':'no-store',...headers}});
 const secret=value=>/^[a-f0-9]{64}$/.test(value||'');
 const encode=new TextEncoder();
+// The finite private preview retains every success so quiet active minutes
+// cannot randomly lack positive telemetry. Production sampling is unchanged.
+export const gatewaySampleRate=(mode,status)=>mode==='preview'||status>=400?1:.1;
 
 export function ipNetwork(value) {
   if(isIP(value)===4)return value;
@@ -243,9 +246,10 @@ export async function gateway(request,env,fetcher=fetch) {
   let previewNetwork=null;
   const expectedHost=mode==='production'?'api.packone.pro':'api-preview.packone.pro';
   const finish=result=>{
-    const sampleRate=result.status>=400?1:.1;
+    const duration=Math.round(performance.now()-started),quota=Math.round(metric.quota_ms),upstream=Math.round(metric.upstream_ms);
+    const sampleRate=gatewaySampleRate(mode,result.status);
     if(Math.random()<sampleRate)console.log(JSON.stringify({...metric,status:result.status,sample_rate:sampleRate,
-      duration_ms:Math.round(performance.now()-started),quota_ms:Math.round(metric.quota_ms),upstream_ms:Math.round(metric.upstream_ms)}));
+      duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
     const headers=new Headers(result.headers);
     headers.set('cache-control','no-store');headers.set('vary','Origin');
     if(ORIGINS.has(origin)) {
@@ -254,6 +258,9 @@ export async function gateway(request,env,fetcher=fetch) {
       headers.set('access-control-expose-headers','Retry-After');
     }
     if(mode==='preview'&&previewNetwork&&url.pathname==='/draft/health')headers.set('x-pack1-preview-network',previewNetwork);
+    if(mode==='preview'&&request.method==='POST'&&
+      (url.pathname==='/draft/v1/runs'||/^\/draft\/v1\/runs\/[a-f0-9-]+\/reroll$/.test(url.pathname))&&metric.upstream_calls===1)
+      headers.set('x-pack1-gateway-timing',JSON.stringify({duration_ms:duration,quota_ms:quota,upstream_ms:upstream}));
     headers.set('x-content-type-options','nosniff');
     return new Response(result.body,{status:result.status,headers});
   };
@@ -375,6 +382,12 @@ export async function gateway(request,env,fetcher=fetch) {
 
     const publicHeaders=new Headers();
     for(const name of ['content-type','retry-after'])if(result.headers.has(name))publicHeaders.set(name,result.headers.get(name));
+    if(preview&&match[1]==='draft'&&method==='POST') {
+      const timingHeader=match[2]==='/v1/runs'?'x-pack1-start-timing':
+        /^\/v1\/runs\/[a-f0-9-]+\/reroll$/.test(match[2])?'x-pack1-reroll-timing':null;
+      const timing=timingHeader&&result.headers.get(timingHeader);
+      if(timing&&timing.length<=1200)publicHeaders.set(timingHeader,timing);
+    }
     if(match[1]==='growth')for(const line of upstreamSetCookies(result.headers))if(publicCookie(line))publicHeaders.append('set-cookie',scopedCookie(line));
     if(result.status>=300&&result.status<400) {
       const target=safeRedirect(result.headers.get('location'),{

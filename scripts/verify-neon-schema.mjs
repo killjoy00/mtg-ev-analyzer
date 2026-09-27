@@ -6,6 +6,8 @@ const result=await query(`SELECT
   EXISTS(SELECT 1 FROM pg_index i JOIN pg_class c ON c.oid=i.indexrelid WHERE c.relname='draft_run_reroll_set_window_idx' AND i.indisvalid) reroll_set_window,
   to_regprocedure('pack1_serving_snapshot(text,text,text)') IS NOT NULL practice_snapshot,
   to_regclass('draft_run_serving_inventory') IS NOT NULL practice_inventory,
+  to_regclass('draft_run_serving_source_groups') IS NOT NULL practice_source_groups,
+  EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='serving_inventory_source_groups' AND tgenabled='O') practice_source_group_capture,
   (SELECT count(*)=22 FROM pg_trigger WHERE tgname IN (
     'serving_puzzle_insert','serving_puzzle_delete','serving_puzzle_metadata','serving_puzzle_truncate',
     'serving_ratings_insert','serving_ratings_delete','serving_ratings','serving_ratings_truncate',

@@ -4,7 +4,7 @@ import {fingerprint,evaluateStage,timing} from './launch-distributed-core.mjs';
 import {policy,verifyFixture,coordinatorSQL,heartbeat,storeReport,readReports,usageGate} from './launch-distributed-control.mjs';
 import {seal} from './launch-distributed-bundle.mjs';
 import {requestClient,runPlayerStage,wait} from './launch-distributed-player.mjs';
-import {inspectPreviewTelemetry,previewAccount} from './launch-distributed-telemetry.mjs';
+import {inspectPreviewTelemetry,previewAccount,previewTelemetryFailure} from './launch-distributed-telemetry.mjs';
 
 async function main() {
   const shard=Number(process.env.LOAD_SHARD),fixture=JSON.parse(fs.readFileSync(process.env.LOAD_FIXTURE_FILE,'utf8')),scope=fixture.scope;
@@ -62,7 +62,7 @@ async function main() {
           const end=timing(start,policy.stages[stage],policy).end;
           await wait(Math.max(0,end+policy.telemetry_settlement_seconds*1000-Date.now()),controller.signal);
           try {summary.telemetry=await inspectPreviewTelemetry({reports,sha:scope.sha,from:start,to:end,policy,account});}
-          catch {summary.telemetry={passed:false,reason:'retained_preview_api_or_schema_unavailable'};}
+          catch(error) {summary.telemetry={passed:false,reason:'retained_preview_api_or_schema_unavailable',detail:previewTelemetryFailure(error)};}
           try {summary.usage=await usageGate(fixture.usage_baseline);}
           catch {summary.usage={passed:false,reason:'provider_usage_unavailable'};}
           if(!summary.telemetry.passed)summary.reasons.push({category:'telemetry',reason:'retained_preview_coverage_failed'});

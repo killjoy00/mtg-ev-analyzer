@@ -1,31 +1,51 @@
 import assert from 'node:assert/strict';
-import {queryEvents,parseGatewayEvent} from './launch-alert.mjs';
+import {parseGatewayEvent} from './launch-alert.mjs';
 import {quantiles} from './launch-distributed-core.mjs';
 
-// Adapt only the retained-log service filter; the production watcher's code and
-// watermark remain byte-for-byte unchanged. Validate rows before its permissive
-// production parser so malformed preview evidence is never silently discarded.
+const PREVIEW_PAGE_SIZE=2000,PREVIEW_MAX_PAGES=32;
+
+// The finite preview emits every success/error, so use the telemetry API's
+// event-page cursor directly instead of the production watcher's 200-row
+// sampling-oriented recursive splitter. The production watcher remains
+// byte-for-byte unchanged. Every retained row is still validated fail-closed.
 export async function queryPreviewEvents(fetcher,token,account,from,to) {
-  const previewFetch=async(url,options)=>{
-    assert.equal(url,`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`,'fixed_telemetry_endpoint');
-    const body=JSON.parse(options.body),service=body.parameters?.filters?.find(f=>f.key==='$metadata.service');
-    assert.equal(service?.value,'pack1-gateway','unexpected_upstream_service_filter');
-    service.value='pack1-gateway-preview';body.queryId='pack1-capacity-preview';
-    const response=await fetcher(url,{...options,body:JSON.stringify(body)}),data=await response.json();
-    if(response.ok&&data.success!==false) {
-      const rows=data.result?.events?.events;assert.ok(Array.isArray(rows),'invalid_preview_log_schema');
-      if(rows.length<200)for(const row of rows) {
-        const event=parseGatewayEvent(row);
-        assert.ok(event?.id&&event.release!=='unknown'&&event.status>=100&&event.status<=599&&event.duration_ms>=0,'invalid_retained_preview_event');
-      }
+  const url=`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`,seen=new Map();
+  let offset=null;
+  for(let page=0;page<PREVIEW_MAX_PAGES;page++) {
+    const body={queryId:'pack1-capacity-preview',timeframe:{from,to},dry:true,limit:PREVIEW_PAGE_SIZE,view:'events',
+      parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters:[
+        {key:'$metadata.service',operation:'eq',type:'string',value:'pack1-gateway-preview'},
+        {key:'event',operation:'eq',type:'string',value:'gateway_request'},
+      ]}};
+    if(offset){body.offset=offset;body.offsetDirection='next';}
+    const response=await fetcher(url,{method:'POST',headers:{authorization:'Bearer '+token,'content-type':'application/json',accept:'application/json'},
+      body:JSON.stringify(body),redirect:'error',signal:AbortSignal.timeout(20000)});
+    const data=await response.json().catch(()=>null);
+    if(!response.ok)throw Error(`preview_telemetry_http_${response.status}`);
+    if(data?.success===false||data?.errors?.length)throw Error('preview_telemetry_api_error');
+    const rows=data?.result?.events?.events;
+    assert.ok(Array.isArray(rows),'invalid_preview_log_schema');
+    for(const row of rows) {
+      const event=parseGatewayEvent(row);
+      assert.ok(event?.id&&event.release!=='unknown'&&event.status>=100&&event.status<=599&&event.duration_ms>=0,'invalid_retained_preview_event');
+      seen.set(event.id,event);
     }
-    return Response.json(data,{status:response.status});
-  };
-  return queryEvents(previewFetch,token,account,from,to);
+    if(rows.length<PREVIEW_PAGE_SIZE)return [...seen.values()];
+    const next=rows.at(-1)?.$metadata?.id;
+    assert.ok(typeof next==='string'&&next.length>0&&next.length<=512&&next!==offset,'invalid_preview_log_cursor');
+    offset=next;
+  }
+  throw Error('preview_telemetry_page_limit');
 }
 
-// Use the production watcher's bounded, splitting, event-ID-deduplicating reader,
-// but never its production probes, usage mutation or issue-watermark writer.
+export function previewTelemetryFailure(error) {
+  const message=String(error?.message||'');
+  return /^(?:preview_telemetry_http_[1-5]\d\d|preview_telemetry_api_error|invalid_preview_log_schema|invalid_preview_log_cursor|invalid_retained_preview_event|preview_telemetry_page_limit)$/.test(message)
+    ?message:'preview_telemetry_unclassified';
+}
+
+// Use only retained preview evidence; never production probes, usage mutation or
+// the issue-watermark writer.
 export async function previewAccount({fetcher=fetch,token=process.env.CLOUDFLARE_EDGE_TOKEN}={}) {
   assert.ok(token,'missing_preview_telemetry_credential');
   const r=await fetcher('https://api.cloudflare.com/client/v4/zones?name=packone.pro&per_page=50',{headers:{authorization:'Bearer '+token},redirect:'error',signal:AbortSignal.timeout(20000)});
@@ -67,5 +87,5 @@ export async function inspectPreviewTelemetry({reports,sha,from,to,policy,accoun
     bins.push(bin);
   }
   return {service:'pack1-gateway-preview',sha,bins,passed:bins.some(b=>b.client_requests>0)&&bins.every(b=>b.passed),
-    limitation:'Ten-percent success sampling: positive per-minute evidence and fully sampled errors, not lossless request reconciliation or a population latency SLO. Preview-only 4xx boundary rejects are retained separately because generated client non-2xx responses already fail the unsampled client record.'};
+    limitation:'The finite private preview emits every success and error, but the retained log API is not a lossless request ledger or a population latency SLO. Exact route percentiles come from unsampled client records. Preview-only 4xx boundary rejects are retained separately because generated client non-2xx responses already fail the client record.'};
 }

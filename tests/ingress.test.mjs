@@ -4,7 +4,7 @@ import {guardIngress} from '../worker/ingress-auth.mjs';
 import legacy from '../worker/index.js';
 import growth from '../worker/growth-function.js';
 import draft from '../worker/draft-run-function.mjs';
-import {gateway,ipNetwork} from '../edge/gateway.mjs';
+import {gateway,gatewaySampleRate,ipNetwork} from '../edge/gateway.mjs';
 import {parseRequest,checkBranch,inheritedFunctionSlugs,commandFailure} from '../scripts/edge-control.mjs';
 import {closedOrigin} from '../edge/closed-origin.mjs';
 import {freshDeployment,deployPreviewFunction} from '../scripts/edge-neon-deploy.mjs';
@@ -15,6 +15,13 @@ const key='a'.repeat(64);
 const env={MODE:'preview',NEON_BRANCH_ID:'br-isolated-preview',ORIGIN_SECRET:key,PREVIEW_KEY:'b'.repeat(64),QUOTA_KEY:'c'.repeat(64),
   NETWORK_QUOTA:{idFromName(name){assert.match(name,/^[a-f0-9]{64}$/);return name;},get(){return {fetch:async()=>new Response(null,{status:204})};}}};
 const req=(path='/growth/v1/session',options={})=>new Request('https://api-preview.packone.pro'+path,{method:'POST',body:'{}',...options,headers:{'content-type':'application/json','x-pack1-preview-key':env.PREVIEW_KEY,'cf-connecting-ip':'192.0.2.1',...options.headers}});
+
+test('finite private preview retains successes without changing production sampling',()=>{
+  assert.equal(gatewaySampleRate('preview',200),1);
+  assert.equal(gatewaySampleRate('preview',503),1);
+  assert.equal(gatewaySampleRate('production',200),.1);
+  assert.equal(gatewaySampleRate('production',503),1);
+});
 
 test('all three real handlers block direct URLs before health, preflight or database work',async()=>{
   const prior={required:process.env.PACK1_REQUIRE_INGRESS,secret:process.env.PACK1_INGRESS_SECRET};
@@ -46,6 +53,38 @@ test('gateway constructs a fixed upstream and strips caller-controlled infrastru
   assert.equal(calls,1);assert.equal(result.status,200);assert.equal(result.headers.get('set-cookie'),null);
   assert.equal(result.headers.get('x-pack1-ingress-secret'),null);assert.equal(result.headers.get('cache-control'),'no-store');
   assert.equal(result.headers.get('access-control-allow-origin'),'https://packone.pro');
+});
+test('start timing is relayed only from the protected draft origin in private preview',async()=>{
+  const timing=JSON.stringify({v:1,total_ms:80,phases:{selection:60},selector:{}});
+  const preview=await gateway(req('/draft/v1/runs',{headers:{'x-pack1-start-timing':'caller-spoof'}}),env,async(_url,options)=>{
+    assert.equal(options.headers.get('x-pack1-start-timing'),null);
+    return Response.json({ok:true},{headers:{'x-pack1-start-timing':timing}});
+  });
+  assert.equal(preview.status,200);
+  assert.equal(preview.headers.get('x-pack1-start-timing'),timing);
+  assert.ok(JSON.parse(preview.headers.get('x-pack1-gateway-timing')).upstream_ms>=0);
+  const other=await gateway(req('/growth/v1/session'),env,async()=>Response.json({ok:true},{headers:{'x-pack1-start-timing':timing}}));
+  assert.equal(other.headers.get('x-pack1-start-timing'),null);
+  const production={...env,MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep'};
+  const prod=await gateway(new Request('https://api.packone.pro/draft/v1/runs',{method:'POST',headers:{'cf-connecting-ip':'192.0.2.1','content-type':'application/json'},body:'{}'}),production,async()=>Response.json({ok:true},{headers:{'x-pack1-start-timing':timing}}));
+  assert.equal(prod.headers.get('x-pack1-start-timing'),null);
+  assert.equal(prod.headers.get('x-pack1-gateway-timing'),null);
+});
+test('reroll timing is restricted to the protected preview reroll path',async()=>{
+  const timing=JSON.stringify({v:1,total_ms:200,phases:{selection:180},selector:{}});
+  const run='00000000-0000-4000-8000-000000000000';
+  const preview=await gateway(req(`/draft/v1/runs/${run}/reroll`,{headers:{'x-pack1-reroll-timing':'caller-spoof'}}),env,async(_url,options)=>{
+    assert.equal(options.headers.get('x-pack1-reroll-timing'),null);
+    return Response.json({ok:true},{headers:{'x-pack1-reroll-timing':timing}});
+  });
+  assert.equal(preview.headers.get('x-pack1-reroll-timing'),timing);
+  assert.ok(JSON.parse(preview.headers.get('x-pack1-gateway-timing')).upstream_ms>=0);
+  const other=await gateway(req(`/draft/v1/runs/${run}/pick`),env,async()=>Response.json({ok:true},{headers:{'x-pack1-reroll-timing':timing}}));
+  assert.equal(other.headers.get('x-pack1-reroll-timing'),null);
+  const production={...env,MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep'};
+  const prod=await gateway(new Request(`https://api.packone.pro/draft/v1/runs/${run}/reroll`,{method:'POST',headers:{'cf-connecting-ip':'192.0.2.1','content-type':'application/json'},body:'{}'}),production,async()=>Response.json({ok:true},{headers:{'x-pack1-reroll-timing':timing}}));
+  assert.equal(prod.headers.get('x-pack1-reroll-timing'),null);
+  assert.equal(prod.headers.get('x-pack1-gateway-timing'),null);
 });
 
 test('production gateway turns Pack One cookies into upstream identity and relays only Pack One cookies',async()=>{
