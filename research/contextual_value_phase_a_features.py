@@ -16,6 +16,11 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Iterable, Mapping, Sequence
 
+import sys
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "scripts"))
+
 from scripts.fetch_card_metadata import (
     aliases,
     choose_main_printing,
@@ -23,10 +28,6 @@ from scripts.fetch_card_metadata import (
     fetch_named,
     request_json,
 )
-
-import sys
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "scripts"))
 
 from contextual_value.checkpoint import (
     draft_id_sha256,
