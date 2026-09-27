@@ -185,7 +185,7 @@ export async function selectBatchedDatabaseRun(query,version,seed,environment='m
     throw servingCacheUnavailable();
   }
   if(result.draws_used!==16||!Array.isArray(result.selections)||result.selections.length!==8)throw servingCacheUnavailable();
-  return result.selections.map(decodePuzzleMetadata);
+  return result.selections.map(p=>({...decodePuzzleMetadata(p),pack_number:String(p.pack_number)}));
 }
 
 export async function selectDatabaseReroll(query,version,source,options) {
