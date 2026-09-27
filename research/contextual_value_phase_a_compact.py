@@ -374,7 +374,7 @@ def main():
             actual_size == expected_source_size + 10
             and prefix_sha == expected_source_sha
             and len(suffix) == 10
-            and suffix[:2] == b"\\x03\\x00"
+            and suffix[:2] == bytes.fromhex("0300")
         ):
             source_provenance_mode = "phase_a1_buffered_gzip_finalizer"
         else:
