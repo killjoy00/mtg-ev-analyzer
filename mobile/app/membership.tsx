@@ -89,13 +89,6 @@ function AppleElitePanel({
     onPurchaseError: (purchaseError) => purchaseErrorHandler.current?.(purchaseError),
   });
 
-  useEffect(() => {
-    let active = true;
-    void readSession().then((value) => { if (active) setSession(value); });
-    const unsubscribe = subscribeSession((value) => setSession(value));
-    return () => { active = false; unsubscribe(); };
-  }, []);
-
   const refreshStatus = useCallback(async (forSession: MobileSession | null) => {
     const usable = billingSession(forSession);
     const request = ++generation.current;
@@ -121,8 +114,16 @@ function AppleElitePanel({
   }, []);
 
   useEffect(() => {
-    void refreshStatus(session);
-  }, [refreshStatus, session]);
+    let active = true;
+    const applySession = (value: MobileSession | null) => {
+      if (!active) return;
+      setSession(value);
+      void refreshStatus(value);
+    };
+    void readSession().then(applySession);
+    const unsubscribe = subscribeSession(applySession);
+    return () => { active = false; unsubscribe(); };
+  }, [refreshStatus]);
 
   useEffect(() => {
     if (!connected) return;
@@ -173,36 +174,43 @@ function AppleElitePanel({
     onAccessChanged();
   }, [onAccessChanged]);
 
-  purchaseHandler.current = (purchase) => {
-    void (async () => {
-      setVerifying(true);
-      setError(null);
-      try {
-        const result = await verifyAndFinish(purchase);
-        await applyVerifiedResult(
-          result,
-          result.status.subscription.active
-            ? 'Apple verified your subscription. Elite access is active.'
-            : 'Apple verified the transaction, but it is not currently granting Elite access.',
-        );
-      } catch (purchaseError: unknown) {
-        setError(purchaseError instanceof Error ? purchaseError.message : 'Apple purchase verification failed.');
-      } finally {
-        setVerifying(false);
-      }
-    })();
-  };
+  useEffect(() => {
+    purchaseHandler.current = (purchase) => {
+      void (async () => {
+        setVerifying(true);
+        setError(null);
+        try {
+          const result = await verifyAndFinish(purchase);
+          await applyVerifiedResult(
+            result,
+            result.status.subscription.active
+              ? 'Apple verified your subscription. Elite access is active.'
+              : 'Apple verified the transaction, but it is not currently granting Elite access.',
+          );
+        } catch (purchaseError: unknown) {
+          setError(purchaseError instanceof Error ? purchaseError.message : 'Apple purchase verification failed.');
+        } finally {
+          setVerifying(false);
+        }
+      })();
+    };
 
-  purchaseErrorHandler.current = (purchaseError) => {
-    setRequesting(false);
-    setVerifying(false);
-    if (purchaseError.code === 'user-cancelled') {
-      setNotice('Purchase canceled. No subscription change was made.');
-      setError(null);
-      return;
-    }
-    setError(purchaseError.message || 'The App Store could not complete the purchase.');
-  };
+    purchaseErrorHandler.current = (purchaseError) => {
+      setRequesting(false);
+      setVerifying(false);
+      if (purchaseError.code === 'user-cancelled') {
+        setNotice('Purchase canceled. No subscription change was made.');
+        setError(null);
+        return;
+      }
+      setError(purchaseError.message || 'The App Store could not complete the purchase.');
+    };
+
+    return () => {
+      purchaseHandler.current = null;
+      purchaseErrorHandler.current = null;
+    };
+  }, [applyVerifiedResult, verifyAndFinish]);
 
   const product = subscriptions.find((item) => item.id === APPLE_ELITE_PRODUCT_ID);
   const period = periodLabel(product);
