@@ -21,7 +21,7 @@ function loadConfig(profile, extraEnv = {}) {
 
 
 function autolinkedPackageNames(platform) {
-  const result = spawnSync(npx, ['expo-modules-autolinking', 'resolve', '--platform', platform], {
+  const result = spawnSync(npx, ['expo-modules-autolinking', 'resolve', '--platform', platform, '--json'], {
     cwd: new URL('..', import.meta.url),
     env: process.env,
     encoding: 'utf8',
