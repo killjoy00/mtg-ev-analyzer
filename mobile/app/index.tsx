@@ -227,7 +227,7 @@ export default function HomeScreen() {
         >
           <Text style={styles.cardKicker}>PRACTICE</Text>
           <Text style={styles.utilityTitle}>Keep drafting</Text>
-          <Text style={styles.cardBody}>Regular practice is included with a free account. Existing Elite access unlocks Cube and custom-set practice.</Text>
+          <Text style={styles.cardBody}>Regular practice is included with a free account. Some accounts also include Powered Cube and custom-set practice.</Text>
           <Text style={styles.cardAction}>Choose practice →</Text>
         </Pressable>
 
