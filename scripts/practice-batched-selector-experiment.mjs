@@ -170,7 +170,7 @@ try {
       'x-pack1-csrf':user.csrf,'x-idempotency-key':randomBytes(18).toString('base64url'),
     };
     const started=performance.now();
-    const response=await runApi.fetch(new Request('https://api-preview.packone.pro/draft/v1/runs',{method:'POST',headers,body:JSON.stringify(body)}));
+    const response=await runApi.fetch(new Request('https://api-preview.packone.pro/v1/runs',{method:'POST',headers,body:JSON.stringify(body)}));
     const full_ms=Math.round((performance.now()-started)*100)/100;
     let diagnostic=null;try{diagnostic=JSON.parse(response.headers.get('x-pack1-start-timing')||'null');}catch{}
     const data=await response.json();
