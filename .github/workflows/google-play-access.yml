@@ -1,13 +1,10 @@
 name: Google Play access probe
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, edited]
+  push:
+    branches: [main]
     paths:
-      - '.github/workflows/google-play-access.yml'
-      - '.well-known/**'
-      - '_config.yml'
-      - 'docs/mobile-release-config.md'
+      - '.github/google-play-access-request.json'
   workflow_dispatch:
 
 permissions:
@@ -15,16 +12,50 @@ permissions:
   id-token: write
 
 concurrency:
-  group: google-play-access-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: google-play-access
+  cancel-in-progress: false
 
 jobs:
   play-access:
     name: verify Pack One Play access
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository }}
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
     runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
     steps:
       - uses: actions/checkout@v4
+
+      - name: Resolve reviewed Play access request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('.github/google-play-access-request.json').read_text())
+          if set(request) != {'operation','reason'}:
+              raise SystemExit('Invalid Google Play access request keys.')
+          if request.get('operation') != 'check-google-play-access':
+              raise SystemExit('Invalid Google Play access operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Google Play access request requires a reason.')
+          print('Reviewed Google Play access request:', reason)
+          PY
+
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Google Play access is allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
 
       - id: auth
         name: Authenticate to Google Cloud
