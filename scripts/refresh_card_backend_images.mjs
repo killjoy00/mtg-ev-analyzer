@@ -20,7 +20,7 @@ for(const setId of setIds) {
 
   let after='',puzzles=0,updatedPuzzles=0,updatedCards=0;
   for(;;) {
-    const page=await importRequest(base,{action:'refresh-image-page',setId,mapping,after});
+    const page=await importRequest(base,{action:'refresh-image-page-v2',setId,mapping,after});
     if(
       page?.set_id!==setId||
       Number(page.mapping_entries)!==mapping.length||
@@ -30,9 +30,11 @@ for(const setId of setIds) {
       Number(page.updated_puzzles)<0||
       !Number.isInteger(Number(page.updated_cards))||
       Number(page.updated_cards)<0||
-      typeof page.done!=='boolean'
+      typeof page.done!=='boolean'||
+      typeof page.corpus_available!=='boolean'
     )throw new Error(`Unexpected image refresh response for ${setId}`);
 
+    if(!page.corpus_available)throw new Error(`No verified puzzles are available for image refresh: ${setId}`);
     puzzles+=Number(page.puzzles);
     updatedPuzzles+=Number(page.updated_puzzles);
     updatedCards+=Number(page.updated_cards);
