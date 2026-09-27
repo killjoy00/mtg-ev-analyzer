@@ -33,6 +33,7 @@ import {
   type DraftRunState,
   type PracticeEnvironment,
 } from '@/src/api/draftRun';
+import { config } from '@/src/config';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import type { MobileSession } from '@/src/storage/session';
@@ -409,7 +410,7 @@ async function loadDraftSurface(
 
 export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface } = {}) {
   const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string }>();
-  const screenshotFeedback = process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1' && params.screenshot === 'feedback';
+  const screenshotFeedback = config.screenshots.fixtures && params.screenshot === 'feedback';
   const practice = !shared && params.mode === 'practice';
   const requestedEnvironment = shared?.initialRun.environment
     ?? (typeof params.environment === 'string' ? params.environment : 'mixed');
