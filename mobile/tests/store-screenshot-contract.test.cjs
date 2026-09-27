@@ -18,7 +18,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const draftRun = read('mobile/app/draft-run.tsx');
   const workflow = read('.github/workflows/mobile-store-screenshots.yml');
 
-  assert.match(config, /Constants\.expoConfig\?\.extra\?\.buildProfile/);
+  assert.match(config, /process\.env\.EXPO_PUBLIC_PACKONE_ENV/);
   assert.match(config, /screenshotFixtures && resolvedEnvironment !== 'preview'/);
   assert.match(config, /Store screenshot fixtures are allowed only in the preview mobile environment/);
   assert.match(appConfig, /preview: 'pro\.packone\.preview'/);
