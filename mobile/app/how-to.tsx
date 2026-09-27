@@ -42,7 +42,7 @@ const sections: ArticleSection[] = [
   {
     title: '6. Share, compare, or keep practicing.',
     body: [
-      'Guests can play, score, and share all three Dailies. A free account adds a persistent identity and unlimited regular Draft Run practice. If an eligible account is linked before the Daily starts, the result ranks immediately; an eligible guest can also sign in or link the completed first attempt on the same Pacific date to validate it for the leaderboard. Elite capabilities add Powered Cube practice and custom set selection in the Practice hub.',
+      'Guests can play, score, and share all three Dailies. A free account adds a persistent identity and unlimited regular Draft Run practice. If an eligible account is linked before the Daily starts, the result ranks immediately; an eligible guest can also sign in or link the completed first attempt on the same Pacific date to validate it for the leaderboard. Additional account access can include Powered Cube practice and custom set selection in the Practice hub.',
       'If you want to understand why alternatives receive partial credit, how Pack One chooses source decisions, or which sets are currently represented, the pages below go deeper without changing the basic loop: make the decision first, then use the reveal as evidence.',
     ],
   },
