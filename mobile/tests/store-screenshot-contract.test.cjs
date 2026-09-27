@@ -14,15 +14,23 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const config = read('mobile/src/config.ts');
   const appConfig = read('mobile/app.config.ts');
   const client = read('mobile/src/api/client.ts');
+  const session = read('mobile/src/storage/session.ts');
+  const draftRun = read('mobile/app/draft-run.tsx');
   const workflow = read('.github/workflows/mobile-store-screenshots.yml');
 
-  assert.match(config, /screenshotFixtures && resolvedEnvironment === 'production'/);
-  assert.match(config, /Store screenshot fixtures are forbidden in the production mobile environment/);
+  assert.match(config, /Constants\.expoConfig\?\.extra\?\.buildProfile/);
+  assert.match(config, /screenshotFixtures && resolvedEnvironment !== 'preview'/);
+  assert.match(config, /Store screenshot fixtures are allowed only in the preview mobile environment/);
   assert.match(appConfig, /preview: 'pro\.packone\.preview'/);
   assert.match(appConfig, /STORE_IDENTIFIER = 'pro\.packone\.app'/);
-  assert.match(client, /EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1'/);
+  assert.match(appConfig, /screenshotFixtures && profile !== 'preview'/);
+  assert.match(appConfig, /PACKONE_BUILD_PROFILE=preview/);
+  assert.match(client, /if \(config\.screenshots\.fixtures\)/);
+  assert.match(session, /if \(config\.screenshots\.fixtures\)/);
+  assert.match(draftRun, /config\.screenshots\.fixtures && params\.screenshot === 'feedback'/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_ENV: preview/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'/);
+  assert.match(workflow, /PACKONE_BUILD_PROFILE: preview/);
   assert.doesNotMatch(
     workflow.slice(0, workflow.indexOf('jobs:')),
     /EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES/,
