@@ -1,6 +1,6 @@
 # Pack One recovery email delivery
 
-Status: **production active**. Managed Neon remains the recovery-token issuer, Auth database owner, and password-reset authority. Pack One owns recovery email delivery and user-visible reset links.
+Status: **production active**. Managed Neon remains the recovery-token issuer, Auth database owner, and password-reset authority. Pack One owns recovery email delivery and user-visible reset links. After a reset token is successfully consumed, Pack One also finalizes that exact Auth identity as email-verified because the reset proves mailbox possession.
 
 ## Production state
 
@@ -33,6 +33,20 @@ The configuration is managed by the reviewed main-only workflow `.github/workflo
 ## Architecture
 
 Managed Neon issues and redeems the recovery credential. Pack One never replaces the Auth database or reset authority.
+
+## Post-reset verification semantics
+
+The recovery **delivery** contract remains separate from the verification-email delivery contract. The account-state transition is intentionally later:
+
+1. a reset request is enumeration-safe and does not verify anything;
+2. Pack One resolves the exact Auth UUID from the Managed Neon reset-token record;
+3. Better Auth `/reset-password` must successfully consume the token and change the password first;
+4. Pack One signs in through its existing restricted non-human Auth admin principal, proves that principal is distinct from the target and has no Pack One account link, then calls `/admin/update-user` for the exact target UUID with `emailVerified:true`;
+5. Apple synthetic-password state is updated where applicable and every Pack One first-party session for that Auth UUID is revoked.
+
+Pack One does not directly update Managed Auth user rows for this normal product flow.
+
+If step 4 cannot be finalized after Better Auth already changed the password, the password change is not rolled back. Pack One still revokes first-party sessions and returns HTTP 503 with `VERIFICATION_FINALIZE`; the recovery path instructs the user to request a normal verification email before signing in. Invalid, expired, reused, policy-rejected, or provider-failed resets never run the verification update.
 
 The persistent receiver is a dedicated Cloudflare Worker because Managed Neon rejects Neon-infrastructure webhook destinations. The production receiver is intentionally separate from `api.packone.pro` and `edge/gateway.mjs`.
 
@@ -125,6 +139,31 @@ The corrected production smoke passed:
 - no second managed-Neon email appeared for the corrected smoke.
 
 The disposable production user and recovery row were removed after the smoke.
+
+## September 27 production closeout
+
+PR #705 implemented the post-reset verification transition and merged as `ce61279ffe0ce5d015588d12806fdc79c8306911`.
+
+Its required PR gates all passed:
+
+- backend schema gate: **36354748211**;
+- browser E2E: **36354748218**;
+- full test: **36354748219**.
+
+The release trigger PR #710 then passed its required test/E2E gates and merged as `a564a207e9f336639636624c366bff55c6a9759f`. Secure-auth run **36357289329** successfully:
+
+- validated release-critical password-recovery/admin secrets;
+- built the exact release revision;
+- applied/verified development schema;
+- deployed the exact revision to development and passed the secure-auth development smoke;
+- applied/verified production schema;
+- deployed the development-tested revision to production;
+- deployed the production recovery webhook Worker;
+- deployed the first-party production gateway;
+- passed live secure-gateway/Google OAuth verification;
+- passed the final retained gateway timing/telemetry gate.
+
+Production therefore has the reset-implies-verification behavior active; this is no longer merely merged source behavior.
 
 ## Real email-client acceptance
 
