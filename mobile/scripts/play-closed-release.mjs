@@ -51,10 +51,20 @@ try {
   }
 
   const trackNames = (tracks?.tracks || []).map((item) => String(item.track));
+  let createdTrack = false;
   if (!trackNames.includes(track)) {
-    throw new Error(
-      `Closed testing track ${track} is not configured in Google Play. Available tracks: ${trackNames.join(', ') || '(none)'}.`,
+    await request(
+      `${apiBase}/edits/${encodeURIComponent(editId)}/tracks`,
+      {
+        method: 'POST',
+        body: JSON.stringify({
+          track,
+          type: 'CLOSED_TESTING',
+          formFactor: 'DEFAULT',
+        }),
+      },
     );
+    createdTrack = true;
   }
 
   const releaseName = `Pack One closed ${process.env.GITHUB_SHA?.slice(0, 7) || versionCode}`;
@@ -90,7 +100,8 @@ try {
     releaseName,
     releaseStatus: 'completed',
     committed: true,
-    availableTracks: trackNames,
+    availableTracks: createdTrack ? [...trackNames, track] : trackNames,
+    createdTrack,
   }));
 } finally {
   if (editId && !committed) {
