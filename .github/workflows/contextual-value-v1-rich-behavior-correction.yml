@@ -1,0 +1,100 @@
+name: contextual-value-v1-rich-behavior-correction
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+    paths:
+      - '.github/workflows/contextual-value-v1-rich-behavior-correction.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PHASE_A2_PILOT_RUN: '36289846820'
+  PHASE_A2_FULL_RUN: '36290030236'
+  ABLATION_RUN: '36280148906'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned model dependency
+        run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1'
+      - name: Compile behavior correction
+        run: python -m py_compile research/contextual_value_behavior_rich_correction.py research/contextual_value_h_freeze_audit.py research/contextual_value_phase_a_bakeoff.py
+
+      - name: Download Phase A2 fold 0
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-0
+          path: folds
+          run-id: ${{ env.PHASE_A2_PILOT_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download Phase A2 remaining folds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-phase-a2-fold-*
+          path: folds
+          merge-multiple: true
+          run-id: ${{ env.PHASE_A2_FULL_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download frozen strong-offset behavior predictions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-strong_offset_only-fold-*
+          path: behavior
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Run bounded rich behavior correction
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRAIN_ARGS=()
+          TRAIN_REPORT_ARGS=()
+          for f in 0 1 2 3 4; do
+            TRAIN_ARGS+=(--train-shard "folds/phase-a2-fold-$f.npz")
+            TRAIN_REPORT_ARGS+=(--train-report "folds/phase-a2-fold-$f-report.json")
+          done
+          BEHAVIOR_ARGS=()
+          BEHAVIOR_REPORT_ARGS=()
+          for f in -1 0 1 2 3 4; do
+            BEHAVIOR_ARGS+=(--behavior-prediction "behavior/strong_offset_only-fold-$f.jsonl.gz")
+            BEHAVIOR_REPORT_ARGS+=(--behavior-report "behavior/strong_offset_only-fold-$f-report.json")
+          done
+          python3 research/contextual_value_behavior_rich_correction.py             "${TRAIN_ARGS[@]}"             "${TRAIN_REPORT_ARGS[@]}"             --validation-shard folds/phase-a2-fold--1.npz             --validation-report folds/phase-a2-fold--1-report.json             "${BEHAVIOR_ARGS[@]}"             "${BEHAVIOR_REPORT_ARGS[@]}"             --out results/contextual-value-v1/rich-behavior-correction
+
+      - name: Assert research boundaries
+        run: |
+          python3 - <<'PY'
+          import json
+          p="results/contextual-value-v1/rich-behavior-correction/rich-behavior-correction-report.json"
+          r=json.load(open(p))
+          assert r["assessment_opened"] is False
+          assert r["frozen_spec"]["H_actions_changed"] is False
+          assert r["frozen_spec"]["A_actions_changed"] is False
+          assert r["frozen_spec"]["q_values_changed"] is False
+          assert r["frozen_spec"]["hyperparameter_search"] is False
+          assert len(r["training_only_crossfit"]["folds"]) == 5
+          if r["training_only_crossfit"]["aggregate"]["gate_passed"]:
+              assert r["fixed_policy_evaluation"]["H_reproduction_max_abs_error"] <= 1e-9
+          PY
+
+      - name: Upload behavior correction report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-rich-behavior-correction
+          path: results/contextual-value-v1/rich-behavior-correction/
+          retention-days: 30
