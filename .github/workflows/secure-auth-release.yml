@@ -67,6 +67,8 @@ jobs:
           fi
 
       - name: Verify password-recovery deployment secret
+        env:
+          PACK1_LAUNCH_WATCHER_GITHUB_TOKEN: ${{ secrets.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -75,6 +77,7 @@ jobs:
           test ${#PACK1_DELETION_ADMIN_PASSWORD} -ge 16 || { echo '::error::PACK1_DELETION_ADMIN_PASSWORD is missing or too short.'; exit 1; }
           [[ "$PACK1_AUTH_RESEND_API_KEY" == re_* ]] || { echo '::error::PACK1_AUTH_RESEND_API_KEY is missing or malformed.'; exit 1; }
           [[ "$PACK1_ACCOUNT_DELETE_RESEND_API_KEY" == re_* && ${#PACK1_ACCOUNT_DELETE_RESEND_API_KEY} -gt 3 ]] || { echo '::error::PACK1_ACCOUNT_DELETE_RESEND_API_KEY is missing or malformed.'; exit 1; }
+          [[ "$PACK1_LAUNCH_WATCHER_GITHUB_TOKEN" == github_pat_* && ${#PACK1_LAUNCH_WATCHER_GITHUB_TOKEN} -ge 30 ]] || { echo '::error::PACK1_LAUNCH_WATCHER_GITHUB_TOKEN must be a fine-grained GitHub token for this repository with Actions write access.'; exit 1; }
           [[ "$APPLE_TEAM_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo '::error::APPLE_TEAM_ID is missing or malformed.'; exit 1; }
           [[ "$APPLE_SIGN_IN_KEY_ID" =~ ^[A-Z0-9]{10}$ ]] || { echo '::error::APPLE_SIGN_IN_KEY_ID is missing or malformed.'; exit 1; }
           [[ "$APPLE_SIGN_IN_KEY_P8" == *"BEGIN PRIVATE KEY"* ]] || { echo '::error::APPLE_SIGN_IN_KEY_P8 is missing or malformed.'; exit 1; }
@@ -136,7 +139,7 @@ jobs:
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$DEV_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
-          node tests/secure-auth-release-smoke.mjs "$DEV_BRANCH" "$GITHUB_SHA" --settle --expect-deletion-email=false
+          node tests/secure-auth-release-smoke.mjs "$DEV_BRANCH" "$GITHUB_SHA" --settle --expect-deletion-email=false --expect-launch-recovery=false
 
       - name: Verify activated Patreon secrets before production
         shell: bash
@@ -177,6 +180,8 @@ jobs:
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
       - name: Deploy the development-tested revision to production
+        env:
+          PACK1_LAUNCH_WATCHER_GITHUB_TOKEN: ${{ secrets.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN }}
         shell: bash
         run: |
           set -euo pipefail
@@ -188,6 +193,7 @@ jobs:
                 --env "PACK1_DELETION_ADMIN_EMAIL=$PACK1_DELETION_ADMIN_EMAIL"
                 --env "PACK1_DELETION_ADMIN_PASSWORD=$PACK1_DELETION_ADMIN_PASSWORD"
                 --env "PACK1_ACCOUNT_DELETE_RESEND_API_KEY=$PACK1_ACCOUNT_DELETE_RESEND_API_KEY"
+                --env "PACK1_LAUNCH_WATCHER_GITHUB_TOKEN=$PACK1_LAUNCH_WATCHER_GITHUB_TOKEN"
                 --env "PACK1_ACCOUNT_DELETION_ENABLED=1"
                 --env "PACK1_VERIFICATION_SWEEP_ENABLED=1"
                 --env "APPLE_TEAM_ID=$APPLE_TEAM_ID"
@@ -200,7 +206,7 @@ jobs:
             fi
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$PROD_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
-          node tests/secure-auth-release-smoke.mjs "$PROD_BRANCH" "$GITHUB_SHA" --settle --expect-deletion-email=true
+          node tests/secure-auth-release-smoke.mjs "$PROD_BRANCH" "$GITHUB_SHA" --settle --expect-deletion-email=true --expect-launch-recovery=true
 
       - name: Deploy dedicated production recovery webhook Worker
         env:

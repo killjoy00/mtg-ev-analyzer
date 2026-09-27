@@ -16,6 +16,7 @@ import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
+import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
@@ -1901,6 +1902,29 @@ async function launchWatcherSignal(trigger,response) {
   } catch {
     freshness={ok:false,reason:'coverage_check_failed',max_age_minutes:30};
   }
+
+  let recoveryDispatch=null,recoveryDispatchError=null;
+  try {
+    recoveryDispatch=await reconcileLaunchWatcherDispatch({query,freshness,now:scheduledAt});
+    if(recoveryDispatch.action==='failed'||recoveryDispatch.action==='exhausted')console.error(JSON.stringify({
+      event:'launch_watcher_recovery_dispatch_failure',
+      reason:recoveryDispatch.reason||recoveryDispatch.action,
+      attempts:recoveryDispatch.attempts,
+      coverage_reason:freshness.reason,
+      covered_through:freshness.covered_through||null,
+      release_commit:releaseMetadata().release_commit,
+    }));
+  } catch(error) {
+    recoveryDispatchError=String(error?.message||error).slice(0,120);
+    console.error(JSON.stringify({
+      event:'launch_watcher_recovery_dispatch_failure',
+      reason:recoveryDispatchError,
+      coverage_reason:freshness.reason,
+      covered_through:freshness.covered_through||null,
+      release_commit:releaseMetadata().release_commit,
+    }));
+  }
+
   let operatorAlert=null;
   try {
     operatorAlert=await reconcileLaunchWatcherAlert({query,freshness,now:scheduledAt});
@@ -1914,19 +1938,33 @@ async function launchWatcherSignal(trigger,response) {
     }));
     if(freshness.ok) {
       const snapshot=await response.json();
-      return json({...snapshot,ok:false,launch_watcher:freshness,launch_watcher_alert:{ok:false,reason:'operator_alert_failed'}},503);
+      return json({
+        ...snapshot,ok:false,launch_watcher:freshness,
+        launch_watcher_alert:{ok:false,reason:'operator_alert_failed'},
+        launch_watcher_recovery:recoveryDispatch||{action:recoveryDispatchError?'failed':'unknown'},
+      },503);
     }
   }
+
   if(freshness.ok) {
-    if(operatorAlert?.action==='recovered')console.log(JSON.stringify({
+    if(operatorAlert?.action==='recovered'||recoveryDispatch?.action==='recovered')console.log(JSON.stringify({
       event:'launch_watcher_recovered',
       covered_through:freshness.covered_through||null,
       age_minutes:Number.isFinite(freshness.age_minutes)?freshness.age_minutes:null,
-      operator_alert:operatorAlert.action,
+      operator_alert:operatorAlert?.action||'healthy',
+      recovery_dispatch:recoveryDispatch?.action||'healthy',
       release_commit:releaseMetadata().release_commit,
     }));
+    if(recoveryDispatchError) {
+      const snapshot=await response.json();
+      return json({
+        ...snapshot,ok:false,launch_watcher:freshness,
+        launch_watcher_recovery:{action:'failed',reason:'dispatch_state_failed'},
+      },503);
+    }
     return response;
   }
+
   console.error(JSON.stringify({
     event:'launch_watcher_stale',
     reason:freshness.reason,
@@ -1934,10 +1972,15 @@ async function launchWatcherSignal(trigger,response) {
     age_minutes:Number.isFinite(freshness.age_minutes)?freshness.age_minutes:null,
     max_age_minutes:freshness.max_age_minutes,
     operator_alert:operatorAlert?.action||'failed',
+    recovery_dispatch:recoveryDispatch?.action||'failed',
+    recovery_attempts:recoveryDispatch?.attempts??null,
     release_commit:releaseMetadata().release_commit,
   }));
   const snapshot=await response.json();
-  return json({...snapshot,ok:false,launch_watcher:freshness},503);
+  return json({
+    ...snapshot,ok:false,launch_watcher:freshness,
+    launch_watcher_recovery:recoveryDispatch||{action:'failed',reason:'dispatch_state_failed'},
+  },503);
 }
 async function handleDeletionMaintenance(request) {
   if(request.method!=='POST')throw Object.assign(Error('Not found.'),{status:404});
@@ -2115,7 +2158,7 @@ async function handleProfileLookup(request) {
 async function route(request) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(request) });
   const url = new URL(request.url);
-  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), apple_sign_in_configured:appleConfigured() });
+  if (request.method === 'GET' && url.pathname === '/health') return json({ ok: true, ...releaseMetadata(), service: 'pack1-growth', version: 3, profiles: true, account_deletion_enabled:deletionEnabled(), verification_sweep_enabled:verificationSweepEnabled(), deletion_email_configured:deletionEmailConfigured(), launch_watcher_recovery_configured:launchWatcherRecoveryConfigured(), apple_sign_in_configured:appleConfigured() });
   if (url.pathname === '/internal/account-deletion-maintenance') return handleDeletionMaintenance(request);
   if (url.pathname === '/internal/account-deletion-maintenance-status') return handleDeletionMaintenanceStatus(request);
   if (request.method === 'GET' && url.pathname === '/v1/account/google/callback') return handleGoogleCallback(request);
