@@ -1,4 +1,4 @@
-import { APPLE_ELITE_PRODUCT_ID } from '@/src/api/apple-subscriptions';
+const APPLE_ELITE_PRODUCT_ID = 'pro.packone.app.elite.monthly';
 
 const PLAYER_ID = '11111111-1111-4111-8111-111111111111';
 const ACCOUNT_ID = '22222222-2222-4222-8222-222222222222';
@@ -118,7 +118,7 @@ function revealedRun(selectedId: string) {
   };
 }
 
-let currentRun = initialRun();
+let currentRun: unknown = initialRun();
 
 const dailyStatus = {
   day: '2026-09-27',
