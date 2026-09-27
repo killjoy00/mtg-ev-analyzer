@@ -158,6 +158,49 @@ async function providerCall(authBase,path,{body,cookie}={}) {
   return {response,data,cookie:session};
 }
 
+export async function markProviderUserEmailVerified({authBase,authUserId,env=process.env,validateServicePrincipal}) {
+  const email=String(env.PACK1_DELETION_ADMIN_EMAIL||'').trim();
+  const password=String(env.PACK1_DELETION_ADMIN_PASSWORD||'');
+  const userId=String(authUserId||'');
+  if(!email||password.length<16)return {kind:'operator_review',code:'PROVIDER_ADMIN_CONFIG'};
+  if(!UUID.test(userId))return {kind:'operator_review',code:'PROVIDER_TARGET_IDENTITY'};
+  let session='';
+  try {
+    const signed=await providerCall(authBase,'/sign-in/email',{body:{email,password,rememberMe:false}});
+    if(!signed.response.ok||!signed.cookie)return {kind:'operator_review',code:'PROVIDER_ADMIN_AUTH'};
+    session=signed.cookie;
+    const serviceId=String(signed.data?.user?.id||'');
+    if(!UUID.test(serviceId)||serviceId===userId)
+      return {kind:'operator_review',code:'PROVIDER_ADMIN_IDENTITY'};
+    if(typeof validateServicePrincipal!=='function')
+      return {kind:'operator_review',code:'PROVIDER_ADMIN_LINK_POLICY'};
+    let servicePrincipalAllowed=false;
+    try {
+      servicePrincipalAllowed=await validateServicePrincipal(serviceId);
+    } catch {
+      return {kind:'transient',code:'PROVIDER_ADMIN_LINK_CHECK'};
+    }
+    if(!servicePrincipalAllowed)
+      return {kind:'operator_review',code:'PROVIDER_ADMIN_LINKED'};
+    const updated=await providerCall(authBase,'/admin/update-user',{cookie:session,body:{
+      userId,
+      data:{emailVerified:true},
+    }});
+    if(updated.response.ok)return {kind:'success'};
+    if(updated.response.status===403)return {kind:'operator_review',code:'PROVIDER_FORBIDDEN'};
+    if(updated.response.status===429)return {kind:'transient',code:'PROVIDER_RATE_LIMIT'};
+    if(updated.response.status>=500)return {kind:'transient',code:'PROVIDER_5XX'};
+    return {kind:'operator_review',code:'PROVIDER_RESPONSE'};
+  } catch(error) {
+    if(error?.name==='TimeoutError'||error?.name==='AbortError')return {kind:'transient',code:'PROVIDER_TIMEOUT'};
+    return {kind:'transient',code:'PROVIDER_NETWORK'};
+  } finally {
+    if(session) {
+      try {await providerCall(authBase,'/sign-out',{cookie:session,body:{}});} catch {}
+    }
+  }
+}
+
 export async function removeProviderUser({authBase,authUserId,env=process.env,validateServicePrincipal}) {
   const email=String(env.PACK1_DELETION_ADMIN_EMAIL||'').trim();
   const password=String(env.PACK1_DELETION_ADMIN_PASSWORD||'');

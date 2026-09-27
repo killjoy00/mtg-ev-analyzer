@@ -11,7 +11,7 @@ import {accountSession,clearAccountCookies,clearPlayerCookie,consumeNeonSession,
 import {accountRuntimeConfig} from './account-config.mjs';
 import {clearCredentialLimit,consumeCredentialLimit,trustedCredentialNetwork} from './account-credential-limits.mjs';
 import {consumeDeletionVerification,createDeletionVerification,deletionEmailConfigured,deletionEmailForAuth} from './account-deletion-verification.mjs';
-import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,deletionRecoveryKey,finishProviderPhase,loadDeletionOperation,maintenanceBatch,removeProviderUser,stuckDeletion,sweepExpiredVerification,verificationSweepEnabled} from './account-deletion.mjs';
+import {beginDeletion,cleanupPackOne,deletedPlayerTombstone,deletionEnabled,deletionRecoveryKey,finishProviderPhase,loadDeletionOperation,maintenanceBatch,markProviderUserEmailVerified,removeProviderUser,stuckDeletion,sweepExpiredVerification,verificationSweepEnabled} from './account-deletion.mjs';
 import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
@@ -880,7 +880,7 @@ async function handleMobileGoogleFinish(request) {
   });
 }
 
-async function appleServicePrincipalAllowed(serviceId) {
+async function providerServicePrincipalAllowed(serviceId) {
   const linked=await query('SELECT 1 FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1',[serviceId]);
   return linked.rows.length===0;
 }
@@ -1023,7 +1023,7 @@ async function handleAppleCallback(request) {
       firstName,
       lastName,
       authBase:NEON_AUTH_BASE,
-      validateServicePrincipal:appleServicePrincipalAllowed,
+      validateServicePrincipal:providerServicePrincipalAllowed,
     });
     const updated=await query(`UPDATE mobile_oauth_handoffs
       SET handoff_hash=$2,auth_user_id=$3::uuid,authenticated_at=now()
@@ -1091,7 +1091,7 @@ async function handleMobileAppleNative(request) {
     firstName:sanitizeAppleFirstName(payload.firstName||''),
     lastName:sanitizeAppleFirstName(payload.lastName||''),
     authBase:NEON_AUTH_BASE,
-    validateServicePrincipal:appleServicePrincipalAllowed,
+    validateServicePrincipal:providerServicePrincipalAllowed,
   });
   const consumedMarker=opaqueMobileToken();
   const updated=await query(`UPDATE mobile_oauth_handoffs
@@ -1219,8 +1219,18 @@ async function handlePasswordReset(request,{mobile=false}={}) {
     if(status>=500)throw Object.assign(Error('Password recovery is temporarily unavailable.'),{status:503,code:'PROVIDER_FAILURE'});
     throw Object.assign(Error(status===400?'This password reset link is invalid, expired, or already used.':'The new password was not accepted.'),{status:400,code:status===400?'INVALID_RESET':'PASSWORD_POLICY'});
   }
+  const verification=await markProviderUserEmailVerified({
+    authBase:NEON_AUTH_BASE,
+    authUserId,
+    validateServicePrincipal:providerServicePrincipalAllowed,
+  });
   await markApplePasswordEstablished(query,authUserId);
   await revokeAllAccountSessions(query,authUserId);
+  if(verification.kind!=='success')
+    throw Object.assign(Error('Your password was changed, but account verification could not be finalized. Request a verification email, then sign in with your new password.'),{
+      status:503,
+      code:'VERIFICATION_FINALIZE',
+    });
   return clearAccountCookies(json({ok:true}));
 }
 
@@ -1687,7 +1697,7 @@ async function resumeDeletionOperation(operation,{knownEmail=null}={}) {
     const result=await removeProviderUser({
       authBase:NEON_AUTH_BASE,
       authUserId:current.auth_user_id,
-      validateServicePrincipal:appleServicePrincipalAllowed,
+      validateServicePrincipal:providerServicePrincipalAllowed,
     });
     current=await finishProviderPhase(query,current,result);
     if(current.state==='operator_review') {

@@ -45,7 +45,7 @@ For email/password accounts:
 - resend is available through Pack One's first-party account API;
 - expired, invalid or already-consumed verification links have a Pack One recovery screen that can request a new link;
 - verification links are presented to users as expiring after 15 minutes;
-- password recovery remains a separate `forget-password` flow;
+- password recovery remains a separate `forget-password` flow, but successfully consuming a password-reset link also marks that same account email verified because the reset link proves mailbox possession;
 - Google OAuth remains independent of password email verification.
 
 ## Existing-account migration
