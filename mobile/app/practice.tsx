@@ -187,7 +187,7 @@ export default function PracticeScreen() {
             pressed && cubeUnlocked && styles.pressed,
           ]}
         >
-          <Text style={styles.cardKicker}>{cubeUnlocked ? 'ADDITIONAL PRACTICE' : 'ADDITIONAL PRACTICE'}</Text>
+          <Text style={styles.cardKicker}>ADDITIONAL PRACTICE</Text>
           <Text style={styles.cardTitle}>Powered Cube</Text>
           <Text style={styles.body}>Unlimited Powered Cube practice with two new-pack rerolls.</Text>
           <Text style={cubeUnlocked ? styles.cardAction : styles.lockedText}>
@@ -196,7 +196,7 @@ export default function PracticeScreen() {
         </Pressable>
 
         <View style={[styles.optionCard, !customUnlocked && styles.lockedCard]}>
-          <Text style={styles.cardKicker}>{customUnlocked ? 'ADDITIONAL PRACTICE' : 'ADDITIONAL PRACTICE'}</Text>
+          <Text style={styles.cardKicker}>ADDITIONAL PRACTICE</Text>
           <Text style={styles.cardTitle}>Choose your sets</Text>
           <Text style={styles.body}>Build an eight-pick practice run from the live sets you select.</Text>
 
