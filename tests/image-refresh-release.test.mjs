@@ -67,8 +67,24 @@ test('targeted image repair is scoped, ordered and keeps dispatch inputs out of 
   assert.match(repair,/if: inputs\.mode == 'targeted'/);
   assert.doesNotMatch(repair,/python scripts\/refresh_card_images\.py/);
   assert.doesNotMatch(repair,/scripts\/refresh_card_backend_images\.mjs/);
-  assert.match(repair,/name: Hydrate targeted replay shards from R2[\s\S]*?REPLAY_SETS: \$\{\{ inputs\.environments \}\}[\s\S]*?r2_replay_shards\.sh hydrate/);
-  assert.match(repair,/name: Publish targeted replay shards to R2[\s\S]*?REPLAY_SETS: \$\{\{ inputs\.environments \}\}[\s\S]*?r2_replay_shards\.sh upload[\s\S]*?r2_replay_shards\.sh verify/);
+  assert.match(repair,/timeout-minutes: 45/);
+  assert.match(repair,/name: Hydrate all replay shards for targeted audit\s+run: bash scripts\/r2_replay_shards\.sh hydrate/);
+  const hydrateBlock=repair.slice(
+    repair.indexOf('Hydrate all replay shards for targeted audit'),
+    repair.indexOf('Repair exact card image metadata'),
+  );
+  assert.doesNotMatch(hydrateBlock,/REPLAY_SETS/);
+  assert.match(repair,/name: Export validated targeted environments[\s\S]*?generated\/card-image-repair\/report\.json[\s\S]*?GITHUB_ENV/);
+  assert.match(repair,/name: Publish targeted replay shards to R2[\s\S]*?r2_replay_shards\.sh upload[\s\S]*?r2_replay_shards\.sh verify/);
+  assert.doesNotMatch(repair,/REPLAY_SETS: \$\{\{ inputs\.environments \}\}/);
+  for(const stage of ['development-repair','development-verify','production-repair','production-verify']) {
+    assert.match(repair,new RegExp(`CARD_IMAGE_BACKEND_STAGE: ${stage}\\n\\s+CARD_IMAGE_BACKEND_DIAGNOSTICS: generated/card-image-repair/backend/${stage}\\.json`));
+  }
+  assert.ok(
+    repair.indexOf('Upload repair diagnostics') >
+    repair.indexOf('Verify production targeted image metadata and gameplay'),
+  );
+  assert.match(repair,/generated\/card-image-repair\/backend\/\*\.json/);
   assert.ok(
     repair.indexOf('node scripts/verify-image-refresh-release.mjs "$EXPECTED_COMMIT"') <
     repair.indexOf('bash scripts/r2_replay_shards.sh upload'),
