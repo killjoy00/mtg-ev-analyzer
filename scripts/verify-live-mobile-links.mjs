@@ -18,7 +18,7 @@ async function fetchJson(url) {
   }
   if (!response.ok) throw new Error(`${url} returned HTTP ${response.status}.`);
   const contentType = response.headers.get('content-type') || '';
-  if (!/application\/json|application\/pkcs7-mime/i.test(contentType)) {
+  if (!/application\/json|application\/pkcs7-mime|application\/octet-stream/i.test(contentType)) {
     throw new Error(`${url} returned unexpected Content-Type ${contentType || '(missing)'}.`);
   }
   const text = await response.text();
