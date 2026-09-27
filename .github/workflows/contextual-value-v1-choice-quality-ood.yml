@@ -1,9 +1,6 @@
 name: contextual-value-v1-choice-quality-ood
 
 on:
-  push:
-    branches:
-      - research/contextual-value-v1-h-freeze-audit-529
   workflow_dispatch:
 
 permissions:
