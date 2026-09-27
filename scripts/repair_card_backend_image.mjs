@@ -16,7 +16,8 @@ function validatePage(page,setId) {
     Number(page.updated_puzzles)<0||
     !Number.isInteger(Number(page.updated_cards))||
     Number(page.updated_cards)<0||
-    typeof page.done!=='boolean'
+    typeof page.done!=='boolean'||
+    typeof page.corpus_available!=='boolean'
   )throw new Error(`Unexpected targeted image refresh response for ${setId}`);
 }
 
@@ -66,8 +67,9 @@ export async function repairBackendImages(
       throw new Error(`Targeted image mapping must contain exactly one entry for ${setId}`);
     let after='',puzzles=0,updatedPuzzles=0,updatedCards=0,pages=0;
     for(;;) {
-      const page=await request(base,{action:'refresh-image-page',setId,mapping,after});
+      const page=await request(base,{action:'refresh-image-page-v2',setId,mapping,after});
       validatePage(page,setId);
+      if(!page.corpus_available)throw new Error(`No verified puzzles are available for targeted image refresh: ${setId}`);
       pages+=1;
       puzzles+=Number(page.puzzles);
       updatedPuzzles+=Number(page.updated_puzzles);
@@ -92,7 +94,6 @@ export async function repairBackendImages(
         throw new Error(`Targeted image refresh cursor did not advance for ${setId}`);
       after=page.next_after;
     }
-    if(puzzles<1)throw new Error(`No verified puzzles are available for targeted image refresh: ${setId}`);
     const summary={
       set_id:setId,
       mapping_entries:1,

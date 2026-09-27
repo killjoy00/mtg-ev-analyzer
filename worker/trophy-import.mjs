@@ -67,19 +67,50 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
   if(!allowed.has(setId))throw error('Image refresh requires a registered environment');
   const mapping=normalizeImageMapping(rawMapping);
   const after=String(rawAfter||'');
+  const desired=JSON.stringify([...mapping].map(([name,display])=>({name,...display})));
+  // Filter inside Postgres before returning payloads. Image maintenance still
+  // validates every row it changes, but already-correct puzzle JSON never
+  // crosses the Neon proxy merely to prove that it is unchanged.
   const page=await query(
-    'SELECT puzzle_id,payload FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND puzzle_id>$3 ORDER BY puzzle_id LIMIT $4',
-    [setId,VERSION,after,IMAGE_REFRESH_PAGE_SIZE],
+    `WITH desired AS (
+       SELECT value AS display FROM jsonb_array_elements($4::jsonb)
+     )
+     SELECT p.puzzle_id,p.payload
+     FROM draft_run_verified_puzzles p
+     WHERE p.set_id=$1 AND p.corpus_version=$2 AND p.puzzle_id>$3
+       AND EXISTS (
+         SELECT 1
+         FROM jsonb_array_elements(
+           COALESCE(p.payload->'candidates','[]'::jsonb) ||
+           COALESCE(p.payload->'prior_picks','[]'::jsonb)
+         ) AS card(value)
+         JOIN desired d ON d.display->>'name'=card.value->>'name'
+         WHERE
+           (card.value->>'image_url') IS DISTINCT FROM (d.display->>'image_url')
+           OR ((d.display ? 'mana_cost') AND (card.value->>'mana_cost') IS DISTINCT FROM (d.display->>'mana_cost'))
+           OR ((d.display ? 'rarity') AND (card.value->>'rarity') IS DISTINCT FROM (d.display->>'rarity'))
+           OR ((d.display ? 'type_line') AND (card.value->>'type_line') IS DISTINCT FROM (d.display->>'type_line'))
+       )
+     ORDER BY p.puzzle_id
+     LIMIT $5`,
+    [setId,VERSION,after,desired,IMAGE_REFRESH_PAGE_SIZE],
   );
-  if(!page.rows.length)return {
-    set_id:setId,
-    mapping_entries:mapping.size,
-    puzzles:0,
-    updated_puzzles:0,
-    updated_cards:0,
-    next_after:null,
-    done:true,
-  };
+  if(!page.rows.length) {
+    const available=(await query(
+      'SELECT 1 FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 LIMIT 1',
+      [setId,VERSION],
+    )).rows.length>0;
+    return {
+      set_id:setId,
+      mapping_entries:mapping.size,
+      puzzles:0,
+      updated_puzzles:0,
+      updated_cards:0,
+      next_after:null,
+      done:true,
+      corpus_available:available,
+    };
+  }
 
   const updates=[];
   let updatedCards=0;
@@ -122,14 +153,16 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
     updated_cards:updatedCards,
     next_after:page.rows.length===IMAGE_REFRESH_PAGE_SIZE?nextAfter:null,
     done:page.rows.length<IMAGE_REFRESH_PAGE_SIZE,
+    corpus_available:true,
   };
 }
 
 export async function refreshTrophyImages(query,setId,rawMapping) {
-  let after='',seen=0,updatedPuzzles=0,updatedCards=0,mappingEntries=null;
+  let after='',seen=0,updatedPuzzles=0,updatedCards=0,mappingEntries=null,corpusAvailable=false;
   for(;;) {
     const page=await refreshTrophyImagePage(query,setId,rawMapping,after);
     mappingEntries??=page.mapping_entries;
+    corpusAvailable ||= page.corpus_available===true;
     seen+=page.puzzles;
     updatedPuzzles+=page.updated_puzzles;
     updatedCards+=page.updated_cards;
@@ -137,7 +170,7 @@ export async function refreshTrophyImages(query,setId,rawMapping) {
     if(!page.next_after||page.next_after===after)throw error('Image refresh cursor did not advance',409);
     after=page.next_after;
   }
-  if(!seen)throw error('No verified puzzles are available for image refresh',409);
+  if(!corpusAvailable)throw error('No verified puzzles are available for image refresh',409);
   return {set_id:setId,mapping_entries:mappingEntries,puzzles:seen,updated_puzzles:updatedPuzzles,updated_cards:updatedCards};
 }
 
@@ -215,10 +248,10 @@ export async function handleTrophyImport(request,query) {
   let body;
   try{body=JSON.parse(Buffer.concat(chunks));}catch{throw error('Invalid JSON');}
 
-  if(body.action==='refresh-images'||body.action==='refresh-image-page'||body.action==='normalize-image-markers') {
+  if(body.action==='refresh-images'||body.action==='refresh-image-page'||body.action==='refresh-image-page-v2'||body.action==='normalize-image-markers') {
     if(identity.workflow_ref!==IMAGE_REFRESH_WORKFLOW)throw error('Image refresh identity denied',403);
     if(body.action==='refresh-images')return refreshTrophyImages(query,body.setId,body.mapping);
-    if(body.action==='refresh-image-page')return refreshTrophyImagePage(query,body.setId,body.mapping,body.after);
+    if(body.action==='refresh-image-page'||body.action==='refresh-image-page-v2')return refreshTrophyImagePage(query,body.setId,body.mapping,body.after);
     return normalizeResolvedImageMarkers(query,body.setIds);
   }
   if(identity.workflow_ref!==IMPORT_WORKFLOW)throw error('Trophy import identity denied',403);

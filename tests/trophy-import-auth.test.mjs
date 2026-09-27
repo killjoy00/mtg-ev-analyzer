@@ -117,7 +117,7 @@ test('card image refresh changes display metadata only for registered environmen
   const original=structuredClone(sample);
   let stored=sample;
   const query=async(sql,params=[])=>{
-    if(sql.startsWith('SELECT puzzle_id,payload')){
+    if(sql.includes('SELECT p.puzzle_id,p.payload')){
       return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
     }
     if(sql.includes('UPDATE draft_run_verified_puzzles')){
@@ -142,6 +142,7 @@ test('card image refresh changes display metadata only for registered environmen
   assert.equal(page.updated_puzzles,1);
   assert.equal(page.done,true);
   assert.equal(page.next_after,null);
+  assert.equal(page.corpus_available,true);
   stored=structuredClone(original);
 
   const result=await refreshTrophyImages(query,'powered-cube',mapping);
@@ -171,7 +172,7 @@ test('a blank mapped type line cannot erase stored metadata during image refresh
   const target={...original.candidates[0],type_line:'Artifact'};
   let stored={...structuredClone(original),candidates:[target,...structuredClone(original.candidates.slice(1))]};
   const query=async(sql,params=[])=>{
-    if(sql.startsWith('SELECT puzzle_id,payload'))return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
+    if(sql.includes('SELECT p.puzzle_id,p.payload'))return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
     if(sql.includes('UPDATE draft_run_verified_puzzles')){stored=JSON.parse(params[0])[0].payload;return {rows:[{puzzle_id:stored.puzzle_id}]};}
     throw new Error('Unexpected SQL in image refresh test: '+sql);
   };
@@ -181,6 +182,38 @@ test('a blank mapped type line cannot erase stored metadata during image refresh
   const card=stored.candidates.find(candidate=>candidate.name===target.name);
   assert.equal(card.image_url,replacement);
   assert.equal(card.type_line,'Artifact');
+});
+
+test('image refresh filters already-correct payloads inside Postgres',async()=>{
+  const rows=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
+  const sample=structuredClone(rows[0]);
+  const target=sample.candidates[0];
+  const mapping=[{
+    name:target.name,
+    image_url:target.image_url,
+    mana_cost:target.mana_cost||'',
+    rarity:target.rarity||'',
+    type_line:target.type_line||'',
+  }];
+  const calls=[];
+  const query=async(sql,params=[])=>{
+    calls.push({sql,params});
+    if(sql.includes('SELECT p.puzzle_id,p.payload'))return {rows:[]};
+    if(sql.startsWith('SELECT 1 FROM draft_run_verified_puzzles'))return {rows:[{exists:1}]};
+    throw new Error('Unexpected SQL in no-op image refresh test: '+sql);
+  };
+  const result=await refreshTrophyImages(query,'powered-cube',mapping);
+  assert.equal(result.puzzles,0);
+  assert.equal(result.updated_puzzles,0);
+  assert.equal(result.updated_cards,0);
+  assert.equal(calls.length,2);
+  assert.match(calls[0].sql,/jsonb_array_elements\(\$4::jsonb\)/);
+  assert.match(calls[0].sql,/IS DISTINCT FROM/);
+  assert.match(calls[0].sql,/COALESCE\(p\.payload->'candidates'/);
+  assert.equal(calls[0].params[2],'');
+  assert.equal(calls[0].params[4],250);
+  assert.deepEqual(JSON.parse(calls[0].params[3]),mapping);
+  assert.doesNotMatch(calls[1].sql,/payload/);
 });
 
 test('image markers clear only after every served card has an HTTPS image',async()=>{
