@@ -1,6 +1,9 @@
 name: contextual-value-v1-rich-behavior-correction
 
 on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
   workflow_dispatch:
 
 permissions:
