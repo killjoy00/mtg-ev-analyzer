@@ -219,6 +219,8 @@ test('Pack One cleanup hard-deletes attributable corpus events and preserves ret
   assert.match(text,/DELETE FROM corpus_status_events WHERE auth_user_id=/);
   assert.match(text,/DELETE FROM account_deletion_verifications WHERE auth_user_id=/);
   assert.match(text,/DELETE FROM mobile_oauth_handoffs WHERE auth_user_id=/);
+  assert.match(text,/DELETE FROM apple_subscription_notifications WHERE original_transaction_id IN/);
+  assert.match(text,/DELETE FROM apple_subscription_entitlements WHERE auth_user_id=/);
   assert.doesNotMatch(text,/UPDATE corpus_status_events SET auth_user_id=NULL/);
   const retained=calls.find(row=>row.sql.includes('UPDATE game_results SET challenge_id=NULL,opponent_name=NULL'))?.sql||'';
   assert.ok(retained,'retained cross-player result is scrubbed');
