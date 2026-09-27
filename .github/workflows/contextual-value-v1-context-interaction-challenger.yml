@@ -1,0 +1,185 @@
+name: contextual-value-v1-context-interaction-challenger
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-context-interactions-529
+    paths:
+      - '.github/workflows/contextual-value-v1-context-interaction-challenger.yml'
+      - 'research/contextual_value_context_interaction_challenger.py'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  SOURCE_RUN: '36256947308'
+  SOURCE_SHA: aa5b17d96b43f3ce08f52fad55ba17f327472c1b
+  ABLATION_RUN: '36280148906'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  fit-fold:
+    name: challenger-fold-${{ matrix.fold }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 6
+      matrix:
+        fold: [-1, 0, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile challenger
+        run: python -m py_compile research/contextual_value_context_interaction_challenger.py
+      - name: Download frozen development cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download retained nuisance-training features
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-feature-fold-${{ matrix.fold }}-*
+          path: precomputed-features
+          merge-multiple: true
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download leakage-safe held features from ablation run
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-held-${{ matrix.fold }}
+          path: held
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download strong-offset-only behavior checkpoint
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-strong_offset_only-fold-${{ matrix.fold }}
+          path: behavior
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Fit challenger Q and preserve behavior
+        shell: bash
+        run: |
+          set -euo pipefail
+          FOLD='${{ matrix.fold }}'
+          python3 research/contextual_value_context_interaction_challenger.py fit-fold \
+            --fold "$FOLD" \
+            --cohort-dir preprocessed-core \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-MSH.jsonl.gz" \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-SOS.jsonl.gz" \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-ECL.jsonl.gz" \
+            --feature-shard "precomputed-features/train-feature-fold-$FOLD-TLA.jsonl.gz" \
+            --held-features "held/held-features-fold-$FOLD.jsonl.gz" \
+            --held-report "held/held-features-fold-$FOLD-report.json" \
+            --behavior-predictions "behavior/strong_offset_only-fold-$FOLD.jsonl.gz" \
+            --behavior-report "behavior/strong_offset_only-fold-$FOLD-report.json" \
+            --source-sha "$SOURCE_SHA" \
+            --out "results/contextual-value-v1/context-interaction-fold-$FOLD"
+      - name: Assert ranking contract and assessment boundary
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          reports=list(pathlib.Path("results/contextual-value-v1").glob("context-interaction-fold-*/context-interaction-fold-*-report.json"))
+          assert len(reports)==1
+          r=json.loads(reports[0].read_text())
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          assert r["behavior"] == "reused_exactly_from_strong_offset_only_ablation"
+          assert r["ranking_strong_player_features_removed"] is True
+          assert len(r["candidate_context_interactions"]) == 15
+          assert "strong_choice_probability" not in r["q_feature_names"]
+          assert "log_strong_choice_probability" not in r["q_feature_names"]
+          PY
+      - name: Upload challenger fold
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-context-interaction-fold-${{ matrix.fold }}
+          path: results/contextual-value-v1/context-interaction-fold-${{ matrix.fold }}/
+          retention-days: 30
+
+  aggregate:
+    needs: fit-fold
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Download frozen development cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: preprocessed-core
+          run-id: ${{ env.SOURCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download held feature checkpoints
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-held-*
+          path: held
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download challenger folds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-context-interaction-fold-*
+          path: challenger
+          merge-multiple: true
+      - name: Download ablation aggregate control
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-audit
+          path: ablation-control
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Evaluate deterministic challenger
+        shell: bash
+        run: |
+          set -euo pipefail
+          ARGS=()
+          for p in held/held-features-fold-*.jsonl.gz; do
+            ARGS+=(--held-feature "$p")
+          done
+          for p in challenger/context-interaction-fold-*.jsonl.gz; do
+            ARGS+=(--challenger-prediction "$p")
+          done
+          for p in challenger/context-interaction-fold-*-report.json; do
+            ARGS+=(--challenger-report "$p")
+          done
+          python3 research/contextual_value_context_interaction_challenger.py aggregate \
+            --cohort-dir preprocessed-core \
+            "${ARGS[@]}" \
+            --ablation-report ablation-control/ablation-report.json \
+            --source-sha "$SOURCE_SHA" \
+            --out results/contextual-value-v1/context-interaction-challenger
+      - name: Assert assessment remains sealed
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open("results/contextual-value-v1/context-interaction-challenger/context-interaction-challenger-report.json"))
+          assert r["assessment_opened"] is False
+          b=r["assessment_boundary"]
+          assert b["outcomes_loaded_into_pipeline"] is False
+          assert b["outcomes_used_for_fit"] is False
+          assert b["outcomes_scored"] is False
+          assert r["challenger_spec"]["target_policy"] == "deterministic_argmax"
+          assert r["challenger_spec"]["ranking_strong_player_features"] == "removed"
+          assert len(r["challenger_spec"]["candidate_context_interactions"]) == 15
+          PY
+      - name: Upload challenger report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-context-interaction-challenger
+          path: results/contextual-value-v1/context-interaction-challenger/
+          retention-days: 30
