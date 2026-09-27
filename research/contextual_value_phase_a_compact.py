@@ -37,6 +37,21 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+def _sha256_prefix(path: Path, size: int) -> str:
+    digest = hashlib.sha256()
+    remaining = size
+    with path.open("rb") as handle:
+        while remaining > 0:
+            block = handle.read(min(1024 * 1024, remaining))
+            if not block:
+                break
+            digest.update(block)
+            remaining -= len(block)
+    if remaining != 0:
+        raise SystemExit("source payload shorter than expected prefix")
+    return digest.hexdigest()
+
+
 def _iter_jsonl_gz(path: Path):
     with gzip.open(path, "rt", encoding="utf-8") as handle:
         for line in handle:
@@ -331,10 +346,22 @@ def main():
     expected_source_sha = str(report.get("payload_sha256") or "")
     expected_source_size = int(report.get("payload_size_bytes") or -1)
     if source_sha != expected_source_sha or args.source.stat().st_size != expected_source_size:
+        actual_size = args.source.stat().st_size
+        prefix_sha = (
+            _sha256_prefix(args.source, expected_source_size)
+            if expected_source_size >= 0 and actual_size >= expected_source_size
+            else None
+        )
+        suffix_hex = ""
+        if expected_source_size >= 0 and actual_size > expected_source_size:
+            with args.source.open("rb") as handle:
+                handle.seek(expected_source_size)
+                suffix_hex = handle.read(64).hex()
         raise SystemExit(
             "source rich-feature payload provenance mismatch: "
             f"actual_sha256={source_sha} expected_sha256={expected_source_sha} "
-            f"actual_bytes={args.source.stat().st_size} expected_bytes={expected_source_size}"
+            f"actual_bytes={actual_size} expected_bytes={expected_source_size} "
+            f"expected_prefix_sha256={prefix_sha} suffix_hex={suffix_hex}"
         )
 
     state_names = list(report["state_feature_names"])
