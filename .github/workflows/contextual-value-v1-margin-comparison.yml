@@ -27,6 +27,9 @@ jobs:
         with:
           python-version: '3.12'
 
+      - name: Install pinned numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.5.3'
+
       - name: Compile comparison
         run: python -m py_compile research/contextual_value_margin_comparison.py
 
