@@ -60,3 +60,24 @@ test('Android app-link configuration does not capture all Pack One HTTPS traffic
   assert.deepEqual(prefixes,['/open/daily/','/open/profile/','/open/shared/']);
   assert.equal(prefixes.includes('/'),false);
 });
+
+
+test('published association files match the production mobile identities and narrow routes', () => {
+  const jekyll=fs.readFileSync('_config.yml','utf8');
+  assert.match(jekyll,/\.well-known/);
+
+  const aasa=JSON.parse(fs.readFileSync('.well-known/apple-app-site-association','utf8'));
+  assert.deepEqual(aasa.applinks.details[0].appIDs,['3564X3VTDB.pro.packone.app']);
+  assert.deepEqual(
+    aasa.applinks.details[0].components.map((item)=>item['/']).sort(),
+    ['/open/daily/*','/open/profile/*','/open/shared/*'],
+  );
+
+  const assetlinks=JSON.parse(fs.readFileSync('.well-known/assetlinks.json','utf8'));
+  const android=assetlinks.find((item)=>item?.target?.package_name==='pro.packone.app');
+  assert.ok(android);
+  assert.deepEqual(android.relation,['delegate_permission/common.handle_all_urls']);
+  assert.deepEqual(android.target.sha256_cert_fingerprints,[
+    '7C:4F:B9:F7:0F:C6:A3:3C:94:F4:F9:29:93:22:65:77:34:CB:C0:4E:0B:F9:25:A7:A0:B8:42:51:30:72:3E:8B',
+  ]);
+});

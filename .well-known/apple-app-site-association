@@ -1,0 +1,22 @@
+{
+  "applinks": {
+    "details": [
+      {
+        "appIDs": [
+          "3564X3VTDB.pro.packone.app"
+        ],
+        "components": [
+          {
+            "/": "/open/profile/*"
+          },
+          {
+            "/": "/open/shared/*"
+          },
+          {
+            "/": "/open/daily/*"
+          }
+        ]
+      }
+    ]
+  }
+}
