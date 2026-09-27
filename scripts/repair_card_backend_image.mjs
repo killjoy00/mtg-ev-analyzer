@@ -69,8 +69,6 @@ export async function repairBackendImages(
       const page=await request(base,{action:'refresh-image-page',setId,mapping,after});
       validatePage(page,setId);
       pages+=1;
-      if(verify&&Number(page.updated_cards)!==0)
-        throw new Error(`Targeted image verification found ${page.updated_cards} updates for ${setId}`);
       puzzles+=Number(page.puzzles);
       updatedPuzzles+=Number(page.updated_puzzles);
       updatedCards+=Number(page.updated_cards);
@@ -87,6 +85,8 @@ export async function repairBackendImages(
       };
       console.log(JSON.stringify(pageResult));
       if(onProgress)onProgress(pageResult);
+      if(verify&&Number(page.updated_cards)!==0)
+        throw new Error(`Targeted image verification found ${page.updated_cards} updates for ${setId}`);
       if(page.done)break;
       if(typeof page.next_after!=='string'||!page.next_after||page.next_after===after)
         throw new Error(`Targeted image refresh cursor did not advance for ${setId}`);
