@@ -20,6 +20,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   const workflowPaths = [
     '.github/workflows/ios-testflight.yml',
     '.github/workflows/android-internal-testing.yml',
+    '.github/workflows/android-production-bundle.yml',
     '.github/workflows/android-closed-testing.yml',
     '.github/workflows/google-play-access.yml',
     '.github/workflows/app-store-subscription-access-probe.yml',
@@ -37,6 +38,14 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-release-request\.json'/s, path);
       assert.match(workflow, /request\.get\('operation'\) != 'upload-android-internal'/, path);
+    } else if (path === '.github/workflows/android-production-bundle.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-production-bundle-request\.json'/s, path);
+      assert.match(workflow, /request\.get\('operation'\) != 'build-play-signed-aab'/, path);
+      assert.match(workflow, /packone-android-upload-keystore-b64/, path);
+      assert.match(workflow, /configure-android-upload-signing\.mjs/, path);
+      assert.match(workflow, /83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B/, path);
+      assert.match(workflow, /pack-one-play-signed-aab/, path);
     } else if (path === '.github/workflows/android-closed-testing.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-closed-release-request\.json'/s, path);
@@ -77,6 +86,12 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.equal(androidRequest.operation, 'upload-android-internal');
   assert.equal(typeof androidRequest.reason, 'string');
   assert.ok(androidRequest.reason.trim().length > 0);
+
+  const androidBundleRequest = JSON.parse(read('.github/android-production-bundle-request.json'));
+  assert.deepEqual(Object.keys(androidBundleRequest).sort(), ['operation','reason']);
+  assert.equal(androidBundleRequest.operation, 'build-play-signed-aab');
+  assert.equal(typeof androidBundleRequest.reason, 'string');
+  assert.ok(androidBundleRequest.reason.trim().length > 0);
 
   const androidClosedRequest = JSON.parse(read('.github/android-closed-release-request.json'));
   assert.deepEqual(Object.keys(androidClosedRequest).sort(), ['operation','reason','track','version_code']);
