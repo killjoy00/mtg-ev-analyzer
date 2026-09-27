@@ -20,7 +20,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(config, /Store screenshot fixtures are forbidden in the production mobile environment/);
   assert.match(appConfig, /preview: 'pro\.packone\.preview'/);
   assert.match(appConfig, /STORE_IDENTIFIER = 'pro\.packone\.app'/);
-  assert.match(client, /if \(config\.screenshots\.fixtures\) return requestScreenshotFixture/);
+  assert.match(client, /EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1'/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_ENV: preview/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'/);
   assert.doesNotMatch(
