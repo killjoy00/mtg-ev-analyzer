@@ -35,7 +35,7 @@ test('targeted backend touches only listed setIds with one-entry mappings',async
   const calls=[];
   const request=async(base,body)=>{
     calls.push({base,body});
-    if(body.action==='refresh-image-page')return {
+    if(body.action==='refresh-image-page-v2')return {
       set_id:body.setId,
       mapping_entries:body.mapping.length,
       puzzles:1,
@@ -43,11 +43,12 @@ test('targeted backend touches only listed setIds with one-entry mappings',async
       updated_cards:1,
       next_after:null,
       done:true,
+      corpus_available:true,
     };
     return {normalized:[{set_id:body.setIds[0],puzzles:1,missing_images:0}]};
   };
   await repairBackendImages(dev,{report,request});
-  const pages=calls.filter(call=>call.body.action==='refresh-image-page');
+  const pages=calls.filter(call=>call.body.action==='refresh-image-page-v2');
   assert.deepEqual(pages.map(call=>call.body.setId),['powered-cube','dsk']);
   assert.ok(pages.every(call=>call.body.mapping.length===1));
   assert.ok(calls.every(call=>!['vow','mid','ktk'].includes(call.body.setId)));
@@ -70,6 +71,7 @@ test('verification pass requires zero updated cards on every page',async()=>{
     updated_cards:1,
     next_after:null,
     done:true,
+    corpus_available:true,
   });
   await assert.rejects(
     repairBackendImages(dev,{report:oneSet,request:dirty,verify:true}),
@@ -82,16 +84,17 @@ test('verification pass requires zero updated cards on every page',async()=>{
     return {
       set_id:body.setId,
       mapping_entries:1,
-      puzzles:1,
+      puzzles:0,
       updated_puzzles:0,
       updated_cards:0,
       next_after:null,
       done:true,
+      corpus_available:true,
     };
   };
   await repairBackendImages(dev,{report:oneSet,request:clean,verify:true});
   assert.equal(calls.length,1);
-  assert.equal(calls[0].action,'refresh-image-page');
+  assert.equal(calls[0].action,'refresh-image-page-v2');
 });
 
 test('development failure prevents the caller from touching production',async()=>{
@@ -111,6 +114,7 @@ test('development failure prevents the caller from touching production',async()=
       updated_cards:0,
       next_after:null,
       done:true,
+      corpus_available:true,
     };
   };
   const run=async()=>{
@@ -138,6 +142,7 @@ test('backend diagnostics retain page counts and verification outcomes',async()=
       updated_cards:0,
       next_after:null,
       done:true,
+      corpus_available:true,
     });
     await runBackendRepair(dev,{
       report:oneSet,
@@ -164,6 +169,7 @@ test('backend diagnostics retain page counts and verification outcomes',async()=
       updated_cards:1,
       next_after:null,
       done:true,
+      corpus_available:true,
     });
     await assert.rejects(
       runBackendRepair(prod,{
