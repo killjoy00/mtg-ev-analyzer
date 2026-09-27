@@ -35,6 +35,13 @@ test('store screenshot fixture mode is isolated from production builds', () => {
     workflow.slice(0, workflow.indexOf('jobs:')),
     /EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES/,
   );
+  assert.match(workflow, /xcodebuild -list -json -workspace/);
+  assert.match(workflow, /pro\.packone\.preview/);
+  assert.doesNotMatch(workflow, /-scheme PackOne\b/);
+  assert.doesNotMatch(workflow, /Release-iphonesimulator\/PackOne\.app/);
+  assert.match(workflow, /adb shell service check package/);
+  assert.match(workflow, /for attempt in 1 2 3; do/);
+  assert.match(workflow, /adb kill-server/);
 });
 
 test('store screenshot and App Store configuration encode reviewed release decisions', () => {
