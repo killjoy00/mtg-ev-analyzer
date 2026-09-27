@@ -2,6 +2,7 @@
 // parameters, account identifiers, or puzzle data cross the gateway.
 const rounded=value=>Math.round(value*100)/100;
 const family=sql=>/pack1_serving_snapshot/.test(sql)?'snapshot':
+  /pack1_select_serving_run_v1/i.test(sql)?'candidate':
   /WITH chosen AS/i.test(sql)?'candidate':
   /draft_run_serving_revision/.test(sql)?'revision':
   /ORDER BY p\.distance/i.test(sql)?'reroll':

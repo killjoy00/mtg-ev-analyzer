@@ -34,11 +34,22 @@ export function parseStartDiagnostics(headers,route='start') {
   }
   return Object.keys(result).length?result:null;
 }
+const requestEndpoint=path=>{
+  const bare=path.split('?')[0];
+  if(bare==='/draft/v1/daily-status')return 'daily_status';
+  if(bare==='/draft/v1/practice-sets')return 'practice_sets';
+  if(bare==='/draft/v1/leaderboard')return 'leaderboard';
+  if(bare==='/growth/v1/account/link-browser')return 'account_link_browser';
+  if(bare==='/growth/v1/profile/me')return 'profile_me';
+  if(/^\\/draft\\/v1\\/runs\\/[^/]+\\/share$/.test(bare))return 'run_share';
+  return null;
+};
 export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch}) {
   return async(actor,route,path,body,{report=null,windows=null}={})=>{
     const url=permittedRequest(path,body);
     if(++budget.gateway_requests>Math.floor((policy.maximum_requests-policy.telemetry_preflight_requests)/policy.generators))throw Object.assign(Error('request_ceiling'),{category:'cost'});
     const at=now(),record={route,at,status:0,ms:0,bytes:0,phase:!windows||at<windows.hold?'initial':at<windows.drain?'hold':at<windows.recovery?'drain':'recovery'};
+    const endpoint=requestEndpoint(path);if(endpoint)record.endpoint=endpoint;
     if(report)report.requests.push(record);
     const headers={'x-pack1-preview-key':fixture.preview,origin:'https://packone.pro','content-type':'application/json'};
     if(actor?.cookies.size)headers.cookie=[...actor.cookies].map(([k,v])=>k+'='+v).join('; ');
@@ -48,7 +59,7 @@ export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch}) 
     try {
       const r=await fetcher(url,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(30000)])});
       record.status=r.status;const text=await r.text();record.bytes=Buffer.byteLength(text);budget.response_bytes+=record.bytes;
-      if(route==='start'||route==='reroll')record.diagnostics=parseStartDiagnostics(r.headers,route);
+      const diagnostics=parseStartDiagnostics(r.headers,route);if(diagnostics)record.diagnostics=diagnostics;
       if(record.bytes>2*1024**2||budget.response_bytes>Math.floor(policy.maximum_response_bytes/policy.generators))throw Object.assign(Error('response_byte_ceiling'),{category:'cost'});
       const data=JSON.parse(text);
       if(r.status===429){record.scopes=data.scopes||[];record.retry_after=Number(r.headers.get('retry-after'));}

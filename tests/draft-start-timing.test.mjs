@@ -18,6 +18,13 @@ test('isolated start timings retain only phase and query-family durations',async
   }});
   assert.doesNotMatch(JSON.stringify(parsed),/private-parameter|SELECT/);
 });
+test('batched current-practice selector is classified as candidate timing',async()=>{
+  let now=0;const timing=draftStartTiming(true,{clock:()=>now});
+  const query=timing.selectionQuery(async()=>{now+=35;return {rows:[]};});
+  await timing.step('selection',()=>query('SELECT pack1_select_serving_run_v1($1,$2,$3,$4,$5,$6)',[]));
+  const parsed=JSON.parse(timing.finish(Response.json({ok:true})).headers.get('x-pack1-start-timing'));
+  assert.deepEqual(parsed.selector,{candidate:{count:1,sum_ms:35,max_ms:35}});
+});
 test('production start timing adds no response header',async()=>{
   const timing=draftStartTiming(false,{clock:()=>{throw Error('disabled clock');}});
   await timing.step('selection',async()=>timing.selectionQuery(async()=>({rows:[]}))('SELECT 1',[]));
