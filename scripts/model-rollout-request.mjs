@@ -66,7 +66,7 @@ export function rolloutDispatch(request) {
   } else if(operation==='card-images') {
     workflow='refresh-powered-cube-images.yml';
   } else if(operation==='card-image-repair') {
-    if(typeof card_name!=='string'||!card_name.trim()||card_name!==card_name.trim()||card_name.length>200||/[\\x00-\\x1f\\x7f]/.test(card_name))throw Error('Invalid targeted card-image repair name.');
+    if(typeof card_name!=='string'||!card_name.trim()||card_name!==card_name.trim()||card_name.length>200||/[\x00-\x1f\x7f]/.test(card_name))throw Error('Invalid targeted card-image repair name.');
     if(typeof environments!=='string'||!/^[a-z0-9-]+(?:,[a-z0-9-]+){0,7}$/.test(environments))throw Error('Invalid targeted card-image repair environments.');
     workflow='refresh-powered-cube-images.yml';inputs={request_id,mode:'targeted',card_name,environments};extra=['card_name','environments'];
   } else if(operation==='card-image-release') {
