@@ -33,6 +33,7 @@ import {
   type DraftRunState,
   type PracticeEnvironment,
 } from '@/src/api/draftRun';
+import { config } from '@/src/config';
 import { useAppResume } from '@/src/hooks/useAppResume';
 import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/storage/idempotency';
 import type { MobileSession } from '@/src/storage/session';
@@ -408,7 +409,8 @@ async function loadDraftSurface(
 }
 
 export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface } = {}) {
-  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string }>();
+  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string }>();
+  const screenshotFeedback = config.screenshots.fixtures && params.screenshot === 'feedback';
   const practice = !shared && params.mode === 'practice';
   const requestedEnvironment = shared?.initialRun.environment
     ?? (typeof params.environment === 'string' ? params.environment : 'mixed');
@@ -530,16 +532,29 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
       ? Promise.resolve({ status: 'ready' as const, run: shared.initialRun, session: shared.session })
       : loadDraftSurface(environment, practice, setIds);
     void initial
-      .then((loaded) => {
+      .then(async (loaded) => {
         if (!active) return;
         if (loaded.status === 'signin-required') {
           commitState({ status: 'signin-required' });
           return;
         }
-        const recoveredFeedback = Boolean(shared && !loaded.run.complete && loaded.run.answers.length);
-        setReviewIndex(recoveredFeedback ? loaded.run.answers.length - 1 : null);
-        setMode(loaded.run.complete ? 'result' : recoveredFeedback ? 'feedback' : 'pick');
-        commitState({ status: 'ready', run: loaded.run, session: loaded.session });
+        let run = loaded.run;
+        if (
+          screenshotFeedback
+          && !shared
+          && !run.complete
+          && run.answers.length === 0
+          && run.current?.candidates.length
+        ) {
+          run = await submitDraftRunPick(run, run.current.candidates[0].id, loaded.session);
+          if (!active) return;
+        }
+        const recoveredFeedback = Boolean(
+          (shared || screenshotFeedback) && !run.complete && run.answers.length,
+        );
+        setReviewIndex(recoveredFeedback ? run.answers.length - 1 : null);
+        setMode(run.complete ? 'result' : recoveredFeedback ? 'feedback' : 'pick');
+        commitState({ status: 'ready', run, session: loaded.session });
       })
       .catch((error: unknown) => {
         if (!active) return;
@@ -553,7 +568,7 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
       refreshGeneration.current += 1;
       mutationGeneration.current += 1;
     };
-  }, [environment, practice, setIds, shared]);
+  }, [environment, practice, screenshotFeedback, setIds, shared]);
 
   const retry = async () => {
     refreshGeneration.current += 1;
