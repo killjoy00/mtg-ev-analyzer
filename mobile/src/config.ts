@@ -10,12 +10,21 @@ function cleanOrigin(value: string) {
   return value.replace(/\/$/, '');
 }
 
+const resolvedEnvironment = environment();
+const screenshotFixtures = process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1';
+if (screenshotFixtures && resolvedEnvironment === 'production') {
+  throw new Error('Store screenshot fixtures are forbidden in the production mobile environment.');
+}
+
 const apiOrigin = cleanOrigin(
   process.env.EXPO_PUBLIC_PACKONE_API_ORIGIN ?? 'https://api.packone.pro',
 );
 
 export const config = Object.freeze({
-  environment: environment(),
+  environment: resolvedEnvironment,
+  screenshots: Object.freeze({
+    fixtures: screenshotFixtures,
+  }),
   api: Object.freeze({
     origin: apiOrigin,
     growthBaseUrl: `${apiOrigin}/growth`,
