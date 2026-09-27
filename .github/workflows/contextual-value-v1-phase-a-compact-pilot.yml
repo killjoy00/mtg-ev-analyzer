@@ -1,11 +1,6 @@
 name: contextual-value-v1-phase-a-compact-pilot
 
 on:
-  push:
-    branches:
-      - research/contextual-value-v1-rich-features-529
-    paths:
-      - '.github/workflows/contextual-value-v1-phase-a-compact-pilot.yml'
   workflow_dispatch:
 
 permissions:
