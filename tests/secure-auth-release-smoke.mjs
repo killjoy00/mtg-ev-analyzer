@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 
 const [branch,commit]=process.argv.slice(2);
 if(!/^br-[a-z0-9-]+$/.test(branch||'')||!/^[a-f0-9]{40}$/.test(commit||'')) {
-  throw Error('Usage: secure-auth-release-smoke.mjs BRANCH_ID FULL_COMMIT_SHA [--settle] [--expect-deletion-email=true|false]');
+  throw Error('Usage: secure-auth-release-smoke.mjs BRANCH_ID FULL_COMMIT_SHA [--settle] [--expect-deletion-email=true|false] [--expect-launch-recovery=true|false]');
 }
 const emailExpectationArg=process.argv.find(value=>value.startsWith('--expect-deletion-email='));
 let expectedDeletionEmail=null;
@@ -13,6 +13,13 @@ if(emailExpectationArg) {
   const value=emailExpectationArg.split('=',2)[1];
   if(!['true','false'].includes(value))throw Error('--expect-deletion-email must be true or false.');
   expectedDeletionEmail=value==='true';
+}
+const launchExpectationArg=process.argv.find(value=>value.startsWith('--expect-launch-recovery='));
+let expectedLaunchRecovery=null;
+if(launchExpectationArg) {
+  const value=launchExpectationArg.split('=',2)[1];
+  if(!['true','false'].includes(value))throw Error('--expect-launch-recovery must be true or false.');
+  expectedLaunchRecovery=value==='true';
 }
 const settle=process.argv.includes('--settle');
 const settleMs=settle?10*60*1000:0;
@@ -73,6 +80,8 @@ assert.equal(growth.account_deletion_enabled,true,'account deletion kill switch 
 assert.equal(growth.verification_sweep_enabled,true,'verification sweep kill switch must be enabled');
 if(expectedDeletionEmail!==null)
   assert.equal(growth.deletion_email_configured,expectedDeletionEmail,'deletion email configuration');
+if(expectedLaunchRecovery!==null)
+  assert.equal(growth.launch_watcher_recovery_configured,expectedLaunchRecovery,'launch watcher recovery configuration');
 assert.equal(growth.apple_sign_in_configured,true,'Sign in with Apple runtime secrets');
 
 // Non-destructive route proof: the endpoint must be mounted, accept only the
