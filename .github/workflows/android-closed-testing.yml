@@ -98,14 +98,21 @@ jobs:
           set -euo pipefail
           result="$(node mobile/scripts/play-closed-release.mjs             "${{ steps.request.outputs.version_code }}"             "${{ steps.request.outputs.track }}")"
           echo "$result"
+          release_status="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.releaseStatus))' "$result")"
+          requires_console="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(Boolean(v.requiresConsoleRollout)))' "$result")"
           {
             echo "## Pack One Android Closed Testing"
             echo
             echo '- Package: `pro.packone.app`'
             printf -- '- Track: `%s`\n' "${{ steps.request.outputs.track }}"
             printf -- '- Version code: `%s`\n' "${{ steps.request.outputs.version_code }}"
-            echo '- Release status: `completed`'
+            printf -- '- Release status: `%s`\n' "$release_status"
             echo "- Source revision: `$GITHUB_SHA`"
             echo
-            echo 'Tester enrollment is managed in Google Play Console. Production access requires at least 12 testers continuously opted into the closed test for 14 days.'
+            if [[ "$requires_console" == "true" ]]; then
+              echo 'Google Play still classifies the app as a draft app. The closed-track release is committed as a draft and must be rolled out once in Play Console before testers can opt in.'
+            else
+              echo 'Closed Testing is active through the API.'
+            fi
+            echo 'Production access requires at least 12 testers continuously opted into the closed test for 14 days.'
           } >> "$GITHUB_STEP_SUMMARY"
