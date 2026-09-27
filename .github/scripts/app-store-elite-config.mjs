@@ -59,7 +59,7 @@ if(a.subscriptionStatusUrl!==notificationUrl||a.subscriptionStatusUrlVersion!=='
   }}}});
 }
 
-let groups=await api(`/v1/apps/${appId}/subscriptionGroups?fields%5BsubscriptionGroups%5D=referenceName&include=subscriptions&fields%5Bsubscriptions%5D=name,productId,subscriptionPeriod,familySharable,reviewNote,groupLevel,state&limit%5BsubscriptionGroups%5D=50&limit%5Bsubscriptions%5D=50`);
+let groups=await api(`/v1/apps/${appId}/subscriptionGroups?fields%5BsubscriptionGroups%5D=referenceName&include=subscriptions&fields%5Bsubscriptions%5D=name,productId,subscriptionPeriod,familySharable,reviewNote,groupLevel,state&limit=200&limit%5Bsubscriptions%5D=50`);
 let group=one(groups,x=>x.attributes?.referenceName===groupReferenceName);
 let subscription=one({data:groups.included||[]},x=>x.type==='subscriptions'&&x.attributes?.productId===productId);
 
