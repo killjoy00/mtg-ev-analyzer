@@ -1,0 +1,264 @@
+name: contextual-value-v1-four-way-fresh
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PHASE_A1_RUN: '36286752890'
+  PHASE_A2_PILOT_RUN: '36289846820'
+  PHASE_A2_FULL_RUN: '36290030236'
+  COMPACT_RUN: '36289366966'
+  ABLATION_RUN: '36280148906'
+  MARGIN_RUN: '36334084490'
+  MAX_DRAFTS: '8000'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  freeze:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned model dependency
+        run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1'
+      - name: Compile frozen bundle exporter
+        run: python -m py_compile research/contextual_value_four_way_freeze.py research/contextual_value_margin_comparison.py research/contextual_value_phase_a_bakeoff.py
+
+      - name: Download Phase A1 feature contract
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold--1
+          path: feature-report
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download Phase A2 fold 0
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-0
+          path: folds
+          run-id: ${{ env.PHASE_A2_PILOT_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download remaining Phase A2 folds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-phase-a2-fold-*
+          path: folds
+          merge-multiple: true
+          run-id: ${{ env.PHASE_A2_FULL_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download exact compact validation fold
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-compact-fold--1
+          path: compact
+          run-id: ${{ env.COMPACT_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download strong-offset-only training predictions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-strong_offset_only-fold-*
+          path: strong
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download no-strong training predictions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-no_strong_entirely-fold-*
+          path: no-strong
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download verified margin comparison report
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-margin-comparison
+          path: margin
+          run-id: ${{ env.MARGIN_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Export frozen H J N Q score bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRAIN=()
+          STRONG=()
+          NOSTRONG=()
+          for f in 0 1 2 3 4; do
+            TRAIN+=(--train-shard "folds/phase-a2-fold-$f.npz")
+            STRONG+=(--strong-prediction "strong/strong_offset_only-fold-$f.jsonl.gz")
+            NOSTRONG+=(--no-strong-prediction "no-strong/no_strong_entirely-fold-$f.jsonl.gz")
+          done
+          python3 research/contextual_value_four_way_freeze.py \
+            "${TRAIN[@]}" \
+            "${STRONG[@]}" \
+            "${NOSTRONG[@]}" \
+            --validation-shard folds/phase-a2-fold--1.npz \
+            --feature-report feature-report/phase-a-rich-fold--1-report.json \
+            --compact-db compact/phase-a-compact-fold--1.sqlite \
+            --compact-schema compact/phase-a-compact-fold--1-schema.json \
+            --margin-report margin/report.json \
+            --output-dir results/contextual-value-v1/four-way-freeze
+      - name: Assert frozen bundle parity
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/contextual-value-v1/four-way-freeze/four-way-freeze.json'))
+          assert r['assessment_opened'] is False
+          assert r['assessment_outcomes_used'] is False
+          assert r['parity']['passed'] is True
+          assert r['parity']['simple_q_validation_max_abs_error'] <= r['parity']['tolerance']
+          assert r['parity']['rich_q_validation_max_abs_error'] <= r['parity']['tolerance']
+          assert r['models'] == ['H','J','N','Q']
+          PY
+      - name: Upload frozen score bundle
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-freeze
+          path: results/contextual-value-v1/four-way-freeze/
+          retention-days: 30
+
+  confirm:
+    needs: freeze
+    name: fresh-${{ matrix.expansion }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        expansion: [EOE, FIN, TDM, DFT]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1' 'scipy==1.18.1'
+      - name: Compile fresh confirmation
+        run: python -m py_compile research/contextual_value_four_way_fresh.py
+      - name: Download frozen score bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-freeze
+          path: freeze
+      - name: Download official 17Lands snapshot
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw-data
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/game.csv.gz \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+          sha256sum raw-data/draft.csv.gz raw-data/game.csv.gz
+      - name: Run frozen four-way fresh confirmation
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p "results/contextual-value-v1/four-way-fresh/$EXPANSION"
+          python3 research/contextual_value_four_way_fresh.py \
+            --expansion "$EXPANSION" \
+            --draft-archive raw-data/draft.csv.gz \
+            --game-archive raw-data/game.csv.gz \
+            --max-drafts "$MAX_DRAFTS" \
+            --freeze-json freeze/four-way-freeze.json \
+            --freeze-q-pickle freeze/four-way-rich-q.pkl \
+            --output "results/contextual-value-v1/four-way-fresh/$EXPANSION/report.json"
+      - name: Assert fresh confirmation boundary
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          p=f"results/contextual-value-v1/four-way-fresh/{os.environ['EXPANSION']}/report.json"
+          r=json.load(open(p))
+          assert r['assessment_opened'] is False
+          assert r['assessment_outcomes_loaded'] is False
+          assert r['assessment_outcomes_used'] is False
+          assert r['model_tuning_authorized'] is False
+          assert r['cohort']['assessment_drafts_withheld'] > 0
+          assert r['cohort']['validation_primary_drafts'] >= 500
+          assert set(k for k in r['incremental_prediction'] if k in {'H','J','N','Q'}) == {'H','J','N','Q'}
+          assert r['next_gate']['assessment_authorized'] is False
+          PY
+      - name: Upload environment report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-fresh-${{ matrix.expansion }}
+          path: results/contextual-value-v1/four-way-fresh/${{ matrix.expansion }}/
+          retention-days: 30
+
+  aggregate:
+    needs: confirm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-four-way-fresh-*
+          path: reports
+      - name: Aggregate all four predeclared environments
+        run: |
+          python3 - <<'PY'
+          import json, pathlib
+          envs=['EOE','FIN','TDM','DFT']
+          reports={}
+          for e in envs:
+            p=pathlib.Path('reports')/f'contextual-value-v1-four-way-fresh-{e}'/'report.json'
+            reports[e]=json.load(open(p))
+          fps={r['frozen_score_fingerprint'] for r in reports.values()}
+          assert len(fps)==1
+          models=['H','J','N','Q']
+          summary={}
+          for m in models:
+            deltas={e: reports[e]['incremental_prediction'][m]['validation_vs_B1']['mse_delta'] for e in envs}
+            cis={e: reports[e]['incremental_prediction'][m]['validation_vs_B1']['mse_ci95'] for e in envs}
+            summary[m]={
+              'mse_delta_by_environment':deltas,
+              'mse_ci95_by_environment':cis,
+              'negative_direction_count':sum(v<0 for v in deltas.values()),
+              'mean_environment_mse_delta':sum(deltas.values())/len(deltas),
+            }
+          jcard={e: reports[e]['J_card_specific_test']['state_plus_J_margin']['validation_vs_state_only']['mse_delta'] for e in envs}
+          out={
+            'phase':'four_way_fresh_environment_confirmation_aggregate',
+            'environments':envs,
+            'frozen_score_fingerprint':next(iter(fps)),
+            'max_drafts_per_environment':8000,
+            'assessment_opened':False,
+            'assessment_authorized':False,
+            'model_tuning_authorized':False,
+            'models':summary,
+            'J_card_specific_mse_delta_by_environment':jcard,
+            'J_card_specific_negative_direction_count':sum(v<0 for v in jcard.values()),
+            'cohorts':{e: reports[e]['cohort'] for e in envs},
+            'interpretation_boundary':'All four environments were predeclared and must be interpreted together. No model or environment may be removed, retuned, or reweighted after results. Negative MSE delta means incremental improvement beyond the shared B1 baseline. OPE remains sensitivity evidence, not sole selection authority.',
+            'next_gate':{'assessment_authorized':False,'model_tuning_authorized':False,'instruction':'Review all four fresh environments jointly before changing the finalist set or considering assessment authorization.'},
+          }
+          pathlib.Path('aggregate').mkdir()
+          pathlib.Path('aggregate/report.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(out,indent=2,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-fresh-aggregate
+          path: aggregate/
+          retention-days: 30
