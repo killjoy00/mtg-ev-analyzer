@@ -1,5 +1,4 @@
 import { config } from '@/src/config';
-import { screenshotRequestJson } from '@/src/screenshots/fixtures';
 
 export class ApiError extends Error {
   constructor(
@@ -32,7 +31,8 @@ function errorMessage(body: unknown, status: number) {
 
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
   const method = options.method ?? 'GET';
-  if (config.screenshots.enabled) {
+  if (config.screenshots?.enabled) {
+    const { screenshotRequestJson } = await import('@/src/screenshots/fixtures');
     return screenshotRequestJson<T>(path, { method, body: options.body });
   }
   const controller = new AbortController();
