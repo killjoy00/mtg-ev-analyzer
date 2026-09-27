@@ -1,0 +1,91 @@
+name: contextual-value-v1-phase-a-compact-remaining
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-rich-features-529
+    paths:
+      - '.github/workflows/contextual-value-v1-phase-a-compact-remaining.yml'
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PHASE_A1_RUN: '36286752890'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  compact:
+    name: compact-fold-${{ matrix.fold }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 5
+      matrix:
+        fold: [-1, 1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile compactor
+        run: python -m py_compile research/contextual_value_phase_a_compact.py
+      - name: Download validated rich fold
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-fold-${{ matrix.fold }}
+          path: source
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download validated fold report
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold-${{ matrix.fold }}
+          path: source-report
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+      - name: Compact and prove exact parity
+        shell: bash
+        run: |
+          set -euo pipefail
+          FOLD='${{ matrix.fold }}'
+          python3 research/contextual_value_phase_a_compact.py \
+            --fold "$FOLD" \
+            --source "source/phase-a-rich-fold-$FOLD.jsonl.gz" \
+            --source-report "source-report/phase-a-rich-fold-$FOLD-report.json" \
+            --out "results/contextual-value-v1/phase-a-compact-fold-$FOLD"
+      - name: Assert parity
+        shell: bash
+        run: |
+          FOLD='${{ matrix.fold }}'
+          python3 - <<PY
+          import json
+          p="results/contextual-value-v1/phase-a-compact-fold-$FOLD/phase-a-compact-fold-$FOLD-parity.json"
+          r=json.load(open(p))
+          assert r["exact_metadata_feature_presence_and_float64_value_parity"] is True
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_used"] is False
+          assert r["source_provenance_mode"] in {
+              "exact_reported_bytes",
+              "phase_a1_buffered_gzip_finalizer",
+          }
+          assert r["decision_rows"] > 0
+          assert r["candidate_rows"] > r["decision_rows"]
+          PY
+      - name: Upload compact fold cache
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-compact-fold-${{ matrix.fold }}
+          path: |
+            results/contextual-value-v1/phase-a-compact-fold-${{ matrix.fold }}/phase-a-compact-fold-${{ matrix.fold }}.sqlite
+            results/contextual-value-v1/phase-a-compact-fold-${{ matrix.fold }}/phase-a-compact-fold-${{ matrix.fold }}-schema.json
+          retention-days: 30
+      - name: Upload small parity report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-compact-parity-fold-${{ matrix.fold }}
+          path: results/contextual-value-v1/phase-a-compact-fold-${{ matrix.fold }}/phase-a-compact-fold-${{ matrix.fold }}-parity.json
+          retention-days: 30
