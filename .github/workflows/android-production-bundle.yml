@@ -6,18 +6,24 @@ on:
     paths:
       - 'mobile/**'
       - '.github/workflows/android-production-bundle.yml'
+  push:
+    branches: [main]
+    paths:
+      - '.github/android-production-bundle-request.json'
   workflow_dispatch:
 
 permissions:
   contents: read
+  id-token: write
 
 concurrency:
   group: android-production-bundle-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  bundle:
-    name: build production Android bundle
+  smoke:
+    name: validate production Android bundle build
+    if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,7 +43,7 @@ jobs:
         run: |
           node ./scripts/check-build-toolchain.mjs
           npm ci --no-audit --no-fund
-      - name: Set store version code
+      - name: Set smoke version code
         shell: bash
         run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
@@ -51,22 +57,156 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle || {
-            echo "Generated Android project does not contain versionCode $PACKONE_ANDROID_VERSION_CODE." >&2
-            grep -n "versionCode" android/app/build.gradle >&2 || true
-            exit 1
-          }
+          grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle
           expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
-          if ! grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle && ! grep -Fq "versionName '$expected_version_name'" android/app/build.gradle; then
-            echo "Generated Android project does not contain versionName $expected_version_name." >&2
-            grep -n "versionName" android/app/build.gradle >&2 || true
-            exit 1
-          fi
-          echo "Verified Android versionName: $expected_version_name"
-      - name: Build release app bundle
+          grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle || grep -Fq "versionName '$expected_version_name'" android/app/build.gradle
+      - name: Build non-publishing PR smoke bundle
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon
-      - name: Verify bundle is signed
+      - name: Verify PR smoke bundle exists
+        working-directory: mobile/android
+        run: test -s app/build/outputs/bundle/release/app-release.aab
+
+  signed-bundle:
+    name: build protected Play-signed Android bundle
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve reviewed production bundle request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('../.github/android-production-bundle-request.json').read_text())
+          if set(request) != {'operation','reason'}:
+              raise SystemExit('Invalid Android production bundle request keys.')
+          if request.get('operation') != 'build-play-signed-aab':
+              raise SystemExit('Invalid Android production bundle operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Android production bundle request requires a reason.')
+          print('Reviewed Android production bundle request:', reason)
+          PY
+
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]] || { echo "Protected Android bundles are allowed only from main." >&2; exit 1; }
+          git fetch --no-tags --depth=1 origin main
+          head_sha="$(git rev-parse HEAD)"
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$head_sha" == "$main_sha" ]] || {
+            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+            exit 1
+          }
+          echo "Verified current main revision: $head_sha"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - id: auth
+        name: Authenticate to Google Cloud and Google Play
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: |
+            https://www.googleapis.com/auth/cloud-platform
+            https://www.googleapis.com/auth/androidpublisher
+
+      - uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: pack-one
+
+      - name: Load Pack One upload key from Secret Manager
+        shell: bash
+        run: |
+          set -euo pipefail
+          keystore_b64="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-keystore-b64)"
+          upload_password="$(gcloud secrets versions access 1 --project=pack-one --secret=packone-android-upload-password)"
+          echo "::add-mask::$upload_password"
+
+          keystore="$RUNNER_TEMP/packone-upload.p12"
+          printf '%s' "$keystore_b64" | base64 --decode > "$keystore"
+          chmod 600 "$keystore"
+
+          {
+            echo "PACKONE_ANDROID_UPLOAD_KEYSTORE=$keystore"
+            echo "PACKONE_ANDROID_UPLOAD_PASSWORD=$upload_password"
+            echo "PACKONE_ANDROID_UPLOAD_KEY_ALIAS=packone-upload"
+          } >> "$GITHUB_ENV"
+
+      - name: Verify registered Google Play upload key
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected_sha1='83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B'
+          actual_sha1="$(keytool -list -v \
+            -keystore "$PACKONE_ANDROID_UPLOAD_KEYSTORE" \
+            -storepass "$PACKONE_ANDROID_UPLOAD_PASSWORD" \
+            -alias "$PACKONE_ANDROID_UPLOAD_KEY_ALIAS" \
+            | awk -F': ' '/SHA1:/{print $2; exit}')"
+          [[ "$actual_sha1" == "$expected_sha1" ]] || {
+            echo "Protected upload key SHA-1 does not match the certificate registered in Google Play." >&2
+            echo "Expected: $expected_sha1" >&2
+            echo "Actual:   $actual_sha1" >&2
+            exit 1
+          }
+          echo "Verified Google Play upload certificate SHA-1: $actual_sha1"
+
+      - id: version-code
+        name: Allocate unused Google Play version code
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKONE_ANDROID_PACKAGE: pro.packone.app
+        run: node ./scripts/play-next-version-code.mjs
+
+      - name: Set store version code
+        shell: bash
+        run: |
+          set -euo pipefail
+          version_code="${{ steps.version-code.outputs.next_version_code }}"
+          [[ "$version_code" =~ ^[1-9][0-9]*$ ]]
+          echo "PACKONE_ANDROID_VERSION_CODE=$version_code" >> "$GITHUB_ENV"
+          echo "Using Google Play-safe Android version code: $version_code"
+
+      - name: Install mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Validate production mobile config
+        run: npm test
+      - name: Generate production Android project
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo prebuild --platform android --clean
+      - name: Apply Pack One upload signing
+        run: node ./scripts/configure-android-upload-signing.mjs
+      - name: Build signed production bundle
+        working-directory: mobile/android
+        run: ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Verify AAB signer matches registered Google Play upload key
         working-directory: mobile/android
         shell: bash
         run: |
@@ -75,10 +215,27 @@ jobs:
           test -s "$bundle"
           jarsigner -verify -verbose -certs "$bundle" | tee /tmp/jarsigner.txt
           grep -q "jar verified" /tmp/jarsigner.txt
-      - name: Upload bundle artifact
+
+          expected_sha1='83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B'
+          key_sha1="$(keytool -list -v \
+            -keystore "$PACKONE_ANDROID_UPLOAD_KEYSTORE" \
+            -storepass "$PACKONE_ANDROID_UPLOAD_PASSWORD" \
+            -alias "$PACKONE_ANDROID_UPLOAD_KEY_ALIAS" \
+            | awk -F': ' '/SHA1:/{print $2; exit}')"
+          bundle_sha1="$(keytool -printcert -jarfile "$bundle" | awk -F': ' '/SHA1:/{print $2; exit}')"
+          [[ "$key_sha1" == "$expected_sha1" && "$bundle_sha1" == "$expected_sha1" ]] || {
+            echo "AAB signer does not match the Google Play registered upload certificate." >&2
+            echo "Expected: $expected_sha1" >&2
+            echo "Keystore: $key_sha1" >&2
+            echo "Bundle:   $bundle_sha1" >&2
+            exit 1
+          }
+          echo "Verified AAB upload certificate SHA-1: $bundle_sha1"
+
+      - name: Upload Play-signed bundle artifact
         uses: actions/upload-artifact@v4
         with:
-          name: pack-one-production-aab
+          name: pack-one-play-signed-aab
           path: mobile/android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 7
