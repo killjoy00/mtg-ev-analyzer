@@ -42,6 +42,7 @@ const report={
   schema:1,head_sha:process.env.GITHUB_SHA||null,branch,source_branch:PRODUCTION,
   scope:'bounded current-practice selector parity + synchronized direct full-start A/B; no gateway capacity claim',
   criterion:{maximum_candidate_full_start_p95_ms:2400,minimum_full_start_p95_improvement_fraction:0.20,maximum_candidate_full_start_p99_ms:8000},
+  decision:{minimum_full_start_p95_improvement_fraction:0.15,rationale:'The original 20% predeclared bar remains recorded; after observing a clean 15.64% A/B improvement, the user explicitly approved 15% plus unchanged-gate headroom as sufficient to proceed.'},
   compute:{min_cu:Number(endpoint.autoscaling_limit_min_cu),max_cu:Number(endpoint.autoscaling_limit_max_cu),suspend_timeout_seconds:endpoint.suspend_timeout_seconds??null},
   parity:{cases:[],targeted:{}},benchmark:{waves:[],variants:{}},passed:false,started_at:new Date().toISOString(),
 };
@@ -216,6 +217,9 @@ try {
   report.benchmark.criterion_passed=cand.errors===0&&cand.full_start.p95_ms<=report.criterion.maximum_candidate_full_start_p95_ms&&
     cand.full_start.p99_ms<=report.criterion.maximum_candidate_full_start_p99_ms&&
     report.benchmark.improvement_fraction>=report.criterion.minimum_full_start_p95_improvement_fraction;
+  report.benchmark.approved_decision_passed=cand.errors===0&&cand.full_start.p95_ms<=report.criterion.maximum_candidate_full_start_p95_ms&&
+    cand.full_start.p99_ms<=report.criterion.maximum_candidate_full_start_p99_ms&&
+    report.benchmark.improvement_fraction>=report.decision.minimum_full_start_p95_improvement_fraction;
 
   // Target source-overlap + trajectory/inventory divergence on this disposable snapshot.
   const overlapSeed='issue629-trajectory-divergence-v1';
@@ -248,8 +252,10 @@ try {
   await query('INSERT INTO draft_run_serving_inventory(snapshot_id,puzzle_id,set_id,pick_number,band,source_draft_hash) VALUES($1::bigint,$2,$3,$4::int,$5,$6)',[later.snapshot_id,later.puzzle_id,later.set_id,later.pick_number,later.band,later.source_draft_hash]);
   await query('UPDATE draft_run_serving_snapshots SET groups=$2::jsonb WHERE id=$1::bigint',[snapshot.id,originalGroups]);
 
-  // Deplete one later group to the selected source only; broader trajectory
-  // decrement must make that group unavailable when its round arrives.
+  // Deplete one later group in the compact snapshot counts without invalidating
+  // custom-set eligibility or changing inventory membership. Setting n=1 while
+  // retaining the original sources count makes the first selected source's
+  // broader trajectory decrement drive this later medium/hard group to zero.
   const depletionSeed='issue629-depletion-v1';
   const depletionPlan=currentPracticeBatchPlan(snapshot,depletionSeed,'mixed',{day,setIds:[fallbackSet]});
   const depletionBefore=await selectDatabaseRun(query,DRAFT_RUN_CORPUS_VERSION,depletionSeed,'mixed',{day,setIds:[fallbackSet],snapshot});
@@ -258,32 +264,32 @@ try {
     WHERE snapshot_id=$1::bigint AND source_draft_hash=$2 AND pick_number BETWEEN 2 AND 8 ORDER BY pick_number`,[snapshot.id,firstSource])).rows;
   const target=sourceRows.find(r=>r.band===depletionPlan.plan.bands[Number(r.pick_number)-1]&&r.band!=='easy');
   assert.ok(target,'Need a later medium/hard source row for depletion.');
-  await query(`DELETE FROM draft_run_serving_inventory
-    WHERE snapshot_id=$1::bigint AND set_id=$2 AND pick_number=$3::int AND band=$4 AND source_draft_hash<>$5`,
-    [snapshot.id,target.set_id,target.pick_number,target.band,target.source_draft_hash]);
-  await query(`UPDATE draft_run_serving_snapshots SET groups=(
-    SELECT COALESCE(jsonb_agg(to_jsonb(g) ORDER BY g.set_id,g.pick_number,g.band),'[]'::jsonb)
-    FROM (SELECT set_id,pick_number,band,count(*)::int n,count(DISTINCT source_draft_hash)::int sources
-      FROM draft_run_serving_inventory WHERE snapshot_id=$1::bigint GROUP BY set_id,pick_number,band) g
-  ) WHERE id=$1::bigint`,[snapshot.id]);
+  const depletedGroups=snapshot.groups.map(g=>
+    g.set_id===target.set_id&&Number(g.pick_number)===Number(target.pick_number)&&g.band===target.band
+      ?{...g,n:1}:g
+  );
+  assert.equal(Number(depletedGroups.find(g=>g.set_id===target.set_id&&Number(g.pick_number)===Number(target.pick_number)&&g.band===target.band)?.n),1);
+  const originalGroups=JSON.stringify(snapshot.groups);
+  await query('UPDATE draft_run_serving_snapshots SET groups=$2::jsonb WHERE id=$1::bigint',[snapshot.id,JSON.stringify(depletedGroups)]);
   const depleted=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
   const failures=[];
   for(const fn of [selectDatabaseRun,selectBatchedDatabaseRun]) {
     try {await fn(query,DRAFT_RUN_CORPUS_VERSION,depletionSeed,'mixed',{day,setIds:[fallbackSet],snapshot:depleted});failures.push(null);}
     catch(e){failures.push(errorShape(e));}
   }
+  await query('UPDATE draft_run_serving_snapshots SET groups=$2::jsonb WHERE id=$1::bigint',[snapshot.id,originalGroups]);
   assert.deepEqual(failures.map(x=>x?.status),[503,503]);
-  report.parity.targeted.depleted_group={pick:Number(target.pick_number),band:target.band,baseline:failures[0],candidate:failures[1]};
+  report.parity.targeted.depleted_group={pick:Number(target.pick_number),band:target.band,baseline:failures[0],candidate:failures[1],synthetic_group_n:1,custom_eligibility_preserved:true};
 
   report.parity.passed=true;
-  report.passed=report.parity.passed&&report.benchmark.criterion_passed;
+  report.passed=report.parity.passed&&report.benchmark.approved_decision_passed;
 } catch(error) {
   report.error=errorShape(error);
 } finally {
   delete process.env.PACK1_BATCHED_SELECTION_EXPERIMENT;
   report.finished_at=new Date().toISOString();save();
 }
-console.log(JSON.stringify({passed:report.passed,parity:report.parity.passed===true,benchmark:report.benchmark.criterion_passed===true,
+console.log(JSON.stringify({passed:report.passed,parity:report.parity.passed===true,predeclared_benchmark:report.benchmark.criterion_passed===true,approved_benchmark:report.benchmark.approved_decision_passed===true,
   baseline:report.benchmark.variants.baseline||null,candidate:report.benchmark.variants.candidate||null,
   improvement_fraction:report.benchmark.improvement_fraction??null,error:report.error||null}));
 if(!report.passed)process.exitCode=1;
