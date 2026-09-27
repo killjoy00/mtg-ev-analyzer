@@ -29,7 +29,7 @@ function nativePlatform(): MobilePlatform | null {
 }
 
 async function checkInstalledVersion(): Promise<VersionGateDecision> {
-  if (config.screenshots.enabled) return { status: 'allowed' };
+  if (config.screenshots?.enabled) return { status: 'allowed' };
   const platform = nativePlatform();
   const version = Application.nativeApplicationVersion;
   const build = Application.nativeBuildVersion;
