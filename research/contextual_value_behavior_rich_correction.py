@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import Mapping, Sequence
 
 import numpy as np
-from scipy.optimize import minimize
+from scipy.optimize import minimize, minimize_scalar
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
@@ -77,6 +77,7 @@ MAX_ITER = 300
 OPTIMIZER_GTOL = 1e-4
 MIN_IMPROVED_FOLDS = 3
 PROB_FLOOR = 1e-12
+PRIMARY_SHRINKAGE_PICKS = tuple(range(1, 9))
 
 
 def parse_args():
@@ -212,6 +213,193 @@ def _choice_metrics(data: Mapping[str, np.ndarray], behavior: np.ndarray) -> dic
         "selected_action_nll": weighted_nll,
         "mean_selected_probability": weighted_selected_probability,
         "top1_accuracy": weighted_top1,
+    }
+
+
+def _decision_subset_metrics(
+    data: Mapping[str, np.ndarray],
+    behavior: np.ndarray,
+    indices: np.ndarray,
+) -> dict:
+    indices = np.asarray(indices, dtype=np.int64)
+    offsets = data["offsets"].astype(np.int64)
+    selected_ord = data["selected_ord"].astype(np.int64)
+    decision_weight = data["decision_weight"].astype(np.float64)
+    if len(indices) == 0:
+        raise SystemExit("choice metric subset is empty")
+    weighted_nll = 0.0
+    weighted_selected_probability = 0.0
+    weighted_top1 = 0.0
+    total_weight = 0.0
+    for index in indices:
+        start, stop = int(offsets[index]), int(offsets[index + 1])
+        selected = start + int(selected_ord[index])
+        probability = float(np.clip(behavior[selected], PROB_FLOOR, 1.0))
+        weight = float(decision_weight[index])
+        weighted_nll += weight * -math.log(probability)
+        weighted_selected_probability += weight * probability
+        weighted_top1 += weight * float(
+            int(np.argmax(behavior[start:stop])) == int(selected_ord[index])
+        )
+        total_weight += weight
+    return {
+        "decisions": int(len(indices)),
+        "total_decision_weight": total_weight,
+        "selected_action_nll": weighted_nll / total_weight,
+        "mean_selected_probability": weighted_selected_probability / total_weight,
+        "top1_accuracy": weighted_top1 / total_weight,
+    }
+
+
+def _primary_window_indices(data: Mapping[str, np.ndarray]) -> np.ndarray:
+    pack = data["pack_number"].astype(np.int64)
+    pick = data["pick_number"].astype(np.int64)
+    return np.flatnonzero(
+        (pack == 1)
+        & (pick >= PRIMARY_SHRINKAGE_PICKS[0])
+        & (pick <= PRIMARY_SHRINKAGE_PICKS[-1])
+    )
+
+
+def _blend_probabilities(
+    data: Mapping[str, np.ndarray],
+    baseline: np.ndarray,
+    corrected: np.ndarray,
+    lambdas_by_pick: Mapping[int, float],
+) -> np.ndarray:
+    offsets = data["offsets"].astype(np.int64)
+    counts = np.diff(offsets).astype(np.int64)
+    per_decision = np.ones(len(counts), dtype=np.float64)
+    pack = data["pack_number"].astype(np.int64)
+    pick = data["pick_number"].astype(np.int64)
+    for pick_number, value in lambdas_by_pick.items():
+        mask = (pack == 1) & (pick == int(pick_number))
+        per_decision[mask] = float(value)
+    row_lambda = np.repeat(per_decision, counts)
+    base_log = np.log(np.clip(baseline, PROB_FLOOR, 1.0))
+    corrected_log = np.log(np.clip(corrected, PROB_FLOOR, 1.0))
+    scores = base_log + row_lambda * (corrected_log - base_log)
+    return _softmax_by_decision(scores, offsets)
+
+
+def _fit_pick_shrinkage(oof_rows: Sequence[dict]) -> dict:
+    by_pick = {}
+    for pick_number in PRIMARY_SHRINKAGE_PICKS:
+        pieces = []
+        for row in oof_rows:
+            data = row["data"]
+            offsets = data["offsets"].astype(np.int64)
+            decision_weight = data["decision_weight"].astype(np.float64)
+            selected_ord = data["selected_ord"].astype(np.int64)
+            pack = data["pack_number"].astype(np.int64)
+            pick = data["pick_number"].astype(np.int64)
+            for index in np.flatnonzero((pack == 1) & (pick == pick_number)):
+                start, stop = int(offsets[index]), int(offsets[index + 1])
+                selected = int(selected_ord[index])
+                base = np.clip(row["baseline"][start:stop], PROB_FLOOR, 1.0)
+                rich = np.clip(row["corrected"][start:stop], PROB_FLOOR, 1.0)
+                pieces.append((
+                    np.log(base),
+                    np.log(rich) - np.log(base),
+                    selected,
+                    float(decision_weight[index]),
+                ))
+        if not pieces:
+            raise SystemExit(f"no OOF P1P{pick_number} decisions for shrinkage fit")
+        total_weight = sum(piece[3] for piece in pieces)
+
+        def nll(value: float) -> float:
+            loss = 0.0
+            for base_log, log_ratio, selected, weight in pieces:
+                scores = base_log + float(value) * log_ratio
+                peak = float(np.max(scores))
+                log_norm = peak + math.log(float(np.sum(np.exp(scores - peak))))
+                loss += weight * (log_norm - float(scores[selected]))
+            return loss / total_weight
+
+        result = minimize_scalar(
+            nll,
+            bounds=(0.0, 1.0),
+            method="bounded",
+            options={"xatol": 1e-4},
+        )
+        candidates = [
+            (0.0, nll(0.0)),
+            (1.0, nll(1.0)),
+            (float(result.x), nll(float(result.x))),
+        ]
+        chosen_lambda, chosen_nll = min(candidates, key=lambda item: item[1])
+        by_pick[str(pick_number)] = {
+            "lambda": float(chosen_lambda),
+            "decisions": int(len(pieces)),
+            "total_decision_weight": float(total_weight),
+            "baseline_nll": float(candidates[0][1]),
+            "rich_nll": float(candidates[1][1]),
+            "shrunk_nll": float(chosen_nll),
+        }
+
+    baseline_total = sum(
+        row["baseline_nll"] * row["total_decision_weight"]
+        for row in by_pick.values()
+    )
+    rich_total = sum(
+        row["rich_nll"] * row["total_decision_weight"]
+        for row in by_pick.values()
+    )
+    shrunk_total = sum(
+        row["shrunk_nll"] * row["total_decision_weight"]
+        for row in by_pick.values()
+    )
+    total_weight = sum(row["total_decision_weight"] for row in by_pick.values())
+    return {
+        "selection_basis": (
+            "eight bounded P1 pick-specific lambda values fit only from pooled "
+            "five-fold out-of-fold selected-action NLL; validation, H/A policy "
+            "effects, and OPE diagnostics are not used to fit lambda"
+        ),
+        "bounds": [0.0, 1.0],
+        "by_pick": by_pick,
+        "aggregate": {
+            "total_decision_weight": float(total_weight),
+            "baseline_nll": float(baseline_total / total_weight),
+            "rich_nll": float(rich_total / total_weight),
+            "shrunk_nll": float(shrunk_total / total_weight),
+        },
+    }
+
+
+def _nuisance_diagnostic_gate(report: Mapping[str, object]) -> dict:
+    evaluation = report.get("fixed_policy_evaluation")
+    prediction = report.get("validation_behavior_prediction")
+    if not isinstance(evaluation, dict) or not isinstance(prediction, dict):
+        return {"passed": False, "reason": "validation diagnostics unavailable"}
+    candidate = evaluation.get("pick_shrunk_behavior")
+    if not isinstance(candidate, dict):
+        return {"passed": False, "reason": "pick-shrunk evaluation unavailable"}
+    checks = {}
+    for policy in ("H", "A"):
+        diagnostics = candidate["evaluator_diagnostics"][policy]
+        checks[f"{policy}_weight_ci_contains_one"] = bool(
+            diagnostics["weight_normalization"]["ci95_contains_one"]
+        )
+        calibration_ci = diagnostics["policy_action_calibration"]["gap_ci95"]
+        checks[f"{policy}_calibration_ci_contains_zero"] = bool(
+            float(calibration_ci[0]) <= 0.0 <= float(calibration_ci[1])
+        )
+    primary = prediction["primary_window"]
+    checks["primary_window_nll_improves_vs_frozen"] = bool(
+        primary["pick_shrunk"]["selected_action_nll"]
+        < primary["baseline"]["selected_action_nll"]
+    )
+    return {
+        "passed": bool(all(checks.values())),
+        "checks": checks,
+        "rule": (
+            "first-order credibility gate only: H/A raw-weight normalization 95% "
+            "CIs must contain theoretical mean 1, H/A policy-action calibration "
+            "gap 95% CIs must contain zero, and P1P1-P1P8 selected-action NLL "
+            "must improve over frozen behavior"
+        ),
     }
 
 
@@ -529,6 +717,7 @@ def main():
     baseline_validation = validation["behavior"].astype(np.float64)
 
     cv_rows = []
+    oof_rows = []
     for held_fold in range(5):
         fit_data = _combine([
             row for fold, row in folds.items() if fold != held_fold
@@ -540,6 +729,12 @@ def main():
             held["data"],
             held["baseline_behavior"],
         )
+        oof_rows.append({
+            "fold": held_fold,
+            "data": held["data"],
+            "baseline": held["baseline_behavior"],
+            "corrected": corrected,
+        })
         cv_rows.append({
             "fold": held_fold,
             "baseline": _choice_metrics(held["data"], held["baseline_behavior"]),
@@ -560,6 +755,7 @@ def main():
         }, sort_keys=True), flush=True)
 
     training_gate = _aggregate_cv(cv_rows)
+    pick_shrinkage = _fit_pick_shrinkage(oof_rows) if training_gate["gate_passed"] else None
     report = {
         "scope": "development_only",
         "phase": "rich_behavior_propensity_correction",
@@ -581,6 +777,11 @@ def main():
             "max_iter": MAX_ITER,
             "optimizer_gtol": OPTIMIZER_GTOL,
             "hyperparameter_search": False,
+            "pick_shrinkage_calibration": (
+                "eight P1 pick-specific lambda values in [0,1], fit from pooled "
+                "five-fold out-of-fold selected-action NLL only; lambda=0 is "
+                "frozen behavior and lambda=1 is the full rich correction"
+            ),
             "training_gate": (
                 "aggregate five-fold training-only NLL improves, at least "
                 "3/5 folds improve, and all fits converge"
@@ -593,6 +794,7 @@ def main():
             "folds": cv_rows,
             "aggregate": training_gate,
         },
+        "pick_shrinkage_training_only": pick_shrinkage,
     }
 
     if training_gate["gate_passed"]:
@@ -607,8 +809,20 @@ def main():
                 validation,
                 baseline_validation,
             )
+            lambdas_by_pick = {
+                int(pick): float(row["lambda"])
+                for pick, row in pick_shrinkage["by_pick"].items()
+            }
+            shrunk_validation = _blend_probabilities(
+                validation,
+                baseline_validation,
+                corrected_validation,
+                lambdas_by_pick,
+            )
             baseline_choice = _choice_metrics(validation, baseline_validation)
             corrected_choice = _choice_metrics(validation, corrected_validation)
+            shrunk_choice = _choice_metrics(validation, shrunk_validation)
+            primary_window = _primary_window_indices(validation)
 
             train = _load_train_shards(args.train_shard, args.train_report)
             primary = _primary_indices(validation)
@@ -630,6 +844,7 @@ def main():
                 )
 
             corrected_map = _behavior_map(validation, corrected_validation)
+            shrunk_map = _behavior_map(validation, shrunk_validation)
             corrected_h = _observations(
                 validation,
                 primary,
@@ -641,6 +856,18 @@ def main():
                 primary,
                 a_chosen,
                 behavior_by_decision=corrected_map,
+            )
+            shrunk_h = _observations(
+                validation,
+                primary,
+                h_chosen,
+                behavior_by_decision=shrunk_map,
+            )
+            shrunk_a = _observations(
+                validation,
+                primary,
+                a_chosen,
+                behavior_by_decision=shrunk_map,
             )
             from contextual_value_phase_a_bakeoff import _minimal_decisions
             primary_decisions = _minimal_decisions(
@@ -666,10 +893,22 @@ def main():
             report["validation_behavior_prediction"] = {
                 "baseline": baseline_choice,
                 "rich_correction": corrected_choice,
+                "pick_shrunk": shrunk_choice,
                 "selected_action_nll_improvement": (
                     baseline_choice["selected_action_nll"]
                     - corrected_choice["selected_action_nll"]
                 ),
+                "primary_window": {
+                    "baseline": _decision_subset_metrics(
+                        validation, baseline_validation, primary_window
+                    ),
+                    "rich_correction": _decision_subset_metrics(
+                        validation, corrected_validation, primary_window
+                    ),
+                    "pick_shrunk": _decision_subset_metrics(
+                        validation, shrunk_validation, primary_window
+                    ),
+                },
             }
             report["fixed_policy_evaluation"] = {
                 "frozen_behavior": _policy_eval(
@@ -681,6 +920,11 @@ def main():
                     primary_decisions,
                     corrected_h,
                     corrected_a,
+                ),
+                "pick_shrunk_behavior": _policy_eval(
+                    primary_decisions,
+                    shrunk_h,
+                    shrunk_a,
                 ),
                 "H_reproduction_max_abs_error": reproduction_error,
             }
@@ -707,12 +951,12 @@ def main():
         "Behavior choice prediction, calibration, raw-weight normalization, balance, "
         "and sensitivity coherence determine whether the nuisance is more credible."
     )
+    nuisance_gate = _nuisance_diagnostic_gate(report)
     report["next_gate"] = {
         "assessment_authorized": False,
-        "historical_ood_stress_next": False,
-        "behavior_nuisance_question_resolved": bool(
-            report.get("fixed_policy_evaluation")
-        ),
+        "historical_ood_stress_next": bool(nuisance_gate["passed"]),
+        "behavior_nuisance_question_resolved": bool(nuisance_gate["passed"]),
+        "behavior_nuisance_diagnostic_gate": nuisance_gate,
     }
     report["elapsed_seconds"] = time.perf_counter() - started
 
