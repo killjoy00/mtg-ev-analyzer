@@ -43,9 +43,9 @@ Three fixed Daily challenges refresh each day:
 
 Everyone gets the same decisions for each Daily, so scores are directly comparable.
 
-Keep practicing between Dailies with regular random runs. A free Pack One account adds leaderboard participation, career history, and cross-device continuity. Existing Elite access unlocks Powered Cube and custom-set practice.
+Keep practicing between Dailies with regular random runs. A free Pack One account adds leaderboard participation, career history, and cross-device continuity.
 
-Your Pack One account works across web, iPhone, and Android. Sign in with Apple, Google, or email. Account deletion is available in the app.
+Your Pack One account works across web, iPhone, iPad, and Android. Sign in with Apple, Google, or email. Account deletion is available in the app.
 
 Pack One is unofficial Fan Content permitted under the Wizards Fan Content Policy and is not approved or endorsed by Wizards. Card metadata and images are sourced from Scryfall. See packone.pro/terms/ for attribution and source-license details.
 
@@ -58,9 +58,9 @@ Sign-in methods:
 - Google
 - Email/password
 
-The app contains no in-app purchase flow and no mobile upgrade/purchase link.
+The app contains no in-app purchase flow and no mobile upgrade/purchase link. Native Patreon interaction is limited to existing-account OAuth authentication at Patreon’s authorize endpoint with identity scope; the app does not link to Patreon purchasing, show prices, or instruct users where to subscribe.
 
-For review of gated Elite practice, provide a non-expiring Pack One demo account with Elite already granted. Do not place reviewer credentials in this repository; enter them only in App Store Connect Review Information.
+Do not submit an iOS build that unlocks paid Patreon-derived practice solely from an external membership unless the exact same digital access is available through compliant iOS IAP or Apple has confirmed an applicable exception for this app. If an approved strategy retains gated practice for review, provide a non-expiring reviewer account with that access already granted. Do not place reviewer credentials in this repository; enter them only in App Store Connect Review Information.
 
 Reviewer path after sign-in:
 1. Home -> Practice
