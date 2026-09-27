@@ -11,6 +11,7 @@ The homepage starts with **Daily Draft Run**, **Daily Powered Cube** and **Daily
 - [Current implementation and deployment state](docs/CURRENT-STATE.md)
 - [Campaign Links owner guide](docs/CAMPAIGN-LINKS-OWNER-GUIDE.md)
 - [Username identity, recovery and admin monitoring](docs/USERNAME-IDENTITY.md)
+- [Email ownership verification](docs/AUTH-EMAIL-VERIFICATION.md), [password recovery delivery](docs/AUTH-RECOVERY-DELIVERY.md), [request/identity integrity](docs/REQUEST-INTEGRITY.md)
 - [Product contract](docs/CHARTER.md)
 - [Corpus and selection](docs/DATA-MANAGEMENT.md), [Corpus Operations](docs/CORPUS-OPERATIONS.md)
 - [Scoring](docs/SCORING-AND-DIFFICULTY.md), [Traditional research](results/rebuild-2026-09-18/TRADITIONAL-RESULTS.md)

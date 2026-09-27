@@ -385,7 +385,7 @@ export async function resumeAccountAuth(status) {
     event('auth_apple_failed',{source});
     const appleErrorCode=new URL(location.href).searchParams.get('appleErrorCode');
     failure={provider:'apple',message:appleErrorCode==='APPLE_EXISTING_ACCOUNT_UNVERIFIED'
-      ? 'An unverified Pack One account already uses this email. Reset its password from that inbox, verify the account, then try Apple again.'
+      ? 'An unverified Pack One account already uses this email. Reset its password from that inbox, then try Apple again.'
       : 'Apple sign in did not finish. Please try again.'};
   } else {
     event('auth_google_failed',{source});

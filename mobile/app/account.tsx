@@ -289,7 +289,7 @@ export default function AccountScreen() {
         if (callback.searchParams.get('apple') === 'error') {
           const code = callback.searchParams.get('appleErrorCode');
           throw new Error(code === 'APPLE_EXISTING_ACCOUNT_UNVERIFIED'
-            ? 'An unverified Pack One account already uses this email. Reset its password from that inbox, verify the account, then try Apple again.'
+            ? 'An unverified Pack One account already uses this email. Reset its password from that inbox, then try Apple again.'
             : 'Apple sign in did not finish.');
         }
         const handoff = callback.searchParams.get('appleHandoff');
