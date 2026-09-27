@@ -4,11 +4,13 @@
 
 The original #516/#527 evidence below remains historical and valid. A later persistent five-egress 25→50→100 qualification on PR #655 materially improves the distributed evidence without changing its predeclared SLOs.
 
-Exact-head run [36326543142](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36326543142), PR head `dcb543da1abc4777d1e36bf3ad599e4af4454671`, tested merge `0ea8e67bbfd969dd7a49e3c2f3264bca43894752`:
+Runtime-code-head run [36326543142](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36326543142), PR head `dcb543da1abc4777d1e36bf3ad599e4af4454671`, tested merge `0ea8e67bbfd969dd7a49e3c2f3264bca43894752`:
 - 25 passed completely.
 - 50 passed completely across five verified egress networks: 3,968 requests, zero correctness failures, start p95/p99 1,602.65/2,188.32 ms, hold-start p95 1,898.40 ms, reroll p95/p99 1,217.49/1,867.57 ms.
 - 100 reached all 100 session/start requests with start p95/p99 318.68/478.46 ms and zero recorded correctness failures, then aborted on one 3,210.81 ms initial view request. That single request crossed the unchanged per-runner rolling 3,000 ms view-p99 gate while the aggregate partial 380-view p99 was 322.84 ms. Because the sustained hold/recovery/final telemetry did not complete, 100 is **not** certified.
 - Cleanup passed.
+
+Subsequent #655 commits through the current documentation update are documentation/release-bookkeeping only; the runtime/schema implementation tested above remains `dcb543da1abc4777d1e36bf3ad599e4af4454671`.
 
 Release decision: accept the current-practice batched selector plus frozen source-decrement cache and stop treating further selector optimization as a v1 blocker. Keep the **formal supported distributed target at 25** under the original promotion rule, record **50 as a demonstrated passing stage**, and treat 100 certification as deferred follow-up in #685 rather than silently weakening the gate.
 
