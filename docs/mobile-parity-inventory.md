@@ -1,6 +1,6 @@
 # Mobile web/native parity inventory
 
-Tracking: #575. Reconciled through current main 8956f8c5011a7bdffd71c2184a5006558b362d69 on September 26, 2026.
+Tracking: #575. Reconciled against main f92fad916c94a1a2bf77299bb3158a53bfb8f845 plus the Apple-IAP release candidate in #673 on September 26, 2026.
 
 This document replaces blanket source-string parity claims with an A–E inventory. **Implemented** means reviewed product code is present on main. It does not mean physical-device acceptance, live association-file verification, store-console approval, or public-release authorization.
 
@@ -27,7 +27,7 @@ Status vocabulary:
 | Public profiles | **Implemented** | Guest-safe public reads, privacy revocation, route changes, pagination, full returned detail and canonical sharing. |
 | Profile activity | **Implemented** | Shared-run/challenge activity plus privacy-bound achievement and Daily sharing. |
 | Membership / Patreon existing access | **Implemented** | Provider-independent account access is separate from Patreon provenance; connect/reconnect, refresh and disconnect are available. Unknown/failure is never labeled Free. |
-| Join/upgrade Patreon membership | **Policy decision open** | Native intentionally does not sell or upgrade memberships and now uses passive existing-account Patreon OAuth wording. For iOS, that alone does not clear 3.1.3(b): if Patreon-derived digital practice remains gated, equivalent IAP or explicit Apple confirmation of another exception is still required. |
+| Elite subscription purchase | **Implemented on iOS; deliberate difference on Android** | iOS offers Pack One Elite as an Apple auto-renewable subscription using StoreKit, StoreKit-displayed pricing, Restore Purchases, and Apple subscription management. Patreon remains an existing-access provider with no native Patreon purchase/upgrade CTA. Google Play billing is deliberately outside this v1 change. |
 | Learn: How to Play / Scoring / Method / Sets | **Implemented** | Core education is native. |
 | Editorial drafting guides | **Deliberate continuation** | Opens canonical `https://packone.pro/learn/` so article copy remains single-source. |
 | Published MSH/ECL/TMT/SOS archive analyses | **Implemented** | Native archive screen uses current checked-in web evidence, native routing and disclosed card links. |
@@ -65,13 +65,17 @@ Status vocabulary:
 | Provider-independent account access is not inferred from Patreon-only grants | **Implemented** |
 | Failed/unknown Patreon status is not presented as Free | **Implemented** |
 | Patreon disconnect removes Patreon grants without deleting other-provider/manual access | **Implemented** |
+| Apple purchase is granted only after server verification of Apple-signed transaction data | **Implemented** |
+| StoreKit appAccountToken is the signed Pack One Auth-user UUID and a subscription chain cannot migrate between Pack One accounts | **Implemented** |
+| Apple expiry/revocation changes only apple-app-store grants; Patreon/manual access survives | **Implemented** |
+| App Store Server Notifications are signature-verified, idempotent, stale-event resistant, and fail closed on app/product/account mismatch | **Implemented** |
 | Signed-in affiliate visibility is authoritative/fail-closed | **Implemented** |
 
 ## D. Deliberate native/store differences
 
 | Difference | Rationale / boundary |
 | --- | --- |
-| No native Patreon purchase/upgrade CTA | Existing-account OAuth is implemented with no purchase link, price, or upgrade CTA. This reduces steering risk but is not treated as permission to unlock externally purchased digital features on iOS without IAP; App Store payment classification remains a release blocker. |
+| Provider-specific purchase surfaces | Patreon remains passive existing-account OAuth with no Patreon purchase link, price, or upgrade CTA. iOS sells equivalent Elite digital access only through Apple IAP. Android has no Google Play billing in this v1 change and therefore retains the passive existing-access membership surface. |
 | Guides and policy copy are not duplicated into native source | Canonical HTTPS continuation prevents editorial/legal drift. |
 | External credential reset remains canonical HTTPS | Avoids exposing reset credentials to interceptable custom schemes. |
 | Affiliate links are restricted to reviewed surfaces | Revealed-card links live inside expanded score analysis; Daily-home fallback is outside active gameplay/results and fail-closed for ad-free/unknown signed-in membership. |
@@ -117,7 +121,8 @@ This exact-main evidence remains valid only while that SHA is the intended relea
 - Upgrade-path acceptance from prior store builds.
 - Sign in with Apple normal + Hide My Email, relay email and deletion/revocation acceptance.
 - Hosted `.well-known/apple-app-site-association` and `.well-known/assetlinks.json` verification using the real Apple Team ID and Google Play **app-signing** certificate.
-- Storefront/geography decision for Patreon join/upgrade; Google Play program enrollment evidence if external digital-purchase links are used.
+- App Store Connect subscription group/product `pro.packone.app.elite.monthly`, pricing/localization/review metadata, and App Store Server Notifications V2 production+sandbox URLs configured for the final app.
+- TestFlight/Sandbox acceptance for Apple subscribe, server verification, renewal, cancellation-at-period-end, billing grace, refund/revocation, Restore Purchases, Manage Subscription, account switching, and duplicate-provider protection.
 - Signed binary hashes/build numbers and exact backend/gateway release recorded against the final store RCs.
 - App Store / Play Console metadata, app-content declarations, reviewer access and production-access qualification.
 - Explicit owner approval before TestFlight/Play/store publication.
