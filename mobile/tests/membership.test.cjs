@@ -57,10 +57,10 @@ async function mount(t, options = {}) {
     restorePurchases: async (request) => { h.iapEvents.push('restore'); h.iapRestores.push(request); },
   };
   const mocks = {
-    'expo-iap': {
-      useIAP: (iapOptions) => { h.iapOptions = iapOptions; return h.iap; },
-      getAvailablePurchases: async () => h.iapAvailable,
-      deepLinkToSubscriptions: async () => { h.links.push('apple-subscriptions'); },
+    '@/src/iap/apple-store': {
+      useAppleStore: (iapOptions) => { h.iapOptions = iapOptions; return h.iap; },
+      getAvailableApplePurchases: async () => h.iapAvailable,
+      openAppleSubscriptionManagement: async () => { h.links.push('apple-subscriptions'); },
     },
     'expo-router': { router: { push: (route) => h.routes.push(route) },
       useFocusEffect: (callback) => React.useEffect(callback, [callback]),
