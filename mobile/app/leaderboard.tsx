@@ -198,7 +198,7 @@ export default function LeaderboardScreen() {
     <View style={styles.header}>
       <Text style={styles.eyebrow}>LEADERBOARD</Text>
       <Text style={styles.title}>See how the field drafted.</Text>
-      <Text style={styles.body}>Ranked scores come from signed-in Pack One Daily runs.</Text>
+      <Text style={styles.body}>Ranked scores come from Pack One Daily runs validated to an eligible account.</Text>
 
       <View style={styles.filterGroup}>
         <Text style={styles.filterLabel}>RUN</Text>
