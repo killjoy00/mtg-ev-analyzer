@@ -97,6 +97,25 @@ test('card-image maintenance dispatch is fixed and takes no arbitrary inputs',()
  for(const extra of [{target:'production'},{sets:'all'},{workflow:'other.yml'},{ref:'branch'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
 
+test('targeted card-image repair dispatch is bounded to one exact card and explicit environments',()=>{
+ const request={...common,operation:'card-image-repair',card_name:'Cosmogrand Zenith',environments:'eoe'};
+ assert.deepEqual(rolloutDispatch(request),{
+   workflow:'refresh-powered-cube-images.yml',
+   body:{ref:'main',inputs:{request_id:'test-request',mode:'targeted',card_name:'Cosmogrand Zenith',environments:'eoe'}},
+ });
+ for(const bad of [
+   {...request,card_name:''},
+   {...request,card_name:' Cosmogrand Zenith'},
+   {...request,card_name:'Cosmogrand Zenith\nOther'},
+   {...request,environments:'EOE'},
+   {...request,environments:'eoe, ecl'},
+   {...request,environments:'eoe,eoe,eoe,eoe,eoe,eoe,eoe,eoe,eoe'},
+   {...request,target:'production'},
+   {...request,workflow:'other.yml'},
+   {...request,ref:'branch'},
+ ])assert.throws(()=>rolloutDispatch(bad));
+});
+
 test('production browser verification accepts only fixed Daily measurement inputs',()=>{
  assert.equal(rolloutDispatch({...common,operation:'production-browser'}).workflow,'production-browser.yml');
  assert.deepEqual(rolloutDispatch({...common,operation:'production-browser',first_environment:'latest',measurement_mode:true}),{
