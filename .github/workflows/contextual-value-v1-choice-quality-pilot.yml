@@ -1,6 +1,9 @@
 name: contextual-value-v1-choice-quality-pilot
 
 on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
   workflow_dispatch:
 
 permissions:
@@ -8,7 +11,7 @@ permissions:
   contents: read
 
 env:
-  CORE_RUN: '36256947308'
+  ABLATION_RUN: '36280148906'
   PHASE_A1_RUN: '36286752890'
   PHASE_A2_PILOT_RUN: '36289846820'
   PHASE_A2_FULL_RUN: '36290030236'
@@ -28,12 +31,13 @@ jobs:
       - name: Compile choice-quality pilot
         run: python -m py_compile research/contextual_value_choice_quality_pilot.py
 
-      - name: Download frozen core pooled checkpoint
+      - name: Download frozen strong-offset-only Q predictions
         uses: actions/download-artifact@v4
         with:
-          name: contextual-value-v1-pooled-msh-sos-ecl-tla-8000
-          path: core
-          run-id: ${{ env.CORE_RUN }}
+          pattern: contextual-value-v1-ablation-strong_offset_only-fold-*
+          path: simple-q
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
           github-token: ${{ github.token }}
 
       - name: Download Phase A1 feature contract
@@ -66,11 +70,15 @@ jobs:
         run: |
           set -euo pipefail
           TRAIN_ARGS=()
+          Q_ARGS=()
           for f in 0 1 2 3 4; do
             TRAIN_ARGS+=(--train-fold "folds/phase-a2-fold-$f.npz")
           done
+          for f in -1 0 1 2 3 4; do
+            Q_ARGS+=(--simple-q-prediction "simple-q/strong_offset_only-fold-$f.jsonl.gz")
+          done
           python3 research/contextual_value_choice_quality_pilot.py \
-            --train-nuisance core/train-nuisance.jsonl.gz \
+            "${Q_ARGS[@]}" \
             "${TRAIN_ARGS[@]}" \
             --validation-fold folds/phase-a2-fold--1.npz \
             --feature-report rich-report/phase-a-rich-fold--1-report.json \
@@ -89,6 +97,7 @@ jobs:
           assert r["cohort"]["train_drafts"] == 4789
           assert r["cohort"]["validation_drafts"] == 1218
           assert r["training_cv"]["chosen_l2"] in r["spec"]["ridge_grid"]
+          assert r["spec"]["simple_q_source"].startswith("strong_offset_only")
           assert r["next_gate"]["assessment_authorized"] is False
           PY
 
