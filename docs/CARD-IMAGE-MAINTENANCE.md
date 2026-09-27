@@ -41,6 +41,37 @@ Unavoidable original/only special-frame printings are reported but do not fail t
 
 The refresh always uploads `generated/card-image-refresh-report.json` and per-environment mappings as retained Actions diagnostics, including on failure. Inspect these first for unresolved names, avoidable special selections, unavoidable special selections, cross-set fallbacks, and card-ID/name collisions.
 
+## Targeted repair vs full refresh
+
+Use targeted repair for a known, isolated display regression on an exact served card name and explicit environment list when the shared selector/policy itself has not changed. Use the full refresh for resolver or printing-policy changes, bulk drift, audits, uncertain scope, or any case where more than a bounded named repair is intended.
+
+Run the targeted repair dry-run before dispatching live mutation. Hydrate only the environments you intend to repair, then resolve and inspect the retained report without changing shards or checked-in source:
+
+```bash
+REPLAY_SETS='powered-cube' bash scripts/r2_replay_shards.sh hydrate
+CARD_NAME='Titania, Protector of Argoth' \
+REPAIR_ENVIRONMENTS='powered-cube' \
+python scripts/repair_card_image.py --dry-run
+cat generated/card-image-repair/report.json
+```
+
+The dry-run requires the same R2 read credentials as shard hydration. It validates exact catalog environment ids, exact case-sensitive served-name presence in both checked-in corpus and hydrated shards, card-id/name collisions, and the deterministic bulk selector. Targeted mode never sends operator card text through Scryfall named/fuzzy resolution; a bulk miss fails closed and should be handled through the full refresh path instead.
+
+Dispatch the existing pinned workflow in targeted mode; do not create or use a second image-maintenance workflow:
+
+```bash
+gh workflow run refresh-powered-cube-images.yml \
+  -f mode=targeted \
+  -f card_name='Titania, Protector of Argoth' \
+  -f environments='powered-cube' \
+  -f request_id='titania-repair' \
+  -f code_commit='<reviewed-main-commit>'
+```
+
+Targeted verification proves that only the listed environments receive one-entry backend mappings, the second image-page pass would update zero cards on every page, image markers are normalized only for those environments, development gameplay passes before production is touched, production gameplay passes, and the backend release marker remains on the requested reviewed revision. R2 hydrate/upload/verify is scoped with `REPLAY_SETS`.
+
+The final protected-branch handoff uses an `automation/card-image-repair-...` branch and never pushes to `main` or creates a pull request from Actions. A no-op source publication is expected when checked-in/R2 display metadata was already correct and only the live backend state had drifted.
+
 ## Guarded release sequence
 
 Use `.github/workflows/card-image-release.yml` for reviewed card-image code changes. It requires a full reviewed `main` commit and runs:
