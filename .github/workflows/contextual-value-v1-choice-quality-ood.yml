@@ -1,0 +1,151 @@
+name: contextual-value-v1-choice-quality-ood
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  J_RUN: '36326699468'
+  PHASE_A1_RUN: '36286752890'
+  PHASE_A2_PILOT_RUN: '36289846820'
+  PHASE_A2_FULL_RUN: '36290030236'
+  ABLATION_RUN: '36280148906'
+  MAX_DRAFTS: '3000'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  stress:
+    name: stress-${{ matrix.set_id }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - expansion: HOB
+            set_id: hob
+          - expansion: TMT
+            set_id: tmt
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned numeric dependency
+        run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1'
+
+      - name: Compile frozen J OOD stress
+        run: python -m py_compile research/contextual_value_choice_quality_ood.py research/contextual_value_choice_quality_pilot.py
+
+      - name: Download corrected frozen J report
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-choice-quality-pilot
+          path: j-freeze
+          run-id: ${{ env.J_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download Phase A1 feature contract
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold--1
+          path: feature-report
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download core Phase A2 fold 0
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-0
+          path: core-folds
+          run-id: ${{ env.PHASE_A2_PILOT_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download remaining core Phase A2 folds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-phase-a2-fold-*
+          path: core-folds
+          merge-multiple: true
+          run-id: ${{ env.PHASE_A2_FULL_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download frozen strong-offset-only core Q predictions
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-strong_offset_only-fold-*
+          path: core-q
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download OOD archive snapshot
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          mkdir -p raw-data
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/game.csv.gz \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+          sha256sum raw-data/draft.csv.gz raw-data/game.csv.gz
+
+      - name: Run rejection-only frozen J OOD stress
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          SET_ID: ${{ matrix.set_id }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TRAIN_ARGS=()
+          Q_ARGS=()
+          for f in 0 1 2 3 4; do
+            TRAIN_ARGS+=(--core-train-fold "core-folds/phase-a2-fold-$f.npz")
+            Q_ARGS+=(--core-simple-q-prediction "core-q/strong_offset_only-fold-$f.jsonl.gz")
+          done
+          mkdir -p "results/contextual-value-v1/choice-quality-ood/$SET_ID"
+          python3 research/contextual_value_choice_quality_ood.py \
+            --expansion "$EXPANSION" \
+            --draft-archive raw-data/draft.csv.gz \
+            --game-archive raw-data/game.csv.gz \
+            --max-drafts "$MAX_DRAFTS" \
+            "${TRAIN_ARGS[@]}" \
+            "${Q_ARGS[@]}" \
+            --feature-report feature-report/phase-a-rich-fold--1-report.json \
+            --j-report j-freeze/choice-quality-report.json \
+            --output "results/contextual-value-v1/choice-quality-ood/$SET_ID/ood-report.json"
+
+      - name: Assert OOD research boundaries
+        env:
+          SET_ID: ${{ matrix.set_id }}
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          p=f"results/contextual-value-v1/choice-quality-ood/{os.environ['SET_ID']}/ood-report.json"
+          r=json.load(open(p))
+          assert r["expansion"] == os.environ["EXPANSION"]
+          assert r["assessment_opened"] is False
+          assert r["assessment_outcomes_loaded"] is False
+          assert r["assessment_outcomes_used"] is False
+          assert r["ood_used_for_J_tuning"] is False
+          assert r["j_frozen_before_ood_outcomes_loaded"] is True
+          assert r["propensity_used_for_primary_evidence"] is False
+          assert r["metadata"]["coverage"] >= .98
+          assert r["next_gate"]["assessment_authorized"] is False
+          assert r["next_gate"]["model_tuning_authorized"] is False
+          PY
+
+      - name: Upload OOD stress report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-choice-quality-ood-${{ matrix.set_id }}
+          path: results/contextual-value-v1/choice-quality-ood/${{ matrix.set_id }}/
+          retention-days: 30
