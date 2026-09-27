@@ -79,10 +79,14 @@ Its disposable password smoke is now policy-aware:
 - signup must still succeed and return a user id;
 - when production `require_email_verification=true`, sign-in for that still-unverified synthetic user must return HTTP 403;
 - when verification is not required, the legacy authenticated sign-in assertion remains available;
-- the same disposable account is used for the password-reset request;
+- the same disposable account is used for the password-reset **request only**; this smoke does not consume the reset token, so the account correctly remains unverified;
 - cleanup removes that single disposable Auth identity through the existing reviewed Better Auth admin path.
 
 This keeps the localhost hardening check aligned with the current production policy instead of treating the expected unverified-user rejection as a regression.
+
+## Interaction with reset-implies-verification
+
+The September 27 password-reset verification release did not change `allow_localhost`, trusted origins, OAuth provider configuration, the recovery webhook subscription, or this hardening controller. It changes only the account state after a valid reset credential is successfully redeemed through Pack One's reset-completion endpoint. See [AUTH-EMAIL-VERIFICATION.md](AUTH-EMAIL-VERIFICATION.md), [AUTH-RECOVERY-DELIVERY.md](AUTH-RECOVERY-DELIVERY.md), and [REQUEST-INTEGRITY.md](REQUEST-INTEGRITY.md).
 
 ## Rollback and failure behavior
 
@@ -94,7 +98,7 @@ Smoke-account cleanup is separate from the core hardening rollback decision: cle
 
 ## Smoke-user cleanup
 
-The localhost-hardening production check creates only the disposable Auth user needed to prove current email/password policy and recovery behavior. Under required verification the synthetic user is expected to remain unverified during the smoke, so HTTP 403 at password sign-in is the correct policy result.
+The localhost-hardening production check creates only the disposable Auth user needed to prove current email/password policy and recovery-request behavior. Under required verification the synthetic user is expected to remain unverified during this smoke because the workflow requests a reset but does not consume the reset link. HTTP 403 at password sign-in is therefore the correct policy result. Since September 27, a **successfully consumed** reset link has different semantics: it marks that exact Auth user verified after Better Auth changes the password.
 
 Cleanup reuses Pack One's existing reviewed Better Auth provider-deletion path from `worker/account-deletion.mjs`:
 
