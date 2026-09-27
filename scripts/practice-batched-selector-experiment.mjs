@@ -183,7 +183,10 @@ try {
     const before=await resource();
     const rows=await Promise.all(slice.map((user,i)=>startOne(variant,user,i)));
     const after=await resource();
-    if(!warmup) {
+    if(warmup) {
+      (report.benchmark.warmups||=[]).push({variant,rows});
+      save();
+    } else {
       measurements[variant].push(...rows);
       report.benchmark.waves.push({variant,count,resource_delta:delta(before,after),
         full_start:summarize(rows.map(r=>r.full_ms)),selection:summarize(rows.map(r=>r.selection_ms).filter(Number.isFinite)),
