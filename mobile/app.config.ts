@@ -38,6 +38,11 @@ function optionalAndroidVersionCode(): number | undefined {
 
 export default ({ config }: ConfigContext): ExpoConfig => {
   const profile = buildProfile();
+  const screenshotFixtures = process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1';
+  if (screenshotFixtures && profile !== 'preview') {
+    throw new Error('Store screenshot fixtures may only be built with PACKONE_BUILD_PROFILE=preview.');
+  }
+
   const production = profile === 'production';
   const identifier = production ? STORE_IDENTIFIER : NON_STORE_IDENTIFIERS[profile];
   const displayName = production
