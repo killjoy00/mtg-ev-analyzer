@@ -1,6 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
 
-import { config } from '@/src/config';
 import { screenshotSession } from '@/src/screenshots/session';
 
 const SESSION_KEY = 'packone.mobile.session.v2';
@@ -76,7 +75,7 @@ async function migrateLegacy(): Promise<MobileSession | null> {
 }
 
 export async function readSession(): Promise<MobileSession | null> {
-  if (config.screenshots.fixtures) return screenshotSession;
+  if (process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1') return screenshotSession;
 
   const raw = await SecureStore.getItemAsync(SESSION_KEY);
   if (!raw) return migrateLegacy();
@@ -90,7 +89,7 @@ export async function readSession(): Promise<MobileSession | null> {
 
 export async function writeSession(session: MobileSession) {
   if (!validSession(session)) throw new Error('Invalid Pack One mobile session.');
-  if (config.screenshots.fixtures) {
+  if (process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1') {
     notifySession(screenshotSession);
     return;
   }
@@ -101,7 +100,7 @@ export async function writeSession(session: MobileSession) {
 }
 
 export async function clearSession() {
-  if (config.screenshots.fixtures) {
+  if (process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1') {
     notifySession(screenshotSession);
     return;
   }
