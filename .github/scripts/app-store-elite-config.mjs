@@ -10,7 +10,6 @@ const groupReferenceName='Pack One Elite';
 const notificationUrl='https://api.packone.pro/growth/v1/apple-subscriptions/notifications';
 const targetTerritories=['USA','CAN'];
 const targetUsPrice=7;
-const planType='MONTHLY';
 
 if(!issuerId||!keyId||!privateKeyText)throw Error('ASC credentials are required.');
 
@@ -22,18 +21,22 @@ const input=`${h}.${p}`;
 const sig=sign('sha256',Buffer.from(input),{key:createPrivateKey(privateKeyText),dsaEncoding:'ieee-p1363'});
 const token=`${input}.${sig.toString('base64url')}`;
 
-async function api(path,{method='GET',body}={}){
-  const r=await fetch(`https://api.appstoreconnect.apple.com${path}`,{
+async function apiRaw(path,{method='GET',body}={}){
+  const response=await fetch(`https://api.appstoreconnect.apple.com${path}`,{
     method,headers:{Authorization:`Bearer ${token}`,Accept:'application/json',...(body?{'Content-Type':'application/json'}:{})},
     body:body?JSON.stringify(body):undefined
   });
-  const text=await r.text();
+  const text=await response.text();
   let data=null;
   if(text){
     try{data=JSON.parse(text);}catch{data=text;}
   }
-  if(!r.ok)throw Error(`${method} ${path} HTTP ${r.status}: ${text}`);
-  return data;
+  return {ok:response.ok,status:response.status,text,data};
+}
+async function api(path,options={}){
+  const result=await apiRaw(path,options);
+  if(!result.ok)throw Error(`${options.method??'GET'} ${path} HTTP ${result.status}: ${result.text}`);
+  return result.data;
 }
 function one(data,pred){return (data?.data||[]).find(pred);}
 function sameStrings(a,b){return [...a].sort().join(',')===[...b].sort().join(',');}
@@ -55,35 +58,39 @@ async function ensureSubscriptionLocalization(versionId){
   if(one(listed,x=>x.attributes?.locale==='en-US'))return;
   await api('/v2/subscriptionLocalizations',{method:'POST',body:{data:{type:'subscriptionLocalizations',attributes:{locale:'en-US',name:'Pack One Elite',description:'Powered Cube and custom-set practice.'},relationships:{version:{data:{type:'subscriptionVersions',id:versionId}}}}}});
 }
-async function ensurePlanAvailability(subscriptionId){
-  const listed=await api(`/v1/subscriptions/${subscriptionId}/planAvailabilities?fields%5BsubscriptionPlanAvailabilities%5D=availableInNewTerritories,planType,availableTerritories&include=availableTerritories&limit=200&limit%5BavailableTerritories%5D=50`);
-  let plan=one(listed,x=>x.attributes?.planType===planType);
-  if(!plan){
-    const created=await api('/v1/subscriptionPlanAvailabilities',{method:'POST',body:{data:{
-      type:'subscriptionPlanAvailabilities',
-      attributes:{planType,availableInNewTerritories:false},
-      relationships:{
-        subscription:{data:{type:'subscriptions',id:subscriptionId}},
-        availableTerritories:{data:targetTerritories.map(id=>({type:'territories',id}))}
-      }
-    }}});
-    return created.data;
+async function readStandardAvailability(subscriptionId){
+  const path=`/v1/subscriptions/${subscriptionId}/subscriptionAvailability?fields%5BsubscriptionAvailabilities%5D=availableInNewTerritories,availableTerritories&include=availableTerritories&limit%5BavailableTerritories%5D=50`;
+  const result=await apiRaw(path);
+  if(result.status===404)return null;
+  if(!result.ok)throw Error(`GET ${path} HTTP ${result.status}: ${result.text}`);
+  return result.data?.data??null;
+}
+async function standardAvailabilityTerritories(availabilityId){
+  const listed=await api(`/v1/subscriptionAvailabilities/${encodeURIComponent(availabilityId)}/availableTerritories?limit=200`);
+  return (listed?.data||[]).map(x=>x.id);
+}
+async function ensureStandardAvailability(subscriptionId){
+  let availability=await readStandardAvailability(subscriptionId);
+  if(availability){
+    const ids=await standardAvailabilityTerritories(availability.id);
+    if(availability.attributes?.availableInNewTerritories===false&&sameStrings(ids,targetTerritories)){
+      return availability;
+    }
   }
-  if(plan.attributes?.availableInNewTerritories!==false){
-    const updated=await api(`/v1/subscriptionPlanAvailabilities/${encodeURIComponent(plan.id)}`,{method:'PATCH',body:{data:{
-      type:'subscriptionPlanAvailabilities',id:plan.id,attributes:{availableInNewTerritories:false}
-    }}});
-    plan=updated.data;
+  const configured=await api('/v1/subscriptionAvailabilities',{method:'POST',body:{data:{
+    type:'subscriptionAvailabilities',
+    attributes:{availableInNewTerritories:false},
+    relationships:{
+      subscription:{data:{type:'subscriptions',id:subscriptionId}},
+      availableTerritories:{data:targetTerritories.map(id=>({type:'territories',id}))}
+    }
+  }}});
+  availability=configured.data;
+  const ids=await standardAvailabilityTerritories(availability.id);
+  if(availability.attributes?.availableInNewTerritories!==false||!sameStrings(ids,targetTerritories)){
+    throw Error(`Standard subscription availability did not settle to USA+CAN only: ${JSON.stringify({availableInNewTerritories:availability.attributes?.availableInNewTerritories,territories:ids})}`);
   }
-  const available=await api(`/v1/subscriptionPlanAvailabilities/${encodeURIComponent(plan.id)}/availableTerritories?limit=50`);
-  const ids=(available?.data||[]).map(x=>x.id);
-  if(!sameStrings(ids,targetTerritories)){
-    await api(`/v1/subscriptionPlanAvailabilities/${encodeURIComponent(plan.id)}/relationships/availableTerritories`,{
-      method:'PATCH',
-      body:{data:targetTerritories.map(id=>({type:'territories',id}))}
-    });
-  }
-  return plan;
+  return availability;
 }
 async function pricePointFor(subscriptionId,territory,customerPrice){
   const points=await api(`/v1/subscriptions/${subscriptionId}/pricePoints?filter%5Bterritory%5D=${territory}&fields%5BsubscriptionPricePoints%5D=customerPrice,territory&include=territory&limit=8000`);
@@ -96,40 +103,37 @@ async function pricePointFor(subscriptionId,territory,customerPrice){
     .slice(0,8);
   throw Error(`No ${territory} subscription price point equals ${customerPrice.toFixed(2)}. Nearest: ${nearby.join(', ')}`);
 }
-async function adjustedEqualization(basePricePointId,territory){
+async function equalizationFor(basePricePointId,territory){
   const q=new URLSearchParams({
-    'filter[upfrontPricePointId]':basePricePointId,
-    'filter[planType]':planType,
     'filter[territory]':territory,
     'include':'territory',
     'fields[subscriptionPricePoints]':'customerPrice,territory',
-    'limit':'200'
+    'limit':'8000'
   });
-  const result=await api(`/v1/subscriptionPricePoints/${encodeURIComponent(basePricePointId)}/adjustedEqualizations?${q}`);
+  const result=await api(`/v1/subscriptionPricePoints/${encodeURIComponent(basePricePointId)}/equalizations?${q}`);
   const point=one(result,x=>x.relationships?.territory?.data?.id===territory);
-  if(!point)throw Error(`No adjusted ${territory} equalization returned for the selected USA price point.`);
+  if(!point)throw Error(`No standard ${territory} equalization returned for the selected USA price point.`);
   return point;
 }
 async function ensurePrice(subscriptionId,territory,pricePointId){
   const q=new URLSearchParams({
     'filter[territory]':territory,
-    'filter[planType]':planType,
     'include':'territory,subscriptionPricePoint',
     'limit':'200'
   });
   const listed=await api(`/v1/subscriptions/${subscriptionId}/prices?${q}`);
   const existing=(listed?.data||[]).filter(x=>x.relationships?.territory?.data?.id===territory);
-  if(existing.some(x=>x.relationships?.subscriptionPricePoint?.data?.id===pricePointId))return;
+  if(existing.some(x=>(x.attributes?.planType??null)===null&&x.relationships?.subscriptionPricePoint?.data?.id===pricePointId))return;
   if(existing.length){
     const summary=existing.map(x=>({
-      id:x.id,startDate:x.attributes?.startDate??null,
+      id:x.id,startDate:x.attributes?.startDate??null,planType:x.attributes?.planType??null,
       pricePointId:x.relationships?.subscriptionPricePoint?.data?.id??null
     }));
-    throw Error(`Refusing to replace an existing ${territory} ${planType} price: ${JSON.stringify(summary)}`);
+    throw Error(`Refusing to replace an existing ${territory} subscription price: ${JSON.stringify(summary)}`);
   }
   await api('/v1/subscriptionPrices',{method:'POST',body:{data:{
     type:'subscriptionPrices',
-    attributes:{startDate:null,planType},
+    attributes:{startDate:null},
     relationships:{
       subscription:{data:{type:'subscriptions',id:subscriptionId}},
       subscriptionPricePoint:{data:{type:'subscriptionPricePoints',id:pricePointId}}
@@ -177,23 +181,23 @@ if(subscription.attributes?.familySharable===true)throw Error('Family Sharing mu
 const subVersion=await ensureDraftVersion('subscriptions',subscription.id,'subscriptionVersions',`/v1/subscriptions/${subscription.id}/versions`);
 await ensureSubscriptionLocalization(subVersion.id);
 
-const planAvailability=await ensurePlanAvailability(subscription.id);
+const availability=await ensureStandardAvailability(subscription.id);
 const usaPricePoint=await pricePointFor(subscription.id,'USA',targetUsPrice);
-const canPricePoint=await adjustedEqualization(usaPricePoint.id,'CAN');
+const canPricePoint=await equalizationFor(usaPricePoint.id,'CAN');
 await ensurePrice(subscription.id,'USA',usaPricePoint.id);
 await ensurePrice(subscription.id,'CAN',canPricePoint.id);
 
 const finalApp=await api(`/v1/apps/${appId}?fields%5Bapps%5D=bundleId,subscriptionStatusUrl,subscriptionStatusUrlVersion,subscriptionStatusUrlForSandbox,subscriptionStatusUrlVersionForSandbox`);
 const finalSub=await api(`/v1/subscriptions/${subscription.id}?fields%5Bsubscriptions%5D=name,productId,subscriptionPeriod,familySharable,state,groupLevel`);
-const finalAvailability=await api(`/v1/subscriptionPlanAvailabilities/${encodeURIComponent(planAvailability.id)}/availableTerritories?limit=50`);
-const finalPrices=await api(`/v1/subscriptions/${subscription.id}/prices?filter%5BplanType%5D=MONTHLY&include=territory,subscriptionPricePoint&limit=200`);
+const finalAvailability=await api(`/v1/subscriptionAvailabilities/${encodeURIComponent(availability.id)}/availableTerritories?limit=200`);
+const finalPrices=await api(`/v1/subscriptions/${subscription.id}/prices?include=territory,subscriptionPricePoint&limit=200`);
 
 console.log(JSON.stringify({
   configured:true,appId,bundleId,groupId:group.id,groupVersionId:groupVersion.id,
   subscriptionId:subscription.id,subscriptionVersionId:subVersion.id,
   subscription:finalSub.data.attributes,notifications:finalApp.data.attributes,
   availability:{
-    planType,
+    mode:'standard-auto-renewable',
     availableInNewTerritories:false,
     territories:(finalAvailability?.data||[]).map(x=>x.id).sort()
   },
@@ -205,7 +209,7 @@ console.log(JSON.stringify({
     configuredPrices:(finalPrices?.data||[]).map(x=>({
       territory:x.relationships?.territory?.data?.id,
       startDate:x.attributes?.startDate??null,
-      planType:x.attributes?.planType,
+      planType:x.attributes?.planType??null,
       pricePointId:x.relationships?.subscriptionPricePoint?.data?.id
     }))
   },
