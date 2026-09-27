@@ -9,8 +9,8 @@ permissions:
 
 env:
   PHASE_A1_RUN: '36286752890'
-  PHASE_A2_PILOT_RUN: '36289846820'
   PHASE_A2_FULL_RUN: '36290030236'
+  MARGIN_Q_RUN: '36333718528'
   ABLATION_RUN: '36280148906'
   PYTHONUNBUFFERED: '1'
 
@@ -38,20 +38,20 @@ jobs:
           run-id: ${{ env.PHASE_A1_RUN }}
           github-token: ${{ github.token }}
 
-      - name: Download Phase A2 fold 0
+      - name: Download frozen cross-fit Q-score training folds
         uses: actions/download-artifact@v4
         with:
-          name: contextual-value-v1-phase-a2-fold-0
-          path: folds
-          run-id: ${{ env.PHASE_A2_PILOT_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Download remaining Phase A2 folds
-        uses: actions/download-artifact@v4
-        with:
-          pattern: contextual-value-v1-phase-a2-fold-*
+          pattern: contextual-value-v1-margin-q-fold-*
           path: folds
           merge-multiple: true
+          run-id: ${{ env.MARGIN_Q_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download frozen Phase A2 validation fold
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold--1
+          path: folds
           run-id: ${{ env.PHASE_A2_FULL_RUN }}
           github-token: ${{ github.token }}
 
