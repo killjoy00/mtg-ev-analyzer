@@ -27,6 +27,13 @@ Dated earlier reviews are historical evidence. Superseded core documents are ret
 - [Neon scheduled maintenance](NEON-SCHEDULERS.md): active trigger definitions, identity boundary, recovery workflow, activation and rollback.
 
 
+## September 27 launch-monitoring reliability hardening
+
+- [Launch-monitoring reliability closeout](reports/LAUNCH-MONITORING-RELIABILITY-CLOSEOUT-2026-09-27.md): delayed GitHub schedule root diagnosis, independent Neon watchdog design, protected credential boundary, CI/release chain, and production recovery evidence.
+- [Launch operations](LAUNCH-OPERATIONS.md): current coverage-watermark, continuation, Neon stale-detection, authenticated recovery-dispatch, operator alerting, thresholds and incident runbook.
+- [Neon scheduled maintenance](NEON-SCHEDULERS.md): production trigger definitions and the production-only launch-recovery credential boundary.
+
+
 ## September 25 launch measurement release
 
 - [Pack One launch measurement closeout](reports/PACK-ONE-LAUNCH-MEASUREMENT-CLOSEOUT-2026-09-25.md): acquisition attribution, habit metrics, Daily streak/reset cue, CI coverage, schema-prerequisite catch, and exact development/production release evidence.
