@@ -155,20 +155,31 @@ test('backend diagnostics retain page counts and verification outcomes',async()=
     assert.equal(success.results[0].verified_zero_updates,true);
     assert.equal(success.events[0].phase,'page');
 
-    const failurePath=path.join(dir,'production-repair.json');
+    const failurePath=path.join(dir,'production-verify.json');
+    const dirty=async(_base,body)=>({
+      set_id:body.setId,
+      mapping_entries:1,
+      puzzles:2,
+      updated_puzzles:1,
+      updated_cards:1,
+      next_after:null,
+      done:true,
+    });
     await assert.rejects(
       runBackendRepair(prod,{
         report:oneSet,
-        request:async()=>{throw new Error('backend unavailable');},
+        request:dirty,
+        verify:true,
         diagnosticsPath:failurePath,
-        stage:'production-repair',
+        stage:'production-verify',
       }),
-      /backend unavailable/,
+      /verification found 1 updates/,
     );
     const failure=JSON.parse(fs.readFileSync(failurePath,'utf8'));
     assert.equal(failure.status,'error');
-    assert.equal(failure.stage,'production-repair');
-    assert.equal(failure.error,'backend unavailable');
+    assert.equal(failure.stage,'production-verify');
+    assert.match(failure.error,/verification found 1 updates/);
+    assert.equal(failure.events[0].updated_cards,1);
   } finally {
     fs.rmSync(dir,{recursive:true,force:true});
   }
