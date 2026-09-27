@@ -270,8 +270,10 @@ export async function selectCachedDatabaseRun(query,version,seed,environment='mi
     const snapshot=await loadServingSnapshot(query,version,{readiness:options.readiness===true});
     let selected,error;
     try {
-      const batched=options.batched===true||process.env.PACK1_BATCHED_SELECTION_EXPERIMENT==='1';
-      selected=await (batched?selectBatchedDatabaseRun:selectDatabaseRun)(query,version,seed,environment,{...options,snapshot});
+      // Current practice defaults to the proven one-call snapshot selector.
+      // Keep an explicit baseline escape hatch for parity/diagnostic tests only.
+      const selector=options.batched===false?selectDatabaseRun:selectBatchedDatabaseRun;
+      selected=await selector(query,version,seed,environment,{...options,snapshot});
     } catch(e){error=e;}
     if(!await servingRevisionMatches(query,snapshot.revision))continue;
     if(error)throw error;
