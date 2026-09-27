@@ -1,0 +1,1 @@
+{"operation":"probe-app-store-subscription-access","reason":"Verify whether the protected App Store Connect API key can read and manage Pack One auto-renewable subscriptions before creating Pack One Elite through the API."}

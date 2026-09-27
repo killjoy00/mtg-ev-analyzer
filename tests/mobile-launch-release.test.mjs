@@ -22,6 +22,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
     '.github/workflows/android-internal-testing.yml',
     '.github/workflows/android-closed-testing.yml',
     '.github/workflows/google-play-access.yml',
+    '.github/workflows/app-store-subscription-access-probe.yml',
     '.github/workflows/ios-testflight-status.yml',
     '.github/workflows/android-internal-status.yml',
   ];
@@ -46,6 +47,11 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/google-play-access-request\.json'/s, path);
       assert.match(workflow, /request\.get\('operation'\) != 'check-google-play-access'/, path);
+      assert.doesNotMatch(workflow, /pull_request:/, path);
+    } else if (path === '.github/workflows/app-store-subscription-access-probe.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/app-store-subscription-access-request\.json'/s, path);
+      assert.match(workflow, /request\.get\('operation'\) != 'probe-app-store-subscription-access'/, path);
       assert.doesNotMatch(workflow, /pull_request:/, path);
     } else if (path === '.github/workflows/android-internal-status.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
@@ -97,6 +103,17 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.equal(playAccessRequest.operation, 'check-google-play-access');
   assert.equal(typeof playAccessRequest.reason, 'string');
   assert.ok(playAccessRequest.reason.trim().length > 0);
+
+  const appleSubscriptionAccessRequest = JSON.parse(read('.github/app-store-subscription-access-request.json'));
+  assert.deepEqual(Object.keys(appleSubscriptionAccessRequest).sort(), ['operation','reason']);
+  assert.equal(appleSubscriptionAccessRequest.operation, 'probe-app-store-subscription-access');
+  assert.equal(typeof appleSubscriptionAccessRequest.reason, 'string');
+  assert.ok(appleSubscriptionAccessRequest.reason.trim().length > 0);
+
+  const appleSubscriptionProbe = read('.github/scripts/app-store-subscription-access-probe.mjs');
+  assert.match(appleSubscriptionProbe, /pro\.packone\.app\.elite\.monthly/);
+  assert.match(appleSubscriptionProbe, /subscriptionGroups/);
+  assert.match(appleSubscriptionProbe, /canManageSubscriptions/);
 
   const androidStatusRequest = JSON.parse(read('.github/android-internal-status-request.json'));
   assert.deepEqual(Object.keys(androidStatusRequest).sort(), ['operation','reason']);
