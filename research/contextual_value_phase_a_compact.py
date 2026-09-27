@@ -328,8 +328,14 @@ def main():
         raise SystemExit("source report is not factorized")
 
     source_sha = _sha256(args.source)
-    if source_sha != report.get("payload_sha256"):
-        raise SystemExit("source rich-feature payload hash mismatch")
+    expected_source_sha = str(report.get("payload_sha256") or "")
+    expected_source_size = int(report.get("payload_size_bytes") or -1)
+    if source_sha != expected_source_sha or args.source.stat().st_size != expected_source_size:
+        raise SystemExit(
+            "source rich-feature payload provenance mismatch: "
+            f"actual_sha256={source_sha} expected_sha256={expected_source_sha} "
+            f"actual_bytes={args.source.stat().st_size} expected_bytes={expected_source_size}"
+        )
 
     state_names = list(report["state_feature_names"])
     candidate_names = list(report["candidate_feature_names"])
