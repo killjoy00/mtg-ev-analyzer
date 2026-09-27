@@ -1,6 +1,6 @@
 # Pack One mobile store submission packet
 
-Updated 2026-09-26. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated 2026-09-27. This file is the source-of-truth submission packet for the first free public mobile release.
 
 ## Shared release identity
 
@@ -19,7 +19,7 @@ Updated 2026-09-26. This file is the source-of-truth submission packet for the f
 - Product ID: `pro.packone.app.elite.monthly`
 - Type: auto-renewable subscription
 - Display name: Pack One Elite
-- The live price and billing period must come from App Store Connect / StoreKit; do not hardcode them into screenshots or review notes.
+- Price: **$7.00/month in the United States**. The live localized price shown to users must still come from App Store Connect / StoreKit. Canada uses Apple's adjusted equalization from the U.S. $7.00 price point.
 - Benefits: Powered Cube practice and custom-set practice on the signed-in Pack One account. Regular Draft Run practice remains included without Elite.
 - Restore Purchases and Manage Apple Subscription are first-class controls on the native Membership screen.
 - Terms: https://packone.pro/terms/
@@ -30,7 +30,7 @@ Updated 2026-09-26. This file is the source-of-truth submission packet for the f
 
 - Support email: `admin@packone.pro`
 - Default language: English (U.S.)
-- Recommended initial public region: United States only. Expand after the first release once review/operations are proven.
+- Initial public regions: **United States and Canada only**.
 
 ## Apple App Store
 
@@ -73,9 +73,9 @@ Sign-in methods:
 - Google
 - Email/password
 
-The app contains no in-app purchase flow and no mobile upgrade/purchase link. Native Patreon interaction is limited to existing-account OAuth authentication at Patreon’s authorize endpoint with identity scope; the app does not link to Patreon purchasing, show prices, or instruct users where to subscribe.
+The iOS app includes the native Pack One Elite auto-renewable subscription through Apple's StoreKit flow. The Membership screen shows the live App Store price, supports purchase and Restore Purchases, and links to Apple subscription management after an Apple subscription is linked. The Pack One backend verifies the Apple-signed transaction before granting Elite capabilities or finishing the transaction.
 
-Do not submit an iOS build that unlocks paid Patreon-derived practice solely from an external membership unless the exact same digital access is available through compliant iOS IAP or Apple has confirmed an applicable exception for this app. If an approved strategy retains gated practice for review, provide a non-expiring reviewer account with that access already granted. Do not place reviewer credentials in this repository; enter them only in App Store Connect Review Information.
+Native Patreon interaction remains limited to existing-account OAuth authentication and membership reconciliation; the iOS app does not provide a Patreon purchase, price, join, or upgrade CTA. Provide a non-expiring reviewer account for account-only review paths, but reviewers can also exercise the Apple IAP flow from the Membership screen. Do not place reviewer credentials in this repository; enter them only in App Store Connect Review Information.
 
 Reviewer path after sign-in:
 1. Home -> Practice
@@ -91,16 +91,17 @@ Release setting: **Manually release this version** after App Review approval.
 
 ### Privacy labels - conservative v1 declaration
 
-Native Pack One has no ad SDK, no third-party analytics SDK, no location permission, no contacts access, no camera/microphone feature, and no mobile purchase SDK.
+Native Pack One has no ad SDK, no third-party analytics SDK, no location permission, no contacts access, and no camera/microphone feature. The iOS app uses StoreKit through `expo-iap` for Pack One Elite. Apple handles payment credentials; Pack One receives and stores subscription transaction/entitlement state needed to verify and operate Elite access.
 
 Declare data collected by Pack One as follows, subject to final App Store Connect wording:
 - Contact Info -> Name: collected for account/profile functionality; linked to the user; not used for tracking.
 - Contact Info -> Email Address: collected for account, verification, recovery, and deletion; linked to the user; not used for tracking.
 - Identifiers -> User ID: Pack One player/account identifiers are collected for app functionality and analytics; linked when signed in; not used for tracking.
+- Purchases -> Purchase History: Apple subscription transaction/entitlement identifiers and state are collected for app functionality and account management; linked to the signed-in Pack One account; not used for tracking.
 - Usage Data -> Product Interaction: gameplay starts, choices, scores, completions, and related product events are collected for app functionality and product analytics; may be linked to the Pack One player/account; not used for tracking.
 
 Do not declare:
-- Purchases or payment information
+- Payment information
 - Precise or approximate location
 - Contacts
 - Photos/videos
@@ -121,7 +122,7 @@ Pack One displays third-party card names/art and uses licensed/public draft data
 - Wizards intellectual-property ownership
 - Wizards Fan Content Policy notice
 
-Before submitting the Content Rights declaration, the account holder must confirm the current Wizards Fan Content Policy remains applicable to this exact commercial/affiliate configuration. Do not make an unsupported rights representation in App Store Connect.
+Complete the App Store Connect Content Rights declaration from the already-approved Pack One rights record. This submission packet does not reopen or re-adjudicate that resolved rights review.
 
 ### Age rating
 
@@ -137,14 +138,19 @@ Card artwork can contain fantasy combat/violence. Review a representative curren
 
 ### Screenshots
 
-Use real screenshots from the exact 1.0 release candidate. Recommended order:
+The repository includes a deterministic store-screenshot harness that renders the **real native Pack One screens and components** with review-safe fixture data. It runs only under the isolated `pro.packone.preview` bundle/package IDs; `EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES=1` is explicitly rejected when `EXPO_PUBLIC_PACKONE_ENV=production`.
+
+The guarded `Mobile store screenshots` workflow captures:
 1. Daily decision screen — `Eight decisions. One score.`
 2. Reveal/comparison screen — `Compare with a real trophy draft.`
 3. Daily hub — `Three fresh Dailies.`
 4. Practice screen — `Keep drafting between Dailies.`
 5. Career/leaderboard — `Track your Pack One career.`
+6. iOS Membership purchase state for the App Store subscription review screenshot.
 
-Apple allows 1-10 screenshots per supported device size. Pack One v1 supports iPad (`ios.supportsTablet=true`), so iPad-specific QA and the required iPad App Store screenshots are mandatory for the accepted 1.0 release candidate.
+Capture outputs are generated for iPhone, iPad, and Android from the same production screen implementation. Before upload, visually compare the generated scenes against the accepted 1.0 RC and recapture any scene whose production layout or copy has materially changed.
+
+Apple allows 1-10 screenshots per supported device size. Pack One v1 supports iPad (`ios.supportsTablet=true`), so iPad-specific QA and required iPad App Store screenshots remain mandatory.
 
 ## Google Play
 
@@ -237,14 +243,14 @@ Recommended phone screenshot story mirrors iOS:
 4. Practice
 5. Career / leaderboard
 
-Use screenshots from the exact release candidate rather than mock UI.
+Use the repository's deterministic native screenshot harness rather than mock marketing UI, then visually verify the generated scenes against the accepted 1.0 RC before upload.
 
 ### Release / publishing settings
 
 - Turn on Managed Publishing before sending store/app-content changes for review so approval does not accidentally publish changes immediately.
 - Closed testing must be completed before production access if Play requires it for this developer account.
 - The first production release does **not** offer a staged rollout percentage; Google documents staged percentages for updates, not the first production release. The first production release goes to all users in the selected production countries.
-- Recommended first public region: United States only. Expand countries after the first release and operational pass.
+- Initial public regions: **United States and Canada only**.
 
 ## Items that still require authenticated store-console actions
 
@@ -253,7 +259,7 @@ The current ChatGPT environment cannot open the logged-in App Store Connect or P
 - enter App Privacy / Data safety questionnaire responses
 - answer the Apple age-rating and Play IARC questionnaires
 - enter the final reviewer account credentials
-- choose countries/regions
+- set/verify public countries/regions are **United States and Canada only**
 - submit for review / start closed testing / start production release
 
 Do not treat those clicks as engineering work; the content above is the prepared source-of-truth for them.
