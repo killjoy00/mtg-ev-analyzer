@@ -1,6 +1,11 @@
 name: contextual-value-v1-phase-a2-bakeoff
 
 on:
+  push:
+    branches:
+      - research/contextual-value-v1-rich-features-529
+    paths:
+      - '.github/workflows/contextual-value-v1-phase-a2-bakeoff.yml'
   workflow_dispatch:
 
 permissions:
@@ -9,7 +14,8 @@ permissions:
 
 env:
   COMPACT_PILOT_RUN: '36289077937'
-  COMPACT_REMAINING_RUN: '36289779766'
+  COMPACT_REMAINING_RUN: '36289366966'
+  PHASE_A2_PILOT_RUN: '36289846820'
   ABLATION_RUN: '36280148906'
   PYTHONUNBUFFERED: '1'
 
@@ -22,7 +28,7 @@ jobs:
       fail-fast: false
       max-parallel: 6
       matrix:
-        fold: [-1, 0, 1, 2, 3, 4]
+        fold: [-1, 1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -33,17 +39,7 @@ jobs:
       - name: Compile bake-off script
         run: python -m py_compile research/contextual_value_phase_a_bakeoff.py
 
-      - name: Download compact fold 0
-        if: ${{ matrix.fold == 0 }}
-        uses: actions/download-artifact@v4
-        with:
-          name: contextual-value-v1-phase-a-compact-pilot-fold-0
-          path: compact
-          run-id: ${{ env.COMPACT_PILOT_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Download remaining compact fold
-        if: ${{ matrix.fold != 0 }}
+      - name: Download compact fold
         uses: actions/download-artifact@v4
         with:
           name: contextual-value-v1-phase-a-compact-fold-${{ matrix.fold }}
@@ -130,7 +126,14 @@ jobs:
           python-version: '3.12'
       - name: Install pinned model dependency
         run: python -m pip install --disable-pip-version-check 'scikit-learn==1.9.1'
-      - name: Download all Phase A2 fold shards
+      - name: Download successful fold-0 Phase A2 pilot
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-0
+          path: folds
+          run-id: ${{ env.PHASE_A2_PILOT_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download remaining Phase A2 fold shards
         uses: actions/download-artifact@v4
         with:
           pattern: contextual-value-v1-phase-a2-fold-*
