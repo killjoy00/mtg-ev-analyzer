@@ -43,6 +43,12 @@ test('image maintenance cannot deploy functions and checks revisions before remo
   assert.doesNotMatch(workflow,/push origin "HEAD:\$branch"/);
   assert.doesNotMatch(workflow,/gh pr create/);
   assert.doesNotMatch(workflow,/push origin HEAD:main/);
+  const fullRefresh=fs.readFileSync(new URL('../scripts/refresh_card_backend_images.mjs',import.meta.url),'utf8');
+  const targetedRefresh=fs.readFileSync(new URL('../scripts/repair_card_backend_image.mjs',import.meta.url),'utf8');
+  assert.match(fullRefresh,/action:'refresh-image-page-v2'/);
+  assert.match(targetedRefresh,/action:'refresh-image-page-v2'/);
+  assert.doesNotMatch(fullRefresh,/action:'refresh-image-page',/);
+  assert.doesNotMatch(targetedRefresh,/action:'refresh-image-page',/);
   const publication=fs.readFileSync(new URL('../.github/workflows/publish-card-image-source.yml',import.meta.url),'utf8');
   assert.match(publication,/\[publish-card-image-source\]/);
   assert.match(publication,/bash scripts\/r2_replay_shards.sh hydrate/);
