@@ -5,15 +5,71 @@ udid="${1:?simulator UDID is required}"
 label="${2:?output label is required}"
 out_root="${3:-store-screenshots}"
 bundle_id="pro.packone.preview"
+scheme="packone"
 
 mkdir -p "$out_root/$label"
+
+# iOS Simulator treats a custom URL opened through CoreSimulatorBridge as an
+# untrusted cross-app handoff the first time and can display an "Open in …?"
+# confirmation sheet. Store screenshots must never capture SpringBoard or that
+# sheet. Register the installed app once, then pre-approve only the preview
+# scheme for CoreSimulatorBridge in this disposable simulator.
+xcrun simctl launch "$udid" "$bundle_id" >/dev/null
+sleep 3
+xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true
+
+python3 - "$udid" "$bundle_id" "$scheme" <<'PY'
+from pathlib import Path
+import plistlib
+import sys
+
+udid, bundle_id, scheme = sys.argv[1:]
+path = (
+    Path.home()
+    / "Library/Developer/CoreSimulator/Devices"
+    / udid
+    / "data/Library/Preferences/com.apple.launchservices.schemeapproval.plist"
+)
+path.parent.mkdir(parents=True, exist_ok=True)
+data = {}
+if path.exists():
+    try:
+        with path.open("rb") as handle:
+            data = plistlib.load(handle)
+    except (plistlib.InvalidFileException, EOFError):
+        data = {}
+data[f"com.apple.CoreSimulator.CoreSimulatorBridge-->{scheme}"] = bundle_id
+with path.open("wb") as handle:
+    plistlib.dump(data, handle, fmt=plistlib.FMT_BINARY)
+print(f"Pre-approved {scheme}:// for {bundle_id} on {udid}.")
+PY
+
+# LaunchServices may already have cached the pre-approval state from the
+# registration launch above. Restarting lsd is scoped to this disposable
+# simulator and forces the updated approval plist to be observed.
+xcrun simctl spawn "$udid" killall lsd >/dev/null 2>&1 || true
+sleep 2
 
 capture() {
   local name="$1"
   local url="$2"
+  local running=0
   xcrun simctl terminate "$udid" "$bundle_id" >/dev/null 2>&1 || true
   xcrun simctl openurl "$udid" "$url"
-  sleep 8
+
+  for _ in 1 2 3 4 5 6 7 8 9 10; do
+    if xcrun simctl spawn "$udid" launchctl print system 2>/dev/null | grep -Fq "UIKitApplication:$bundle_id"; then
+      running=1
+      break
+    fi
+    sleep 1
+  done
+  if [[ "$running" != "1" ]]; then
+    echo "Preview app did not launch for screenshot URL: $url" >&2
+    exit 1
+  fi
+
+  sleep 7
   xcrun simctl io "$udid" screenshot "$out_root/$label/$name.png"
 }
 
