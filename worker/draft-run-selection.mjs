@@ -132,6 +132,62 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
   return selected;
 }
 
+
+export function currentPracticeBatchPlan(snapshot,seed,environment='mixed',{day=gameDateKey(),setIds=[]}={}) {
+  if(!snapshot||!Array.isArray(snapshot.groups)||!Array.isArray(snapshot.metadata))throw servingCacheUnavailable();
+  let planningDraws=0;
+  const seeded=seededRandom(seed),random=()=>{planningDraws++;return seeded();};
+  const bands=runDifficultyBands(random,DRAFT_RUN_SELECTION_VERSION),windows=runPickWindows(environment,DRAFT_RUN_SELECTION_VERSION);
+  const metadata=snapshot.metadata;
+  const live=new Set(metadata.filter(s=>environment==='powered-cube'?s.set_id==='powered-cube':s.regular_run&&s.release_date&&s.release_date<=day).map(s=>s.set_id));
+  const required=environment==='latest'?latestSetPlan(metadata,day):setIds.length?balancedSetPlan(setIds,random):[];
+  const groups=snapshot.groups.map(g=>({...g,pick_number:Number(g.pick_number),n:Number(g.n)})).filter(g=>
+    (g.set_id==='powered-cube')===(environment==='powered-cube') && Number(g.pick_number)<=maxRunPick(environment) &&
+    (environment==='powered-cube'||!SELECTABLE_ONLY_SETS.has(g.set_id)) &&
+    (!(environment==='latest'||setIds.length)||required.includes(g.set_id))
+  ).filter(g=>live.has(g.set_id));
+  if(setIds.length) {
+    const eligible=new Set(customSetsFromSnapshot(snapshot,day,setIds).map(s=>s.set_id));
+    if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});
+  }
+  const forced=requiredSetRounds(groups,bands,windows,random,required);
+  // Keep policy RNG authoritative in JS. Replay only the already-consumed
+  // planning draws into a clone, then materialize the per-round values that SQL
+  // will consume. A failed invocation discards this local RNG exactly as today.
+  const roundRandom=seededRandom(seed);
+  for(let i=0;i<planningDraws;i++)roundRandom();
+  const roundRandoms=Array.from({length:windows.length},()=>({set:roundRandom(),offset:roundRandom()}));
+  return {
+    planningDraws,
+    plan:{
+      selection_version:DRAFT_RUN_SELECTION_VERSION,
+      groups:groups.map(({set_id,pick_number,band,n})=>({set_id,pick_number,band,n})),
+      windows,bands,required,
+      forced:Array.from({length:windows.length},(_,i)=>forced.get(i)||''),
+      round_randoms:roundRandoms,
+    },
+  };
+}
+
+export async function selectBatchedDatabaseRun(query,version,seed,environment='mixed',{day=gameDateKey(),setIds=[],snapshot=null}={}) {
+  snapshot ||= await loadServingSnapshot(query,version);
+  const {plan}=currentPracticeBatchPlan(snapshot,seed,environment,{day,setIds});
+  const row=(await query(
+    'SELECT pack1_select_serving_run_v1($1::bigint,$2::bigint,$3,$4,$5,$6::jsonb) selection',
+    [snapshot.id,snapshot.revision,version,DRAFT_RUN_DIFFICULTY_VERSION,SERVING_POLICY_VERSION,JSON.stringify(plan)],
+  )).rows[0];
+  const result=typeof row?.selection==='string'?JSON.parse(row.selection):row?.selection;
+  if(!result||result.ok!==true) {
+    if(result?.error==='not_enough_verified_puzzles')
+      throw Object.assign(Error('Not enough verified puzzles for a balanced run.'),{status:503});
+    if(result?.error==='corpus_changed')
+      throw Object.assign(Error('The corpus changed while starting this run. Please retry.'),{status:503});
+    throw servingCacheUnavailable();
+  }
+  if(result.draws_used!==16||!Array.isArray(result.selections)||result.selections.length!==8)throw servingCacheUnavailable();
+  return result.selections.map(decodePuzzleMetadata);
+}
+
 export async function selectDatabaseReroll(query,version,source,options) {
   const {environment='mixed',selectionVersion=DRAFT_RUN_SELECTION_VERSION,difficultyVersion=DRAFT_RUN_DIFFICULTY_VERSION,round,type,anchor}=options;
   if(!['set','pack'].includes(type)||environment==='powered-cube'&&type==='set')throw Error('Invalid reroll.');
@@ -213,8 +269,10 @@ export async function selectCachedDatabaseRun(query,version,seed,environment='mi
   for(let attempt=0;attempt<2;attempt++) {
     const snapshot=await loadServingSnapshot(query,version,{readiness:options.readiness===true});
     let selected,error;
-    try {selected=await selectDatabaseRun(query,version,seed,environment,{...options,snapshot});}
-    catch(e){error=e;}
+    try {
+      const batched=options.batched===true||process.env.PACK1_BATCHED_SELECTION_EXPERIMENT==='1';
+      selected=await (batched?selectBatchedDatabaseRun:selectDatabaseRun)(query,version,seed,environment,{...options,snapshot});
+    } catch(e){error=e;}
     if(!await servingRevisionMatches(query,snapshot.revision))continue;
     if(error)throw error;
     Object.defineProperty(selected,'servingRevision',{value:snapshot.revision});

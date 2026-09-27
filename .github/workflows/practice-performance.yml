@@ -2,12 +2,9 @@ name: isolated practice performance comparison
 on:
   pull_request:
     paths:
-      - 'scripts/practice-performance.mjs'
-      - 'scripts/practice-reroll-performance.mjs'
-      - 'scripts/practice-cache-publication.mjs'
+      - 'scripts/practice-batched-selector-experiment.mjs'
       - 'worker/draft-run-selection.mjs'
-      - 'migrations/0039_practice_serving_cache.sql'
-      - 'tests/practice-performance.test.mjs'
+      - 'migrations/0045_batched_practice_selector.sql'
       - '.github/workflows/practice-performance.yml'
   workflow_dispatch:
 permissions:
@@ -16,7 +13,7 @@ concurrency:
   group: practice-performance-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: false
 jobs:
-  baseline:
+  batched-selector:
     if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -41,37 +38,26 @@ jobs:
           project_id: patient-shadow-91417882
           parent_branch: br-orange-feather-ayps8kep
           api_key: ${{ secrets.NEON_API_KEY }}
-          branch_name: practice-baseline-${{ github.run_id }}-${{ github.run_attempt }}
+          branch_name: practice-batched-${{ github.run_id }}-${{ github.run_attempt }}
           database: pack1
           role: pack1_owner
           suspend_timeout: 300
           expires_at: ${{ steps.expiry.outputs.expires_at }}
-      - name: Verify isolated target, build derived cache and compare selection
+      - name: Install candidate selector function
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: psql -X -d "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
+      - name: Prove parity and run bounded synchronized start A/B
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
           NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
           PACK1_BENCHMARK_BRANCH: ${{ steps.neon.outputs.branch_id }}
-          PACK1_BENCHMARK_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
-          PACK1_BENCHMARK_SAMPLES: '3'
-          PACK1_BENCHMARK_CACHE: '1'
-        run: node scripts/practice-performance.mjs
-      - name: Verify concurrent publication rollback and bulk trigger cost
-        env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          PACK1_BENCHMARK_BRANCH: ${{ steps.neon.outputs.branch_id }}
-        run: node scripts/practice-cache-publication.mjs
-      - name: Diagnose reroll latency and an isolated candidate index
-        env:
-          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
-          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
-          PACK1_BENCHMARK_BRANCH: ${{ steps.neon.outputs.branch_id }}
-        run: node scripts/practice-reroll-performance.mjs
+        run: node scripts/practice-batched-selector-experiment.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: practice-performance-${{ github.run_id }}
-          path: artifacts/practice-performance
+          name: practice-batched-selector-${{ github.run_id }}
+          path: artifacts/practice-batched-selector
           retention-days: 30
       - name: Delete this disposable copy
         if: always() && steps.neon.outputs.branch_id != '' && steps.neon.outputs.created == 'true'
