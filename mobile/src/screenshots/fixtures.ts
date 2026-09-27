@@ -79,7 +79,8 @@ const initialRun: DraftRunState = {
 function feedbackRun(selectedId: string): DraftRunState {
   const current = puzzle(0);
   const selected = current.candidates.find((item) => item.id === selectedId) ?? current.candidates[0];
-  const historical = current.candidates.find((item) => item.id === 'sol-ring')!;
+  const historical = current.candidates.find((item) => item.id === 'sol-ring');
+  if (!selected || !historical) throw new Error('Store screenshot draft fixture is incomplete.');
   const score = selected.id === historical.id ? 100 : selected.id === 'black-lotus' ? 96 : 78;
   const answer: DraftRunAnswer = {
     score,
