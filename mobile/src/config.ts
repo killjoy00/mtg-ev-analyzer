@@ -1,28 +1,9 @@
-import Constants from 'expo-constants';
-
 export type MobileEnvironment = 'development' | 'preview' | 'production';
 
-function validEnvironment(value: unknown): MobileEnvironment | null {
-  return value === 'development' || value === 'preview' || value === 'production'
-    ? value
-    : null;
-}
-
 function environment(): MobileEnvironment {
-  const publicEnvironment = validEnvironment(process.env.EXPO_PUBLIC_PACKONE_ENV);
-  const embeddedEnvironment = validEnvironment(Constants.expoConfig?.extra?.buildProfile);
-
-  if (
-    publicEnvironment
-    && embeddedEnvironment
-    && publicEnvironment !== embeddedEnvironment
-  ) {
-    throw new Error(
-      `Pack One mobile environment mismatch: public=${publicEnvironment}, build=${embeddedEnvironment}.`,
-    );
-  }
-
-  return embeddedEnvironment ?? publicEnvironment ?? 'development';
+  const value = process.env.EXPO_PUBLIC_PACKONE_ENV;
+  if (value === 'preview' || value === 'production') return value;
+  return 'development';
 }
 
 function cleanOrigin(value: string) {
