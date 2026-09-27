@@ -1,5 +1,4 @@
 import { config } from '@/src/config';
-import { requestScreenshotFixture } from '@/src/screenshots/fixtures';
 
 export class ApiError extends Error {
   constructor(
@@ -31,7 +30,10 @@ function errorMessage(body: unknown, status: number) {
 }
 
 export async function requestJson<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  if (config.screenshots.fixtures) return requestScreenshotFixture<T>(path, options);
+  if (process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1') {
+    const { requestScreenshotFixture } = await import('../screenshots/fixtures');
+    return requestScreenshotFixture<T>(path, options);
+  }
 
   const method = options.method ?? 'GET';
   const controller = new AbortController();
