@@ -27,8 +27,13 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "scripts"))
 sys.path.insert(0, str(ROOT / "research"))
 
-from contextual_value.diagnostics import paired_dr_delta_ci, policy_overlap_diagnostics
+from contextual_value.diagnostics import (
+    describe,
+    paired_dr_delta_ci,
+    policy_overlap_diagnostics,
+)
 from contextual_value.dr import PolicyObservation, evaluate_policy
+from contextual_value.propensity import support_threshold
 from contextual_value_phase_a_bakeoff import (
     RIDGE_L2,
     WEIGHT_CAPS,
@@ -88,6 +93,392 @@ def _delta(candidate, incumbent, cap: float = 20.0) -> dict:
         "direct": left.direct - right.direct,
         "snips": left.snips - right.snips,
         "ipw": left.ipw - right.ipw,
+    }
+
+
+def _target_action(observation: PolicyObservation) -> str:
+    return min(
+        observation.target,
+        key=lambda action: (-float(observation.target[action]), action),
+    )
+
+
+def _raw_policy_weight(observation: PolicyObservation) -> float:
+    return (
+        float(observation.target[observation.action])
+        / float(observation.behavior[observation.action])
+    )
+
+
+def _bootstrap_mean_ci(
+    values: Sequence[float],
+    *,
+    seed: int,
+    replicates: int = BOOTSTRAP_REPLICATES,
+) -> list[float]:
+    array = np.asarray(values, dtype=np.float64)
+    if array.size == 0:
+        raise ValueError("bootstrap mean requires observations")
+    if array.size == 1:
+        return [float(array[0]), float(array[0])]
+    rng = np.random.default_rng(seed)
+    sampled = rng.integers(0, array.size, size=(replicates, array.size))
+    means = np.mean(array[sampled], axis=1)
+    return [
+        float(np.quantile(means, 0.025)),
+        float(np.quantile(means, 0.975)),
+    ]
+
+
+def _weight_normalization(
+    observations: Sequence[PolicyObservation],
+    *,
+    seed: int,
+) -> dict:
+    weights = [_raw_policy_weight(row) for row in observations]
+    ci = _bootstrap_mean_ci(weights, seed=seed)
+    mean = float(np.mean(weights))
+    return {
+        "n": len(weights),
+        "sum": float(np.sum(weights)),
+        "mean": mean,
+        "mean_minus_theoretical_one": mean - 1.0,
+        "mean_ci95": ci,
+        "ci95_contains_one": bool(ci[0] <= 1.0 <= ci[1]),
+        "distribution": describe(weights),
+    }
+
+
+def _policy_action_calibration(
+    observations: Sequence[PolicyObservation],
+    *,
+    seed: int,
+) -> dict:
+    predicted = np.asarray(
+        [float(row.behavior[_target_action(row)]) for row in observations],
+        dtype=np.float64,
+    )
+    observed = np.asarray(
+        [1.0 if row.action == _target_action(row) else 0.0 for row in observations],
+        dtype=np.float64,
+    )
+    gap = observed - predicted
+    order = np.argsort(predicted, kind="stable")
+    bins = []
+    for bin_index, positions in enumerate(
+        np.array_split(order, min(5, len(order))),
+        start=1,
+    ):
+        if len(positions) == 0:
+            continue
+        bins.append({
+            "bin": bin_index,
+            "n": int(len(positions)),
+            "predicted_mean": float(np.mean(predicted[positions])),
+            "observed_frequency": float(np.mean(observed[positions])),
+            "observed_minus_predicted": float(np.mean(gap[positions])),
+            "predicted_min": float(np.min(predicted[positions])),
+            "predicted_max": float(np.max(predicted[positions])),
+        })
+    return {
+        "n": len(observations),
+        "mean_predicted_probability": float(np.mean(predicted)),
+        "observed_choice_frequency": float(np.mean(observed)),
+        "observed_minus_predicted": float(np.mean(gap)),
+        "gap_ci95": _bootstrap_mean_ci(gap, seed=seed),
+        "brier": float(np.mean(np.square(gap))),
+        "equal_count_bins": bins,
+    }
+
+
+def _stratified_propensity_diagnostics(
+    decisions,
+    observations: Sequence[PolicyObservation],
+    *,
+    seed: int,
+) -> dict:
+    if len(decisions) != len(observations):
+        raise ValueError("stratified propensity inputs do not align")
+    result = {}
+    next_seed = seed
+    for axis in ("set", "pick", "skill", "experience"):
+        groups = defaultdict(list)
+        for decision, observation in zip(decisions, observations):
+            groups[_slice_label(decision, axis)].append(observation)
+        result[axis] = {}
+        for label, rows in sorted(groups.items()):
+            next_seed += 2
+            result[axis][label] = {
+                "n": len(rows),
+                "weight_normalization": _weight_normalization(
+                    rows,
+                    seed=next_seed,
+                ),
+                "policy_action_calibration": _policy_action_calibration(
+                    rows,
+                    seed=next_seed + 1,
+                ),
+            }
+    return result
+
+
+def _covariate_balance(
+    decisions,
+    observations: Sequence[PolicyObservation],
+) -> dict:
+    if len(decisions) != len(observations):
+        raise ValueError("covariate balance inputs do not align")
+    weights = np.asarray(
+        [_raw_policy_weight(row) for row in observations],
+        dtype=np.float64,
+    )
+    total_weight = float(np.sum(weights))
+    if total_weight <= 0:
+        raise ValueError("covariate balance requires positive total policy weight")
+    result = {}
+    for axis in ("set", "pick", "skill", "experience"):
+        labels = [_slice_label(decision, axis) for decision in decisions]
+        rows = {}
+        absolute_gaps = []
+        for label in sorted(set(labels)):
+            mask = np.asarray([value == label for value in labels], dtype=bool)
+            target_share = float(np.mean(mask))
+            weighted_share = float(np.sum(weights[mask]) / total_weight)
+            gap = weighted_share - target_share
+            absolute_gaps.append(abs(gap))
+            rows[label] = {
+                "target_share": target_share,
+                "ipw_weighted_share": weighted_share,
+                "gap": gap,
+            }
+        result[axis] = {
+            "categories": rows,
+            "max_abs_gap": float(max(absolute_gaps) if absolute_gaps else 0.0),
+            "total_variation": float(sum(absolute_gaps) / 2.0),
+        }
+    return result
+
+
+def _dr_decomposition(
+    candidate: Sequence[PolicyObservation],
+    incumbent: Sequence[PolicyObservation],
+    *,
+    cap: float = 20.0,
+) -> dict:
+    left = evaluate_policy(candidate, cap)
+    right = evaluate_policy(incumbent, cap)
+    left_residual = left.dr - left.direct
+    right_residual = right.dr - right.direct
+    return {
+        "cap": cap,
+        "H": {
+            "direct": left.direct,
+            "residual_correction": left_residual,
+            "dr": left.dr,
+        },
+        "A": {
+            "direct": right.direct,
+            "residual_correction": right_residual,
+            "dr": right.dr,
+        },
+        "H_minus_A": {
+            "direct": left.direct - right.direct,
+            "residual_correction": left_residual - right_residual,
+            "dr": left.dr - right.dr,
+        },
+    }
+
+
+def _disagreement_support(
+    candidate: Sequence[PolicyObservation],
+    incumbent: Sequence[PolicyObservation],
+    *,
+    seed: int,
+) -> dict:
+    if len(candidate) != len(incumbent) or not candidate:
+        raise ValueError("disagreement inputs must align and be non-empty")
+    h_rows = []
+    a_rows = []
+    for left, right in zip(candidate, incumbent):
+        if left.cluster != right.cluster:
+            raise ValueError("disagreement observations do not share clusters")
+        if _target_action(left) != _target_action(right):
+            h_rows.append(left)
+            a_rows.append(right)
+    if not h_rows:
+        return {
+            "n": 0,
+            "coverage": 0.0,
+        }
+
+    def support(rows, row_seed):
+        probabilities = [
+            float(row.behavior[_target_action(row)])
+            for row in rows
+        ]
+        supported = [
+            probability >= support_threshold(len(row.behavior))
+            for row, probability in zip(rows, probabilities)
+        ]
+        estimate = evaluate_policy(rows, 20.0)
+        return {
+            "target_action_behavior_probability": describe(probabilities),
+            "supported_fraction": float(np.mean(supported)),
+            "weight_normalization": _weight_normalization(rows, seed=row_seed),
+            "policy_action_calibration": _policy_action_calibration(
+                rows,
+                seed=row_seed + 1,
+            ),
+            "cap20_ess": estimate.ess,
+            "cap20_ess_ratio": estimate.ess_ratio,
+            "cap20_max_unclipped_weight": estimate.max_unclipped_weight,
+        }
+
+    coverage = len(h_rows) / len(candidate)
+    conditional_delta = _delta(h_rows, a_rows)
+    overall_delta = _delta(candidate, incumbent)
+    weighted_back = {
+        key: coverage * conditional_delta[key]
+        for key in ("dr", "direct", "ipw")
+    }
+    crosscheck = max(
+        abs(weighted_back[key] - overall_delta[key])
+        for key in weighted_back
+    )
+    return {
+        "n": len(h_rows),
+        "coverage": coverage,
+        "H": support(h_rows, seed),
+        "A": support(a_rows, seed + 10),
+        "conditional_H_minus_A_cap20": conditional_delta,
+        "coverage_weighted_back_to_overall": weighted_back,
+        "overall_H_minus_A_cap20": {
+            key: overall_delta[key]
+            for key in ("dr", "direct", "ipw")
+        },
+        "linear_metric_reweight_crosscheck_max_abs_error": crosscheck,
+        "note": (
+            "SNIPS is intentionally not coverage-weighted because its "
+            "self-normalization is nonlinear."
+        ),
+    }
+
+
+def _leave_one_draft_out_influence(
+    candidate: Sequence[PolicyObservation],
+    incumbent: Sequence[PolicyObservation],
+    *,
+    cap: float = 20.0,
+) -> dict:
+    if len(candidate) != len(incumbent) or len(candidate) < 2:
+        raise ValueError("leave-one-out inputs must align with at least two rows")
+
+    def contribution(row: PolicyObservation) -> float:
+        direct = sum(
+            float(row.target[action]) * float(row.q_values[action])
+            for action in row.target
+        )
+        weight = min(_raw_policy_weight(row), cap)
+        residual = float(row.outcome) - float(row.q_values[row.action])
+        return direct + weight * residual
+
+    contributions = np.asarray(
+        [
+            contribution(left) - contribution(right)
+            for left, right in zip(candidate, incumbent)
+        ],
+        dtype=np.float64,
+    )
+    total = float(np.sum(contributions))
+    n = len(contributions)
+    overall = total / n
+    expected = _delta(candidate, incumbent, cap)["dr"]
+    if abs(overall - expected) > 1e-12:
+        raise ValueError("leave-one-out DR contribution reconstruction failed")
+    loo = (total - contributions) / (n - 1)
+    changes = loo - overall
+    absolute = np.abs(changes)
+    top = np.argsort(-absolute)[:10]
+    return {
+        "n": n,
+        "cap": cap,
+        "overall_dr_delta": overall,
+        "max_abs_change": float(np.max(absolute)),
+        "abs_change_quantiles": {
+            "p50": float(np.quantile(absolute, 0.50)),
+            "p90": float(np.quantile(absolute, 0.90)),
+            "p95": float(np.quantile(absolute, 0.95)),
+            "p99": float(np.quantile(absolute, 0.99)),
+        },
+        "top_influence": [
+            {
+                "draft_cluster": str(candidate[int(index)].cluster),
+                "paired_dr_contribution": float(contributions[index]),
+                "leave_one_out_dr_delta": float(loo[index]),
+                "change_from_overall": float(changes[index]),
+            }
+            for index in top
+        ],
+    }
+
+
+def _evaluator_diagnostics(
+    decisions,
+    candidate: Sequence[PolicyObservation],
+    incumbent: Sequence[PolicyObservation],
+    *,
+    seed: int,
+) -> dict:
+    return {
+        "raw_importance_weight_normalization_target": 1.0,
+        "normalization_interpretation": (
+            "Under a correctly specified behavior propensity, the raw "
+            "importance weight for any fixed target policy has expectation one."
+        ),
+        "H": {
+            "weight_normalization": _weight_normalization(
+                candidate,
+                seed=seed,
+            ),
+            "policy_action_calibration": _policy_action_calibration(
+                candidate,
+                seed=seed + 1,
+            ),
+            "stratified": _stratified_propensity_diagnostics(
+                decisions,
+                candidate,
+                seed=seed + 100,
+            ),
+            "covariate_balance": _covariate_balance(decisions, candidate),
+        },
+        "A": {
+            "weight_normalization": _weight_normalization(
+                incumbent,
+                seed=seed + 2,
+            ),
+            "policy_action_calibration": _policy_action_calibration(
+                incumbent,
+                seed=seed + 3,
+            ),
+            "stratified": _stratified_propensity_diagnostics(
+                decisions,
+                incumbent,
+                seed=seed + 200,
+            ),
+            "covariate_balance": _covariate_balance(decisions, incumbent),
+        },
+        "H_vs_A": {
+            "dr_decomposition": _dr_decomposition(candidate, incumbent),
+            "disagreement_support": _disagreement_support(
+                candidate,
+                incumbent,
+                seed=seed + 300,
+            ),
+            "leave_one_draft_out_influence": _leave_one_draft_out_influence(
+                candidate,
+                incumbent,
+            ),
+        },
     }
 
 
@@ -359,6 +750,18 @@ def main():
     baseline_slices = _slice_intervals(
         primary_decisions, baseline_h, baseline_a
     )
+    baseline_evaluator = _evaluator_diagnostics(
+        primary_decisions,
+        baseline_h,
+        baseline_a,
+        seed=2026092600,
+    )
+    sensitivity_evaluator = _evaluator_diagnostics(
+        primary_decisions,
+        sensitivity_h,
+        sensitivity_a,
+        seed=2026092700,
+    )
 
     baseline_ci = paired_dr_delta_ci(
         baseline_h,
@@ -410,6 +813,7 @@ def main():
                 baseline_h,
                 action_order_by_cluster=h_action_order_by_draft,
             ),
+            "evaluator_diagnostics": baseline_evaluator,
         },
         "behavior_nuisance_sensitivity": {
             "alternate_nuisance": "no_strong_entirely",
@@ -426,6 +830,7 @@ def main():
                 sensitivity_h,
                 action_order_by_cluster=h_action_order_by_draft,
             ),
+            "evaluator_diagnostics": sensitivity_evaluator,
         },
         "slice_uncertainty_frozen_behavior": baseline_slices,
         "environment_power": {
@@ -440,7 +845,13 @@ def main():
         "reused_prior_ablation_evidence": _ablation_reuse(ablation),
         "next_gate": {
             "core_freeze_audit_complete": True,
-            "historical_ood_stress_required": True,
+            "cached_evaluator_diagnostics_complete": True,
+            "historical_ood_stress_required_eventually": True,
+            "historical_ood_stress_next": False,
+            "next_required": (
+                "interpret propensity diagnostics and, if warranted, predeclare "
+                "one bounded richer behavior-model comparison before OOD"
+            ),
             "assessment_authorized": False,
         },
     }
