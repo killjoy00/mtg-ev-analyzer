@@ -14,6 +14,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requestJson } from '@/src/api/client';
+import { config } from '@/src/config';
 import { VersionGateBoundary } from '@/src/components/VersionGateBoundary';
 import { colors, spacing } from '@/src/theme';
 import {
@@ -28,6 +29,7 @@ function nativePlatform(): MobilePlatform | null {
 }
 
 async function checkInstalledVersion(): Promise<VersionGateDecision> {
+  if (config.screenshots.enabled) return { status: 'allowed' };
   const platform = nativePlatform();
   const version = Application.nativeApplicationVersion;
   const build = Application.nativeBuildVersion;

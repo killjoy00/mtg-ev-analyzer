@@ -1,6 +1,6 @@
 # Pack One mobile store submission packet
 
-Updated 2026-09-26. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated 2026-09-27. This file is the source-of-truth submission packet for the first free public mobile release.
 
 ## Shared release identity
 
@@ -30,7 +30,7 @@ Updated 2026-09-26. This file is the source-of-truth submission packet for the f
 
 - Support email: `admin@packone.pro`
 - Default language: English (U.S.)
-- Recommended initial public region: United States only. Expand after the first release once review/operations are proven.
+- Initial public regions: **United States and Canada only**.
 
 ## Apple App Store
 
@@ -73,9 +73,9 @@ Sign-in methods:
 - Google
 - Email/password
 
-The app contains no in-app purchase flow and no mobile upgrade/purchase link. Native Patreon interaction is limited to existing-account OAuth authentication at Patreon’s authorize endpoint with identity scope; the app does not link to Patreon purchasing, show prices, or instruct users where to subscribe.
+Pack One Elite is available on iOS as the auto-renewable App Store subscription `pro.packone.app.elite.monthly` at **$7/month**. Elite unlocks Powered Cube practice and custom-set practice for the signed-in Pack One account. The Membership screen uses StoreKit pricing, includes Restore Purchases and Manage Subscription, and grants access only after Pack One verifies the Apple-signed transaction server-side.
 
-Do not submit an iOS build that unlocks paid Patreon-derived practice solely from an external membership unless the exact same digital access is available through compliant iOS IAP or Apple has confirmed an applicable exception for this app. If an approved strategy retains gated practice for review, provide a non-expiring reviewer account with that access already granted. Do not place reviewer credentials in this repository; enter them only in App Store Connect Review Information.
+Patreon is shown only as an existing-account connection. The iOS app does not link to Patreon purchasing, display Patreon prices, or direct users to subscribe externally. Provide a non-expiring reviewer account as needed, and enter reviewer credentials only in App Store Connect Review Information.
 
 Reviewer path after sign-in:
 1. Home -> Practice
@@ -91,16 +91,17 @@ Release setting: **Manually release this version** after App Review approval.
 
 ### Privacy labels - conservative v1 declaration
 
-Native Pack One has no ad SDK, no third-party analytics SDK, no location permission, no contacts access, no camera/microphone feature, and no mobile purchase SDK.
+Native Pack One has no ad SDK, no third-party analytics SDK, no location permission, no contacts access, and no camera/microphone feature. iOS uses StoreKit for Pack One Elite.
 
 Declare data collected by Pack One as follows, subject to final App Store Connect wording:
 - Contact Info -> Name: collected for account/profile functionality; linked to the user; not used for tracking.
 - Contact Info -> Email Address: collected for account, verification, recovery, and deletion; linked to the user; not used for tracking.
 - Identifiers -> User ID: Pack One player/account identifiers are collected for app functionality and analytics; linked when signed in; not used for tracking.
+- Purchases -> Purchase History: Apple subscription state associated with the Pack One account is collected for app functionality; linked to the account; not used for tracking.
 - Usage Data -> Product Interaction: gameplay starts, choices, scores, completions, and related product events are collected for app functionality and product analytics; may be linked to the Pack One player/account; not used for tracking.
 
 Do not declare:
-- Purchases or payment information
+- Payment-card information
 - Precise or approximate location
 - Contacts
 - Photos/videos
@@ -121,7 +122,7 @@ Pack One displays third-party card names/art and uses licensed/public draft data
 - Wizards intellectual-property ownership
 - Wizards Fan Content Policy notice
 
-Before submitting the Content Rights declaration, the account holder must confirm the current Wizards Fan Content Policy remains applicable to this exact commercial/affiliate configuration. Do not make an unsupported rights representation in App Store Connect.
+The content-rights / Elite Wizards-IP review is already resolved in the project’s dedicated rights documentation. It is not an open release decision in this submission packet. Complete App Store Connect’s Content Rights declaration from that established source of truth.
 
 ### Age rating
 
@@ -244,7 +245,7 @@ Use screenshots from the exact release candidate rather than mock UI.
 - Turn on Managed Publishing before sending store/app-content changes for review so approval does not accidentally publish changes immediately.
 - Closed testing must be completed before production access if Play requires it for this developer account.
 - The first production release does **not** offer a staged rollout percentage; Google documents staged percentages for updates, not the first production release. The first production release goes to all users in the selected production countries.
-- Recommended first public region: United States only. Expand countries after the first release and operational pass.
+- Initial public regions: **United States and Canada only**.
 
 ## Items that still require authenticated store-console actions
 

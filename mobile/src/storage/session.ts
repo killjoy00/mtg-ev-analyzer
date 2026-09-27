@@ -1,5 +1,8 @@
 import * as SecureStore from 'expo-secure-store';
 
+import { config } from '@/src/config';
+import { screenshotSession } from '@/src/screenshots/fixtures';
+
 const SESSION_KEY = 'packone.mobile.session.v2';
 const LEGACY_SESSION_KEY = 'packone.mobile.session.v1';
 
@@ -73,6 +76,9 @@ async function migrateLegacy(): Promise<MobileSession | null> {
 }
 
 export async function readSession(): Promise<MobileSession | null> {
+  if (config.screenshots.enabled) {
+    return { ...screenshotSession, accountUser: { ...screenshotSession.accountUser } } as MobileSession;
+  }
   const raw = await SecureStore.getItemAsync(SESSION_KEY);
   if (!raw) return migrateLegacy();
   try {
@@ -85,6 +91,10 @@ export async function readSession(): Promise<MobileSession | null> {
 
 export async function writeSession(session: MobileSession) {
   if (!validSession(session)) throw new Error('Invalid Pack One mobile session.');
+  if (config.screenshots.enabled) {
+    notifySession(session);
+    return;
+  }
   await SecureStore.setItemAsync(SESSION_KEY, JSON.stringify(session), {
     keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY,
   });
@@ -92,6 +102,10 @@ export async function writeSession(session: MobileSession) {
 }
 
 export async function clearSession() {
+  if (config.screenshots.enabled) {
+    notifySession(null);
+    return;
+  }
   await Promise.all([
     SecureStore.deleteItemAsync(SESSION_KEY),
     SecureStore.deleteItemAsync(LEGACY_SESSION_KEY),

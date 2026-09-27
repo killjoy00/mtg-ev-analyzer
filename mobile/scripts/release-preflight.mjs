@@ -8,6 +8,10 @@ const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const icon = resolve(root, 'assets/images/icon.png');
 const storeReleasePath = resolve(root, 'store-release.json');
 
+if (process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_MODE === '1') {
+  throw new Error('Pack One production preflight failed. Screenshot fixture mode must never be enabled for a store build.');
+}
+
 if (!existsSync(storeReleasePath)) {
   throw new Error('Pack One production preflight failed. Missing mobile/store-release.json.');
 }

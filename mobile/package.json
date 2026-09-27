@@ -18,7 +18,9 @@
     "test:shared-run-screen": "node --test ./tests/shared-run-screen.test.cjs ./tests/shared-run-home-resume.test.cjs",
     "test:membership": "node --test ./tests/membership.test.cjs",
     "test:profiles": "node --test ./tests/public-profile-api.test.cjs ./tests/profile-browsing.test.cjs",
-    "test:activity": "node --test ./tests/profile-activity.test.cjs ./tests/profile-activity-screen.test.cjs"
+    "test:activity": "node --test ./tests/profile-activity.test.cjs ./tests/profile-activity-screen.test.cjs",
+    "screenshots:ios:capture": "bash ./scripts/capture-ios-store-screenshots.sh",
+    "screenshots:android:capture": "bash ./scripts/capture-android-store-screenshots.sh"
   },
   "dependencies": {
     "expo": "~57.0.24",

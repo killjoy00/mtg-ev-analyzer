@@ -38,6 +38,7 @@ import { clearPracticeIdempotencyKey, practiceIdempotencyKey } from '@/src/stora
 import type { MobileSession } from '@/src/storage/session';
 import type { SharedRunSurface } from '@/src/state/sharedRunSurface';
 import { tcgplayerUrl } from '@/src/tcgplayer';
+import { config } from '@/src/config';
 import { colors, spacing } from '@/src/theme';
 
 type LoadState =
@@ -408,7 +409,7 @@ async function loadDraftSurface(
 }
 
 export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface } = {}) {
-  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string }>();
+  const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string }>();
   const practice = !shared && params.mode === 'practice';
   const requestedEnvironment = shared?.initialRun.environment
     ?? (typeof params.environment === 'string' ? params.environment : 'mixed');
@@ -530,10 +531,21 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
       ? Promise.resolve({ status: 'ready' as const, run: shared.initialRun, session: shared.session })
       : loadDraftSurface(environment, practice, setIds);
     void initial
-      .then((loaded) => {
+      .then(async (loaded) => {
         if (!active) return;
         if (loaded.status === 'signin-required') {
           commitState({ status: 'signin-required' });
+          return;
+        }
+        const screenshotCardId = config.screenshots.enabled && params.screenshot === 'feedback'
+          ? loaded.run.current?.candidates[0]?.id
+          : undefined;
+        if (screenshotCardId) {
+          const revealed = await submitDraftRunPick(loaded.run, screenshotCardId, loaded.session);
+          if (!active) return;
+          setReviewIndex(revealed.answers.length - 1);
+          setMode('feedback');
+          commitState({ status: 'ready', run: revealed, session: loaded.session });
           return;
         }
         const recoveredFeedback = Boolean(shared && !loaded.run.complete && loaded.run.answers.length);
@@ -553,7 +565,7 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
       refreshGeneration.current += 1;
       mutationGeneration.current += 1;
     };
-  }, [environment, practice, setIds, shared]);
+  }, [environment, params.screenshot, practice, setIds, shared]);
 
   const retry = async () => {
     refreshGeneration.current += 1;

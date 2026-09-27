@@ -10,12 +10,17 @@ function cleanOrigin(value: string) {
   return value.replace(/\/$/, '');
 }
 
+const mobileEnvironment = environment();
+const screenshotMode = process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_MODE === '1'
+  && mobileEnvironment !== 'production';
+
 const apiOrigin = cleanOrigin(
   process.env.EXPO_PUBLIC_PACKONE_API_ORIGIN ?? 'https://api.packone.pro',
 );
 
 export const config = Object.freeze({
-  environment: environment(),
+  environment: mobileEnvironment,
+  screenshots: Object.freeze({ enabled: screenshotMode }),
   api: Object.freeze({
     origin: apiOrigin,
     growthBaseUrl: `${apiOrigin}/growth`,

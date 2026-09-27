@@ -1,0 +1,151 @@
+name: Mobile store screenshots
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/mobile-store-screenshots-request.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-store-screenshots
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    name: validate screenshot request
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Require exact current main
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$GITHUB_REF" == "refs/heads/main" ]]
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - name: Validate reviewed request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          request=json.loads(Path('.github/mobile-store-screenshots-request.json').read_text())
+          if set(request) != {'operation','reason'}:
+              raise SystemExit('Invalid mobile screenshot request keys.')
+          if request.get('operation') != 'generate-mobile-store-screenshots':
+              raise SystemExit('Invalid mobile screenshot operation.')
+          reason=request.get('reason')
+          if not isinstance(reason,str) or not reason.strip():
+              raise SystemExit('Mobile screenshot request requires a reason.')
+          print('Reviewed mobile screenshot request:', reason)
+          PY
+
+  ios:
+    name: generate iPhone and iPad screenshots
+    needs: prepare
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install deterministic mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Validate production code before screenshot build
+        run: npm test
+      - name: Generate preview iOS project with screenshot fixtures
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: preview
+          EXPO_PUBLIC_PACKONE_ENV: preview
+          EXPO_PUBLIC_PACKONE_SCREENSHOT_MODE: '1'
+        run: npx expo prebuild --platform ios --clean
+      - name: Build simulator app
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: preview
+          EXPO_PUBLIC_PACKONE_ENV: preview
+          EXPO_PUBLIC_PACKONE_SCREENSHOT_MODE: '1'
+        shell: bash
+        run: |
+          set -euo pipefail
+          workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
+          test -n "$workspace"
+          xcodebuild -workspace "$workspace" -scheme PackOne -configuration Release -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath "$RUNNER_TEMP/PackOneScreenshots" CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO build
+          app="$(find "$RUNNER_TEMP/PackOneScreenshots/Build/Products/Release-iphonesimulator" -maxdepth 1 -name '*.app' -print -quit)"
+          test -d "$app"
+          echo "PACKONE_SCREENSHOT_APP=$app" >> "$GITHUB_ENV"
+      - name: Capture store scenes
+        shell: bash
+        run: bash ./scripts/capture-ios-store-screenshots.sh "$PACKONE_SCREENSHOT_APP"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-ios-store-screenshots
+          path: mobile/store-screenshots/ios/*.png
+          if-no-files-found: error
+          retention-days: 30
+
+  android:
+    name: generate Android screenshots
+    needs: prepare
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install deterministic mobile dependencies
+        run: |
+          node ./scripts/check-build-toolchain.mjs
+          npm ci --no-audit --no-fund
+      - name: Generate preview Android project with screenshot fixtures
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: preview
+          EXPO_PUBLIC_PACKONE_ENV: preview
+          EXPO_PUBLIC_PACKONE_SCREENSHOT_MODE: '1'
+        run: npx expo prebuild --platform android --clean
+      - name: Build screenshot APK
+        working-directory: mobile/android
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: preview
+          EXPO_PUBLIC_PACKONE_ENV: preview
+          EXPO_PUBLIC_PACKONE_SCREENSHOT_MODE: '1'
+        run: ./gradlew :app:assembleRelease --no-daemon
+      - name: Capture Android store scenes
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_7
+          disable-animations: true
+          script: cd mobile && bash ./scripts/capture-android-store-screenshots.sh ./android/app/build/outputs/apk/release/app-release.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-store-screenshots
+          path: mobile/store-screenshots/android/*.png
+          if-no-files-found: error
+          retention-days: 30
