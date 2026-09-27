@@ -5,7 +5,7 @@ import {execFileSync} from 'node:child_process';
 import {pathToFileURL} from 'node:url';
 
 export function rolloutDispatch(request) {
-  const {operation,reason,request_id,replay_of,corpus_version,commit,sets,target,action,source,first_environment,measurement_mode,measurement_samples}=request||{};
+  const {operation,reason,request_id,replay_of,corpus_version,commit,sets,target,action,source,first_environment,measurement_mode,measurement_samples,card_name,environments}=request||{};
   const common=['operation','reason','request_id','replay_of'];
   if(typeof reason!=='string'||!reason.trim()||!/^[-a-zA-Z0-9]+$/.test(request_id||''))throw Error('A named rollout request and reason are required.');
   if(replay_of!==undefined&&!/^[-a-zA-Z0-9]+$/.test(replay_of||''))throw Error('Invalid rollout replay reference.');
@@ -65,6 +65,10 @@ export function rolloutDispatch(request) {
     workflow='self-share-cleanup.yml';inputs={commit};extra=['commit'];
   } else if(operation==='card-images') {
     workflow='refresh-powered-cube-images.yml';
+  } else if(operation==='card-image-repair') {
+    if(typeof card_name!=='string'||!card_name.trim()||card_name!==card_name.trim()||card_name.length>200||/[\\x00-\\x1f\\x7f]/.test(card_name))throw Error('Invalid targeted card-image repair name.');
+    if(typeof environments!=='string'||!/^[a-z0-9-]+(?:,[a-z0-9-]+){0,7}$/.test(environments))throw Error('Invalid targeted card-image repair environments.');
+    workflow='refresh-powered-cube-images.yml';inputs={request_id,mode:'targeted',card_name,environments};extra=['card_name','environments'];
   } else if(operation==='card-image-release') {
     if(!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Invalid card-image release request.');
     workflow='card-image-release.yml';inputs={commit};extra=['commit'];
