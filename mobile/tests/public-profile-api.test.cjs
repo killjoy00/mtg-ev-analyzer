@@ -21,7 +21,7 @@ function api(t, fetcher) {
       compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS, esModuleInterop: true } }).outputText;
     const prior = Module._load;
     Module._load = function load(request, parent, main) {
-      if (request === '@/src/config') return { config: { api: { origin: 'https://api.packone.pro' } } };
+      if (request === '@/src/config') return { config: { screenshots: { fixtures: false }, api: { origin: 'https://api.packone.pro' } } };
       if (request === '@/src/api/client') return compile('src/api/client.ts');
       return prior.call(this, request, parent, main);
     };
