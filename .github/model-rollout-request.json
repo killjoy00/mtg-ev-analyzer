@@ -1,7 +1,8 @@
 {
   "operation": "deploy",
-  "request_id": "egress-image-refresh-541-dev-20260927",
-  "reason": "Deploy the reviewed #697 image-refresh egress fix to development before production promotion.",
+  "request_id": "egress-image-refresh-541-dev-retry1-20260927",
+  "replay_of": "egress-image-refresh-541-dev-20260927",
+  "reason": "Retry the guarded development deployment after the rollout bridge replay policy correctly rejected the merged PR request as equivalent history.",
   "commit": "4e39399ff0481fe11636546c2e1cf5a1e2407c96",
   "target": "development"
 }
