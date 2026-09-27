@@ -1,9 +1,28 @@
+import Constants from 'expo-constants';
+
 export type MobileEnvironment = 'development' | 'preview' | 'production';
 
+function validEnvironment(value: unknown): MobileEnvironment | null {
+  return value === 'development' || value === 'preview' || value === 'production'
+    ? value
+    : null;
+}
+
 function environment(): MobileEnvironment {
-  const value = process.env.EXPO_PUBLIC_PACKONE_ENV;
-  if (value === 'preview' || value === 'production') return value;
-  return 'development';
+  const publicEnvironment = validEnvironment(process.env.EXPO_PUBLIC_PACKONE_ENV);
+  const embeddedEnvironment = validEnvironment(Constants.expoConfig?.extra?.buildProfile);
+
+  if (
+    publicEnvironment
+    && embeddedEnvironment
+    && publicEnvironment !== embeddedEnvironment
+  ) {
+    throw new Error(
+      `Pack One mobile environment mismatch: public=${publicEnvironment}, build=${embeddedEnvironment}.`,
+    );
+  }
+
+  return embeddedEnvironment ?? publicEnvironment ?? 'development';
 }
 
 function cleanOrigin(value: string) {
@@ -12,8 +31,8 @@ function cleanOrigin(value: string) {
 
 const resolvedEnvironment = environment();
 const screenshotFixtures = process.env.EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES === '1';
-if (screenshotFixtures && resolvedEnvironment === 'production') {
-  throw new Error('Store screenshot fixtures are forbidden in the production mobile environment.');
+if (screenshotFixtures && resolvedEnvironment !== 'preview') {
+  throw new Error('Store screenshot fixtures are allowed only in the preview mobile environment.');
 }
 
 const apiOrigin = cleanOrigin(
