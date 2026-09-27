@@ -42,7 +42,9 @@ for(const setId of setIds) {
     if(typeof page.next_after!=='string'||!page.next_after||page.next_after===after)throw new Error(`Image refresh cursor did not advance for ${setId}`);
     after=page.next_after;
   }
-  if(puzzles<1)throw new Error(`No verified puzzles are available for image refresh: ${setId}`);
+  // Zero returned payloads is a valid no-op: the server now filters already-
+  // matching JSON before it crosses the Neon proxy. The normalization pass
+  // below independently verifies that the set exists and contains puzzles.
   refreshed.push({set_id:setId,mapping_entries:mapping.length,puzzles,updated_puzzles:updatedPuzzles,updated_cards:updatedCards});
 }
 
