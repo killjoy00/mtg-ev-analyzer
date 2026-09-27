@@ -3,12 +3,15 @@ import assert from 'node:assert/strict';
 
 process.env.DATABASE_URL='postgres://user:pass@ep-fixture.example/neondb';
 process.env.PACK1_RATE_LIMIT_SECRET='r'.repeat(64);
+process.env.PACK1_DELETION_ADMIN_EMAIL='auth-admin@example.invalid';
+process.env.PACK1_DELETION_ADMIN_PASSWORD='A'.repeat(32);
 
 const {accountRuntimeConfig,PROD_AUTH_BASE,QA_AUTH_BASE,PROD_RESET_DESTINATION,QA_RESET_DESTINATION}=await import('../worker/account-config.mjs');
 const {requireTrustedOrigin,revokeAllAccountSessions}=await import('../worker/account-session.mjs');
 const {default:growth,normalizedRecoveryEmail,recoveryRateKey}=await import('../worker/growth-function.js');
 
 const authId='11111111-1111-4111-8111-111111111111';
+const serviceAuthId='22222222-2222-4222-8222-222222222222';
 const origin='https://packone.pro';
 const request=(path,body={},headers={})=>new Request('https://packone.pro'+path,{
   method:'POST',
@@ -20,7 +23,7 @@ function dbResponse(fields=[],rows=[],rowCount=0) {
   return Response.json({fields:fields.map(name=>({name})),rows,rowCount});
 }
 
-function installFetch({providerStatus=200,attempts=1,recovery='valid'}={}) {
+function installFetch({providerStatus=200,verificationStatus=200,attempts=1,recovery='valid'}={}) {
   const calls=[];
   globalThis.fetch=async(url,options={})=>{
     const target=String(url),body=options.body?JSON.parse(options.body):null;
@@ -35,11 +38,19 @@ function installFetch({providerStatus=200,attempts=1,recovery='valid'}={}) {
         return dbResponse(['auth_user_id','expires_at'],[[authId,'2099-01-01T00:00:00Z']],1);
       }
       if(sql.startsWith('UPDATE apple_auth_identities SET synthetic_password=false'))return dbResponse([],[],0);
+      if(sql.includes('SELECT 1 FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1'))return dbResponse([],[],0);
       if(sql.includes('UPDATE account_sessions SET revoked_at'))return dbResponse([],[],2);
       throw Error('Unexpected SQL: '+sql);
     }
     if(target.startsWith(PROD_AUTH_BASE)) {
       calls.push({kind:'provider',url:target,body,headers:new Headers(options.headers||{})});
+      if(target.endsWith('/sign-in/email'))return new Response(JSON.stringify({user:{id:serviceAuthId}}),{
+        status:200,
+        headers:{'content-type':'application/json','set-cookie':'better-auth.session_token=fixture; Path=/; HttpOnly'},
+      });
+      if(target.endsWith('/admin/update-user'))
+        return verificationStatus===200?Response.json({status:true}):Response.json({message:'verification update failed'},{status:verificationStatus});
+      if(target.endsWith('/sign-out'))return Response.json({status:true});
       return providerStatus===200?Response.json({status:true}):Response.json({message:'provider rejected'},{status:providerStatus});
     }
     throw Error('Unexpected fetch '+target);
@@ -180,15 +191,28 @@ test('shared account-session revocation is idempotent and requires an unambiguou
   await assert.rejects(revokeAllAccountSessions(query,'legacy-token'),/Unambiguous Auth user identity/);
 });
 
-test('successful reset revokes Pack One sessions only after provider success',async()=>{
+test('successful reset verifies the exact Auth user and revokes Pack One sessions only after provider success',async()=>{
   const calls=installFetch();
   const response=await growth.fetch(request('/v1/account/reset-password',{token:'T'.repeat(32),newPassword:'New-password-123!'}));
   assert.equal(response.status,200);
   const providerIndex=calls.findIndex(x=>x.kind==='provider'&&x.url.endsWith('/reset-password'));
+  const verifyIndex=calls.findIndex(x=>x.kind==='provider'&&x.url.endsWith('/admin/update-user'));
   const revokeIndex=calls.findIndex(x=>x.kind==='db'&&x.sql.includes('UPDATE account_sessions SET revoked_at'));
-  assert.ok(providerIndex>=0&&revokeIndex>providerIndex);
+  assert.ok(providerIndex>=0&&verifyIndex>providerIndex&&revokeIndex>verifyIndex);
+  assert.deepEqual(calls[verifyIndex].body,{userId:authId,data:{emailVerified:true}});
   const cookies=response.headers.get('set-cookie')||'';
   assert.match(cookies,/__Host-pack1_account=;.*Max-Age=0/);
+});
+
+test('verification finalization failure still revokes sessions after the password was changed',async()=>{
+  const calls=installFetch({verificationStatus:503});
+  const response=await growth.fetch(request('/v1/account/reset-password',{token:'T'.repeat(32),newPassword:'New-password-123!'}));
+  const body=await response.json();
+  assert.equal(response.status,503);
+  assert.equal(body.code,'VERIFICATION_FINALIZE');
+  assert.match(body.error,/password was changed/i);
+  assert.ok(calls.some(x=>x.kind==='provider'&&x.url.endsWith('/admin/update-user')));
+  assert.ok(calls.some(x=>x.kind==='db'&&x.sql.includes('UPDATE account_sessions SET revoked_at')));
 });
 
 test('failed, expired, invalid or policy-rejected resets never revoke valid sessions',async()=>{
@@ -204,6 +228,7 @@ test('failed, expired, invalid or policy-rejected resets never revoke valid sess
     assert.equal(response.status,400);
     assert.equal(body.code,setup.code);
     assert.equal(calls.some(x=>x.kind==='db'&&x.sql.includes('UPDATE account_sessions SET revoked_at')),false);
+    assert.equal(calls.some(x=>x.kind==='provider'&&x.url.endsWith('/admin/update-user')),false);
   }
 });
 
