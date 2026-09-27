@@ -633,13 +633,12 @@ def run_fit_fold(args):
         "outcome": held["outcome"].astype(np.float64),
         "decision_weight": decision_weight,
     }
-    if args.fold == -1:
-        save.update({
-            "behavior": aligned["behavior"],
-            "q_rich": q_rich,
-            "q_simple": aligned["q_simple"],
-        })
-    else:
+    save.update({
+        "behavior": aligned["behavior"],
+        "q_rich": q_rich,
+        "q_simple": aligned["q_simple"],
+    })
+    if args.fold != -1:
         save.update({
             "phi_rich": phi_rich,
             "phi_simple": phi_simple,
