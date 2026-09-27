@@ -171,7 +171,8 @@ BEGIN
     SELECT to_jsonb(t) INTO chosen_metadata
     FROM (
       SELECT p.puzzle_id,p.set_id,p.corpus_version,p.source_draft_hash,p.pack_number,p.pick_number,p.candidate_count,
-        p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band
+        p.consensus_top_gap,p.support_entropy,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band,
+        p.puzzle_id selected_id
       FROM draft_run_verified_puzzles p
       JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
       WHERE p.puzzle_id=chosen_puzzle_id
