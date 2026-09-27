@@ -65,15 +65,16 @@ test('native instructional copy preserves current web Daily eligibility semantic
   const webHowToText = normalizeMarkupText(webHowTo);
   const webScoringText = normalizeMarkupText(webScoring);
   const dailyIntro = 'Pack One has three fixed Daily challenges.';
-  const guestValidation = 'an eligible guest can also sign in or link the completed first attempt on the same Pacific date to validate it for the leaderboard';
+  const howToGuestValidation = 'an eligible guest can also sign in or link the completed first attempt on the same Pacific date to validate it for the leaderboard';
+  const scoringGuestValidation = 'an eligible guest can sign in or link that completed first attempt on the same Pacific date to validate it for the leaderboard';
 
   assert.ok(webHowToText.includes(dailyIntro));
   assert.ok(howToScreen.includes(dailyIntro));
-  assert.ok(webHowToText.includes(guestValidation));
-  assert.ok(howToScreen.includes(guestValidation));
+  assert.ok(webHowToText.includes(howToGuestValidation));
+  assert.ok(howToScreen.includes(howToGuestValidation));
 
-  assert.ok(webScoringText.includes(guestValidation));
-  assert.ok(scoringScreen.includes(guestValidation));
+  assert.ok(webScoringText.includes(scoringGuestValidation));
+  assert.ok(scoringScreen.includes(scoringGuestValidation));
   assert.doesNotMatch(scoringScreen, /requires an authenticated account when starting/);
 
   assert.match(leaderboardScreen, /validated to an eligible account/);
