@@ -1,10 +1,3 @@
-import {
-  deepLinkToSubscriptions,
-  getAvailablePurchases,
-  type ProductSubscription,
-  type Purchase,
-  useIAP,
-} from 'expo-iap';
 import { router, useFocusEffect } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -30,6 +23,15 @@ import type { NativeAppleSubscriptionStatus } from '@/src/api/apple-subscription
 import { connectNativePatreon, loadNativePatreonStatus, mutateNativePatreon } from '@/src/api/patreon';
 import { canonicalContentUrl } from '@/src/contentLinks';
 import { useAppResume } from '@/src/hooks/useAppResume';
+import {
+  getAvailableAppleAppleStorePurchases,
+  openAppleSubscriptionManagement,
+  useAppleStore,
+} from '@/src/iap/apple-store';
+import type {
+  AppleStoreAppleStorePurchase,
+  AppleStoreSubscription,
+} from '@/src/iap/apple-store';
 import { accountAccessLabel, createMembershipController, initialMembershipState } from '@/src/state/membership';
 import { readSession, subscribeSession } from '@/src/storage/session';
 import type { MobileSession } from '@/src/storage/session';
@@ -39,11 +41,11 @@ function billingSession(session: MobileSession | null) {
   return session?.accountToken && session.accountUser?.id ? session : null;
 }
 
-function purchaseKey(purchase: Purchase) {
+function purchaseKey(purchase: AppleStorePurchase) {
   return purchase.transactionId || purchase.purchaseToken || purchase.id;
 }
 
-function periodLabel(product: ProductSubscription | undefined) {
+function periodLabel(product: AppleStoreSubscription | undefined) {
   if (!product || product.platform !== 'ios') return '';
   const count = Number(product.subscriptionPeriodNumberIOS || 1);
   const unit = String(product.subscriptionPeriodUnitIOS || '').toLowerCase();
@@ -68,9 +70,9 @@ function AppleElitePanel({
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const generation = useRef(0);
-  const purchaseHandler = useRef<((purchase: Purchase) => void) | null>(null);
+  const purchaseHandler = useRef<((purchase: AppleStorePurchase) => void) | null>(null);
   const purchaseErrorHandler = useRef<((error: { code?: string; message?: string }) => void) | null>(null);
-  const verifiedPurchases = useRef(new Map<string, Promise<{
+  const verifiedAppleStorePurchases = useRef(new Map<string, Promise<{
     status: NativeAppleSubscriptionStatus;
     accountId: string;
   }>>());
@@ -79,12 +81,12 @@ function AppleElitePanel({
     connected,
     subscriptions,
     fetchProducts,
-    requestPurchase,
+    requestAppleStorePurchase,
     finishTransaction,
-    restorePurchases,
-  } = useIAP({
-    onPurchaseSuccess: (purchase) => purchaseHandler.current?.(purchase),
-    onPurchaseError: (purchaseError) => purchaseErrorHandler.current?.(purchaseError),
+    restoreAppleStorePurchases,
+  } = useAppleStore({
+    onAppleStorePurchaseSuccess: (purchase) => purchaseHandler.current?.(purchase),
+    onAppleStorePurchaseError: (purchaseError) => purchaseErrorHandler.current?.(purchaseError),
   });
 
   useEffect(() => {
@@ -130,9 +132,9 @@ function AppleElitePanel({
       });
   }, [connected, fetchProducts]);
 
-  const verifyAndFinish = useCallback((purchase: Purchase, fixedSession?: MobileSession) => {
+  const verifyAndFinish = useCallback((purchase: AppleStorePurchase, fixedSession?: MobileSession) => {
     const key = purchaseKey(purchase);
-    const existing = verifiedPurchases.current.get(key);
+    const existing = verifiedAppleStorePurchases.current.get(key);
     if (existing) return existing;
 
     const operation = (async () => {
@@ -154,8 +156,8 @@ function AppleElitePanel({
       return { status: verified, accountId };
     })();
 
-    verifiedPurchases.current.set(key, operation);
-    void operation.catch(() => { verifiedPurchases.current.delete(key); });
+    verifiedAppleStorePurchases.current.set(key, operation);
+    void operation.catch(() => { verifiedAppleStorePurchases.current.delete(key); });
     return operation;
   }, [finishTransaction]);
 
@@ -195,7 +197,7 @@ function AppleElitePanel({
     setRequesting(false);
     setVerifying(false);
     if (purchaseError.code === 'user-cancelled') {
-      setNotice('Purchase canceled. No subscription change was made.');
+      setNotice('AppleStorePurchase canceled. No subscription change was made.');
       setError(null);
       return;
     }
@@ -227,7 +229,7 @@ function AppleElitePanel({
     setNotice(null);
     setError(null);
     try {
-      await requestPurchase({
+      await requestAppleStorePurchase({
         type: 'subs',
         request: {
           apple: {
@@ -261,8 +263,8 @@ function AppleElitePanel({
     setNotice(null);
     setError(null);
     try {
-      await restorePurchases({ onlyIncludeActiveItemsIOS: true });
-      const purchases = await getAvailablePurchases({ onlyIncludeActiveItemsIOS: true });
+      await restoreAppleStorePurchases({ onlyIncludeActiveItemsIOS: true });
+      const purchases = await getAvailableAppleStorePurchases({ onlyIncludeActiveItemsIOS: true });
       const eligible = purchases.filter((item) => item.productId === APPLE_ELITE_PRODUCT_ID);
       if (!eligible.length) {
         setNotice('No active Pack One Elite subscription was found for this Apple Account.');
@@ -286,7 +288,7 @@ function AppleElitePanel({
 
   const manage = async () => {
     try {
-      await deepLinkToSubscriptions();
+      await openAppleSubscriptionManagement();
     } catch (manageError: unknown) {
       setError(manageError instanceof Error ? manageError.message : 'Apple subscription management could not be opened.');
     }
@@ -333,7 +335,7 @@ function AppleElitePanel({
         onPress={() => void restore()}
         style={[styles.button, (busy || !signedIn || !connected) && styles.disabled]}
       >
-        <Text style={styles.buttonText}>Restore Purchases</Text>
+        <Text style={styles.buttonText}>Restore AppleStorePurchases</Text>
       </Pressable>
 
       {status?.subscription.linked ? (
