@@ -1,6 +1,11 @@
 name: contextual-value-v1-phase-a-rich-features
 
 on:
+  push:
+    branches:
+      - research/contextual-value-v1-rich-features-529
+    paths:
+      - '.github/workflows/contextual-value-v1-phase-a-rich-features.yml'
   workflow_dispatch:
 
 permissions:
