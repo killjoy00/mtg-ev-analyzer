@@ -84,6 +84,7 @@ class CardImageRepairTests(unittest.TestCase):
     def test_environment_validation_rejects_unknown_duplicate_and_too_many(self):
         catalog = {"sets": [{"id": "a"}, {"id": "b"}]}
         self.assertEqual(repair.parse_environments("a,b", catalog), ["a", "b"])
+        self.assertEqual(repair.parse_environments("a, b", catalog), ["a", "b"])
         with self.assertRaisesRegex(ValueError, "Unknown environment"):
             repair.parse_environments("a,c", catalog)
         with self.assertRaisesRegex(ValueError, "duplicate"):
@@ -128,6 +129,35 @@ class CardImageRepairTests(unittest.TestCase):
                 "Alpha",
                 {"id1"},
                 {"id1": {"Alpha", "Beta"}},
+                {},
+            )
+
+    def test_shard_collision_scan_includes_non_target_environments(self):
+        catalog = {"sets": [{"id": "a"}, {"id": "b"}]}
+        names_by_id = {}
+        cards = {
+            "a": [{"id": "shared", "name": "Alpha"}],
+            "b": [{"id": "shared", "name": "Beta"}],
+        }
+        with mock.patch.object(
+            repair,
+            "cards_in_shards",
+            side_effect=lambda sid: iter(cards[sid]),
+        ) as read_shards:
+            targets = repair.collect_shard_inventory(
+                catalog,
+                "Alpha",
+                ["a"],
+                names_by_id,
+            )
+        self.assertEqual(read_shards.call_count, 2)
+        self.assertEqual(targets, {"a": [cards["a"][0]]})
+        self.assertEqual(names_by_id["shared"], {"Alpha", "Beta"})
+        with self.assertRaisesRegex(ValueError, "collision"):
+            repair.fail_on_card_id_collisions(
+                "Alpha",
+                {"shared"},
+                names_by_id,
                 {},
             )
 

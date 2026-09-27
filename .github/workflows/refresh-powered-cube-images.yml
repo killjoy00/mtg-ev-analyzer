@@ -160,7 +160,7 @@ jobs:
   repair:
     if: inputs.mode == 'targeted'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 45
     env:
       DEV_IMPORT_API: https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
       PROD_IMPORT_API: https://br-orange-feather-ayps8kep-draftrunapi.compute.c-5.us-east-2.aws.neon.tech
@@ -197,9 +197,7 @@ jobs:
         with:
           node-version: 24
 
-      - name: Hydrate targeted replay shards from R2
-        env:
-          REPLAY_SETS: ${{ inputs.environments }}
+      - name: Hydrate all replay shards for targeted audit
         run: bash scripts/r2_replay_shards.sh hydrate
 
       - name: Repair exact card image metadata
@@ -208,20 +206,19 @@ jobs:
           REPAIR_ENVIRONMENTS: ${{ inputs.environments }}
         run: python scripts/repair_card_image.py
 
+      - name: Export validated targeted environments
+        shell: bash
+        run: |
+          set -euo pipefail
+          replay_sets="$(node -e "const fs=require('node:fs');const report=JSON.parse(fs.readFileSync('generated/card-image-repair/report.json','utf8'));process.stdout.write(report.environments.join(','))")"
+          [[ -n "$replay_sets" ]]
+          printf 'REPLAY_SETS=%s\n' "$replay_sets" >> "$GITHUB_ENV"
+
       - name: Run full test suite
         run: npm test
 
       - name: Audit all production datasets
         run: python scripts/audit_datasets.py --fail-on-error
-
-      - name: Upload repair diagnostics
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: card-image-repair-${{ github.run_id }}-${{ github.run_attempt }}
-          retention-days: 30
-          if-no-files-found: error
-          path: generated/card-image-repair/report.json
 
       - name: Verify marked, matching backend releases
         env:
@@ -229,16 +226,20 @@ jobs:
         run: node scripts/verify-image-refresh-release.mjs "$EXPECTED_COMMIT"
 
       - name: Publish targeted replay shards to R2
-        env:
-          REPLAY_SETS: ${{ inputs.environments }}
         run: |
           bash scripts/r2_replay_shards.sh upload
           bash scripts/r2_replay_shards.sh verify
 
       - name: Repair development Draft Run image metadata
+        env:
+          CARD_IMAGE_BACKEND_STAGE: development-repair
+          CARD_IMAGE_BACKEND_DIAGNOSTICS: generated/card-image-repair/backend/development-repair.json
         run: node scripts/repair_card_backend_image.mjs "$DEV_IMPORT_API"
 
       - name: Verify development targeted image metadata and gameplay
+        env:
+          CARD_IMAGE_BACKEND_STAGE: development-verify
+          CARD_IMAGE_BACKEND_DIAGNOSTICS: generated/card-image-repair/backend/development-verify.json
         run: |
           set -euo pipefail
           node scripts/repair_card_backend_image.mjs "$DEV_IMPORT_API" --verify
@@ -251,9 +252,15 @@ jobs:
         run: node scripts/verify-image-refresh-release.mjs "$EXPECTED_COMMIT"
 
       - name: Repair production Draft Run image metadata
+        env:
+          CARD_IMAGE_BACKEND_STAGE: production-repair
+          CARD_IMAGE_BACKEND_DIAGNOSTICS: generated/card-image-repair/backend/production-repair.json
         run: node scripts/repair_card_backend_image.mjs "$PROD_IMPORT_API"
 
       - name: Verify production targeted image metadata and gameplay
+        env:
+          CARD_IMAGE_BACKEND_STAGE: production-verify
+          CARD_IMAGE_BACKEND_DIAGNOSTICS: generated/card-image-repair/backend/production-verify.json
         run: |
           set -euo pipefail
           node scripts/repair_card_backend_image.mjs "$PROD_IMPORT_API" --verify
@@ -283,3 +290,14 @@ jobs:
           git -C "$publish_dir" push origin "HEAD:refs/heads/$branch"
           echo "Generated targeted card-image source branch: $branch" >> "$GITHUB_STEP_SUMMARY"
           echo "Open that branch as a pull request to main with the normal required checks." >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload repair diagnostics
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: card-image-repair-${{ github.run_id }}-${{ github.run_attempt }}
+          retention-days: 30
+          if-no-files-found: error
+          path: |
+            generated/card-image-repair/report.json
+            generated/card-image-repair/backend/*.json
