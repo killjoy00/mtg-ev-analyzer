@@ -269,7 +269,7 @@ try {
       ?{...g,n:1}:g
   );
   assert.equal(Number(depletedGroups.find(g=>g.set_id===target.set_id&&Number(g.pick_number)===Number(target.pick_number)&&g.band===target.band)?.n),1);
-  const originalGroups=JSON.stringify(snapshot.groups);
+  const depletionOriginalGroups=JSON.stringify(snapshot.groups);
   await query('UPDATE draft_run_serving_snapshots SET groups=$2::jsonb WHERE id=$1::bigint',[snapshot.id,JSON.stringify(depletedGroups)]);
   const depleted=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
   const failures=[];
@@ -277,7 +277,7 @@ try {
     try {await fn(query,DRAFT_RUN_CORPUS_VERSION,depletionSeed,'mixed',{day,setIds:[fallbackSet],snapshot:depleted});failures.push(null);}
     catch(e){failures.push(errorShape(e));}
   }
-  await query('UPDATE draft_run_serving_snapshots SET groups=$2::jsonb WHERE id=$1::bigint',[snapshot.id,originalGroups]);
+  await query('UPDATE draft_run_serving_snapshots SET groups=$2::jsonb WHERE id=$1::bigint',[snapshot.id,depletionOriginalGroups]);
   assert.deepEqual(failures.map(x=>x?.status),[503,503]);
   report.parity.targeted.depleted_group={pick:Number(target.pick_number),band:target.band,baseline:failures[0],candidate:failures[1],synthetic_group_n:1,custom_eligibility_preserved:true};
 
