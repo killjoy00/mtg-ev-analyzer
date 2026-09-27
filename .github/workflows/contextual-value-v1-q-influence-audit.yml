@@ -2,14 +2,6 @@ name: contextual-value-v1-q-influence-audit
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - research/contextual-value-v1-h-freeze-audit-529
-    paths:
-      - research/contextual_value_q_influence_audit.py
-      - research/CONTEXTUAL-VALUE-V1-Q-INFLUENCE-AUDIT.md
-      - .github/workflows/contextual-value-v1-q-influence-audit.yml
-
 permissions:
   actions: read
   contents: read
