@@ -348,8 +348,10 @@ export async function handleAppleSubscriptions(request,{
   });
   return json({
     verified:true,
+    configured:true,
     product_id:APPLE_ELITE_PRODUCT_ID,
     subscription:result.subscription,
     account_capabilities:await accountCapabilities(auth,query),
+    checked_at:new Date().toISOString(),
   });
 }
