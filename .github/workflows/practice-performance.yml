@@ -7,6 +7,7 @@ on:
       - 'scripts/practice-cache-publication.mjs'
       - 'worker/draft-run-selection.mjs'
       - 'migrations/0039_practice_serving_cache.sql'
+      - 'migrations/0045_batched_practice_selector.sql'
       - 'tests/practice-performance.test.mjs'
       - '.github/workflows/practice-performance.yml'
   workflow_dispatch:
@@ -46,6 +47,10 @@ jobs:
           role: pack1_owner
           suspend_timeout: 300
           expires_at: ${{ steps.expiry.outputs.expires_at }}
+      - name: Install batched selector function
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+        run: psql -X -d "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
       - name: Verify isolated target, build derived cache and compare selection
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
