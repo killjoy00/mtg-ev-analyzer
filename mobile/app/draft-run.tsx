@@ -539,14 +539,15 @@ export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface }
           return;
         }
         let run = loaded.run;
+        const screenshotCandidate = run.current?.candidates[0];
         if (
           screenshotFeedback
           && !shared
           && !run.complete
           && run.answers.length === 0
-          && run.current?.candidates.length
+          && screenshotCandidate
         ) {
-          run = await submitDraftRunPick(run, run.current.candidates[0].id, loaded.session);
+          run = await submitDraftRunPick(run, screenshotCandidate.id, loaded.session);
           if (!active) return;
         }
         const recoveredFeedback = Boolean(
