@@ -37,6 +37,10 @@ const result=await query(`SELECT
   (SELECT count(*)=4 FROM information_schema.columns WHERE table_name='corpus_sources' AND column_name IN ('game_archive_url','game_archive_available','game_archive_etag','game_archive_last_modified')) dual_source_preflight,
   to_regclass('player_request_limits') IS NOT NULL limits,
   to_regclass('entitlement_grants') IS NOT NULL capabilities,
+  to_regclass('apple_subscription_entitlements') IS NOT NULL apple_subscription_entitlements,
+  to_regclass('apple_subscription_notifications') IS NOT NULL apple_subscription_notifications,
+  EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='apple_subscription_account_idx') apple_subscription_account_index,
+  to_regprocedure('pack1_apply_apple_subscription_state(uuid,uuid,text,text,text,text,timestamp with time zone,boolean,text,timestamp with time zone,uuid)') IS NOT NULL apple_subscription_apply,
   to_regclass('account_sessions') IS NOT NULL account_sessions,
   to_regclass('account_recovery_rate_limits') IS NOT NULL account_recovery_rate_limits,
   to_regclass('account_credential_rate_limits') IS NOT NULL account_credential_rate_limits,
@@ -95,6 +99,6 @@ const result=await query(`SELECT
   position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0042 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0045 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');
