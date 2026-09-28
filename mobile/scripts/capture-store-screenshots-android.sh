@@ -10,7 +10,9 @@ capture() {
   local name="$1"
   local url="$2"
   adb shell am force-stop "$package_name" >/dev/null 2>&1 || true
-  adb shell am start -W -a android.intent.action.VIEW -d "$url" "$package_name" >/dev/null
+  # adb shell reconstructs a remote shell command. Quote the URI inside that
+  # remote command so query separators such as '&' are not parsed by /system/bin/sh.
+  adb shell "am start -W -a android.intent.action.VIEW -d '$url' -p '$package_name'" >/dev/null
   sleep 8
   adb exec-out screencap -p > "$out_root/android/$name.png"
 }
