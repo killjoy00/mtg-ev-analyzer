@@ -50,7 +50,9 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const androidCapture = read('mobile/scripts/capture-store-screenshots-android.sh');
   assert.match(androidCapture, /adb shell "am start -W -a android\.intent\.action\.VIEW -d '\$url' -p '\$package_name'"/);
   assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
-  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/draft-run\?environment=mixed&screenshot=feedback"/);
+  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/draft-run\?environment=mixed&screenshot=feedback" "trophy drafter"/);
+  assert.match(androidCapture, /uiautomator dump/);
+  assert.match(androidCapture, /grep -F "\$expected_text"/);
   assert.match(androidCapture, /screenshot=feedback/);
   assert.match(androidCapture, /adb shell wm size 1080x1920/);
   assert.match(androidCapture, /adb shell wm density 420/);
