@@ -98,7 +98,18 @@ jobs:
           workflow_path="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '.path')"
           [[ "$head_sha" == "$EXPECTED_HEAD_SHA" ]]
           [[ "$workflow_path" == ".github/workflows/mobile-store-screenshots.yml" ]]
-          ios_conclusion="$(gh api --paginate "/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs" --jq '[.jobs[] | select(.name == "capture iPhone and iPad")][-1].conclusion')"
+          ios_conclusion=""
+          for attempt in $(seq 1 180); do
+            ios_conclusion="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" --jq '[.jobs[] | select(.name == "capture iPhone and iPad")][-1].conclusion // ""')"
+            if [[ "$ios_conclusion" == "success" ]]; then
+              break
+            fi
+            if [[ "$ios_conclusion" == "failure" || "$ios_conclusion" == "cancelled" || "$ios_conclusion" == "timed_out" ]]; then
+              echo "Corrected iOS screenshot job ended with: $ios_conclusion" >&2
+              exit 1
+            fi
+            sleep 30
+          done
           [[ "$ios_conclusion" == "success" ]]
 
       - name: Download reviewed iOS screenshot artifact
