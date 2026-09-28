@@ -8,6 +8,7 @@ first_13000 - prior_8000.
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -17,11 +18,18 @@ sys.path.insert(0, str(ROOT / "scripts"))
 
 from contextual_value.archive import select_global_draft_ids
 from contextual_value.dataset import draft_split
-from contextual_value_four_way_fresh import sha256
 
 PRIOR_N = 8000
 TOTAL_N = 13000
 CONFIRM_N = 5000
+
+
+def sha256(path):
+    h = hashlib.sha256()
+    with Path(path).open("rb") as handle:
+        for block in iter(lambda: handle.read(1024 * 1024), b""):
+            h.update(block)
+    return h.hexdigest()
 
 
 def parse_args():
