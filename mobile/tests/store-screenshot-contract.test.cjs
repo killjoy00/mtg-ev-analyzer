@@ -50,8 +50,8 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const androidCapture = read('mobile/scripts/capture-store-screenshots-android.sh');
   assert.match(androidCapture, /adb shell "am start -W -a android\.intent\.action\.VIEW -d '\$url' -p '\$package_name'"/);
   assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
-  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/store-screenshot-feedback"/);
-  assert.doesNotMatch(androidCapture, /screenshot=feedback/);
+  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/draft-run\?environment=mixed&screenshot=feedback"/);
+  assert.match(androidCapture, /screenshot=feedback/);
   assert.match(androidCapture, /adb shell wm size 1080x1920/);
   assert.match(androidCapture, /adb shell wm density 420/);
   assert.match(androidCapture, /ffmpeg[\s\S]*\.jpg/);
@@ -195,4 +195,29 @@ test('App Store screenshot upload is protected, source-pinned, and non-submittin
   assert.equal(request.versionString, '1.0');
   assert.equal(request.screenshotRunId, 36383054888);
   assert.equal(request.screenshotHeadSha, 'd4b344ac2d0fe4666c5791b9e7f492a8fe86fb77');
+});
+
+
+test('Google Play screenshot upload is protected, source-pinned, and listing-only', () => {
+  const workflow = read('.github/workflows/google-play-screenshots.yml');
+  const uploaderPath = path.join(repo, '.github/scripts/google-play-upload-screenshots.mjs');
+  const uploader = fs.readFileSync(uploaderPath, 'utf8');
+  const syntax = require('node:child_process').spawnSync(process.execPath, ['--check', uploaderPath], { encoding: 'utf8' });
+  assert.equal(syntax.status, 0, syntax.stderr);
+
+  assert.match(workflow, /environment: pack-one-mobile-release/);
+  assert.match(workflow, /actions: read/);
+  assert.match(workflow, /id-token: write/);
+  assert.match(workflow, /mobile-store-screenshots\.yml/);
+  assert.match(workflow, /capture Android phone/);
+  assert.match(workflow, /pack-one-android-store-screenshots/);
+  assert.match(workflow, /packone-play-ci@pack-one\.iam\.gserviceaccount\.com/);
+  assert.match(uploader, /phoneScreenshots/);
+  assert.match(uploader, /en-US/);
+  assert.match(uploader, /1080/);
+  assert.match(uploader, /1920/);
+  assert.match(uploader, /:validate/);
+  assert.match(uploader, /:commit/);
+  assert.doesNotMatch(uploader, /\/tracks/);
+  assert.doesNotMatch(uploader, /bundles/);
 });
