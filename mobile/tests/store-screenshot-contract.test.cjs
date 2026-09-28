@@ -50,6 +50,11 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
   assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/store-screenshot-feedback"/);
   assert.doesNotMatch(androidCapture, /screenshot=feedback/);
+  assert.match(androidCapture, /adb shell wm size 1080x1920/);
+  assert.match(androidCapture, /adb shell wm density 420/);
+  assert.match(androidCapture, /ffmpeg[\s\S]*\.jpg/);
+  assert.match(androidCapture, /expected="1080x1920"/);
+  assert.doesNotMatch(androidCapture, /\.png"\s*$/m);
   assert.match(screenshotFeedbackRoute, /config\.screenshots\.fixtures/);
   assert.match(screenshotFeedbackRoute, /<DraftRunScreen screenshotFeedback \/>/);
   assert.match(draftRun, /screenshotFeedbackOverride/);
@@ -58,6 +63,9 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(layout, /Settings\.get\('packoneScreenshotScene'\)/);
   assert.match(layout, /scene === 'reveal-comparison'/);
   assert.match(iosCapture, /simctl launch "\$udid" "\$bundle_id" -packoneScreenshotScene "\$scene"/);
+  assert.match(iosCapture, /sips -s format jpeg[\s\S]*\.jpg/);
+  assert.match(iosCapture, /iphone:1320x2868/);
+  assert.match(iosCapture, /ipad:2064x2752/);
   assert.doesNotMatch(iosCapture, /simctl openurl/);
   assert.doesNotMatch(iosCapture, /schemeapproval/);
   assert.match(workflow, /Enable KVM for Android emulator when available/);
@@ -117,10 +125,22 @@ test('iOS capture launches an explicit preview scene and rejects failed or unexp
             printf '%s\\n' "$LAUNCH_OUTPUT"
             return "$LAUNCH_STATUS"
           elif [[ "$2" == io ]]; then
-            touch "$SCREENSHOT_MARKER"
+            touch "${@: -1}"
             return 0
           fi
           return 2
+        }
+        sips() {
+          local out=""
+          while [[ "$#" -gt 0 ]]; do
+            if [[ "$1" == "--out" ]]; then
+              out="$2"
+              break
+            fi
+            shift
+          done
+          [[ -n "$out" ]]
+          touch "$out"
         }
         ${capture}
         capture test practice
