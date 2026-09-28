@@ -66,7 +66,8 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(screenshotFeedbackRoute, /<DraftRunScreen screenshotFeedback \/>/);
   assert.match(draftRun, /screenshotFeedbackOverride/);
   assert.match(layout, /store-screenshot-feedback/);
-  assert.match(layout, /config\.screenshots\.fixtures \|\| Platform\.OS !== 'ios'/);
+  assert.match(layout, /if \(!config\.screenshots\.fixtures\) return;/);
+  assert.match(layout, /Platform\.OS === 'android'[\s\S]*Linking\.getInitialURL\(\)[\s\S]*packone:\/\/store-screenshot-feedback[\s\S]*router\.replace\('\/store-screenshot-feedback'\)/);
   assert.match(layout, /Settings\.get\('packoneScreenshotScene'\)/);
   assert.match(layout, /scene === 'reveal-comparison'[\s\S]*router\.replace\('\/store-screenshot-feedback'\)/);
   assert.match(layout, /scene === 'daily-hub'[\s\S]*return;/);

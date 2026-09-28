@@ -1,7 +1,7 @@
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect } from 'react';
-import { Platform, Pressable, Settings, Text } from 'react-native';
+import { Linking, Platform, Pressable, Settings, Text } from 'react-native';
 
 import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
 import { VersionGate } from '@/src/components/VersionGate';
@@ -10,7 +10,16 @@ import { colors } from '@/src/theme';
 
 function ScreenshotFixtureEntry() {
   useEffect(() => {
-    if (!config.screenshots.fixtures || Platform.OS !== 'ios') return;
+    if (!config.screenshots.fixtures) return;
+    if (Platform.OS === 'android') {
+      void Linking.getInitialURL().then((url) => {
+        if (url?.startsWith('packone://store-screenshot-feedback')) {
+          router.replace('/store-screenshot-feedback');
+        }
+      });
+      return;
+    }
+    if (Platform.OS !== 'ios') return;
     const scene = Settings.get('packoneScreenshotScene');
     if (typeof scene !== 'string' || !scene) return;
 
