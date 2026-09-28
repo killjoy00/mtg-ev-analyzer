@@ -1,6 +1,6 @@
 {
   "operation": "card-image-release",
-  "request_id": "tishana-card-image-audit-20260928",
-  "reason": "Deploy the reviewed live-component image-repair scope fix from #731, then run the full deterministic Pack One card-image normalization so Tishana's Tidebinder and any other stale served component art are corrected and audited without changing gameplay data.",
-  "commit": "c8dc309676139f9507dc409a22a571076931934e"
+  "request_id": "tishana-card-image-release-hotfix-20260928",
+  "reason": "Deploy the reviewed live-component validation hotfix from #736 and rerun the full guarded Pack One card-image normalization so Tishana's Tidebinder and any other stale Live component art are propagated and verified.",
+  "commit": "8c3c4df35f53e99c63cbbe3fe2c675a8e2b21203"
 }
