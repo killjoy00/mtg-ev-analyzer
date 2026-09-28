@@ -23,7 +23,9 @@ from contextual_value_candidate_advantage_r_common import (
     compute_residual, compute_z, feature_cleanup, fit_r_prime,
     legacy_r_support_actions, load_fold, noise_legacy_support_rate,
     read_nuisance, weighted_mean_scale,
+    fit_skill_interaction_behavior, predict_skill_interaction_behavior,
 )
+from contextual_value_multiaction_sensitivity import skill_odds_shift_summary
 from contextual_value_behavior_rich_correction import (
     _combine as behavior_combine,
     _fit_correction as fit_behavior_correction,
@@ -316,6 +318,41 @@ def main():
         "offsets":val["offsets"],
     }
     alt_behavior=predict_behavior_correction(alt_model,vdata_for_behavior,vbehavior)
+    # Outcome-free recorded-skill confounding benchmark.
+    skill_train=behavior_combine(behavior_rows)
+    skill_train["skill_rate"]=np.concatenate([np.asarray(d["skill_rate"],dtype=np.float64) for d in fold_payloads])
+    skill_model=fit_skill_interaction_behavior(
+        data=skill_train,
+        baseline_behavior=np.asarray(skill_train["behavior"],dtype=np.float64),
+        l2=1000.0,
+    )
+    skill_val_data={
+        "cand_rich":val["cand_rich"],
+        "candidate_names":val["candidate_names"],
+        "decision_weight":val["decision_weight"],
+        "selected_ord":val["selected_ord"],
+        "offsets":val["offsets"],
+        "skill_rate":val["skill_rate"],
+    }
+    skill_behavior=predict_skill_interaction_behavior(
+        skill_model,data=skill_val_data,baseline_behavior=vbehavior,
+    )
+    skill_benchmark={
+        "A":skill_odds_shift_summary(
+            reference_behavior=vbehavior,skill_behavior=skill_behavior,
+            offsets=val["offsets"],target_ord=val["incumbent_ord"],decision_indices=eligible,
+        ),
+        "R_LCB":skill_odds_shift_summary(
+            reference_behavior=vbehavior,skill_behavior=skill_behavior,
+            offsets=val["offsets"],target_ord=lcb_actions,decision_indices=eligible,
+        ),
+    }
+    gamma_reference=max(
+        float(skill_benchmark["A"]["gamma_reference_p95"]),
+        float(skill_benchmark["R_LCB"]["gamma_reference_p95"]),
+    )
+    fixed_gamma_grid=sorted(set([1.0,1.10,1.25,1.50,2.0,3.0,5.0,round(gamma_reference,6)]))
+
     metrics=behavior_choice_metrics(vdata_for_behavior,alt_behavior)
     expected_nll=float(prior_behavior["validation_behavior_prediction"]["pick_shrunk"]["selected_action_nll"])
     nll_error=abs(float(metrics["selected_action_nll"])-expected_nll)
@@ -334,6 +371,9 @@ def main():
         r_support_ord=np.asarray(legacy_actions,dtype=np.int16),
         r_unconstrained_ord=np.asarray(unconstrained_actions,dtype=np.int16),
         alternative_behavior=np.asarray(alt_behavior,dtype=np.float64),
+        skill_aware_behavior=np.asarray(skill_behavior,dtype=np.float64),
+        gamma_reference_p95=np.asarray([gamma_reference],dtype=np.float64),
+        sensitivity_gamma_grid=np.asarray(fixed_gamma_grid,dtype=np.float64),
         global_beta=np.asarray(fit.global_beta,dtype=np.float64),
         global_covariance=np.asarray(fit.global_covariance,dtype=np.float64),
         z_scale=np.asarray(fit.z_scale,dtype=np.float64),
@@ -377,6 +417,17 @@ def main():
             "early_fit_policy":early_lcbdiag,
         },
         "legacy_r_support_noise":legacy_noise,
+        "hidden_confounding_benchmark":{
+            "model":"skill x rich-candidate conditional-logit correction over frozen strong-offset behavior",
+            "l2":1000.0,
+            "training_objective":float(skill_model["objective"]),
+            "iterations":int(skill_model["iterations"]),
+            "gradient_max_abs":float(skill_model["gradient_max_abs"]),
+            "target_action_odds_shift":skill_benchmark,
+            "gamma_reference_p95":gamma_reference,
+            "fixed_gamma_grid":fixed_gamma_grid,
+            "note":"Outcome-free scale benchmark only; it does not identify unmeasured confounding strength.",
+        },
         "behavior_sensitivity_freeze":{
             "prior_run":36323128790,
             "all_training_pick_lambdas_are_one":True,
