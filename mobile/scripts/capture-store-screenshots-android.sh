@@ -13,7 +13,7 @@ capture() {
   # adb shell reconstructs a remote shell command. Quote the URI inside that
   # remote command so query separators such as '&' are not parsed by /system/bin/sh.
   adb shell "am start -W -a android.intent.action.VIEW -d '$url' -p '$package_name'" >/dev/null
-  sleep 8
+  sleep 12
   adb exec-out screencap -p > "$out_root/android/$name.png"
 }
 
