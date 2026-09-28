@@ -301,13 +301,10 @@ async function replaceScreenshotSet(setId, files) {
     throw error;
   }
 
-  await api(`/v1/appScreenshotSets/${encodeURIComponent(setId)}/relationships/appScreenshots`, {
-    method: 'PATCH',
-    body: {
-      data: uploadedIds.map((id) => ({ type: 'appScreenshots', id })),
-    },
-  });
-
+  // App Store Connect rejects add/remove relationship operations while the
+  // screenshot set is in its reorder state. Upload the new screenshots in the
+  // desired sequence, then delete the prior screenshots. Once only the newly
+  // created resources remain, their creation order is the display order.
   for (const screenshot of existing) {
     await deleteAppScreenshot(screenshot.id);
   }
