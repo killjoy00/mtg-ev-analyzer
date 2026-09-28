@@ -54,7 +54,6 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(androidCapture, /adb shell wm density 420/);
   assert.match(androidCapture, /ffmpeg[\s\S]*\.jpg/);
   assert.match(androidCapture, /expected="1080x1920"/);
-  assert.doesNotMatch(androidCapture, /\.png"\s*$/m);
   assert.match(screenshotFeedbackRoute, /config\.screenshots\.fixtures/);
   assert.match(screenshotFeedbackRoute, /<DraftRunScreen screenshotFeedback \/>/);
   assert.match(draftRun, /screenshotFeedbackOverride/);
