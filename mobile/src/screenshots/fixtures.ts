@@ -15,43 +15,46 @@ type ScreenshotRequestOptions = {
   body?: unknown;
 };
 
-function cardImage(name: string) {
-  return `https://api.scryfall.com/cards/named?exact=${encodeURIComponent(name)}&format=image&version=normal`;
-}
-
-function card(id: string, name: string, manaCost: string, rarity: string, typeLine: string): DraftRunCard {
+function card(
+  id: string,
+  name: string,
+  imageUrl: string,
+  manaCost = '',
+  rarity = 'rare',
+  typeLine = '',
+): DraftRunCard {
   return {
     id,
     name,
-    image_url: cardImage(name),
+    image_url: imageUrl,
     mana_cost: manaCost,
     rarity,
     type_line: typeLine,
   };
 }
 
+// Screenshot fixtures deliberately use direct, source-controlled Scryfall CDN
+// URLs already present in Pack One's set archive content. The prior named-card
+// API URLs returned redirects and produced blank art in emulator screenshots.
 const candidates: DraftRunCard[] = [
-  card('black-lotus', 'Black Lotus', '{0}', 'rare', 'Artifact'),
-  card('sol-ring', 'Sol Ring', '{1}', 'uncommon', 'Artifact'),
-  card('lightning-bolt', 'Lightning Bolt', '{R}', 'common', 'Instant'),
-  card('swords-to-plowshares', 'Swords to Plowshares', '{W}', 'uncommon', 'Instant'),
-  card('counterspell', 'Counterspell', '{U}{U}', 'uncommon', 'Instant'),
-  card('birds-of-paradise', 'Birds of Paradise', '{G}', 'rare', 'Creature — Bird'),
-  card('thoughtseize', 'Thoughtseize', '{B}', 'rare', 'Sorcery'),
-  card('demonic-tutor', 'Demonic Tutor', '{1}{B}', 'rare', 'Sorcery'),
+  card('hero-in-training', 'Hero in Training', 'https://cards.scryfall.io/normal/front/1/0/105a937b-289c-47b5-96a4-654c697bbb7d.jpg?1783902973'),
+  card('web-up', 'Web Up', 'https://cards.scryfall.io/normal/front/9/a/9a1b057b-229c-4f65-ba4e-12dd342238de.jpg?1783902964'),
+  card('the-vision', 'The Vision', 'https://cards.scryfall.io/normal/front/2/9/2961cf20-33c8-4e66-9d0f-6daca8ea7880.jpg?1783902887'),
+  card('cosmic-cube', 'Cosmic Cube', 'https://cards.scryfall.io/normal/front/d/1/d1cf1ead-fe91-4328-89ab-6d0bc9ff6cbe.jpg?1783902891'),
+  card('mighty-thor-jane-foster', 'The Mighty Thor, Jane Foster', 'https://cards.scryfall.io/normal/front/0/8/082cc8cc-bbea-4ca7-a0e8-da1f865d6626.jpg?1783902900'),
 ];
 
 const priorPicks: DraftRunCard[] = [
-  card('mox-sapphire', 'Mox Sapphire', '{0}', 'rare', 'Artifact'),
-  card('jace-the-mind-sculptor', 'Jace, the Mind Sculptor', '{2}{U}{U}', 'mythic', 'Legendary Planeswalker — Jace'),
+  card('rimekin-recluse', 'Rimekin Recluse', 'https://cards.scryfall.io/normal/front/b/a/ba6b5368-3262-4002-bf1e-fce62f7f7901.jpg?1783904483'),
+  card('moon-vigil-adherents', 'Moon-Vigil Adherents', 'https://cards.scryfall.io/normal/front/6/0/60621c37-62e1-4261-ae76-3946b4a0cfa3.jpg?1783904429'),
 ];
 
 function puzzle(index: number): DraftRunPuzzle {
   return {
     puzzle_id: `screenshot-puzzle-${index + 1}`,
-    set_id: 'powered-cube',
+    set_id: 'msh',
     pack_number: 1,
-    pick_number: index + 3,
+    pick_number: index + 6,
     prior_picks: priorPicks,
     candidates,
   };
@@ -79,30 +82,30 @@ const initialRun: DraftRunState = {
 function feedbackRun(selectedId: string): DraftRunState {
   const current = puzzle(0);
   const selected = current.candidates.find((item) => item.id === selectedId) ?? current.candidates[0];
-  const historical = current.candidates.find((item) => item.id === 'sol-ring');
+  const historical = current.candidates.find((item) => item.id === 'web-up');
   if (!selected || !historical) throw new Error('Store screenshot draft fixture is incomplete.');
-  const score = selected.id === historical.id ? 100 : selected.id === 'black-lotus' ? 96 : 78;
+  const score = selected.id === historical.id ? 100 : selected.id === 'hero-in-training' ? 96 : 78;
   const answer: DraftRunAnswer = {
     score,
     selectedId: selected.id,
     selectedName: selected.name,
-    selectedSupport: selected.id === 'black-lotus' ? 0.46 : 0.24,
+    selectedSupport: selected.id === 'hero-in-training' ? 0.46 : 0.24,
     historicalId: historical.id,
     historicalName: historical.name,
     historicalMatch: selected.id === historical.id,
-    consensusId: 'black-lotus',
-    consensusName: 'Black Lotus',
+    consensusId: 'hero-in-training',
+    consensusName: 'Hero in Training',
     consensusSupport: 0.46,
-    consensusRank: selected.id === 'black-lotus' ? 1 : 2,
+    consensusRank: selected.id === 'hero-in-training' ? 1 : 2,
     consensusCap: 100,
-    supportRatio: selected.id === 'black-lotus' ? 1 : 0.52,
+    supportRatio: selected.id === 'hero-in-training' ? 1 : 0.52,
     pickNumber: current.pick_number,
     modelTargetDisagreement: selected.id !== historical.id,
     ranking: [
-      { id: 'black-lotus', name: 'Black Lotus', support: 0.46, score: 100 },
-      { id: 'sol-ring', name: 'Sol Ring', support: 0.24, score: 96 },
-      { id: 'swords-to-plowshares', name: 'Swords to Plowshares', support: 0.11, score: 84 },
-      { id: 'lightning-bolt', name: 'Lightning Bolt', support: 0.08, score: 79 },
+      { id: 'hero-in-training', name: 'Hero in Training', support: 0.46, score: 100 },
+      { id: 'web-up', name: 'Web Up', support: 0.24, score: 96 },
+      { id: 'the-vision', name: 'The Vision', support: 0.11, score: 84 },
+      { id: 'cosmic-cube', name: 'Cosmic Cube', support: 0.08, score: 79 },
     ],
     puzzle: current,
   };
@@ -272,7 +275,7 @@ export async function requestScreenshotFixture<T>(
   if (path === '/draft/v1/runs' && method === 'POST') return clone(initialRun) as T;
   if (path === '/draft/v1/runs/screenshot-run') return clone(initialRun) as T;
   if (path === '/draft/v1/runs/screenshot-run/pick' && method === 'POST') {
-    const selected = String(parseBody(options).cardId || 'black-lotus');
+    const selected = String(parseBody(options).cardId || 'hero-in-training');
     return clone(feedbackRun(selected)) as T;
   }
   if (path === '/draft/v1/runs/screenshot-run/reroll' && method === 'POST') return clone(initialRun) as T;
