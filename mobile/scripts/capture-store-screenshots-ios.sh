@@ -25,7 +25,12 @@ capture() {
   fi
 
   sleep 12
-  xcrun simctl io "$udid" screenshot "$out_root/$label/$name.png"
+  local raw="$out_root/$label/$name.raw.png"
+  xcrun simctl io "$udid" screenshot "$raw"
+  # App Store Connect rejects images with alpha. Convert Simulator PNG output
+  # to JPEG while preserving the exact native simulator dimensions.
+  sips -s format jpeg "$raw" --out "$out_root/$label/$name.jpg" >/dev/null
+  rm -f "$raw"
 }
 
 capture "01-daily-decision" "daily-decision"
@@ -35,18 +40,20 @@ capture "04-practice" "practice"
 capture "05-career" "career"
 capture "iap-review-membership" "membership"
 
-python3 - "$out_root/$label" <<'PY'
-from pathlib import Path
-import struct
-import sys
-
-root = Path(sys.argv[1])
-for path in sorted(root.glob("*.png")):
-    raw = path.read_bytes()
-    if raw[:8] != b"\x89PNG\r\n\x1a\n":
-        raise SystemExit(f"{path} is not a PNG")
-    width, height = struct.unpack(">II", raw[16:24])
-    if width < 1000 or height < 1000:
-        raise SystemExit(f"{path} is unexpectedly small: {width}x{height}")
-    print(f"{path.name}: {width}x{height}")
-PY
+count=0
+while IFS= read -r path; do
+  width="$(sips -g pixelWidth "$path" | awk '/pixelWidth:/{print $2}')"
+  height="$(sips -g pixelHeight "$path" | awk '/pixelHeight:/{print $2}')"
+  dimensions="${width}x${height}"
+  case "$label:$dimensions" in
+    iphone:1320x2868|iphone:1290x2796|iphone:1260x2736) ;;
+    ipad:2064x2752|ipad:2048x2732) ;;
+    *)
+      echo "$path has an App Store-incompatible size for $label: $dimensions" >&2
+      exit 1
+      ;;
+  esac
+  count=$((count + 1))
+  echo "$(basename "$path"): $dimensions"
+done < <(find "$out_root/$label" -maxdepth 1 -name '*.jpg' -type f -print | sort)
+[[ "$count" == 6 ]]
