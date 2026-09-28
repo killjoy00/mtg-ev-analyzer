@@ -1,10 +1,36 @@
 import { router, Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { Pressable, Text } from 'react-native';
+import { useEffect } from 'react';
+import { Platform, Pressable, Settings, Text } from 'react-native';
 
 import { ScreenErrorBoundary } from '@/src/components/ScreenErrorBoundary';
 import { VersionGate } from '@/src/components/VersionGate';
+import { config } from '@/src/config';
 import { colors } from '@/src/theme';
+
+function ScreenshotFixtureEntry() {
+  useEffect(() => {
+    if (!config.screenshots.fixtures || Platform.OS !== 'ios') return;
+    const scene = Settings.get('packoneScreenshotScene');
+    if (typeof scene !== 'string' || !scene) return;
+
+    if (scene === 'daily-decision') {
+      router.replace({ pathname: '/draft-run', params: { environment: 'mixed' } });
+    } else if (scene === 'reveal-comparison') {
+      router.replace({ pathname: '/draft-run', params: { environment: 'mixed', screenshot: 'feedback' } });
+    } else if (scene === 'daily-hub') {
+      router.replace('/');
+    } else if (scene === 'practice') {
+      router.replace('/practice');
+    } else if (scene === 'career') {
+      router.replace('/career');
+    } else if (scene === 'membership') {
+      router.replace('/membership');
+    }
+  }, []);
+
+  return null;
+}
 
 function MembershipEntry() {
   return (
@@ -20,6 +46,7 @@ export default function RootLayout() {
     <VersionGate>
       <>
         <StatusBar style="dark" />
+        <ScreenshotFixtureEntry />
         <Stack
           unstable_screenErrorBoundary={ScreenErrorBoundary}
           screenOptions={{
