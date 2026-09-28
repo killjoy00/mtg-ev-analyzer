@@ -408,9 +408,13 @@ async function loadDraftSurface(
   return { status: 'ready' as const, run, session };
 }
 
-export default function DraftRunScreen({ shared }: { shared?: SharedRunSurface } = {}) {
+export default function DraftRunScreen({
+  shared,
+  screenshotFeedback: screenshotFeedbackOverride = false,
+}: { shared?: SharedRunSurface; screenshotFeedback?: boolean } = {}) {
   const params = useLocalSearchParams<{ environment?: string; mode?: string; setIds?: string; screenshot?: string }>();
-  const screenshotFeedback = config.screenshots.fixtures && params.screenshot === 'feedback';
+  const screenshotFeedback = config.screenshots.fixtures
+    && (screenshotFeedbackOverride || params.screenshot === 'feedback');
   const practice = !shared && params.mode === 'practice';
   const requestedEnvironment = shared?.initialRun.environment
     ?? (typeof params.environment === 'string' ? params.environment : 'mixed');
