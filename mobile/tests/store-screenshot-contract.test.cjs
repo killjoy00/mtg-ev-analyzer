@@ -30,6 +30,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(client, /if \(config\.screenshots\.fixtures\)/);
   assert.match(session, /if \(config\.screenshots\.fixtures\)/);
   assert.match(screenshotFixtures, /https:\/\/cards\.scryfall\.io\/normal\/front\//);
+  assert.doesNotMatch(screenshotFixtures, /name: 'September Season'/);
   assert.doesNotMatch(screenshotFixtures, /api\.scryfall\.com\/cards\/named/);
   assert.match(draftRun, /config\.screenshots\.fixtures[\s\S]*screenshotFeedbackOverride \|\| params\.screenshot === 'feedback'/);
   assert.match(versionGate, /if \(config\.screenshots\.fixtures\) return <>\{children\}<\/>;/);
