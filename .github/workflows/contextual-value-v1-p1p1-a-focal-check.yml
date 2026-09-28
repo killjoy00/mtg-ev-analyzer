@@ -1,0 +1,168 @@
+name: contextual-value-v1-p1p1-a-focal-check
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+    paths:
+      - .github/workflows/contextual-value-v1-p1p1-a-focal-check.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  CONFIRM_RUN: '36371215506'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  DRAFT_SHA: '1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648'
+  GAME_SHA: '130e7e7580a1cb4b4f635411d187a078bc7bdd9dd3436ef5ff7535e14cadaf1b'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+
+      - name: Download exact spent EOE confirmation cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-cohort-EOE
+          path: cohort
+          run-id: ${{ env.CONFIRM_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact EOE public archives
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.EOE.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw/game.csv.gz \
+            "$BASE/game_data/game_data_public.EOE.PremierDraft.csv.gz"
+          echo "$DRAFT_SHA  raw/draft.csv.gz" | sha256sum -c -
+          echo "$GAME_SHA  raw/game.csv.gz" | sha256sum -c -
+
+      - name: Check A on focal P1P1 cards without confirmation outcomes
+        run: |
+          python3 - <<'PY'
+          import json, sys
+          from collections import Counter
+          from pathlib import Path
+          import numpy as np
+
+          ROOT=Path.cwd()
+          sys.path.insert(0,str(ROOT/'scripts'))
+          sys.path.insert(0,str(ROOT/'research'))
+
+          from contextual_value.archive import ArchiveSignalProvider, GameStore, load_decisions
+          from contextual_value.features import model_feature_map
+          from contextual_value_four_way_fresh import _argmax
+          from contextual_value_r_confirmation_freeze import load_contexts_without_outcomes
+
+          cohort=json.load(open('cohort/cohort.json'))
+          assert cohort['expansion']=='EOE'
+          train_ids=frozenset(map(str,cohort['prior_train_ids']))
+          confirm_ids=frozenset(map(str,cohort['confirmation_ids']))
+          assert len(confirm_ids)==5000 and not (train_ids & confirm_ids)
+
+          # Historical prior-training rows may carry their already-spent outcomes.
+          # Confirmation contexts are loaded through the explicit no-outcome parser.
+          train=load_decisions(Path('raw/draft.csv.gz'),keep_ids=train_ids)
+          confirm_all=load_contexts_without_outcomes(Path('raw/draft.csv.gz'),set(confirm_ids),'EOE')
+          p1p1=[d for d in confirm_all if int(d.pack_number)==0 and int(d.pick_number)==0]
+          assert len(p1p1)==5000
+          assert {str(d.draft_id) for d in p1p1}==set(confirm_ids)
+
+          games=GameStore.from_archives([Path('raw/game.csv.gz')],train_ids)
+          provider=ArchiveSignalProvider([*train,*p1p1],games)
+
+          focal=('Elegy Acolyte','Genemorph Imago')
+          out={
+            'phase':'existing_spent_eoe_p1p1_A_focal_check',
+            'confirmation_outcomes_parsed':False,
+            'confirmation_outcomes_used':False,
+            'cohort':'exact already-spent EOE 5k confirmation IDs from run 36371215506',
+            'A_definition':'exact research A leader: deterministic argmax of leakage-safe strong_choice_probability using prior_train_ids only',
+            'cards':{}
+          }
+
+          for card in focal:
+            rows=[]
+            for d in p1p1:
+              if card not in d.candidates:
+                continue
+              signals=provider(d,train_ids)
+              fmap=model_feature_map(d,signals)
+              names=list(d.candidates)
+              scores=[float(fmap[a].get('strong_choice_probability',0.0)) for a in names]
+              lead=_argmax(scores,names)
+              order=sorted(range(len(names)),key=lambda i:(-scores[i],str(names[i])))
+              card_i=names.index(card)
+              rank=order.index(card_i)+1
+              leader=names[lead]
+              rows.append({
+                'draft_id':str(d.draft_id),
+                'A_leader':leader,
+                'A_selects_focal':leader==card,
+                'historical_pick':d.selected_card,
+                'historical_selects_focal':d.selected_card==card,
+                'focal_A_score':scores[card_i],
+                'leader_A_score':scores[lead],
+                'focal_A_rank':rank,
+                'margin_leader_minus_focal':scores[lead]-scores[card_i],
+              })
+            assert rows
+            dis=[r for r in rows if not r['A_selects_focal']]
+            alternatives=Counter(r['A_leader'] for r in dis)
+            margins=np.asarray([r['margin_leader_minus_focal'] for r in dis],float) if dis else np.asarray([],float)
+            ranks=Counter(r['focal_A_rank'] for r in rows)
+            out['cards'][card]={
+              'present_n':len(rows),
+              'A_selects_focal_n':sum(r['A_selects_focal'] for r in rows),
+              'A_selects_focal_rate':sum(r['A_selects_focal'] for r in rows)/len(rows),
+              'A_ranks_focal_top2_n':sum(r['focal_A_rank']<=2 for r in rows),
+              'A_ranks_focal_top2_rate':sum(r['focal_A_rank']<=2 for r in rows)/len(rows),
+              'historical_selects_focal_n':sum(r['historical_selects_focal'] for r in rows),
+              'historical_selects_focal_rate':sum(r['historical_selects_focal'] for r in rows)/len(rows),
+              'A_disagreement_n':len(dis),
+              'A_disagreement_rate':len(dis)/len(rows),
+              'focal_A_rank_counts':{str(k):v for k,v in sorted(ranks.items())},
+              'A_disagreement_alternatives':alternatives.most_common(),
+              'A_disagreement_margin_leader_minus_focal':None if not len(dis) else {
+                'median':float(np.median(margins)),
+                'p90':float(np.quantile(margins,.9)),
+                'max':float(np.max(margins)),
+              },
+              'disagreement_cases':dis,
+            }
+
+          Path('results').mkdir(exist_ok=True)
+          Path('results/report.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          print(json.dumps({c:{k:v for k,v in x.items() if k!='disagreement_cases'} for c,x in out['cards'].items()},indent=2,sort_keys=True))
+          PY
+
+      - name: Assert narrow outcome-free boundary
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/report.json'))
+          assert r['confirmation_outcomes_parsed'] is False
+          assert r['confirmation_outcomes_used'] is False
+          assert set(r['cards'])=={'Elegy Acolyte','Genemorph Imago'}
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-p1p1-a-focal-check
+          path: results/report.json
+          retention-days: 90
