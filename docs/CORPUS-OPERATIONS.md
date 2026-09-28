@@ -68,11 +68,13 @@ Card-image repair is a separate explicit corpus mutation, not part of ingestion 
 
 Backend propagation is paged in idempotent 250-puzzle requests with an explicit cursor. Do not restore whole-environment refresh requests: large environments can exceed the authenticated import request timeout.
 
+Current-serving image propagation includes the current parent corpus plus any `Live` supplemental component attached to that parent. Candidate/non-Live components and components under older parents are excluded. When a selected row belongs to a component, validate it against the row's stored component `corpus_version`; do not validate it against the parent version by default. This is a release-safety invariant, not just a test detail.
+
 The guarded release deploys the same reviewed code revision to development and production before running the Pack One-wide image refresh. Live propagation must pass normalization, tests, dataset audit, exact backend-revision verification, R2 publication, development/production backend refreshes, and gameplay verification. The checked-in corpus is then published separately through a generated branch because protected `main` does not accept workflow direct pushes. An authorized operator/app opens that branch as the pull request; GitHub Actions itself is not currently allowed to create PRs in this repository.
 
 If live propagation succeeded but the final source PR was not published, use the card-image source recovery workflow to regenerate from normalized R2 state and push a recovery branch, then have an authorized operator/app open that branch as the PR. Do not rerun a successful production backend refresh solely to recover repository bookkeeping.
 
-See [Card image maintenance](CARD-IMAGE-MAINTENANCE.md) and [the September 23 rollout closeout](reports/CARD-IMAGE-ROLLOUT-CLOSEOUT-2026-09-23.md).
+See [Card image maintenance](CARD-IMAGE-MAINTENANCE.md), [the September 23 rollout closeout](reports/CARD-IMAGE-ROLLOUT-CLOSEOUT-2026-09-23.md), and [the September 28 Tishana/card-image audit closeout](reports/CARD-IMAGE-TISHANA-AUDIT-CLOSEOUT-2026-09-28.md).
 
 
 ## Supplemental Traditional components
