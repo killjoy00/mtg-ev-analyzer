@@ -371,11 +371,13 @@ def fit_r_prime(
     penalty[gstop:]=float(set_l2)
     penalized=gram.copy()
     penalized[np.diag_indices_from(penalized)] += penalty
-    coef=np.linalg.solve(penalized,rhs)
+    # Unpenalized nuisance controls may be linearly dependent in sparse
+    # set/rank/position cells. Use the Moore-Penrose solution; candidate
+    # directions remain ridge-identified and the rank/conditioning is reported.
+    bread=np.linalg.pinv(penalized,rcond=1e-12)
+    coef=bread@rhs
     prediction=design@coef
     err=y-prediction
-
-    bread=np.linalg.inv(penalized)
     draft_ids=np.asarray(data["draft_ids"]).astype(str)
     unique,inverse=np.unique(draft_ids,return_inverse=True)
     score=np.zeros((len(unique),width),dtype=np.float64)
@@ -395,6 +397,12 @@ def fit_r_prime(
         "control_names":control_names,
         "global_feature_count":p,
         "weighted_residual_rmse":math.sqrt(float(np.sum(w*np.square(err))/np.sum(w))),
+        "linear_system":{
+            "width":width,
+            "rank":int(np.linalg.matrix_rank(penalized)),
+            "condition_number":float(np.linalg.cond(penalized)),
+            "solver":"Moore-Penrose pseudoinverse rcond=1e-12",
+        },
         "global_gram_diag":{
             "min":float(np.min(gram_diag)),
             "median":float(np.median(gram_diag)),
