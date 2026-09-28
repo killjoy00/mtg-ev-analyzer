@@ -106,15 +106,15 @@ test('iOS capture launches an explicit preview scene and rejects failed or unexp
     const source = read('mobile/scripts/capture-store-screenshots-ios.sh');
     const capture = source.slice(source.indexOf('capture() {'), source.indexOf('\ncapture "01-'));
     assert.ok(capture.endsWith('}\n'));
-    const screenshot = path.join(directory, 'captured');
+    const screenshot = path.join(directory, 'fixture', 'test.jpg');
     const args = path.join(directory, 'args.txt');
     const run = (launchOutput = 'pro.packone.preview: 1234', launchStatus = 0) => {
       fs.rmSync(screenshot, { force: true });
       fs.rmSync(args, { force: true });
       return spawnSync('bash', ['-c', `
         set -euo pipefail
-        udid=fixture; bundle_id=pro.packone.preview; out_root=unused; label=fixture
-        mkdir -p unused/fixture
+        udid=fixture; bundle_id=pro.packone.preview; out_root="$TEST_OUT_ROOT"; label=fixture
+        mkdir -p "$out_root/fixture"
         sleep() { :; }
         xcrun() {
           if [[ "$2" == terminate ]]; then
@@ -144,7 +144,7 @@ test('iOS capture launches an explicit preview scene and rejects failed or unexp
         ${capture}
         capture test practice
       `], { encoding: 'utf8', env: { ...process.env,
-        SCREENSHOT_MARKER: screenshot, ARGS_MARKER: args,
+        TEST_OUT_ROOT: directory, ARGS_MARKER: args,
         LAUNCH_OUTPUT: launchOutput, LAUNCH_STATUS: String(launchStatus),
       } });
     };
