@@ -118,9 +118,18 @@ test('card image refresh changes display metadata only for registered environmen
   let stored=sample;
   const query=async(sql,params=[])=>{
     if(sql.includes('SELECT p.puzzle_id,p.payload')){
+      assert.match(sql,/corpus_components/);
+      assert.match(sql,/c\.parent_version=\$2/);
+      assert.match(sql,/c\.component_version=p\.corpus_version/);
+      assert.match(sql,/c\.status='Live'/);
+      assert.equal(params[1],DRAFT_RUN_CORPUS_VERSION);
       return {rows:stored.puzzle_id>String(params[2]||'')?[{puzzle_id:stored.puzzle_id,payload:stored}]:[]};
     }
     if(sql.includes('UPDATE draft_run_verified_puzzles')){
+      assert.match(sql,/corpus_components/);
+      assert.match(sql,/c\.parent_version=\$3/);
+      assert.match(sql,/c\.component_version=p\.corpus_version/);
+      assert.match(sql,/c\.status='Live'/);
       const updates=JSON.parse(params[0]);
       assert.equal(updates.length,1);
       stored=updates[0].payload;
@@ -199,7 +208,7 @@ test('image refresh filters already-correct payloads inside Postgres',async()=>{
   const query=async(sql,params=[])=>{
     calls.push({sql,params});
     if(sql.includes('SELECT p.puzzle_id,p.payload'))return {rows:[]};
-    if(sql.startsWith('SELECT 1 FROM draft_run_verified_puzzles'))return {rows:[{exists:1}]};
+    if(sql.includes('SELECT 1')&&sql.includes('FROM draft_run_verified_puzzles p'))return {rows:[{exists:1}]};
     throw new Error('Unexpected SQL in no-op image refresh test: '+sql);
   };
   const result=await refreshTrophyImages(query,'powered-cube',mapping);
@@ -213,6 +222,12 @@ test('image refresh filters already-correct payloads inside Postgres',async()=>{
   assert.equal(calls[0].params[2],'');
   assert.equal(calls[0].params[4],250);
   assert.deepEqual(JSON.parse(calls[0].params[3]),mapping);
+  for(const call of calls) {
+    assert.match(call.sql,/corpus_components/);
+    assert.match(call.sql,/c\.parent_version=\$2/);
+    assert.match(call.sql,/c\.component_version=p\.corpus_version/);
+    assert.match(call.sql,/c\.status='Live'/);
+  }
   assert.doesNotMatch(calls[1].sql,/payload/);
 });
 
