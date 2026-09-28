@@ -161,7 +161,7 @@ def measure(sid,directory,frozen):
     groups[EVENTS[1]],trad_cohort=cohort(trad,EVENTS[1],include_sources=True)
     trad_sources=trad_cohort.pop('sources')
     names={c for group in groups.values() for examples in group.values() for p in examples for c in (*p.candidates,*p.pool)}
-    known=resolve_images(names,known,directory/'images.json',None if sid==CUBE else sid)
+    known=resolve_images(names,known,directory/'images.json',None if sid=='powered-cube' else sid)
     records=[];puzzles=[];excluded=Counter();ledger=[]
     for did,d in sorted(trad_sources.items()):
         if not d['complete']:
