@@ -1,125 +1,17 @@
-name: contextual-value-v1-candidate-advantage-r-amended-one-time
+name: contextual-value-v1-candidate-advantage-r-amended-one-time-BLOCKED
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - research/contextual-value-v1-h-freeze-audit-529
-    paths:
-      - .github/workflows/contextual-value-v1-candidate-advantage-r-amended-one-time.yml
 
 permissions:
-  actions: read
   contents: read
 
-env:
-  PHASE_A2_RUN: '36290030236'
-  ABLATION_RUN: '36280148906'
-  PRERUN_FREEZE_RUN: '36442998592'
-  PRERUN_REPORT_SHA256: '9b351ee6ca0a3dd8d676c18d2eed3f847ca34b8f7c619c797e76c193df234b66'
-  POLICY_BUNDLE_SHA256: '8191ef8ef3eb0de5cbd963392b5e11c86b31f82984ec39b8701e6b5c107ac520'
-  PYTHONUNBUFFERED: '1'
-
 jobs:
-  amended-r-development:
+  blocked:
     runs-on: ubuntu-latest
-    timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install pinned numeric dependencies
-        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2' 'scikit-learn==1.9.1'
-
-      - name: Compile frozen evaluator
+      - name: Block repeat R outcome evaluation
         run: |
-          python -m py_compile \
-            research/contextual_value_draft_weighted_ope.py \
-            research/contextual_value_multiaction_sensitivity.py \
-            research/contextual_value_candidate_advantage_r_common.py \
-            research/contextual_value_candidate_advantage_r_outcome.py
-
-      - name: Run amended evaluator invariants
-        env:
-          PYTHONPATH: scripts:research
-        run: python -m unittest tests.test_contextual_value_r_amended -v
-
-      - name: Download frozen Phase A2 validation shard
-        uses: actions/download-artifact@v4
-        with:
-          name: contextual-value-v1-phase-a2-fold--1
-          path: validation
-          run-id: ${{ env.PHASE_A2_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Download frozen strong-offset validation nuisance
-        uses: actions/download-artifact@v4
-        with:
-          name: contextual-value-v1-ablation-strong_offset_only-fold--1
-          path: nuisance
-          run-id: ${{ env.ABLATION_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Download immutable pre-outcome freeze
-        uses: actions/download-artifact@v4
-        with:
-          name: contextual-value-v1-r-prerun-freeze-final
-          path: freeze
-          run-id: ${{ env.PRERUN_FREEZE_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Verify exact frozen inputs before opening R validation outcomes
-        shell: bash
-        run: |
-          set -euo pipefail
-          test "$(sha256sum freeze/prerun-freeze-report.json | awk '{print $1}')" = "$PRERUN_REPORT_SHA256"
-          test "$(sha256sum freeze/r-policy-bundle.npz | awk '{print $1}')" = "$POLICY_BUNDLE_SHA256"
-          python3 - <<'PY'
-          import json
-          r=json.load(open('freeze/prerun-freeze-report.json'))
-          assert r['phase'] == 'candidate_advantage_R_prerun_freeze'
-          assert r['validation_outcomes_loaded'] is False
-          assert r['assessment_outcomes_loaded'] is False
-          assert r['r_result_seen'] is False
-          assert r['frozen_policy']['r_lcb_c'] == 2.49
-          assert r['frozen_policy']['r_lcb_null_deviation_rate'] <= .02
-          assert abs(r['power_planning']['minimum_detectable_effect_wins'] - 0.1555427239853002) < 1e-15
-          PY
-
-      - name: Run exactly frozen amended R-LCB development evaluation
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p results/r-amended-one-time
-          python3 research/contextual_value_candidate_advantage_r_outcome.py \
-            --validation-shard validation/phase-a2-fold--1.npz \
-            --validation-report validation/phase-a2-fold--1-report.json \
-            --validation-nuisance nuisance/strong_offset_only-fold--1.jsonl.gz \
-            --prerun-report freeze/prerun-freeze-report.json \
-            --policy-bundle freeze/r-policy-bundle.npz \
-            --output results/r-amended-one-time/report.json
-          cp freeze/prerun-freeze-report.json results/r-amended-one-time/prerun-freeze-report.json
-
-      - name: Assert one-time outcome boundary
-        run: |
-          python3 - <<'PY'
-          import json
-          r=json.load(open('results/r-amended-one-time/report.json'))
-          assert r['phase'] == 'candidate_advantage_R_amended_development'
-          assert r['validation_outcomes_opened'] is True
-          assert r['assessment_outcomes_opened'] is False
-          assert r['twenty_k_used_for_model_selection'] is False
-          assert r['registered_prerun_freeze_sha256'] == '9b351ee6ca0a3dd8d676c18d2eed3f847ca34b8f7c619c797e76c193df234b66'
-          assert r['policy_bundle_sha256'] == '8191ef8ef3eb0de5cbd963392b5e11c86b31f82984ec39b8701e6b5c107ac520'
-          assert abs(r['power_planning']['minimum_detectable_effect_wins'] - 0.1555427239853002) < 1e-15
-          PY
-
-      - name: Upload immutable amended R result
-        uses: actions/upload-artifact@v4
-        with:
-          name: contextual-value-v1-r-amended-development-one-time
-          path: results/r-amended-one-time/
-          retention-days: 90
+          echo "::error::The amended R-LCB validation outcome was opened exactly once by workflow run 36446571368."
+          echo "::error::Do not rerun or retune this development evaluation. Use its retained artifact and the frozen protocol record."
+          exit 1
