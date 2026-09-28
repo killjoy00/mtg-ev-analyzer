@@ -1,17 +1,139 @@
-name: contextual-value-v1-candidate-advantage-r-amended-recovery-BLOCKED
+name: contextual-value-v1-candidate-advantage-r-amended-recovery-final
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+    paths:
+      - .github/workflows/contextual-value-v1-candidate-advantage-r-amended-recovery.yml
 
 permissions:
+  actions: read
   contents: read
 
+env:
+  PHASE_A2_RUN: '36290030236'
+  ABLATION_RUN: '36280148906'
+  PRERUN_FREEZE_RUN: '36442998592'
+  PRERUN_REPORT_SHA256: '9b351ee6ca0a3dd8d676c18d2eed3f847ca34b8f7c619c797e76c193df234b66'
+  POLICY_BUNDLE_SHA256: '8191ef8ef3eb0de5cbd963392b5e11c86b31f82984ec39b8701e6b5c107ac520'
+  EVALUATOR_BLOB_SHA1: '4bb727a05bc915893bbefa57995636c2222e725a'
+  FAILED_FIRST_RUN: '36446571368'
+  FAILED_SECOND_RUN: '36447033084'
+  PYTHONUNBUFFERED: '1'
+
 jobs:
-  blocked:
+  recovery:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
-      - name: Block repeat amended R recovery
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Verify execution-only evaluator correction
+        shell: bash
         run: |
-          echo "::error::Execution-only amended R recovery was launched as workflow run 36447033084."
-          echo "::error::Do not repeat this validation evaluation. Use its retained artifact and recovery record."
-          exit 1
+          set -euo pipefail
+          test "$(git hash-object research/contextual_value_candidate_advantage_r_outcome.py)" = "$EVALUATOR_BLOB_SHA1"
+          grep -F "behavior,q,join=align_nuisance(data,nuisance,verify_phi=False)" research/contextual_value_candidate_advantage_r_outcome.py
+          ! grep -F '\\n    # The outcome evaluator' research/contextual_value_candidate_advantage_r_outcome.py
+          test -f research/CONTEXTUAL-VALUE-V1-CANDIDATE-ADVANTAGE-R-RECOVERY-2026-09-28.md
+
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2' 'scikit-learn==1.9.1'
+
+      - name: Compile frozen evaluator
+        run: |
+          python -m py_compile \
+            research/contextual_value_draft_weighted_ope.py \
+            research/contextual_value_multiaction_sensitivity.py \
+            research/contextual_value_candidate_advantage_r_common.py \
+            research/contextual_value_candidate_advantage_r_outcome.py
+
+      - name: Run amended evaluator invariants
+        env:
+          PYTHONPATH: scripts:research
+        run: python -m unittest tests.test_contextual_value_r_amended -v
+
+      - name: Download frozen Phase A2 validation shard
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold--1
+          path: validation
+          run-id: ${{ env.PHASE_A2_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download frozen strong-offset validation nuisance
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-ablation-strong_offset_only-fold--1
+          path: nuisance
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download immutable pre-outcome freeze
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-freeze-final
+          path: freeze
+          run-id: ${{ env.PRERUN_FREEZE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Verify exact frozen inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum freeze/prerun-freeze-report.json | awk '{print $1}')" = "$PRERUN_REPORT_SHA256"
+          test "$(sha256sum freeze/r-policy-bundle.npz | awk '{print $1}')" = "$POLICY_BUNDLE_SHA256"
+          python3 - <<'PY'
+          import json
+          r=json.load(open('freeze/prerun-freeze-report.json'))
+          assert r['phase'] == 'candidate_advantage_R_prerun_freeze'
+          assert r['validation_outcomes_loaded'] is False
+          assert r['assessment_outcomes_loaded'] is False
+          assert r['r_result_seen'] is False
+          assert r['frozen_policy']['r_lcb_c'] == 2.49
+          assert r['frozen_policy']['r_lcb_null_deviation_rate'] <= .02
+          assert abs(r['power_planning']['minimum_detectable_effect_wins'] - 0.1555427239853002) < 1e-15
+          PY
+
+      - name: Complete frozen amended R-LCB evaluation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results/r-amended-recovery
+          python3 research/contextual_value_candidate_advantage_r_outcome.py \
+            --validation-shard validation/phase-a2-fold--1.npz \
+            --validation-report validation/phase-a2-fold--1-report.json \
+            --validation-nuisance nuisance/strong_offset_only-fold--1.jsonl.gz \
+            --prerun-report freeze/prerun-freeze-report.json \
+            --policy-bundle freeze/r-policy-bundle.npz \
+            --output results/r-amended-recovery/report.json
+          cp freeze/prerun-freeze-report.json results/r-amended-recovery/prerun-freeze-report.json
+          printf '%s\n' "$FAILED_FIRST_RUN" > results/r-amended-recovery/failed-first-run.txt
+          printf '%s\n' "$FAILED_SECOND_RUN" > results/r-amended-recovery/failed-second-run.txt
+
+      - name: Assert frozen outcome boundary
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/r-amended-recovery/report.json'))
+          assert r['phase'] == 'candidate_advantage_R_amended_development'
+          assert r['validation_outcomes_opened'] is True
+          assert r['assessment_outcomes_opened'] is False
+          assert r['twenty_k_used_for_model_selection'] is False
+          assert r['registered_prerun_freeze_sha256'] == '9b351ee6ca0a3dd8d676c18d2eed3f847ca34b8f7c619c797e76c193df234b66'
+          assert r['policy_bundle_sha256'] == '8191ef8ef3eb0de5cbd963392b5e11c86b31f82984ec39b8701e6b5c107ac520'
+          assert abs(r['power_planning']['minimum_detectable_effect_wins'] - 0.1555427239853002) < 1e-15
+          PY
+
+      - name: Upload immutable amended R recovery result
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-r-amended-development-final-recovery
+          path: results/r-amended-recovery/
+          retention-days: 90
