@@ -209,7 +209,7 @@ const careerProfile: CareerProfile = {
   current_season: {
     id: 'season-2026-09',
     set_id: 'eoe',
-    name: 'September Season',
+    name: 'September',
     start_date: '2026-09-01',
     end_date: '2026-09-30',
     standings: [
