@@ -1,0 +1,36 @@
+name: contextual-value-v1-r-confirmation-codecheck
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+    paths:
+      - .github/workflows/contextual-value-v1-r-confirmation-codecheck.yml
+
+permissions:
+  contents: read
+
+jobs:
+  codecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned research dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2'
+      - name: Compile exact new research entry points
+        run: |
+          python -m py_compile             research/contextual_value_r_confirmation_reserve.py             research/contextual_value_r_evaluator_audit.py             research/contextual_value_r_confirmation_freeze.py             research/contextual_value_r_confirmation_outcome.py             research/contextual_value_p1p1_eoe_preflight.py             research/contextual_value_p1p1_eoe_primary_final.py
+      - name: Import frozen evaluator helpers
+        run: |
+          PYTHONPATH=scripts:research python - <<'PY'
+          import contextual_value_r_confirmation_freeze
+          import contextual_value_r_confirmation_outcome
+          import contextual_value_p1p1_eoe_primary_final
+          from contextual_value_draft_weighted_ope import evaluate_draft_weighted
+          from contextual_value_multiaction_sensitivity import paired_policy_bounds
+          print('imports ok')
+          PY
