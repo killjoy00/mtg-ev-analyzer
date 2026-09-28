@@ -16,6 +16,8 @@ The shared resolver in `scripts/fetch_card_metadata.py` owns card identity, alia
 
 The resolver must be deterministic with respect to API ordering. Ranking is based on language, special-treatment penalty, preferred set, paper/digital tie-breaking after the set anchor, release date, collector number, and card ID.
 
+Future trophy/component imports must seed card metadata from the environment being built, not from an arbitrary other environment that happens to contain the same card name. Retained per-build image caches may fill missing metadata but may not override current environment-scoped shard metadata. Any true miss is resolved through the shared exact-name selector with that environment as the preferred set (or with no preferred set for Powered Cube).
+
 ## Display-only mutation boundary
 
 Image maintenance may change only:

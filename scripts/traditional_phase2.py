@@ -173,7 +173,7 @@ def measure(sid,directory,frozen):
     models=[OutOfFoldModel(counts,f,fit) for f in folds]
 
     by_hash={hashlib.sha256(f'{sid}|{did}'.encode()).hexdigest()[:32]:did for did in qualified}
-    first,last=serving_window(sid);parity=0;known=metadata(ROOT)
+    first,last=serving_window(sid);parity=0;known=metadata(ROOT,sid)
     with gzip.open(frozen/sid/'puzzles.jsonl.gz','rt') as handle:
         for line in handle:
             old=json.loads(line)
@@ -218,7 +218,7 @@ def measure(sid,directory,frozen):
         if not snapshot['pass']:raise ValueError('Powered Cube Premier/Traditional snapshot mismatch')
 
     names={c for group in groups.values() for examples in group.values() for p in examples for c in (*p.candidates,*p.pool)}
-    known=resolve_images(names,known,directory/'images.json')
+    known=resolve_images(names,known,directory/'images.json',None if sid==CUBE else sid)
     records=[];puzzles=[];excluded=Counter();ledger=[]
     for did,d in sorted(trad_sources.items()):
         if not d['complete']:

@@ -125,7 +125,7 @@ def measure(sid,directory,frozen):
     # The original supplement is the actual serving evidence. Check every
     # available first-eight supplement decision, not merely a version label.
     by_hash={hashlib.sha256(f'{sid}|{did}'.encode()).hexdigest()[:32]:did for did in qualified}
-    parity=0;known=metadata(ROOT)
+    parity=0;known=metadata(ROOT,sid)
     with gzip.open(frozen/sid/'puzzles.jsonl.gz','rt') as handle:
         for line in handle:
             old=json.loads(line)
@@ -161,7 +161,7 @@ def measure(sid,directory,frozen):
     groups[EVENTS[1]],trad_cohort=cohort(trad,EVENTS[1],include_sources=True)
     trad_sources=trad_cohort.pop('sources')
     names={c for group in groups.values() for examples in group.values() for p in examples for c in (*p.candidates,*p.pool)}
-    known=resolve_images(names,known,directory/'images.json')
+    known=resolve_images(names,known,directory/'images.json',None if sid=='powered-cube' else sid)
     records=[];puzzles=[];excluded=Counter();ledger=[]
     for did,d in sorted(trad_sources.items()):
         if not d['complete']:
