@@ -1,0 +1,65 @@
+name: contextual-value-v1-p1p1-eoe-preflight
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+    paths:
+      - .github/workflows/contextual-value-v1-p1p1-eoe-preflight.yml
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  CONFIRM_RUN: '36371215506'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  DRAFT_SHA: '1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Compile frozen P1P1 preflight/final analyzers
+        run: |
+          python -m py_compile             research/contextual_value_p1p1_eoe_preflight.py             research/contextual_value_p1p1_eoe_primary.py             research/contextual_value_p1p1_eoe_primary_final.py
+      - name: Download exact frozen EOE 13k cohort boundary
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-cohort-EOE
+          path: cohort
+          run-id: ${{ env.CONFIRM_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download exact EOE public draft archive
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          curl --fail --location --retry 5 --retry-delay 3             --output raw/EOE.csv.gz             "$BASE/draft_data/draft_data_public.EOE.PremierDraft.csv.gz"
+          echo "$DRAFT_SHA  raw/EOE.csv.gz" | sha256sum -c -
+      - name: Run outcome-free collation/metadata preflight
+        run: |
+          python3 research/contextual_value_p1p1_eoe_preflight.py             --draft-archive raw/EOE.csv.gz             --cohort-manifest cohort/cohort.json             --output-dir results/p1p1-eoe-preflight
+      - name: Assert frozen outcome boundary
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/p1p1-eoe-preflight/preflight-report.json'))
+          assert r['outcomes_read'] is False
+          assert r['untouched_p1p1_drafts'] == 91377
+          assert r['archive_sha256'] == '1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648'
+          assert r['metadata_coverage'] >= .98
+          assert r['p1p9_rows_seen'] >= 0
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-p1p1-eoe-preflight
+          path: results/p1p1-eoe-preflight/
+          retention-days: 90
