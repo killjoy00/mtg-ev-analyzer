@@ -18,7 +18,7 @@ capture() {
 }
 
 capture "01-daily-decision" "packone://draft-run?environment=mixed"
-capture "02-reveal-comparison" "packone://draft-run?environment=mixed&screenshot=feedback"
+capture "02-reveal-comparison" "packone://store-screenshot-feedback"
 capture "03-daily-hub" "packone://"
 capture "04-practice" "packone://practice"
 capture "05-career" "packone://career"
