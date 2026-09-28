@@ -1,0 +1,275 @@
+name: contextual-value-v1-candidate-advantage-r-prerun
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PHASE_A1_RUN: '36286752890'
+  PHASE_A2_PILOT_RUN: '36289846820'
+  PHASE_A2_RUN: '36290030236'
+  ABLATION_RUN: '36280148906'
+  RICH_BEHAVIOR_RUN: '36323128790'
+  CONFIRM_RUN: '36371215506'
+  FROZEN_RUN: '36337059424'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  core-prerun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2' 'scikit-learn==1.9.1'
+      - name: Compile amended R pre-run
+        run: |
+          python -m py_compile \
+            research/contextual_value_draft_weighted_ope.py \
+            research/contextual_value_multiaction_sensitivity.py \
+            research/contextual_value_candidate_advantage_r_common.py \
+            research/contextual_value_candidate_advantage_r_prerun.py \
+            research/contextual_value_candidate_advantage_r_prerun_finalize.py
+      - name: Run amended R synthetic tests
+        env:
+          PYTHONPATH: scripts:research
+        run: python -m unittest tests.test_contextual_value_r_amended tests.test_contextual_value_trust_audit -v
+
+      - name: Download Phase A2 fold 0
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-0
+          path: folds
+          run-id: ${{ env.PHASE_A2_PILOT_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download Phase A2 validation and folds 1-4
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-phase-a2-fold-*
+          path: folds
+          merge-multiple: true
+          run-id: ${{ env.PHASE_A2_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download all frozen strong-offset nuisance folds
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-strong_offset_only-fold-*
+          path: nuisance
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact rich feature schema
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold--1
+          path: feature
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download retained rich behavior correction report
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-rich-behavior-correction
+          path: rich-behavior
+          run-id: ${{ env.RICH_BEHAVIOR_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Freeze R-prime R-LCB and all outcome-free diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results/r-prerun-core
+          TRAIN_ARGS=()
+          REPORT_ARGS=()
+          NUISANCE_ARGS=()
+          for f in 0 1 2 3 4; do
+            TRAIN_ARGS+=(--train-shard "folds/phase-a2-fold-$f.npz")
+            REPORT_ARGS+=(--train-report "folds/phase-a2-fold-$f-report.json")
+            NUISANCE_ARGS+=(--train-nuisance "nuisance/strong_offset_only-fold-$f.jsonl.gz")
+          done
+          python3 research/contextual_value_candidate_advantage_r_prerun.py \
+            "${TRAIN_ARGS[@]}" \
+            "${REPORT_ARGS[@]}" \
+            "${NUISANCE_ARGS[@]}" \
+            --validation-shard folds/phase-a2-fold--1.npz \
+            --validation-report folds/phase-a2-fold--1-report.json \
+            --validation-nuisance nuisance/strong_offset_only-fold--1.jsonl.gz \
+            --feature-report feature/phase-a-rich-fold--1-report.json \
+            --rich-behavior-report rich-behavior/rich-behavior-correction-report.json \
+            --out-dir results/r-prerun-core
+
+      - name: Assert validation outcome remained unopened
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json, numpy as np
+          r=json.load(open('results/r-prerun-core/core-prerun-report.json'))
+          assert r['phase']=='candidate_advantage_R_prerun_outcome_free'
+          assert r['validation_outcomes_loaded'] is False
+          assert r['assessment_outcomes_loaded'] is False
+          assert r['twenty_k_outcomes_loaded'] is False
+          assert r['nuisance_join']['validation']['max_behavior_sum_error'] <= 1e-9
+          p=np.load('results/r-prerun-core/r-policy-bundle.npz',allow_pickle=False)
+          assert len(p['sensitivity_gamma_grid']) >= 7
+          assert float(p['c'][0]) >= 0
+          PY
+
+      - name: Upload core outcome-free pre-run
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-core
+          path: results/r-prerun-core/
+          retention-days: 90
+
+  variance:
+    name: variance-${{ matrix.expansion }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - expansion: EOE
+            draft_sha: 1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648
+            game_sha: 130e7e7580a1cb4b4f635411d187a078bc7bdd9dd3436ef5ff7535e14cadaf1b
+          - expansion: FIN
+            draft_sha: 9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b
+            game_sha: f6452e622976f66dd5420c55741da5b246c7e8d25d63c080e728635e1741a6a6
+          - expansion: TDM
+            draft_sha: 831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5
+            game_sha: e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4
+          - expansion: DFT
+            draft_sha: 7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd
+            game_sha: 734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2' 'scikit-learn==1.9.1'
+      - name: Download frozen Q bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-freeze
+          path: freeze
+          run-id: ${{ env.FROZEN_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download retained 13k cohort manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-cohort-${{ matrix.expansion }}
+          path: cohort
+          run-id: ${{ env.CONFIRM_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download retained environment confirmation
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-confirm-${{ matrix.expansion }}
+          path: retained
+          run-id: ${{ env.CONFIRM_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download exact frozen archives
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw-data
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/game.csv.gz \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+      - name: Run authorized spent-20k all-position diagnostic
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+          GAME_SHA: ${{ matrix.game_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p results/variance
+          python3 research/contextual_value_r_20k_variance.py \
+            --expansion "$EXPANSION" \
+            --draft-archive raw-data/draft.csv.gz \
+            --game-archive raw-data/game.csv.gz \
+            --expected-draft-sha256 "$DRAFT_SHA" \
+            --expected-game-sha256 "$GAME_SHA" \
+            --cohort-manifest cohort/cohort.json \
+            --freeze-json freeze/four-way-freeze.json \
+            --freeze-q-pickle freeze/four-way-rich-q.pkl \
+            --retained-confirmation retained/report.json \
+            --output "results/variance/$EXPANSION.json"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-variance-${{ matrix.expansion }}
+          path: results/variance/
+          retention-days: 90
+
+  finalize:
+    needs: [core-prerun, variance]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-core
+          path: core
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-r-prerun-variance-*
+          path: variance
+          merge-multiple: true
+      - name: Aggregate variance and finalize immutable pre-run report
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p final
+          python3 research/contextual_value_r_20k_variance_aggregate.py \
+            --report variance/EOE.json \
+            --report variance/FIN.json \
+            --report variance/TDM.json \
+            --report variance/DFT.json \
+            --output final/variance-report.json
+          python3 research/contextual_value_candidate_advantage_r_prerun_finalize.py \
+            --core-report core/core-prerun-report.json \
+            --policy-bundle core/r-policy-bundle.npz \
+            --variance-report final/variance-report.json \
+            --output final/prerun-freeze-report.json
+          cp core/r-policy-bundle.npz final/
+      - name: Assert final no-outcome freeze
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('final/prerun-freeze-report.json'))
+          assert r['validation_outcomes_loaded'] is False
+          assert r['assessment_outcomes_loaded'] is False
+          assert r['r_result_seen'] is False
+          assert r['frozen_policy']['r_lcb_null_deviation_rate'] <= 0.02
+          assert r['power_planning']['minimum_detectable_effect_wins'] > 0
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-freeze
+          path: final/
+          retention-days: 90
