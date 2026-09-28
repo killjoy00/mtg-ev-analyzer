@@ -1,0 +1,107 @@
+name: contextual-value-v1-p1p1-eoe-final-retry
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+    paths:
+      - .github/workflows/contextual-value-v1-p1p1-eoe-final-retry.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  P1P1_PREFLIGHT_RUN: '36453124664'
+  CONFIRM_RUN: '36371215506'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  p1p1-eoe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+      - name: Compile frozen P1P1 analyzer
+        run: python -m py_compile research/contextual_value_p1p1_eoe_primary.py research/contextual_value_p1p1_eoe_primary_final.py
+
+      - name: Download frozen P1P1 preflight
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-p1p1-eoe-preflight
+          path: preflight
+          run-id: ${{ env.P1P1_PREFLIGHT_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact frozen EOE 13k boundary
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-cohort-EOE
+          path: cohort
+          run-id: ${{ env.CONFIRM_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Verify exact preflight artifact contents before outcomes
+        run: |
+          set -euo pipefail
+          test -f preflight/eoe-card-metadata.json
+          test -f preflight/preflight-report.json
+          python3 - <<'PY'
+          import json, hashlib
+          r=json.load(open('preflight/preflight-report.json'))
+          assert r['outcomes_read'] is False
+          assert r['untouched_p1p1_drafts'] == 91377
+          assert r['archive_sha256'] == '1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648'
+          h=hashlib.sha256(open('preflight/eoe-card-metadata.json','rb').read()).hexdigest()
+          assert h == r['metadata_sha256']
+          PY
+
+      - name: Download exact EOE draft archive
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw/EOE.csv.gz \
+            "$BASE/draft_data/draft_data_public.EOE.PremierDraft.csv.gz"
+          echo "1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648  raw/EOE.csv.gz" | sha256sum -c -
+
+      - name: Run frozen 91,377-draft EOE P1P1 study
+        run: |
+          mkdir -p results/p1p1-eoe
+          python3 research/contextual_value_p1p1_eoe_primary_final.py \
+            --draft-archive raw/EOE.csv.gz \
+            --cohort-manifest cohort/cohort.json \
+            --card-metadata preflight/eoe-card-metadata.json \
+            --metadata-report preflight/preflight-report.json \
+            --output results/p1p1-eoe/report.json
+
+      - name: Assert frozen P1P1 boundaries
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/p1p1-eoe/report.json'))
+          assert r['phase']=='p1p1_eoe_randomized_pack_primary_final'
+          assert r['primary_changed_after_outcomes'] is False
+          assert r['frozen_sample_size']==91377
+          assert len(r['primary_cards'])==10
+          assert r['high_pick_collation_diagnostic']['count']==59
+          assert r['archive_sha256']=='1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648'
+          assert r['nonterminal_or_retired_records_excluded'] is False
+          assert r['collation_diagnostics']['rarity_composition_available'] is True
+          assert r['collation_diagnostics']['booster_slot_provenance_available'] is False
+          for card in r['primary_cards']:
+            assert 'other_high_pick_card_copresence_difference_full_frozen_cohort' in r['cards'][card]
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-p1p1-eoe-primary-final
+          path: results/p1p1-eoe/
+          retention-days: 90
