@@ -2,11 +2,6 @@ name: contextual-value-v1-p1p1-eoe-preflight
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - research/contextual-value-v1-h-freeze-audit-529
-    paths:
-      - .github/workflows/contextual-value-v1-p1p1-eoe-preflight.yml
 
 permissions:
   actions: read
