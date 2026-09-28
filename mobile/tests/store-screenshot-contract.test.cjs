@@ -40,6 +40,9 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.doesNotMatch(workflow, /-scheme PackOne\b/);
   assert.doesNotMatch(workflow, /Release-iphonesimulator\/PackOne\.app/);
   const iosCapture = read('mobile/scripts/capture-store-screenshots-ios.sh');
+  const androidCapture = read('mobile/scripts/capture-store-screenshots-android.sh');
+  assert.match(androidCapture, /adb shell "am start -W -a android\.intent\.action\.VIEW -d '\$url' -p '\$package_name'"/);
+  assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
   assert.match(iosCapture, /com\.apple\.launchservices\.schemeapproval\.plist/);
   assert.match(iosCapture, /CoreSimulatorBridge-->/);
   assert.match(iosCapture, /UIKitApplication:\$bundle_id/);
