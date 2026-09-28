@@ -17,6 +17,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const session = read('mobile/src/storage/session.ts');
   const screenshotFixtures = read('mobile/src/screenshots/fixtures.ts');
   const draftRun = read('mobile/app/draft-run.tsx');
+  const versionGate = read('mobile/src/components/VersionGate.tsx');
   const workflow = read('.github/workflows/mobile-store-screenshots.yml');
 
   assert.match(config, /process\.env\.EXPO_PUBLIC_PACKONE_ENV/);
@@ -31,6 +32,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(screenshotFixtures, /https:\/\/cards\.scryfall\.io\/normal\/front\//);
   assert.doesNotMatch(screenshotFixtures, /api\.scryfall\.com\/cards\/named/);
   assert.match(draftRun, /config\.screenshots\.fixtures[\s\S]*screenshotFeedbackOverride \|\| params\.screenshot === 'feedback'/);
+  assert.match(versionGate, /if \(config\.screenshots\.fixtures\) return <>\{children\}<\/>;/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_ENV: preview/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'/);
   assert.match(workflow, /PACKONE_BUILD_PROFILE: preview/);
