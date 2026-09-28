@@ -1,6 +1,7 @@
 {
   "operation": "card-image-release",
-  "request_id": "tishana-card-image-release-hotfix-20260928",
-  "reason": "Deploy the reviewed live-component validation hotfix from #736 and rerun the full guarded Pack One card-image normalization so Tishana's Tidebinder and any other stale Live component art are propagated and verified.",
+  "request_id": "tishana-card-image-release-hotfix-replay-20260928",
+  "replay_of": "tishana-card-image-release-hotfix-20260928",
+  "reason": "Intentional retry after the prior equivalent rollout request was rejected by the replay guard before dispatch. Deploy #736 and rerun the guarded Tishana/card-art release.",
   "commit": "8c3c4df35f53e99c63cbbe3fe2c675a8e2b21203"
 }
