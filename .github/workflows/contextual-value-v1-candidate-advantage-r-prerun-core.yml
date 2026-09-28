@@ -1,0 +1,114 @@
+name: contextual-value-v1-candidate-advantage-r-prerun-core
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PHASE_A1_RUN: '36286752890'
+  PHASE_A2_PILOT_RUN: '36289846820'
+  PHASE_A2_RUN: '36290030236'
+  ABLATION_RUN: '36280148906'
+  RICH_BEHAVIOR_RUN: '36323128790'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  core-prerun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2' 'scikit-learn==1.9.1'
+      - name: Compile amended R pre-run
+        run: |
+          python -m py_compile \
+            research/contextual_value_draft_weighted_ope.py \
+            research/contextual_value_multiaction_sensitivity.py \
+            research/contextual_value_candidate_advantage_r_common.py \
+            research/contextual_value_candidate_advantage_r_prerun.py
+      - name: Run amended R synthetic tests
+        env:
+          PYTHONPATH: scripts:research
+        run: python -m unittest tests.test_contextual_value_r_amended tests.test_contextual_value_trust_audit -v
+      - uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold-0
+          path: folds
+          run-id: ${{ env.PHASE_A2_PILOT_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-phase-a2-fold-*
+          path: folds
+          merge-multiple: true
+          run-id: ${{ env.PHASE_A2_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-ablation-strong_offset_only-fold-*
+          path: nuisance
+          merge-multiple: true
+          run-id: ${{ env.ABLATION_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold--1
+          path: feature
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-rich-behavior-correction
+          path: rich-behavior
+          run-id: ${{ env.RICH_BEHAVIOR_RUN }}
+          github-token: ${{ github.token }}
+      - name: Freeze R-prime R-LCB and all outcome-free diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results/r-prerun-core
+          TRAIN_ARGS=()
+          REPORT_ARGS=()
+          NUISANCE_ARGS=()
+          for f in 0 1 2 3 4; do
+            TRAIN_ARGS+=(--train-shard "folds/phase-a2-fold-$f.npz")
+            REPORT_ARGS+=(--train-report "folds/phase-a2-fold-$f-report.json")
+            NUISANCE_ARGS+=(--train-nuisance "nuisance/strong_offset_only-fold-$f.jsonl.gz")
+          done
+          python3 research/contextual_value_candidate_advantage_r_prerun.py \
+            "${TRAIN_ARGS[@]}" \
+            "${REPORT_ARGS[@]}" \
+            "${NUISANCE_ARGS[@]}" \
+            --validation-shard folds/phase-a2-fold--1.npz \
+            --validation-report folds/phase-a2-fold--1-report.json \
+            --validation-nuisance nuisance/strong_offset_only-fold--1.jsonl.gz \
+            --feature-report feature/phase-a-rich-fold--1-report.json \
+            --rich-behavior-report rich-behavior/rich-behavior-correction-report.json \
+            --out-dir results/r-prerun-core
+      - name: Assert outcome-free boundary
+        run: |
+          python3 - <<'PY'
+          import json, numpy as np
+          r=json.load(open('results/r-prerun-core/core-prerun-report.json'))
+          assert r['validation_outcomes_loaded'] is False
+          assert r['assessment_outcomes_loaded'] is False
+          assert r['twenty_k_outcomes_loaded'] is False
+          assert r['r_lcb']['null_calibration']['chosen_null_deviation_rate'] <= .02
+          p=np.load('results/r-prerun-core/r-policy-bundle.npz',allow_pickle=False)
+          assert len(p['sensitivity_gamma_grid']) >= 7
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-core-fixed
+          path: results/r-prerun-core/
+          retention-days: 90
