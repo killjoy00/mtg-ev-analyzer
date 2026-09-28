@@ -1,0 +1,7 @@
+{
+  "operation": "upload-pack-one-app-store-screenshots",
+  "reason": "Upload the visually reviewed corrected iPhone and iPad screenshots from Mobile store screenshots run 36383054888 to the Pack One iOS 1.0 English (U.S.) App Store submission, and attach the Membership capture as the Pack One Elite subscription App Review screenshot. Do not submit the app or subscription for review and do not release anything.",
+  "screenshotRunId": 36383054888,
+  "screenshotHeadSha": "d4b344ac2d0fe4666c5791b9e7f492a8fe86fb77",
+  "versionString": "1.0"
+}
