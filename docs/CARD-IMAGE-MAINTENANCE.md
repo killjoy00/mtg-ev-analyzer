@@ -74,6 +74,8 @@ Targeted workflow hydration is intentionally all-environment and read-only so th
 
 Backend repair and verification summaries are retained under `generated/card-image-repair/backend/*.json` in the repair artifact, including stage, page counts, update totals, verification outcome, and failures. The targeted job has a 45-minute timeout; this is a ceiling, not an expected runtime.
 
+Backend image propagation covers both the current parent corpus and any `Live` supplemental component whose `parent_version` is that current corpus. `Candidate`, retired/non-Live, and components attached to older parent corpora are deliberately excluded. This scope applies to both full and targeted image maintenance so a normalized parent cannot mask stale art in a currently served component.
+
 The final protected-branch handoff uses an `automation/card-image-repair-...` branch and never pushes to `main` or creates a pull request from Actions. A no-op source publication is expected when checked-in/R2 display metadata was already correct and only the live backend state had drifted.
 
 ## Guarded release sequence
