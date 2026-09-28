@@ -79,7 +79,7 @@ test('store screenshot and App Store configuration encode reviewed release decis
   assert.match(request.reason, /exact United States customer price to \$7\.00/);
 });
 
-test('iOS capture consumes a large process listing and rejects missing or failed launches', () => {
+test('iOS capture launches an explicit preview scene and rejects failed or unexpected launches', () => {
   const { spawnSync } = require('node:child_process');
   const os = require('node:os');
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), 'packone-capture-'));
@@ -87,38 +87,47 @@ test('iOS capture consumes a large process listing and rejects missing or failed
     const source = read('mobile/scripts/capture-store-screenshots-ios.sh');
     const capture = source.slice(source.indexOf('capture() {'), source.indexOf('\ncapture "01-'));
     assert.ok(capture.endsWith('}\n'));
-    const fixture = path.join(directory, 'processes.txt');
     const screenshot = path.join(directory, 'captured');
-    const run = (listing, producerStatus = 0) => {
-      fs.writeFileSync(fixture, listing);
+    const args = path.join(directory, 'args.txt');
+    const run = (launchOutput = 'pro.packone.preview: 1234', launchStatus = 0) => {
       fs.rmSync(screenshot, { force: true });
+      fs.rmSync(args, { force: true });
       return spawnSync('bash', ['-c', `
         set -euo pipefail
         udid=fixture; bundle_id=pro.packone.preview; out_root=unused; label=fixture
+        mkdir -p unused/fixture
         sleep() { :; }
         xcrun() {
-          if [[ "$2" == spawn ]]; then
-            cat "$PROCESS_FIXTURE" || return $?
-            return "$PRODUCER_STATUS"
+          if [[ "$2" == terminate ]]; then
+            return 0
+          elif [[ "$2" == launch ]]; then
+            printf '%s\\n' "$*" > "$ARGS_MARKER"
+            printf '%s\\n' "$LAUNCH_OUTPUT"
+            return "$LAUNCH_STATUS"
           elif [[ "$2" == io ]]; then
             touch "$SCREENSHOT_MARKER"
+            return 0
           fi
+          return 2
         }
         ${capture}
-        capture test packone://practice
+        capture test practice
       `], { encoding: 'utf8', env: { ...process.env,
-        PROCESS_FIXTURE: fixture, SCREENSHOT_MARKER: screenshot,
-        PRODUCER_STATUS: String(producerStatus),
+        SCREENSHOT_MARKER: screenshot, ARGS_MARKER: args,
+        LAUNCH_OUTPUT: launchOutput, LAUNCH_STATUS: String(launchStatus),
       } });
     };
-    const largeListing = 'UIKitApplication:pro.packone.preview\n' + 'unrelated service\n'.repeat(100000);
-    const success = run(largeListing);
+
+    const success = run();
     assert.equal(success.status, 0, success.stderr);
     assert.ok(fs.existsSync(screenshot));
-    const missing = run('unrelated service\n');
-    assert.notEqual(missing.status, 0);
+    assert.match(fs.readFileSync(args, 'utf8'), /simctl launch fixture pro\.packone\.preview -packoneScreenshotScene practice/);
+
+    const unexpected = run('different.bundle: 1234');
+    assert.notEqual(unexpected.status, 0);
     assert.ok(!fs.existsSync(screenshot));
-    const failed = run(largeListing, 1);
+
+    const failed = run('', 1);
     assert.notEqual(failed.status, 0);
     assert.ok(!fs.existsSync(screenshot));
   } finally {
