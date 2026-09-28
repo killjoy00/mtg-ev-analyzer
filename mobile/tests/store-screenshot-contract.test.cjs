@@ -71,6 +71,9 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(workflow, /MODE="0666"/);
   assert.match(workflow, /sudo chmod 666 \/dev\/kvm/);
   assert.match(workflow, /emulator-boot-timeout: 900/);
+  assert.match(workflow, /Install Android screenshot image tools/);
+  assert.match(workflow, /sudo apt-get install -y --no-install-recommends ffmpeg/);
+  assert.match(workflow, /command -v ffprobe/);
   assert.match(workflow, /concurrency:[\s\S]*group: mobile-store-screenshots[\s\S]*cancel-in-progress: true/);
   assert.match(workflow, /adb shell service check package/);
   assert.match(workflow, /for attempt in 1 2 3; do/);
