@@ -8,6 +8,7 @@ import {verifyImportToken,IMPORT_WORKFLOW,IMAGE_REFRESH_WORKFLOW} from '../worke
 import {insertTrophyBatch,handleTrophyImport,refreshTrophyImagePage,refreshTrophyImages,normalizeResolvedImageMarkers} from '../worker/trophy-import.mjs';
 import {SERVING_ANALYZE_SQL,SOURCE_ANALYZE_SQL,SERVING_STATISTICS_COLUMNS,SERVING_STATISTICS_READY_SQL} from '../worker/serving-statistics.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION} from '../corpus-components.mjs';
 
 const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048});
 const jwk={...publicKey.export({format:'jwk'}),kid:'test',use:'sig'};
@@ -173,6 +174,51 @@ test('card image refresh changes display metadata only for registered environmen
   assert.equal(stored.candidates.find(card=>card.name===target.name).image_url,replacement);
   await assert.rejects(refreshTrophyImages(query,'not-a-real-environment',mapping),/registered environment/);
   await assert.rejects(refreshTrophyImages(query,'powered-cube',[{name:target.name,image_url:'http://bad.example/card.jpg'}]),/Invalid image mapping/);
+});
+
+test('live component image refresh validates the stored component version',async()=>{
+  const rows=JSON.parse(zlib.gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
+  const parent=structuredClone(rows[0]);
+  let stored={
+    ...parent,
+    set_id:'mom',
+    corpus_version:TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,
+    source_event_type:'TradDraft',
+    model_version:V4_CONTEXT_MODEL_VERSION,
+    model_source_event:'PremierDraft',
+    event_match_wins:3,
+    event_match_losses:0,
+    skill_evidence:'win_rate_bucket',
+    player_games_lower_bound:100,
+    player_win_rate_bucket:.65,
+    source_evidence:'official_archive_trajectory',
+  };
+  const query=async(sql,params=[])=>{
+    if(sql.includes('SELECT p.puzzle_id,p.payload')){
+      return {rows:stored.puzzle_id>String(params[2]||'')?[{
+        puzzle_id:stored.puzzle_id,
+        payload:stored,
+        corpus_version:stored.corpus_version,
+      }]:[]};
+    }
+    if(sql.includes('UPDATE draft_run_verified_puzzles')){
+      stored=JSON.parse(params[0])[0].payload;
+      return {rows:[{puzzle_id:stored.puzzle_id}]};
+    }
+    throw new Error('Unexpected SQL in live component image refresh test: '+sql);
+  };
+  const target=stored.candidates[0];
+  const replacement='https://cards.example/live-component-main-art.jpg';
+  const result=await refreshTrophyImages(query,'mom',[{
+    name:target.name,
+    image_url:replacement,
+    mana_cost:target.mana_cost||'',
+    rarity:target.rarity||'',
+    type_line:target.type_line||'',
+  }]);
+  assert.equal(result.updated_puzzles,1);
+  assert.equal(stored.corpus_version,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION);
+  assert.equal(stored.candidates.find(card=>card.name===target.name).image_url,replacement);
 });
 
 test('a blank mapped type line cannot erase stored metadata during image refresh',async()=>{
