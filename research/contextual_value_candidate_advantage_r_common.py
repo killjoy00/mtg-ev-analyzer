@@ -627,6 +627,102 @@ def legacy_r_support_actions(
     return chosen
 
 
+
+def fit_skill_interaction_behavior(
+    *,
+    data: Mapping[str,np.ndarray],
+    baseline_behavior: np.ndarray,
+    l2: float=1000.0,
+) -> dict:
+    """Outcome-free conditional-logit correction using skill x candidate features."""
+    from scipy.optimize import minimize
+
+    offsets=np.asarray(data["offsets"],dtype=np.int64)
+    counts=np.diff(offsets).astype(np.int64)
+    candidate=np.asarray(data["cand_rich"],dtype=np.float64)
+    skill=np.asarray(data["skill_rate"],dtype=np.float64)
+    weight=np.asarray(data["decision_weight"],dtype=np.float64)
+    selected=np.asarray(data["selected_ord"],dtype=np.int64)
+    total=float(np.sum(weight))
+    skill_mean=float(np.sum(weight*skill)/total)
+    skill_sd=math.sqrt(float(np.sum(weight*np.square(skill-skill_mean))/total))
+    if skill_sd<=1e-12:
+        raise SystemExit("recorded skill has no variation")
+    skill_z=(skill-skill_mean)/skill_sd
+    row_skill=np.repeat(skill_z,counts)
+    row_weight=np.repeat(weight,counts)
+
+    row_base=np.asarray(baseline_behavior,dtype=np.float64)
+    if len(row_base)!=len(candidate):
+        raise SystemExit("skill-aware behavior baseline length mismatch")
+    base_log=np.log(np.clip(row_base,1e-12,1.0))
+
+    # Standardize candidate dimensions outcome-free using decision-normalized weights.
+    row_norm_weight=np.repeat(weight/counts,counts)
+    scale_total=float(np.sum(row_norm_weight))
+    mean=np.sum(candidate*row_norm_weight[:,None],axis=0)/scale_total
+    var=np.sum(np.square(candidate-mean)*row_norm_weight[:,None],axis=0)/scale_total
+    scale=np.sqrt(np.maximum(var,0.0))
+    active=scale>1e-8
+    if not np.any(active):
+        raise SystemExit("no active candidate features for skill-aware behavior")
+    x=((candidate[:,active]-mean[active])/scale[active])*row_skill[:,None]
+    selected_global=offsets[:-1]+selected
+
+    def objective(beta):
+        score=base_log+x@beta
+        peak=np.maximum.reduceat(score,offsets[:-1])
+        exp=np.exp(score-np.repeat(peak,counts))
+        denom=np.add.reduceat(exp,offsets[:-1])
+        logz=peak+np.log(denom)
+        loss=float(np.sum(weight*(logz-score[selected_global]))/total + 0.5*l2*float(beta@beta)/total)
+        prob=exp/np.repeat(denom,counts)
+        gradient=(x.T@(row_weight*prob)-x[selected_global].T@weight)/total + l2*beta/total
+        return loss,np.asarray(gradient,dtype=np.float64)
+
+    result=minimize(
+        objective,np.zeros(int(np.sum(active)),dtype=np.float64),
+        method="L-BFGS-B",jac=True,
+        options={"maxiter":300,"ftol":1e-9,"gtol":1e-6,"maxls":20},
+    )
+    if not result.success:
+        raise SystemExit(f"skill-aware behavior fit failed: {result.message}")
+    return {
+        "beta":np.asarray(result.x,dtype=np.float64),
+        "mean":mean,
+        "scale":np.where(active,scale,1.0),
+        "active":active,
+        "skill_mean":skill_mean,
+        "skill_scale":skill_sd,
+        "l2":float(l2),
+        "objective":float(result.fun),
+        "iterations":int(result.nit),
+        "gradient_max_abs":float(np.max(np.abs(result.jac))),
+    }
+
+
+def predict_skill_interaction_behavior(
+    model: Mapping[str,object],
+    *,
+    data: Mapping[str,np.ndarray],
+    baseline_behavior: np.ndarray,
+) -> np.ndarray:
+    offsets=np.asarray(data["offsets"],dtype=np.int64)
+    counts=np.diff(offsets).astype(np.int64)
+    candidate=np.asarray(data["cand_rich"],dtype=np.float64)
+    skill=(np.asarray(data["skill_rate"],dtype=np.float64)-float(model["skill_mean"]))/float(model["skill_scale"])
+    active=np.asarray(model["active"],dtype=bool)
+    x=((candidate[:,active]-np.asarray(model["mean"],dtype=np.float64)[active])/
+       np.asarray(model["scale"],dtype=np.float64)[active])*np.repeat(skill,counts)[:,None]
+    score=np.log(np.clip(np.asarray(baseline_behavior,dtype=np.float64),1e-12,1.0))+x@np.asarray(model["beta"],dtype=np.float64)
+    peak=np.maximum.reduceat(score,offsets[:-1])
+    exp=np.exp(score-np.repeat(peak,counts))
+    denom=np.add.reduceat(exp,offsets[:-1])
+    prob=exp/np.repeat(denom,counts)
+    if np.any(~np.isfinite(prob)) or np.any(prob<=0):
+        raise SystemExit("invalid skill-aware behavior probabilities")
+    return prob
+
 def noise_legacy_support_rate(
     *,
     data: Mapping[str,np.ndarray],
