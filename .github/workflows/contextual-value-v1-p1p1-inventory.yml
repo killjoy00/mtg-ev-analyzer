@@ -1,0 +1,183 @@
+name: contextual-value-v1-p1p1-outcome-free-inventory
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  CONFIRM_RUN: '36371215506'
+  CORE_RUN: '36256947308'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  inventory:
+    name: p1p1-${{ matrix.expansion }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - expansion: EOE
+            draft_sha: 1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648
+            source: fresh
+          - expansion: FIN
+            draft_sha: 9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b
+            source: fresh
+          - expansion: TDM
+            draft_sha: 831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5
+            source: fresh
+          - expansion: DFT
+            draft_sha: 7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd
+            source: fresh
+          - expansion: MSH
+            draft_sha: 64100d71db77e0f0ef8ba893b259a1024eb6d15816db337c7758e7d96bc29cf7
+            source: core
+          - expansion: SOS
+            draft_sha: df6220d8941e99b7264a54a7a7427096246ee6510057a83d4c9424b472761853
+            source: core
+          - expansion: ECL
+            draft_sha: 77d14502147241bf5fff65abe7bdfdda5e18e90ece3f935316447386112bc876
+            source: core
+          - expansion: TLA
+            draft_sha: e4a801b12cbe3d711dce7d92bd2d256db64e0be18d22da14b477d512567627bb
+            source: core
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Download exact public draft archive
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw-data
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          echo "$DRAFT_SHA  raw-data/draft.csv.gz" | sha256sum -c -
+
+      - name: Download fresh-set reserved 13k cohort
+        if: matrix.source == 'fresh'
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-cohort-${{ matrix.expansion }}
+          path: reserved-source
+          run-id: ${{ env.CONFIRM_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download pooled core 8k cohort
+        if: matrix.source == 'core'
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: reserved-source
+          run-id: ${{ env.CORE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Build exact reserved ID file
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          SOURCE: ${{ matrix.source }}
+        run: |
+          set -euo pipefail
+          mkdir -p inventory
+          python3 - <<'PY'
+          import json, os, pathlib
+          exp=os.environ['EXPANSION']
+          source=os.environ['SOURCE']
+          if source=='fresh':
+              r=json.load(open('reserved-source/cohort.json'))
+              assert r['expansion']==exp
+              ids=set(map(str,r['prior_8000_ids'])) | set(map(str,r['confirmation_ids']))
+              assert len(ids)==13000
+          else:
+              r=json.load(open('reserved-source/cohort-manifest.json'))
+              ids={str(x['draft_id']) for x in r['selected_drafts'] if str(x['expansion'])==exp}
+          pathlib.Path('inventory/reserved.txt').write_text('\n'.join(sorted(ids))+'\n')
+          print({'expansion':exp,'reserved_ids':len(ids),'source':source})
+          PY
+
+      - name: Scan P1P1 without reading outcomes
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          python3 research/contextual_value_p1p1_inventory.py \
+            --expansion "$EXPANSION" \
+            --draft-archive raw-data/draft.csv.gz \
+            --reserved-id-file inventory/reserved.txt \
+            --first-rows 300000 \
+            --output inventory/report.json
+          python3 - <<'PY'
+          import json
+          r=json.load(open('inventory/report.json'))
+          assert r['outcomes_read'] is False
+          PY
+
+      - name: Upload outcome-free P1P1 inventory
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-p1p1-inventory-${{ matrix.expansion }}
+          path: inventory/
+          retention-days: 90
+
+  aggregate:
+    needs: inventory
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-p1p1-inventory-*
+          path: reports
+      - name: Aggregate coverage
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import glob,json,pathlib
+          out={}
+          for p in glob.glob('reports/*/report.json'):
+              r=json.load(open(p))
+              out[r['expansion']]=r
+          assert set(out)=={'EOE','FIN','TDM','DFT','MSH','SOS','ECL','TLA'}
+          result={
+              'phase':'p1p1_outcome_free_inventory_aggregate',
+              'outcomes_read':False,
+              'sets':{
+                  e:{
+                      'archive_sha256':r['archive_sha256'],
+                      'premier_drafts_seen':r['premier_drafts_seen'],
+                      'p1p1_unique_drafts':r['p1p1']['unique_drafts'],
+                      'p1p1_coverage':r['p1p1']['coverage_fraction_of_seen_drafts'],
+                      'first_300k_coverage':r['p1p1']['first_rows_coverage_fraction'],
+                      'reserved_ids':r['reserved']['ids_loaded'],
+                      'reserved_p1p1_ids':r['reserved']['p1p1_ids_excluded'],
+                      'untouched_p1p1_drafts':r['reserved']['untouched_p1p1_drafts'],
+                      'contested_cards_ge_30pct':r['untouched_card_stats']['cards_take_rate_at_least_0_30'],
+                      'contested_pick_share':r['untouched_card_stats']['share_of_untouched_p1p1_picks_from_take_rate_at_least_0_30_cards'],
+                  } for e,r in sorted(out.items())
+              }
+          }
+          pathlib.Path('aggregate').mkdir()
+          pathlib.Path('aggregate/report.json').write_text(json.dumps(result,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(result,indent=2,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-p1p1-inventory-aggregate
+          path: aggregate/
+          retention-days: 90
