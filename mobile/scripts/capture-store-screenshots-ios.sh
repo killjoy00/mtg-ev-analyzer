@@ -24,7 +24,7 @@ capture() {
     exit 1
   fi
 
-  sleep 8
+  sleep 12
   xcrun simctl io "$udid" screenshot "$out_root/$label/$name.png"
 }
 
