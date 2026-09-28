@@ -1,0 +1,9 @@
+{
+  "operation": "upload-google-play-phone-screenshots",
+  "reason": "Upload the final visually reviewed Pack One Android phone screenshots from run 36493915041 / artifact 11003158035 to the en-US Google Play main store listing. Visual QA confirmed correct decision, 96/100 reveal comparison, Daily hub, Practice, and Career scenes; no Android system dialog; the Career season label is corrected. Replace phone screenshots only. Do not alter tracks, releases, rollout, review submission, countries, or any other Play listing assets.",
+  "source_run_id": 36493915041,
+  "source_artifact_id": 11003158035,
+  "source_sha": "6dbaf00bd80e761c0fc50c08ead2e8ad04539e58",
+  "artifact_digest": "sha256:dc7de6d7b4a925c75d3cc687ba4dca4e45be138157620e15dc2e4c5892a46d82",
+  "language": "en-US"
+}
