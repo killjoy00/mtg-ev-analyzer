@@ -1,0 +1,291 @@
+name: contextual-value-v1-q-guard10-20k-confirmation
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  FROZEN_RUN: '36337059424'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  cohort:
+    name: cohort-${{ matrix.expansion }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - expansion: EOE
+            draft_sha: 1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648
+            game_sha: 130e7e7580a1cb4b4f635411d187a078bc7bdd9dd3436ef5ff7535e14cadaf1b
+          - expansion: FIN
+            draft_sha: 9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b
+            game_sha: f6452e622976f66dd5420c55741da5b246c7e8d25d63c080e728635e1741a6a6
+          - expansion: TDM
+            draft_sha: 831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5
+            game_sha: e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4
+          - expansion: DFT
+            draft_sha: 7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd
+            game_sha: 734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Compile model-free cohort builder
+        run: python -m py_compile research/contextual_value_q_guard10_20k_cohort.py
+
+      - name: Download exact frozen draft archive
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw-data
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+
+      - name: Build exact unused 5k cohort
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "results/contextual-value-v1/q-guard10-20k/cohort/$EXPANSION"
+          python3 research/contextual_value_q_guard10_20k_cohort.py \
+            --expansion "$EXPANSION" \
+            --draft-archive raw-data/draft.csv.gz \
+            --expected-draft-sha256 "$DRAFT_SHA" \
+            --output "results/contextual-value-v1/q-guard10-20k/cohort/$EXPANSION/cohort.json"
+
+      - name: Assert cohort boundary before scoring
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          python3 - <<'PY'
+          import json,os
+          p=f"results/contextual-value-v1/q-guard10-20k/cohort/{os.environ['EXPANSION']}/cohort.json"
+          r=json.load(open(p))
+          assert len(r['prior_8000_ids']) == 8000
+          assert len(r['confirmation_ids']) == 5000
+          assert len(set(r['prior_8000_ids']) & set(r['confirmation_ids'])) == 0
+          assert r['overlap_with_prior'] == 0
+          assert r['selection']['confirmation_rule'] == 'select_global_draft_ids(13000) - select_global_draft_ids(8000)'
+          PY
+
+      - name: Upload frozen cohort manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-cohort-${{ matrix.expansion }}
+          path: results/contextual-value-v1/q-guard10-20k/cohort/${{ matrix.expansion }}/
+          retention-days: 90
+
+  confirm:
+    needs: cohort
+    name: confirm-${{ matrix.expansion }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - expansion: EOE
+            draft_sha: 1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648
+            game_sha: 130e7e7580a1cb4b4f635411d187a078bc7bdd9dd3436ef5ff7535e14cadaf1b
+          - expansion: FIN
+            draft_sha: 9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b
+            game_sha: f6452e622976f66dd5420c55741da5b246c7e8d25d63c080e728635e1741a6a6
+          - expansion: TDM
+            draft_sha: 831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5
+            game_sha: e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4
+          - expansion: DFT
+            draft_sha: 7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd
+            game_sha: 734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2' 'scikit-learn==1.9.1'
+
+      - name: Compile frozen confirmation evaluator
+        run: python -m py_compile research/contextual_value_q_guard10_20k_confirmation.py research/contextual_value_four_way_fresh.py
+
+      - name: Download frozen Q bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-freeze
+          path: freeze
+          run-id: ${{ env.FROZEN_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download frozen cohort manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-cohort-${{ matrix.expansion }}
+          path: cohort
+
+      - name: Verify frozen model and cohort before data
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os
+          f=json.load(open('freeze/four-way-freeze.json'))
+          c=json.load(open('cohort/cohort.json'))
+          assert f['assessment_opened'] is False
+          assert f['assessment_outcomes_used'] is False
+          assert f['parity']['passed'] is True
+          assert f['fingerprint_sha256'] == 'd1f3cb78d1674b1424805b33637c89d3f3977baa890db61ff534fa7700cb5f33'
+          assert c['expansion'] == os.environ['EXPANSION']
+          assert c['draft_sha256'] == os.environ['DRAFT_SHA']
+          assert len(c['confirmation_ids']) == 5000
+          assert not (set(c['prior_8000_ids']) & set(c['confirmation_ids']))
+          print('frozen model/cohort identity verified; confirmation scoring may proceed')
+          PY
+
+      - name: Download exact frozen draft and game archives
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw-data
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/game.csv.gz \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+
+      - name: Verify exact frozen archive bytes
+        shell: bash
+        env:
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+          GAME_SHA: ${{ matrix.game_sha }}
+        run: |
+          set -euo pipefail
+          echo "$DRAFT_SHA  raw-data/draft.csv.gz" | sha256sum -c -
+          echo "$GAME_SHA  raw-data/game.csv.gz" | sha256sum -c -
+
+      - name: Score frozen A Q and Guard-10 once
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+          GAME_SHA: ${{ matrix.game_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "results/contextual-value-v1/q-guard10-20k/confirm/$EXPANSION"
+          python3 research/contextual_value_q_guard10_20k_confirmation.py \
+            --expansion "$EXPANSION" \
+            --draft-archive raw-data/draft.csv.gz \
+            --game-archive raw-data/game.csv.gz \
+            --expected-draft-sha256 "$DRAFT_SHA" \
+            --expected-game-sha256 "$GAME_SHA" \
+            --cohort-manifest cohort/cohort.json \
+            --freeze-json freeze/four-way-freeze.json \
+            --freeze-q-pickle freeze/four-way-rich-q.pkl \
+            --output "results/contextual-value-v1/q-guard10-20k/confirm/$EXPANSION/report.json"
+
+      - name: Assert confirmation boundary
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          python3 - <<'PY'
+          import json,os
+          p=f"results/contextual-value-v1/q-guard10-20k/confirm/{os.environ['EXPANSION']}/report.json"
+          r=json.load(open(p))
+          assert r['phase'] == 'q_guard10_20k_confirmation_environment'
+          assert r['confirmation_outcomes_used_for_fit'] is False
+          assert r['confirmation_outcomes_used_for_scoring'] is True
+          assert r['cohort']['confirmation'] == 5000
+          assert r['cohort']['overlap'] == 0
+          assert len(r['cohort']['confirmation_ids']) == 5000
+          assert set(r['comparisons_vs_A']) == {'Q','guard_010'}
+          for m in ('Q','guard_010'):
+              for cap in ('10','20','50'):
+                  assert len(r['raw_dr_delta_terms'][m][cap]) == 5000
+          assert len(r['paired']['guard_010_minus_Q_cap20']['terms']) == 5000
+          PY
+
+      - name: Upload environment confirmation
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-confirm-${{ matrix.expansion }}
+          path: results/contextual-value-v1/q-guard10-20k/confirm/${{ matrix.expansion }}/
+          retention-days: 90
+
+  aggregate:
+    needs: confirm
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned aggregate dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+      - name: Compile aggregate
+        run: python -m py_compile research/contextual_value_q_guard10_20k_aggregate.py
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-q-guard10-20k-confirm-*
+          path: reports
+
+      - name: Aggregate exact 20k confirmation
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results/contextual-value-v1/q-guard10-20k/aggregate
+          python3 research/contextual_value_q_guard10_20k_aggregate.py \
+            --report reports/contextual-value-v1-q-guard10-20k-confirm-EOE/report.json \
+            --report reports/contextual-value-v1-q-guard10-20k-confirm-FIN/report.json \
+            --report reports/contextual-value-v1-q-guard10-20k-confirm-TDM/report.json \
+            --report reports/contextual-value-v1-q-guard10-20k-confirm-DFT/report.json \
+            --output results/contextual-value-v1/q-guard10-20k/aggregate/report.json
+
+      - name: Assert final confirmation contract
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/contextual-value-v1/q-guard10-20k/aggregate/report.json'))
+          assert r['phase'] == 'q_guard10_20k_confirmation_aggregate'
+          assert r['confirmation_drafts'] == 20000
+          assert r['confirmation_outcomes_used_for_fit'] is False
+          assert set(r['comparisons_vs_A']) == {'Q','guard_010'}
+          assert set(r['gates']) == {'Q','guard_010'}
+          assert r['multiplicity']['primary_comparisons'] == 2
+          assert r['multiplicity']['family_alpha'] == 0.05
+          assert set(r['confirmed_challengers']).issubset({'Q','guard_010'})
+          PY
+
+      - name: Upload 20k aggregate report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-aggregate
+          path: results/contextual-value-v1/q-guard10-20k/aggregate/
+          retention-days: 90
