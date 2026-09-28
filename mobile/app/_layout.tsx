@@ -17,9 +17,14 @@ function ScreenshotFixtureEntry() {
     if (scene === 'daily-decision') {
       router.replace({ pathname: '/draft-run', params: { environment: 'mixed' } });
     } else if (scene === 'reveal-comparison') {
-      router.replace({ pathname: '/draft-run', params: { environment: 'mixed', screenshot: 'feedback' } });
+      // Use the dedicated fixture-only route instead of replacing into the
+      // draft-run query shape during cold startup. This avoids a transient
+      // blank render observed on the 6.9-inch iPhone simulator.
+      router.replace('/store-screenshot-feedback');
     } else if (scene === 'daily-hub') {
-      router.replace('/');
+      // The app already cold-starts on the hub. Replacing / with / during the
+      // initial router mount can leave a blank frame on some iPhone runtimes.
+      return;
     } else if (scene === 'practice') {
       router.replace('/practice');
     } else if (scene === 'career') {

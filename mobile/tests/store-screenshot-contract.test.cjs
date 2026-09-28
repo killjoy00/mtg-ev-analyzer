@@ -50,8 +50,9 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const androidCapture = read('mobile/scripts/capture-store-screenshots-android.sh');
   assert.match(androidCapture, /adb shell "am start -W -a android\.intent\.action\.VIEW -d '\$url' -p '\$package_name'"/);
   assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
-  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/store-screenshot-feedback"/);
-  assert.doesNotMatch(androidCapture, /screenshot=feedback/);
+  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/draft-run\?environment=mixed&screenshot=feedback"/);
+  assert.match(androidCapture, /-lavfi ssim/);
+  assert.match(androidCapture, /score >= 0\.98/);
   assert.match(androidCapture, /adb shell wm size 1080x1920/);
   assert.match(androidCapture, /adb shell wm density 420/);
   assert.match(androidCapture, /ffmpeg[\s\S]*\.jpg/);
@@ -62,8 +63,13 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(layout, /store-screenshot-feedback/);
   assert.match(layout, /config\.screenshots\.fixtures \|\| Platform\.OS !== 'ios'/);
   assert.match(layout, /Settings\.get\('packoneScreenshotScene'\)/);
-  assert.match(layout, /scene === 'reveal-comparison'/);
+  assert.match(layout, /scene === 'reveal-comparison'[\s\S]*router\.replace\('\/store-screenshot-feedback'\)/);
+  assert.match(layout, /scene === 'daily-hub'[\s\S]*return;/);
   assert.match(iosCapture, /simctl launch "\$udid" "\$bundle_id" -packoneScreenshotScene "\$scene"/);
+  assert.match(iosCapture, /for attempt in 1 2 3; do/);
+  assert.match(iosCapture, /minimum_bytes=120000/);
+  assert.match(iosCapture, /minimum_bytes=180000/);
+  assert.match(iosCapture, /stat -f%z/);
   assert.match(iosCapture, /sips -s format jpeg[\s\S]*\.jpg/);
   assert.match(iosCapture, /iphone:1320x2868/);
   assert.match(iosCapture, /ipad:2064x2752/);
@@ -146,6 +152,7 @@ test('iOS capture launches an explicit preview scene and rejects failed or unexp
           [[ -n "$out" ]]
           touch "$out"
         }
+        stat() { printf '200000\\n'; }
         ${capture}
         capture test practice
       `], { encoding: 'utf8', env: { ...process.env,
