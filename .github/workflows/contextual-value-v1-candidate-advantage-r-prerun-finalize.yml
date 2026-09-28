@@ -1,0 +1,68 @@
+name: contextual-value-v1-candidate-advantage-r-prerun-finalize
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  CORE_RUN: '36392568889'
+  VARIANCE_RUN: '36391518026'
+
+jobs:
+  finalize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-core-fixed
+          path: core
+          run-id: ${{ env.CORE_RUN }}
+          github-token: ${{ github.token }}
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-r-prerun-variance-*
+          path: variance
+          merge-multiple: true
+          run-id: ${{ env.VARIANCE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Finalize pre-run freeze
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p final
+          python3 research/contextual_value_r_20k_variance_aggregate.py \
+            --report variance/EOE.json \
+            --report variance/FIN.json \
+            --report variance/TDM.json \
+            --report variance/DFT.json \
+            --output final/variance-report.json
+          python3 research/contextual_value_candidate_advantage_r_prerun_finalize.py \
+            --core-report core/core-prerun-report.json \
+            --policy-bundle core/r-policy-bundle.npz \
+            --variance-report final/variance-report.json \
+            --output final/prerun-freeze-report.json
+          cp core/r-policy-bundle.npz final/
+      - name: Assert frozen boundary
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('final/prerun-freeze-report.json'))
+          assert r['validation_outcomes_loaded'] is False
+          assert r['assessment_outcomes_loaded'] is False
+          assert r['r_result_seen'] is False
+          assert r['frozen_policy']['r_lcb_null_deviation_rate'] <= .02
+          assert r['power_planning']['minimum_detectable_effect_wins'] > 0
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-freeze-final
+          path: final/
+          retention-days: 90
