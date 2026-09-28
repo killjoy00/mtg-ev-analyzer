@@ -1,0 +1,161 @@
+name: contextual-value-v1-r-confirmation-freeze
+
+on:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+    paths:
+      - .github/workflows/contextual-value-v1-r-confirmation-freeze.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PRERUN_RUN: '36451550413'
+  PHASE_A1_RUN: '36286752890'
+  PHASE_A2_RUN: '36290030236'
+  R_FREEZE_RUN: '36442998592'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  freeze:
+    strategy:
+      fail-fast: false
+      matrix:
+        expansion: [FIN, TDM, DFT]
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2'
+
+      - name: Download immutable confirmation prerun
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-prerun
+          path: prerun
+          run-id: ${{ env.PRERUN_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download immutable R policy bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-freeze-final
+          path: r-freeze
+          run-id: ${{ env.R_FREEZE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact rich feature schema
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold--1
+          path: feature
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download retained development validation shard
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold--1
+          path: validation
+          run-id: ${{ env.PHASE_A2_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact public archives
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output "raw/$EXPANSION-draft.csv.gz" \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output "raw/$EXPANSION-game.csv.gz" \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+          sha256sum "raw/$EXPANSION-draft.csv.gz" "raw/$EXPANSION-game.csv.gz"
+
+      - name: Freeze exact transfer actions and nuisances without outcomes
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          python3 research/contextual_value_r_confirmation_freeze.py \
+            --expansion "$EXPANSION" \
+            --draft-archive "raw/$EXPANSION-draft.csv.gz" \
+            --game-archive "raw/$EXPANSION-game.csv.gz" \
+            --reserve-json prerun/reserve.json \
+            --r-policy-bundle r-freeze/r-policy-bundle.npz \
+            --feature-report feature/phase-a-rich-fold--1-report.json \
+            --reproduction-validation-shard validation/phase-a2-fold--1.npz \
+            --output-dir "results/$EXPANSION"
+
+      - name: Assert outcome-free freeze invariants
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          e=os.environ['EXPANSION']
+          r=json.load(open(f'results/{e}/freeze-report.json'))
+          assert r['confirmation_outcomes_parsed'] is False
+          assert r['confirmation_outcomes_used'] is False
+          assert r['cohort']['confirmation_n'] == 15000
+          assert r['cohort']['overlap'] == 0
+          assert r['R']['c'] == 2.49
+          assert r['R']['development_action_reproduction_exact'] is True
+          assert r['context']['override_count'] >= 0
+          assert r['context']['npz_sha256']
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-${{ matrix.expansion }}
+          path: results/${{ matrix.expansion }}/
+          retention-days: 90
+
+  aggregate:
+    needs: freeze
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-r-independent-confirmation-freeze-*
+          path: frozen
+      - name: Verify all three frozen environments
+        run: |
+          python3 - <<'PY'
+          import hashlib,json,pathlib
+          out={'phase':'R_independent_confirmation_transfer_freeze_aggregate','confirmation_outcomes_opened':False,'environments':{}}
+          for e in ('FIN','TDM','DFT'):
+            p=pathlib.Path('frozen')/f'contextual-value-v1-r-independent-confirmation-freeze-{e}'
+            r=json.load(open(p/'freeze-report.json'))
+            assert r['expansion']==e
+            assert r['confirmation_outcomes_parsed'] is False and r['confirmation_outcomes_used'] is False
+            assert r['cohort']['confirmation_n']==15000 and r['cohort']['overlap']==0
+            assert r['R']['development_action_reproduction_exact'] is True
+            npz=p/'frozen-evaluation-context.npz'
+            h=hashlib.sha256(npz.read_bytes()).hexdigest()
+            assert h==r['context']['npz_sha256']
+            out['environments'][e]={
+              'context_sha256':h,
+              'transfer_score_digest_sha256':r['R']['transfer_score_digest_sha256'],
+              'override_count':r['context']['override_count'],
+              'override_fraction':r['context']['override_fraction'],
+              'metadata_sha256':r['metadata']['sha256'],
+            }
+          pathlib.Path('freeze-aggregate.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(out,indent=2,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-aggregate
+          path: freeze-aggregate.json
+          retention-days: 90
