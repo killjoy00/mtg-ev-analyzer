@@ -1,5 +1,9 @@
 # Candidate-advantage model R — frozen development protocol
 
+> **PRE-RESULTS AMENDMENT:** This original freeze is superseded where specified by
+> `research/CONTEXTUAL-VALUE-V1-CANDIDATE-ADVANTAGE-R-AMENDMENT-2026-09-28.md`.
+> No R fit or R validation result existed when that amendment was committed.
+
 **Issue:** #529  
 **Status:** conditional next model family; do not execute unless the Q/Guard-10 evaluator-trust audit passes without a hard validity defect.
 
