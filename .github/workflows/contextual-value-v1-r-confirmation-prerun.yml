@@ -1,0 +1,185 @@
+name: contextual-value-v1-r-confirmation-prerun
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+    paths:
+      - .github/workflows/contextual-value-v1-r-confirmation-prerun.yml
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  CORE_RUN: '36256947308'
+  EARLY_RUN: '36188897960'
+  FRESH_RUN: '36371215506'
+  PHASE_A1_RUN: '36286752890'
+  PHASE_A2_RUN: '36290030236'
+  R_FREEZE_RUN: '36442998592'
+  R_RESULT_RUN: '36447316564'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  prerun:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2'
+
+      - name: Download immutable R freeze
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-prerun-freeze-final
+          path: r-freeze
+          run-id: ${{ env.R_FREEZE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download immutable R development result
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-amended-development-final-recovery
+          path: r-result
+          run-id: ${{ env.R_RESULT_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download core 8k cohort
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: core
+          run-id: ${{ env.CORE_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download fresh 13k cohort manifests
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-q-guard10-20k-cohort-*
+          path: fresh
+          run-id: ${{ env.FRESH_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download early exploratory artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-*-3000
+          path: early
+          run-id: ${{ env.EARLY_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download core R validation shard
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a2-fold--1
+          path: validation
+          run-id: ${{ env.PHASE_A2_RUN }}
+          github-token: ${{ github.token }}
+      - name: Download exact rich feature schema
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-phase-a-rich-report-fold--1
+          path: feature
+          run-id: ${{ env.PHASE_A1_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Verify preserved R evidence before any new study
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(sha256sum r-freeze/r-policy-bundle.npz | awk '{print $1}')" = "8191ef8ef3eb0de5cbd963392b5e11c86b31f82984ec39b8701e6b5c107ac520"
+          test "$(sha256sum r-freeze/prerun-freeze-report.json | awk '{print $1}')" = "9b351ee6ca0a3dd8d676c18d2eed3f847ca34b8f7c619c797e76c193df234b66"
+          test "$(sha256sum feature/phase-a-rich-fold--1-report.json | awk '{print $1}')" = "351698079ebf2d108f4647d579ce20827adcc26adfa74c0f6bb85824805b460a"
+          python3 - <<'PY'
+          import json
+          f=json.load(open('r-freeze/prerun-freeze-report.json'))
+          r=json.load(open('r-result/report.json'))
+          assert f['frozen_policy']['r_lcb_c'] == 2.49
+          assert f['frozen_policy']['bundle_sha256'] == '8191ef8ef3eb0de5cbd963392b5e11c86b31f82984ec39b8701e6b5c107ac520'
+          assert r['advancement_gate']['advances'] is False
+          cap=r['primary_R_LCB_vs_A']['20']['minus_A']
+          assert abs(cap['dr'] - 0.04779800060583739) < 1e-15
+          assert all(abs(a-b)<1e-15 for a,b in zip(cap['dr_ci95'],[-0.006083997003363221,0.10348772352753974]))
+          assert abs(r['alternative_behavior_same_actions']['20']['minus_A']['dr'] - 0.04596395079160409) < 1e-15
+          assert abs(r['intervention_rate_vs_A'] - 0.0910490433252694) < 1e-15
+          PY
+
+      - name: Download exact FIN/TDM/DFT draft archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          for E in FIN TDM DFT; do
+            curl --fail --location --retry 5 --retry-delay 3               --output "raw/$E.csv.gz"               "$BASE/draft_data/draft_data_public.$E.PremierDraft.csv.gz"
+          done
+          echo "9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b  raw/FIN.csv.gz" | sha256sum -c -
+          echo "831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5  raw/TDM.csv.gz" | sha256sum -c -
+          echo "7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd  raw/DFT.csv.gz" | sha256sum -c -
+
+      - name: Build complete prior-use ledger and reserve exact 45k
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 research/contextual_value_r_confirmation_reserve.py             --core-cohort-manifest core/cohort-manifest.json             --fresh-cohort-manifest fresh/contextual-value-v1-q-guard10-20k-cohort-EOE/cohort.json             --fresh-cohort-manifest fresh/contextual-value-v1-q-guard10-20k-cohort-FIN/cohort.json             --fresh-cohort-manifest fresh/contextual-value-v1-q-guard10-20k-cohort-TDM/cohort.json             --fresh-cohort-manifest fresh/contextual-value-v1-q-guard10-20k-cohort-DFT/cohort.json             --early-train TMT=early/contextual-value-v1-tmt-3000/train-nuisance.jsonl.gz             --early-validation TMT=early/contextual-value-v1-tmt-3000/validation-nuisance.jsonl.gz             --early-train HOB=early/contextual-value-v1-hob-3000/train-nuisance.jsonl.gz             --early-validation HOB=early/contextual-value-v1-hob-3000/validation-nuisance.jsonl.gz             --early-train MSH=early/contextual-value-v1-msh-3000/train-nuisance.jsonl.gz             --early-validation MSH=early/contextual-value-v1-msh-3000/validation-nuisance.jsonl.gz             --draft-archive FIN=raw/FIN.csv.gz             --draft-archive TDM=raw/TDM.csv.gz             --draft-archive DFT=raw/DFT.csv.gz             --output-dir results/prerun
+
+      - name: Audit behavior evaluators on spent R development only
+        run: |
+          python3 research/contextual_value_r_evaluator_audit.py             --validation-shard validation/phase-a2-fold--1.npz             --policy-bundle r-freeze/r-policy-bundle.npz             --output results/prerun/evaluator-audit.json
+
+      - name: Freeze planning calculation
+        run: |
+          python3 - <<'PY'
+          import json, math, pathlib
+          from scipy.stats import norm
+          variance=3.7543868017860915
+          effect=.03
+          alpha=.05
+          power=.90
+          z=float(norm.ppf(1-alpha/2)+norm.ppf(power))
+          required=variance*z*z/(effect*effect)
+          rounded=45000
+          achieved=float(norm.cdf(math.sqrt(rounded)*effect/math.sqrt(variance)-norm.ppf(1-alpha/2)))
+          assert math.ceil(required)==43833
+          assert rounded==15000*3
+          out={
+            'phase':'R_independent_confirmation_power_freeze',
+            'planning_variance':variance,
+            'planning_variance_source':'already-spent 20k all-eligible draft-level Q-A diagnostic retained in R prerun freeze',
+            'minimum_planning_effect_wins':effect,
+            'alpha_two_sided':alpha,
+            'target_power':power,
+            'normal_required_n':required,
+            'normal_required_n_ceiling':math.ceil(required),
+            'frozen_n':rounded,
+            'per_environment_n':15000,
+            'environments':['FIN','TDM','DFT'],
+            'normal_approx_power_at_frozen_n':achieved,
+            'interpretation':'Powers detection of +0.03 versus zero under variance-transfer and independent-draft normal approximation. It does not power proof that the effect exceeds +0.03. Repeated-player dependence cannot be addressed because no stable player identifier is available.',
+          }
+          pathlib.Path('results/prerun/power.json').write_text(json.dumps(out,indent=2,sort_keys=True)+'\n')
+          print(json.dumps(out,indent=2,sort_keys=True))
+          PY
+
+      - name: Assert no new confirmation outcome analysis occurred
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/prerun/reserve.json'))
+          e=json.load(open('results/prerun/evaluator-audit.json'))
+          p=json.load(open('results/prerun/power.json'))
+          assert r['new_outcomes_analyzed'] is False
+          assert r['reserve_total'] == 45000
+          assert all(r['environments'][x]['reserve_n']==15000 for x in ('FIN','TDM','DFT'))
+          assert e['new_confirmation_outcomes_opened'] is False
+          assert e['primary_evaluator']=='primary_strong_offset'
+          assert e['alternative_evaluator']=='skill_aware'
+          assert p['frozen_n']==45000 and p['normal_required_n_ceiling']==43833
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-prerun
+          path: results/prerun/
+          retention-days: 90
