@@ -78,6 +78,8 @@ Backend repair and verification summaries are retained under `generated/card-ima
 
 Backend image propagation covers both the current parent corpus and any `Live` supplemental component whose `parent_version` is that current corpus. `Candidate`, retired/non-Live, and components attached to older parent corpora are deliberately excluded. This scope applies to both full and targeted image maintenance so a normalized parent cannot mask stale art in a currently served component.
 
+Rows selected from a supplemental component must be validated against that row's stored `corpus_version`, not against the current parent version. The September 28 Tishana release exposed this distinction: the Live-component query was correct, but the first release attempt rejected a valid Traditional-v4 row because the verifier implicitly expected the parent corpus version. The refresh now selects the stored row version, requires the payload version to match it, and validates both the before/after payload against that exact version. Keep that invariant whenever component-aware image propagation changes.
+
 The final protected-branch handoff uses an `automation/card-image-repair-...` branch and never pushes to `main` or creates a pull request from Actions. A no-op source publication is expected when checked-in/R2 display metadata was already correct and only the live backend state had drifted.
 
 ## Guarded release sequence
@@ -141,3 +143,5 @@ Conversely, the live product can be correct while the final checked-in source pu
 Do not rerun a successful production backend refresh merely because protected-branch publication failed. Recover the repository state through the PR-based source publication workflow.
 
 See [the September 23 card-image rollout closeout](reports/CARD-IMAGE-ROLLOUT-CLOSEOUT-2026-09-23.md) for the production evidence and the protected-branch recovery that established this contract.
+
+See also [the September 28 Tishana/card-image audit closeout](reports/CARD-IMAGE-TISHANA-AUDIT-CLOSEOUT-2026-09-28.md) for the Live supplemental-component propagation bug, the component-version validation fix, the future-import hardening, and the successful Pack One-wide re-audit.
