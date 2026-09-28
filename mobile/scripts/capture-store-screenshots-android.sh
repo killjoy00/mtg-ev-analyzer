@@ -17,11 +17,16 @@ command -v ffprobe >/dev/null
 capture() {
   local name="$1"
   local url="$2"
+  local expected_text="${3:-}"
   adb shell am force-stop "$package_name" >/dev/null 2>&1 || true
   # adb shell reconstructs a remote shell command. Quote the URI inside that
   # remote command so query separators such as '&' are not parsed by /system/bin/sh.
   adb shell "am start -W -a android.intent.action.VIEW -d '$url' -p '$package_name'" >/dev/null
   sleep 12
+  if [[ -n "$expected_text" ]]; then
+    adb shell uiautomator dump /sdcard/packone-screenshot.xml >/dev/null
+    adb shell cat /sdcard/packone-screenshot.xml | grep -F "$expected_text" >/dev/null
+  fi
   local raw="$out_root/android/$name.raw.png"
   adb exec-out screencap -p > "$raw"
   ffmpeg -hide_banner -loglevel error -y -i "$raw" -frames:v 1 "$out_root/android/$name.jpg"
@@ -29,7 +34,7 @@ capture() {
 }
 
 capture "01-daily-decision" "packone://draft-run?environment=mixed"
-capture "02-reveal-comparison" "packone://draft-run?environment=mixed&screenshot=feedback"
+capture "02-reveal-comparison" "packone://draft-run?environment=mixed&screenshot=feedback" "trophy drafter"
 capture "03-daily-hub" "packone://"
 capture "04-practice" "packone://practice"
 capture "05-career" "packone://career"
