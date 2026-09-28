@@ -43,10 +43,17 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.doesNotMatch(workflow, /-scheme PackOne\b/);
   assert.doesNotMatch(workflow, /Release-iphonesimulator\/PackOne\.app/);
   const layout = read('mobile/app/_layout.tsx');
+  const screenshotFeedbackRoute = read('mobile/app/store-screenshot-feedback.tsx');
   const iosCapture = read('mobile/scripts/capture-store-screenshots-ios.sh');
   const androidCapture = read('mobile/scripts/capture-store-screenshots-android.sh');
   assert.match(androidCapture, /adb shell "am start -W -a android\.intent\.action\.VIEW -d '\$url' -p '\$package_name'"/);
   assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
+  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/store-screenshot-feedback"/);
+  assert.doesNotMatch(androidCapture, /screenshot=feedback/);
+  assert.match(screenshotFeedbackRoute, /config\.screenshots\.fixtures/);
+  assert.match(screenshotFeedbackRoute, /<DraftRunScreen screenshotFeedback \/>/);
+  assert.match(draftRun, /screenshotFeedbackOverride/);
+  assert.match(layout, /store-screenshot-feedback/);
   assert.match(layout, /config\.screenshots\.fixtures \|\| Platform\.OS !== 'ios'/);
   assert.match(layout, /Settings\.get\('packoneScreenshotScene'\)/);
   assert.match(layout, /scene === 'reveal-comparison'/);
