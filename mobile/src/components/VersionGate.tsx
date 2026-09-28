@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { requestJson } from '@/src/api/client';
 import { VersionGateBoundary } from '@/src/components/VersionGateBoundary';
+import { config } from '@/src/config';
 import { colors, spacing } from '@/src/theme';
 import {
   resolveVersionCheck,
@@ -93,6 +94,10 @@ function UpdateRequiredScreen({
 }
 
 export function VersionGate({ children }: { children: ReactNode }) {
+  // Screenshot fixture builds are preview-only and fully deterministic. Do not
+  // render a transient version-check screen that can be captured as store art.
+  if (config.screenshots.fixtures) return <>{children}</>;
+
   return (
     <VersionGateBoundary
       checkVersion={checkInstalledVersion}
