@@ -124,7 +124,7 @@ test('iOS capture launches an explicit preview scene and rejects failed or unexp
             printf '%s\\n' "$LAUNCH_OUTPUT"
             return "$LAUNCH_STATUS"
           elif [[ "$2" == io ]]; then
-            touch "${@: -1}"
+            touch "\${@: -1}"
             return 0
           fi
           return 2
