@@ -50,7 +50,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const androidCapture = read('mobile/scripts/capture-store-screenshots-android.sh');
   assert.match(androidCapture, /adb shell "am start -W -a android\.intent\.action\.VIEW -d '\$url' -p '\$package_name'"/);
   assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
-  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/draft-run\?screenshot=feedback"/);
+  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/\/store-screenshot-feedback"/);
   assert.match(androidCapture, /-lavfi ssim/);
   assert.match(androidCapture, /score >= 0\.98/);
   assert.match(androidCapture, /adb shell wm size 1080x1920/);
@@ -196,6 +196,7 @@ test('App Store screenshot upload is protected, source-pinned, and non-submittin
   assert.match(uploader, /APP_IPAD_PRO_3GEN_129/);
   assert.match(uploader, /iap-review-membership\.jpg/);
   assert.match(uploader, /PREPARE_FOR_SUBMISSION/);
+  assert.doesNotMatch(uploader, /relationships\/appScreenshots[\s\S]*method: 'PATCH'/);
   assert.match(uploader, /subscriptionAppStoreReviewScreenshots/);
   assert.doesNotMatch(uploader, /reviewSubmissions/);
   assert.equal(request.operation, 'upload-pack-one-app-store-screenshots');
