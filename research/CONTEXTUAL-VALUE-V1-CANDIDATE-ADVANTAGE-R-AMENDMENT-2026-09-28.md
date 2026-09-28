@@ -9,6 +9,9 @@ This amendment supersedes the affected sections of
 `CONTEXTUAL-VALUE-V1-CANDIDATE-ADVANTAGE-R.md`. The original file remains
 for audit history.
 
+A separate identification/robustness addendum also applies without replacing this amendment:
+`research/CONTEXTUAL-VALUE-V1-IDENTIFICATION-ADDENDUM-2026-09-28.md`.
+
 ## Why an amendment is required
 
 Three launch attempts failed **before R fitting/report generation**:
