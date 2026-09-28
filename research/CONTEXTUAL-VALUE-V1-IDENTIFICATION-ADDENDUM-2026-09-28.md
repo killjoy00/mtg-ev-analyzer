@@ -279,6 +279,20 @@ it supplies a scale reference.
 
 ### Confounding-robust fallback policy
 
+**Pre-result implementation decision:** the project now implements a conservative
+native multi-action **evaluation** outer bound by applying the marginal
+one-vs-rest odds sensitivity constraint to each target action while retaining
+historical third-action observations. This supplies DR/IPW robustness bounds
+without reducing the sample to binary R-vs-A decisions.
+
+That construction is not claimed to be a sharp, coherent joint multinomial
+uncertainty set for **policy optimization**. Therefore the project will **not**
+manufacture a Kallus-Zhou-style per-decision robust fallback policy from those
+outer bounds before R outcomes. A robust secondary policy remains authorized
+only after a formally validated joint multi-action uncertainty set/objective is
+specified. This is a deliberate disagreement with treating the binary robust
+policy formula as immediately portable; it does not change primary R-LCB.
+
 Kallus & Zhou (2018) motivates a policy that departs from a baseline only when
 improvement survives a prespecified confounding uncertainty set.
 
