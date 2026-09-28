@@ -15,6 +15,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const appConfig = read('mobile/app.config.ts');
   const client = read('mobile/src/api/client.ts');
   const session = read('mobile/src/storage/session.ts');
+  const screenshotFixtures = read('mobile/src/screenshots/fixtures.ts');
   const draftRun = read('mobile/app/draft-run.tsx');
   const workflow = read('.github/workflows/mobile-store-screenshots.yml');
 
@@ -27,6 +28,8 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(appConfig, /PACKONE_BUILD_PROFILE=preview/);
   assert.match(client, /if \(config\.screenshots\.fixtures\)/);
   assert.match(session, /if \(config\.screenshots\.fixtures\)/);
+  assert.match(screenshotFixtures, /https:\/\/cards\.scryfall\.io\/normal\/front\//);
+  assert.doesNotMatch(screenshotFixtures, /api\.scryfall\.com\/cards\/named/);
   assert.match(draftRun, /config\.screenshots\.fixtures && params\.screenshot === 'feedback'/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_ENV: preview/);
   assert.match(workflow, /EXPO_PUBLIC_PACKONE_SCREENSHOT_FIXTURES: '1'/);
@@ -50,9 +53,10 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   assert.match(iosCapture, /simctl launch "\$udid" "\$bundle_id" -packoneScreenshotScene "\$scene"/);
   assert.doesNotMatch(iosCapture, /simctl openurl/);
   assert.doesNotMatch(iosCapture, /schemeapproval/);
-  assert.match(workflow, /Enable KVM for Android emulator/);
+  assert.match(workflow, /Enable KVM for Android emulator when available/);
   assert.match(workflow, /MODE="0666"/);
-  assert.match(workflow, /test -w \/dev\/kvm/);
+  assert.match(workflow, /sudo chmod 666 \/dev\/kvm/);
+  assert.match(workflow, /emulator-boot-timeout: 900/);
   assert.match(workflow, /adb shell service check package/);
   assert.match(workflow, /for attempt in 1 2 3; do/);
   assert.match(workflow, /adb kill-server/);
