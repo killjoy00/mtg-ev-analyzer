@@ -1,7 +1,6 @@
 {
-  "operation": "deploy",
-  "request_id": "egress-image-refresh-541-prod-20260927",
-  "reason": "Promote the exact #697 egress-fix revision to production after the guarded development deployment and live acceptance succeeded.",
-  "commit": "4e39399ff0481fe11636546c2e1cf5a1e2407c96",
-  "target": "production"
+  "operation": "card-image-release",
+  "request_id": "tishana-card-image-release-20260928",
+  "reason": "Deploy the reviewed live-component image repair and run the full guarded Pack One card-art normalization and audit after the Tishana Tidebinder regression.",
+  "commit": "c8dc309676139f9507dc409a22a571076931934e"
 }
