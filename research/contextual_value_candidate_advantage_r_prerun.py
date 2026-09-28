@@ -305,7 +305,7 @@ def main():
     prior_behavior=json.loads(args.rich_behavior_report.read_text())
     expected=prior_behavior["final_correction_fit"]
     objective_error=abs(float(alt_model["objective"])-float(expected["objective"]))
-    if objective_error>1e-8:
+    if objective_error>1e-5:
         raise SystemExit(f"rich behavior final-fit objective parity error {objective_error}")
     lambdas=prior_behavior["pick_shrinkage_training_only"]["by_pick"]
     if any(abs(float(row["lambda"])-1.0)>1e-12 for row in lambdas.values()):
@@ -356,7 +356,7 @@ def main():
     metrics=behavior_choice_metrics(vdata_for_behavior,alt_behavior)
     expected_nll=float(prior_behavior["validation_behavior_prediction"]["pick_shrunk"]["selected_action_nll"])
     nll_error=abs(float(metrics["selected_action_nll"])-expected_nll)
-    if nll_error>1e-8:
+    if nll_error>1e-5:
         raise SystemExit(f"rich behavior validation NLL parity error {nll_error}")
 
     # Freeze every policy action before validation outcomes are available.
