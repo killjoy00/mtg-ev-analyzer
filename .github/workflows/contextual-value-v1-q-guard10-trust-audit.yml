@@ -1,0 +1,208 @@
+name: contextual-value-v1-q-guard10-trust-audit
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  CONFIRM_RUN: '36371215506'
+  FROZEN_RUN: '36337059424'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  audit:
+    name: trust-${{ matrix.expansion }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        include:
+          - expansion: EOE
+            draft_sha: 1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648
+            game_sha: 130e7e7580a1cb4b4f635411d187a078bc7bdd9dd3436ef5ff7535e14cadaf1b
+          - expansion: FIN
+            draft_sha: 9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b
+            game_sha: f6452e622976f66dd5420c55741da5b246c7e8d25d63c080e728635e1741a6a6
+          - expansion: TDM
+            draft_sha: 831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5
+            game_sha: e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4
+          - expansion: DFT
+            draft_sha: 7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd
+            game_sha: 734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2' 'scikit-learn==1.9.1'
+
+      - name: Compile trust audit
+        run: python -m py_compile research/contextual_value_q_guard10_20k_trust_audit.py research/contextual_value_q_guard10_20k_trust_aggregate.py
+
+      - name: Download frozen Q bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-freeze
+          path: freeze
+          run-id: ${{ env.FROZEN_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download retained cohort manifest
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-cohort-${{ matrix.expansion }}
+          path: cohort
+          run-id: ${{ env.CONFIRM_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download retained environment confirmation
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-confirm-${{ matrix.expansion }}
+          path: retained
+          run-id: ${{ env.CONFIRM_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact frozen archives
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw-data
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/game.csv.gz \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+
+      - name: Verify exact archive bytes
+        shell: bash
+        env:
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+          GAME_SHA: ${{ matrix.game_sha }}
+        run: |
+          set -euo pipefail
+          echo "$DRAFT_SHA  raw-data/draft.csv.gz" | sha256sum -c -
+          echo "$GAME_SHA  raw-data/game.csv.gz" | sha256sum -c -
+
+      - name: Reconstruct frozen evaluator and audit support
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+          GAME_SHA: ${{ matrix.game_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p "results/contextual-value-v1/q-guard10-trust/$EXPANSION"
+          python3 research/contextual_value_q_guard10_20k_trust_audit.py \
+            --expansion "$EXPANSION" \
+            --draft-archive raw-data/draft.csv.gz \
+            --game-archive raw-data/game.csv.gz \
+            --expected-draft-sha256 "$DRAFT_SHA" \
+            --expected-game-sha256 "$GAME_SHA" \
+            --cohort-manifest cohort/cohort.json \
+            --freeze-json freeze/four-way-freeze.json \
+            --freeze-q-pickle freeze/four-way-rich-q.pkl \
+            --retained-confirmation retained/report.json \
+            --metadata-output "results/contextual-value-v1/q-guard10-trust/$EXPANSION/metadata.json" \
+            --output "results/contextual-value-v1/q-guard10-trust/$EXPANSION/report.json"
+
+      - name: Assert hard trust boundaries
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          python3 - <<'PY'
+          import json,os
+          p=f"results/contextual-value-v1/q-guard10-trust/{os.environ['EXPANSION']}/report.json"
+          r=json.load(open(p))
+          assert r['phase'] == 'q_guard10_20k_trust_audit_environment'
+          assert r['registered_result_unchanged'] is True
+          assert r['parity']['passed'] is True
+          assert r['parity']['max_abs_error'] <= 1e-9
+          assert r['identity']['rich_q_pickle_sha256'] == '854ea2594bb9ae59d38d8a8f7f1e7a12cbc4e7da77293dce91596cd1a8d7d477'
+          assert r['invariants']['identical_A_vs_A_exact_zero'] is True
+          assert r['outcome_completeness']['n'] == 5000
+          PY
+
+      - name: Upload environment trust audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-trust-${{ matrix.expansion }}
+          path: results/contextual-value-v1/q-guard10-trust/${{ matrix.expansion }}/
+          retention-days: 90
+
+  aggregate:
+    needs: audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+
+      - name: Run semi-synthetic evaluator invariants
+        env:
+          PYTHONPATH: scripts
+        run: python -m unittest tests.test_contextual_value_trust_audit -v
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-q-guard10-trust-*
+          path: reports
+
+      - name: Download registered 20k aggregate
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-aggregate
+          path: registered
+          run-id: ${{ env.CONFIRM_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Aggregate fixed-set trust diagnostics
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results/contextual-value-v1/q-guard10-trust/aggregate
+          python3 research/contextual_value_q_guard10_20k_trust_aggregate.py \
+            --report reports/contextual-value-v1-q-guard10-trust-EOE/report.json \
+            --report reports/contextual-value-v1-q-guard10-trust-FIN/report.json \
+            --report reports/contextual-value-v1-q-guard10-trust-TDM/report.json \
+            --report reports/contextual-value-v1-q-guard10-trust-DFT/report.json \
+            --registered-aggregate registered/report.json \
+            --output results/contextual-value-v1/q-guard10-trust/aggregate/report.json
+
+      - name: Assert trust-audit conclusion
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/contextual-value-v1/q-guard10-trust/aggregate/report.json'))
+          assert r['phase'] == 'q_guard10_20k_trust_audit_aggregate'
+          assert r['registered_result_unchanged'] is True
+          assert r['registered_decision'] == 'no_confirmed_challenger'
+          assert r['reconstruction_validity_defect_found'] is False
+          assert all(v['passed'] for v in r['hard_reconstruction_parity'].values())
+          PY
+
+      - name: Upload aggregate trust audit
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-trust-aggregate
+          path: results/contextual-value-v1/q-guard10-trust/aggregate/
+          retention-days: 90
