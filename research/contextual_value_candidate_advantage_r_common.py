@@ -639,19 +639,43 @@ def noise_legacy_support_rate(
     factor,psd=_psd_factor(fit.global_covariance)
     rng=np.random.default_rng(seed)
     idx=np.asarray(decision_indices,dtype=np.int64)
+    offsets=np.asarray(data["offsets"],dtype=np.int64)
     incumbent=np.asarray(data["incumbent_ord"],dtype=np.int64)
-    total=0; deviations=0; clipped_band=0
-    for _ in range(draws):
-        beta=rng.standard_normal(factor.shape[1])@factor.T
-        action=legacy_r_support_actions(
-            data=data,beta=beta,keep_indices=fit.keep_indices,scale=fit.z_scale,
-            decision_indices=idx,behavior=behavior,
-        )
-        deviations += int(np.sum(action[idx]!=incumbent[idx]))
-        offsets=np.asarray(data["offsets"],dtype=np.int64)
-        prop=np.asarray([behavior[int(offsets[i])+int(action[i])] for i in idx])
-        clipped_band += int(np.sum((prop>=0.01)&(prop<0.05)))
-        total += len(idx)
+    cand=np.asarray(data["cand_rich"],dtype=np.float64)
+    # Build one relative-to-A matrix for every candidate in every eligible decision.
+    pieces=[]; prop_pieces=[]; owner_slices=[]; thresholds=[]
+    cursor=0
+    for raw_i in idx:
+        i=int(raw_i); start,stop=int(offsets[i]),int(offsets[i+1])
+        a=int(incumbent[i])
+        base=cand[start+a,fit.keep_indices]
+        d=(cand[start:stop,fit.keep_indices]-base)/fit.z_scale
+        pieces.append(d)
+        prop_pieces.append(np.asarray(behavior[start:stop],dtype=np.float64))
+        owner_slices.append((cursor,cursor+(stop-start),a))
+        thresholds.append(max(0.01,0.10/(stop-start)))
+        cursor += stop-start
+    diff=np.concatenate(pieces,axis=0)
+    props=np.concatenate(prop_pieces)
+    thresholds=np.asarray(thresholds,dtype=np.float64)
+
+    deviations=0; clipped_band=0; total=0
+    batch=100
+    for begin in range(0,draws,batch):
+        b=min(batch,draws-begin)
+        beta=rng.standard_normal((b,factor.shape[1]))@factor.T
+        score=diff@beta.T
+        for owner,(a,bound,a_local) in enumerate(owner_slices):
+            block=score[a:bound]
+            local=np.argmax(block,axis=0)
+            max_score=block[local,np.arange(b)]
+            # Tie probability under continuous null draws is zero; A has relative score 0.
+            chosen_prop=props[a+local]
+            dev=(max_score>0)&(local!=a_local)&(chosen_prop>=thresholds[owner])
+            deviations += int(np.sum(dev))
+            chosen_effective=np.where(dev,chosen_prop,props[a+a_local])
+            clipped_band += int(np.sum((chosen_effective>=0.01)&(chosen_effective<0.05)))
+        total += len(idx)*b
     return {
         "draws":draws,
         "seed":seed,
@@ -659,3 +683,4 @@ def noise_legacy_support_rate(
         "chosen_propensity_0_01_to_0_05_fraction":clipped_band/total,
         "covariance_psd":psd,
     }
+
