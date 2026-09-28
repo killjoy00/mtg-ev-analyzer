@@ -161,7 +161,10 @@ def main():
     if identity_sha(data)!=freeze["core"]["validation_identity_sha256"]:
         raise SystemExit("validation identity differs from pre-run freeze")
     nuisance=read_nuisance(args.validation_nuisance,-1)
-    # Validation shards do not retain phi_simple; training-fold phi parity was frozen pre-outcome.\n    # The outcome evaluator uses only joined behavior/q here, so verify coverage/normalization\n    # without requesting the unavailable training pseudo-value parity check.\n    behavior,q,join=align_nuisance(data,nuisance,verify_phi=False)
+    # Validation shards do not retain phi_simple; training-fold phi parity was frozen pre-outcome.
+    # The outcome evaluator uses only joined behavior/q here, so verify coverage/normalization
+    # without requesting the unavailable training pseudo-value parity check.
+    behavior,q,join=align_nuisance(data,nuisance,verify_phi=False)
 
     bundle=np.load(args.policy_bundle,allow_pickle=False)
     if str(bundle["validation_identity"][0])!=freeze["core"]["validation_identity_sha256"]:
