@@ -2,9 +2,6 @@ name: contextual-value-v1-qa-policy-study
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - research/contextual-value-v1-h-freeze-audit-529
 
 permissions:
   actions: read
