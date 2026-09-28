@@ -1,0 +1,157 @@
+name: contextual-value-v1-qa-policy-study
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - research/contextual-value-v1-h-freeze-audit-529
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  FROZEN_RUN: '36337059424'
+  MAX_DRAFTS: '8000'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  study:
+    name: qa-${{ matrix.expansion }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 150
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        expansion: [EOE, FIN, TDM, DFT]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2' 'scikit-learn==1.9.1'
+
+      - name: Compile bounded Q+A study
+        run: python -m py_compile research/contextual_value_qa_policy_study.py research/contextual_value_qa_policy_aggregate.py research/contextual_value_four_way_fresh.py
+
+      - name: Download frozen Q bundle
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-four-way-freeze
+          path: freeze
+          run-id: ${{ env.FROZEN_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Verify frozen bundle identity
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          r=json.load(open('freeze/four-way-freeze.json'))
+          assert r['assessment_opened'] is False
+          assert r['assessment_outcomes_used'] is False
+          assert r['parity']['passed'] is True
+          assert r['fingerprint_sha256'] == 'd1f3cb78d1674b1424805b33637c89d3f3977baa890db61ff534fa7700cb5f33'
+          PY
+
+      - name: Download official fresh 17Lands snapshot
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw-data
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw-data/game.csv.gz \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+
+      - name: Run bounded Q+A policy study
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p "results/contextual-value-v1/qa-policy-study/$EXPANSION"
+          python3 research/contextual_value_qa_policy_study.py \
+            --expansion "$EXPANSION" \
+            --draft-archive raw-data/draft.csv.gz \
+            --game-archive raw-data/game.csv.gz \
+            --max-drafts "$MAX_DRAFTS" \
+            --freeze-json freeze/four-way-freeze.json \
+            --freeze-q-pickle freeze/four-way-rich-q.pkl \
+            --output "results/contextual-value-v1/qa-policy-study/$EXPANSION/report.json"
+
+      - name: Assert policy-study boundary
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          python3 - <<'PY'
+          import json,os
+          p=f"results/contextual-value-v1/qa-policy-study/{os.environ['EXPANSION']}/report.json"
+          r=json.load(open(p))
+          assert r['phase'] == 'qa_bounded_policy_study_environment'
+          assert r['assessment_opened'] is False
+          assert r['assessment_outcomes_loaded'] is False
+          assert r['cohort']['assessment_drafts_withheld'] > 0
+          assert r['cohort']['primary_validation_drafts'] >= 500
+          assert set(r['policies']) == {'A','Q','guard_005','guard_010','guard_020','blend_025','blend_050','blend_075'}
+          PY
+
+      - name: Upload environment policy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-qa-policy-${{ matrix.expansion }}
+          path: results/contextual-value-v1/qa-policy-study/${{ matrix.expansion }}/
+          retention-days: 30
+
+  aggregate:
+    needs: study
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-qa-policy-*
+          path: reports
+
+      - name: Aggregate frozen hybrid study
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results/contextual-value-v1/qa-policy-study/aggregate
+          python3 research/contextual_value_qa_policy_aggregate.py \
+            --report reports/contextual-value-v1-qa-policy-EOE/report.json \
+            --report reports/contextual-value-v1-qa-policy-FIN/report.json \
+            --report reports/contextual-value-v1-qa-policy-TDM/report.json \
+            --report reports/contextual-value-v1-qa-policy-DFT/report.json \
+            --output results/contextual-value-v1/qa-policy-study/aggregate/report.json
+
+      - name: Assert aggregate boundary
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/contextual-value-v1/qa-policy-study/aggregate/report.json'))
+          assert r['phase'] == 'qa_bounded_policy_study_aggregate'
+          assert r['assessment_opened'] is False
+          assert r['assessment_outcomes_loaded'] is False
+          assert set(r['environments']) == {'EOE','FIN','TDM','DFT'}
+          if r['selected_hybrid'] is not None:
+              assert r['selected_hybrid'] in r['eligible_hybrids']
+          PY
+
+      - name: Upload aggregate policy report
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextual-value-v1-qa-policy-aggregate
+          path: results/contextual-value-v1/qa-policy-study/aggregate/
+          retention-days: 30
