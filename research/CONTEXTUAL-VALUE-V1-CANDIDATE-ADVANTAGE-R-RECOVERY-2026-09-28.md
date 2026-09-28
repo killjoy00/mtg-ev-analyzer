@@ -54,3 +54,20 @@ No partial estimate from run 36446571368 is used to justify this correction; the
 One recovery execution is allowed solely to complete the already-frozen evaluation. It must use the exact frozen artifacts/hashes above and the evaluator blob produced by commit 6d39da6870729bba33c3015cbc2645e6f5136d4e.
 
 After launch, the recovery workflow must be blocked against repeat execution. Any further failure may be repaired only if it is another execution defect that leaves all frozen scientific choices unchanged and is documented before retry.
+
+
+## Second failed execution
+
+Recovery run **36447033084** again verified the same frozen inputs and evaluator-unit-test boundary, then failed before any call to `estimate_dict` with:
+
+`NameError: name 'behavior' is not defined`
+
+Cause: the first execution-only edit accidentally inserted literal `\n` characters inside one Python comment line. Python therefore treated the intended `behavior,q,join=align_nuisance(..., verify_phi=False)` assignment as part of that comment.
+
+No R estimate, CI, environment result, sensitivity bound, or advancement-gate result was produced by run 36447033084.
+
+Commit **772f98272b21e2ec9f11d16bf19a2c857a451b13** fixes only those literal-newline characters so the already-intended assignment executes. The resulting evaluator blob SHA-1 is:
+
+`4bb727a05bc915893bbefa57995636c2222e725a`
+
+This changes no scientific choice and uses no partial result. One final execution-only recovery is authorized with this exact evaluator blob and the same frozen artifacts/hashes.
