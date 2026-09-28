@@ -20,14 +20,34 @@ class FullTrophyTests(unittest.TestCase):
         complete={'image_url':'https://example.com/complete.jpg','type_line':'Land'}
         with tempfile.TemporaryDirectory() as tmp:
             cache=Path(tmp)/'images.json'
-            cache.write_text(json.dumps({'Deduce':{'image_url':'https://example.com/old.jpg'}}))
+            cache.write_text(json.dumps({
+                'Deduce':{'image_url':'https://example.com/old.jpg'},
+                'Complete':{'image_url':'https://example.com/stale.jpg','type_line':'Wrong'},
+            }))
             with patch('import_all_trophies.fetch_named',return_value=card) as fetch_named, patch('import_all_trophies.time.sleep'):
-                known=resolve_images({'Deduce','Complete'},{'Complete':complete},cache)
-            fetch_named.assert_called_once_with('Deduce')
+                known=resolve_images({'Deduce','Complete'},{'Complete':complete},cache,'abc')
+            fetch_named.assert_called_once_with('Deduce','abc')
             self.assertEqual(known['Deduce']['type_line'],'Instant')
             self.assertEqual(known['Complete'],complete)
-            with patch('import_all_trophies.fetch_named',side_effect=AssertionError('Complete metadata must use cache')):
-                self.assertEqual(resolve_images({'Deduce','Complete'},known,cache),known)
+            with patch('import_all_trophies.fetch_named',side_effect=AssertionError('Complete metadata must use current set metadata')):
+                self.assertEqual(resolve_images({'Deduce','Complete'},known,cache,'abc'),known)
+
+    def test_metadata_is_scoped_to_the_requested_environment(self):
+        from import_all_trophies import metadata
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp)
+            (root/'corpus/draft-run').mkdir(parents=True)
+            (root/'corpus/draft-run/card-images.json').write_text('{}')
+            for sid,image in [('lci','https://example.com/lci.jpg'),('woe','https://example.com/woe.jpg')]:
+                shard=root/'data'/sid/'shards'
+                shard.mkdir(parents=True)
+                payload={'replays':[{'picks':[{'candidates':[{
+                    'id':'shared-card','name':'Shared Card','image_url':image,
+                    'type_line':'Creature','rarity':'common','mana_cost':'{1}',
+                }]}]}]}
+                (shard/'one.json').write_text(json.dumps(payload))
+            self.assertEqual(metadata(root,'lci')['Shared Card']['image_url'],'https://example.com/lci.jpg')
+            self.assertEqual(metadata(root,'woe')['Shared Card']['image_url'],'https://example.com/woe.jpg')
 
     def test_trophies_have_no_replay_or_training_cap(self):
         drafts={f'd{i}':{'wins':7,'games':100,'rate':.65} for i in range(6001)}
