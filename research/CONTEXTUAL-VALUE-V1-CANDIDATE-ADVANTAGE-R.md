@@ -67,15 +67,19 @@ One fixed model only:
 - per-environment deviations for MSH/SOS/ECL/TLA: L2 = **1000**;
 - intercept unpenalized.
 
-The set deviations are shrinkage terms, not separate per-set models.
+The set deviations are shrinkage/nuisance terms, not separate per-set models and not policy-ranking coefficients.
 
 No card-name identity coefficients are used. Candidate strength is represented by the existing leakage-safe aggregate signals/static metadata/pack-relative/pool-fit features.
 
 ## Policy
 
-For candidate a in environment s:
+The per-environment deviation terms are **fit-time nuisance/shrinkage terms only**. They absorb core-set heterogeneity while estimating the transportable global advantage coefficients; they are not used to rank cards.
 
-`R_score(a) = x_scaled(a) beta_global + x_scaled(a) delta_s`.
+For every environment, including the core development sets:
+
+`R_score(a) = x_scaled(a) beta_global`.
+
+This makes development evaluation and later unseen-set transfer use the exact same ranking rule. The fitted MSH/SOS/ECL/TLA deviation terms are reported diagnostically but never enter the target policy.
 
 The common baseline/intercept cancels for ranking.
 
