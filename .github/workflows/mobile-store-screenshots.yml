@@ -247,18 +247,14 @@ jobs:
           ls -l /dev/kvm
       - name: Capture Android screenshots
         uses: reactivecircus/android-emulator-runner@v2
-        with:
-          api-level: 35
-          target: google_apis
-          arch: x86_64
-          profile: pixel_7_pro
-          disable-animations: true
-          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
-          script: |
+        # The action runs each script line through /bin/sh. Keep the Bash
+        # program in one environment value and explicitly invoke Bash once.
+        env:
+          PACKONE_ANDROID_SCREENSHOT_SCRIPT: |
             set -euo pipefail
             adb wait-for-device
             for attempt in 1 2 3 4 5 6; do
-              if adb shell service check package 2>/dev/null | grep -q 'Service package: found'; then
+              if adb shell service check package 2>/dev/null | grep -F 'Service package: found' >/dev/null; then
                 break
               fi
               if [[ "$attempt" == 6 ]]; then
@@ -283,6 +279,14 @@ jobs:
             [[ "$installed" == 1 ]]
             cd mobile
             bash ./scripts/capture-store-screenshots-android.sh "$GITHUB_WORKSPACE/store-screenshots"
+        with:
+          api-level: 35
+          target: google_apis
+          arch: x86_64
+          profile: pixel_7_pro
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -no-snapshot -noaudio -no-boot-anim
+          script: bash -c "$PACKONE_ANDROID_SCREENSHOT_SCRIPT"
       - uses: actions/upload-artifact@v4
         with:
           name: pack-one-android-store-screenshots
