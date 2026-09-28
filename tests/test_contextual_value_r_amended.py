@@ -161,7 +161,7 @@ class AmendedRTests(unittest.TestCase):
             behavior=behavior,q_values=q,draft_ids=drafts,decision_indices=idx,cap=20)
         b,bt=self.evaluate_draft_weighted(offsets=offsets,selected_ord=selected,target_ord=target_b,outcome=outcome,
             behavior=behavior,q_values=q,draft_ids=drafts,decision_indices=idx,cap=20)
-        delta=self.paired_delta(b,at)
+        delta=self.paired_delta(bt,at)
         self.assertEqual(len(delta),2)
         self.assertAlmostEqual(float(np.mean(delta)),b.dr-a.dr,places=12)
 
