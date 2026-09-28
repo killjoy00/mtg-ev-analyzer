@@ -126,6 +126,7 @@ def _summarize(obs, aobs, leader_props, intervention_rate):
                 "policy": _weight_sums(obs, cap),
                 "A": _weight_sums(aobs, cap),
                 "dr_delta_sum": float(np.sum(d)),
+                "dr_delta_sq_sum": float(np.sum(np.square(d))),
             },
         }
     return out
