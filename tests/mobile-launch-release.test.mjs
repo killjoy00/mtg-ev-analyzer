@@ -23,6 +23,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
     '.github/workflows/android-production-bundle.yml',
     '.github/workflows/android-closed-testing.yml',
     '.github/workflows/google-play-access.yml',
+    '.github/workflows/google-play-listing-assets.yml',
     '.github/workflows/app-store-subscription-access-probe.yml',
     '.github/workflows/ios-testflight-status.yml',
     '.github/workflows/android-internal-status.yml',
@@ -56,6 +57,16 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/google-play-access-request\.json'/s, path);
       assert.match(workflow, /request\.get\('operation'\) != 'check-google-play-access'/, path);
+      assert.doesNotMatch(workflow, /pull_request:/, path);
+    } else if (path === '.github/workflows/google-play-listing-assets.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && github\.event_name == 'push'/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/google-play-listing-assets-request\.json'/s, path);
+      assert.match(workflow, /upload-google-play-phone-screenshots/, path);
+      assert.match(workflow, /phoneScreenshots/, path);
+      assert.match(workflow, /SOURCE_ARTIFACT_ID/, path);
+      assert.match(workflow, /ARTIFACT_DIGEST/, path);
+      assert.match(workflow, /edits\/\$edit_id:commit/, path);
+      assert.doesNotMatch(workflow, /\/tracks/, path);
       assert.doesNotMatch(workflow, /pull_request:/, path);
     } else if (path === '.github/workflows/app-store-subscription-access-probe.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
@@ -118,6 +129,17 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.equal(playAccessRequest.operation, 'check-google-play-access');
   assert.equal(typeof playAccessRequest.reason, 'string');
   assert.ok(playAccessRequest.reason.trim().length > 0);
+
+  const playListingRequest = JSON.parse(read('.github/google-play-listing-assets-request.json'));
+  assert.deepEqual(Object.keys(playListingRequest).sort(), ['artifact_digest','language','operation','reason','source_artifact_id','source_run_id','source_sha']);
+  assert.equal(playListingRequest.operation, 'upload-google-play-phone-screenshots');
+  assert.equal(playListingRequest.language, 'en-US');
+  assert.match(playListingRequest.source_sha, /^[a-f0-9]{40}$/);
+  assert.match(playListingRequest.artifact_digest, /^sha256:[a-f0-9]{64}$/);
+  assert.ok(Number.isInteger(playListingRequest.source_run_id) && playListingRequest.source_run_id > 0);
+  assert.ok(Number.isInteger(playListingRequest.source_artifact_id) && playListingRequest.source_artifact_id > 0);
+  assert.equal(typeof playListingRequest.reason, 'string');
+  assert.ok(playListingRequest.reason.trim().length > 0);
 
   const appleSubscriptionAccessRequest = JSON.parse(read('.github/app-store-subscription-access-request.json'));
   assert.deepEqual(Object.keys(appleSubscriptionAccessRequest).sort(), ['operation','reason']);
