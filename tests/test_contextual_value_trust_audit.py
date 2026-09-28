@@ -1,7 +1,10 @@
 import math
 import unittest
 
-import numpy as np
+try:
+    import numpy as np
+except ModuleNotFoundError:  # Generic repo test job does not install numeric deps.
+    np = None
 
 from contextual_value.dr import PolicyObservation, evaluate_policy
 
@@ -17,6 +20,7 @@ def make_obs(action, outcome, behavior, target, q):
     )
 
 
+@unittest.skipIf(np is None, "NumPy is not installed in the generic repo test job")
 class TrustAuditSyntheticTests(unittest.TestCase):
     def test_identical_targets_have_exact_zero_difference(self):
         rows = []
