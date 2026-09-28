@@ -170,3 +170,29 @@ test('iOS capture launches an explicit preview scene and rejects failed or unexp
     fs.rmSync(directory, { recursive: true, force: true });
   }
 });
+
+
+test('App Store screenshot upload is protected, source-pinned, and non-submitting', () => {
+  const workflow = read('.github/workflows/app-store-screenshots.yml');
+  const uploaderPath = path.join(repo, '.github/scripts/app-store-upload-screenshots.mjs');
+  const uploader = fs.readFileSync(uploaderPath, 'utf8');
+  const syntax = require('node:child_process').spawnSync(process.execPath, ['--check', uploaderPath], { encoding: 'utf8' });
+  assert.equal(syntax.status, 0, syntax.stderr);
+  const request = JSON.parse(read('.github/app-store-screenshot-upload-request.json'));
+
+  assert.match(workflow, /environment: pack-one-mobile-release/);
+  assert.match(workflow, /actions: read/);
+  assert.match(workflow, /mobile-store-screenshots\.yml/);
+  assert.match(workflow, /capture iPhone and iPad/);
+  assert.match(workflow, /pack-one-ios-store-screenshots/);
+  assert.match(uploader, /APP_IPHONE_67/);
+  assert.match(uploader, /APP_IPAD_PRO_3GEN_129/);
+  assert.match(uploader, /iap-review-membership\.jpg/);
+  assert.match(uploader, /PREPARE_FOR_SUBMISSION/);
+  assert.match(uploader, /subscriptionAppStoreReviewScreenshots/);
+  assert.doesNotMatch(uploader, /reviewSubmissions/);
+  assert.equal(request.operation, 'upload-pack-one-app-store-screenshots');
+  assert.equal(request.versionString, '1.0');
+  assert.equal(request.screenshotRunId, 36383054888);
+  assert.equal(request.screenshotHeadSha, 'd4b344ac2d0fe4666c5791b9e7f492a8fe86fb77');
+});

@@ -1,0 +1,132 @@
+name: App Store screenshots
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/app-store-screenshot-upload-request.json'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: app-store-screenshot-upload
+  cancel-in-progress: false
+
+jobs:
+  upload:
+    name: upload reviewed Pack One screenshots to App Store Connect
+    if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch') }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve reviewed screenshot upload request
+        id: request
+        if: github.event_name == 'push'
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, re
+          from pathlib import Path
+
+          request = json.loads(Path('.github/app-store-screenshot-upload-request.json').read_text())
+          expected = {'operation','reason','screenshotRunId','screenshotHeadSha','versionString'}
+          if set(request) != expected:
+              raise SystemExit(f'Invalid App Store screenshot request keys: {sorted(request)}')
+          if request.get('operation') != 'upload-pack-one-app-store-screenshots':
+              raise SystemExit('Invalid App Store screenshot upload operation.')
+          if not isinstance(request.get('reason'), str) or not request['reason'].strip():
+              raise SystemExit('Screenshot upload request reason is required.')
+          run_id = request.get('screenshotRunId')
+          if not isinstance(run_id, int) or run_id <= 0:
+              raise SystemExit('screenshotRunId must be a positive integer.')
+          head_sha = request.get('screenshotHeadSha')
+          if not isinstance(head_sha, str) or not re.fullmatch(r'[0-9a-f]{40}', head_sha):
+              raise SystemExit('screenshotHeadSha must be a full lowercase commit SHA.')
+          version = request.get('versionString')
+          if version != '1.0':
+              raise SystemExit('This guarded workflow is currently restricted to Pack One iOS 1.0.')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f'run_id={run_id}\n')
+              output.write(f'head_sha={head_sha}\n')
+              output.write(f'version={version}\n')
+          print(request['reason'])
+          PY
+
+      - name: Resolve manual upload inputs
+        id: manual
+        if: github.event_name == 'workflow_dispatch'
+        shell: bash
+        run: |
+          echo "Manual dispatch is intentionally probe-only without a reviewed request file."
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          request = json.loads(Path('.github/app-store-screenshot-upload-request.json').read_text())
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"run_id={request['screenshotRunId']}\n")
+              output.write(f"head_sha={request['screenshotHeadSha']}\n")
+              output.write(f"version={request['versionString']}\n")
+          PY
+
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+
+      - name: Validate reviewed screenshot artifact source
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RUN_ID: ${{ steps.request.outputs.run_id || steps.manual.outputs.run_id }}
+          EXPECTED_HEAD_SHA: ${{ steps.request.outputs.head_sha || steps.manual.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          [[ -n "$RUN_ID" && -n "$EXPECTED_HEAD_SHA" ]]
+          head_sha="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '.head_sha')"
+          workflow_path="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID" --jq '.path')"
+          [[ "$head_sha" == "$EXPECTED_HEAD_SHA" ]]
+          [[ "$workflow_path" == ".github/workflows/mobile-store-screenshots.yml" ]]
+          ios_conclusion=""
+          for attempt in $(seq 1 180); do
+            ios_conclusion="$(gh api "/repos/$GITHUB_REPOSITORY/actions/runs/$RUN_ID/jobs?per_page=100" --jq '[.jobs[] | select(.name == "capture iPhone and iPad")][-1].conclusion // ""')"
+            if [[ "$ios_conclusion" == "success" ]]; then
+              break
+            fi
+            if [[ "$ios_conclusion" == "failure" || "$ios_conclusion" == "cancelled" || "$ios_conclusion" == "timed_out" ]]; then
+              echo "Corrected iOS screenshot job ended with: $ios_conclusion" >&2
+              exit 1
+            fi
+            sleep 30
+          done
+          [[ "$ios_conclusion" == "success" ]]
+
+      - name: Download reviewed iOS screenshot artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: pack-one-ios-store-screenshots
+          path: asc-screenshots
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ steps.request.outputs.run_id || steps.manual.outputs.run_id }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Upload product and Elite review screenshots
+        env:
+          SCREENSHOT_ROOT: asc-screenshots
+          PACKONE_VERSION_STRING: ${{ steps.request.outputs.version || steps.manual.outputs.version }}
+        run: node .github/scripts/app-store-upload-screenshots.mjs
