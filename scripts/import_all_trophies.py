@@ -353,10 +353,16 @@ def metadata(root, set_id=None):
 
 
 def resolve_images(names, known, cache_path, preferred_set=None):
-    cache = {k:v for k,v in json.loads(cache_path.read_text()).items() if v} if cache_path.exists() else {}
+    cache_policy = f"main-readable-v3:{preferred_set or 'global'}"
+    raw_cache = json.loads(cache_path.read_text()) if cache_path.exists() else {}
+    cache = {
+        k:v for k,v in raw_cache.items()
+        if k != '__packone_cache_policy__' and v
+    } if raw_cache.get('__packone_cache_policy__') == cache_policy else {}
     # Current environment shards are the normalized checked-in/R2 source of
     # truth. A retained per-build cache may fill gaps but must never override
-    # fresher environment-scoped metadata.
+    # fresher environment-scoped metadata. Unversioned or differently scoped
+    # caches are ignored so an old cross-set image cannot survive a code change.
     known = {**cache, **known}
     for name in sorted(name for name in names if not (known.get(name, {}).get('image_url', '').startswith('https://') and known.get(name, {}).get('type_line'))):
         # Resolve all printings for the exact card identity and pick deterministic
@@ -370,7 +376,7 @@ def resolve_images(names, known, cache_path, preferred_set=None):
             cache[name] = value
         else:
             cache[name] = None
-        atomic_json(cache_path, cache)
+        atomic_json(cache_path, {'__packone_cache_policy__':cache_policy, **cache})
     return known
 
 def write_gzip_jsonl(path, values):
