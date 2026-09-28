@@ -187,6 +187,44 @@ class AmendedRTests(unittest.TestCase):
         self.assertGreater(abs(false_adv),0.05)
         self.false_advantage=false_adv
 
+    def test_multiaction_sensitivity_keeps_third_actions_and_widens_with_gamma(self):
+        from contextual_value_multiaction_sensitivity import paired_policy_bounds
+        offsets=np.arange(0,13,3,dtype=np.int64)
+        selected=np.asarray([0,1,2,0],dtype=np.int64)
+        challenger=np.asarray([0,0,0,0],dtype=np.int64)
+        incumbent=np.asarray([1,1,1,1],dtype=np.int64)
+        outcome=np.asarray([2.0,1.0,4.0,3.0])
+        behavior=np.tile(np.asarray([0.4,0.4,0.2]),4)
+        q=np.zeros(12)
+        drafts=np.asarray(["d1","d1","d2","d2"])
+        idx=np.arange(4)
+        g1=paired_policy_bounds(
+            offsets=offsets,selected_ord=selected,challenger_ord=challenger,incumbent_ord=incumbent,
+            outcome=outcome,behavior=behavior,q_values=q,draft_ids=drafts,decision_indices=idx,
+            gamma=1.0,cap=20.0,estimator="dr",
+        )
+        g2=paired_policy_bounds(
+            offsets=offsets,selected_ord=selected,challenger_ord=challenger,incumbent_ord=incumbent,
+            outcome=outcome,behavior=behavior,q_values=q,draft_ids=drafts,decision_indices=idx,
+            gamma=2.0,cap=20.0,estimator="dr",
+        )
+        self.assertAlmostEqual(g1.lower,g1.upper,places=12)
+        self.assertLessEqual(g2.lower,g1.lower)
+        self.assertGreaterEqual(g2.upper,g1.upper)
+
+    def test_skill_aware_choice_benchmark_changes_target_odds_without_outcomes(self):
+        from contextual_value_candidate_advantage_r_common import (
+            fit_skill_interaction_behavior,predict_skill_interaction_behavior,
+        )
+        data,behavior,_=self._synthetic_fold(n=400,seed=533)
+        model=fit_skill_interaction_behavior(data=data,baseline_behavior=behavior,l2=100.0)
+        pred=predict_skill_interaction_behavior(model,data=data,baseline_behavior=behavior)
+        self.assertEqual(len(pred),len(behavior))
+        offsets=data["offsets"]
+        sums=np.add.reduceat(pred,offsets[:-1])
+        self.assertLess(float(np.max(np.abs(sums-1.0))),1e-10)
+        self.assertGreater(float(np.max(np.abs(pred-behavior))),1e-5)
+
 
 if __name__=="__main__":
     unittest.main()
