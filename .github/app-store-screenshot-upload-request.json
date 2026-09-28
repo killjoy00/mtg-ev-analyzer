@@ -1,6 +1,6 @@
 {
   "operation": "upload-pack-one-app-store-screenshots",
-  "reason": "Replace the previously uploaded flawed Apple screenshot set with the visually reviewed iPhone and iPad screenshots from Mobile store screenshots run 36392125277 (commit 73016d3240a4e1c2962257dcf81018e5ae0bc96d) in the Pack One iOS 1.0 English (U.S.) App Store submission, and replace the Pack One Elite subscription App Review screenshot with the reviewed Membership capture. Do not submit the app or subscription for review and do not release anything.",
+  "reason": "Retry replacement of the flawed Apple screenshot set using the visually reviewed iPhone and iPad screenshots from Mobile store screenshots run 36392125277 after App Store Connect rejected the prior relationship-reorder PATCH with STATE_ERROR. The uploader now preserves order by uploading the reviewed replacements sequentially and deleting the prior screenshots without the rejected reorder call. Replace the Pack One Elite review screenshot as well. Do not submit the app or subscription for review and do not release anything.",
   "screenshotRunId": 36392125277,
   "screenshotHeadSha": "73016d3240a4e1c2962257dcf81018e5ae0bc96d",
   "versionString": "1.0"
