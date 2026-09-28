@@ -134,6 +134,23 @@ def main():
 
     if len(rows)!=EXPECTED_N: raise SystemExit(f"expected {EXPECTED_N}, got {len(rows)}")
     if len({r["draft_id"] for r in rows})!=EXPECTED_N: raise SystemExit("duplicate P1P1 draft")
+    # Outcome-free definition of "other high-pick cards", frozen before
+    # any outcome statistic is computed. This reproduces the pre-existing
+    # EOE inventory convention: take rate >= 30% when present.
+    appearances={}
+    takes={}
+    for r in rows:
+        for name in r["offered"]:
+            appearances[name]=appearances.get(name,0)+1
+        if r["pick"] in r["offered"]:
+            takes[r["pick"]]=takes.get(r["pick"],0)+1
+    high_pick_cards=sorted(
+        name for name,n in appearances.items()
+        if n>0 and takes.get(name,0)/n>=0.30
+    )
+    if len(high_pick_cards)!=59:
+        raise SystemExit(f"expected 59 outcome-free >=30% high-pick cards, got {len(high_pick_cards)}")
+
     missing=sum(r["outcome"] is None for r in rows)
     complete=[r for r in rows if r["outcome"] is not None]
     y=np.asarray([r["outcome"] for r in complete],float)
@@ -151,6 +168,11 @@ def main():
             if other==card:continue
             x=np.asarray([other in r["offered"] for r in rows],float)
             co[other]=float(np.mean(x[zall])-np.mean(x[~zall]))
+        high_pick_co={}
+        for other in high_pick_cards:
+            if other==card:continue
+            x=np.asarray([other in r["offered"] for r in rows],float)
+            high_pick_co[other]=float(np.mean(x[zall])-np.mean(x[~zall]))
         result_cards[card]={
           "n_present_outcome_observed":int(np.sum(z)),
           "n_absent_outcome_observed":int(np.sum(~z)),
@@ -168,6 +190,7 @@ def main():
           "wald_ci95":[wald-Z_95*wald_se,wald+Z_95*wald_se],
           "recorded_covariate_balance_full_frozen_cohort":covariate_balance(rows,card),
           "primary_card_copresence_difference_full_frozen_cohort":co,
+          "other_high_pick_card_copresence_difference_full_frozen_cohort":high_pick_co,
           "rarity_composition_diagnostic_full_frozen_cohort":rarity_contrast(rows,card,metadata),
           "p1p9_return_diagnostic_full_frozen_cohort":p1p9_diag(rows,p1p9,card),
         }
@@ -187,6 +210,11 @@ def main():
       "missing_outcome_n":missing,
       "nonterminal_or_retired_records_excluded":False,
       "primary_cards":list(CARDS),
+      "high_pick_collation_diagnostic":{
+        "definition":"Outcome-free full-cohort take rate when present >= 0.30, matching the pre-existing EOE inventory convention.",
+        "count":len(high_pick_cards),
+        "cards":high_pick_cards,
+      },
       "familywise_method":"Bonferroni alpha .05 / 10; two-sided 99.5% CI",
       "cards":result_cards,
       "collation_diagnostics":{
