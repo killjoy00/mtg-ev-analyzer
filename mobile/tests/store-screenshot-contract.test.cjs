@@ -50,7 +50,7 @@ test('store screenshot fixture mode is isolated from production builds', () => {
   const androidCapture = read('mobile/scripts/capture-store-screenshots-android.sh');
   assert.match(androidCapture, /adb shell "am start -W -a android\.intent\.action\.VIEW -d '\$url' -p '\$package_name'"/);
   assert.doesNotMatch(androidCapture, /adb shell am start -W -a android\.intent\.action\.VIEW -d "\$url"/);
-  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/draft-run\?environment=mixed&screenshot=feedback"/);
+  assert.match(androidCapture, /capture "02-reveal-comparison" "packone:\/\/draft-run\?screenshot=feedback"/);
   assert.match(androidCapture, /-lavfi ssim/);
   assert.match(androidCapture, /score >= 0\.98/);
   assert.match(androidCapture, /adb shell wm size 1080x1920/);
@@ -200,6 +200,6 @@ test('App Store screenshot upload is protected, source-pinned, and non-submittin
   assert.doesNotMatch(uploader, /reviewSubmissions/);
   assert.equal(request.operation, 'upload-pack-one-app-store-screenshots');
   assert.equal(request.versionString, '1.0');
-  assert.equal(request.screenshotRunId, 36383054888);
-  assert.equal(request.screenshotHeadSha, 'd4b344ac2d0fe4666c5791b9e7f492a8fe86fb77');
+  assert.equal(request.screenshotRunId, 36392125277);
+  assert.equal(request.screenshotHeadSha, '73016d3240a4e1c2962257dcf81018e5ae0bc96d');
 });
