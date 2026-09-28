@@ -75,7 +75,7 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
     `WITH desired AS (
        SELECT value AS display FROM jsonb_array_elements($4::jsonb)
      )
-     SELECT p.puzzle_id,p.payload
+     SELECT p.puzzle_id,p.payload,p.corpus_version
      FROM draft_run_verified_puzzles p
      WHERE p.set_id=$1
        AND (
@@ -142,7 +142,8 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
   let updatedCards=0;
   for(const row of page.rows) {
     const current=parse(row.payload);
-    if(!validateDraftRunPuzzle(current)||current.set_id!==setId||current.puzzle_id!==row.puzzle_id)throw error('Stored puzzle failed image-refresh verification',409);
+    const rowVersion=String(row.corpus_version||current?.corpus_version||'');
+    if(!rowVersion||current?.corpus_version!==rowVersion||!validateDraftRunPuzzle(current,rowVersion)||current.set_id!==setId||current.puzzle_id!==row.puzzle_id)throw error('Stored puzzle failed image-refresh verification',409);
     const counters={cards:0};
     const next={
       ...current,
@@ -150,7 +151,7 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
       prior_picks:patchCards(current.prior_picks,mapping,counters),
     };
     if(counters.cards) {
-      if(!validateDraftRunPuzzle(next)||!isDeepStrictEqual(scrubPuzzle(current),scrubPuzzle(next)))throw error('Image refresh attempted to change gameplay data',409);
+      if(!validateDraftRunPuzzle(next,rowVersion)||!isDeepStrictEqual(scrubPuzzle(current),scrubPuzzle(next)))throw error('Image refresh attempted to change gameplay data',409);
       updates.push({puzzle_id:row.puzzle_id,payload:next});
       updatedCards+=counters.cards;
     }
