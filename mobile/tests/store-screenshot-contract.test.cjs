@@ -174,7 +174,10 @@ test('iOS capture launches an explicit preview scene and rejects failed or unexp
 
 test('App Store screenshot upload is protected, source-pinned, and non-submitting', () => {
   const workflow = read('.github/workflows/app-store-screenshots.yml');
-  const uploader = read('.github/scripts/app-store-upload-screenshots.mjs');
+  const uploaderPath = path.join(repo, '.github/scripts/app-store-upload-screenshots.mjs');
+  const uploader = fs.readFileSync(uploaderPath, 'utf8');
+  const syntax = require('node:child_process').spawnSync(process.execPath, ['--check', uploaderPath], { encoding: 'utf8' });
+  assert.equal(syntax.status, 0, syntax.stderr);
   const request = JSON.parse(read('.github/app-store-screenshot-upload-request.json'));
 
   assert.match(workflow, /environment: pack-one-mobile-release/);
