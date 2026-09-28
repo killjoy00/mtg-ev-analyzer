@@ -336,10 +336,13 @@ def trajectory(examples, last_pick):
     return valid, initial, reason
 
 
-def metadata(root):
+def metadata(root, set_id=None):
+    """Seed display metadata from the requested environment, never an arbitrary other set."""
     supplemental = json.loads((root/'corpus/draft-run/card-images.json').read_text())
     result = {}
-    for path in sorted((root/'data').glob('*/shards/*.json')):
+    shard_root = root/'data'/set_id/'shards' if set_id else root/'data'
+    paths = sorted(shard_root.glob('*.json')) if set_id else sorted(shard_root.glob('*/shards/*.json'))
+    for path in paths:
         for replay in json.loads(path.read_text()).get('replays', []):
             for pick in replay['picks']:
                 for c in pick['candidates']:
@@ -349,14 +352,17 @@ def metadata(root):
     return result
 
 
-def resolve_images(names, known, cache_path):
+def resolve_images(names, known, cache_path, preferred_set=None):
     cache = {k:v for k,v in json.loads(cache_path.read_text()).items() if v} if cache_path.exists() else {}
-    known = {**known, **{k:v for k,v in cache.items() if v}}
+    # Current environment shards are the normalized checked-in/R2 source of
+    # truth. A retained per-build cache may fill gaps but must never override
+    # fresher environment-scoped metadata.
+    known = {**cache, **known}
     for name in sorted(name for name in names if not (known.get(name, {}).get('image_url', '').startswith('https://') and known.get(name, {}).get('type_line'))):
         # Resolve all printings for the exact card identity and pick deterministic
         # main readable art; never accept Scryfall's arbitrary default printing.
         time.sleep(.15)
-        card = fetch_named(name)
+        card = fetch_named(name, preferred_set)
         value = metadata_for_alias(card, name) if card else None
         if value and value.get('image_url','').startswith('https://'):
             value = {k:v for k,v in value.items() if k != 'name'}
@@ -565,7 +571,8 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
         deck_fits = build_colour_tables_by_fold(
             directory/'games.csv.gz', colour_examples, fold_training, sid)
         all_names = {name for examples in output.values() for p in examples for name in list(p.candidates)+list(p.pool)}
-        known = resolve_images(all_names, metadata(root), directory/'images.json')
+        preferred_set = None if sid == 'powered-cube' else sid
+        known = resolve_images(all_names, metadata(root, sid), directory/'images.json', preferred_set)
         for did,d in sorted(qualified.items()):
             valid, prior, why = trajectory(output.get(did,[]),12 if sid=='powered-cube' else 11)
             source_hash=hashlib.sha256(f'{sid}|{did}'.encode()).hexdigest()[:32]
