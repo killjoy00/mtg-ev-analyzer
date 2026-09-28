@@ -77,7 +77,19 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
      )
      SELECT p.puzzle_id,p.payload
      FROM draft_run_verified_puzzles p
-     WHERE p.set_id=$1 AND p.corpus_version=$2 AND p.puzzle_id>$3
+     WHERE p.set_id=$1
+       AND (
+         p.corpus_version=$2
+         OR EXISTS (
+           SELECT 1
+           FROM corpus_components c
+           WHERE c.set_id=p.set_id
+             AND c.parent_version=$2
+             AND c.component_version=p.corpus_version
+             AND c.status='Live'
+         )
+       )
+       AND p.puzzle_id>$3
        AND EXISTS (
          SELECT 1
          FROM jsonb_array_elements(
@@ -97,7 +109,21 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
   );
   if(!page.rows.length) {
     const available=(await query(
-      'SELECT 1 FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 LIMIT 1',
+      `SELECT 1
+       FROM draft_run_verified_puzzles p
+       WHERE p.set_id=$1
+         AND (
+           p.corpus_version=$2
+           OR EXISTS (
+             SELECT 1
+             FROM corpus_components c
+             WHERE c.set_id=p.set_id
+               AND c.parent_version=$2
+               AND c.component_version=p.corpus_version
+               AND c.status='Live'
+           )
+         )
+       LIMIT 1`,
       [setId,VERSION],
     )).rows.length>0;
     return {
@@ -137,7 +163,19 @@ export async function refreshTrophyImagePage(query,setId,rawMapping,rawAfter='')
       UPDATE draft_run_verified_puzzles p
       SET payload=i.payload
       FROM incoming i
-      WHERE p.puzzle_id=i.puzzle_id AND p.set_id=$2 AND p.corpus_version=$3
+      WHERE p.puzzle_id=i.puzzle_id
+        AND p.set_id=$2
+        AND (
+          p.corpus_version=$3
+          OR EXISTS (
+            SELECT 1
+            FROM corpus_components c
+            WHERE c.set_id=p.set_id
+              AND c.parent_version=$3
+              AND c.component_version=p.corpus_version
+              AND c.status='Live'
+          )
+        )
       RETURNING p.puzzle_id`,
       [JSON.stringify(updates),setId,VERSION],
     );

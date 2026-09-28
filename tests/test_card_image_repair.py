@@ -88,6 +88,46 @@ class CardImageRepairTests(unittest.TestCase):
         self.assertEqual(targeted, full)
         self.assertEqual(targeted["eoe"][name]["image_url"], "https://img/cosmogrand-eoe-9.jpg")
 
+    def test_targeted_selection_prefers_tishana_base_lci_printing(self):
+        name = "Tishana's Tidebinder"
+        standard = self.card(
+            "907b3d1d-8c85-4707-80b5-c4d832df9846",
+            name,
+            "lci",
+            "2023-11-17",
+            "https://img/tishana-lci-81.jpg",
+            collector_number="81",
+            rarity="rare",
+        )
+        borderless = self.card(
+            "604e2bfc-655d-4d3e-98aa-374780ca4016",
+            name,
+            "lci",
+            "2023-11-17",
+            "https://img/tishana-lci-335.jpg",
+            collector_number="335",
+            rarity="rare",
+            border_color="borderless",
+            frame_effects=["inverted"],
+        )
+        art_series = self.card(
+            "tishana-art-series-60",
+            name,
+            "alci",
+            "2023-11-17",
+            "https://img/tishana-art-series-60.jpg",
+            collector_number="60",
+            rarity="rare",
+            set_type="art_series",
+        )
+        printings = [art_series, borderless, standard]
+        with mock.patch.object(refresh, "all_printings", return_value=iter(printings)):
+            full = refresh.resolve_inventory({"lci": {name}})[0]
+        with mock.patch.object(refresh, "all_printings", return_value=iter(printings)):
+            targeted = repair.resolve_target(name, ["lci"])[0]
+        self.assertEqual(targeted, full)
+        self.assertEqual(targeted["lci"][name]["image_url"], "https://img/tishana-lci-81.jpg")
+
     def test_targeted_selection_matches_full_refresh_for_regular_preferred_set(self):
         name = "Alpha"
         older = self.card("old", name, "old", "2001-01-01", "https://img/old.jpg")
