@@ -11,9 +11,13 @@ import gzip
 import hashlib
 import json
 import math
+import sys
 from pathlib import Path
 
 import numpy as np
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
+from contextual_value.dataset import _games_lower_bound, _number
 
 EXPECTED_SHA="1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648"
 EXPECTED_N=91377
@@ -100,8 +104,8 @@ def main():
                 "outcome":outcome,
                 "pick":row.get("pick",""),
                 "offered":offered,
-                "skill":float(row["user_game_win_rate_bucket"]) if row.get("user_game_win_rate_bucket","").strip() else None,
-                "experience":float(row["user_n_games_bucket"]) if row.get("user_n_games_bucket","").strip() else None,
+                "skill":_number(row.get("user_game_win_rate_bucket","")),
+                "experience":_games_lower_bound(row.get("user_n_games_bucket","")),
                 "rank":row.get("rank",""),
             })
     if len(rows)!=EXPECTED_N:
