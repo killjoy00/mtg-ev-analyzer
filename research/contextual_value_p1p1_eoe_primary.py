@@ -75,6 +75,40 @@ def standardized_difference(x,z):
     return float((np.mean(a)-np.mean(b))/denom) if denom>0 else 0.0
 
 
+def categorical_balance(values,z):
+    z=np.asarray(z,bool)
+    values=np.asarray([str(x) if str(x) else "missing" for x in values])
+    levels=sorted(set(values))
+    diff={}
+    for level in levels:
+        x=values==level
+        diff[level]=float(np.mean(x[z])-np.mean(x[~z]))
+    return {
+        "level_probability_difference":diff,
+        "max_abs_level_difference":max((abs(v) for v in diff.values()),default=0.0),
+    }
+
+
+def missing_outcome_rf_bounds(rows,card):
+    # Event match wins are bounded in [0,7]. Freeze worst-case complete-cohort
+    # bounds rather than conditioning silently on observed outcomes.
+    z=np.asarray([card in r["offered"] for r in rows],bool)
+    low=[];high=[]
+    for present,r in zip(z,rows):
+        y=r["outcome"]
+        if y is not None:
+            low.append(float(y));high.append(float(y));continue
+        # Lower RF makes present-card outcomes as low and absent outcomes as high
+        # as possible; upper RF reverses those assignments.
+        low.append(0.0 if present else 7.0)
+        high.append(7.0 if present else 0.0)
+    low=np.asarray(low,float);high=np.asarray(high,float)
+    return {
+        "lower":float(np.mean(low[z])-np.mean(low[~z])),
+        "upper":float(np.mean(high[z])-np.mean(high[~z])),
+    }
+
+
 def main():
     args=parse_args()
     if sha256(args.draft_archive)!=EXPECTED_SHA:
@@ -126,8 +160,14 @@ def main():
         balance={}
         for name in ("skill","experience"):
             vals=[r[name] for r in complete]
-            if all(v is not None for v in vals):
-                balance[name+"_standardized_difference"]=standardized_difference(vals,z)
+            observed=np.asarray([v is not None for v in vals],bool)
+            balance[name+"_missing_fraction_present"]=float(np.mean(~observed[z]))
+            balance[name+"_missing_fraction_absent"]=float(np.mean(~observed[~z]))
+            if np.any(observed & z) and np.any(observed & ~z):
+                vv=np.asarray([0.0 if v is None else float(v) for v in vals])
+                use=observed
+                balance[name+"_standardized_difference_complete_covariate"]=standardized_difference(vv[use],z[use])
+        balance["rank"]=categorical_balance([r["rank"] for r in complete],z)
         # Collation association with other primary cards.
         co={}
         for other in CARDS:
@@ -141,6 +181,7 @@ def main():
             "reduced_form_ci99_5":[rf-Z_BONF*rf_se,rf+Z_BONF*rf_se],
             "reduced_form_ci95":[rf-Z_95*rf_se,rf+Z_95*rf_se],
             "first_stage":fs,
+            "missing_outcome_reduced_form_worst_case":missing_outcome_rf_bounds(rows,card),
             "wald":wald,
             "wald_se":wald_se,
             "wald_ci99_5":[wald-Z_BONF*wald_se,wald+Z_BONF*wald_se],
