@@ -1,7 +1,6 @@
 {
-  "operation": "deploy",
-  "request_id": "egress-image-refresh-541-prod-20260927",
-  "reason": "Promote the exact #697 egress-fix revision to production after the guarded development deployment and live acceptance succeeded.",
-  "commit": "4e39399ff0481fe11636546c2e1cf5a1e2407c96",
-  "target": "production"
+  "operation": "card-image-release",
+  "request_id": "tishana-card-image-audit-20260928",
+  "reason": "Deploy the reviewed live-component image-repair scope fix from #731, then run the full deterministic Pack One card-image normalization so Tishana's Tidebinder and any other stale served component art are corrected and audited without changing gameplay data.",
+  "commit": "c8dc309676139f9507dc409a22a571076931934e"
 }
