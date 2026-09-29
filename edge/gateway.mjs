@@ -43,6 +43,7 @@ function permitted(service,path,method,search,mode) {
   if(service==='growth'&&(nativePatreonAction(path,method)||appleSubscriptionAction(path,method)))return true;
   if(method==='GET'&&path==='/health')return search==='?quick=1';
   if(service==='growth') {
+    if(mode==='production'&&method==='POST'&&path==='/v1/admin/campaign-links/publish')return true;
     if(method==='POST'&&[
       '/v1/session','/v1/player/session','/v1/player/migrate',
       '/v1/account/signup','/v1/account/signin','/v1/account/send-verification-email','/v1/account/request-password-reset','/v1/account/reset-password','/v1/account/password-change','/v1/account/delete/verification/start','/v1/account/delete/apple/start','/v1/account/delete/apple/finish','/v1/account/delete','/v1/account/migrate',
@@ -212,6 +213,7 @@ export function routeFamily(path) {
   if(/^\/growth\/v1\/apple-subscriptions\/mobile\/(status|verify)$/.test(path))return 'apple_subscription_'+path.split('/').at(-1);
   if(path==='/growth/v1/apple-subscriptions/notifications')return 'apple_subscription_notification';
   if(path==='/growth/v1/mobile/version')return 'mobile_version';
+  if(path==='/growth/v1/admin/campaign-links/publish')return 'admin_campaign_publish';
   if(/^\/draft\/v1\/runs\/[^/]+\/(pick|view|reroll|share)$/.test(path))return 'draft_'+path.split('/').at(-1);
   if(path==='/draft/v1/runs')return 'draft_start';
   if(/^\/draft\/v1\/runs\/[^/]+$/.test(path))return 'draft_read';
