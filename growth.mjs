@@ -198,7 +198,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     const usernameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required'].includes(linked?.rankingIdentity?.reason));
     if(usernameAttention) {
       pendingDailyRunValidation=validationRunId;
-      const profiles=await import('./profile-product.mjs?v=6');
+      const profiles=await import('./profile-product.mjs?v=7');
       profiles.installProfileProductLayer();
       (await import('./profile-polish.mjs?v=6')).installProfilePolish();
       await profiles.renderMyProfile();
@@ -214,7 +214,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     }
     if(intent==='patreon-activate') { await renderPatreonActivation({source}); return; }
     if(intent==='elite') { await openEliteLanding(source); return; }
-    const profiles=await import('./profile-product.mjs?v=6');
+    const profiles=await import('./profile-product.mjs?v=7');
     profiles.installProfileProductLayer();
     (await import('./profile-polish.mjs?v=6')).installProfilePolish();
     await profiles.renderMyProfile();
@@ -282,7 +282,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     }
   });
   document.querySelector('#account-forgot')?.addEventListener('click',()=>void renderForgotPassword());
-  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=6')).renderMyProfile();});
+  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=7')).renderMyProfile();});
   document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();document.querySelector('#brand-home')?.click();});
 
   const signup=document.querySelector('#account-signup');
