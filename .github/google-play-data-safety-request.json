@@ -1,0 +1,5 @@
+{
+  "operation": "configure-google-play-data-safety",
+  "mode": "dry-run",
+  "reason": "Generate and validate Pack One's Google Play Data Safety declaration against Google's current official CSV schema. Select only Name, Email address, User IDs, App interactions, and Other actions; collected only, not shared; encryption in transit and deletion available; no advertising purpose. Dry run must not submit or publish anything."
+}
