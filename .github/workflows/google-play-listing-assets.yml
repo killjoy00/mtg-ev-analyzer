@@ -168,7 +168,7 @@ jobs:
             echo "Reviewed Play icon SHA-256 mismatch: $icon_sha" >&2
             exit 1
           }
-          [[ "$feature_sha" == "ecfe3ab53fad59c77198f52087786a93bbdc0e13825a64e9e6f93126ea1c3335" ]] || {
+          [[ "$feature_sha" == "56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69" ]] || {
             echo "Reviewed Play feature graphic SHA-256 mismatch: $feature_sha" >&2
             exit 1
           }
