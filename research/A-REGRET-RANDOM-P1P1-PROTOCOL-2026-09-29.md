@@ -51,11 +51,11 @@ Expected P1P1 supply from already recorded inventories, after the known later FI
 - FIN: 112,237
 - TDM: 73,323
 - DFT: 115,504
-- MSH: 67,149
+- MSH: 66,003
 - SOS: 105,197
-- total: 473,410
+- total: 472,264
 
-These are verification targets, not inputs to the estimator. If regenerated counts differ, fail closed before outcomes rather than silently changing the cohort.
+These are verification targets, not inputs to the estimator. The MSH target includes 1,146 additional exact early-exploratory prior-use IDs found in the retained #529 spent-draft ledger before any #756 outcome was opened. If regenerated counts differ, fail closed before outcomes rather than silently changing the cohort.
 
 Use every remaining eligible P1P1 draft. No outcome-dependent subsampling.
 
