@@ -46,13 +46,12 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          set +e
-          base64 -d research/one_time/a_regret_later.py.gz.b64 | gzip -dc > research/a_regret_later_runtime.py
-          gzip_rc=${PIPESTATUS[1]}
-          set -e
+          git fetch --depth=1 origin e966e4d7c92aeb1b3e86ccbe3dea469f1ee72c77
+          git show e966e4d7c92aeb1b3e86ccbe3dea469f1ee72c77:research/one_time/a_regret_later.py.gz.b64 \
+            | base64 -d | gzip -d > /tmp/a_regret_later_old.py
+          python research/one_time/a_regret_later_recovery_patch.py \
+            /tmp/a_regret_later_old.py research/a_regret_later_runtime.py
           python -m py_compile research/a_regret_later_runtime.py
-          test -s research/a_regret_later_runtime.py
-          echo "Recovered corrected analyzer source; gzip footer status=$gzip_rc"
           sha256sum research/a_regret_later_runtime.py
 
       - name: Download exact retained #529 prior-use ledger
