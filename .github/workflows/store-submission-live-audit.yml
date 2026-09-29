@@ -1,0 +1,114 @@
+name: Store submission live audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/store-submission-audit-request.json'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: store-submission-live-audit
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    name: audit live App Store and Google Play metadata
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate guarded audit request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('.github/store-submission-audit-request.json').read_text())
+          if set(r) != {'operation','reason'} or r.get('operation') != 'audit-mobile-store-submission':
+              raise SystemExit('Invalid store submission audit request.')
+          if not isinstance(r.get('reason'),str) or not r['reason'].strip():
+              raise SystemExit('Audit reason is required.')
+          PY
+
+      - name: Require current main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - id: google-auth
+        name: Authenticate to Google Play
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Read live Apple and Google Play metadata
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: node .github/scripts/store-submission-live-audit.mjs
+
+      - name: Read current Google Data Safety CSV schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import csv, html, io, json, re, urllib.request
+
+          help_url='https://support.google.com/googleplay/android-developer/answer/10787469?hl=en'
+          request=urllib.request.Request(help_url,headers={'User-Agent':'Mozilla/5.0'})
+          page=urllib.request.urlopen(request,timeout=30).read().decode('utf-8','replace')
+          page=html.unescape(page)
+          urls=re.findall(r'https://storage\.googleapis\.com/support-kms-prod/[A-Za-z0-9_-]+',page)
+          if not urls:
+              raise SystemExit('Could not locate current Google Data Safety sample CSV URL.')
+          sample_url=urls[0]
+          req=urllib.request.Request(sample_url,headers={'User-Agent':'Mozilla/5.0'})
+          raw=urllib.request.urlopen(req,timeout=30).read().decode('utf-8-sig')
+          rows=list(csv.DictReader(io.StringIO(raw)))
+          if not rows:
+              raise SystemExit('Google Data Safety sample CSV is empty.')
+
+          def field(row,*names):
+              for name in names:
+                  if name in row:return row.get(name,'')
+              return ''
+
+          wanted=[]
+          terms=[
+              'collect or share','encrypted in transit','request that their data is deleted',
+              'personal info','name','email address','app interactions','user ids','device or other ids'
+          ]
+          for row in rows:
+              label=' '.join(str(v or '') for v in row.values()).lower()
+              qid=field(row,'Question ID (machine readable)','Question ID')
+              resp=field(row,'Response (machine readable)','Response')
+              if any(term in label for term in terms) or any(k in (qid+' '+resp) for k in ['PSL_NAME','PSL_EMAIL','PSL_APP_INTERACTIONS','PSL_USER_ID']):
+                  wanted.append(row)
+
+          print(json.dumps({
+              'sampleUrl':sample_url,
+              'columns':list(rows[0].keys()),
+              'rowCount':len(rows),
+              'relevantRows':wanted,
+          },indent=2))
+          PY
