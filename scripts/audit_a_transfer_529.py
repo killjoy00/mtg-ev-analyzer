@@ -265,10 +265,10 @@ def read_corpus(path: Path):
     raw = gzip.decompress(path.read_bytes())
     keys = "|".join(re.escape(k) for k in FORBIDDEN_COLUMNS).encode()
     pattern = re.compile(
-        rb'("(?:(?:' + keys + rb'))"\\s*:\\s*)'
-        rb'(?:-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|true|false|null|"[^"]*")'
+        rb'("(?:(?:' + keys + rb'))"\s*:\s*)'
+        rb'(?:-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null|"[^"]*")'
     )
-    raw = pattern.sub(rb"\\1null", raw)
+    raw = pattern.sub(rb"\1null", raw)
     value = json.loads(raw)
     if not isinstance(value, list):
         raise ValueError(f"{path}: expected frozen corpus JSON array")
