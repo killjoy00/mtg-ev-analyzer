@@ -150,14 +150,15 @@ def main():
     if envs_with_rows != set(ENVIRONMENTS):
         raise SystemExit(f"missing row data for {sorted(set(ENVIRONMENTS)-envs_with_rows)}")
 
-    point = float(np.mean(np.asarray(all_values, dtype=np.float64)))
+    all_array = np.asarray(all_values, dtype=np.float64)
+    point = float(np.mean(all_array))
 
     # Exact environment-stratified source-draft bootstrap. Generate in bounded
     # batches so the frozen 10k resamples do not require a giant index matrix.
     rng = np.random.default_rng(SEED)
     boot_num = np.zeros(BOOTSTRAPS, dtype=np.float64)
     boot_den = np.zeros(BOOTSTRAPS, dtype=np.float64)
-    batch = 10
+    batch = 100
     bootstrap_env = {}
     for exp in ENVIRONMENTS:
         pairs = list(draft_stats[exp].values())
@@ -214,9 +215,9 @@ def main():
         "all_environment_failed_pick_numbers": {e: reports[e].get("failed_pick_numbers", []) for e in ENVIRONMENTS},
         "eligible_decisions": int(len(all_values)),
         "overall_mean_regret": point,
-        "overall_median_regret": float(np.median(np.asarray(all_values, dtype=np.float64))),
-        "overall_p90_regret": float(np.quantile(np.asarray(all_values, dtype=np.float64), 0.90)),
-        "overall_share_regret_gt_0_02": float(np.mean(np.asarray(all_values, dtype=np.float64) > PRACTICAL)),
+        "overall_median_regret": float(np.median(all_array)),
+        "overall_p90_regret": float(np.quantile(all_array, 0.90)),
+        "overall_share_regret_gt_0_02": float(np.mean(all_array > PRACTICAL)),
         "bootstrap": {
             "method": "10000 environment-stratified source-draft resamples; decision-weighted draft totals/counts",
             "draws": BOOTSTRAPS,
