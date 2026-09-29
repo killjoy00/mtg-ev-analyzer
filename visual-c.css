@@ -176,6 +176,11 @@ button, input, select, textarea { font: inherit; }
   pointer-events: none;
 }
 
+.top-actions #account-nav {
+  min-width: 96px;
+  justify-content: center;
+}
+
 .top-nav-button:hover {
   background: transparent;
   color: var(--green);
