@@ -72,6 +72,10 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /SOURCE_ARTIFACT_ID/, path);
       assert.match(workflow, /ARTIFACT_DIGEST/, path);
       assert.match(workflow, /x\.image\?\.id/, path);
+      assert.match(workflow, /ffmpeg .*feature\.png .*feature\.jpg/, path);
+      assert.match(workflow, /Content-Type: image\/jpeg/, path);
+      assert.match(workflow, /Committed reviewed en-US Play icon and five phone screenshots/, path);
+      assert.match(workflow, /Committed reviewed en-US Play feature graphic/, path);
       assert.match(workflow, /feature_status=.*write-out '%\{http_code\}'/, path);
       assert.match(workflow, /cat feature-upload\.json >&2/, path);
       assert.match(workflow, /edits\/\$edit_id:commit/, path);
