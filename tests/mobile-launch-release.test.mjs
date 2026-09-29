@@ -64,6 +64,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.ok(workflow.includes(".github/google-play-feature-graphic-request.json"), path);
       assert.ok(workflow.includes("upload-google-play-feature-graphic"), path);
       assert.ok(workflow.includes("Pillow==11.3.0"), path);
+      assert.ok(workflow.includes("ImageFile.LOAD_TRUNCATED_IMAGES = True"), path);
       assert.ok(workflow.includes("featureGraphic?uploadType=resumable"), path);
       assert.ok(workflow.includes("X-Upload-Content-Type: image/jpeg"), path);
       assert.ok(workflow.includes("Resumable session initialized successfully."), path);
