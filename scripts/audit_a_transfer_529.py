@@ -490,10 +490,22 @@ def evaluate_scope(name, set_id, dids, exact_keys, lookup, fold_models,
             "broad_behavior_propensity_of_deployed_pick": b.get(dt),
             "broad_behavior_propensity_of_research_pick": b.get(rt),
         })
-    expected = sum(1 for key in lookup if key[0] in dids and key[1] == 1 and 1 <= key[2] <= 8
-                   and (exact_keys is None or key in exact_keys))
+    if exact_keys is None:
+        expected = sum(
+            1 for key in lookup
+            if key[0] in dids and key[1] == 1 and 1 <= key[2] <= 8
+        )
+    else:
+        expected = sum(
+            1 for key in exact_keys
+            if key[0] in dids and key[1] == 1 and 1 <= key[2] <= 8
+        )
     missing = max(0, expected - len(rows))
-    return rows, {"incumbent_top_mismatches_vs_frozen_context": incumbent_mismatch, "missing": missing}
+    return rows, {
+        "expected_decisions": expected,
+        "incumbent_top_mismatches_vs_frozen_context": incumbent_mismatch,
+        "missing": missing,
+    }
 
 
 def evaluate_served_stored(set_id, corpus, by_hash, lookup, research_model):
