@@ -17,6 +17,7 @@ import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trig
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
+import {handleCampaignLinkPublish} from './campaign-link-publish.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
@@ -2177,6 +2178,7 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/mobile/version') return handleMobileVersionCheck(request,{query,json});
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (url.pathname.startsWith('/v1/apple-subscriptions/')) return handleAppleSubscriptions(request,{query,json,readJson,mobileAccountIdentity});
+  if (url.pathname === '/v1/admin/campaign-links/publish') return handleCampaignLinkPublish(request,{query,readJson,allowedOrigins:ALLOWED_ORIGINS});
   if (request.method === 'POST' && url.pathname === '/internal/player-session-refresh') return handleBrowserPlayerSession(request,{existingOnly:true});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
   if (request.method === 'POST' && url.pathname === '/v1/player/migrate') return handlePlayerMigration(request);
