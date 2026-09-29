@@ -68,11 +68,13 @@ export function installDailyHome(identityReady = Promise.resolve()) {
     // Start Daily hydration immediately. getAuthSession() and loadDailyStatus()
     // both share ensureMigrations(), so this overlaps their post-migration reads
     // without racing account/player setup.
-    const profilePromise=loadDailyStatus();
+    const profilePromise=loadDailyStatus().then(
+      profile=>({profile,error:null}),
+      error=>({profile:null,error}),
+    );
     await identityReady;
-    let profile=null,state='ready';
-    try { profile=await profilePromise; }
-    catch { state='unavailable'; }
+    const result=await profilePromise;
+    const profile=result.profile,state=result.error?'unavailable':'ready';
     if (version !== generation || day !== gameDateKey() || !document.querySelector('[data-daily-home]')) return;
     renderDailyHome(profile, state);
   }
