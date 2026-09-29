@@ -1,112 +1,16 @@
-name: a-regret-later-final-aggregate-756
+name: a-regret-later-final-aggregate-756-BLOCKED
 
 on:
-  push:
-    branches:
-      - research/a-regret-bound-756
-    paths:
-      - research/A-REGRET-LATER-AGGREGATE-RUN-756.txt
   workflow_dispatch:
 
 permissions:
-  actions: read
   contents: read
 
-env:
-  INITIAL_RUN: '36587913521'
-  RECOVERY_RUN: '36602844254'
-  PYTHONUNBUFFERED: '1'
-
 jobs:
-  aggregate:
+  blocked:
     runs-on: ubuntu-latest
-    timeout-minutes: 120
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Install pinned numeric dependency
-        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
-
-      - name: Download preserved FIN result
-        uses: actions/download-artifact@v4
-        with:
-          name: a-regret-later-FIN
-          path: sets/FIN
-          run-id: ${{ env.INITIAL_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Download preserved TDM result
-        uses: actions/download-artifact@v4
-        with:
-          name: a-regret-later-TDM
-          path: sets/TDM
-          run-id: ${{ env.INITIAL_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Download preserved DFT result
-        uses: actions/download-artifact@v4
-        with:
-          name: a-regret-later-DFT
-          path: sets/DFT
-          run-id: ${{ env.INITIAL_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Download recovered MSH result
-        uses: actions/download-artifact@v4
-        with:
-          name: a-regret-later-recovery-MSH
-          path: sets/MSH
-          run-id: ${{ env.RECOVERY_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Download recovered SOS result
-        uses: actions/download-artifact@v4
-        with:
-          name: a-regret-later-recovery-SOS
-          path: sets/SOS
-          run-id: ${{ env.RECOVERY_RUN }}
-          github-token: ${{ github.token }}
-
-      - name: Verify exact source artifact set
-        shell: bash
+      - name: Block repeat #756 outcome analysis
         run: |
-          set -euo pipefail
-          for e in FIN TDM DFT MSH SOS; do
-            test -f "sets/$e/later-report.json"
-            test -f "sets/$e/later-regret-rows.jsonl.gz"
-            test -f "sets/$e/preflight-later.json"
-          done
-          python -m py_compile research/a_regret_later_aggregate.py
-
-      - name: Aggregate frozen later-pick result
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p results
-          python research/a_regret_later_aggregate.py \
-            --input-root sets \
-            --output results/a-regret-later-recentered-aggregate.json
-
-      - name: Assert final aggregation boundary
-        shell: bash
-        run: |
-          python - <<'PY'
-          import json
-          r=json.load(open('results/a-regret-later-recentered-aggregate.json'))
-          assert r['issue']==756
-          assert r['secondary_after_p1p1_outcome_open'] is True
-          assert r['bootstrap']['draws']==10000
-          assert set(r['environments'])=={'FIN','TDM','DFT','MSH','SOS'}
-          assert r['eligible_decisions'] > 0
-          assert len(r['bootstrap']['ci95'])==2
-          PY
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: a-regret-later-recentered-final-aggregate-756
-          path: results/a-regret-later-recentered-aggregate.json
-          retention-days: 90
+          echo "::error::Final five-set aggregation completed successfully in run 36604499634, artifact 11050628262. Use the retained result; do not recompute after outcomes."
+          exit 1
