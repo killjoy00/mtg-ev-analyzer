@@ -1,0 +1,51 @@
+name: App Store safe submission metadata
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/app-store-submission-metadata-request.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-store-safe-submission-metadata
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    name: configure safe App Store submission metadata
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate guarded metadata request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('.github/app-store-submission-metadata-request.json').read_text())
+          if set(r) != {'operation','reason'} or r.get('operation') != 'configure-app-store-safe-submission-metadata':
+              raise SystemExit('Invalid App Store metadata request.')
+          if not isinstance(r.get('reason'),str) or not r['reason'].strip():
+              raise SystemExit('Request reason is required.')
+          PY
+      - name: Require current main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Configure manual release and privacy choices URL
+        run: node .github/scripts/app-store-submission-metadata.mjs
