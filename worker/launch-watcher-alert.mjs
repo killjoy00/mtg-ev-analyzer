@@ -113,11 +113,6 @@ async function sendStaleOperatorEmail({env,fetcher,episode,freshness,detectedAt,
   if(!response.ok)throw Object.assign(Error('Launch watcher operator email failed'),{status:response.status});
 }
 
-function elapsed(now,value) {
-  if(!value)return Infinity;
-  return Math.max(0,now-Date.parse(value));
-}
-
 export async function reconcileLaunchWatcherAlert({query,freshness,now=Date.now(),env=process.env,fetcher=fetch,urgent=false}={}) {
   if(typeof query!=='function')throw Error('Launch watcher alert query is required');
   if(!freshness||typeof freshness.ok!=='boolean')throw Error('Launch watcher freshness result is required');
@@ -147,7 +142,7 @@ export async function reconcileLaunchWatcherAlert({query,freshness,now=Date.now(
     if(!urgent)return {action:'grace',episode_id:grace.episode_id};
     pending=await saveState(query,{...grace,notify_after:null});
   } else if(current.status==='stale_pending'&&current.notify_after) {
-    if(!urgent&&elapsed(now,current.notify_after)===0)
+    if(!urgent&&now<Date.parse(current.notify_after))
       return {action:'grace',episode_id:current.episode_id};
     pending=await saveState(query,{...current,notify_after:null});
   }
