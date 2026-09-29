@@ -1935,9 +1935,12 @@ async function launchWatcherSignal(trigger,response) {
     }));
   }
 
+  const urgentOperatorAlert=Boolean(
+    recoveryDispatchError||recoveryDispatch?.action==='failed'||recoveryDispatch?.action==='exhausted'
+  );
   let operatorAlert=null;
   try {
-    operatorAlert=await reconcileLaunchWatcherAlert({query,freshness,now:scheduledAt});
+    operatorAlert=await reconcileLaunchWatcherAlert({query,freshness,now:scheduledAt,urgent:urgentOperatorAlert});
   } catch(error) {
     console.error(JSON.stringify({
       event:'launch_watcher_operator_alert_failure',
@@ -1957,7 +1960,7 @@ async function launchWatcherSignal(trigger,response) {
   }
 
   if(freshness.ok) {
-    if(operatorAlert?.action==='recovered'||recoveryDispatch?.action==='recovered')console.log(JSON.stringify({
+    if(operatorAlert?.action==='recovered_silently'||recoveryDispatch?.action==='recovered')console.log(JSON.stringify({
       event:'launch_watcher_recovered',
       covered_through:freshness.covered_through||null,
       age_minutes:Number.isFinite(freshness.age_minutes)?freshness.age_minutes:null,
