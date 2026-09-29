@@ -173,6 +173,13 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.match(dataSafetyScript, /PSL_DATA_COLLECTION_USER_REQUEST_DELETE','TRUE'/);
   assert.match(dataSafetyScript, /name:'Other actions'/);
   assert.match(dataSafetyScript, /PSL_DATA_USAGE_ONLY_COLLECTED/);
+  assert.match(dataSafetyScript, /PSL_SUPPORTED_ACCOUNT_CREATION_METHODS/);
+  assert.match(dataSafetyScript, /PSL_ACM_USER_ID_PASSWORD/);
+  assert.match(dataSafetyScript, /PSL_ACM_OAUTH/);
+  assert.match(dataSafetyScript, /PSL_ACCOUNT_DELETION_URL/);
+  assert.match(dataSafetyScript, /https:\/\/packone\.pro\/privacy\/#delete-account/);
+  assert.match(dataSafetyScript, /PSL_SUPPORT_DATA_DELETION_BY_USER/);
+  assert.match(dataSafetyScript, /DATA_DELETION_NO/);
   assert.match(dataSafetyScript, /Unexpected sharing declarations/);
   assert.match(dataSafetyScript, /Advertising\/marketing purpose must not be selected/);
 
