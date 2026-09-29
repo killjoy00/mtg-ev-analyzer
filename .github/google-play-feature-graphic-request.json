@@ -1,6 +1,6 @@
 {
   "operation": "upload-google-play-feature-graphic",
   "language": "en-US",
-  "source_png_sha256": "56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69",
-  "reason": "Retry only the reviewed 1024x500 feature graphic using Google Play's documented resumable media upload protocol with a JPEG derived from the pinned opaque RGB PNG. This workflow must not touch icons, screenshots, tracks, releases, rollout, review submission, regions, or any other listing data. Clean recovery: retry the isolated featureGraphic flow using Pillow-generated 1024x500 JPEG and Google resumable media upload; no icon or screenshot mutations."
+  "reason": "Retry only the reviewed 1024x500 feature graphic using Google Play's documented resumable media upload protocol with a JPEG derived from the pinned opaque RGB PNG. This workflow must not touch icons, screenshots, tracks, releases, rollout, review submission, regions, or any other listing data. Clean recovery: retry the isolated featureGraphic flow using Pillow-generated 1024x500 JPEG and Google resumable media upload; no icon or screenshot mutations. Retry using the exact reviewed 1024x500 JPEG as the pinned source; do not derive from the corrupted PNG.",
+  "source_jpeg_sha256": "0acc7f62b39dd9bc2a8f320be6c73dc3dc5c6a81e7af8096fa09cae4c9fe23ec"
 }
