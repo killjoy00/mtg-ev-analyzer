@@ -21,7 +21,7 @@ export function adminOnlyGatewayPatch(patch) {
   if(!lines.length)return false;
   return lines.every(line=>{
     if(!line||line.startsWith('//'))return true;
-    const normalized=line.replaceAll('\\\\','');
+    const normalized=line.replaceAll('\\','');
     if(!normalized.includes('/admin/')||normalized.includes('||'))return false;
     if(/^if\(.+\)return true;$/.test(normalized))return true;
     return /^if\(path===['"]\/(?:growth|draft)\/v1\/admin\/[^'"]+['"]\)return ['"]admin_[a-z0-9_]+['"];$/.test(normalized);
