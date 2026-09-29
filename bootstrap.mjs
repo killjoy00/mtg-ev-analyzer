@@ -113,7 +113,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     if(growth.accountState()==='unavailable') {
       await growth.refreshAccountSession();
       syncPrimaryNavState(growth.accountState());
-      if(growth.accountState()==='unavailable')return;
+      return;
     }
     await growth.renderAccount({source:'nav'});
   };
