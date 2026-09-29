@@ -80,6 +80,33 @@ function setPurposes(rows,qid,purposes){
   for(const r of choices)r[COL_V]=purposes.includes(r[COL_R])?'TRUE':'';
 }
 
+function ensureRow(rows,{questionId,responseId='',value='',requirement='MAYBE_REQUIRED',label}){
+  let row=rows.find(r=>r[COL_Q]===questionId&&r[COL_R]===responseId);
+  if(!row){
+    row={
+      [COL_Q]:questionId,
+      [COL_R]:responseId,
+      [COL_V]:'',
+      [COL_REQ]:requirement,
+      [COL_LABEL]:label,
+    };
+    rows.push(row);
+  }
+  row[COL_V]=value;
+  return row;
+}
+function ensureChoiceGroup(rows,questionId,choices,selectedIds){
+  for(const choice of choices){
+    ensureRow(rows,{
+      questionId,
+      responseId:choice.id,
+      value:selectedIds.includes(choice.id)?'TRUE':'',
+      requirement:'MULTIPLE_CHOICE',
+      label:choice.label,
+    });
+  }
+}
+
 const response=await fetch(sampleUrl);
 if(!response.ok)throw Error(`Google sample CSV HTTP ${response.status}`);
 const raw=await response.text();
@@ -92,6 +119,31 @@ for(const row of rows)row[COL_V]='';
 setSingleton(rows,'PSL_DATA_COLLECTION_COLLECTS_PERSONAL_DATA','TRUE');
 setSingleton(rows,'PSL_DATA_COLLECTION_ENCRYPTED_IN_TRANSIT','TRUE');
 setSingleton(rows,'PSL_DATA_COLLECTION_USER_REQUEST_DELETE','TRUE');
+
+// Google's live applications.dataSafety validator requires the account-creation
+// and account-deletion answers even though the current downloadable sample CSV
+// omits these rows. Pack One supports email/password plus OAuth account creation
+// (Google and Apple) and provides both in-app permanent deletion and a public
+// web deletion resource.
+ensureChoiceGroup(rows,'PSL_SUPPORTED_ACCOUNT_CREATION_METHODS',[
+  {id:'PSL_ACM_USER_ID_PASSWORD',label:'Which account creation methods does the app support? / Username and password'},
+  {id:'PSL_ACM_USER_ID_OTHER_AUTH',label:'Which account creation methods does the app support? / Username and other authentication'},
+  {id:'PSL_ACM_USER_ID_PASSWORD_OTHER_AUTH',label:'Which account creation methods does the app support? / Username, password, and other authentication'},
+  {id:'PSL_ACM_OAUTH',label:'Which account creation methods does the app support? / OAuth'},
+  {id:'PSL_ACM_OTHER',label:'Which account creation methods does the app support? / Other'},
+  {id:'PSL_ACM_NONE',label:'Which account creation methods does the app support? / App does not allow account creation'},
+],['PSL_ACM_USER_ID_PASSWORD','PSL_ACM_OAUTH']);
+ensureRow(rows,{
+  questionId:'PSL_ACCOUNT_DELETION_URL',
+  value:'https://packone.pro/privacy/#delete-account',
+  requirement:'MAYBE_REQUIRED',
+  label:'Link where users can request deletion of their account and associated data',
+});
+ensureChoiceGroup(rows,'PSL_SUPPORT_DATA_DELETION_BY_USER',[
+  {id:'DATA_DELETION_YES',label:'Can users request deletion of some or all data without deleting the account? / Yes'},
+  {id:'DATA_DELETION_NO',label:'Can users request deletion of some or all data without deleting the account? / No'},
+  {id:'DATA_DELETION_NO_AUTO_DELETED',label:'Can users request deletion of some or all data without deleting the account? / No, but data is automatically deleted within 90 days'},
+],['DATA_DELETION_NO']);
 
 const specs=[
   {
@@ -153,6 +205,13 @@ if(advertisingRows.length)throw Error('Advertising/marketing purpose must not be
 
 const unresolvedRequired=rows.filter(r=>r[COL_REQ]==='REQUIRED'&&!String(r[COL_V]).trim());
 if(unresolvedRequired.length)throw Error(`Unresolved REQUIRED rows: ${JSON.stringify(unresolvedRequired.slice(0,40))}`);
+
+const accountMethods=rows.filter(r=>r[COL_Q]==='PSL_SUPPORTED_ACCOUNT_CREATION_METHODS'&&r[COL_V]==='TRUE').map(r=>r[COL_R]).sort();
+if(JSON.stringify(accountMethods)!==JSON.stringify(['PSL_ACM_OAUTH','PSL_ACM_USER_ID_PASSWORD']))throw Error(`Unexpected account creation methods: ${JSON.stringify(accountMethods)}`);
+const deletionUrl=rows.find(r=>r[COL_Q]==='PSL_ACCOUNT_DELETION_URL'&&r[COL_R]==='')?.[COL_V];
+if(deletionUrl!=='https://packone.pro/privacy/#delete-account')throw Error(`Unexpected account deletion URL: ${deletionUrl}`);
+const dataDeletion=rows.filter(r=>r[COL_Q]==='PSL_SUPPORT_DATA_DELETION_BY_USER'&&r[COL_V]==='TRUE').map(r=>r[COL_R]);
+if(JSON.stringify(dataDeletion)!==JSON.stringify(['DATA_DELETION_NO']))throw Error(`Unexpected separate data-deletion answer: ${JSON.stringify(dataDeletion)}`);
 
 // Validate every selected type has the complete conditional set we intend.
 for(const item of selected){
