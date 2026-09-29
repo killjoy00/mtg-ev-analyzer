@@ -249,12 +249,11 @@ def kendall_tau(order_a, order_b):
 
 
 def read_corpus(path: Path):
-    rows = []
     with gzip.open(path, "rt", encoding="utf-8") as f:
-        for line in f:
-            if line.strip():
-                rows.append(json.loads(line))
-    return rows
+        value = json.load(f)
+    if not isinstance(value, list):
+        raise ValueError(f"{path}: expected frozen corpus JSON array")
+    return value
 
 
 def source_hash(set_id, draft_id):
@@ -344,6 +343,15 @@ def summarize_scope(rows):
             "kendall_tau": statistics.fmean(r["kendall_tau"] for r in group),
         }
 
+    def prop_summary(field):
+        vals = [r[field] for r in disagreements if r.get(field) is not None]
+        return {
+            "n": len(vals),
+            "median": percentile(vals, .5),
+            "p10": percentile(vals, .1),
+            "p90": percentile(vals, .9),
+        }
+
     return {
         **core(rows),
         "p1p1": core(p1),
@@ -357,6 +365,12 @@ def summarize_scope(rows):
             "both_le_0_05": sum(x <= .05 for x in both) / len(both) if both else None,
             "both_le_0_10": sum(x <= .10 for x in both) / len(both) if both else None,
             "both_le_0_20": sum(x <= .20 for x in both) / len(both) if both else None,
+        },
+        "disagreement_pick_propensities": {
+            "research_strong_deployed_pick": prop_summary("research_strong_propensity_of_deployed_pick"),
+            "research_strong_research_pick": prop_summary("research_strong_propensity_of_research_pick"),
+            "broad_behavior_deployed_pick": prop_summary("broad_behavior_propensity_of_deployed_pick"),
+            "broad_behavior_research_pick": prop_summary("broad_behavior_propensity_of_research_pick"),
         },
         "common_card_pairs": [
             {"deployed": a, "research": b, "n": count}
@@ -416,6 +430,58 @@ def evaluate_scope(name, set_id, dids, exact_keys, lookup, prod_training, fold_m
     return rows, {"incumbent_top_mismatches_vs_frozen_context": incumbent_mismatch, "missing": missing}
 
 
+def evaluate_served_stored(set_id, corpus, by_hash, lookup, research_model):
+    """Step 3a from immutable stored production probabilities.
+
+    This remains valid even if Step 2 reproduction fails; it never substitutes
+    a reconstructed/approximate deployed score for the committed v8 value.
+    """
+    rows = []
+    missing = 0
+    for puzzle in corpus:
+        pick = int(puzzle["pick_number"])
+        if not 1 <= pick <= 8:
+            continue
+        did = by_hash.get(puzzle["source_draft_hash"])
+        if did is None:
+            missing += 1
+            continue
+        key = (did, int(puzzle["pack_number"]), pick)
+        ex = lookup.get(key)
+        if ex is None:
+            missing += 1
+            continue
+        dp = {c["name"]: float(c["model_probability"]) for c in puzzle["candidates"]}
+        rp = probs(research_model, ex)
+        if set(dp) != set(rp):
+            missing += 1
+            continue
+        dr, rr = ranking(dp), ranking(rp)
+        dt, rt = dr[0], rr[0]
+        overlap = len(set(dr[:2]) & set(rr[:2])) / min(2, len(dr), len(rr))
+        rows.append({
+            "scope": "served_v8",
+            "set": set_id,
+            "draft_id": did,
+            "stage": f"P1P{pick}",
+            "historical_pick": ex.historical_pick,
+            "deployed_top": dt,
+            "research_top": rt,
+            "agree": dt == rt,
+            "top2_overlap": overlap,
+            "kendall_tau": kendall_tau(dr, rr),
+            "deployed_margin": 0.0 if dt == rt else dp[dt] - dp[rt],
+            "research_margin": 0.0 if dt == rt else rp[rt] - rp[dt],
+            "deployed_top_probability": dp[dt],
+            "research_top_probability": rp[rt],
+            "research_strong_propensity_of_deployed_pick": rp[dt],
+            "research_strong_propensity_of_research_pick": rp[rt],
+            "broad_behavior_propensity_of_deployed_pick": None,
+            "broad_behavior_propensity_of_research_pick": None,
+        })
+    return rows, {"stored_deployed_probabilities": True, "missing": missing}
+
+
 def predictive(rows, strong_eval_ids):
     chosen = [r for r in rows if r["draft_id"] in strong_eval_ids]
     if not chosen:
@@ -467,7 +533,7 @@ def run_set(args):
         len(training) == int(cohort["training_drafts"])
         and experienced == int(cohort["experienced_drafts"])
         and abs(cutoff - float(cohort["win_rate_cutoff"])) <= 1e-12
-        and manifest["model"]["version"] == "strong-player-colour-stage-v4"
+        and manifest["model"]["model_version"] == "strong-player-colour-stage-v4"
         and manifest["model"]["holdout"] == "5-fold by draft_id"
     )
 
@@ -528,7 +594,10 @@ def run_set(args):
         if ex is None:
             repro_errors.append({"key": key, "error": "source decision missing"})
             continue
-        model = fold_models[stable_fold(did, 5)] if did in training else full_prod
+        # Production corpus builder assigns every served draft to its stable
+        # fold grader, even when the served trophy is not one of the 5,000
+        # training IDs. This must mirror import_all_trophies.build_set exactly.
+        model = fold_models[stable_fold(did, 5)]
         p = probs(model, ex)
         stored = {c["name"]: float(c["model_probability"]) for c in puzzle["candidates"]}
         if set(stored) != set(p):
@@ -554,9 +623,8 @@ def run_set(args):
         and cohort_match
     )
 
-    served_rows, served_check = evaluate_scope(
-        "served_v8", set_id, served_ids, None, lookup, training, fold_models,
-        full_prod, research_model, freeze_meta={}
+    served_rows, served_check = evaluate_served_stored(
+        set_id, corpus, by_hash, lookup, research_model
     )
 
     scope_rows = {"served_v8": served_rows}
@@ -722,6 +790,9 @@ def aggregate(args):
     outdir.mkdir(parents=True, exist_ok=True)
     (outdir / "report.json").write_text(json.dumps(final, indent=2, sort_keys=True) + "\n")
 
+    def format_pct(value):
+        return "—" if value is None else f"{value:.4%}"
+
     lines = [
         "# Issue #529 — deployed A vs research A transfer audit",
         "",
@@ -755,8 +826,8 @@ def aggregate(args):
         m = a["margins"]["max_of_two"]["p90"]
         lines.append(
             f"| {r['set'].upper()} | {a['n']} | {a['top1_agreement']:.4%} | "
-            f"{'—' if p1['top1_agreement'] is None else f'{p1['top1_agreement']:.4%}'} | "
-            f"{'—' if pl['top1_agreement'] is None else f'{pl['top1_agreement']:.4%}'} | "
+            f"{format_pct(p1['top1_agreement'])} | "
+            f"{format_pct(pl['top1_agreement'])} | "
             f"{a['top2_overlap']:.4f} | {a['kendall_tau']:.4f} | {a['disagreements']} | "
             f"{'—' if m is None else f'{m:.6f}'} | {a['p1p1_disagreements_involving_frozen_10']} |"
         )
