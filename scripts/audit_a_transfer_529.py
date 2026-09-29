@@ -716,8 +716,18 @@ def run_set(args):
         if len(repro_errors) >= 50:
             break
 
+    identity_match = all((
+        identity["corpus_hash_match"],
+        identity["draft_hash_match"],
+        identity["game_hash_match_research"],
+        identity["data_date_match"],
+        identity["research_draft_hash_match"],
+        identity["research_game_hash_match"],
+    ))
     reproduction_pass = (
-        not unmapped and not repro_errors and max_abs <= 1e-6 and top_mismatch == 0
+        identity_match
+        and not unmapped and not repro_errors
+        and max_abs <= 1e-6 and top_mismatch == 0
         and cohort_match
     )
 
@@ -809,6 +819,7 @@ def run_set(args):
         },
         "reproduction": {
             "pass": reproduction_pass,
+            "identity_match": identity_match,
             "served_decisions_checked": decisions_checked,
             "candidate_probabilities_checked": candidates_checked,
             "max_abs_probability_error": max_abs,
