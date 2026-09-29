@@ -152,8 +152,12 @@ def scan_skills(path: Path):
     return skills, draft_ids, header
 
 
-def load_examples(path: Path, wanted_ids: set[str], header: tuple[str, ...]):
-    """Parse only state/action/candidate/pool columns for selected draft IDs."""
+def load_examples(path: Path, wanted_ids: set[str], header: tuple[str, ...], full_ids: set[str]):
+    """Parse only state/action/candidate/pool columns for selected draft IDs.
+
+    Model-training and served-reproduction IDs retain all picks. Evaluation-only
+    IDs retain only P1P1-P1P8, bounding the 45k audit without changing its scope.
+    """
     pack_cols = candidate_columns(header)
     pool_cols = pool_columns(header)
     idx = {name: i for i, name in enumerate(header)}
@@ -187,6 +191,8 @@ def load_examples(path: Path, wanted_ids: set[str], header: tuple[str, ...]):
                 raw_pack = int(float(values[pack_at]))
                 raw_pick = int(float(values[pos_at]))
             except ValueError:
+                continue
+            if did not in full_ids and (raw_pack != 0 or raw_pick > 7):
                 continue
             candidates = [c[len("pack_card_"):] for c, i in packed if truthy_count(values[i]) > 0]
             if historical not in candidates or len(candidates) != len(set(candidates)):
@@ -562,10 +568,11 @@ def run_set(args):
     )
     research_strong = set(research_strong)
 
-    wanted = set(training) | served_ids | prior_ids | research_strong
+    wanted = set(training) | served_ids | research_strong
     for ids in scopes.values():
         wanted |= set(ids)
-    examples = load_examples(draft_path, wanted, header)
+    full_ids = set(training) | served_ids | research_strong
+    examples = load_examples(draft_path, wanted, header, full_ids)
     lookup = example_lookup(examples)
 
     prod_pairs = [(did, ex) for did in training for ex in examples.get(did, ())]
