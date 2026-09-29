@@ -5,7 +5,7 @@ export const LAUNCH_WATCHER_ALERT_SENDER='Pack One <accounts@packone.pro>';
 export const LAUNCH_WATCHER_ALERT_DESTINATION='admin@packone.pro';
 export const LAUNCH_WATCHER_ALERT_GRACE_MS=30*60*1000;
 const RESEND_URL='https://api.resend.com/emails';
-const STATUS=new Set(['fresh','stale_grace','stale_pending','stale','recovery_pending']);
+const STATUS=new Set(['fresh','stale_pending','stale','recovery_pending']);
 
 function iso(value) {
   const time=Number(value);
@@ -14,7 +14,7 @@ function iso(value) {
 }
 
 function defaultState() {
-  return {version:1,status:'fresh',episode_id:null,started_at:null,alerted_at:null,recovered_at:null,reason:null,covered_through:null};
+  return {version:1,status:'fresh',episode_id:null,started_at:null,alerted_at:null,recovered_at:null,reason:null,covered_through:null,notify_after:null};
 }
 
 function parseTime(value) {
@@ -43,6 +43,7 @@ export function parseLaunchWatcherAlertState(value) {
     recovered_at:parseTime(parsed.recovered_at),
     reason:parsed.reason===null||parsed.reason===undefined?null:String(parsed.reason).slice(0,80),
     covered_through:parseTime(parsed.covered_through),
+    notify_after:parseTime(parsed.notify_after),
   };
 }
 
@@ -129,7 +130,7 @@ export async function reconcileLaunchWatcherAlert({query,freshness,now=Date.now(
     const episode=current.episode_id;
     await saveState(query,{
       version:1,status:'fresh',episode_id:null,started_at:null,alerted_at:null,recovered_at:detectedAt,
-      reason:null,covered_through:freshness.covered_through||null,
+      reason:null,covered_through:freshness.covered_through||null,notify_after:null,
     });
     return {action:'recovered_silently',episode_id:episode};
   }
@@ -139,16 +140,16 @@ export async function reconcileLaunchWatcherAlert({query,freshness,now=Date.now(
   let pending=current;
   if(current.status==='fresh'||current.status==='recovery_pending') {
     const grace=await saveState(query,{
-      version:1,status:'stale_grace',episode_id:episodeId(now,freshness),started_at:detectedAt,
+      version:1,status:'stale_pending',episode_id:episodeId(now,freshness),started_at:detectedAt,
       alerted_at:null,recovered_at:null,reason:freshness.reason||'unknown',
-      covered_through:freshness.covered_through||null,
+      covered_through:freshness.covered_through||null,notify_after:iso(now+LAUNCH_WATCHER_ALERT_GRACE_MS),
     });
     if(!urgent)return {action:'grace',episode_id:grace.episode_id};
-    pending=await saveState(query,{...grace,status:'stale_pending'});
-  } else if(current.status==='stale_grace') {
-    if(!urgent&&elapsed(now,current.started_at)<LAUNCH_WATCHER_ALERT_GRACE_MS)
+    pending=await saveState(query,{...grace,notify_after:null});
+  } else if(current.status==='stale_pending'&&current.notify_after) {
+    if(!urgent&&elapsed(now,current.notify_after)===0)
       return {action:'grace',episode_id:current.episode_id};
-    pending=await saveState(query,{...current,status:'stale_pending'});
+    pending=await saveState(query,{...current,notify_after:null});
   }
 
   await sendStaleOperatorEmail({
@@ -156,7 +157,7 @@ export async function reconcileLaunchWatcherAlert({query,freshness,now=Date.now(
   });
   await saveState(query,{
     ...pending,status:'stale',alerted_at:detectedAt,reason:freshness.reason||pending.reason,
-    covered_through:freshness.covered_through||pending.covered_through,
+    covered_through:freshness.covered_through||pending.covered_through,notify_after:null,
   });
   return {action:'alerted',episode_id:pending.episode_id};
 }
