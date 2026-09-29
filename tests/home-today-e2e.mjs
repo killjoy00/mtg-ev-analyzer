@@ -37,7 +37,7 @@ try{
  both=false;
  await page.evaluate(()=>{window.__todayNow=Date.parse('2026-09-15T07:00:00Z');window.dispatchEvent(new Event('focus'));});await progress('0');
  assert.equal(await page.locator('.daily-home time').getAttribute('datetime'),'2026-09-15');
- fail=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Daily progress is unavailable.',{exact:false}).waitFor();
+ fail=true;await page.evaluate(()=>window.dispatchEvent(new Event('focus')));await page.getByText('Daily progress is temporarily unavailable.',{exact:false}).waitFor();
  assert.equal(starts,0,'Reading Today must never reserve a ranked Daily');
  console.log('Daily home refresh passed: completion, stale response, Pacific rollover, unavailable status and no Daily reservation.');
 }finally{await browser.close();}

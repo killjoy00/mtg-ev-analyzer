@@ -37,6 +37,8 @@
 .daily-home-game.is-complete .daily-home-number{font-size:32px}
 .daily-home-game.is-complete h2{font-size:26px;margin-bottom:5px}
 .daily-home-game.is-complete .button{min-width:110px}
+.daily-home-unavailable{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:14px 0;border-bottom:1px solid var(--line);color:var(--muted);font-size:14px}
+.daily-home-unavailable .text-button{flex:0 0 auto}
 .daily-home-practice{margin-top:30px;padding:26px 0;border-top:2px solid var(--ink);border-bottom:1px solid var(--line)}
 .daily-home-practice .eyebrow{margin:0 0 8px}
 .daily-home-practice h2{font-family:var(--display);font-size:40px;line-height:1.1;letter-spacing:0;margin:0 0 22px}

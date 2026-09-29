@@ -39,7 +39,7 @@ async function renderMembershipState() {
     action.disabled=false;
     action.onclick=async()=>{
       action.disabled=true;
-      const { beginEliteUpgrade }=await import('/growth.mjs?v=6');
+      const { beginEliteUpgrade }=await import('/growth.mjs?v=7');
       await beginEliteUpgrade({source:'patreon_landing'});
     };
     setStatus('Sign in or create a free Pack One account first. Elite benefits need a Pack One account to attach to.');

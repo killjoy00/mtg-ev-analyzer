@@ -41,7 +41,12 @@ try{
   assert.equal(await page.locator('.daily-home-game.is-complete').count(),sets.length);
   assert.equal(await page.locator('.daily-home-practice').count(),sets.length===3?1:0);
   assert.equal(await page.locator('.daily-home-regular,.daily-home-custom').count(),0,'Daily home must not duplicate Practice or Elite surfaces');
-  if(sets.length===1)assert.equal(await page.locator('.daily-home-game').first().getAttribute('class'),'daily-home-game is-unplayed');
+  if(sets.length===1){
+   const titles=await page.locator('.daily-home-game h2').allTextContents();
+   assert.deepEqual(titles,['Daily Draft Run','Daily Powered Cube','Daily Latest Set'],'Daily card positions stay stable while completion hydrates');
+   const completedEnvironment=sets[0];
+   assert.ok(String(await page.locator(`.daily-home-game[data-environment="${completedEnvironment}"]`).getAttribute('class')).includes('is-complete'));
+  }
   for(const width of [320,390,768,1440]){
    await page.setViewportSize({width,height:900});
    const metrics=await page.evaluate(()=>[document.documentElement.scrollWidth,document.documentElement.clientWidth]);assert.ok(metrics[0]<=metrics[1]+1,`No overflow at ${width}`);
@@ -54,5 +59,5 @@ try{
   await page.screenshot({path:`artifacts/home-${sets.join('-')||'unplayed'}-mobile.png`,fullPage:true});
  }
  assert.deepEqual(errors,[]);
- console.log('Core home passed: immediate play, completion ordering, Daily-first signed-in state, factual Daily copy, responsive layout, isolated startup.');
+ console.log('Core home passed: immediate play, stable completion hydration, Daily-first signed-in state, factual Daily copy, responsive layout, isolated startup.');
 }finally{await browser.close();}

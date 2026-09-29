@@ -57,10 +57,29 @@ test('fresh guests get a larger Start here label instead of the generic first-ro
  assert.match(guest,/Free · No account required/);
 });
 
-test('either unfinished Daily precedes the compact result',()=>{
- for(const done of ['mixed','powered-cube']){
+test('checking state is neutral instead of pretending the player is a guest',()=>{
+ const html=dailyHomeMarkup(null,day,'checking');
+ assert.match(html,/data-home-state="checking"/);
+ assert.match(html,/data-completed="pending"/);
+ assert.equal((html.match(/is-pending/g)||[]).length,3);
+ assert.doesNotMatch(html,/is-unplayed|is-complete|Start here|Free · No account required|Create a free account|Dailies complete/);
+ assert.match(html,/The daily challenge/);
+});
+
+test('failed Daily hydration stays unknown and offers a retry',()=>{
+ const html=dailyHomeMarkup(null,day,'unavailable');
+ assert.match(html,/data-home-state="unavailable"/);
+ assert.equal((html.match(/is-pending/g)||[]).length,3);
+ assert.match(html,/Daily progress is temporarily unavailable/);
+ assert.match(html,/data-home-retry/);
+ assert.doesNotMatch(html,/Start here|Free · No account required|Create a free account/);
+});
+
+test('Daily card order stays stable as completion data hydrates',()=>{
+ for(const done of ['mixed','powered-cube','latest']){
   const html=dailyHomeMarkup({daily_history:[row(done)]},day);
-  assert.ok(html.indexOf('is-unplayed')<html.indexOf('is-complete'));
+  assert.ok(html.indexOf('Daily Draft Run')<html.indexOf('Daily Powered Cube'));
+  assert.ok(html.indexOf('Daily Powered Cube')<html.indexOf('Daily Latest Set'));
   assert.equal((html.match(/>Play now</g)||[]).length,2);
   assert.match(html,/View result/);assert.doesNotMatch(html,/Keep drafting/);
  }
@@ -94,7 +113,10 @@ test('home runtime isolates historical code and lazily loads profiles',()=>{
  assert.doesNotMatch(source,/import\(['"]\.\/(app\.js|social\.mjs|home-today\.mjs|cube-home\.mjs|home-product\.mjs)/);
  assert.match(source,/historical-share\.mjs/);
  assert.match(source,/daily-home\.mjs/);
+ assert.match(source,/renderDailyHome\(null,'checking'\)/,'Homepage must render an explicit neutral hydration state');
+ assert.match(source,/refreshAccountSession\(\)/,'Account-change refreshes must revalidate the session instead of reading stale cached state');
  assert.match(source,/renderAccount\(\{source:'nav'\}\)/,'Account navigation routes guests to sign in and members to My Pack One');
+ assert.doesNotMatch(home,/await identityReady;\s*const profile = await loadDailyStatus/,'Daily status must not wait serially behind the account read');
  assert.doesNotMatch(home,/data-home-elite|beginEliteUpgrade/,'Daily home must not duplicate Elite upsells now that Practice is a dedicated hub');
 });
 
