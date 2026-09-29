@@ -203,6 +203,148 @@ jobs:
           command -v ffmpeg >/dev/null
           ffmpeg -hide_banner -loglevel error -y -i reviewed/play/feature.png -q:v 2 reviewed/play/feature.jpg
           ffprobe -v error -select_streams v:0 -show_entries stream=width,height,pix_fmt -of csv=p=0 reviewed/play/feature.jpg | grep -Eq '^1024,500,(yuvj420p|yuv420p|yuvj444p|yuv444p)
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Replace en-US Google Play icon and phone screenshots
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKAGE_NAME: pro.packone.app
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME"
+          upload_root="https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$PACKAGE_NAME"
+          edit_id=""
+          committed=0
+
+          cleanup() {
+            if [[ -n "$edit_id" && "$committed" != 1 ]]; then
+              curl --fail --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id" >/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          edit_response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits")"
+          edit_id="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$edit_response")"
+
+          curl --fail-with-body --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/phoneScreenshots" >/dev/null
+          curl --fail-with-body --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/icon" >/dev/null
+
+          icon_response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: image/png' --data-binary '@reviewed/play/icon.png' "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/icon?uploadType=media")"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.image?.id){console.error(x);process.exit(2)} console.log("Uploaded Play icon:", x.image.id)' "$icon_response"
+
+          : > uploaded-ids.txt
+          for path in reviewed/android/*.jpg; do
+            echo "Uploading $(basename "$path")"
+            response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: image/jpeg' --data-binary "@$path" "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/phoneScreenshots?uploadType=media")"
+            node -e 'const x=JSON.parse(process.argv[1]); if(!x.image?.id){console.error(x);process.exit(2)} console.log(x.image.id)' "$response" >> uploaded-ids.txt
+          done
+
+          [[ "$(wc -l < uploaded-ids.txt | tr -d ' ')" == 5 ]] || { echo "Expected five uploaded screenshot IDs." >&2; exit 1; }
+
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/phoneScreenshots" > after.json
+          node -e 'const x=require("./after.json"); if((x.images||[]).length!==5){console.error(x);process.exit(2)} console.log("Verified five screenshots in pending Play edit.")'
+
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/icon" > icon-after.json
+          node -e 'const x=require("./icon-after.json"); if((x.images||[]).length!==1){console.error(x);process.exit(2)} console.log("Verified one icon in pending Play edit.")'
+
+          curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits/$edit_id:commit" > commit.json
+          committed=1
+          edit_id=""
+          echo "Committed reviewed en-US Play icon and five phone screenshots for $PACKAGE_NAME."
+
+      - name: Verify committed Play icon and phone screenshots
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKAGE_NAME: pro.packone.app
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME"
+          verify_edit=""
+          cleanup() {
+            if [[ -n "$verify_edit" ]]; then
+              curl --fail --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit" >/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits")"
+          verify_edit="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$response")"
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit/listings/$LISTING_LANGUAGE/phoneScreenshots" > verified.json
+          node -e 'const x=require("./verified.json"); const n=(x.images||[]).length; if(n!==5){console.error(x);process.exit(2)} console.log("Verified committed Google Play phone screenshot count:", n)'
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit/listings/$LISTING_LANGUAGE/icon" > verified-icon.json
+          node -e 'const x=require("./verified-icon.json"); const n=(x.images||[]).length; if(n!==1){console.error(x);process.exit(2)} console.log("Verified committed Google Play app icon count:", n)'
+
+      - name: Replace en-US Google Play feature graphic
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKAGE_NAME: pro.packone.app
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME"
+          upload_root="https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$PACKAGE_NAME"
+          edit_id=""
+          committed=0
+
+          cleanup() {
+            if [[ -n "$edit_id" && "$committed" != 1 ]]; then
+              curl --fail --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id" >/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          edit_response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits")"
+          edit_id="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$edit_response")"
+          curl --fail-with-body --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic" >/dev/null
+
+          feature_status="$(curl --silent --show-error --output feature-upload.json --write-out '%{http_code}' --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: image/jpeg' --data-binary '@reviewed/play/feature.jpg' "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic?uploadType=media")"
+          if [[ "$feature_status" != 2* ]]; then
+            echo "Google Play feature graphic JPEG upload failed with HTTP $feature_status" >&2
+            cat feature-upload.json >&2
+            exit 1
+          fi
+          node -e 'const x=require("./feature-upload.json"); if(!x.image?.id){console.error(x);process.exit(2)} console.log("Uploaded Play feature graphic:", x.image.id)'
+
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic" > feature-after.json
+          node -e 'const x=require("./feature-after.json"); if((x.images||[]).length!==1){console.error(x);process.exit(2)} console.log("Verified one feature graphic in pending Play edit.")'
+
+          curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits/$edit_id:commit" > commit-feature.json
+          committed=1
+          edit_id=""
+          echo "Committed reviewed en-US Play feature graphic for $PACKAGE_NAME."
+
+      - name: Verify committed Play feature graphic
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKAGE_NAME: pro.packone.app
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME"
+          verify_edit=""
+          cleanup() {
+            if [[ -n "$verify_edit" ]]; then
+              curl --fail --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit" >/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits")"
+          verify_edit="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$response")"
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit/listings/$LISTING_LANGUAGE/featureGraphic" > verified-feature.json
+          node -e 'const x=require("./verified-feature.json"); const n=(x.images||[]).length; if(n!==1){console.error(x);process.exit(2)} console.log("Verified committed Google Play feature graphic count:", n)'
+
+          echo "Prepared Play feature graphic JPEG from the pinned reviewed PNG."
+
+      - id: auth
         name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
