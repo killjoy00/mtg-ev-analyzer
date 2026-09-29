@@ -74,14 +74,7 @@ jobs:
           python3 - <<'PY'
           import csv, html, io, json, re, urllib.request
 
-          help_url='https://support.google.com/googleplay/android-developer/answer/10787469?hl=en'
-          request=urllib.request.Request(help_url,headers={'User-Agent':'Mozilla/5.0'})
-          page=urllib.request.urlopen(request,timeout=30).read().decode('utf-8','replace')
-          page=html.unescape(page)
-          urls=re.findall(r'https://storage\.googleapis\.com/support-kms-prod/[A-Za-z0-9_-]+',page)
-          if not urls:
-              raise SystemExit('Could not locate current Google Data Safety sample CSV URL.')
-          sample_url=urls[0]
+          sample_url='https://storage.googleapis.com/support-kms-prod/b5v9It2EgwrgyY1gPFVB3jPUypc5lL3oNg2G'
           req=urllib.request.Request(sample_url,headers={'User-Agent':'Mozilla/5.0'})
           raw=urllib.request.urlopen(req,timeout=30).read().decode('utf-8-sig')
           rows=list(csv.DictReader(io.StringIO(raw)))
@@ -94,15 +87,14 @@ jobs:
               return ''
 
           wanted=[]
-          terms=[
-              'collect or share','encrypted in transit','request that their data is deleted',
-              'personal info','name','email address','app interactions','user ids','device or other ids'
-          ]
+          selected_tokens=['PSL_NAME','PSL_EMAIL','PSL_USER_ID','PSL_APP_INTERACTIONS','PSL_OTHER_ACTIONS']
+          top_terms=['collect or share','encrypted in transit','request that their data is deleted','data deletion','account deletion']
           for row in rows:
               label=' '.join(str(v or '') for v in row.values()).lower()
               qid=field(row,'Question ID (machine readable)','Question ID')
               resp=field(row,'Response (machine readable)','Response')
-              if any(term in label for term in terms) or any(k in (qid+' '+resp) for k in ['PSL_NAME','PSL_EMAIL','PSL_APP_INTERACTIONS','PSL_USER_ID']):
+              machine=qid+' '+resp
+              if any(term in label for term in top_terms) or any(k in machine for k in selected_tokens):
                   wanted.append(row)
 
           print(json.dumps({
