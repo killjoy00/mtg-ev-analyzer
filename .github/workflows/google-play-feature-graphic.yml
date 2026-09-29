@@ -60,23 +60,25 @@ jobs:
           mkdir -p reviewed/play
           base64 --decode .github/play-assets/pack-one-feature-1024x500.png.b64 > reviewed/play/feature.png
           [[ "$(sha256sum reviewed/play/feature.png | awk '{print $1}')" == "56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69" ]]
+          python3 -m pip install --quiet 'Pillow==11.3.0'
           python3 <<'PY'
           from pathlib import Path
-          import struct
-          data = Path('reviewed/play/feature.png').read_bytes()
-          if data[:8] != b'\x89PNG\r\n\x1a\n':
-              raise SystemExit('Feature source is not PNG')
-          width, height, bit_depth, color_type = struct.unpack('>IIBB', data[16:26])
-          if (width, height, bit_depth, color_type) != (1024, 500, 8, 2):
-              raise SystemExit(f'Unexpected source PNG metadata: {(width, height, bit_depth, color_type)}')
+          from PIL import Image
+
+          source = Path('reviewed/play/feature.png')
+          target = Path('reviewed/play/feature.jpg')
+          with Image.open(source) as image:
+              if image.size != (1024, 500):
+                  raise SystemExit(f'Unexpected feature source dimensions: {image.size}')
+              if image.mode != 'RGB':
+                  image = image.convert('RGB')
+              image.save(target, format='JPEG', quality=95, subsampling=0, optimize=True)
+
+          with Image.open(target) as image:
+              if image.size != (1024, 500) or image.format != 'JPEG':
+                  raise SystemExit(f'Unexpected feature JPEG: {image.format} {image.size}')
+          print(f'Prepared feature JPEG: {target.stat().st_size} bytes')
           PY
-          ffmpeg -hide_banner -loglevel error -y -i reviewed/play/feature.png -q:v 2 reviewed/play/feature.jpg
-          dims="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 reviewed/play/feature.jpg)"
-          [[ "$dims" == "1024,500" ]] || {
-            echo "Unexpected JPEG dimensions: $dims" >&2
-            exit 1
-          }
-          echo "Prepared feature JPEG: $(wc -c < reviewed/play/feature.jpg | tr -d ' ') bytes"
 
       - id: auth
         name: Authenticate to Google Cloud

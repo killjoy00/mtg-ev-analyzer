@@ -2,5 +2,5 @@
   "operation": "upload-google-play-feature-graphic",
   "language": "en-US",
   "source_png_sha256": "56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69",
-  "reason": "Retry only the reviewed 1024x500 feature graphic using Google Play's documented resumable media upload protocol with a JPEG derived from the pinned opaque RGB PNG. This workflow must not touch icons, screenshots, tracks, releases, rollout, review submission, regions, or any other listing data."
+  "reason": "Retry only the reviewed 1024x500 feature graphic using Google Play's documented resumable media upload protocol with a JPEG derived from the pinned opaque RGB PNG. This workflow must not touch icons, screenshots, tracks, releases, rollout, review submission, regions, or any other listing data. Clean recovery: retry the isolated featureGraphic flow using Pillow-generated 1024x500 JPEG and Google resumable media upload; no icon or screenshot mutations."
 }

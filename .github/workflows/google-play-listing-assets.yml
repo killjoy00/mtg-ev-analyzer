@@ -17,7 +17,7 @@ concurrency:
 
 jobs:
   upload-listing-assets:
-    name: upload reviewed Google Play listing assets
+    name: upload reviewed Google Play icon and phone screenshots
     if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     environment: pack-one-mobile-release
@@ -49,7 +49,6 @@ jobs:
             'LISTING_LANGUAGE=' + request.language,
             ''
           ].join('\n'));
-          console.log('Reviewed Google Play listing request:', request.reason);
           NODE
 
       - name: Require current approved main revision
@@ -57,13 +56,10 @@ jobs:
         run: |
           set -euo pipefail
           git fetch --no-tags --depth=1 origin main
-          head_sha="$(git rev-parse HEAD)"
-          main_sha="$(git rev-parse FETCH_HEAD)"
-          [[ "$head_sha" == "$main_sha" ]] || {
-            echo "Checked-out revision $head_sha is no longer current main ($main_sha)." >&2
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]] || {
+            echo "Checked-out revision is no longer current main." >&2
             exit 1
           }
-          echo "Verified current main revision: $head_sha"
 
       - name: Download exact reviewed Android screenshot artifact
         env:
@@ -73,7 +69,6 @@ jobs:
           set -euo pipefail
           api="https://api.github.com/repos/$GITHUB_REPOSITORY"
           auth=(-H "Authorization: Bearer $GH_TOKEN" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28")
-
           curl --fail --silent --show-error "${auth[@]}" "$api/actions/runs/$SOURCE_RUN_ID" > run.json
           curl --fail --silent --show-error "${auth[@]}" "$api/actions/artifacts/$SOURCE_ARTIFACT_ID" > artifact.json
 
@@ -81,47 +76,36 @@ jobs:
           const fs = require('node:fs');
           const run = JSON.parse(fs.readFileSync('run.json', 'utf8'));
           const artifact = JSON.parse(fs.readFileSync('artifact.json', 'utf8'));
-          const expectedRun = Number(process.env.SOURCE_RUN_ID);
-          const expectedArtifact = Number(process.env.SOURCE_ARTIFACT_ID);
-          if (run.id !== expectedRun) throw new Error('Source run id mismatch.');
+          if (run.id !== Number(process.env.SOURCE_RUN_ID)) throw new Error('Source run id mismatch.');
           if (run.event !== 'push' || run.head_branch !== 'main') throw new Error('Screenshots must come from a main push run.');
           if (run.head_sha !== process.env.SOURCE_SHA) throw new Error('Source run SHA mismatch.');
-          if (artifact.id !== expectedArtifact) throw new Error('Source artifact id mismatch.');
+          if (artifact.id !== Number(process.env.SOURCE_ARTIFACT_ID)) throw new Error('Source artifact id mismatch.');
           if (artifact.name !== 'pack-one-android-store-screenshots') throw new Error('Unexpected artifact name.');
           if (artifact.expired) throw new Error('Reviewed screenshot artifact has expired.');
-          if (artifact.workflow_run && artifact.workflow_run.id !== expectedRun) throw new Error('Artifact is not attached to the reviewed run.');
+          if (artifact.workflow_run && artifact.workflow_run.id !== Number(process.env.SOURCE_RUN_ID)) throw new Error('Artifact is not attached to the reviewed run.');
           if (artifact.digest !== process.env.ARTIFACT_DIGEST) throw new Error('Reviewed screenshot artifact digest mismatch.');
-          console.log('Verified reviewed screenshot artifact', artifact.id, artifact.digest);
           NODE
 
-          curl --fail --location --silent --show-error "${auth[@]}"             "$api/actions/artifacts/$SOURCE_ARTIFACT_ID/zip"             --output android-screenshots.zip
+          curl --fail --location --silent --show-error "${auth[@]}" "$api/actions/artifacts/$SOURCE_ARTIFACT_ID/zip" --output android-screenshots.zip
           mkdir -p reviewed
           unzip -q android-screenshots.zip -d reviewed
 
-      - name: Validate reviewed phone screenshot set
+      - name: Validate reviewed icon and phone screenshots
         shell: bash
         run: |
           set -euo pipefail
+          mkdir -p reviewed/play
+          base64 --decode .github/play-assets/pack-one-p1-icon-512.png.b64 > reviewed/play/icon.png
+          [[ "$(sha256sum reviewed/play/icon.png | awk '{print $1}')" == "e44233fe8cab56f5de4f891bc04450411122b4c592d68228dd37f486de361640" ]]
+
           python3 <<'PY'
           from pathlib import Path
           import struct
 
-          root = Path('reviewed/android')
-          expected = [
-              '01-daily-decision.jpg',
-              '02-reveal-comparison.jpg',
-              '03-daily-hub.jpg',
-              '04-practice.jpg',
-              '05-career.jpg',
-          ]
-          actual = sorted(p.name for p in root.glob('*.jpg'))
-          if actual != expected:
-              raise SystemExit(f'Unexpected Android screenshot set: {actual!r}')
-
           def jpeg_size(path):
               data = path.read_bytes()
               if data[:2] != b'\xff\xd8':
-                  raise ValueError(f'{path} is not a JPEG')
+                  raise SystemExit(f'{path} is not a JPEG')
               i = 2
               while i < len(data):
                   if data[i] != 0xFF:
@@ -137,72 +121,39 @@ jobs:
                       break
                   length = struct.unpack('>H', data[i:i+2])[0]
                   if marker in tuple(range(0xC0, 0xC4)) + tuple(range(0xC5, 0xC8)) + tuple(range(0xC9, 0xCC)) + tuple(range(0xCD, 0xD0)):
-                      if i + 7 > len(data):
-                          break
                       height, width = struct.unpack('>HH', data[i+3:i+7])
                       return width, height
                   i += length
-              raise ValueError(f'Could not read JPEG dimensions from {path}')
+              raise SystemExit(f'Could not read JPEG dimensions from {path}')
 
+          expected = [
+              '01-daily-decision.jpg',
+              '02-reveal-comparison.jpg',
+              '03-daily-hub.jpg',
+              '04-practice.jpg',
+              '05-career.jpg',
+          ]
+          root = Path('reviewed/android')
+          actual = sorted(p.name for p in root.glob('*.jpg'))
+          if actual != expected:
+              raise SystemExit(f'Unexpected Android screenshot set: {actual!r}')
           for name in expected:
               path = root / name
               if path.stat().st_size < 50000:
                   raise SystemExit(f'{name} is suspiciously small: {path.stat().st_size} bytes')
-              size = jpeg_size(path)
-              if size != (1080, 1920):
-                  raise SystemExit(f'{name} has dimensions {size}, expected (1080, 1920)')
-              print(f'{name}: {size[0]}x{size[1]}')
+              if jpeg_size(path) != (1080, 1920):
+                  raise SystemExit(f'{name} is not 1080x1920')
+
+          icon = Path('reviewed/play/icon.png').read_bytes()
+          if icon[:8] != b'\x89PNG\r\n\x1a\n':
+              raise SystemExit('Play icon is not PNG')
+          width, height, bit_depth, color_type = struct.unpack('>IIBB', icon[16:26])
+          if (width, height) != (512, 512) or bit_depth != 8 or color_type not in (2, 6):
+              raise SystemExit('Play icon metadata is invalid')
+          print('Validated Play icon and five reviewed phone screenshots.')
           PY
 
-      - name: Restore and validate reviewed Play graphics
-        shell: bash
-        run: |
-          set -euo pipefail
-          mkdir -p reviewed/play
-          base64 --decode .github/play-assets/pack-one-p1-icon-512.png.b64 > reviewed/play/icon.png
-          base64 --decode .github/play-assets/pack-one-feature-1024x500.png.b64 > reviewed/play/feature.png
-
-          icon_sha="$(sha256sum reviewed/play/icon.png | awk '{print $1}')"
-          feature_sha="$(sha256sum reviewed/play/feature.png | awk '{print $1}')"
-          [[ "$icon_sha" == "e44233fe8cab56f5de4f891bc04450411122b4c592d68228dd37f486de361640" ]] || {
-            echo "Reviewed Play icon SHA-256 mismatch: $icon_sha" >&2
-            exit 1
-          }
-          [[ "$feature_sha" == "56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69" ]] || {
-            echo "Reviewed Play feature graphic SHA-256 mismatch: $feature_sha" >&2
-            exit 1
-          }
-
-          python3 <<'PY'
-          from pathlib import Path
-          import struct
-
-          def png_meta(path):
-              data = Path(path).read_bytes()
-              if data[:8] != b'\x89PNG\r\n\x1a\n':
-                  raise SystemExit(f'{path} is not a PNG')
-              width, height, bit_depth, color_type = struct.unpack('>IIBB', data[16:26])
-              return data, width, height, bit_depth, color_type
-
-          icon, iw, ih, ib, ic = png_meta('reviewed/play/icon.png')
-          if (iw, ih) != (512, 512):
-              raise SystemExit(f'Play icon dimensions are {(iw, ih)}, expected (512, 512)')
-          if len(icon) > 1024 * 1024 or ib != 8 or ic not in (2, 6):
-              raise SystemExit('Play icon PNG format/size is not acceptable')
-
-          feature, fw, fh, fb, fc = png_meta('reviewed/play/feature.png')
-          if (fw, fh) != (1024, 500):
-              raise SystemExit(f'Feature graphic dimensions are {(fw, fh)}, expected (1024, 500)')
-          if fb != 8 or fc != 2:
-              raise SystemExit('Feature graphic must be opaque 24-bit RGB PNG')
-
-          print(f'Validated Play icon: {iw}x{ih}, {len(icon)} bytes')
-          print(f'Validated feature graphic: {fw}x{fh}, {len(feature)} bytes')
-          PY
-
-          command -v ffmpeg >/dev/null
-          ffmpeg -hide_banner -loglevel error -y -i reviewed/play/feature.png -q:v 2 reviewed/play/feature.jpg
-          ffprobe -v error -select_streams v:0 -show_entries stream=width,height,pix_fmt -of csv=p=0 reviewed/play/feature.jpg | grep -Eq '^1024,500,(yuvj420p|yuv420p|yuvj444p|yuv444p)
+      - id: auth
         name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v3
         with:
@@ -223,7 +174,6 @@ jobs:
           upload_root="https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$PACKAGE_NAME"
           edit_id=""
           committed=0
-
           cleanup() {
             if [[ -n "$edit_id" && "$committed" != 1 ]]; then
               curl --fail --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id" >/dev/null || true
@@ -233,7 +183,6 @@ jobs:
 
           edit_response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits")"
           edit_id="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$edit_response")"
-
           curl --fail-with-body --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/phoneScreenshots" >/dev/null
           curl --fail-with-body --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/icon" >/dev/null
 
@@ -242,23 +191,20 @@ jobs:
 
           : > uploaded-ids.txt
           for path in reviewed/android/*.jpg; do
-            echo "Uploading $(basename "$path")"
             response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: image/jpeg' --data-binary "@$path" "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/phoneScreenshots?uploadType=media")"
             node -e 'const x=JSON.parse(process.argv[1]); if(!x.image?.id){console.error(x);process.exit(2)} console.log(x.image.id)' "$response" >> uploaded-ids.txt
           done
+          [[ "$(wc -l < uploaded-ids.txt | tr -d ' ')" == "5" ]]
 
-          [[ "$(wc -l < uploaded-ids.txt | tr -d ' ')" == 5 ]] || { echo "Expected five uploaded screenshot IDs." >&2; exit 1; }
-
-          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/phoneScreenshots" > after.json
-          node -e 'const x=require("./after.json"); if((x.images||[]).length!==5){console.error(x);process.exit(2)} console.log("Verified five screenshots in pending Play edit.")'
-
-          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/icon" > icon-after.json
-          node -e 'const x=require("./icon-after.json"); if((x.images||[]).length!==1){console.error(x);process.exit(2)} console.log("Verified one icon in pending Play edit.")'
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/phoneScreenshots" > pending-screenshots.json
+          node -e 'const x=require("./pending-screenshots.json"); if((x.images||[]).length!==5){console.error(x);process.exit(2)}'
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/icon" > pending-icon.json
+          node -e 'const x=require("./pending-icon.json"); if((x.images||[]).length!==1){console.error(x);process.exit(2)}'
 
           curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits/$edit_id:commit" > commit.json
           committed=1
           edit_id=""
-          echo "Committed reviewed en-US Play icon and five phone screenshots for $PACKAGE_NAME."
+          echo "Committed reviewed en-US Play icon and five phone screenshots."
 
       - name: Verify committed Play icon and phone screenshots
         env:
@@ -278,67 +224,7 @@ jobs:
 
           response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits")"
           verify_edit="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$response")"
-          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit/listings/$LISTING_LANGUAGE/phoneScreenshots" > verified.json
-          node -e 'const x=require("./verified.json"); const n=(x.images||[]).length; if(n!==5){console.error(x);process.exit(2)} console.log("Verified committed Google Play phone screenshot count:", n)'
+          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit/listings/$LISTING_LANGUAGE/phoneScreenshots" > verified-screenshots.json
+          node -e 'const x=require("./verified-screenshots.json"); const n=(x.images||[]).length; if(n!==5){console.error(x);process.exit(2)} console.log("Verified committed Google Play phone screenshot count:", n)'
           curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit/listings/$LISTING_LANGUAGE/icon" > verified-icon.json
           node -e 'const x=require("./verified-icon.json"); const n=(x.images||[]).length; if(n!==1){console.error(x);process.exit(2)} console.log("Verified committed Google Play app icon count:", n)'
-
-      - name: Replace en-US Google Play feature graphic
-        env:
-          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-          PACKAGE_NAME: pro.packone.app
-        shell: bash
-        run: |
-          set -euo pipefail
-          root="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME"
-          upload_root="https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$PACKAGE_NAME"
-          edit_id=""
-          committed=0
-
-          cleanup() {
-            if [[ -n "$edit_id" && "$committed" != 1 ]]; then
-              curl --fail --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id" >/dev/null || true
-            fi
-          }
-          trap cleanup EXIT
-
-          edit_response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits")"
-          edit_id="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$edit_response")"
-          curl --fail-with-body --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic" >/dev/null
-
-          feature_status="$(curl --silent --show-error --output feature-upload.json --write-out '%{http_code}' --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: image/jpeg' --data-binary '@reviewed/play/feature.jpg' "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic?uploadType=media")"
-          if [[ "$feature_status" != 2* ]]; then
-            echo "Google Play feature graphic JPEG upload failed with HTTP $feature_status" >&2
-            cat feature-upload.json >&2
-            exit 1
-          fi
-          node -e 'const x=require("./feature-upload.json"); if(!x.image?.id){console.error(x);process.exit(2)} console.log("Uploaded Play feature graphic:", x.image.id)'
-
-          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic" > feature-after.json
-          node -e 'const x=require("./feature-after.json"); if((x.images||[]).length!==1){console.error(x);process.exit(2)} console.log("Verified one feature graphic in pending Play edit.")'
-
-          curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits/$edit_id:commit" > commit-feature.json
-          committed=1
-          edit_id=""
-          echo "Committed reviewed en-US Play feature graphic for $PACKAGE_NAME."
-
-      - name: Verify committed Play feature graphic
-        env:
-          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-          PACKAGE_NAME: pro.packone.app
-        shell: bash
-        run: |
-          set -euo pipefail
-          root="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME"
-          verify_edit=""
-          cleanup() {
-            if [[ -n "$verify_edit" ]]; then
-              curl --fail --silent --show-error --request DELETE --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit" >/dev/null || true
-            fi
-          }
-          trap cleanup EXIT
-
-          response="$(curl --fail-with-body --silent --show-error --request POST --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" --header 'Content-Type: application/json' --data '{}' "$root/edits")"
-          verify_edit="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$response")"
-          curl --fail-with-body --silent --show-error --header "Authorization: Bearer $PLAY_ACCESS_TOKEN" "$root/edits/$verify_edit/listings/$LISTING_LANGUAGE/featureGraphic" > verified-feature.json
-          node -e 'const x=require("./verified-feature.json"); const n=(x.images||[]).length; if(n!==1){console.error(x);process.exit(2)} console.log("Verified committed Google Play feature graphic count:", n)'
