@@ -73,6 +73,221 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /ARTIFACT_DIGEST/, path);
       assert.match(workflow, /x\.image\?\.id/, path);
       assert.match(workflow, /ffmpeg .*feature\.png .*feature\.jpg/, path);
+      assert.match(workflow, /grep -Eq '\^1024,500,\(yuvj420p\|yuv420p\|yuvj444p\|yuv444p\)\
+      assert.match(workflow, /Content-Type: image\/jpeg/, path);
+      assert.match(workflow, /Committed reviewed en-US Play icon and five phone screenshots/, path);
+      assert.match(workflow, /Committed reviewed en-US Play feature graphic/, path);
+      assert.match(workflow, /feature_status=.*write-out '%\{http_code\}'/, path);
+      assert.match(workflow, /cat feature-upload\.json >&2/, path);
+      assert.match(workflow, /edits\/\$edit_id:commit/, path);
+      assert.doesNotMatch(workflow, /\/tracks/, path);
+      assert.doesNotMatch(workflow, /pull_request:/, path);
+    } else if (path === '.github/workflows/app-store-subscription-access-probe.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/app-store-subscription-access-request\.json'/s, path);
+      assert.match(workflow, /request\.get\('operation'\) != 'probe-app-store-subscription-access'/, path);
+      assert.doesNotMatch(workflow, /pull_request:/, path);
+    } else if (path === '.github/workflows/android-internal-status.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-status-request\.json'/s, path);
+      assert.match(workflow, /request\.get\('operation'\) != 'check-android-internal-status'/, path);
+    } else {
+      assert.match(workflow, /github\.event_name == 'workflow_dispatch' && github\.ref == 'refs\/heads\/main'/, path);
+    }
+    assert.match(workflow, /environment: pack-one-mobile-release/, path);
+    assert.match(workflow, /git fetch --no-tags --depth=1 origin main/, path);
+    assert.match(workflow, /git rev-parse FETCH_HEAD/, path);
+  }
+
+  const ios = read('.github/workflows/ios-testflight.yml');
+  const iosRequest = JSON.parse(read('.github/testflight-release-request.json'));
+  assert.deepEqual(Object.keys(iosRequest).sort(), ['operation','reason']);
+  assert.equal(iosRequest.operation, 'upload-testflight-internal');
+  assert.equal(typeof iosRequest.reason, 'string');
+  assert.ok(iosRequest.reason.trim().length > 0);
+
+  const androidRequest = JSON.parse(read('.github/android-internal-release-request.json'));
+  assert.deepEqual(Object.keys(androidRequest).sort(), ['operation','reason']);
+  assert.equal(androidRequest.operation, 'upload-android-internal');
+  assert.equal(typeof androidRequest.reason, 'string');
+  assert.ok(androidRequest.reason.trim().length > 0);
+
+  const androidBundleRequest = JSON.parse(read('.github/android-production-bundle-request.json'));
+  assert.deepEqual(Object.keys(androidBundleRequest).sort(), ['operation','reason']);
+  assert.equal(androidBundleRequest.operation, 'build-play-signed-aab');
+  assert.equal(typeof androidBundleRequest.reason, 'string');
+  assert.ok(androidBundleRequest.reason.trim().length > 0);
+
+  const androidClosedRequest = JSON.parse(read('.github/android-closed-release-request.json'));
+  assert.deepEqual(Object.keys(androidClosedRequest).sort(), ['operation','reason','track','version_code']);
+  assert.equal(androidClosedRequest.operation, 'promote-android-closed');
+  assert.equal(androidClosedRequest.track, 'alpha');
+  assert.match(String(androidClosedRequest.version_code), /^[1-9][0-9]*$/);
+  assert.equal(typeof androidClosedRequest.reason, 'string');
+  assert.ok(androidClosedRequest.reason.trim().length > 0);
+
+  const closedRelease = read('mobile/scripts/play-closed-release.mjs');
+  assert.match(closedRelease, /releaseStatus = 'completed'/);
+  assert.match(closedRelease, /releaseStatus = 'draft'/);
+  assert.match(closedRelease, /requiresConsoleRollout = true/);
+  assert.match(closedRelease, /Only releases with status draft may be created on draft app/);
+  assert.match(closedRelease, /:validate/);
+  assert.doesNotMatch(closedRelease, /upload\/androidpublisher/);
+  const liveLinks = read('scripts/verify-live-mobile-links.mjs');
+  assert.match(liveLinks, /app-site-association\.cdn-apple\.com\/a\/v1\/packone\.pro/);
+  assert.match(liveLinks, /3564X3VTDB\.pro\.packone\.app/);
+  assert.match(liveLinks, /7C:4F:B9:F7:0F:C6:A3:3C:94:F4:F9:29:93:22:65:77:34:CB:C0:4E:0B:F9:25:A7:A0:B8:42:51:30:72:3E:8B/);
+
+  const playAccessRequest = JSON.parse(read('.github/google-play-access-request.json'));
+  assert.deepEqual(Object.keys(playAccessRequest).sort(), ['operation','reason']);
+  assert.equal(playAccessRequest.operation, 'check-google-play-access');
+  assert.equal(typeof playAccessRequest.reason, 'string');
+  assert.ok(playAccessRequest.reason.trim().length > 0);
+
+  const playListingRequest = JSON.parse(read('.github/google-play-listing-assets-request.json'));
+  assert.deepEqual(Object.keys(playListingRequest).sort(), ['artifact_digest','language','operation','reason','source_artifact_id','source_run_id','source_sha']);
+  assert.equal(playListingRequest.operation, 'upload-google-play-listing-assets');
+  assert.equal(playListingRequest.language, 'en-US');
+  assert.match(playListingRequest.source_sha, /^[a-f0-9]{40}$/);
+  assert.match(playListingRequest.artifact_digest, /^sha256:[a-f0-9]{64}$/);
+  assert.ok(Number.isInteger(playListingRequest.source_run_id) && playListingRequest.source_run_id > 0);
+  assert.ok(Number.isInteger(playListingRequest.source_artifact_id) && playListingRequest.source_artifact_id > 0);
+  assert.equal(typeof playListingRequest.reason, 'string');
+  assert.ok(playListingRequest.reason.trim().length > 0);
+
+  const appleSubscriptionAccessRequest = JSON.parse(read('.github/app-store-subscription-access-request.json'));
+  assert.deepEqual(Object.keys(appleSubscriptionAccessRequest).sort(), ['operation','reason']);
+  assert.equal(appleSubscriptionAccessRequest.operation, 'probe-app-store-subscription-access');
+  assert.equal(typeof appleSubscriptionAccessRequest.reason, 'string');
+  assert.ok(appleSubscriptionAccessRequest.reason.trim().length > 0);
+
+  const appleSubscriptionProbe = read('.github/scripts/app-store-subscription-access-probe.mjs');
+  assert.match(appleSubscriptionProbe, /pro\.packone\.app\.elite\.monthly/);
+  assert.match(appleSubscriptionProbe, /subscriptionGroups/);
+  assert.match(appleSubscriptionProbe, /canManageSubscriptions/);
+
+  const androidStatusRequest = JSON.parse(read('.github/android-internal-status-request.json'));
+  assert.deepEqual(Object.keys(androidStatusRequest).sort(), ['operation','reason']);
+  assert.equal(androidStatusRequest.operation, 'check-android-internal-status');
+  assert.equal(typeof androidStatusRequest.reason, 'string');
+  assert.ok(androidStatusRequest.reason.trim().length > 0);
+
+  assert.match(ios, /CFBundleShortVersionString/);
+  assert.match(ios, /store-release\.json/);
+
+  const android = read('.github/workflows/android-internal-testing.yml');
+  assert.match(android, /versionName/);
+  assert.match(android, /store-release\.json/);
+});
+
+test('privacy page exposes the stable Play deletion resource and fallback request path', () => {
+  const privacy = read('privacy/index.html');
+  assert.match(privacy, /<h2 id="delete-account">Deleting your account<\/h2>/);
+  assert.match(privacy, /mailto:admin@packone\.pro/);
+  assert.match(privacy, />admin@packone\.pro<\/a>/);
+
+  const releaseDocs = read('docs/mobile-release-config.md');
+  assert.match(releaseDocs, /https:\/\/packone\.pro\/privacy\/#delete-account/);
+  assert.doesNotMatch(releaseDocs, /- Sign in with Apple provider\/capability work/);
+});
+
+
+test('v1 cold-start gate keeps navigation mounted across foreground revalidation', () => {
+  const layout = read('mobile/app/_layout.tsx');
+  const gate = read('mobile/src/components/VersionGate.tsx');
+  const boundary = read('mobile/src/components/VersionGateBoundary.js');
+  const lifecycle = read('mobile/tests/version-gate-lifecycle.test.cjs');
+  const policy = read('mobile/src/versionPolicy.ts');
+  const gateway = read('edge/gateway.mjs');
+  const releaseWorkflow = read('.github/workflows/secure-auth-release.yml');
+  const pkg = JSON.parse(read('mobile/package.json'));
+
+  assert.match(layout, /<VersionGate>/);
+  assert.equal(pkg.dependencies['expo-application'], '~57.0.3');
+  assert.equal(pkg.devDependencies['react-test-renderer'], '19.2.3');
+  assert.match(pkg.scripts['test:lifecycle'], /node --test/);
+  assert.match(pkg.scripts.test, /test:lifecycle/);
+  assert.match(gate, /Application\.nativeApplicationVersion/);
+  assert.match(gate, /Application\.nativeBuildVersion/);
+  assert.match(gate, /VersionGateBoundary/);
+  assert.match(gate, /initialAppState=\{AppState\.currentState\}/);
+  assert.match(boundary, /requestIdRef/);
+  assert.match(boundary, /requestId === requestIdRef\.current/);
+  assert.match(boundary, /Foreground checks intentionally do not clear the current decision/);
+  assert.match(lifecycle, /foreground allowed, delayed, and failed checks preserve mounted child state/);
+  assert.match(lifecycle, /newer foreground decision wins over an older overlapping check/);
+  assert.match(lifecycle, /validated update-required foreground decision blocks/);
+  assert.match(gate, /\/growth\/v1\/mobile\/version/);
+  assert.match(policy, /catch \{\s*return \{ status: 'allowed' \};\s*\}/);
+  assert.match(policy, /apps\.apple\.com/);
+  assert.match(policy, /play\.google\.com/);
+  assert.match(gateway, /'\/v1\/mobile\/version'/);
+  assert.match(releaseWorkflow, /migrations\/0040_mobile_minimum_version\.sql/g);
+});
+
+
+test('v1 implements Sign in with Apple across native iOS, Android/web handoff, and secure release', () => {
+  const app = JSON.parse(read('mobile/app.json'));
+  const pkg = JSON.parse(read('mobile/package.json'));
+  const account = read('mobile/app/account.tsx');
+  const api = read('mobile/src/api/account.ts');
+  const worker = read('worker/growth-function.js');
+  const apple = read('worker/apple-auth.mjs');
+  const gateway = read('edge/gateway.mjs');
+  const releaseWorkflow = read('.github/workflows/secure-auth-release.yml');
+  const integrity = read('docs/REQUEST-INTEGRITY.md');
+
+  assert.equal(app.expo.ios.usesAppleSignIn, true);
+  assert.ok(app.expo.plugins.includes('expo-apple-authentication'));
+  assert.equal(pkg.dependencies['expo-apple-authentication'], '~57.0.2');
+  assert.match(account, /AppleAuthentication\.AppleAuthenticationButton/);
+  assert.match(account, /nonce: start\.flowToken/);
+  assert.match(account, /finishNativeAppleSignIn/);
+  assert.match(account, /finishAppleSignIn/);
+  assert.match(account, /credential\.fullName\?\.givenName/);
+  assert.match(account, /credential\.fullName\?\.familyName/);
+  assert.match(read('migrations/0041_apple_auth.sql'), /first_name text[\s\S]*last_name text/);
+  assert.match(api, /\/growth\/v1\/mobile\/account\/apple\/native/);
+  assert.match(worker, /\/v1\/account\/apple\/callback/);
+  assert.match(worker, /revokeAppleAuthorization/);
+  assert.match(apple, /https:\/\/appleid\.apple\.com\/auth\/revoke/);
+  assert.match(apple, /pro\.packone\.app/);
+  assert.match(apple, /pro\.packone\.web/);
+  assert.match(gateway, /'\/v1\/mobile\/account\/apple\/native'/);
+  assert.match(releaseWorkflow, /migrations\/0041_apple_auth\.sql/g);
+  assert.match(releaseWorkflow, /APPLE_SIGN_IN_KEY_P8/);
+  assert.doesNotMatch(integrity, /Sign in with Apple is not currently exposed/);
+});
+
+
+test('Apple launch hardening blocks pre-hijack, separates token keys, and uses Apple deletion re-auth', () => {
+  const apple = read('worker/apple-auth.mjs');
+  const worker = read('worker/growth-function.js');
+  const workflow = read('.github/workflows/secure-auth-release.yml');
+  const mobile = read('mobile/app/account.tsx');
+  const api = read('mobile/src/api/account.ts');
+  const docs = read('docs/mobile-release-config.md');
+
+  assert.match(apple, /APPLE_EXISTING_ACCOUNT_UNVERIFIED/);
+  assert.doesNotMatch(apple, /markAppleAuthEmailVerified\(\{authBase,userId:authUserId/);
+  assert.match(apple, /APPLE_TOKEN_ENCRYPTION_KEY_V1/);
+  assert.match(apple, /TOKEN_CIPHER_PREFIX='apple-token'[\s\S]*TOKEN_KEY_VERSION='v1'/);
+  assert.match(workflow, /APPLE_TOKEN_ENCRYPTION_KEY_V1/);
+  assert.match(worker, /purpose='delete'/);
+  assert.match(worker, /\/v1\/mobile\/account\/delete\/apple\/start/);
+  assert.match(worker, /\/v1\/mobile\/account\/delete\/apple\/finish/);
+  assert.match(worker, /flow_kind='mobile'[\s\S]*purpose='signin'/);
+  assert.match(api, /startAppleDeletionVerification/);
+  assert.match(api, /finishAppleDeletion/);
+  assert.match(mobile, /Verify with Apple and delete account/);
+  assert.match(mobile, /appleDeleteHandoff/);
+  assert.match(docs, /Private Email Relay/);
+  assert.match(docs, /at least as prominent as the Google control/);
+  assert.match(mobile, /appleButton: \{ width: '100%', height: 52 \}/);
+  assert.match(mobile, /googleButton: \{ minHeight: 52/);
+});
+/, path);
+      assert.match(workflow, /- id: auth\s+name: Authenticate to Google Cloud/, path);
       assert.match(workflow, /Content-Type: image\/jpeg/, path);
       assert.match(workflow, /Committed reviewed en-US Play icon and five phone screenshots/, path);
       assert.match(workflow, /Committed reviewed en-US Play feature graphic/, path);
