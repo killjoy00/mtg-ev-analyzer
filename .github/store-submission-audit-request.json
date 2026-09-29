@@ -1,0 +1,4 @@
+{
+  "operation": "audit-mobile-store-submission",
+  "reason": "Read live App Store Connect and Google Play listing metadata and the current Google Data Safety CSV schema before applying non-publishing release metadata updates. Do not submit, publish, change tracks, change rollout, or release either app."
+}
