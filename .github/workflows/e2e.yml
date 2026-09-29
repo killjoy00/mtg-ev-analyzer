@@ -115,6 +115,9 @@ jobs:
       - name: Run Today refresh and Pacific rollover regression
         if: steps.scope.outputs.run_full == 'true'
         run: node tests/home-today-e2e.mjs
+      - name: Run homepage auth hydration regression
+        if: steps.scope.outputs.run_full == 'true'
+        run: node tests/home-auth-hydration-e2e.mjs
       - name: Run eight-decision Draft Run regression
         if: steps.scope.outputs.run_full == 'true'
         run: node tests/draft-run-e2e.mjs
