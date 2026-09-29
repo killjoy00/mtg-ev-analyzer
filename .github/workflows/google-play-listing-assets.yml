@@ -244,8 +244,13 @@ jobs:
           icon_response="$(curl --fail-with-body --silent --show-error             --request POST             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             --header 'Content-Type: image/png'             --data-binary '@reviewed/play/icon.png'             "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/icon?uploadType=media")"
           node -e 'const x=JSON.parse(process.argv[1]); if(!x.image?.id){console.error(x);process.exit(2)} console.log("Uploaded Play icon:", x.image.id)' "$icon_response"
 
-          feature_response="$(curl --fail-with-body --silent --show-error             --request POST             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             --header 'Content-Type: image/png'             --data-binary '@reviewed/play/feature.png'             "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic?uploadType=media")"
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.image?.id){console.error(x);process.exit(2)} console.log("Uploaded Play feature graphic:", x.image.id)' "$feature_response"
+          feature_status="$(curl --silent --show-error             --output feature-upload.json             --write-out '%{http_code}'             --request POST             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             --header 'Content-Type: image/png'             --data-binary '@reviewed/play/feature.png'             "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic?uploadType=media")"
+          if [[ "$feature_status" != 2* ]]; then
+            echo "Google Play feature graphic upload failed with HTTP $feature_status" >&2
+            cat feature-upload.json >&2
+            exit 1
+          fi
+          node -e 'const x=require("./feature-upload.json"); if(!x.image?.id){console.error(x);process.exit(2)} console.log("Uploaded Play feature graphic:", x.image.id)'
 
           : > uploaded-ids.txt
           for path in reviewed/android/*.jpg; do
