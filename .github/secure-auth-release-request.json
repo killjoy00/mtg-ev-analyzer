@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Deploy the merged password-reset email-verification fix through the guarded secure-auth release path: development deploy and smoke first, then production deploy and live verification."}
+{"operation":"deploy-secure-auth","reason":"Deploy one-click Admin campaign publishing through the guarded development-first release: production-only admin publish route, scoped GitHub workflow dispatch, readiness marker, and fixed gateway route."}
