@@ -352,7 +352,10 @@ def load_freeze(path: Path | None):
     dids = [str(x) for x in z["draft_ids"]]
     packs = [int(x) for x in z["pack_number"]]
     picks = [int(x) for x in z["pick_number"]]
-    exact = {(d, p, k) for d, p, k in zip(dids, packs, picks)}
+    # Frozen contextual-value decisions use the native 0-based archive
+    # convention; example_lookup() below uses human-facing 1-based pack/pick
+    # numbers. Normalize once at the artifact boundary.
+    exact = {(d, p + 1, k + 1) for d, p, k in zip(dids, packs, picks)}
     unique = set(dids)
 
     behavior = {}
@@ -362,7 +365,8 @@ def load_freeze(path: Path | None):
         names = z["candidate_names"]
         pb = z["primary_behavior"]
         inc = z["incumbent_ord"] if "incumbent_ord" in z.files else None
-        for i, key in enumerate(zip(dids, packs, picks)):
+        for i, raw_key in enumerate(zip(dids, packs, picks)):
+            key = (raw_key[0], raw_key[1] + 1, raw_key[2] + 1)
             lo, hi = int(offsets[i]), int(offsets[i + 1])
             behavior[key] = {str(names[j]): float(pb[j]) for j in range(lo, hi)}
             if inc is not None:
