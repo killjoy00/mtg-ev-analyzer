@@ -1,0 +1,227 @@
+name: issue-529 A-transfer Step 4
+
+on:
+  push:
+    branches:
+      - audit-529-a-transfer-step4
+    paths:
+      - .github/workflows/issue-529-a-transfer-step4.yml
+      - research/deployed_a_transfer_step4_529.py
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  AUDIT_RUN: '36603461542'
+  FREEZE_RUN: '36475098718'
+  HISTORICAL_COMMIT: a7c0afd3cd5f2f872d312fe26f510894c305ef3b
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  wait-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require completed exact outcome-blind transfer audit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run watch "$AUDIT_RUN" --repo "$GITHUB_REPOSITORY" --exit-status --interval 20
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$AUDIT_RUN" --jq .conclusion)" = success
+
+  freeze-actions:
+    needs: wait-audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - expansion: FIN
+            set_id: fin
+          - expansion: TDM
+            set_id: tdm
+          - expansion: DFT
+            set_id: dft
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+
+      - name: Fetch exact historical DR helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p historical
+          curl --fail --location --retry 5 \
+            -o historical/contextual_value_draft_weighted_ope.py \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$HISTORICAL_COMMIT/research/contextual_value_draft_weighted_ope.py"
+          curl --fail --location --retry 5 \
+            -o historical/contextual_value_multiaction_sensitivity.py \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$HISTORICAL_COMMIT/research/contextual_value_multiaction_sensitivity.py"
+          test "$(git hash-object historical/contextual_value_draft_weighted_ope.py)" = 42dc3dac8af8bfe157b38a9e285a34656394e5fa
+          test "$(git hash-object historical/contextual_value_multiaction_sensitivity.py)" = ebc65d7c424d7ec9343b8a7441ec45b2c0953eb7
+          python -m py_compile research/deployed_a_transfer_step4_529.py historical/*.py
+
+      - name: Download exact Step 1-3 set audit
+        uses: actions/download-artifact@v4
+        with:
+          name: a-transfer-${{ matrix.set_id }}
+          path: audit
+          run-id: ${{ env.AUDIT_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact outcome-free 45k context
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-${{ matrix.expansion }}
+          path: frozen
+          run-id: ${{ env.FREEZE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact public draft and game snapshots
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw/game.csv.gz \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+
+      - name: Freeze exact deployed-A actions without outcomes
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          SET_ID: ${{ matrix.set_id }}
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          python research/deployed_a_transfer_step4_529.py freeze-actions \
+            --expansion "$EXPANSION" \
+            --draft raw/draft.csv.gz \
+            --game raw/game.csv.gz \
+            --audit-report "audit/$SET_ID.json" \
+            --frozen-context frozen/frozen-evaluation-context.npz \
+            --freeze-report frozen/freeze-report.json \
+            --output-npz results/actions.npz \
+            --output-report results/freeze-report.json
+
+      - name: Assert Step 4 action freeze is outcome-free and exact
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('results/freeze-report.json'))
+          assert r['outcomes_parsed'] is False
+          assert r['outcomes_used'] is False
+          assert r['audit_reproduction_pass'] is True
+          assert r['research_frozen_action_identity_ok'] is True
+          assert r['drafts'] == 15000
+          assert r['decisions'] > 0
+          assert r['production_change_authorized'] is False
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: a-transfer-step4-actions-${{ matrix.expansion }}
+          path: results/
+          retention-days: 90
+
+  evaluate:
+    needs: freeze-actions
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+
+      - name: Fetch exact historical DR helpers
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p historical
+          curl --fail --location --retry 5 \
+            -o historical/contextual_value_draft_weighted_ope.py \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$HISTORICAL_COMMIT/research/contextual_value_draft_weighted_ope.py"
+          curl --fail --location --retry 5 \
+            -o historical/contextual_value_multiaction_sensitivity.py \
+            "https://raw.githubusercontent.com/$GITHUB_REPOSITORY/$HISTORICAL_COMMIT/research/contextual_value_multiaction_sensitivity.py"
+          test "$(git hash-object historical/contextual_value_draft_weighted_ope.py)" = 42dc3dac8af8bfe157b38a9e285a34656394e5fa
+          test "$(git hash-object historical/contextual_value_multiaction_sensitivity.py)" = ebc65d7c424d7ec9343b8a7441ec45b2c0953eb7
+
+      - name: Download frozen deployed/research action contexts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: a-transfer-step4-actions-*
+          path: action-freezes
+
+      - name: Download original outcome-free 45k contexts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: contextual-value-v1-r-independent-confirmation-freeze-*
+          path: frozen
+          run-id: ${{ env.FREEZE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact already-spent outcome archives
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          for E in FIN TDM DFT; do
+            curl --fail --location --retry 5 --retry-delay 3 \
+              --output "raw/$E.csv.gz" \
+              "$BASE/draft_data/draft_data_public.$E.PremierDraft.csv.gz"
+          done
+
+      - name: Run the single prespecified Step 4 diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          python research/deployed_a_transfer_step4_529.py evaluate \
+            --frozen-context FIN=frozen/contextual-value-v1-r-independent-confirmation-freeze-FIN/frozen-evaluation-context.npz \
+            --frozen-context TDM=frozen/contextual-value-v1-r-independent-confirmation-freeze-TDM/frozen-evaluation-context.npz \
+            --frozen-context DFT=frozen/contextual-value-v1-r-independent-confirmation-freeze-DFT/frozen-evaluation-context.npz \
+            --frozen-actions FIN=action-freezes/a-transfer-step4-actions-FIN/actions.npz \
+            --frozen-actions TDM=action-freezes/a-transfer-step4-actions-TDM/actions.npz \
+            --frozen-actions DFT=action-freezes/a-transfer-step4-actions-DFT/actions.npz \
+            --draft-archive FIN=raw/FIN.csv.gz \
+            --draft-archive TDM=raw/TDM.csv.gz \
+            --draft-archive DFT=raw/DFT.csv.gz \
+            --output results/report.json
+
+      - name: Assert Step 4 scope and production boundary
+        run: |
+          python - <<'PY'
+          import json
+          r=json.load(open('results/report.json'))
+          assert r['phase']=='deployed_A_vs_research_A_step4_45k_diagnostic'
+          assert r['authorization']['step0_transfer_gate_failed_outcome_blind'] is True
+          assert r['authorization']['this_is_the_single_prespecified_step4_followup'] is True
+          assert r['drafts_total']==45000
+          assert r['environments']==['FIN','TDM','DFT']
+          assert r['primary_estimator'].startswith('paired cap20 DR')
+          assert len(r['hidden_confounding']['grid'])==8
+          assert r['production_change_authorized'] is False
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: issue-529-deployed-vs-research-A-step4-45k
+          path: results/report.json
+          retention-days: 90
