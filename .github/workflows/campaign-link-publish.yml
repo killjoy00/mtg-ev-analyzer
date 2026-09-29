@@ -1,0 +1,219 @@
+name: publish Pack One campaign link
+run-name: publish campaign / ${{ inputs.slug }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      slug:
+        description: Canonical /go/ slug
+        required: true
+        type: string
+      destination:
+        description: Pack One destination
+        required: true
+        default: /
+        type: string
+      source:
+        description: Canonical acquisition source
+        required: true
+        type: string
+      campaign:
+        description: Canonical campaign name
+        required: true
+        type: string
+      medium:
+        description: Optional canonical acquisition medium
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: write
+  pages: write
+
+concurrency:
+  group: packone-campaign-link-publication
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      GH_TOKEN: ${{ github.token }}
+      CAMPAIGN_SLUG: ${{ inputs.slug }}
+      CAMPAIGN_DESTINATION: ${{ inputs.destination }}
+      CAMPAIGN_SOURCE: ${{ inputs.source }}
+      CAMPAIGN_NAME: ${{ inputs.campaign }}
+      CAMPAIGN_MEDIUM: ${{ inputs.medium }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Fast-forward to latest reviewed main
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          git reset --hard origin/main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Prepare deterministic campaign route
+        run: node scripts/prepare-campaign-link-publish.mjs
+
+      - name: Validate generated source
+        run: |
+          node scripts/generate-campaign-links.mjs --check
+          npm test
+
+      - name: Publish automation branch
+        id: branch
+        shell: bash
+        run: |
+          set -euo pipefail
+          branch="automation/campaign-link-${CAMPAIGN_SLUG}"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add campaign-links.json "go/${CAMPAIGN_SLUG}/index.html"
+          if git diff --cached --quiet; then
+            echo "already_published=true" >> "$GITHUB_OUTPUT"
+            echo "Campaign link is already present on main." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          git commit -m "Publish campaign link: ${CAMPAIGN_SLUG}"
+          head_sha="$(git rev-parse HEAD)"
+          git push --force origin "HEAD:refs/heads/${branch}"
+          echo "branch=${branch}" >> "$GITHUB_OUTPUT"
+          echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+          echo "already_published=false" >> "$GITHUB_OUTPUT"
+
+      - name: Open protected-main pull request
+        if: steps.branch.outputs.already_published != 'true'
+        id: pr
+        shell: bash
+        env:
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          set -euo pipefail
+          pr_url="$(gh pr list --head "$BRANCH" --base main --state open --json url --jq '.[0].url // empty')"
+          if [[ -z "$pr_url" ]]; then
+            if ! pr_url="$(gh pr create               --base main               --head "$BRANCH"               --title "Publish campaign link: ${CAMPAIGN_SLUG}"               --body "Admin-requested Pack One vanity link publication. The route and registry entry were generated deterministically; required test and browser checks are dispatched explicitly before merge.")"; then
+              echo "::error::GitHub Actions is not allowed to create pull requests for this repository. Enable Settings > Actions > General > Workflow permissions > Allow GitHub Actions to create and approve pull requests."
+              echo "The validated automation branch is \`$BRANCH\`." >> "$GITHUB_STEP_SUMMARY"
+              exit 1
+            fi
+          fi
+          echo "url=$pr_url" >> "$GITHUB_OUTPUT"
+          echo "Campaign publication PR: $pr_url" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Dispatch required checks
+        if: steps.branch.outputs.already_published != 'true'
+        shell: bash
+        env:
+          BRANCH: ${{ steps.branch.outputs.branch }}
+        run: |
+          set -euo pipefail
+          gh workflow run test.yml --ref "$BRANCH"
+          gh workflow run e2e.yml --ref "$BRANCH"
+
+      - name: Wait for required checks
+        if: steps.branch.outputs.already_published != 'true'
+        shell: bash
+        env:
+          BRANCH: ${{ steps.branch.outputs.branch }}
+          HEAD_SHA: ${{ steps.branch.outputs.head_sha }}
+        run: |
+          set -euo pipefail
+          wait_for_workflow() {
+            local workflow="$1"
+            local label="$2"
+            for attempt in $(seq 1 120); do
+              runs="$(gh run list --workflow "$workflow" --branch "$BRANCH" --event workflow_dispatch                 --limit 20 --json databaseId,headSha,status,conclusion,url)"
+              row="$(printf '%s' "$runs" | jq -r --arg sha "$HEAD_SHA"                 '[.[] | select(.headSha==$sha)][0] | if . then [.databaseId,.status,(.conclusion // ""),.url] | @tsv else "" end')"
+              if [[ -n "$row" ]]; then
+                IFS=$'\t' read -r run_id status conclusion run_url <<< "$row"
+                if [[ "$status" == completed ]]; then
+                  if [[ "$conclusion" == success ]]; then
+                    echo "$label passed: $run_url" >> "$GITHUB_STEP_SUMMARY"
+                    return 0
+                  fi
+                  echo "::error::$label failed with conclusion $conclusion: $run_url"
+                  return 1
+                fi
+              fi
+              sleep 10
+            done
+            echo "::error::Timed out waiting for $label."
+            return 1
+          }
+          wait_for_workflow test.yml test
+          wait_for_workflow e2e.yml browser
+
+      - name: Merge checked campaign PR
+        if: steps.branch.outputs.already_published != 'true'
+        shell: bash
+        env:
+          PR_URL: ${{ steps.pr.outputs.url }}
+        run: |
+          set -euo pipefail
+          gh pr merge "$PR_URL" --squash --delete-branch
+          echo "Merged campaign publication PR: $PR_URL" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Request Pages build from merged main
+        if: steps.branch.outputs.already_published != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/${GITHUB_REPOSITORY}/pages/builds" >/tmp/pages-build.json
+          for attempt in $(seq 1 120); do
+            status="$(gh api "repos/${GITHUB_REPOSITORY}/pages/builds/latest" --jq '.status')"
+            if [[ "$status" == built ]]; then
+              echo "GitHub Pages build completed." >> "$GITHUB_STEP_SUMMARY"
+              exit 0
+            fi
+            if [[ "$status" == errored ]]; then
+              echo "::error::GitHub Pages build failed."
+              exit 1
+            fi
+            sleep 5
+          done
+          echo "::error::Timed out waiting for GitHub Pages build."
+          exit 1
+
+      - name: Verify live vanity route
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const slug=process.env.CAMPAIGN_SLUG;
+          const expected=new URL(process.env.CAMPAIGN_DESTINATION,'https://packone.pro');
+          expected.searchParams.set('utm_source',process.env.CAMPAIGN_SOURCE);
+          expected.searchParams.set('utm_campaign',process.env.CAMPAIGN_NAME);
+          if(process.env.CAMPAIGN_MEDIUM)expected.searchParams.set('utm_medium',process.env.CAMPAIGN_MEDIUM);
+          const live='https://packone.pro/go/'+slug+'/';
+          const marker='location.replace('+JSON.stringify(expected.toString())+')';
+          let last='';
+          for(let attempt=0;attempt<36;attempt++) {
+            try {
+              const response=await fetch(live,{headers:{'cache-control':'no-cache'}});
+              const html=await response.text();
+              if(response.ok&&html.includes(marker)) {
+                console.log('Published '+live+' -> '+expected);
+                process.exit(0);
+              }
+              last='HTTP '+response.status;
+            } catch(error) {
+              last=String(error?.message||error);
+            }
+            await new Promise(resolve=>setTimeout(resolve,5000));
+          }
+          throw new Error('Live campaign route verification failed: '+last);
+          NODE
+          echo "Published https://packone.pro/go/${CAMPAIGN_SLUG}/" >> "$GITHUB_STEP_SUMMARY"
