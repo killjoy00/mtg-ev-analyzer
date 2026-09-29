@@ -193,21 +193,24 @@ def take_rate_comparison(mod,contexts,fs_by_fold,original_rows):
     }
 
 
-def fit_half(mod,rows,outcomes):
-    supported,_,_=mod.support_for(rows)
-    fs=mod.first_stage(rows,supported)
-    if not fs["diagnostics"]["gate"]:
-        raise SystemExit("power half failed frozen identification gate")
-    _,beta=mod.second_stage(rows,fs,outcomes)
-    return fs,beta
-
-
-def power_crossfit(mod,contexts,outcomes,v):
+def build_power_halves(mod,contexts):
     halves=[[r for r in contexts if half_of(r["draft_id"])==h] for h in (0,1)]
-    fits=[fit_half(mod,halves[h],outcomes) for h in (0,1)]
+    fs=[]
+    for h in (0,1):
+        supported,_,_=mod.support_for(halves[h])
+        cur=mod.first_stage(halves[h],supported)
+        if not cur["diagnostics"]["gate"]:
+            raise SystemExit("power half failed frozen identification gate")
+        fs.append(cur)
+    return halves,fs
+
+
+def power_crossfit(mod,halves,half_fs,outcomes,v):
+    betas=[mod.second_stage(halves[h],half_fs[h],outcomes)[1] for h in (0,1)]
     est_sum=true_sum=n=0
     for select_h,eval_h in ((0,1),(1,0)):
-        fs_s,beta_s=fits[select_h]; fs_e,beta_e=fits[eval_h]
+        fs_s,beta_s=half_fs[select_h],betas[select_h]
+        fs_e,beta_e=half_fs[eval_h],betas[eval_h]
         sup_s=set(fs_s["cards"]); sup_e=set(fs_e["cards"])
         for row in halves[eval_h]:
             a=row["a_card"]
@@ -244,6 +247,9 @@ def main():
         fs_by_fold[fold]=fs
 
     tr=take_rate_comparison(mod,contexts,fs_by_fold,args.original_regret_rows)
+    fold_training={fold:[r for r in contexts if r["fold"]!=fold] for fold in range(mod.FOLDS)}
+    fold_held={fold:[r for r in contexts if r["fold"]==fold] for fold in range(mod.FOLDS)}
+    power_halves,power_fs=build_power_halves(mod,contexts)
     cards=sorted(ameta["normal_score"])
     scenario_results={}
     rep0_regrets={}
@@ -262,8 +268,8 @@ def main():
             slices={k:[0.0,0] for k in MARGIN_SLICES}
             rep_rows=[]
             for fold in range(mod.FOLDS):
-                training=[r for r in contexts if r["fold"]!=fold]
-                held=[r for r in contexts if r["fold"]==fold]
+                training=fold_training[fold]
+                held=fold_held[fold]
                 fs=fs_by_fold[fold]
                 _,beta=mod.second_stage(training,fs,outcomes)
                 supported=set(fs["cards"])
@@ -280,7 +286,8 @@ def main():
                     sl=margin_slice(row["a_margin"]); slices[sl][0]+=regret; slices[sl][1]+=1
                     if rep==0: rep_rows.append(regret)
 
-            p=power_crossfit(mod,contexts,outcomes,v)
+            p=power_crossfit(mod,power_halves,power_fs,outcomes,v)
+            print(json.dumps({"expansion":exp,"scenario":name,"rep":rep,"estimate":est_sum/n,"true":true_sum/n,"power_estimate":p["estimate"]}),flush=True)
             reps.append({
                 "rep":rep,"n":n,"est_mean":est_sum/n,"true_mean":true_sum/n,
                 "disagreement_rate":dis/n,
