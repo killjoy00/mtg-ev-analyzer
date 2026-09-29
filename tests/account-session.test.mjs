@@ -36,6 +36,13 @@ test('ordinary growth bootstrap observes account state without relinking',()=>{
   assert.doesNotMatch(body,/\blinkAccount\s*\(/,'ordinary page bootstrap must not call link-browser');
 });
 
+test('ordinary growth bootstrap preserves unavailable as a third account state',()=>{
+  const source=readFileSync(new URL('../growth.mjs',import.meta.url),'utf8');
+  assert.doesNotMatch(source,/getAuthSession\(\)\.catch\(\(\)=>null\)/,'auth infrastructure failures must not be collapsed into signed out');
+  assert.match(source,/currentAccountState='unavailable'/);
+  assert.match(source,/export async function refreshAccountSession\(\)/);
+});
+
 test('a live first-party cookie resolves to its account',async()=>{
   const session=await accountSession(request(accountCookie(LIVE)),fakeQuery());
   assert.equal(session.source,'cookie');
