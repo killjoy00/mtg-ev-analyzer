@@ -164,7 +164,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   const dataSafetyRequest = JSON.parse(read('.github/google-play-data-safety-request.json'));
   assert.deepEqual(Object.keys(dataSafetyRequest).sort(), ['mode','operation','reason']);
   assert.equal(dataSafetyRequest.operation, 'configure-google-play-data-safety');
-  assert.equal(dataSafetyRequest.mode, 'dry-run');
+  assert.equal(dataSafetyRequest.mode, 'submit');
   assert.equal(typeof dataSafetyRequest.reason, 'string');
   assert.ok(dataSafetyRequest.reason.trim().length > 0);
 
