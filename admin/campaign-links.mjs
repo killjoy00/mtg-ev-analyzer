@@ -10,11 +10,11 @@ function setError(form,name,message) {
   if(error){error.textContent=message||'';error.hidden=!message;}
 }
 
-export async function renderCampaignLinks(root) {
+export async function renderCampaignLinks(root,publishRequest) {
   root.innerHTML=`<section class="campaign-link-builder">
     <h1>Campaign Links / Link Builder</h1>
     <p class="muted">Build a tracked campaign URL immediately, or add a slug when you also want a static vanity route.</p>
-    <p class="note"><strong>Publishing step required.</strong> Building or copying this link does not publish the vanity URL. The entry must be committed to <code>campaign-links.json</code> and deployed through the normal site PR.</p>
+    <p class="note"><strong>One-click publish.</strong> The tracked URL works immediately. For a vanity URL, Publish opens a protected site PR, runs the required checks, merges it, and waits for the Pages route to go live.</p>
     <form id="campaign-link-form" class="campaign-form" novalidate>
       <label>Slug (needed for vanity URL)<input name="slug" autocomplete="off" spellcheck="false" placeholder="reddit-launch"><small data-error="slug" class="error" hidden></small></label>
       <label>Source<input name="source" autocomplete="off" spellcheck="false" placeholder="reddit"><small data-error="source" class="error" hidden></small></label>
@@ -37,6 +37,10 @@ export async function renderCampaignLinks(root) {
       <label>campaign-links.json entry<textarea id="campaign-json" readonly aria-label="campaign-links.json entry" rows="8"></textarea></label>
       <button type="button" class="secondary" data-copy="campaign-json">Copy JSON entry</button>
     </div>
+    <div class="campaign-publish-actions">
+      <button type="button" id="publish-campaign">Publish vanity link</button>
+      <p id="publish-status" role="status"></p>
+    </div>
     <p id="copy-status" role="status"></p>
     <h2>Existing campaign links</h2>
     <p id="existing-status" class="muted">Loading the checked-in campaign registry…</p>
@@ -51,16 +55,22 @@ export async function renderCampaignLinks(root) {
   const vanity=root.querySelector('#vanity-url');
   const json=root.querySelector('#campaign-json');
   const copyStatus=root.querySelector('#copy-status');
-  let existing=new Map();
+  const publishButton=root.querySelector('#publish-campaign');
+  const publishStatus=root.querySelector('#publish-status');
+  let existing=new Map(),publishing=false;
 
-  function update() {
-    const draft=buildCampaignDraft({
+  function currentDraft() {
+    return buildCampaignDraft({
       slug:valueOf(form,'slug'),
       source:valueOf(form,'source'),
       campaign:valueOf(form,'campaign'),
       medium:valueOf(form,'medium'),
       destination:valueOf(form,'destination')
     });
+  }
+
+  function update() {
+    const draft=currentDraft();
     root.querySelector('#canonical-slug').textContent=show(draft.normalized.slug);
     root.querySelector('#canonical-source').textContent=show(draft.normalized.source);
     root.querySelector('#canonical-campaign').textContent=show(draft.normalized.campaign);
@@ -78,7 +88,47 @@ export async function renderCampaignLinks(root) {
       else if(target==='campaign-json')button.disabled=!draft.entry||duplicate;
       else if(target==='vanity-url')button.disabled=!draft.valid||!draft.vanityUrl;
     }
+    publishButton.disabled=publishing||!draft.entry||duplicate;
+    publishButton.textContent=publishing?'Publishing…':'Publish vanity link';
     copyStatus.textContent='';
+  }
+
+  function renderExisting(entries) {
+    existing=new Map(entries.map(entry=>[entry.slug,entry]));
+    existingStatus.textContent=entries.length?`${entries.length} published campaign link(s).`:'No published campaign links yet.';
+    existingList.replaceChildren(...entries.map(entry=>{
+      const item=document.createElement('li');
+      item.textContent=`${entry.slug} → ${entry.destination} · source=${entry.source} · campaign=${entry.campaign}${entry.medium?` · medium=${entry.medium}`:''}`;
+      return item;
+    }));
+  }
+
+  async function loadExisting({quiet=false}={}) {
+    try {
+      const response=await fetch('/campaign-links.json',{cache:'no-store'});
+      if(!response.ok)throw new Error(`HTTP ${response.status}`);
+      const entries=validateCampaignEntries(await response.json());
+      renderExisting(entries);
+      update();
+      return true;
+    } catch {
+      if(!quiet)existingStatus.textContent='Existing campaign links could not be loaded. Form validation still works, but slug reuse cannot be checked here.';
+      return false;
+    }
+  }
+
+  async function waitForPublished(slug,vanityUrl) {
+    for(let attempt=0;attempt<100;attempt++) {
+      await new Promise(resolve=>setTimeout(resolve,6000));
+      await loadExisting({quiet:true});
+      if(existing.has(slug)) {
+        publishStatus.classList.remove('error');
+        publishStatus.textContent=`Published: ${vanityUrl}`;
+        return;
+      }
+    }
+    publishStatus.classList.add('error');
+    publishStatus.textContent='Publish was accepted, but the vanity route is not live yet. Check the campaign publishing workflow before distributing it.';
   }
 
   form.addEventListener('input',update);
@@ -91,19 +141,30 @@ export async function renderCampaignLinks(root) {
   });
   update();
 
-  try {
-    const response=await fetch('/campaign-links.json',{cache:'no-store'});
-    if(!response.ok)throw new Error(`HTTP ${response.status}`);
-    const entries=validateCampaignEntries(await response.json());
-    existing=new Map(entries.map(entry=>[entry.slug,entry]));
-    existingStatus.textContent=entries.length?`${entries.length} published campaign link(s).`:'No published campaign links yet.';
-    existingList.replaceChildren(...entries.map(entry=>{
-      const item=document.createElement('li');
-      item.textContent=`${entry.slug} → ${entry.destination} · source=${entry.source} · campaign=${entry.campaign}${entry.medium?` · medium=${entry.medium}`:''}`;
-      return item;
-    }));
-  } catch {
-    existingStatus.textContent='Existing campaign links could not be loaded. Form validation still works, but slug reuse cannot be checked here.';
-  }
-  update();
+  publishButton.addEventListener('click',async()=>{
+    const draft=currentDraft();
+    if(publishing||!draft.entry||existing.has(draft.entry.slug))return;
+    if(typeof publishRequest!=='function') {
+      publishStatus.classList.add('error');
+      publishStatus.textContent='Campaign publishing is unavailable in this Admin build.';
+      return;
+    }
+    publishing=true;
+    publishStatus.classList.remove('error');
+    publishStatus.textContent='Starting protected publish…';
+    update();
+    try {
+      const result=await publishRequest('/v1/admin/campaign-links/publish',draft.entry);
+      publishStatus.textContent=`Publishing ${result.vanity_url}. Required checks and the Pages deploy are running automatically.`;
+      await waitForPublished(draft.entry.slug,result.vanity_url);
+    } catch(error) {
+      publishStatus.classList.add('error');
+      publishStatus.textContent=error.message||'Campaign publishing failed.';
+    } finally {
+      publishing=false;
+      update();
+    }
+  });
+
+  await loadExisting();
 }
