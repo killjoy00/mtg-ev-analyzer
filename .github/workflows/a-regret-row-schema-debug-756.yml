@@ -1,0 +1,40 @@
+name: a-regret-row-schema-debug-756
+
+on:
+  push:
+    branches:
+      - research/a-regret-bound-756
+    paths:
+      - .github/workflows/a-regret-row-schema-debug-756.yml
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: a-regret-later-TDM
+          path: sample
+          run-id: '36587913521'
+          github-token: ${{ github.token }}
+      - name: Inspect result schema
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "=== files ==="
+          find sample -maxdepth 2 -type f -printf '%p %s bytes\n'
+          echo "=== report ==="
+          cat sample/later-report.json
+          echo "=== preflight keys ==="
+          python - <<'PY'
+          import json
+          p=json.load(open('sample/preflight-later.json'))
+          print(sorted(p))
+          print(json.dumps(p,indent=2,sort_keys=True)[:12000])
+          PY
+          echo "=== first regret rows ==="
+          gzip -dc sample/later-regret-rows.jsonl.gz | head -n 3 || true
