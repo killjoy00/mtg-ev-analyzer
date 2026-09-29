@@ -1,0 +1,246 @@
+name: issue-529 deployed A transfer audit
+
+on:
+  push:
+    branches:
+      - audit-529-a-transfer
+    paths:
+      - .github/workflows/issue-529-deployed-a-transfer-audit.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  CORE_RUN: '36256947308'
+  CONFIRM_20K_RUN: '36371215506'
+  R45_FREEZE_RUN: '36475098718'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  compare:
+    name: compare-${{ matrix.set_id }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    strategy:
+      fail-fast: false
+      max-parallel: 8
+      matrix:
+        include:
+          - set_id: msh
+            expansion: MSH
+            research_kind: core
+            draft_sha: 64100d71db77e0f0ef8ba893b259a1024eb6d15816db337c7758e7d96bc29cf7
+            game_sha: 8a6bd93a5d50554a3d87703e93624d09e638dc6dd03eda12be9c3f2925484edf
+            has_45k: 'false'
+          - set_id: sos
+            expansion: SOS
+            research_kind: core
+            draft_sha: df6220d8941e99b7264a54a7a7427096246ee6510057a83d4c9424b472761853
+            game_sha: 1be513933918ca243c137af0314aae099c721c408786c9cb56f08027d9b113fb
+            has_45k: 'false'
+          - set_id: ecl
+            expansion: ECL
+            research_kind: core
+            draft_sha: 77d14502147241bf5fff65abe7bdfdda5e18e90ece3f935316447386112bc876
+            game_sha: 54b94edb0702dbcf20aa943d0e7da5a7987cf20232864083953e61b95b38ff48
+            has_45k: 'false'
+          - set_id: tla
+            expansion: TLA
+            research_kind: core
+            draft_sha: e4a801b12cbe3d711dce7d92bd2d256db64e0be18d22da14b477d512567627bb
+            game_sha: 6bb12e5cf17e57a2624ca8ac83f15fd4415ea347aa58eac0ed82feb1b17d536b
+            has_45k: 'false'
+          - set_id: eoe
+            expansion: EOE
+            research_kind: fresh
+            draft_sha: 1dd9d1baf31fa56e06bbd2d9d9bb8c2c87cf342bc15872b5a30dbe9d4ecab648
+            game_sha: 130e7e7580a1cb4b4f635411d187a078bc7bdd9dd3436ef5ff7535e14cadaf1b
+            has_45k: 'false'
+          - set_id: fin
+            expansion: FIN
+            research_kind: fresh
+            draft_sha: 9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b
+            game_sha: f6452e622976f66dd5420c55741da5b246c7e8d25d63c080e728635e1741a6a6
+            has_45k: 'true'
+          - set_id: tdm
+            expansion: TDM
+            research_kind: fresh
+            draft_sha: 831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5
+            game_sha: e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4
+            has_45k: 'true'
+          - set_id: dft
+            expansion: DFT
+            research_kind: fresh
+            draft_sha: 7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd
+            game_sha: 734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b
+            has_45k: 'true'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+      - name: Compile audit scorer
+        run: python -m py_compile research/deployed_a_transfer_audit.py
+
+      - name: Download core outcome-free cohort identity
+        if: matrix.research_kind == 'core'
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-preprocessed-core-8000
+          path: research-cohort
+          run-id: ${{ env.CORE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download fresh-environment outcome-free cohort identity
+        if: matrix.research_kind == 'fresh'
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-q-guard10-20k-cohort-${{ matrix.expansion }}
+          path: research-cohort
+          run-id: ${{ env.CONFIRM_20K_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download outcome-free 45k frozen scoring context
+        if: matrix.has_45k == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-${{ matrix.expansion }}
+          path: frozen-45k
+          run-id: ${{ env.R45_FREEZE_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download exact public draft and game archives
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw/draft.csv.gz \
+            "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3 \
+            --output raw/game.csv.gz \
+            "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+
+      - name: Verify frozen archive bytes
+        shell: bash
+        env:
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+          GAME_SHA: ${{ matrix.game_sha }}
+        run: |
+          set -euo pipefail
+          echo "$DRAFT_SHA  raw/draft.csv.gz" | sha256sum -c -
+          echo "$GAME_SHA  raw/game.csv.gz" | sha256sum -c -
+
+      - name: Run outcome-blind identity, reproduction and agreement audit
+        shell: bash
+        env:
+          SET_ID: ${{ matrix.set_id }}
+          EXPANSION: ${{ matrix.expansion }}
+          RESEARCH_KIND: ${{ matrix.research_kind }}
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+          GAME_SHA: ${{ matrix.game_sha }}
+          HAS_45K: ${{ matrix.has_45k }}
+        run: |
+          set -euo pipefail
+          mkdir -p "results/$SET_ID"
+          if [[ "$RESEARCH_KIND" == "core" ]]; then
+            COHORT=research-cohort/cohort-manifest.json
+          else
+            COHORT=research-cohort/cohort.json
+          fi
+          EXTRA=()
+          if [[ "$HAS_45K" == "true" ]]; then
+            EXTRA+=(--frozen-45k frozen-45k/frozen-evaluation-context.npz)
+          fi
+          python research/deployed_a_transfer_audit.py \
+            --set-id "$SET_ID" \
+            --expansion "$EXPANSION" \
+            --draft-archive raw/draft.csv.gz \
+            --game-archive raw/game.csv.gz \
+            --expected-draft-sha256 "$DRAFT_SHA" \
+            --expected-game-sha256 "$GAME_SHA" \
+            --research-kind "$RESEARCH_KIND" \
+            --cohort-manifest "$COHORT" \
+            "${EXTRA[@]}" \
+            --output "results/$SET_ID/report.json"
+
+      - name: Assert no Step 4 and no outcome access
+        shell: bash
+        env:
+          SET_ID: ${{ matrix.set_id }}
+        run: |
+          python - <<'PY'
+          import json,os
+          r=json.load(open(f"results/{os.environ['SET_ID']}/report.json"))
+          b=r["outcome_boundary"]
+          assert b["outcome_values_deserialized_from_corpus"] is False
+          assert b["draft_outcome_columns_indexed"] is False
+          assert b["game_outcome_columns_indexed"] is False
+          assert b["step4_implemented_or_run"] is False
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: issue-529-deployed-a-transfer-${{ matrix.set_id }}
+          path: results/${{ matrix.set_id }}/report.json
+          retention-days: 90
+
+  aggregate:
+    needs: compare
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: issue-529-deployed-a-transfer-*
+          path: reports
+      - name: Aggregate frozen Step-0 decision
+        run: |
+          python - <<'PY'
+          import json,pathlib
+          sets=("msh","sos","ecl","tla","eoe","fin","tdm","dft")
+          reports={}
+          for sid in sets:
+              p=pathlib.Path("reports")/f"issue-529-deployed-a-transfer-{sid}"/"report.json"
+              reports[sid]=json.loads(p.read_text())
+          reproduction=all(r["step2_reproduction"]["pass"] for r in reports.values())
+          set_pass={sid:bool(r["step0_set_pass"]) for sid,r in reports.items()}
+          threshold_pass=reproduction and all(set_pass.values())
+          out={
+            "schema":1,
+            "step0_commit":"84d08a6364015fc7624c5ddbc49934b6918e9b8f",
+            "step0_numeric_threshold":"top-1 agreement >= 95% in every set",
+            "reproduction_all_sets":reproduction,
+            "set_pass":set_pass,
+            "numeric_pass":threshold_pass,
+            "step4_required":not threshold_pass,
+            "outcomes_opened":False,
+            "sets":{},
+          }
+          for sid,r in reports.items():
+              s=r.get("step3_agreement",{}).get("served",{}).get("P1P1-P1P8",{})
+              q=r.get("step3_agreement",{}).get("research_combined",{}).get("P1P1-P1P8",{})
+              out["sets"][sid]={
+                "reproduction":r["step2_reproduction"]["pass"],
+                "served_top1_agreement":s.get("top1_agreement"),
+                "research_top1_agreement":q.get("top1_agreement"),
+                "served_disagreements":s.get("top1_disagreements"),
+                "research_disagreements":q.get("top1_disagreements"),
+                "research_45k_parity":r["research_a_fit"]["frozen_45k_action_parity"],
+              }
+          pathlib.Path("aggregate.json").write_text(json.dumps(out,indent=2,sort_keys=True)+"\n")
+          print(json.dumps(out,indent=2,sort_keys=True))
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: issue-529-deployed-a-transfer-aggregate
+          path: aggregate.json
+          retention-days: 90
