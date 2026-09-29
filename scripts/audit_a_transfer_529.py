@@ -763,6 +763,16 @@ def run_set(args):
             scope_rows[name] = rows
             scope_checks[name] = check
 
+    frozen_action_identity_ok = True
+    if args.freeze_context:
+        frozen_check = scope_checks.get("spent_45k")
+        frozen_action_identity_ok = bool(
+            reproduction_pass
+            and frozen_check is not None
+            and frozen_check.get("missing") == 0
+            and frozen_check.get("incumbent_top_mismatches_vs_frozen_context") == 0
+        )
+
     # Secondary held-out strong-player prediction on research evaluation scopes,
     # outside both model training sets.
     strong_cutoff_ids = {
@@ -828,6 +838,7 @@ def run_set(args):
                 "comparison use the historically correct train+validation assessment fit."
             ),
             "cohort": research_meta,
+            "frozen_action_identity_ok": frozen_action_identity_ok,
         },
         "reproduction": {
             "pass": reproduction_pass,
@@ -875,7 +886,12 @@ def aggregate(args):
             raise ValueError(f"{sid}: expected exactly one report, found {matches}")
         reports.append(json.loads(matches[0].read_text()))
 
-    reproduction_ok = all(r["reproduction"]["pass"] for r in reports)
+    deployed_reproduction_ok = all(r["reproduction"]["pass"] for r in reports)
+    research_action_identity_ok = all(
+        r["research_A"].get("frozen_action_identity_ok", True)
+        for r in reports
+    )
+    reproduction_ok = deployed_reproduction_ok and research_action_identity_ok
     served_pass = {
         r["set"]: (r["agreement"]["served_v8"]["top1_agreement"] or 0) >= .95
         for r in reports
@@ -941,6 +957,8 @@ def aggregate(args):
         "release_commit": RELEASE_COMMIT,
         "verdict": verdict,
         "reproduction_all_sets": reproduction_ok,
+        "deployed_reproduction_all_sets": deployed_reproduction_ok,
+        "research_frozen_action_identity_all_sets": research_action_identity_ok,
         "step0_served_top1_pass_each_set": served_pass,
         "step0_research_top1": research_top1,
         "step0_research_top1_pass_each_set": research_pass,
