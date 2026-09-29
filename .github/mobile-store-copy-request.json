@@ -1,0 +1,4 @@
+{
+  "operation": "sync-reviewed-mobile-store-copy",
+  "reason": "Sync only API-writable App Store and Google Play en-US listing copy to docs/mobile-store-submission.md, the reviewed source-of-truth for Pack One 1.0. Do not change age/content ratings, App Privacy/Data Safety, review credentials, builds, tracks, releases, rollout, countries, subscription configuration, submission, or publication."
+}
