@@ -96,7 +96,7 @@ async function render() {
   app.querySelectorAll('[data-practice-upgrade]').forEach(button=>button.addEventListener('click',async()=>{
     button.disabled=true;
     try {
-      const { beginEliteUpgrade }=await import('/growth.mjs?v=6');
+      const { beginEliteUpgrade }=await import('/growth.mjs?v=7');
       await beginEliteUpgrade({source:'practice_hub'});
     } finally {
       button.disabled=false;

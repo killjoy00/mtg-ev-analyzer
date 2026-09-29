@@ -171,6 +171,16 @@ button, input, select, textarea { font: inherit; }
   display: none;
 }
 
+.top-actions.is-account-checking [data-account-nav] {
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.top-actions #account-nav {
+  min-width: 96px;
+  justify-content: center;
+}
+
 .top-nav-button:hover {
   background: transparent;
   color: var(--green);

@@ -52,8 +52,43 @@ installRenderLifecycle();
 document.querySelector('#brand-home').onclick = () => location.href = './';
 document.querySelector('#daily-nav').onclick = () => location.href = '?game=draft-run&daily=1';
 
+const topActions=document.querySelector('.top-actions');
+const howNav=document.querySelector('#how-nav');
+const account=document.querySelector('#account-nav');
+const dynamicNavIds=['practice-nav','leaderboard-nav','learn-nav'];
+function syncPrimaryNavState(state) {
+  const signed=state==='signed-in',checking=state==='checking',unavailable=state==='unavailable';
+  topActions.dataset.accountState=state;
+  topActions.classList.toggle('is-account-checking',checking);
+  // The checking shell reserves the signed-in geometry so returning members do
+  // not watch Practice / Leaders / Learn push the navigation around after auth.
+  topActions.classList.toggle('is-signed-nav',signed||checking);
+  if(howNav)howNav.hidden=signed||checking;
+  for(const id of dynamicNavIds) {
+    const link=document.querySelector('#'+id);
+    if(!link)continue;
+    link.hidden=!(signed||checking);
+    if(checking) {
+      link.setAttribute('aria-hidden','true');
+      link.tabIndex=-1;
+    } else {
+      link.removeAttribute('aria-hidden');
+      link.removeAttribute('tabindex');
+    }
+  }
+  if(account) {
+    account.dataset.accountState=state;
+    account.toggleAttribute('aria-busy',checking);
+    account.textContent=signed?'My Pack One':state==='signed-out'?'Sign in':unavailable?'Retry account':'Account';
+    account.title=unavailable?'Account status is temporarily unavailable. Retry the session check.':'';
+  }
+}
+syncPrimaryNavState('checking');
+
 const deletionState=params.get('account');
 if (deletionState==='deleted'||deletionState==='deleting') {
+  syncPrimaryNavState('signed-out');
+  if(account)account.onclick=()=>location.href='./?account=1';
   const app=document.querySelector('#app');
   if(app) {
     const complete=deletionState==='deleted';
@@ -62,48 +97,36 @@ if (deletionState==='deleted'||deletionState==='deleting') {
 } else if (historicalShare) {
   const { installHistoricalShare } = await import('./historical-share.mjs');
   await installHistoricalShare();
+  const growth=await import('./growth.mjs');
+  syncPrimaryNavState(growth.accountState());
+  if(account)account.onclick=()=>void growth.renderAccount({source:'nav'});
 } else {
-  // Paint play links before identity/profile requests. Profiles load on demand.
+  // Paint the real Daily layout immediately, but keep account/progress-specific
+  // claims neutral until the cookie-backed session and Daily status resolve.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
-    ? await import('./daily-home.mjs?v=7') : null;
-  home?.renderDailyHome();
-  const growthReady = import('./growth.mjs?v=6');
+    ? await import('./daily-home.mjs?v=8') : null;
+  home?.renderDailyHome(null,'checking');
+  const growthReady = import('./growth.mjs?v=7');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
-  const topActions=document.querySelector('.top-actions');
-  const howNav=document.querySelector('#how-nav');
-  const account = document.createElement('button');
-  account.id = 'account-nav'; account.type = 'button';
-  account.className = 'top-nav-button'; account.textContent = 'Sign in';
-  account.onclick = async () => {
+
+  if(account)account.onclick = async () => {
+    const growth=await growthReady;
     await identityReady;
-    await (await growthReady).renderAccount({source:'nav'});
-  };
-  topActions.append(account);
-  const dynamicNavIds=['practice-nav','leaderboard-nav','learn-nav'];
-  function syncPrimaryNav(signed) {
-    for(const id of dynamicNavIds)document.querySelector('#'+id)?.remove();
-    if(howNav)howNav.hidden=signed;
-    topActions.classList.toggle('is-signed-nav',signed);
-    if(!signed)return;
-    const items=[
-      ['practice-nav','/practice/','Practice'],
-      ['leaderboard-nav','?game=draft-run&board=daily','Leaders'],
-      ['learn-nav','/learn/','Learn'],
-    ];
-    for(const [id,href,label] of items){
-      const link=document.createElement('a');
-      link.id=id;link.className='top-nav-button';link.href=href;link.textContent=label;
-      topActions.insertBefore(link,account);
+    if(growth.accountState()==='unavailable') {
+      await growth.refreshAccountSession();
+      syncPrimaryNavState(growth.accountState());
+      return;
     }
-  }
-  async function refreshPrimaryNav(){
-    await identityReady;
-    const signed=(await growthReady).accountSignedIn();
-    account.textContent=signed?'My Pack One':'Sign in';
-    syncPrimaryNav(signed);
+    await growth.renderAccount({source:'nav'});
+  };
+  async function refreshPrimaryNav({recheck=false}={}) {
+    const growth=await growthReady;
+    if(recheck)await growth.refreshAccountSession();
+    else await identityReady;
+    syncPrimaryNavState(growth.accountState());
   }
   void refreshPrimaryNav();
-  window.addEventListener('packone-account-changed',()=>void refreshPrimaryNav());
+  window.addEventListener('packone-account-changed',()=>void refreshPrimaryNav({recheck:true}));
   if (params.has('auth')) {
     await identityReady;
     await (await growthReady).resumeAccountAuth(params.get('auth'));
@@ -115,7 +138,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     if(patreonResult==='activate'||growth.hasPatreonActivationIntent()) {
       await growth.renderPatreonActivation({result:patreonResult==='activate'?null:patreonResult,source:patreonResult==='activate'?'welcome_note':'oauth_return'});
     } else {
-      const profiles=await import('./profile-product.mjs?v=6');
+      const profiles=await import('./profile-product.mjs?v=7');
       profiles.installProfileProductLayer();
       (await import('./profile-polish.mjs?v=6')).installProfilePolish();
       await profiles.renderMyProfile();
@@ -131,9 +154,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     }
   } else if (params.has('profile')) {
     await identityReady;
-    (await import('./profile-product.mjs?v=6')).installProfileProductLayer();
+    (await import('./profile-product.mjs?v=7')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=7');
+    const game = await import('./draft-run-product.mjs?v=8');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();
