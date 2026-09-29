@@ -854,13 +854,36 @@ def aggregate(args):
         r["set"]: (r["agreement"]["served_v8"]["top1_agreement"] or 0) >= .95
         for r in reports
     }
+    research_top1 = {}
+    research_pass = {}
+    for r in reports:
+        set_id = r["set"]
+        scope_names = (
+            ("core_validation", "core_assessment")
+            if set_id in CORE
+            else (("spent_20k", "spent_45k") if set_id in R45 else ("spent_20k",))
+        )
+        available = [r["agreement"][name] for name in scope_names if name in r["agreement"]]
+        n = sum(row["n"] for row in available)
+        agreement = (
+            sum(row["n"] * row["top1_agreement"] for row in available) / n
+            if n else None
+        )
+        research_top1[set_id] = {"n": n, "top1_agreement": agreement, "scopes": list(scope_names)}
+        research_pass[set_id] = agreement is not None and agreement >= .95
+
     close = {
         r["set"]: r["agreement"]["served_v8"]["margins"]["max_of_two"]
         for r in reports
     }
-    # Frozen rule: numerical gate is >=95% in every set; close-call margins are
-    # reported rather than retroactively inventing a second numerical threshold.
-    transfer = reproduction_ok and all(served_pass.values())
+    # Frozen rule: numerical gate is >=95% in every set. We require it on both
+    # the served distribution and the research decisions that carry the #529
+    # verdict. Close-call margins are reported rather than post-hoc thresholded.
+    transfer = (
+        reproduction_ok
+        and all(served_pass.values())
+        and all(research_pass.values())
+    )
     verdict = (
         "inconclusive: reproduction failed"
         if not reproduction_ok
@@ -892,8 +915,11 @@ def aggregate(args):
         "release_commit": RELEASE_COMMIT,
         "verdict": verdict,
         "reproduction_all_sets": reproduction_ok,
-        "step0_top1_pass_each_set": served_pass,
+        "step0_served_top1_pass_each_set": served_pass,
+        "step0_research_top1": research_top1,
+        "step0_research_top1_pass_each_set": research_pass,
         "served_close_call_margins": close,
+        "step4_required": reproduction_ok and not transfer,
         "outcome_fields_accessed": [],
         "per_set": reports,
         "aggregate_scopes": aggregate_scopes,
@@ -945,7 +971,7 @@ def aggregate(args):
         )
 
     lines += ["", "## Research-decision agreement", ""]
-    for scope in ("core_validation_assessment", "spent_20k", "spent_45k"):
+    for scope in ("core_validation", "core_assessment", "spent_20k", "spent_45k"):
         available = [(r["set"], r["agreement"][scope]) for r in reports if scope in r["agreement"]]
         if not available:
             continue
@@ -980,13 +1006,13 @@ def aggregate(args):
     lines += ["", "## Verdict", ""]
     if verdict == "research verdict transfers":
         lines.append(
-            "research verdict transfers. Exact v8 probabilities/top picks reproduced first, and every set met the frozen >=95% served P1P1–P1P8 top-1 agreement gate. "
-            "The disagreement-margin tables above characterize how close the remaining recommendation differences are; no production change follows from this audit."
+            "research verdict transfers. Exact v8 probabilities/top picks reproduced first, and every set met the frozen >=95% P1P1–P1P8 top-1 agreement gate on both the served distribution and the combined research-decision population. "
+            "The disagreement-margin tables above characterize how close the remaining recommendation differences are; no post-hoc numeric margin cutoff was introduced, and no production change follows from this audit."
         )
     elif verdict == "does not transfer":
         lines.append(
-            "does not transfer. Exact deployed A reproduced, but at least one set failed the frozen >=95% served-decision agreement gate. "
-            "Per the precommitted rule, the single permitted Step-4 diagnostic is required before any statement about the research value verdict; no production change follows from this audit alone."
+            "does not transfer. Exact deployed A reproduced, but at least one set failed the frozen >=95% P1P1–P1P8 agreement gate on the served and/or research-decision population. "
+            "Per the precommitted rule, the single permitted Step-4 diagnostic is required before closing the transfer question; no production change follows from this audit alone."
         )
     else:
         lines.append(
@@ -994,7 +1020,14 @@ def aggregate(args):
             "Only the descriptive served comparison is retained, and no production change follows."
         )
     (outdir / "report.md").write_text("\n".join(lines) + "\n")
-    print(json.dumps({"verdict": verdict, "reproduction_all_sets": reproduction_ok, "served_pass": served_pass}, indent=2))
+    print(json.dumps({
+        "verdict": verdict,
+        "reproduction_all_sets": reproduction_ok,
+        "served_pass": served_pass,
+        "research_pass": research_pass,
+        "research_top1": research_top1,
+        "step4_required": reproduction_ok and not transfer,
+    }, indent=2))
 
 
 def main():
