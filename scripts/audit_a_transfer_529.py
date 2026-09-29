@@ -444,8 +444,8 @@ def summarize_scope(rows):
     }
 
 
-def evaluate_scope(name, set_id, dids, exact_keys, lookup, prod_training, fold_models,
-                   full_prod, research_model, freeze_meta):
+def evaluate_scope(name, set_id, dids, exact_keys, lookup, fold_models,
+                   research_model, freeze_meta):
     rows = []
     missing = 0
     incumbent_mismatch = 0
@@ -457,7 +457,7 @@ def evaluate_scope(name, set_id, dids, exact_keys, lookup, prod_training, fold_m
             continue
         if exact_keys is not None and key not in exact_keys:
             continue
-        dep_model = fold_models[stable_fold(did, 5)] if did in prod_training else full_prod
+        dep_model = fold_models[stable_fold(did, 5)]
         dp = probs(dep_model, ex)
         rp = probs(research_model, ex)
         dr, rr = ranking(dp), ranking(rp)
@@ -665,8 +665,6 @@ def run_set(args):
         f.fold: OutOfFoldModel(f.counts, CountStore.empty(), fits[f.fold])
         for f in folds
     }
-    full_prod = build_full_model(prod_pairs, game_path, set_id)
-
     research_models = {}
     for fit_name, info in research_fit_info.items():
         research_pairs = [
@@ -731,8 +729,8 @@ def run_set(args):
             exact = freeze_exact if name == "spent_45k" else None
             fit_name = scope_fit[name]
             rows, check = evaluate_scope(
-                name, set_id, set(ids), exact, lookup, training, fold_models,
-                full_prod, research_models[fit_name],
+                name, set_id, set(ids), exact, lookup, fold_models,
+                research_models[fit_name],
                 freeze_meta if name == "spent_45k" else {}
             )
             check["research_fit"] = fit_name
@@ -755,7 +753,7 @@ def run_set(args):
             did, pack, pick = key
             if did not in held_ids or pack != 1 or not 1 <= pick <= 8:
                 continue
-            dm = fold_models[stable_fold(did, 5)] if did in training else full_prod
+            dm = fold_models[stable_fold(did, 5)]
             dp, rp = probs(dm, ex), probs(research_models[served_fit], ex)
             if ex.historical_pick not in dp or ex.historical_pick not in rp:
                 continue
