@@ -609,24 +609,51 @@ def run_set(args):
         else:
             served_ids.add(did)
 
-    prior_ids, scopes, research_meta = research_ids(set_id, Path(args.cohort))
+    research = research_ids(set_id, Path(args.cohort))
+    fit_prior_ids = {name: set(ids) for name, ids in research["fit_prior_ids"].items()}
+    scopes = {name: set(ids) for name, ids in research["scope_ids"].items()}
+    scope_fit = dict(research["scope_fit"])
+    served_fit = research["served_fit"]
+    research_meta = research["meta"]
+    identity["research_frozen_draft_sha256"] = research_meta.get("draft_sha256")
+    identity["research_frozen_game_sha256"] = research_meta.get("game_sha256")
+    identity["research_draft_hash_match"] = (
+        research_meta.get("draft_sha256") is None
+        or research_meta.get("draft_sha256") == identity["draft_archive_sha256"]
+    )
+    identity["research_game_hash_match"] = (
+        research_meta.get("game_sha256") is None
+        or research_meta.get("game_sha256") == identity["game_archive_sha256"]
+    )
+
     freeze_ids = set()
     freeze_exact = None
     freeze_meta = {}
     if args.freeze_context:
         freeze_ids, freeze_exact, freeze_meta = load_freeze(Path(args.freeze_context))
         scopes["spent_45k"] = freeze_ids
+        scope_fit["spent_45k"] = served_fit
 
-    research_skills = {did: skills[did] for did in prior_ids if did in skills}
-    research_strong, research_cutoff, research_experienced = select_strong_drafts(
-        research_skills, 100, .15, 5000
-    )
-    research_strong = set(research_strong)
+    research_fit_info = {}
+    research_strong_union = set()
+    for fit_name, prior in fit_prior_ids.items():
+        fit_skills = {did: skills[did] for did in prior if did in skills}
+        strong, fit_cutoff, fit_experienced = select_strong_drafts(
+            fit_skills, 100, .15, 5000
+        )
+        strong = set(strong)
+        research_strong_union |= strong
+        research_fit_info[fit_name] = {
+            "prior_ids": set(prior),
+            "strong_ids": strong,
+            "experienced_in_prior": fit_experienced,
+            "strong_cutoff": fit_cutoff,
+        }
 
-    wanted = set(training) | served_ids | research_strong
+    wanted = set(training) | served_ids | research_strong_union
     for ids in scopes.values():
         wanted |= set(ids)
-    full_ids = set(training) | served_ids | research_strong
+    full_ids = set(training) | served_ids | research_strong_union
     examples = load_examples(draft_path, wanted, header, full_ids)
     lookup = example_lookup(examples)
 
@@ -639,8 +666,14 @@ def run_set(args):
     }
     full_prod = build_full_model(prod_pairs, game_path, set_id)
 
-    research_pairs = [(did, ex) for did in research_strong for ex in examples.get(did, ())]
-    research_model = build_full_model(research_pairs, game_path, set_id)
+    research_models = {}
+    for fit_name, info in research_fit_info.items():
+        research_pairs = [
+            (did, ex)
+            for did in info["strong_ids"]
+            for ex in examples.get(did, ())
+        ]
+        research_models[fit_name] = build_full_model(research_pairs, game_path, set_id)
 
     repro_errors = []
     max_abs = 0.0
@@ -686,18 +719,22 @@ def run_set(args):
     )
 
     served_rows, served_check = evaluate_served_stored(
-        set_id, corpus, by_hash, lookup, research_model
+        set_id, corpus, by_hash, lookup, research_models[served_fit]
     )
+    served_check["research_fit"] = served_fit
 
     scope_rows = {"served_v8": served_rows}
     scope_checks = {"served_v8": served_check}
     if reproduction_pass:
         for name, ids in scopes.items():
             exact = freeze_exact if name == "spent_45k" else None
+            fit_name = scope_fit[name]
             rows, check = evaluate_scope(
                 name, set_id, set(ids), exact, lookup, training, fold_models,
-                full_prod, research_model, freeze_meta if name == "spent_45k" else {}
+                full_prod, research_models[fit_name],
+                freeze_meta if name == "spent_45k" else {}
             )
+            check["research_fit"] = fit_name
             scope_rows[name] = rows
             scope_checks[name] = check
 
@@ -707,8 +744,9 @@ def run_set(args):
         did for did, skill in skills.items()
         if skill.games_lower_bound >= 100 and skill.rate >= cutoff
     }
-    eval_ids = set().union(*(set(v) for k, v in scopes.items()))
-    held_ids = eval_ids & strong_cutoff_ids - training - prior_ids
+    eval_ids = set().union(*(set(v) for v in scopes.values()))
+    final_research_training = research_fit_info[served_fit]["strong_ids"]
+    held_ids = eval_ids & strong_cutoff_ids - training - final_research_training
     pred_n = dep_hit = res_hit = 0
     dep_loss = res_loss = 0.0
     if reproduction_pass:
@@ -717,7 +755,7 @@ def run_set(args):
             if did not in held_ids or pack != 1 or not 1 <= pick <= 8:
                 continue
             dm = fold_models[stable_fold(did, 5)] if did in training else full_prod
-            dp, rp = probs(dm, ex), probs(research_model, ex)
+            dp, rp = probs(dm, ex), probs(research_models[served_fit], ex)
             if ex.historical_pick not in dp or ex.historical_pick not in rp:
                 continue
             pred_n += 1
@@ -747,11 +785,23 @@ def run_set(args):
             "manifest_match": cohort_match,
         },
         "research_A": {
-            "prior_training_ids": len(prior_ids),
-            "experienced_in_prior": research_experienced,
-            "strong_training_ids": len(research_strong),
-            "strong_cutoff": research_cutoff,
-            "definition": "ArchiveSignalProvider strong_choice_probability path reconstructed outcome-free from identical OutOfFoldModel/count/deck-colour inputs",
+            "served_fit": served_fit,
+            "scope_fit": scope_fit,
+            "fits": {
+                name: {
+                    "prior_training_ids": len(info["prior_ids"]),
+                    "experienced_in_prior": info["experienced_in_prior"],
+                    "strong_training_ids": len(info["strong_ids"]),
+                    "strong_cutoff": info["strong_cutoff"],
+                }
+                for name, info in research_fit_info.items()
+            },
+            "definition": (
+                "ArchiveSignalProvider strong_choice_probability path reconstructed outcome-free "
+                "from identical OutOfFoldModel/count/deck-colour inputs. Core validation uses "
+                "train-only aggregates; locked core assessment and the served-distribution "
+                "comparison use the historically correct train+validation assessment fit."
+            ),
             "cohort": research_meta,
         },
         "reproduction": {
