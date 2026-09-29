@@ -845,8 +845,8 @@ def aggregate(args):
             p1, pl = a["p1p1"], a["p1p2_p1p8"]
             lines.append(
                 f"| {sid.upper()} | {a['n']} | {a['top1_agreement']:.4%} | "
-                f"{'—' if p1['top1_agreement'] is None else f'{p1['top1_agreement']:.4%}'} | "
-                f"{'—' if pl['top1_agreement'] is None else f'{pl['top1_agreement']:.4%}'} | "
+                f"{format_pct(p1['top1_agreement'])} | "
+                f"{format_pct(pl['top1_agreement'])} | "
                 f"{a['top2_overlap']:.4f} | {a['kendall_tau']:.4f} | "
                 f"{r['training_overlap'].get(scope, 0)} |"
             )
