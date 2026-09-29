@@ -4,6 +4,13 @@ on:
   push:
     branches:
       - audit-529-a-transfer
+    paths:
+      - scripts/audit_a_transfer_529.py
+      - scripts/build_replays.py
+      - scripts/import_all_trophies.py
+      - reports/ISSUE-529-A-TRANSFER-AUDIT-DECISION-RULE.md
+      - corpus/draft-run/**
+      - data/**/manifest.json
   workflow_dispatch:
 
 concurrency:
