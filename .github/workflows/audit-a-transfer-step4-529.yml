@@ -1,0 +1,147 @@
+name: "Audit #529 A-transfer Step 4"
+
+on:
+  push:
+    branches:
+      - audit-529-a-transfer
+    paths:
+      - scripts/audit_a_transfer_step4_529.py
+      - .github/workflows/audit-a-transfer-step4-529.yml
+
+concurrency:
+  group: issue-529-a-transfer-step4
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  step4:
+    name: Single spent-45k Step 4 diagnostic
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    env:
+      BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Checkout exact historical estimator source
+        uses: actions/checkout@v4
+        with:
+          ref: a7c0afd3cd5f2f872d312fe26f510894c305ef3b
+          path: historical
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install frozen numeric dependency
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3'
+
+      - name: Compile Step 4
+        run: python -m py_compile scripts/audit_a_transfer_step4_529.py
+
+      - name: Download exact completed Step-3 report
+        uses: actions/download-artifact@v4
+        with:
+          name: a-transfer-529-final
+          path: step3
+          run-id: 36603461542
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - name: Download historical spent-45k R result
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-45k-final
+          path: historical-result
+          run-id: 36475283530
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - name: Download exact frozen 45k contexts
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-FIN
+          path: freeze/FIN
+          run-id: 36475098718
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-TDM
+          path: freeze/TDM
+          run-id: 36475098718
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-freeze-DFT
+          path: freeze/DFT
+          run-id: 36475098718
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+
+      - name: Download exact public snapshots
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p raw results
+          for E in FIN TDM DFT; do
+            curl --fail --location --retry 5 --retry-delay 3 \
+              --output "raw/$E-draft.csv.gz" \
+              "$BASE/draft_data/draft_data_public.$E.PremierDraft.csv.gz"
+            curl --fail --location --retry 5 --retry-delay 3 \
+              --output "raw/$E-game.csv.gz" \
+              "$BASE/game_data/game_data_public.$E.PremierDraft.csv.gz"
+          done
+          echo "9d5b2a3e908bb8daf0ea6e951097714b651546370a5c852893dc90a1f2f6ab8b  raw/FIN-draft.csv.gz" | sha256sum -c -
+          echo "f6452e622976f66dd5420c55741da5b246c7e8d25d63c080e728635e1741a6a6  raw/FIN-game.csv.gz" | sha256sum -c -
+          echo "831ba8bc4be5eabe140fac00a8e6eaded3f3f931685be8f91403ad9cfde5cbf5  raw/TDM-draft.csv.gz" | sha256sum -c -
+          echo "e2e679168818d67d812972343ba541d626d0f57140bc22955e09dd07bc2086e4  raw/TDM-game.csv.gz" | sha256sum -c -
+          echo "7812d16e0de78ff7a69faf9981f7ff03be4dfc618a86f14369424ec2204580cd  raw/DFT-draft.csv.gz" | sha256sum -c -
+          echo "734325afbe5c023245e7769fab66c88dcf241407666becb06b956d7fee13a28b  raw/DFT-game.csv.gz" | sha256sum -c -
+
+      - name: Run the single authorized Step-4 outcome diagnostic
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/audit_a_transfer_step4_529.py \
+            --historical-root historical \
+            --step3-report step3/report.json \
+            --historical-r-report historical-result/report.json \
+            --draft FIN=raw/FIN-draft.csv.gz \
+            --draft TDM=raw/TDM-draft.csv.gz \
+            --draft DFT=raw/DFT-draft.csv.gz \
+            --game FIN=raw/FIN-game.csv.gz \
+            --game TDM=raw/TDM-game.csv.gz \
+            --game DFT=raw/DFT-game.csv.gz \
+            --freeze FIN=freeze/FIN/frozen-evaluation-context.npz \
+            --freeze TDM=freeze/TDM/frozen-evaluation-context.npz \
+            --freeze DFT=freeze/DFT/frozen-evaluation-context.npz \
+            --out results
+
+      - name: Assert Step-4 invariants
+        run: |
+          python3 - <<'PY'
+          import json
+          r=json.load(open('results/report.json'))
+          assert r['phase']=='issue_529_A_transfer_step4_single_followup'
+          assert r['step4_execution_count_for_this_audit']==1
+          assert r['authorized_because_step3_verdict']=='does not transfer'
+          assert r['historical_r_minus_research_reproduction']['pass'] is True
+          assert r['outcome_fields_accessed']==['event_match_wins']
+          assert r['sensitivity_grid']==[1.0,1.1,1.22352,1.25,1.5,2.0,3.0,5.0]
+          assert r['production_change_authorized'] is False
+          assert set(r['per_environment'])=={'FIN','TDM','DFT'}
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: a-transfer-529-step4-final
+          path: results/
+          if-no-files-found: error
+          retention-days: 90
