@@ -1,5 +1,5 @@
 {
   "operation": "configure-google-play-data-safety",
-  "mode": "dry-run",
-  "reason": "Generate and validate Pack One's Google Play Data Safety declaration against Google's current official CSV schema. Select only Name, Email address, Personal identifiers (Pack One player/account IDs), and Other actions (gameplay); collected only, not shared; encryption in transit and deletion available; no advertising/tracking purpose. Dry run must not submit or publish anything."
+  "mode": "submit",
+  "reason": "Submit the already-validated Pack One Google Play Data Safety declaration generated from Google's current official 763-row CSV schema. Declare only Name, Email address, Personal identifiers (Pack One player/account IDs), and Other actions (gameplay); collected only, not shared; all selected data non-ephemeral; encrypted in transit; deletion available; no advertising/tracking purpose. Do not modify tracks, releases, rollout, countries, listing graphics/copy, or publishing."
 }
