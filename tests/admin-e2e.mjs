@@ -14,7 +14,7 @@ try {
   await page.addInitScript(()=>{localStorage.setItem('pack1-auth-session-v1','synthetic-admin-session');Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.__copiedText=value;}}});});
   const requests=[],publishBodies=[];
   const userId='11111111-1111-4111-8111-111111111111';
-  await page.route(/\\/health\\?quick=1$/,route=>route.fulfill({json:{ok:true,campaign_link_publish_configured:true}}));
+  await page.route(/\/health\?quick=1$/,route=>route.fulfill({json:{ok:true,campaign_link_publish_configured:true}}));
   await page.route('**/v1/admin/**',async route=>{
     requests.push(route.request().url());
     const requestUrl=new URL(route.request().url()),path=requestUrl.pathname;
