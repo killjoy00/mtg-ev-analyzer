@@ -1,0 +1,80 @@
+name: a-regret-null-final-aggregate-756
+
+on:
+  push:
+    branches:
+      - research/a-regret-null-calibration-756
+    paths:
+      - research/A-REGRET-NULL-AGGREGATE-RUN-756.txt
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  P1_RUN: '36610903434'
+  LATER_RUN: '36610634980'
+  ORIGINAL_P1_RUN: '36583791463'
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  aggregate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2'
+
+      - name: Download P1 null-calibration artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: a-regret-p1-null-cal-*
+          path: p1
+          run-id: ${{ env.P1_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download later null-calibration artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: a-regret-later-null-cal-*
+          path: later
+          run-id: ${{ env.LATER_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download original P1 #756 artifacts for margin weights
+        uses: actions/download-artifact@v4
+        with:
+          pattern: a-regret-p1p1-*
+          path: original
+          run-id: ${{ env.ORIGINAL_P1_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Verify complete set
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find p1 -name p1-null-set.json | wc -l)" -eq 5
+          test "$(find p1 -name rep0-regrets.npz | wc -l)" -eq 5
+          test "$(find later -name later-null-set.json | wc -l)" -eq 5
+          test "$(find original -name regret-rows.jsonl.gz | wc -l)" -eq 5
+
+      - name: Aggregate synthetic calibration
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p results
+          python research/a_regret_null_calibration_aggregate_756.py \
+            --p1-root p1 \
+            --later-root later \
+            --original-p1-root original \
+            --output results/a-regret-null-calibration-aggregate.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: a-regret-null-calibration-final-756
+          path: results/a-regret-null-calibration-aggregate.json
+          retention-days: 90
