@@ -13,6 +13,7 @@ import gzip
 import hashlib
 import json
 import math
+import re
 import statistics
 import sys
 from collections import Counter, defaultdict
@@ -255,10 +256,26 @@ def kendall_tau(order_a, order_b):
 
 
 def read_corpus(path: Path):
-    with gzip.open(path, "rt", encoding="utf-8") as f:
-        value = json.load(f)
+    """Load scoring fields while making corpus outcome values unreadable.
+
+    The committed corpus carries historical outcome metadata that this audit does
+    not need. Mask those values in the raw decompressed bytes before JSON parsing
+    so the scoring-only process never deserializes an outcome value.
+    """
+    raw = gzip.decompress(path.read_bytes())
+    keys = "|".join(re.escape(k) for k in FORBIDDEN_COLUMNS).encode()
+    pattern = re.compile(
+        rb'("(?:(?:' + keys + rb'))"\\s*:\\s*)'
+        rb'(?:-?\\d+(?:\\.\\d+)?(?:[eE][+-]?\\d+)?|true|false|null|"[^"]*")'
+    )
+    raw = pattern.sub(rb"\\1null", raw)
+    value = json.loads(raw)
     if not isinstance(value, list):
         raise ValueError(f"{path}: expected frozen corpus JSON array")
+    for row in value:
+        for key in FORBIDDEN_COLUMNS:
+            if key in row and row[key] is not None:
+                raise AssertionError(f"{path}: outcome masking failed for {key}")
     return value
 
 
@@ -267,24 +284,62 @@ def source_hash(set_id, draft_id):
 
 
 def research_ids(set_id: str, cohort_path: Path):
+    """Return exact evaluation scopes and the historical A fit complement per scope."""
     data = json.loads(cohort_path.read_text())
     if set_id in CORE:
         selected = [x for x in data["selected_drafts"] if x["expansion"].lower() == set_id]
-        prior = {x["draft_id"] for x in selected if x["split"] == "train"}
-        eval_ids = {
-            x["draft_id"] for x in selected
-            if x["split"] in ("validation", "assessment")
-        }
-        return prior, {"core_validation_assessment": eval_ids}, {
-            "cohort_id": data.get("cohort_id"),
-            "selected_drafts_sha256": data.get("selected_drafts_sha256"),
+        train = {x["draft_id"] for x in selected if x["split"] == "train"}
+        validation = {x["draft_id"] for x in selected if x["split"] == "validation"}
+        assessment = {x["draft_id"] for x in selected if x["split"] == "assessment"}
+        archives = data.get("archives") or []
+        draft_row = next(
+            (x for x in archives if x.get("kind") == "draft"
+             and Path(str(x.get("path", ""))).name == f"draft-{set_id.upper()}.csv.gz"),
+            None,
+        )
+        game_row = next(
+            (x for x in archives if x.get("kind") == "game"
+             and Path(str(x.get("path", ""))).name == f"game-{set_id.upper()}.csv.gz"),
+            None,
+        )
+        return {
+            "fit_prior_ids": {
+                "validation_fit": train,
+                # The one-shot locked assessment explicitly used original
+                # train + validation IDs for aggregate signals / incumbent A.
+                "assessment_fit": train | validation,
+            },
+            "scope_ids": {
+                "core_validation": validation,
+                "core_assessment": assessment,
+            },
+            "scope_fit": {
+                "core_validation": "validation_fit",
+                "core_assessment": "assessment_fit",
+            },
+            "served_fit": "assessment_fit",
+            "meta": {
+                "cohort_id": data.get("cohort_id"),
+                "selected_drafts_sha256": data.get("selected_drafts_sha256"),
+                "draft_sha256": draft_row.get("sha256") if draft_row else None,
+                "game_sha256": game_row.get("sha256") if game_row else None,
+                "validation_fit_prior_n": len(train),
+                "assessment_fit_prior_n": len(train | validation),
+            },
         }
     prior = set(data["prior_train_ids"])
-    return prior, {"spent_20k": set(data["confirmation_ids"])}, {
-        "draft_sha256": data["draft_sha256"],
-        "prior_train_n": len(prior),
-        "prior_8000_n": len(data["prior_8000_ids"]),
-        "spent_20k_n": len(data["confirmation_ids"]),
+    return {
+        "fit_prior_ids": {"confirmation_fit": prior},
+        "scope_ids": {"spent_20k": set(data["confirmation_ids"])},
+        "scope_fit": {"spent_20k": "confirmation_fit"},
+        "served_fit": "confirmation_fit",
+        "meta": {
+            "draft_sha256": data["draft_sha256"],
+            "game_sha256": EXPECTED_GAME_SHA256[set_id],
+            "prior_train_n": len(prior),
+            "prior_8000_n": len(data["prior_8000_ids"]),
+            "spent_20k_n": len(data["confirmation_ids"]),
+        },
     }
 
 
