@@ -29,3 +29,29 @@ jobs:
           grep -n -C 20 "more rows than frozen unused drafts" /tmp/a_regret_later_old.py || true
           echo "=== sparse/cross-product candidates ==="
           grep -n -C 10 -E "sparse|cross|@|dot\(|matmul|Zt|Et|Ht|rank" /tmp/a_regret_later_old.py | head -n 500 || true
+          echo "=== compare corrupted corrected payload to old source ==="
+          set +e
+          base64 -d research/one_time/a_regret_later.py.gz.b64 | gzip -dc > /tmp/a_regret_later_new.bin
+          set -e
+          python - <<'PY'
+          from pathlib import Path
+          import difflib
+          old=Path('/tmp/a_regret_later_old.py').read_bytes()
+          new=Path('/tmp/a_regret_later_new.bin').read_bytes()
+          print({'old_len':len(old),'new_len':len(new),'new_nuls':new.count(b'\0')})
+          a=old.decode('utf-8','replace').splitlines()
+          b=new.decode('utf-8','replace').replace('\x00','<NUL>').splitlines()
+          sm=difflib.SequenceMatcher(a=a,b=b,autojunk=False)
+          shown=0
+          for tag,i1,i2,j1,j2 in sm.get_opcodes():
+              if tag=='equal':
+                  continue
+              print('OP',tag,'old',i1+1,i2,'new',j1+1,j2)
+              for line in a[max(0,i1-4):min(len(a),i2+4)]:
+                  print('OLD',line)
+              for line in b[max(0,j1-4):min(len(b),j2+4)]:
+                  print('NEW',line)
+              shown+=1
+              if shown>=20:
+                  break
+          PY
