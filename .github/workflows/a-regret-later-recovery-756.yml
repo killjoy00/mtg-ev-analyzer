@@ -1,0 +1,103 @@
+name: a-regret-later-recovery-756
+
+on:
+  push:
+    branches:
+      - research/a-regret-bound-756
+    paths:
+      - .github/workflows/a-regret-later-recovery-756.yml
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+env:
+  PRERUN_RUN: '36451550413'
+  BASE: https://17lands-public.s3.amazonaws.com/analysis_data
+  PYTHONUNBUFFERED: '1'
+
+jobs:
+  analyze:
+    name: a-regret-later-recovery-${{ matrix.expansion }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        include:
+          - expansion: MSH
+            draft_sha: 64100d71db77e0f0ef8ba893b259a1024eb6d15816db337c7758e7d96bc29cf7
+            game_sha: 8a6bd93a5d50554a3d87703e93624d09e638dc6dd03eda12be9c3f2925484edf
+          - expansion: SOS
+            draft_sha: df6220d8941e99b7264a54a7a7427096246ee6510057a83d4c9424b472761853
+            game_sha: 1be513933918ca243c137af0314aae099c721c408786c9cb56f08027d9b113fb
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install pinned numeric dependencies
+        run: python -m pip install --disable-pip-version-check 'numpy==2.3.3' 'scipy==1.16.2'
+
+      - name: Materialize frozen corrected analyzer
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d research/one_time/a_regret_later.py.gz.b64 | gzip -d > research/a_regret_later_runtime.py
+          python -m py_compile research/a_regret_later_runtime.py
+
+      - name: Download exact retained #529 prior-use ledger
+        uses: actions/download-artifact@v4
+        with:
+          name: contextual-value-v1-r-independent-confirmation-prerun
+          path: prior
+          run-id: ${{ env.PRERUN_RUN }}
+          github-token: ${{ github.token }}
+
+      - name: Download and verify exact public archives
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+          DRAFT_SHA: ${{ matrix.draft_sha }}
+          GAME_SHA: ${{ matrix.game_sha }}
+        run: |
+          set -euo pipefail
+          mkdir -p raw
+          curl --fail --location --retry 5 --retry-delay 3             --output raw/draft.csv.gz             "$BASE/draft_data/draft_data_public.$EXPANSION.PremierDraft.csv.gz"
+          curl --fail --location --retry 5 --retry-delay 3             --output raw/game.csv.gz             "$BASE/game_data/game_data_public.$EXPANSION.PremierDraft.csv.gz"
+          echo "$DRAFT_SHA  raw/draft.csv.gz" | sha256sum -c -
+          echo "$GAME_SHA  raw/game.csv.gz" | sha256sum -c -
+
+      - name: Run frozen corrected recentered analysis
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          set -euo pipefail
+          python research/a_regret_later_runtime.py             --expansion "$EXPANSION"             --draft-archive raw/draft.csv.gz             --game-archive raw/game.csv.gz             --spent-ledger prior/spent-draft-ledger.json.gz             --reserve-json prior/reserve.json             --output-dir "results/$EXPANSION"
+
+      - name: Assert frozen secondary boundary
+        shell: bash
+        env:
+          EXPANSION: ${{ matrix.expansion }}
+        run: |
+          python - <<'PY'
+          import json, os
+          e=os.environ['EXPANSION']
+          r=json.load(open(f'results/{e}/later-report.json'))
+          assert r['issue']==756
+          assert r['secondary_after_p1p1_outcome_open'] is True
+          assert r['status'] in {'analyzed_secondary_recentered','insufficient_recentered_identification'}
+          p=json.load(open(f'results/{e}/preflight-later.json'))
+          assert p['later_pick_value_estimates_computed'] is False
+          assert p['later_pick_unique_draft_ids_seen'] <= p['expected_unused_draft_ids']
+          PY
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: a-regret-later-recovery-${{ matrix.expansion }}
+          path: results/${{ matrix.expansion }}/
+          retention-days: 90
