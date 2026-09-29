@@ -69,7 +69,7 @@ export function installDailyHome(identityReady = Promise.resolve()) {
     // both share ensureMigrations(), so this overlaps their post-migration reads
     // without racing account/player setup.
     const profilePromise=loadDailyStatus();
-    void identityReady;
+    await identityReady;
     let profile=null,state='ready';
     try { profile=await profilePromise; }
     catch { state='unavailable'; }
