@@ -1,0 +1,24 @@
+name: a-regret-aggregate-debug-756
+
+on:
+  push:
+    branches:
+      - research/a-regret-bound-756
+    paths:
+      - .github/workflows/a-regret-aggregate-debug-756.yml
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Inspect frozen aggregate interface
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d research/one_time/a_regret_later_aggregate.py.gz.b64 | gzip -d > /tmp/aggregate.py
+          python -m py_compile /tmp/aggregate.py
+          grep -n -C 8 -E "input-root|glob|later-report|later-regret|ArgumentParser|def main|bootstrap" /tmp/aggregate.py | head -n 500
