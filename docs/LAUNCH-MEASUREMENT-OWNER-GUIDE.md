@@ -29,7 +29,7 @@ The preferred operator surface is the Admin **Campaign Links / Link Builder**:
 
 It validates and normalizes source, campaign, optional medium, and an optional slug. The slug is required only for a `/go/<slug>/` vanity route; a tracked UTM URL can be built with the slug left blank. The builder previews the tracked URL and intended vanity URL, produces the exact `campaign-links.json` entry when a valid slug is present, and warns when a slug already exists.
 
-A tracked UTM URL can be copied and used immediately. A vanity `/go/<slug>/` URL is **not** published by the builder: its JSON entry and generated page must be committed through the normal site PR and deployed by GitHub Pages.
+A tracked UTM URL can be copied and used immediately. For a vanity `/go/<slug>/` URL, click **Publish vanity link**. Admin dispatches the reviewed campaign-publication workflow, which creates the registry/generated-page change, runs the required checks, merges the protected site PR, requests the Pages build, and verifies the public route before Admin reports it as published.
 
 For the complete publishing, retirement, generator, and troubleshooting workflow, use [Campaign Links owner guide](CAMPAIGN-LINKS-OWNER-GUIDE.md).
 

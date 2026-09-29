@@ -127,7 +127,7 @@ After development and production refresh plus gameplay verification succeed, the
 5. an authorized operator/app opens the branch as a pull request;
 6. normal required checks protect the final merge.
 
-GitHub Actions is not currently permitted to create pull requests in this repository, even when a workflow has `pull-requests: write`. The workflow must therefore treat a successful branch push as its handoff rather than calling `gh pr create`.
+The card-image workflow intentionally treats a successful branch push as its handoff and does not call `gh pr create`. Repository-level permission for Actions to create pull requests may be enabled for other narrowly reviewed automation (such as Admin campaign publishing); that does not broaden this card-image workflow's own publication contract.
 
 If live backend propagation has already succeeded but source publication fails, do **not** rerun production propagation just to recover the checked-in files. `.github/workflows/publish-card-image-source.yml` hydrates the already-normalized R2 state, deterministically regenerates the checked-in corpus, validates it, pushes a recovery branch, and hands that branch to an authorized operator/app for the protected-main PR.
 

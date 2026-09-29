@@ -1,6 +1,7 @@
 name: test
 
 on:
+  workflow_dispatch:
   pull_request:
     types: [opened, synchronize, reopened, edited]
   push:
@@ -93,7 +94,7 @@ jobs:
       # release-critical secret is intentionally not yet provisioned. A
       # same-repository PR still cannot go green or merge without all four.
       - name: Verify account-deletion release secrets are provisioned
-        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event_name == 'workflow_dispatch' || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository)
         shell: bash
         env:
           RATE_LIMIT_SECRET_PRESENT: ${{ secrets.PACK1_RATE_LIMIT_SECRET != '' }}

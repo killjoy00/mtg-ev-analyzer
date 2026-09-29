@@ -1,7 +1,7 @@
 name: isolated distributed launch acceptance
 on:
   pull_request:
-    paths: ['scripts/launch-distributed*', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
+    paths: ['scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
   contents: read
@@ -9,7 +9,36 @@ concurrency:
   group: pack1-gateway-preview
   cancel-in-progress: false
 jobs:
+  scope:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      run_load: ${{ steps.scope.outputs.run_load }}
+      reason: ${{ steps.scope.outputs.reason }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Decide whether the production-like load rehearsal is needed
+        id: scope
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "run_load=true" >> "$GITHUB_OUTPUT"
+            echo "reason=manual_dispatch" >> "$GITHUB_OUTPUT"
+          else
+            node scripts/launch-change-scope.mjs "$BASE_SHA" "$HEAD_SHA" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Explain skipped load rehearsal
+        if: steps.scope.outputs.run_load != 'true'
+        run: echo "Production-like load rehearsal skipped; scope=${{ steps.scope.outputs.reason }}. Fast regressions still run." >> "$GITHUB_STEP_SUMMARY"
   regression:
+    needs: scope
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
@@ -22,8 +51,8 @@ jobs:
           node --test tests/launch-distributed-capacity.test.mjs tests/launch-alert.test.mjs tests/launch-controls.test.mjs
           npm run test:js
   setup:
-    needs: regression
-    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    needs: [scope, regression]
+    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:

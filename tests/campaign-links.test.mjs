@@ -74,9 +74,10 @@ test('campaign config rejects duplicates, unsafe slugs, invalid acquisition fiel
   assert.throws(()=>validateCampaignEntries([{...productionEntry,destination:'/practice/'}]),/destination .* is not supported/);
 });
 
-test('checked-in production campaign config contains only reddit-launch',async()=>{
-  const config=JSON.parse(await readFile('campaign-links.json','utf8'));
-  assert.deepEqual(validateCampaignEntries(config),[productionEntry]);
+test('checked-in production campaign config retains the canonical reddit-launch baseline',async()=>{
+  const config=validateCampaignEntries(JSON.parse(await readFile('campaign-links.json','utf8')));
+  assert.ok(config.length>=1);
+  assert.deepEqual(config.find(entry=>entry.slug===productionEntry.slug),productionEntry);
   assert.equal(buildCampaignTrackingUrl(productionEntry),'https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social');
   assert.equal(buildCampaignVanityUrl(productionEntry.slug),'https://packone.pro/go/reddit-launch/');
 });
@@ -126,7 +127,8 @@ test('generated campaign social previews stay in parity with the homepage',async
 
 test('committed campaign pages are fresh',async()=>{
   const result=await generateCampaignLinks({root:process.cwd(),check:true});
-  assert.deepEqual(result.slugs,['reddit-launch']);
+  const config=validateCampaignEntries(JSON.parse(await readFile('campaign-links.json','utf8')));
+  assert.deepEqual(result.slugs,config.map(entry=>entry.slug));
 });
 
 test('generator check detects missing, stale and orphan generated output',async t=>{

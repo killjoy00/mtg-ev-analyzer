@@ -82,6 +82,8 @@ if(expectedDeletionEmail!==null)
   assert.equal(growth.deletion_email_configured,expectedDeletionEmail,'deletion email configuration');
 if(expectedLaunchRecovery!==null)
   assert.equal(growth.launch_watcher_recovery_configured,expectedLaunchRecovery,'launch watcher recovery configuration');
+if(expectedLaunchRecovery!==null)
+  assert.equal(growth.campaign_link_publish_configured,expectedLaunchRecovery,'campaign publisher configuration');
 assert.equal(growth.apple_sign_in_configured,true,'Sign in with Apple runtime secrets');
 
 // Non-destructive route proof: the endpoint must be mounted, accept only the
