@@ -52,7 +52,7 @@ export function renderDailyHome(profile = null, state = 'ready') {
   document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=7')).renderAccount());
   document.querySelector('[data-home-username]')?.addEventListener('click', async () => {
     if(!profile?.player?.claimed){await (await import('./growth.mjs?v=7')).renderAccount({notice:'Choose a unique username to join Daily leaderboards.'});return;}
-    const profiles=await import('./profile-product.mjs?v=6');
+    const profiles=await import('./profile-product.mjs?v=7');
     await profiles.renderMyProfile();
     document.querySelector('#profile-account-tab')?.click();
     document.querySelector('#profile-account input[name="displayName"]')?.focus();
