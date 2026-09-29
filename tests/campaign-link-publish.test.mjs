@@ -19,17 +19,17 @@ const entry={slug:'newsletter-launch',destination:'/',source:'newsletter',campai
 const publishWorkflow=readFileSync('.github/workflows/campaign-link-publish.yml','utf8');
 
 test('campaign publish workflow preserves protected-main publication',()=>{
-  assert.match(publishWorkflow,/permissions:\\s+[\\s\\S]*contents: write[\\s\\S]*pull-requests: write[\\s\\S]*actions: write[\\s\\S]*pages: write/);
-  assert.match(publishWorkflow,/git push --force origin "HEAD:refs\\/heads\\/\\$\\{branch\\}"/);
-  assert.doesNotMatch(publishWorkflow,/git push[^\\n]*(?:refs\\/heads\\/main|HEAD:main)/);
-  assert.match(publishWorkflow,/gh pr create/);
-  assert.match(publishWorkflow,/gh workflow run test\\.yml --ref "\\$BRANCH"/);
-  assert.match(publishWorkflow,/gh workflow run e2e\\.yml --ref "\\$BRANCH"/);
-  assert.match(publishWorkflow,/gh pr merge "\\$PR_URL" --squash --delete-branch/);
-  assert.match(publishWorkflow,/repos\\/\\$\\{GITHUB_REPOSITORY\\}\\/pages\\/builds/);
+  assert.match(publishWorkflow,/permissions:\s+[\s\S]*contents: write[\s\S]*pull-requests: write[\s\S]*actions: write[\s\S]*pages: write/);
+  assert.ok(publishWorkflow.includes('git push --force origin "HEAD:refs/heads/$branch"'));
+  assert.ok(!publishWorkflow.includes('HEAD:refs/heads/main'));
+  assert.ok(!publishWorkflow.includes('HEAD:main'));
+  assert.ok(publishWorkflow.includes('gh pr create'));
+  assert.ok(publishWorkflow.includes('gh workflow run test.yml --ref "$BRANCH"'));
+  assert.ok(publishWorkflow.includes('gh workflow run e2e.yml --ref "$BRANCH"'));
+  assert.ok(publishWorkflow.includes('gh pr merge "$PR_URL" --squash --delete-branch'));
+  assert.ok(publishWorkflow.includes('repos/${GITHUB_REPOSITORY}/pages/builds'));
   assert.match(publishWorkflow,/timeout-minutes: 60/);
 });
-
 test('campaign publish configuration follows the scoped production dispatch credential',()=>{
   assert.equal(campaignLinkPublishConfigured({PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:TOKEN}),true);
   assert.equal(campaignLinkPublishConfigured({}),false);
