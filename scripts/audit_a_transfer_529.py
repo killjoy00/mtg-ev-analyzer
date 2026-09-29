@@ -507,7 +507,7 @@ def evaluate_served_stored(set_id, corpus, by_hash, lookup, research_model):
         if did is None:
             missing += 1
             continue
-        key = (did, int(puzzle["pack_number"]), pick)
+        key = (did, 1, pick)
         ex = lookup.get(key)
         if ex is None:
             missing += 1
@@ -684,7 +684,7 @@ def run_set(args):
         did = by_hash.get(puzzle["source_draft_hash"])
         if did is None:
             continue
-        key = (did, int(puzzle["pack_number"]), int(puzzle["pick_number"]))
+        key = (did, 1, int(puzzle["pick_number"]))
         ex = lookup.get(key)
         if ex is None:
             repro_errors.append({"key": key, "error": "source decision missing"})
