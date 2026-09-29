@@ -99,7 +99,7 @@ try {
 
     if(kind==='signin') {
       patreonStatus=patreonElite;
-      await page.evaluate(async()=>{const profiles=await import('./profile-product.mjs?v=6');await profiles.renderMyProfile();});
+      await page.evaluate(async()=>{const profiles=await import('./profile-product.mjs?v=7');await profiles.renderMyProfile();});
       await page.locator('#profile-account-tab').click();
       await page.locator('#patreon-connect').waitFor();
       assert.match(await page.locator('.profile-membership').textContent(),/Elite active/);
