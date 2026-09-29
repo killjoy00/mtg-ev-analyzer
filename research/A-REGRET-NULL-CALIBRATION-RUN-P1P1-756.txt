@@ -1,0 +1,1 @@
+Frozen null-calibration protocol commit a41ed7774a42cc17a7d6ec35a2e2cb7261596034. Synthetic outcomes only.\n
