@@ -1,0 +1,31 @@
+name: a-regret-later-debug-756
+
+on:
+  push:
+    branches:
+      - research/a-regret-bound-756
+    paths:
+      - .github/workflows/a-regret-later-debug-756.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Recover last known-good later analyzer source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin e966e4d7c92aeb1b3e86ccbe3dea469f1ee72c77
+          git show e966e4d7c92aeb1b3e86ccbe3dea469f1ee72c77:research/one_time/a_regret_later.py.gz.b64             | base64 -d | gzip -d > /tmp/a_regret_later_old.py
+          python -m py_compile /tmp/a_regret_later_old.py
+          echo "=== accounting ==="
+          grep -n -C 20 "more rows than frozen unused drafts" /tmp/a_regret_later_old.py || true
+          echo "=== sparse/cross-product candidates ==="
+          grep -n -C 10 -E "sparse|cross|@|dot\(|matmul|Zt|Et|Ht|rank" /tmp/a_regret_later_old.py | head -n 500 || true
