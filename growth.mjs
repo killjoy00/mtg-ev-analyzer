@@ -4,6 +4,8 @@ import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActi
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
 let currentAccount = null;
+let currentAccountState = 'checking';
+let currentAccountError = null;
 let pendingDailyRunValidation = null;
 const AUTH_FLOW_KEY='pack1-auth-flow-v1';
 
@@ -15,11 +17,33 @@ function takeAuthFlow() {
 }
 function authCompleted(data) {return firstPartyAuthEnabled()?Boolean(data?.user):Boolean(data?.token);}
 
-function syncAccountNav(signedIn=Boolean(currentAccount?.user)) {
+function syncAccountNav() {
   const nav=document.querySelector('#account-nav');
-  if(nav)nav.textContent=signedIn?'My Pack One':'Sign in';
+  if(!nav)return;
+  nav.dataset.accountState=currentAccountState;
+  nav.toggleAttribute('aria-busy',currentAccountState==='checking');
+  nav.textContent=currentAccountState==='signed-in'?'My Pack One'
+    :currentAccountState==='signed-out'?'Sign in'
+      :currentAccountState==='unavailable'?'Retry account':'Account';
 }
-export function accountSignedIn() {return Boolean(currentAccount?.user);}
+export function accountSignedIn() {return currentAccountState==='signed-in'&&Boolean(currentAccount?.user);}
+export function accountState() {return currentAccountState;}
+export function accountError() {return currentAccountError;}
+export async function refreshAccountSession() {
+  currentAccountState='checking';
+  currentAccountError=null;
+  syncAccountNav();
+  try {
+    currentAccount=await getAuthSession();
+    currentAccountState=currentAccount?.user?'signed-in':'signed-out';
+  } catch(error) {
+    currentAccount=null;
+    currentAccountState='unavailable';
+    currentAccountError=error;
+  }
+  syncAccountNav();
+  return {state:currentAccountState,account:currentAccount,error:currentAccountError};
+}
 export { hasPatreonActivationIntent };
 export async function renderPatreonActivation(options={}) {
   const source=options.source||'welcome_note';
@@ -49,7 +73,9 @@ async function claimCurrentSession() {
   const usernameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required'].includes(linked?.rankingIdentity?.reason));
   if(!usernameAttention)pendingDailyRunValidation=null;
   currentAccount=session;
-  syncAccountNav(true);
+  currentAccountState='signed-in';
+  currentAccountError=null;
+  syncAccountNav();
   return {linked,validationRunId:linked?.validatedDailyScore?validationRunId:null};
 }
 
@@ -149,8 +175,14 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   const app=document.querySelector('#app'); if(!app) return;
   try {
     currentAccount=await getAuthSession();
-    syncAccountNav(Boolean(currentAccount?.user));
+    currentAccountState=currentAccount?.user?'signed-in':'signed-out';
+    currentAccountError=null;
+    syncAccountNav();
   } catch(error) {
+    currentAccount=null;
+    currentAccountState='unavailable';
+    currentAccountError=error;
+    syncAccountNav();
     renderAccountError(app,error,()=>renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode}));
     return;
   }
@@ -418,15 +450,15 @@ export function renderDeletionState(deletionState) {
 
 export async function installGrowthLayer() {
   const deletionState=new URLSearchParams(location.search).get('account');
-  if(renderDeletionState(deletionState))return;
-  currentAccount = await getAuthSession().catch(()=>null);
-  syncAccountNav(Boolean(currentAccount?.user));
+  if(renderDeletionState(deletionState))return {state:'signed-out',account:null,error:null};
+  const result=await refreshAccountSession();
   // Authentication/account-establishment flows link explicitly. Ordinary page
   // bootstrap must only observe the existing account session: calling
   // link-browser here rotates identity cookies and defeats session stability.
-  event('page_view', { account:Boolean(currentAccount?.user) });
+  if(result.state!=='unavailable')event('page_view', { account:result.state==='signed-in' });
   document.addEventListener('pack1:share-completed', shareCompletedAnalytics);
   document.addEventListener('click', e => {
     if (e.target.closest?.('#leaderboard-nav')) event('leaderboard_view');
   }, true);
+  return result;
 }
