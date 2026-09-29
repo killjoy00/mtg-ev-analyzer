@@ -6,6 +6,7 @@
 **Null-calibration run:** [36608962626](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36608962626)  
 **Null-calibration aggregate artifact:** `11053481639`  
 **Null-calibration aggregate digest:** `sha256:559bbb01af6a2c2f01962414fda3868b9a087a6cf3c5c9db6b48628cc69f5e50`  
+**Per-scenario row-bootstrap supplement:** [36611484019](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36611484019), artifact `11053419212`  
 **Production impact:** none
 
 > **CORRECTION / SUPERSEDING INTERPRETATION**
@@ -66,14 +67,14 @@ on the real #756 packs and historical picks.
 
 Original #756 statistic: **0.1552391 wins/decision**.
 
-| Scenario | Exact true regret | Mean estimated #756 statistic | SD | 2.5–97.5% replicate range | A/IV-best disagree |
-|---|---:|---:|---:|---:|---:|
-| Pure null, v=0 | 0.00000 | 0.20472 | 0.01261 | [0.18328, 0.22715] | 71.33% |
-| A exactly optimal, tau=.10 | 0.00000 | 0.14220 | 0.00911 | **[0.12616, 0.15844]** | 57.75% |
-| A exactly optimal, tau=.20 | 0.00000 | 0.10096 | 0.00734 | [0.08737, 0.11205] | 44.37% |
-| tau=.10 + card noise s=.05 | 0.01344 | 0.14414 | 0.00852 | [0.13311, 0.16119] | 57.26% |
-| tau=.10 + card noise s=.10 | 0.04572 | 0.15623 | 0.01187 | [0.13228, 0.17504] | 58.44% |
-| tau=.10 + card noise s=.20 | 0.12839 | 0.19837 | 0.01357 | [0.17521, 0.21912] | 59.16% |
+| Scenario | Exact true regret | Mean estimated #756 statistic | SD | 2.5–97.5% replicate range | A/IV-best disagree | Replicate-0 row-bootstrap half-width |
+|---|---:|---:|---:|---:|---:|---:|
+| Pure null, v=0 | 0.00000 | 0.20472 | 0.01261 | [0.18328, 0.22715] | 71.33% | 0.000625 |
+| A exactly optimal, tau=.10 | 0.00000 | 0.14220 | 0.00911 | **[0.12616, 0.15844]** | 57.75% | 0.000570 |
+| A exactly optimal, tau=.20 | 0.00000 | 0.10096 | 0.00734 | [0.08737, 0.11205] | 44.37% | 0.000546 |
+| tau=.10 + card noise s=.05 | 0.01344 | 0.14414 | 0.00852 | [0.13311, 0.16119] | 57.26% | 0.000525 |
+| tau=.10 + card noise s=.10 | 0.04572 | 0.15623 | 0.01187 | [0.13228, 0.17504] | 58.44% | 0.000528 |
+| tau=.10 + card noise s=.20 | 0.12839 | 0.19837 | 0.01357 | [0.17521, 0.21912] | 59.16% | 0.000729 |
 
 ### Fixed decision rule
 
@@ -105,6 +106,8 @@ Thus this design would have failed the 0.02 gate even when A's true regret was e
 The statement **"A was not demonstrated optimal-enough"** remains formally correct, but it is no longer evidence against A: the test itself was not calibrated to pass a perfect A.
 
 ## Conditional row-bootstrap CI
+
+The supplement reran the requested 10,000-draw environment-stratified row bootstrap on replicate 0 for **every scenario**. Half-widths are shown in the table above and range only from **0.000525 to 0.000729**, despite the much larger between-replicate estimator variation.
 
 For pure-null replicate 0:
 
