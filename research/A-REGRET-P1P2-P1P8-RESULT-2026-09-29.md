@@ -1,70 +1,58 @@
 # Issue #756 — P1P2–P1P8 recentered-instrument A-regret result
 
 **Date:** 2026-09-29 PT  
-**Primary P1P1 run:** 36583791463  
-**Initial later-pick run:** 36587913521 (FIN/TDM/DFT retained)  
-**MSH/SOS recovery run:** 36602844254  
-**Final aggregate run:** 36604499634  
-**Final aggregate artifact:** 11050628262  
-**Artifact digest:** `sha256:53ed7445e3e24ffeae343925cce7bd24ebf101cfbbbac80376d6ce978d3d8321`  
+**Original initial later-pick run:** [36587913521](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36587913521)  
+**Original MSH/SOS recovery run:** [36602844254](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36602844254)  
+**Original aggregate run:** [36604499634](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36604499634)  
+**Original aggregate artifact:** `11050628262`  
+**Original aggregate digest:** `sha256:53ed7445e3e24ffeae343925cce7bd24ebf101cfbbbac80376d6ce978d3d8321`  
+**Null-calibration run:** [36609131738](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36609131738)  
+**Null-calibration aggregate artifact:** `11053676156`  
+**Null-calibration aggregate digest:** `sha256:16f824c12d0790887fe6b7239aa50c68caa3f74bef39f4020c73c1afd7d69211`  
 **Production impact:** none
 
-## Status
+> **CORRECTION / SUPERSEDING INTERPRETATION**
+>
+> The original later-pick statistic, like the P1P1 statistic, selects the largest fitted candidate value and measures its gap to A using that same fitted value vector. Synthetic calibration confirms that this selected-maximum statistic can be very large when true regret is exactly zero.
+>
+> The predeclared later-pick decision rule does **not** label the observed 0.2290850 statistic "uninformative," because it lies *below*, not inside, the pure-noise replicate range. That narrow rule result is retained.
+>
+> However, the original 0.2290850 must **not** be interpreted as an estimate of true A regret, a statistically significant remaining value gap, or proof that A is systematically making materially improvable choices. The original bootstrap CI conditions on the fitted coefficients and excludes coefficient-estimation / best-card-selection uncertainty.
 
-The secondary P1P2–P1P8 recentered-instrument extension is complete.
+## Original frozen design
 
-All five predeclared environments and all seven later Pack 1 positions passed every frozen identification/recentering gate. No environment or pick was dropped or replaced.
+The secondary P1P2–P1P8 extension used:
 
-This analysis is explicitly secondary: the same draft-level outcomes were already opened by the completed P1P1 study.
-
-## Frozen design
-
-The protocol remained unchanged after outcomes:
-
-- environments: FIN, TDM, DFT, MSH, SOS;
+- environments FIN, TDM, DFT, MSH, SOS;
 - exact #529 prior-use exclusions;
 - P1P2–P1P8 only;
-- research A trained only from frozen prior-training IDs;
-- 5 deterministic folds by source draft;
-- passed-pack offer instruments recentered on pre-pick pool H;
+- the same frozen research A;
+- 5 deterministic source-draft folds;
+- passed-pack offer instruments recentered on pre-pick pool state H;
 - frozen support floors and ridge penalties;
-- frozen rank / first-stage / held-out recentering gates;
-- regret against the highest-valued statistically supported offered card;
-- 10,000 environment-stratified source-draft bootstraps;
-- 0.02 wins/decision retained only as the previously frozen materiality reference.
+- frozen rank / first-stage / recentering gates;
+- candidate value `V(c,H) = beta_c + gamma * s_A(c,H)`;
+- regret `max(0, V_best - V_A)`, where `V_best` is selected from the same fitted values used to measure the gap.
 
-## Execution recovery
+All 35 environment × pick cells passed the frozen outcome-free identification/recentering gates.
 
-The first later-pick run produced successful FIN, TDM and DFT artifacts but stopped MSH/SOS before any later-pick value estimate.
+The original analysis was explicitly secondary because the same draft-level real outcomes had already been opened by the P1P1 analysis.
 
-Two execution-only defects were corrected without changing the statistical specification:
+## Original selected-maximum result, retained for provenance
 
-1. the implementation incorrectly bounded later-pick rows by P1P1 row coverage; MSH has one and SOS three otherwise valid drafts whose P1P1 row is absent but later picks are logged, so the correct outcome-free bound is exact unused draft IDs (MSH 66,004; SOS 105,200);
-2. dense temporary outer-product accumulation was replaced by algebraically identical sparse-index accumulation to avoid unnecessary memory pressure.
-
-FIN/TDM/DFT artifacts were preserved. Only MSH/SOS were rerun through the corrected execution path.
-
-## Aggregate result
-
-Eligible P1P2–P1P8 decisions: **3,183,118**
-
-Average regret of research A relative to the recentered-IV best statistically supported offered action:
+Across **3,183,118** eligible P1P2–P1P8 decisions, the original selected-maximum statistic was:
 
 **0.2290850 wins / decision**
 
-10,000-draw environment-stratified source-draft bootstrap CI95:
+The original 10,000-draw environment-stratified source-draft bootstrap CI95 was:
 
 **[0.2288306, 0.2293455]**
 
-Median regret: **0.17565**
+That interval resampled draft-level realized regret values while holding the fitted IV coefficients fixed. It therefore **does not include coefficient-estimation uncertainty or uncertainty from selecting the maximum fitted candidate value**.
 
-P90 regret: **0.55519**
+Original by-environment values:
 
-Share of eligible decisions with regret > 0.02: **73.39%**
-
-### By environment
-
-| Set | Eligible decisions | Mean regret |
+| Set | Eligible decisions | Original selected-max statistic |
 |---|---:|---:|
 | FIN | 766,420 | 0.21675 |
 | TDM | 496,221 | 0.24258 |
@@ -72,63 +60,130 @@ Share of eligible decisions with regret > 0.02: **73.39%**
 | MSH | 415,050 | 0.24435 |
 | SOS | 714,898 | 0.23238 |
 
-### By pick, pooled across environments
+Original by-pick values:
 
-| Pick | Eligible decisions | Mean regret | Share > 0.02 |
-|---|---:|---:|---:|
-| P1P2 | 457,427 | 0.25057 | 76.82% |
-| P1P3 | 454,039 | 0.22150 | 72.87% |
-| P1P4 | 452,462 | 0.22067 | 72.41% |
-| P1P5 | 455,702 | 0.23191 | 74.14% |
-| P1P6 | 455,684 | 0.25150 | 74.71% |
-| P1P7 | 454,861 | 0.21247 | 71.12% |
-| P1P8 | 452,943 | 0.21470 | 71.65% |
+| Pick | Eligible decisions | Original selected-max statistic |
+|---|---:|---:|
+| P1P2 | 457,427 | 0.25057 |
+| P1P3 | 454,039 | 0.22150 |
+| P1P4 | 452,462 | 0.22067 |
+| P1P5 | 455,702 | 0.23191 |
+| P1P6 | 455,684 | 0.25150 |
+| P1P7 | 454,861 | 0.21247 |
+| P1P8 | 452,943 | 0.21470 |
 
-## Close-call audit
+These values remain useful as provenance for the original computation, but they are **not calibrated estimates of true policy regret**.
 
-Regret is largest where A is least decisive, but substantial estimated regret remains even when A's top-two probability margin exceeds 0.10.
+## Later-pick null calibration
 
-| A top-two margin | n | Mean regret | Median | P90 | Share > 0.02 |
-|---|---:|---:|---:|---:|---:|
-| <= .02 | 584,984 | 0.26846 | 0.22102 | 0.61545 | 78.45% |
-| .02–.05 | 686,119 | 0.25252 | 0.20372 | 0.58799 | 76.90% |
-| .05–.10 | 770,211 | 0.23487 | 0.18407 | 0.56106 | 74.70% |
-| > .10 | 1,141,804 | 0.19092 | 0.13175 | 0.48908 | 67.82% |
+The follow-up used the frozen #756 later-pick code path and cohorts with one change only: the outcome source was synthetic.
 
-Disagreement slices:
+No `event_match_wins` value was read by the calibration. The aggregate explicitly records:
 
-- A vs recentered-IV best: n=2,419,400, mean regret **0.30140**, 96.56% > 0.02.
-- A vs historical drafter: n=1,832,591, mean regret **0.24523**, 75.63% > 0.02.
-- A vs both IV-best and historical drafter: n=1,431,290, mean regret **0.31399**, 96.83% > 0.02.
+`outcome_columns_read: []`
 
-## Combined answer to #756
+Scenario:
 
-The preregistered primary P1P1 study already failed the 0.02 optimal-enough gate:
+`Y = N(0, 2.18^2)`
 
-- P1P1 mean regret: **0.1552391**
-- P1P1 CI95: **[0.1546613, 0.1558308]**
+with one synthetic outcome draw per source draft, so **true regret is exactly zero**.
 
-The secondary P1P2–P1P8 study points in the same direction, with an even larger pooled estimate:
+The requested minimum was 10 replicates; the run used **12**.
 
-- P1P2–P1P8 mean regret: **0.2290850**
-- clustered CI95: **[0.2288306, 0.2293455]**
+Research-A card, probability, and margin reconstruction was checked against all retained original scored rows. Maximum absolute probability and margin differences were 0 in every environment.
 
-Therefore the requested empirical stopping argument does **not** support the claim that A is optimal-enough at a 0.02 wins/decision materiality threshold.
+### Pure-noise scenario
 
-This does not establish literal omniscient card values or prove that a deployable policy can capture the full reported gap. The estimates are relative to frozen randomized-offer/recentered-IV projections, and their exclusion restrictions remain approximate because pack composition also affects passed-card information and wheel behavior.
+| True regret | Mean #756 statistic | SD | 2.5–97.5% replicate range | A / recentered-IV-best disagreement |
+|---:|---:|---:|---:|---:|
+| 0.00000 | **0.331658** | 0.006600 | **[0.321684, 0.342061]** | **88.67%** |
 
-The practical conclusion is narrower but strong:
+The original observed later-pick statistic was **0.2290850**.
 
-> Under both predeclared designs, the statistically supported remaining value gap is materially larger than 0.02 wins/decision. The data do not justify stopping on the theory that A has no meaningful room left to improve.
+### Frozen decision rule
 
-## Randomized recommendation experiment
+The later-pick rule was:
 
-A prospective randomized recommendation experiment remains the definitive direct policy test.
+> If 0.2290850 falls inside the 2.5–97.5% pure-noise range, record the later-pick result as uninformative about A's regret.
 
-No retrospective analysis in #756 is treated as equivalent to randomizing recommendations, and no such experiment was fabricated or launched by this research-only issue.
+It does **not** fall inside [0.321684, 0.342061].
+
+Therefore the frozen decision-rule result is:
+
+> **later null calibration did not trigger the predeclared "uninformative" rule.**
+
+This is a statement about that specific decision rule only. It does **not** rescue the original statistic as a valid true-regret estimator. The calibration still demonstrates that the estimator has a large positive selected-maximum baseline under zero true regret.
+
+## A-margin slices under pure noise
+
+The same qualitative margin pattern is present when true regret is exactly zero:
+
+| A top-two margin | Mean selected-max statistic under pure noise |
+|---|---:|
+| <= .02 | 0.33840 |
+| .02–.05 | 0.33544 |
+| .05–.10 | 0.33216 |
+| > .10 | 0.32559 |
+
+Thus the original later-pick claim that the close-call pattern itself demonstrated residual improvement opportunity is **withdrawn**.
+
+## By-pick null baseline
+
+Pure-noise mean selected-max statistic by raw later-pick index:
+
+| Display pick | Mean under true regret = 0 |
+|---|---:|
+| P1P2 | 0.31338 |
+| P1P3 | 0.32621 |
+| P1P4 | 0.33828 |
+| P1P5 | 0.34318 |
+| P1P6 | 0.34504 |
+| P1P7 | 0.33788 |
+| P1P8 | 0.31766 |
+
+Every pick position therefore shows a substantial positive statistic under a zero-regret data-generating process.
+
+## Corrected combined interpretation of #756
+
+The P1P1 correction is decisive for the original primary gate:
+
+- observed P1P1 statistic: **0.1552391**;
+- when A is exactly optimal at tau=.10, the same frozen estimator produced **[0.126159, 0.158438]** across synthetic replicates;
+- therefore the frozen P1P1 decision rule classifies the original result as **uninformative about A's true regret**;
+- the P1P1 design could not have passed the 0.02 optimal-enough gate even with a perfect A.
+
+Accordingly, the statement:
+
+> **A was not demonstrated optimal-enough**
+
+is retained as the literal outcome of the preregistered gate, but that failure is **not evidence that A is materially suboptimal**, because the primary test was not calibrated to pass a perfect A.
+
+For later picks, the specified pure-noise decision rule did not trigger because the observed selected-max statistic is below the null range. Even so, the null calibration shows that the statistic has a large nonzero baseline and the original CI omits coefficient / selection uncertainty.
+
+The following former conclusions are therefore **withdrawn**:
+
+- that #756 showed A is systematically making materially improvable choices;
+- that 0.1552 or 0.2291 measured a "remaining value gap";
+- that the "statistically supported" action set implied statistically significant card advantages;
+- that the close-call / disagreement patterns themselves demonstrated genuine residual opportunity.
+
+In the #756 protocols, **supported** meant only that an action passed predeclared appearance / take-rate support thresholds. It did **not** mean its fitted advantage over A was statistically significant.
+
+## What #756 does and does not establish
+
+#756 establishes that the original optimal-enough gate was not passed.
+
+After null calibration, #756 does **not** establish:
+
+- the magnitude of A's true regret;
+- that A is materially worse than an attainable alternative policy;
+- that the original IV-best actions are better than A;
+- that a production challenger should be developed from the selected-max results.
+
+A prospective randomized recommendation experiment, or another design with policy selection separated from evaluation and adequate power, remains the appropriate direct test.
+
+No model-development issue should be opened on the basis of #756.
 
 ## Production boundary
 
-No production scoring, corpus, puzzle, database, or deployment change is authorized by this result.
-
-Any attempt to turn the identified value gap into a new production recommender requires a separately preregistered model/policy-development issue and prospective confirmation.
+No production scoring, corpus, puzzle, database, or deployment change is authorized or made by this correction.
