@@ -42,6 +42,26 @@ The frozen Step-0 rule required >=95% top-1 agreement in every set. It failed de
 
 The disagreement rates are too large to characterize the difference as a handful of tie-breaks or isolated close calls. Per the frozen rule, this required exactly one Step-4 diagnostic on the already-spent 45k FIN/TDM/DFT cohort.
 
+### Construction caveat: the >=95% agreement gate was not a valid parity test
+
+The authoritative Step-3 run report shows that research A and deployed A were not comparably trained models. In each set, deployed A used the production strong-player cohort cap of **5,000 training drafts**, while the research-A fit used only **100-752 strong training drafts**, depending on set/fold scope (`per_set[*].research_A.fits[*].strong_training_ids` versus `per_set[*].production_cohort.training_drafts` in run 36603461542).
+
+That mismatch is structural rather than a small implementation difference. The frozen >=95% top-1 agreement gate was therefore **unattainable by construction** for this comparison and its failure is **uninformative** about whether the deployed production policy transfers to the research setting. The verdict label below remains `does not transfer` because that is the literal frozen gate result, but the gate failure should not be interpreted as evidence that deployed A is meaningfully different in policy value.
+
+The secondary held-out strong-player prediction diagnostic is more informative about the two fits themselves. On held-out strong-player decisions, deployed A had higher top-1 accuracy and lower log loss in all eight sets:
+
+| Set | decisions | deployed top-1 | research top-1 | deployed log loss | research log loss |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| MSH | 208 | 55.7692% | 42.3077% | 1.321394 | 1.878619 |
+| SOS | 344 | 50.2907% | 43.0233% | 1.392130 | 1.778582 |
+| ECL | 266 | 53.7594% | 36.0902% | 1.376563 | 1.819532 |
+| TLA | 343 | 53.0612% | 42.8571% | 1.376544 | 1.799127 |
+| EOE | 3,480 | 58.9655% | 53.6782% | 1.245956 | 1.446279 |
+| FIN | 17,664 | 57.6370% | 53.4477% | 1.328827 | 1.512027 |
+| TDM | 10,648 | 54.0195% | 50.1221% | 1.346217 | 1.566353 |
+| DFT | 15,671 | 56.6333% | 52.3196% | 1.300644 | 1.508232 |
+
+
 ## Step 4 — spent 45k value diagnostic
 
 - Step-4 run: `36608499362`
@@ -57,8 +77,10 @@ The disagreement rates are too large to characterize the difference as a handful
 
 Step-4 value-classification changed under literal deployed comparator: **NO**.
 
+**This Step-4 value diagnostic is the informative result for the transfer question.** Unlike the structurally mismatched top-1 agreement gate, it directly asks whether substituting literal deployed A for research A changes the already-spent #529 policy-value interpretation. It does not: deployed A - research A is **-0.007920** with CI95 **[-0.020981, +0.005429]**, and R-LCB - deployed A is **+0.008600** with CI95 **[-0.005029, +0.021874]**. This leaves the practical conclusion unchanged: the #529 challenger evidence does not support replacing deployed A.
+
 The frozen alternative behavior evaluator agrees: deployed A - research A = **-0.009463** (95% CI **[-0.022509, +0.003796]**) and R-LCB - deployed A = **+0.010492** (95% CI **[-0.003385, +0.023748]**). Both primary and alternative comparisons remain in the same `interval_excludes_+0.03_benefit` classification as the historical R-LCB - research-A result. The prespecified hidden-confounding sensitivity grid was also reported; at the recorded-skill reference Gamma=1.22352, both new contrasts' conservative DR outer bounds include zero.
 
 ## Final verdict
 
-**does not transfer.** Exact deployed A reproduced across all eight sets, but the frozen >=95% P1P1-P1P8 top-1 agreement gate failed in every set on the research-decision population (and likewise on served v8). Step 4 was run exactly once on the precommitted spent-45k cohort to determine whether substituting literal deployed A for research A changes the #529 value interpretation; that diagnostic is reported above. This audit authorizes **no production change**.
+**does not transfer.** This label is retained as the literal frozen gate verdict. However, the >=95% agreement failure is uninformative because research A was trained on only 100-752 strong drafts per set while deployed A used 5,000, making the parity gate unattainable by construction. The informative Step-4 value diagnostic shows that substituting literal deployed A for research A does **not** change the practical #529 conclusion. This audit authorizes **no production change**.
