@@ -4,10 +4,11 @@ on:
   push:
     branches:
       - audit-529-a-transfer
-  pull_request:
-    branches:
-      - main
   workflow_dispatch:
+
+concurrency:
+  group: issue-529-a-transfer-audit
+  cancel-in-progress: true
 
 permissions:
   contents: read
