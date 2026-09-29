@@ -1,0 +1,173 @@
+name: Google Play feature graphic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/google-play-feature-graphic-request.json'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: google-play-feature-graphic
+  cancel-in-progress: false
+
+jobs:
+  upload-feature-graphic:
+    name: upload reviewed Play feature graphic
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate guarded feature graphic request
+        shell: bash
+        run: |
+          set -euo pipefail
+          node <<'NODE'
+          const fs = require('node:fs');
+          const request = JSON.parse(fs.readFileSync('.github/google-play-feature-graphic-request.json', 'utf8'));
+          const expected = ['language','operation','reason','source_png_sha256'];
+          if (JSON.stringify(Object.keys(request).sort()) !== JSON.stringify(expected)) {
+            throw new Error('Invalid feature graphic request keys.');
+          }
+          if (request.operation !== 'upload-google-play-feature-graphic') throw new Error('Invalid operation.');
+          if (request.language !== 'en-US') throw new Error('Only en-US is allowed.');
+          if (request.source_png_sha256 !== '56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69') {
+            throw new Error('Unexpected feature graphic source hash.');
+          }
+          if (typeof request.reason !== 'string' || !request.reason.trim()) throw new Error('Reason is required.');
+          fs.appendFileSync(process.env.GITHUB_ENV, 'LISTING_LANGUAGE=' + request.language + '\n');
+          NODE
+
+      - name: Require current main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]] || {
+            echo "This guarded request is no longer current main." >&2
+            exit 1
+          }
+
+      - name: Prepare reviewed 1024x500 JPEG
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p reviewed/play
+          base64 --decode .github/play-assets/pack-one-feature-1024x500.png.b64 > reviewed/play/feature.png
+          [[ "$(sha256sum reviewed/play/feature.png | awk '{print $1}')" == "56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69" ]]
+          python3 <<'PY'
+          from pathlib import Path
+          import struct
+          data = Path('reviewed/play/feature.png').read_bytes()
+          if data[:8] != b'\x89PNG\r\n\x1a\n':
+              raise SystemExit('Feature source is not PNG')
+          width, height, bit_depth, color_type = struct.unpack('>IIBB', data[16:26])
+          if (width, height, bit_depth, color_type) != (1024, 500, 8, 2):
+              raise SystemExit(f'Unexpected source PNG metadata: {(width, height, bit_depth, color_type)}')
+          PY
+          ffmpeg -hide_banner -loglevel error -y -i reviewed/play/feature.png -q:v 2 reviewed/play/feature.jpg
+          dims="$(ffprobe -v error -select_streams v:0 -show_entries stream=width,height -of csv=p=0 reviewed/play/feature.jpg)"
+          [[ "$dims" == "1024,500" ]] || {
+            echo "Unexpected JPEG dimensions: $dims" >&2
+            exit 1
+          }
+          echo "Prepared feature JPEG: $(wc -c < reviewed/play/feature.jpg | tr -d ' ') bytes"
+
+      - id: auth
+        name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Upload feature graphic with resumable media protocol
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKAGE_NAME: pro.packone.app
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME"
+          upload_root="https://androidpublisher.googleapis.com/upload/androidpublisher/v3/applications/$PACKAGE_NAME"
+          edit_id=""
+          committed=0
+
+          cleanup() {
+            if [[ -n "$edit_id" && "$committed" != 1 ]]; then
+              curl --fail --silent --show-error --request DELETE                 --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"                 "$root/edits/$edit_id" >/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+
+          edit_response="$(curl --fail-with-body --silent --show-error             --request POST             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             --header 'Content-Type: application/json'             --data '{}'             "$root/edits")"
+          edit_id="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$edit_response")"
+
+          list_status="$(curl --silent --show-error --output feature-before.json --write-out '%{http_code}'             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic")"
+          if [[ "$list_status" != 2* ]]; then
+            echo "Google Play featureGraphic list failed with HTTP $list_status" >&2
+            cat feature-before.json >&2
+            exit 1
+          fi
+          echo "featureGraphic image type is accepted by edits.images.list."
+
+          curl --fail-with-body --silent --show-error             --request DELETE             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic"             >/dev/null
+
+          size="$(wc -c < reviewed/play/feature.jpg | tr -d ' ')"
+          init_status="$(curl --silent --show-error --dump-header resumable-headers.txt --output resumable-init.json --write-out '%{http_code}'             --request POST             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             --header "X-Upload-Content-Type: image/jpeg"             --header "X-Upload-Content-Length: $size"             --header "Content-Length: 0"             "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic?uploadType=resumable")"
+          if [[ "$init_status" != 2* ]]; then
+            echo "Google Play featureGraphic resumable init failed with HTTP $init_status" >&2
+            cat resumable-init.json >&2
+            exit 1
+          fi
+
+          session_uri="$(awk 'BEGIN{IGNORECASE=1} /^location:/ {sub(/\r$/, ""); sub(/^[^:]*:[[:space:]]*/, ""); print; exit}' resumable-headers.txt)"
+          [[ -n "$session_uri" ]] || {
+            echo "Google Play did not return a resumable upload Location header." >&2
+            cat resumable-headers.txt >&2
+            exit 1
+          }
+          echo "Resumable session initialized successfully."
+
+          upload_status="$(curl --silent --show-error --output feature-upload.json --write-out '%{http_code}'             --request PUT             --header 'Content-Type: image/jpeg'             --header "Content-Length: $size"             --data-binary '@reviewed/play/feature.jpg'             "$session_uri")"
+          if [[ "$upload_status" != "200" && "$upload_status" != "201" ]]; then
+            echo "Google Play featureGraphic resumable PUT failed with HTTP $upload_status" >&2
+            cat feature-upload.json >&2
+            exit 1
+          fi
+          node -e 'const x=require("./feature-upload.json"); if(!x.image?.id){console.error(x);process.exit(2)} console.log("Uploaded feature graphic:", x.image.id)'
+
+          curl --fail-with-body --silent --show-error             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic"             > feature-after.json
+          node -e 'const x=require("./feature-after.json"); if((x.images||[]).length!==1){console.error(x);process.exit(2)} console.log("Verified feature graphic in pending edit.")'
+
+          curl --fail-with-body --silent --show-error             --request POST             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             --header 'Content-Type: application/json'             --data '{}'             "$root/edits/$edit_id:commit"             > feature-commit.json
+          committed=1
+          edit_id=""
+          echo "Committed reviewed Google Play feature graphic."
+
+      - name: Verify committed feature graphic
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          PACKAGE_NAME: pro.packone.app
+        shell: bash
+        run: |
+          set -euo pipefail
+          root="https://androidpublisher.googleapis.com/androidpublisher/v3/applications/$PACKAGE_NAME"
+          verify_edit=""
+          cleanup() {
+            if [[ -n "$verify_edit" ]]; then
+              curl --fail --silent --show-error --request DELETE                 --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"                 "$root/edits/$verify_edit" >/dev/null || true
+            fi
+          }
+          trap cleanup EXIT
+          response="$(curl --fail-with-body --silent --show-error --request POST             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             --header 'Content-Type: application/json' --data '{}' "$root/edits")"
+          verify_edit="$(node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); process.stdout.write(x.id)' "$response")"
+          curl --fail-with-body --silent --show-error             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             "$root/edits/$verify_edit/listings/$LISTING_LANGUAGE/featureGraphic"             > verified-feature.json
+          node -e 'const x=require("./verified-feature.json"); const n=(x.images||[]).length; if(n!==1){console.error(x);process.exit(2)} console.log("Verified committed Google Play feature graphic count:", n)'
