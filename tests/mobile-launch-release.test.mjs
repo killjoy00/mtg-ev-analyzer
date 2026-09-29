@@ -63,7 +63,8 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.ok(workflow.includes("github.ref == 'refs/heads/main' && github.event_name == 'push'"), path);
       assert.ok(workflow.includes(".github/google-play-feature-graphic-request.json"), path);
       assert.ok(workflow.includes("upload-google-play-feature-graphic"), path);
-      assert.ok(workflow.includes("Pillow==11.3.0"), path);
+      assert.ok(workflow.includes("pack-one-feature-1024x500.jpg.b64"), path);
+      assert.ok(workflow.includes("0acc7f62b39dd9bc2a8f320be6c73dc3dc5c6a81e7af8096fa09cae4c9fe23ec"), path);
       assert.ok(workflow.includes("featureGraphic?uploadType=resumable"), path);
       assert.ok(workflow.includes("X-Upload-Content-Type: image/jpeg"), path);
       assert.ok(workflow.includes("Resumable session initialized successfully."), path);
@@ -151,10 +152,10 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.ok(playAccessRequest.reason.trim().length > 0);
 
   const playFeatureRequest = JSON.parse(read('.github/google-play-feature-graphic-request.json'));
-  assert.deepEqual(Object.keys(playFeatureRequest).sort(), ['language','operation','reason','source_png_sha256']);
+  assert.deepEqual(Object.keys(playFeatureRequest).sort(), ['language','operation','reason','source_jpeg_sha256']);
   assert.equal(playFeatureRequest.operation, 'upload-google-play-feature-graphic');
   assert.equal(playFeatureRequest.language, 'en-US');
-  assert.equal(playFeatureRequest.source_png_sha256, '56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69');
+  assert.equal(playFeatureRequest.source_jpeg_sha256, '0acc7f62b39dd9bc2a8f320be6c73dc3dc5c6a81e7af8096fa09cae4c9fe23ec');
   assert.equal(typeof playFeatureRequest.reason, 'string');
   assert.ok(playFeatureRequest.reason.trim().length > 0);
 
