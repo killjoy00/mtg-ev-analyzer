@@ -71,6 +71,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /56ef62740b03173123c1d1b0f3dfcb83e4d11227be755acd8202a32989de2e69/, path);
       assert.match(workflow, /SOURCE_ARTIFACT_ID/, path);
       assert.match(workflow, /ARTIFACT_DIGEST/, path);
+      assert.match(workflow, /x\.image\?\.id/, path);
       assert.match(workflow, /edits\/\$edit_id:commit/, path);
       assert.doesNotMatch(workflow, /\/tracks/, path);
       assert.doesNotMatch(workflow, /pull_request:/, path);

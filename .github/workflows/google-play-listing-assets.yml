@@ -242,16 +242,16 @@ jobs:
           curl --fail-with-body --silent --show-error             --request DELETE             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             "$root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic"             >/dev/null
 
           icon_response="$(curl --fail-with-body --silent --show-error             --request POST             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             --header 'Content-Type: image/png'             --data-binary '@reviewed/play/icon.png'             "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/icon?uploadType=media")"
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.id){console.error(x);process.exit(2)} console.log("Uploaded Play icon:", x.id)' "$icon_response"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.image?.id){console.error(x);process.exit(2)} console.log("Uploaded Play icon:", x.image.id)' "$icon_response"
 
           feature_response="$(curl --fail-with-body --silent --show-error             --request POST             --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"             --header 'Content-Type: image/png'             --data-binary '@reviewed/play/feature.png'             "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/featureGraphic?uploadType=media")"
-          node -e 'const x=JSON.parse(process.argv[1]); if(!x.id){console.error(x);process.exit(2)} console.log("Uploaded Play feature graphic:", x.id)' "$feature_response"
+          node -e 'const x=JSON.parse(process.argv[1]); if(!x.image?.id){console.error(x);process.exit(2)} console.log("Uploaded Play feature graphic:", x.image.id)' "$feature_response"
 
           : > uploaded-ids.txt
           for path in reviewed/android/*.jpg; do
             echo "Uploading $(basename "$path")"
             response="$(curl --fail-with-body --silent --show-error               --request POST               --header "Authorization: Bearer $PLAY_ACCESS_TOKEN"               --header 'Content-Type: image/jpeg'               --data-binary "@$path"               "$upload_root/edits/$edit_id/listings/$LISTING_LANGUAGE/phoneScreenshots?uploadType=media")"
-            node -e 'const x=JSON.parse(process.argv[1]); if(!x.id) process.exit(2); console.log(x.id)' "$response" >> uploaded-ids.txt
+            node -e 'const x=JSON.parse(process.argv[1]); if(!x.image?.id){console.error(x);process.exit(2)} console.log(x.image.id)' "$response" >> uploaded-ids.txt
           done
 
           [[ "$(wc -l < uploaded-ids.txt | tr -d ' ')" == 5 ]] || {
