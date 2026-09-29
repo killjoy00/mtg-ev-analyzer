@@ -63,7 +63,9 @@ jobs:
           python3 -m pip install --quiet 'Pillow==11.3.0'
           python3 <<'PY'
           from pathlib import Path
-          from PIL import Image
+          from PIL import Image, ImageFile
+
+          ImageFile.LOAD_TRUNCATED_IMAGES = True
 
           source = Path('reviewed/play/feature.png')
           target = Path('reviewed/play/feature.jpg')
@@ -77,7 +79,7 @@ jobs:
           with Image.open(target) as image:
               if image.size != (1024, 500) or image.format != 'JPEG':
                   raise SystemExit(f'Unexpected feature JPEG: {image.format} {image.size}')
-          print(f'Prepared feature JPEG: {target.stat().st_size} bytes')
+          print(f'Prepared recovered feature JPEG: {target.stat().st_size} bytes')
           PY
 
       - id: auth
