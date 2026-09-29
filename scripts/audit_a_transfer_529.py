@@ -26,6 +26,7 @@ sys.path.insert(0, str(ROOT / "scripts"))
 from build_replays import (  # noqa: E402
     CountStore,
     DraftSkill,
+    ISOLATED_MODEL_VERSION,
     OutOfFoldModel,
     PickExample,
     build_colour_table,
@@ -594,7 +595,7 @@ def run_set(args):
         len(training) == int(cohort["training_drafts"])
         and experienced == int(cohort["experienced_drafts"])
         and abs(cutoff - float(cohort["win_rate_cutoff"])) <= 1e-12
-        and manifest["model"]["model_version"] == "strong-player-colour-stage-v4"
+        and manifest["model"]["model_version"] == ISOLATED_MODEL_VERSION
         and manifest["model"]["holdout"] == "5-fold by draft_id"
     )
 
