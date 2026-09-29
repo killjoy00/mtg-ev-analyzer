@@ -73,7 +73,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /ARTIFACT_DIGEST/, path);
       assert.match(workflow, /x\.image\?\.id/, path);
       assert.match(workflow, /ffmpeg .*feature\.png .*feature\.jpg/, path);
-      assert.match(workflow, /grep -Eq '\^1024,500,\(yuvj420p\|yuv420p\|yuvj444p\|yuv444p\)\
+      assert.ok(workflow.includes("grep -Eq '^1024,500,(yuvj420p|yuv420p|yuvj444p|yuv444p)$'"), path);
       assert.match(workflow, /Content-Type: image\/jpeg/, path);
       assert.match(workflow, /Committed reviewed en-US Play icon and five phone screenshots/, path);
       assert.match(workflow, /Committed reviewed en-US Play feature graphic/, path);
