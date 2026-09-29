@@ -40,7 +40,7 @@ concurrency:
 jobs:
   publish:
     runs-on: ubuntu-latest
-    timeout-minutes: 35
+    timeout-minutes: 60
     env:
       GH_TOKEN: ${{ github.token }}
       CAMPAIGN_SLUG: ${{ inputs.slug }}

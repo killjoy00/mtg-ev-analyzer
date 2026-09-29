@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
 import {mkdtemp,readFile,rm,writeFile} from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -14,6 +15,19 @@ import {prepareCampaignLinkPublish} from '../scripts/prepare-campaign-link-publi
 const TOKEN='github_pat_fixture_abcdefghijklmnopqrstuvwxyz';
 const USER='11111111-1111-4111-8111-111111111111';
 const entry={slug:'newsletter-launch',destination:'/',source:'newsletter',campaign:'launch-week',medium:'email'};
+const publishWorkflow=readFileSync('.github/workflows/campaign-link-publish.yml','utf8');
+
+test('campaign publish workflow preserves protected-main publication',()=>{
+  assert.match(publishWorkflow,/permissions:\\s+[\\s\\S]*contents: write[\\s\\S]*pull-requests: write[\\s\\S]*actions: write[\\s\\S]*pages: write/);
+  assert.match(publishWorkflow,/git push --force origin "HEAD:refs\\/heads\\/\\$\\{branch\\}"/);
+  assert.doesNotMatch(publishWorkflow,/git push[^\\n]*(?:refs\\/heads\\/main|HEAD:main)/);
+  assert.match(publishWorkflow,/gh pr create/);
+  assert.match(publishWorkflow,/gh workflow run test\\.yml --ref "\\$BRANCH"/);
+  assert.match(publishWorkflow,/gh workflow run e2e\\.yml --ref "\\$BRANCH"/);
+  assert.match(publishWorkflow,/gh pr merge "\\$PR_URL" --squash --delete-branch/);
+  assert.match(publishWorkflow,/repos\\/\\$\\{GITHUB_REPOSITORY\\}\\/pages\\/builds/);
+  assert.match(publishWorkflow,/timeout-minutes: 60/);
+});
 
 test('campaign publish payload is canonicalized and rejects unsupported fields',()=>{
   const result=normalizeCampaignPublishPayload({
