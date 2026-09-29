@@ -1,0 +1,43 @@
+name: a-regret-null-recover-source-756
+
+on:
+  push:
+    branches:
+      - research/a-regret-null-calibration-756
+    paths:
+      - .github/workflows/a-regret-null-recover-source-756.yml
+
+permissions:
+  contents: write
+
+jobs:
+  recover:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - name: Recover exact frozen analyzers
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --depth=1 origin d121aa4b63f738ea039e15a21f839d97cbafb427
+          git fetch --depth=1 origin e966e4d7c92aeb1b3e86ccbe3dea469f1ee72c77
+          mkdir -p research/null_calibration_756
+          git show d121aa4b63f738ea039e15a21f839d97cbafb427:research/one_time/a_regret_p1p1.py.gz.b64 \
+            | base64 -d | gzip -d > research/null_calibration_756/frozen_a_regret_p1p1.py
+          git show e966e4d7c92aeb1b3e86ccbe3dea469f1ee72c77:research/one_time/a_regret_later.py.gz.b64 \
+            | base64 -d | gzip -d > /tmp/later_old.py
+          python research/one_time/a_regret_later_recovery_patch.py \
+            /tmp/later_old.py research/null_calibration_756/frozen_a_regret_later.py
+          python -m py_compile research/null_calibration_756/frozen_a_regret_p1p1.py research/null_calibration_756/frozen_a_regret_later.py
+          grep -R "event_match_wins" -n research/null_calibration_756 || true
+      - name: Commit recovered source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add research/null_calibration_756/
+          git commit -m "Recover exact frozen #756 analyzers for null calibration"
+          git push origin HEAD:research/a-regret-null-calibration-756
