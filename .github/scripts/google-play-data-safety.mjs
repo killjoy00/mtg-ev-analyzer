@@ -102,15 +102,10 @@ const specs=[
   {
     name:'Email address',
     optional:true,
-    purposes:['PSL_APP_FUNCTIONALITY','PSL_DEVELOPER_COMMUNICATIONS','PSL_ACCOUNT_MANAGEMENT'],
+    purposes:['PSL_APP_FUNCTIONALITY','PSL_ACCOUNT_MANAGEMENT'],
   },
   {
-    name:'User IDs',
-    optional:false,
-    purposes:['PSL_APP_FUNCTIONALITY','PSL_ANALYTICS','PSL_FRAUD_PREVENTION_SECURITY','PSL_ACCOUNT_MANAGEMENT'],
-  },
-  {
-    name:'App interactions',
+    name:'Personal identifiers',
     optional:false,
     purposes:['PSL_APP_FUNCTIONALITY','PSL_ANALYTICS'],
   },
