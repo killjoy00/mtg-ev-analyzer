@@ -25,6 +25,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
     '.github/workflows/google-play-access.yml',
     '.github/workflows/google-play-listing-assets.yml',
     '.github/workflows/google-play-feature-graphic.yml',
+    '.github/workflows/google-play-data-safety.yml',
     '.github/workflows/app-store-subscription-access-probe.yml',
     '.github/workflows/ios-testflight-status.yml',
     '.github/workflows/android-internal-status.yml',
@@ -70,6 +71,15 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.ok(workflow.includes("Resumable session initialized successfully."), path);
       assert.ok(workflow.includes("Verified committed Google Play feature graphic count:"), path);
       assert.doesNotMatch(workflow, /phoneScreenshots/, path);
+      assert.doesNotMatch(workflow, /\/tracks/, path);
+      assert.doesNotMatch(workflow, /pull_request:/, path);
+    } else if (path === '.github/workflows/google-play-data-safety.yml') {
+      assert.ok(workflow.includes("github.ref == 'refs/heads/main' && github.event_name == 'push'"), path);
+      assert.ok(workflow.includes(".github/google-play-data-safety-request.json"), path);
+      assert.ok(workflow.includes("configure-google-play-data-safety"), path);
+      assert.ok(workflow.includes("DATA_SAFETY_MODE"), path);
+      assert.ok(workflow.includes("pack-one-data-safety.csv"), path);
+      assert.ok(workflow.includes("https://www.googleapis.com/auth/androidpublisher"), path);
       assert.doesNotMatch(workflow, /\/tracks/, path);
       assert.doesNotMatch(workflow, /pull_request:/, path);
     } else if (path === '.github/workflows/google-play-listing-assets.yml') {
@@ -150,6 +160,21 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.equal(playAccessRequest.operation, 'check-google-play-access');
   assert.equal(typeof playAccessRequest.reason, 'string');
   assert.ok(playAccessRequest.reason.trim().length > 0);
+
+  const dataSafetyRequest = JSON.parse(read('.github/google-play-data-safety-request.json'));
+  assert.deepEqual(Object.keys(dataSafetyRequest).sort(), ['mode','operation','reason']);
+  assert.equal(dataSafetyRequest.operation, 'configure-google-play-data-safety');
+  assert.equal(dataSafetyRequest.mode, 'dry-run');
+  assert.equal(typeof dataSafetyRequest.reason, 'string');
+  assert.ok(dataSafetyRequest.reason.trim().length > 0);
+
+  const dataSafetyScript = read('.github/scripts/google-play-data-safety.mjs');
+  assert.match(dataSafetyScript, /PSL_DATA_COLLECTION_ENCRYPTED_IN_TRANSIT','TRUE'/);
+  assert.match(dataSafetyScript, /PSL_DATA_COLLECTION_USER_REQUEST_DELETE','TRUE'/);
+  assert.match(dataSafetyScript, /name:'Other actions'/);
+  assert.match(dataSafetyScript, /PSL_DATA_USAGE_ONLY_COLLECTED/);
+  assert.match(dataSafetyScript, /Unexpected sharing declarations/);
+  assert.match(dataSafetyScript, /Advertising\/marketing purpose must not be selected/);
 
   const playFeatureRequest = JSON.parse(read('.github/google-play-feature-graphic-request.json'));
   assert.deepEqual(Object.keys(playFeatureRequest).sort(), ['language','operation','reason','source_png_sha256']);

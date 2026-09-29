@@ -1,0 +1,74 @@
+name: Google Play Data Safety
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/google-play-data-safety-request.json'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: google-play-data-safety
+  cancel-in-progress: false
+
+jobs:
+  data-safety:
+    name: validate or submit Google Play Data Safety
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: request
+        name: Validate guarded Data Safety request
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const r=JSON.parse(fs.readFileSync('.github/google-play-data-safety-request.json','utf8'));
+          if(JSON.stringify(Object.keys(r).sort())!==JSON.stringify(['mode','operation','reason']))throw Error('Invalid request keys.');
+          if(r.operation!=='configure-google-play-data-safety')throw Error('Invalid operation.');
+          if(!['dry-run','submit'].includes(r.mode))throw Error('Invalid Data Safety mode.');
+          if(typeof r.reason!=='string'||!r.reason.trim())throw Error('Reason required.');
+          fs.appendFileSync(process.env.GITHUB_OUTPUT,'mode='+r.mode+'\n');
+          NODE
+
+      - name: Require current main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - id: google-auth
+        name: Authenticate to Google Play
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - name: Generate and validate current Data Safety declaration
+        env:
+          DATA_SAFETY_MODE: ${{ steps.request.outputs.mode }}
+          PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: node .github/scripts/google-play-data-safety.mjs
+
+      - name: Upload validated declaration evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-google-play-data-safety
+          path: pack-one-data-safety.csv
+          if-no-files-found: error
+          retention-days: 14
