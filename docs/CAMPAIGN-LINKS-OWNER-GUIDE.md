@@ -262,6 +262,10 @@ Use a new slug. Duplicate slugs are rejected by the checked-in registry validato
 
 Fix the inline validation errors first. Copying the JSON entry is also disabled when the slug duplicates an existing published entry.
 
+### Publish button stays disabled even with valid fields
+
+Admin enables publishing only after the production growth backend reports that the scoped GitHub Actions dispatch credential is configured. This prevents the frontend from exposing a dead Publish action while a reviewed backend/gateway release is still rolling out. The tracked UTM URL remains available immediately.
+
 ### Publish is accepted but the vanity URL never becomes live
 
 Do not distribute the URL yet. Check the **publish Pack One campaign link** workflow. The most common configuration failure is that GitHub Actions is still forbidden from creating pull requests. The workflow fails safely rather than writing directly to `main`.

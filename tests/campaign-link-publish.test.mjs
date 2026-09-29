@@ -6,6 +6,7 @@ import os from 'node:os';
 import path from 'node:path';
 import {digest} from '../worker/account-session.mjs';
 import {
+  campaignLinkPublishConfigured,
   dispatchCampaignLinkPublish,
   handleCampaignLinkPublish,
   normalizeCampaignPublishPayload,
@@ -27,6 +28,12 @@ test('campaign publish workflow preserves protected-main publication',()=>{
   assert.match(publishWorkflow,/gh pr merge "\\$PR_URL" --squash --delete-branch/);
   assert.match(publishWorkflow,/repos\\/\\$\\{GITHUB_REPOSITORY\\}\\/pages\\/builds/);
   assert.match(publishWorkflow,/timeout-minutes: 60/);
+});
+
+test('campaign publish configuration follows the scoped production dispatch credential',()=>{
+  assert.equal(campaignLinkPublishConfigured({PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:TOKEN}),true);
+  assert.equal(campaignLinkPublishConfigured({}),false);
+  assert.equal(campaignLinkPublishConfigured({PACK1_LAUNCH_WATCHER_GITHUB_TOKEN:'not-a-token'}),false);
 });
 
 test('campaign publish payload is canonicalized and rejects unsupported fields',()=>{

@@ -57,7 +57,7 @@ export async function renderCampaignLinks(root,publishRequest) {
   const copyStatus=root.querySelector('#copy-status');
   const publishButton=root.querySelector('#publish-campaign');
   const publishStatus=root.querySelector('#publish-status');
-  let existing=new Map(),publishing=false;
+  let existing=new Map(),publishing=false,publishConfigured=false;
 
   function currentDraft() {
     return buildCampaignDraft({
@@ -88,7 +88,7 @@ export async function renderCampaignLinks(root,publishRequest) {
       else if(target==='campaign-json')button.disabled=!draft.entry||duplicate;
       else if(target==='vanity-url')button.disabled=!draft.valid||!draft.vanityUrl;
     }
-    publishButton.disabled=publishing||!draft.entry||duplicate;
+    publishButton.disabled=publishing||!publishConfigured||!draft.entry||duplicate;
     publishButton.textContent=publishing?'Publishing…':'Publish vanity link';
     copyStatus.textContent='';
   }
@@ -113,6 +113,27 @@ export async function renderCampaignLinks(root,publishRequest) {
       return true;
     } catch {
       if(!quiet)existingStatus.textContent='Existing campaign links could not be loaded. Form validation still works, but slug reuse cannot be checked here.';
+      return false;
+    }
+  }
+
+  async function loadPublishAvailability() {
+    if(typeof publishRequest!=='function') {
+      publishConfigured=false;
+      publishStatus.textContent='Vanity publishing is not available in this Admin build.';
+      update();
+      return false;
+    }
+    try {
+      const health=await publishRequest('/health?quick=1');
+      publishConfigured=health?.campaign_link_publish_configured===true;
+      if(!publishConfigured)publishStatus.textContent='Vanity publishing will become available after the production publisher is deployed.';
+      update();
+      return publishConfigured;
+    } catch {
+      publishConfigured=false;
+      publishStatus.textContent='Vanity publishing status could not be verified. Try again after the production publisher is deployed.';
+      update();
       return false;
     }
   }
@@ -143,7 +164,7 @@ export async function renderCampaignLinks(root,publishRequest) {
 
   publishButton.addEventListener('click',async()=>{
     const draft=currentDraft();
-    if(publishing||!draft.entry||existing.has(draft.entry.slug))return;
+    if(publishing||!publishConfigured||!draft.entry||existing.has(draft.entry.slug))return;
     if(typeof publishRequest!=='function') {
       publishStatus.classList.add('error');
       publishStatus.textContent='Campaign publishing is unavailable in this Admin build.';
@@ -166,5 +187,5 @@ export async function renderCampaignLinks(root,publishRequest) {
     }
   });
 
-  await loadExisting();
+  await Promise.all([loadExisting(),loadPublishAvailability()]);
 }
