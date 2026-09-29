@@ -18,8 +18,9 @@ for (const [name, flow] of [['test',unit],['browser',browser]]) {
 }
 
 test('required test fast path keeps the account-deletion secret guard',()=>{
+  assert.match(unit,/workflow_dispatch:/);
   assert.match(unit,/Verify account-deletion release secrets are provisioned/);
-  assert.match(unit,/if: github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  assert.match(unit,/if: github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository\)/);
 });
 
 test('browser dependency installation is skipped on the mobile-only fast path',()=>{
