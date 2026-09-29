@@ -4,7 +4,7 @@ import {guardIngress} from '../worker/ingress-auth.mjs';
 import legacy from '../worker/index.js';
 import growth from '../worker/growth-function.js';
 import draft from '../worker/draft-run-function.mjs';
-import {gateway,gatewaySampleRate,ipNetwork} from '../edge/gateway.mjs';
+import {gateway,gatewaySampleRate,ipNetwork,routeFamily} from '../edge/gateway.mjs';
 import {parseRequest,checkBranch,inheritedFunctionSlugs,commandFailure} from '../scripts/edge-control.mjs';
 import {closedOrigin} from '../edge/closed-origin.mjs';
 import {freshDeployment,deployPreviewFunction} from '../scripts/edge-neon-deploy.mjs';
@@ -121,6 +121,29 @@ test('production gateway turns Pack One cookies into upstream identity and relay
   assert.equal(badBranch.status,503);
 });
 
+
+test('campaign publication route is production-only and preserves admin browser proof',async()=>{
+  const prod={MODE:'production',NEON_BRANCH_ID:'br-orange-feather-ayps8kep',QUOTA_KEY:'d'.repeat(64),
+    NETWORK_QUOTA:{idFromName:name=>name,get:()=>({fetch:async()=>new Response(null,{status:204})})}};
+  const account='a'.repeat(43),csrf='b'.repeat(43);
+  let forwarded=0;
+  const result=await gateway(new Request('https://api.packone.pro/growth/v1/admin/campaign-links/publish',{
+    method:'POST',body:'{}',headers:{
+      'content-type':'application/json','cf-connecting-ip':'192.0.2.55','origin':'https://packone.pro',
+      cookie:`__Host-pack1_account=${account}; __Secure-pack1_csrf=${csrf}`,'x-pack1-csrf':csrf,
+    },
+  }),prod,async(url,options)=>{
+    forwarded++;
+    assert.equal(url,'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech/v1/admin/campaign-links/publish');
+    assert.match(options.headers.get('cookie'),/__Host-pack1_account=/);
+    assert.equal(options.headers.get('x-pack1-csrf'),csrf);
+    return Response.json({ok:true});
+  });
+  assert.equal(result.status,200);
+  assert.equal(forwarded,1);
+  assert.equal(routeFamily('/growth/v1/admin/campaign-links/publish'),'admin_campaign_publish');
+  assert.equal((await gateway(req('/growth/v1/admin/campaign-links/publish'),env,()=>{throw Error('Must not forward');})).status,404);
+});
 
 test('gateway rejects disallowed paths, origins, hosts, missing identity and partial config without forwarding',async()=>{
   const noFetch=()=>{throw Error('Must not forward');};
