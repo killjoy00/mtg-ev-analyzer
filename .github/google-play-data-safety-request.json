@@ -1,5 +1,5 @@
 {
   "operation": "configure-google-play-data-safety",
   "mode": "submit",
-  "reason": "Submit the already-validated Pack One Google Play Data Safety declaration generated from Google's current official 763-row CSV schema. Declare only Name, Email address, Personal identifiers (Pack One player/account IDs), and Other actions (gameplay); collected only, not shared; all selected data non-ephemeral; encrypted in transit; deletion available; no advertising/tracking purpose. Do not modify tracks, releases, rollout, countries, listing graphics/copy, or publishing."
+  "reason": "Submit the already-validated Pack One Google Play Data Safety declaration generated from Google's current official 763-row CSV schema. Declare only Name, Email address, Personal identifiers (Pack One player/account IDs), and Other actions (gameplay); collected only, not shared; all selected data non-ephemeral; encrypted in transit; deletion available; no advertising/tracking purpose. Do not modify tracks, releases, rollout, countries, listing graphics/copy, or publishing. Retry after Google applications.dataSafety rejected the otherwise-validated declaration for missing PSL_SUPPORTED_ACCOUNT_CREATION_METHODS; include email/password and OAuth account creation, the reviewed public account-deletion URL, and no separate data-only deletion flow."
 }
