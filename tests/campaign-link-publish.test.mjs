@@ -20,7 +20,7 @@ const publishWorkflow=readFileSync('.github/workflows/campaign-link-publish.yml'
 
 test('campaign publish workflow preserves protected-main publication',()=>{
   assert.match(publishWorkflow,/permissions:\s+[\s\S]*contents: write[\s\S]*pull-requests: write[\s\S]*actions: write[\s\S]*pages: write/);
-  assert.ok(publishWorkflow.includes('git push --force origin "HEAD:refs/heads/$branch"'));
+  assert.ok(publishWorkflow.includes('git push --force origin "HEAD:refs/heads/${branch}"'));
   assert.ok(!publishWorkflow.includes('HEAD:refs/heads/main'));
   assert.ok(!publishWorkflow.includes('HEAD:main'));
   assert.ok(publishWorkflow.includes('gh pr create'));
