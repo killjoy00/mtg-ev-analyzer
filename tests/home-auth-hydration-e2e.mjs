@@ -14,6 +14,10 @@ async function fixture({auth='guest',claimed=false,complete=false,holdAuth=false
   const authGate=holdAuth?new Promise(resolve=>releaseAuth=resolve):Promise.resolve();
   const dailyGate=holdDaily?new Promise(resolve=>releaseDaily=resolve):Promise.resolve();
 
+  await page.addInitScript(()=>{
+    const OriginalDate=Date;const now=OriginalDate.parse('2026-09-28T19:00:00Z');
+    window.Date=class extends OriginalDate{constructor(...args){super(...(args.length?args:[now]));}static now(){return now;}};
+  });
   if(auth!=='guest') {
     await page.addInitScript(()=>localStorage.setItem('pack1-auth-session-v1','auth-fixture'));
   }
@@ -37,7 +41,7 @@ async function fixture({auth='guest',claimed=false,complete=false,holdAuth=false
     if(path!=='/v1/daily-status')return route.fulfill({status:404,contentType:'application/json',body:JSON.stringify({error:'Not found'})});
     await dailyGate;
     if(state.dailyFailure)return route.fulfill({status:503,contentType:'application/json',body:JSON.stringify({error:'Daily unavailable'})});
-    const daily_history=state.complete?[{date:new Date().toISOString().slice(0,10),mode:'draft_run',set_id:'mixed',score:91}]:[];
+    const daily_history=state.complete?[{date:'2026-09-28',mode:'draft_run',set_id:'mixed',score:91}]:[];
     await route.fulfill({contentType:'application/json',body:JSON.stringify({
       capabilities:state.claimed?['account']:[],
       player:{claimed:state.claimed},
