@@ -138,7 +138,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     if(patreonResult==='activate'||growth.hasPatreonActivationIntent()) {
       await growth.renderPatreonActivation({result:patreonResult==='activate'?null:patreonResult,source:patreonResult==='activate'?'welcome_note':'oauth_return'});
     } else {
-      const profiles=await import('./profile-product.mjs?v=6');
+      const profiles=await import('./profile-product.mjs?v=7');
       profiles.installProfileProductLayer();
       (await import('./profile-polish.mjs?v=6')).installProfilePolish();
       await profiles.renderMyProfile();
@@ -154,9 +154,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     }
   } else if (params.has('profile')) {
     await identityReady;
-    (await import('./profile-product.mjs?v=6')).installProfileProductLayer();
+    (await import('./profile-product.mjs?v=7')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=7');
+    const game = await import('./draft-run-product.mjs?v=8');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();
