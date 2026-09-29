@@ -496,5 +496,6 @@ export async function signOutAccount() {
     for(const key of [TOKEN_KEY,NAME_KEY,'pack1-game-history-v2','pack1-daily-history-v1'])localStorage.removeItem(key);
   } catch {}
   sessionPromise=null;
+  signalAccountChange();
   return {ok:true};
 }
