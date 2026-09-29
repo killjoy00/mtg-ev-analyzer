@@ -1,96 +1,206 @@
 # Issue #756 — P1P1 randomized-offer A-regret result
 
 **Date:** 2026-09-29 PT  
-**Run:** 36583791463  
-**Frozen workflow commit:** `d121aa4b63f738ea039e15a21f839d97cbafb427`  
+**Original run:** [36583791463](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36583791463)  
+**Frozen original workflow commit:** `d121aa4b63f738ea039e15a21f839d97cbafb427`  
+**Null-calibration run:** [36608962626](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36608962626)  
+**Null-calibration aggregate artifact:** `11053481639`  
+**Null-calibration aggregate digest:** `sha256:559bbb01af6a2c2f01962414fda3868b9a087a6cf3c5c9db6b48628cc69f5e50`  
 **Production impact:** none
 
-## Decision rule
+> **CORRECTION / SUPERSEDING INTERPRETATION**
+>
+> The original #756 P1P1 statistic is **not informative about A's true regret**. A synthetic-outcome null calibration using the exact frozen #756 cohorts, A decisions, folds, support rules, first stage, second stage, penalties, and regret definition shows that the estimator reports large positive "regret" even when A's true regret is exactly zero.
+>
+> The retained conclusion is only: **A was not demonstrated optimal-enough by #756.**  
+> #756 also did **not** demonstrate that A is materially suboptimal, that A is systematically making materially improvable choices, or that a statistically significant remaining value gap exists.
 
-The preregistered product-materiality ceiling was **0.02 event match wins per decision**.
+## Why the original interpretation was wrong
 
-A could be called optimal-enough at P1P1 only if the upper 95% confidence endpoint for average regret was below 0.02.
+#756 defined per-row regret as:
 
-## Prior-use boundary
+`max(0, V_best - V_A)`
 
-EOE was excluded because #529 already consumed its 91,377 previously untouched P1P1 outcomes.
+where `V_best` was the offered card with the largest value from the **same fitted coefficient vector** used to measure `V_best - V_A`.
 
-The final five-set #756 supply excluded all retained #529 prior-use IDs, including:
-- FIN/TDM/DFT original 13k boundaries plus their later exact 15k R-confirmation reserves;
-- MSH pooled-core IDs plus 1,146 additional early-exploratory IDs recovered from the retained spent-draft ledger;
-- SOS pooled-core IDs.
+Cross-fitting kept a held-out draft's own outcome out of its coefficient fit, but it did **not** separate:
 
-Unused P1P1 rows:
-- FIN 112,237
-- TDM 73,323
-- DFT 115,504
-- MSH 66,003
-- SOS 105,197
+1. selecting the largest noisy fitted value, from
+2. evaluating the selected card with that same noisy fitted value.
 
-All exact archive hashes matched.
+The maximum therefore captures the largest favorable estimation error among the offered cards. Truncation at zero makes the statistic positive by construction. The original held-row bootstrap resampled the resulting regret rows while holding fitted coefficients fixed, so its narrow CI did **not** include coefficient-estimation or best-card-selection uncertainty.
 
-## Identification
+This is exactly the failure mode tested by the synthetic calibration below.
 
-Every environment passed every frozen outcome-free identification gate in all five draft folds:
-- supported-card floor;
-- instrument rank fraction;
-- median own-card first stage;
-- p10 own-card first stage.
+## Hard calibration boundary
 
-No environment was dropped or replaced.
+The correction run never read `event_match_wins`.
 
-## Primary result
+Research A was reconstructed without indexing any draft outcome column; for the P1P1 calibration no game outcome data were needed. Reconstructed A card, probability, and margin were validated exactly against every retained #756 scored row before the synthetic results were accepted.
 
-Supported held-out decisions: **448,218**
+The authoritative pre-result calibration protocol was frozen at commit `a41ed7774a42cc17a7d6ec35a2e2cb7261596034` in:
 
-Average regret of research A relative to the best statistically supported offered card in the frozen randomized-offer IV projection:
+`research/A-REGRET-NULL-CALIBRATION-PROTOCOL-2026-09-29.md`
 
-**0.1552391 wins / decision**
+## Frozen original cohort
 
-10,000-draw environment-stratified held-row bootstrap CI95:
+The same five unused #756 P1P1 cohorts were used:
 
-**[0.1546613, 0.1558308]**
+| Set | Unused P1P1 rows |
+|---|---:|
+| FIN | 112,237 |
+| TDM | 73,323 |
+| DFT | 115,504 |
+| MSH | 66,003 |
+| SOS | 105,197 |
 
-This is far above the frozen 0.02 ceiling.
+The same prior-use exclusions, deterministic five-fold salt `a-regret-v1:<draft_id>`, A definition, support thresholds, first-stage gate, and lambda=10 were retained.
 
-The row-bootstrap upper endpoint is already above 0.02, so the preregistered gate cannot pass even before adding model-refit uncertainty. The 200-refit bootstrap is therefore not required for a no-pass verdict.
+Each calibration scenario used **30 synthetic replicates**, with:
 
-### By environment
+`Y = v[historical pick] + N(0, 2.18^2)`
 
-| Set | Eligible decisions | Coverage | Mean regret | Bootstrap CI95 |
-|---|---:|---:|---:|---:|
-| FIN | 106,734 | 95.10% | 0.16059 | [0.15937, 0.16183] |
-| TDM | 69,767 | 95.15% | 0.14494 | [0.14338, 0.14653] |
-| DFT | 113,298 | 98.09% | 0.14262 | [0.14154, 0.14372] |
-| MSH | 61,632 | 93.38% | 0.13764 | [0.13605, 0.13923] |
-| SOS | 96,787 | 92.01% | 0.18274 | [0.18147, 0.18402] |
+on the real #756 packs and historical picks.
 
-## Close-call audit
+## Null calibration results
 
-Regret is largest where A is least decisive, but it does not disappear when A is confident.
+Original #756 statistic: **0.1552391 wins/decision**.
 
-| A top-two probability margin | n | Mean regret | Share regret > .02 |
-|---|---:|---:|---:|
-| <= .02 | 80,529 | 0.1931 | 63.65% |
-| .02–.05 | 93,600 | 0.1851 | 62.43% |
-| .05–.10 | 94,927 | 0.1636 | 58.72% |
-| > .10 | 179,162 | 0.1182 | 46.90% |
+| Scenario | Exact true regret | Mean estimated #756 statistic | SD | 2.5–97.5% replicate range | A/IV-best disagree |
+|---|---:|---:|---:|---:|---:|
+| Pure null, v=0 | 0.00000 | 0.20472 | 0.01261 | [0.18328, 0.22715] | 71.33% |
+| A exactly optimal, tau=.10 | 0.00000 | 0.14220 | 0.00911 | **[0.12616, 0.15844]** | 57.75% |
+| A exactly optimal, tau=.20 | 0.00000 | 0.10096 | 0.00734 | [0.08737, 0.11205] | 44.37% |
+| tau=.10 + card noise s=.05 | 0.01344 | 0.14414 | 0.00852 | [0.13311, 0.16119] | 57.26% |
+| tau=.10 + card noise s=.10 | 0.04572 | 0.15623 | 0.01187 | [0.13228, 0.17504] | 58.44% |
+| tau=.10 + card noise s=.20 | 0.12839 | 0.19837 | 0.01357 | [0.17521, 0.21912] | 59.16% |
 
-Additional slices:
-- A vs IV-best disagreement: n=260,740, mean regret **0.2669**.
-- A vs historical drafter disagreement: n=190,088, mean regret **0.1922**.
-- A vs both IV-best and historical drafter: n=125,178, mean regret **0.2919**.
+### Fixed decision rule
 
-Therefore residual opportunity is concentrated in close/disagreement decisions but is not confined to them.
+The calibration decision rule was frozen before simulation:
 
-## Interpretation boundary
+> If the observed 0.1552391 falls inside the 2.5–97.5% range of the pure null or either exactly-optimal-A scenario, record the original P1P1 result as uninformative about A's regret.
 
-This result does **not** identify literal omniscient drafting.
+**Triggered.**
 
-It measures regret relative to the best statistically supported action in the frozen card-action IV projection using randomized collated P1P1 offer variation. Card presence also changes the rest of the pack, downstream passed-card information, and possible P1P9 returns, so the exclusion restriction remains approximate.
+0.1552391 lies inside the **A-exactly-optimal tau=.10** range **[0.1261592, 0.1584382]**, where true regret is exactly zero.
 
-Within that frozen design, however, the answer to the product question is unambiguous:
+Therefore:
 
-> **A is not demonstrated to be optimal-enough at P1P1 at a 0.02 wins/decision materiality threshold.**
+> **The original P1P1 #756 statistic is uninformative about A's true regret.**
 
-The next registered stage is the secondary P1P2–P1P8 recentered-instrument extension.
+The pure-zero null actually produces an even larger statistic on average, **0.20472**, despite true regret being exactly zero.
+
+## The original optimal-enough gate was not capable of validating a perfect A
+
+The product gate required the upper 95% endpoint to be below **0.02 wins/decision**.
+
+Yet when A was exactly optimal:
+
+- tau=.10: all of the calibrated replicate range was **0.126–0.158**;
+- tau=.20: all of the calibrated replicate range was **0.087–0.112**.
+
+Thus this design would have failed the 0.02 gate even when A's true regret was exactly zero.
+
+The statement **"A was not demonstrated optimal-enough"** remains formally correct, but it is no longer evidence against A: the test itself was not calibrated to pass a perfect A.
+
+## Conditional row-bootstrap CI
+
+For pure-null replicate 0:
+
+- point estimate: **0.2030506**
+- 10,000-draw environment-stratified row-bootstrap CI95: **[0.2024155, 0.2036764]**
+- half-width: **0.0006305**
+
+True regret in that replicate is exactly **0**.
+
+This demonstrates why the original narrow bootstrap CI was misleading for the scientific question: it conditions on the fitted values and therefore measures row-sampling variation around a biased selected maximum. It excludes coefficient-estimation and best-card-selection uncertainty.
+
+## A-margin slices under the null
+
+Even the original qualitative "close-call" pattern can arise under zero true regret.
+
+| A top-two margin | Pure-null mean estimated regret | A-optimal tau=.10 mean estimated regret |
+|---|---:|---:|
+| <= .02 | 0.22473 | 0.18773 |
+| .02–.05 | 0.21587 | 0.16585 |
+| .05–.10 | 0.20505 | 0.14209 |
+| > .10 | 0.18973 | 0.10944 |
+
+Accordingly, the former inference that "residual opportunity is concentrated in close/disagreement decisions but is not confined to them" is **withdrawn**. The same pattern appears when true regret is zero.
+
+## Take-rate audit of the original IV-best disagreements
+
+On all **260,740** retained original P1P1 rows where IV-best != A, using each row's original fold training complement:
+
+| Metric | A card | Original IV-best |
+|---|---:|---:|
+| Mean take rate when offered | 44.80% | 18.07% |
+| Median take rate when offered | 37.38% | 10.71% |
+
+Paired IV-best minus A take-rate difference:
+
+- mean: **-26.73 percentage points**
+- median: **-23.55 percentage points**
+- IV-best had a **lower** take rate than A on **82.61%** of disagreement rows
+- IV-best had a higher take rate on **17.39%**
+
+This does not prove the crowd is correct, but it is consistent with the selected "IV-best" frequently being an unusually noisy low-take action rather than evidence of a robustly superior card.
+
+## Independent-selection design and power
+
+A valid simulation separated policy selection from evaluation:
+
+- one deterministic half chose B using its fitted values;
+- the other half evaluated `V(B)-V(A)`;
+- halves were swapped;
+- only actions supported in both halves were used.
+
+This removes the specific same-fit winner's-curse mechanism under audit.
+
+| Scenario | Exact true B-A gain | Estimated B-A | Bias | Estimator SD | Power for true +.02 |
+|---|---:|---:|---:|---:|---:|
+| Pure null | 0.00000 | 0.00085 | +0.00085 | 0.01717 | 21.4% |
+| A-opt tau=.10 | -0.04877 | -0.05287 | -0.00409 | 0.01354 | 31.5% |
+| A-opt tau=.20 | -0.06593 | -0.06706 | -0.00113 | 0.01379 | 30.5% |
+| Perturbed s=.05 | -0.04198 | -0.04687 | -0.00489 | 0.01586 | 24.3% |
+| Perturbed s=.10 | -0.02164 | -0.03127 | -0.00963 | 0.01486 | 27.0% |
+| Perturbed s=.20 | +0.04664 | +0.03275 | -0.01389 | 0.01741 | 20.9% |
+
+**No scenario reaches 80% power to detect a true +0.02 wins/decision gain.**
+
+The split design is much better calibrated around its target than the original max statistic, but this cohort/noise level does not provide adequate power for a +0.02 policy-gain benchmark under the frozen simulation.
+
+## Historical original result, retained for provenance
+
+The original analysis reported:
+
+- supported held-out decisions: **448,218**
+- estimated selected-max "regret": **0.1552391**
+- conditional held-row bootstrap CI95: **[0.1546613, 0.1558308]**
+
+Those numbers are not deleted. Their former interpretation is superseded.
+
+The original by-environment selected-max estimates were:
+
+| Set | Eligible decisions | Original statistic |
+|---|---:|---:|
+| FIN | 106,734 | 0.16059 |
+| TDM | 69,767 | 0.14494 |
+| DFT | 113,298 | 0.14262 |
+| MSH | 61,632 | 0.13764 |
+| SOS | 96,787 | 0.18274 |
+
+They should now be read as outputs of an uncalibrated selected-maximum statistic, **not estimates of true policy regret**.
+
+## Corrected conclusion
+
+The scientifically supportable conclusion of #756 P1P1 is:
+
+> **A was not demonstrated optimal-enough, because the preregistered test failed its gate. However, the test was itself incapable of passing a perfect A under realistic synthetic outcomes. Therefore #756 P1P1 provides no reliable evidence that A is materially suboptimal or that a meaningful improvement opportunity exists.**
+
+Claims that A is "systematically making materially improvable choices," that the observed 0.155 represented a remaining value gap, or that the "IV-best" actions were statistically significant improvements are **withdrawn**.
+
+In the #756 protocol, "statistically supported action" referred only to the predeclared **action-support eligibility rule** (appearance/take-rate thresholds). It did **not** mean that an action's advantage over A was statistically significant.
+
+No production change and no model-development issue should be based on the original #756 regret estimate.
