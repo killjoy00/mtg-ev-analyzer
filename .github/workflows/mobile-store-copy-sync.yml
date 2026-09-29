@@ -1,0 +1,63 @@
+name: Sync mobile store listing copy
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/mobile-store-copy-request.json'
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: mobile-store-listing-copy
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    name: sync reviewed App Store and Play listing copy
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate guarded listing-copy request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('.github/mobile-store-copy-request.json').read_text())
+          if set(r) != {'operation','reason'} or r.get('operation') != 'sync-reviewed-mobile-store-copy':
+              raise SystemExit('Invalid mobile store copy request.')
+          if not isinstance(r.get('reason'),str) or not r['reason'].strip():
+              raise SystemExit('Request reason is required.')
+          PY
+      - name: Require current main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: google-auth
+        name: Authenticate to Google Play
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Sync reviewed listing copy only
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: node .github/scripts/mobile-store-copy-sync.mjs
