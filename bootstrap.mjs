@@ -87,6 +87,8 @@ syncPrimaryNavState('checking');
 
 const deletionState=params.get('account');
 if (deletionState==='deleted'||deletionState==='deleting') {
+  syncPrimaryNavState('signed-out');
+  if(account)account.onclick=()=>location.href='./?account=1';
   const app=document.querySelector('#app');
   if(app) {
     const complete=deletionState==='deleted';
