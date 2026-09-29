@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Deploy the merged password-reset email-verification fix through the guarded secure-auth release path: development deploy and smoke first, then production deploy and live verification."}
+{"operation":"deploy-secure-auth","reason":"Deploy the quiet launch-watcher operator alert policy: routine automatic stale-to-fresh recovery is silent, while prolonged stale coverage and bounded recovery failures still alert."}
