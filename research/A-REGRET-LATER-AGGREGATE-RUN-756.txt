@@ -1,0 +1,2 @@
+Issue #756 final P1P2-P1P8 aggregate trigger.
+Sources: run 36587913521 FIN/TDM/DFT; run 36602844254 MSH/SOS.
