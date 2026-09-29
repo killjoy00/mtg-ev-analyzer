@@ -1,0 +1,57 @@
+name: Configure mobile store metadata
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/store-submission-config-request.json'
+permissions:
+  contents: read
+  id-token: write
+concurrency:
+  group: configure-mobile-store-metadata
+  cancel-in-progress: false
+jobs:
+  configure:
+    name: configure reviewed App Store and Play metadata
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate guarded config request
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const r=JSON.parse(fs.readFileSync('.github/store-submission-config-request.json','utf8'));
+          if(JSON.stringify(Object.keys(r).sort())!==JSON.stringify(['operation','reason']))throw Error('Invalid request keys.');
+          if(r.operation!=='configure-mobile-store-metadata')throw Error('Invalid operation.');
+          if(typeof r.reason!=='string'||!r.reason.trim())throw Error('Reason required.');
+          NODE
+      - name: Require current main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - id: google-auth
+        name: Authenticate to Google Play
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+      - name: Configure reviewed non-publishing store metadata
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.google-auth.outputs.access_token }}
+        run: node .github/scripts/store-submission-config.mjs
