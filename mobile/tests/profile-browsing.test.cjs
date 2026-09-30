@@ -47,12 +47,12 @@ async function fixture(t, options = {}) {
   const mobile = process.cwd();
   const cache = new Map();
   const storage = new Map([[SESSION_KEY, JSON.stringify(session())]]);
-  const calls = []; const shares = []; const pushes = [];
+  const calls = []; const shares = []; const pushes = []; let backs = 0;
   let params = { key: options.key ?? KEY_A }; let focus; let resume; let locked = false;
   const priorFetch = globalThis.fetch;
   const mocks = {
     'expo-router': {
-      router: { push(value) { pushes.push(value); } }, useLocalSearchParams: () => params,
+      router: { push(value) { pushes.push(value); }, back() { backs += 1; } }, useLocalSearchParams: () => params,
       useFocusEffect(callback) { React.useEffect(() => { focus = callback; const cleanup = callback(); return () => { if (focus === callback) focus = null; cleanup?.(); }; }, [callback]); },
     },
     'react-native': { ActivityIndicator: host('ActivityIndicator'), FlatList, Pressable: host('Pressable'), Text: host('Text'), View: host('View'),
@@ -90,7 +90,12 @@ async function fixture(t, options = {}) {
     let result;
     if (target.pathname === '/growth/v1/mobile/profile/me') result = await (options.privateProfile?.(other) ?? profile(other ? KEY_B : KEY_A, true));
     else if (target.pathname === '/growth/v1/mobile/profile/history') result = await (options.privateHistory?.(other, cursor) ?? { rows: [row(other ? '200' : '100')], next_cursor: '90' });
-    else if (/^\/growth\/v1\/profile\/[ab]{16}\/history$/.test(target.pathname)) {
+    else if (/^\/growth\/v1\/mobile\/profile\/[ab]{16}\/(report|block)$/.test(target.pathname)) {
+      const parts = target.pathname.split('/'); const key = parts[5]; const action = parts[6];
+      result = await (options.safety?.(key, action, init) ?? (action === 'report' ? { ok: true, report_id: '1' } : { ok: true, blocked: true }));
+    } else if (/^\/growth\/v1\/mobile\/profile\/[ab]{16}$/.test(target.pathname)) {
+      const key = target.pathname.split('/')[5]; result = await (options.profile?.(key) ?? profile(key));
+    } else if (/^\/growth\/v1\/profile\/[ab]{16}\/history$/.test(target.pathname)) {
       const key = target.pathname.split('/')[4]; result = await (options.history?.(key, cursor) ?? { rows: [row(key === KEY_A ? '100' : '200')], next_cursor: '90' });
     } else if (/^\/growth\/v1\/profile\/[ab]{16}$/.test(target.pathname)) {
       const key = target.pathname.split('/')[4]; result = await (options.profile?.(key) ?? profile(key));
@@ -103,7 +108,7 @@ async function fixture(t, options = {}) {
   await act(async () => { root = Renderer.create(React.createElement(Screen)); await drain(); });
   t.after(async () => { await act(async () => root.unmount()); globalThis.fetch = priorFetch; });
   return {
-    calls, shares, pushes, root,
+    calls, shares, pushes, root, backs: () => backs,
     text: () => text(root.toJSON()),
     rows: () => root.root.findAllByType('FlatList')[0]?.props.data ?? [],
     list: () => root.root.findByType('FlatList'),
@@ -125,17 +130,33 @@ async function fixture(t, options = {}) {
 
 const missing = () => Response.json({ error: 'Profile not found or private.' }, { status: 404 });
 
-test('public profile loads real overview, identity detail and history without creating or sending a session', async (t) => {
+test('public profile uses an existing account session for block-aware identity lookup without creating a new session', async (t) => {
   const f = await fixture(t);
   assert.match(f.text(), /Public Alice/); assert.match(f.text(), /Favorite environment:.*MSH/);
   assert.match(f.text(), /Showcased achievement:.*First Run/); assert.match(f.text(), /Best final Daily finish: Top.*8/);
   assert.match(f.text(), /Played environments/); assert.deepEqual(f.rows().map((item) => item.cursor), ['100']);
-  for (const call of f.calls) {
-    assert.equal(call.init.credentials, 'omit');
-    assert.equal(call.init.headers.has('x-pack1-mobile-session'), false);
-    assert.equal(call.init.headers.has('x-pack1-mobile-account'), false);
-    assert.equal(call.path.includes('/session'), false);
-  }
+  const profileCall=f.calls.find((call)=>call.path===`/growth/v1/mobile/profile/${KEY_A}`);
+  assert.ok(profileCall);
+  assert.match(profileCall.init.headers.get('x-pack1-mobile-session')||'',/^p1_/);
+  assert.equal(profileCall.init.headers.get('x-pack1-mobile-account'),session().accountToken);
+  const historyCall=f.calls.find((call)=>call.path===`/growth/v1/profile/${KEY_A}/history`);
+  assert.ok(historyCall);
+  assert.equal(historyCall.init.headers.has('x-pack1-mobile-session'),false);
+  assert.equal(historyCall.init.headers.has('x-pack1-mobile-account'),false);
+  assert.equal(f.calls.some((call)=>call.path.includes('/session')),false);
+});
+
+test('public profile safety controls report and block with the existing account identity', async (t) => {
+  const f = await fixture(t);
+  await f.press('Report profile');
+  const report=f.calls.find((call)=>call.path===`/growth/v1/mobile/profile/${KEY_A}/report`);
+  assert.ok(report); assert.equal(report.init.method,'POST');
+  assert.deepEqual(JSON.parse(report.init.body),{reason:'offensive_name'});
+  assert.match(f.text(),/Report sent to Pack One/);
+
+  await f.press('Block profile');
+  const block=f.calls.find((call)=>call.path===`/growth/v1/mobile/profile/${KEY_A}/block`);
+  assert.ok(block); assert.equal(block.init.method,'POST'); assert.equal(f.backs(),1);
 });
 
 test('an invalid profile link makes no request and never shows cached identity', async (t) => {
@@ -202,7 +223,7 @@ for (const stage of ['refresh', 'history', 'share']) {
 test('public sharing revalidates opt-in and uses only the canonical public key', async (t) => {
   const f = await fixture(t); await f.press('Share public profile');
   assert.equal(f.shares.length, 1); assert.equal(f.shares[0].message, `Public Alice's Pack One profile\nhttps://packone.pro/?profile=${KEY_A}`);
-  assert.equal(f.calls.filter((call) => call.path === `/growth/v1/profile/${KEY_A}`).length, 2);
+  assert.equal(f.calls.filter((call) => call.path === `/growth/v1/mobile/profile/${KEY_A}`).length, 2);
 });
 
 test('a delayed public share cannot open for A after navigating to B', async (t) => {
