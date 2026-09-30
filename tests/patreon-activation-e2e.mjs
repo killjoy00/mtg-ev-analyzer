@@ -41,7 +41,7 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
     status=signed?200:401;
     body=signed?{user:accountUser,session:{expiresAt:'2099-01-01T00:00:00Z'}}:{error:'Account session required.'};
   } else if(path==='/v1/account/signin'){
-    signed=true;body={ok:true,user:accountUser};
+    signed=true;body={ok:true,user:accountUser,session:{expiresAt:'2099-01-01T00:00:00Z'}};
   } else if(path==='/v1/account/signup'){
     const input=route.request().postDataJSON();
     if(verificationRequired)body={ok:true,verificationRequired:true,user:{...accountUser,email:input.email,name:'Pack One Player'}};
