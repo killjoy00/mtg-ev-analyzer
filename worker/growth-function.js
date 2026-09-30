@@ -2091,11 +2091,70 @@ async function handleMyProfile(request) {
   return json(await buildProfile(id, meta, { own: true }));
 }
 
-async function handlePublicProfile(profileKey) {
+async function optionalViewerPlayer(request) {
+  try { return await player(request,false); } catch { return null; }
+}
+
+async function authenticatedProfilePlayer(request,{mobile=false}={}) {
+  if(mobile)return (await mobileAccountIdentity(request)).owner;
+  const owner=await player(request);
+  const auth=await authSession(request);
+  const link=await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1',[auth.user_id]);
+  if(link.rows[0]?.player_id!==owner)throw Object.assign(new Error('Sign in again to continue with your account.'),{status:401});
+  return owner;
+}
+
+async function handlePublicProfile(profileKey,request) {
   if (!PROFILE_KEY_RE.test(profileKey)) throw Object.assign(new Error('Invalid profile.'), { status: 400 });
-  const meta = await profileMetaByKey(profileKey);
+  const viewerPlayerId=await optionalViewerPlayer(request);
+  const meta = await profileMetaByKey(profileKey,{viewerPlayerId});
   if (!meta) return json({ error: 'Profile not found or private.' }, 404);
   return json(await buildProfile(meta.player_id, meta, { own: false }));
+}
+
+async function handlePublicIdentityReport(request,profileKey,{mobile=false}={}) {
+  if(!PROFILE_KEY_RE.test(profileKey))throw Object.assign(new Error('Invalid profile.'),{status:400});
+  const reporter=await authenticatedProfilePlayer(request,{mobile});
+  const target=await profileMetaByKey(profileKey,{viewerPlayerId:reporter,ignoreBlock:true});
+  if(!target)return json({error:'Profile not found or private.'},404);
+  if(target.player_id===reporter)throw Object.assign(new Error('You cannot report your own profile.'),{status:400});
+  const payload=await readJson(request);
+  const reason=normalizedReportReason(payload.reason);
+  const details=normalizedReportDetails(payload.details);
+  const result=await query(
+    `INSERT INTO public_identity_reports(reporter_player_id,target_player_id,reason,details)
+     VALUES($1::uuid,$2::uuid,$3,$4)
+     ON CONFLICT(reporter_player_id,target_player_id) WHERE status='open'
+     DO UPDATE SET reason=excluded.reason,details=excluded.details,updated_at=now()
+     RETURNING id::text,created_at`,
+    [reporter,target.player_id,reason,details],
+  );
+  return json({ok:true,report_id:result.rows[0]?.id||null});
+}
+
+async function handlePublicIdentityBlock(request,profileKey,{mobile=false}={}) {
+  if(!PROFILE_KEY_RE.test(profileKey))throw Object.assign(new Error('Invalid profile.'),{status:400});
+  const blocker=await authenticatedProfilePlayer(request,{mobile});
+  const target=(await query(
+    `SELECT id::text player_id FROM players
+     WHERE profile_key=$1 AND username_owned=true
+       AND public_identity_terms_version=$2
+       AND public_identity_terms_accepted_at IS NOT NULL
+       AND public_identity_hidden_at IS NULL
+     LIMIT 1`,[profileKey,PUBLIC_IDENTITY_TERMS_VERSION],
+  )).rows[0];
+  if(!target)return json({error:'Profile not found or private.'},404);
+  if(target.player_id===blocker)throw Object.assign(new Error('You cannot block your own profile.'),{status:400});
+  if(request.method==='DELETE') {
+    await query('DELETE FROM public_identity_blocks WHERE blocker_player_id=$1::uuid AND target_player_id=$2::uuid',[blocker,target.player_id]);
+    return json({ok:true,blocked:false});
+  }
+  await query(
+    `INSERT INTO public_identity_blocks(blocker_player_id,target_player_id)
+     VALUES($1::uuid,$2::uuid) ON CONFLICT DO NOTHING`,
+    [blocker,target.player_id],
+  );
+  return json({ok:true,blocked:true});
 }
 
 async function handleProfileUpdate(request,{mobile=false}={}) {
@@ -2130,26 +2189,43 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
   const profilePublic = typeof payload.profilePublic === 'boolean' ? payload.profilePublic : bool(meta.profile_public);
   const favorite = payload.favoriteSetId === undefined ? meta.favorite_set_id || null : String(payload.favoriteSetId || '').trim().toLowerCase() || null;
   const showcase = payload.showcaseAchievement === undefined ? meta.showcase_achievement || null : String(payload.showcaseAchievement || '').trim().toLowerCase() || null;
+  const acceptsTerms=payload.acceptPublicIdentityTerms===true;
+  const termsCurrent=acceptsTerms||publicIdentityTermsCurrent(meta);
+  const wantsOwned=!isPlaceholderUsername(displayName);
 
   if (favorite && !allowedSets.has(favorite)) throw Object.assign(new Error('Choose a playable environment.'), { status: 400 });
   if (showcase && !unlocked.has(showcase)) throw Object.assign(new Error('Showcase an achievement you have unlocked.'), { status: 400 });
+  if(publicIdentityHidden(meta)&&(payload.displayName!==undefined||payload.profilePublic===true||acceptsTerms)) {
+    throw Object.assign(new Error('This public identity is unavailable. Contact Pack One support if you believe this is a mistake.'),{status:403,code:'PUBLIC_IDENTITY_MODERATED'});
+  }
+  if((wantsOwned||profilePublic)&&!termsCurrent) {
+    throw Object.assign(new Error('Accept the Public Identity rules before using a leaderboard name or public profile.'),{status:409,code:'PUBLIC_IDENTITY_TERMS_REQUIRED'});
+  }
+  if(profilePublic&&!wantsOwned)throw Object.assign(new Error('Choose a leaderboard name before publishing a profile.'),{status:400});
+  if(wantsOwned)assertPublicDisplayNameAllowed(displayName);
 
-  // This is the one path where an account owner deliberately chooses a name, so
-  // it is also where ownership is taken. `players_username_uq` decides whether
-  // the name is free: a preflight check could only narrow the race, not close
-  // it. Reverting to the placeholder releases the previous name.
   try {
     await query(
-      `WITH previous AS MATERIALIZED (SELECT profile_public,display_name FROM players WHERE id=$1::uuid FOR UPDATE), changed AS (UPDATE players
-       SET display_name=$2,profile_public=$3::boolean,favorite_set_id=$4,showcase_achievement=$5,username_owned=$6::boolean,updated_at=now()
-       FROM previous WHERE id=$1::uuid RETURNING previous.profile_public was_public,previous.display_name old_display_name),
-       events(event_name) AS (
+      `WITH previous AS MATERIALIZED (
+         SELECT profile_public,display_name FROM players WHERE id=$1::uuid FOR UPDATE
+       ), changed AS (
+         UPDATE players
+         SET display_name=$2,profile_public=$3::boolean,favorite_set_id=$4,showcase_achievement=$5,
+             username_owned=$6::boolean,
+             public_identity_terms_version=CASE WHEN $7::boolean THEN $8 ELSE public_identity_terms_version END,
+             public_identity_terms_accepted_at=CASE WHEN $7::boolean THEN now() ELSE public_identity_terms_accepted_at END,
+             updated_at=now()
+         FROM previous WHERE id=$1::uuid
+         RETURNING previous.profile_public was_public,previous.display_name old_display_name
+       ), events(event_name) AS (
          SELECT 'public_profile_enabled' FROM changed WHERE NOT was_public AND $3::boolean
          UNION ALL
          SELECT 'leaderboard_name_changed' FROM changed WHERE old_display_name IS DISTINCT FROM $2
+         UNION ALL
+         SELECT 'public_identity_terms_accepted' FROM changed WHERE $7::boolean
        )
        INSERT INTO analytics_events(player_id,event_name) SELECT $1::uuid,event_name FROM events`,
-      [id, displayName, profilePublic, favorite, showcase, !isPlaceholderUsername(displayName)],
+      [id,displayName,profilePublic,favorite,showcase,wantsOwned&&termsCurrent,acceptsTerms,PUBLIC_IDENTITY_TERMS_VERSION],
     );
   } catch (error) {
     rethrowUsernameConflict(error);
@@ -2165,7 +2241,8 @@ async function handleMyHistory(request) {
 
 async function handlePublicHistory(profileKey, request) {
   if (!PROFILE_KEY_RE.test(profileKey)) throw Object.assign(new Error('Invalid profile.'), { status: 400 });
-  const meta = await profileMetaByKey(profileKey);
+  const viewerPlayerId=await optionalViewerPlayer(request);
+  const meta = await profileMetaByKey(profileKey,{viewerPlayerId});
   if (!meta) return json({ error: 'Profile not found or private.' }, 404);
   const url = new URL(request.url);
   return json(await historyPage(meta.player_id, url.searchParams.get('cursor'), url.searchParams.get('limit')));
