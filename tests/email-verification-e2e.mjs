@@ -36,13 +36,13 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
   await page.locator('#account-mode-toggle').click();
 
   const signup=page.locator('#account-signup');
+  assert.equal(await signup.locator('[name="name"]').count(),0);
+  assert.equal(await signup.locator('[name="email"]').getAttribute('autocomplete'),'username');
   await signup.locator('[name="email"]').fill('verify@example.invalid');
   await signup.locator('[name="password"]').fill('fixture-password-123');
   await signup.getByRole('button',{name:'Create account',exact:true}).click();
 
   await page.getByRole('heading',{name:'Check your email'}).waitFor();
-  assert.equal(await signup.locator('[name="name"]').count(),0);
-  assert.equal(await signup.locator('[name="email"]').getAttribute('autocomplete'),'username');
   await page.getByText('Verification links expire after 15 minutes.').waitFor();
   await page.getByRole('button',{name:'Send a new verification link'}).click();
   await page.getByText("If an unverified account exists for that email, we've sent a verification link.").waitFor();
