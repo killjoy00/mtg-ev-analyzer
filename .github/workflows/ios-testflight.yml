@@ -216,6 +216,18 @@ jobs:
           python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
           echo "Verified signed Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
           echo "PACKONE_ARCHIVED_BUILD_NUMBER=$archived_build_number" >> "$GITHUB_ENV"
+      - name: Audit signed iOS privacy surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ./scripts/audit-ios-archive.py "$RUNNER_TEMP/PackOne.xcarchive" --output "$RUNNER_TEMP/pack-one-ios-native-audit.json"
+      - name: Upload signed iOS native audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-ios-signed-native-audit
+          path: ${{ runner.temp }}/pack-one-ios-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Upload to TestFlight Internal Only
         shell: bash
         run: |
