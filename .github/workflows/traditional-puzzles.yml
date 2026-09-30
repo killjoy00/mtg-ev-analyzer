@@ -16,7 +16,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - run: npm install --no-save playwright@1.55.0
+      - run: npm install --no-save playwright@1.63.0
       - name: Verify the released production revision
         run: node tests/release-functions-smoke.mjs br-orange-feather-ayps8kep bc1007e257401f2be8daba06a1a6c5e54eac19bb
       - name: Complete both actual Daily games on mobile and inspect desktop layout
