@@ -42,7 +42,7 @@ jobs:
           echo "RELEASE_COMMIT=$commit" >> "$GITHUB_ENV"
       - name: Install pinned Worker deployment tool
         if: steps.request.outputs.operation != 'idle'
-        run: npm install --prefix "$RUNNER_TEMP/auth-webhook-tools" --no-audit --no-fund wrangler@4.143.0
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/auth-webhook-tools"
       - name: Check dedicated recovery-email credential
         if: steps.request.outputs.operation == 'check-secret'
         env:
