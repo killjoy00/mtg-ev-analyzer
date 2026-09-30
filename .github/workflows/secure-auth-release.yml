@@ -50,7 +50,7 @@ jobs:
         run: node scripts/edge-production-control.mjs request
 
       - name: Install pinned release tools
-        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@4.17.4 esbuild@0.28.2 wrangler@4.143.0
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
 
       - name: Verify production gateway ownership before backend changes
         env:
