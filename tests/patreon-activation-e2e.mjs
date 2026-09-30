@@ -44,8 +44,8 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
     signed=true;body={ok:true,user:accountUser};
   } else if(path==='/v1/account/signup'){
     const input=route.request().postDataJSON();
-    if(verificationRequired)body={ok:true,verificationRequired:true,email:input.email};
-    else {signed=true;body={ok:true,user:{...accountUser,email:input.email,name:input.name}};}
+    if(verificationRequired)body={ok:true,verificationRequired:true,user:{...accountUser,email:input.email,name:'Pack One Player'}};
+    else {signed=true;body={ok:true,user:{...accountUser,email:input.email,name:'Pack One Player'},session:{expiresAt:'2099-01-01T00:00:00Z'}};}
   } else if(path==='/v1/account/link-browser'){
     linkCalls++;body={ok:true,merged:false,displayName:'QA Player'};
   } else if(path==='/v1/account/migrate'){
@@ -86,7 +86,6 @@ async function fill(kind){
   await page.locator('#account-signin,#account-signup').first().waitFor();
   if(await page.locator('#account-'+kind).count()===0)await page.locator('#account-mode-toggle').click();
   const form=page.locator('#account-'+kind);await form.waitFor();
-  if(kind==='signup')await form.locator('[name="name"]').fill('QA Player');
   await form.locator('[name="email"]').fill('qa@example.invalid');
   await form.locator('[name="password"]').fill('fixture-password-123');
   await form.getByRole('button',{name:kind==='signup'?'Create account':'Sign in',exact:true}).click();
@@ -119,7 +118,7 @@ try {
   await reset({verify:true});
   await page.goto(base+'/?patreon=activate');
   await fill('signup');
-  await page.getByText(/Check your email\. We sent a verification link/).waitFor();
+  await page.getByText(/We sent a verification link/).waitFor();
   assert.equal(signed,false);
   assert.equal(connectCalls,0);
   assert.equal(await page.evaluate(()=>Boolean(sessionStorage.getItem('pack1-patreon-activation-v1'))),true);
