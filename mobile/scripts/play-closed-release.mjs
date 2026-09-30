@@ -1,7 +1,7 @@
 const token = process.env.PLAY_ACCESS_TOKEN?.trim();
 const packageName = process.env.PACKONE_ANDROID_PACKAGE?.trim() || 'pro.packone.app';
 const versionCode = String(process.argv[2] || '').trim();
-const track = String(process.argv[3] || 'alpha').trim();
+const track = String(process.argv[3] || 'production-access').trim();
 
 if (!token) throw new Error('PLAY_ACCESS_TOKEN is required.');
 if (!/^[1-9][0-9]*$/.test(versionCode)) throw new Error('A valid Google Play version code is required.');

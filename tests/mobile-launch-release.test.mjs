@@ -55,6 +55,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /request\.get\('operation'\) != 'promote-android-closed'/, path);
       assert.match(workflow, /Verify live Universal Links and App Links associations/);
       assert.match(workflow, /Verify Google Play app-signing certificate matches assetlinks\.json/);
+      assert.match(workflow, /track != 'production-access'/);
     } else if (path === '.github/workflows/google-play-access.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/google-play-access-request\.json'/s, path);
@@ -138,7 +139,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   const androidClosedRequest = JSON.parse(read('.github/android-closed-release-request.json'));
   assert.deepEqual(Object.keys(androidClosedRequest).sort(), ['operation','reason','track','version_code']);
   assert.equal(androidClosedRequest.operation, 'promote-android-closed');
-  assert.equal(androidClosedRequest.track, 'alpha');
+  assert.equal(androidClosedRequest.track, 'production-access');
   assert.match(String(androidClosedRequest.version_code), /^[1-9][0-9]*$/);
   assert.equal(typeof androidClosedRequest.reason, 'string');
   assert.ok(androidClosedRequest.reason.trim().length > 0);

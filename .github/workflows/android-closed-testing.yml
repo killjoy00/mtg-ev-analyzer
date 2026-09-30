@@ -47,8 +47,8 @@ jobs:
           if not version.isdigit() or version.startswith('0'):
               raise SystemExit('Android closed release request requires a positive version_code.')
           track=str(request.get('track',''))
-          if track != 'alpha':
-              raise SystemExit('Pack One production-access qualification must use the reviewed alpha closed-testing track.')
+          if track != 'production-access':
+              raise SystemExit('Pack One production-access qualification must use the reviewed production-access closed-testing track.')
           print(f'version_code={version}')
           print(f'track={track}')
           PY
