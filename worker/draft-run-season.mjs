@@ -40,7 +40,7 @@ export async function resolveCurrentSeason(query,{today=gameDateKey(),ensureSche
   return reconcilePersistedSeasons(query);
 }
 
-export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,limit=100}={}) {
+export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,blockedByPlayerId=null,limit=100}={}) {
   const result=await query(`WITH results AS (
       SELECT player_id,round(avg(score),1) score,count(*) days
       FROM scores
@@ -53,6 +53,9 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
             AND owned.public_identity_terms_accepted_at IS NOT NULL
             AND owned.public_identity_hidden_at IS NULL
         )
+        AND ($7::uuid IS NULL OR NOT EXISTS (
+          SELECT 1 FROM public_identity_blocks b WHERE b.blocker_player_id=$7::uuid AND b.target_player_id=scores.player_id
+        ))
         AND challenge_date BETWEEN $1::date AND $2::date
       GROUP BY player_id
     ), ranked AS (
@@ -79,7 +82,7 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
     FROM ranked
     WHERE ($4::uuid IS NULL OR player_id=$4::uuid)
     ORDER BY score DESC,days DESC,display_name
-    LIMIT $5::int`,[start,end,environment,playerId,limit,PUBLIC_IDENTITY_TERMS_VERSION]);
+    LIMIT $5::int`,[start,end,environment,playerId,limit,PUBLIC_IDENTITY_TERMS_VERSION,blockedByPlayerId]);
   return result.rows.map(row=>({
     ...row,
     rank:num(row.rank),
