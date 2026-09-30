@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"September 30 Auth branch-binding incident: deploy merged PR #794 to restore production Auth to serving branch br-orange-feather-ayps8kep after owner added the new Google OAuth redirect URI."}
+{"operation":"deploy-secure-auth","reason":"Complete September 30 Auth branch-binding incident cleanup: deploy merged PR #799 and redeploy production pack1-authhook with only the serving-branch AUTH_BASE after successful real Google sign-in acceptance."}
