@@ -11,12 +11,14 @@ on:
       - 'mobile/package-lock.json'
       - '.github/workflows/dependency-security.yml'
       - '.github/workflows/**'
+      - '.github/scripts/install-wrangler-tool.mjs'
   push:
     branches: [main]
     paths:
       - 'mobile/package.json'
       - 'mobile/package-lock.json'
       - '.github/workflows/dependency-security.yml'
+      - '.github/scripts/install-wrangler-tool.mjs'
 
 permissions:
   contents: read
@@ -80,9 +82,18 @@ jobs:
           neon4 neon@4.17.4
           neon5 neon@5.0.0
           esbuild esbuild@0.28.2
-          wrangler wrangler@4.143.0
           playwright playwright@1.63.0
           EOF
+
+          wrangler_dir="$RUNNER_TEMP/dependency-audit/tool-wrangler"
+          node .github/scripts/install-wrangler-tool.mjs "$wrangler_dir"
+          set +e
+          npm audit --prefix "$wrangler_dir" --omit=dev --audit-level=high --json > "$RUNNER_TEMP/dependency-audit/tool-wrangler.json"
+          status=$?
+          set -e
+          printf '%s\n' "$status" > "$RUNNER_TEMP/dependency-audit/tool-wrangler.status"
+          if (( status != 0 )); then overall=1; fi
+
           printf '%s\n' "$overall" > "$RUNNER_TEMP/dependency-audit/workflow-tools.status"
 
       - name: Summarize audit evidence
