@@ -178,13 +178,13 @@ try {
   await page.locator('#account-mode-toggle').click();
   verificationRequired=true;
   const signup=page.locator('#account-signup');
+  assert.equal(await signup.locator('[name="name"]').count(),0);
+  assert.equal(await signup.locator('[name="email"]').getAttribute('autocomplete'),'username');
   await signup.locator('[name="email"]').fill('verify@example.invalid');
   await signup.locator('[name="password"]').fill('fixture-password-123');
   await signup.getByRole('button',{name:'Create account',exact:true}).click();
   await page.getByRole('heading',{name:'Check your email'}).waitFor();
   await page.getByText(/We sent a verification link to verify@example\.invalid/).waitFor();
-  assert.equal(await signup.locator('[name="name"]').count(),0);
-  assert.equal(await signup.locator('[name="email"]').getAttribute('autocomplete'),'username');
   assert.equal(await page.locator('.account-verification-success').count(),1);
   assert.equal(await page.locator('#account-verification-signin').count(),1);
   assert.equal(await page.locator('.account-verification-success.form-error').count(),0);
