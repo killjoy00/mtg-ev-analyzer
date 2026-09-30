@@ -47,8 +47,9 @@ test('Auth webhook deployment controller pins service identity, Auth bases, send
   assert.match(source,/worker:'pack1-authhook'/);
   assert.match(source,/ep-lively-river-b5tky50l\.neonauth/);
   assert.match(source,/authBase:'https:\/\/ep-young-hall-ayl0754j\.neonauth/);
-  assert.match(source,/previousAuthBase:'https:\/\/ep-hidden-bonus-ayfmcpys\.neonauth/);
-  assert.match(source,/AUTH_PREVIOUS_BASE/);
+  assert.doesNotMatch(source,/previousAuthBase/);
+  assert.doesNotMatch(source,/AUTH_PREVIOUS_BASE/);
+  assert.doesNotMatch(source,/ep-hidden-bonus-ayfmcpys\.neonauth/);
   assert.match(source,/Pack One QA <qa-accounts@packone\.pro>/);
   assert.match(source,/Pack One <accounts@packone\.pro>/);
   assert.match(source,/resetOrigin:'http:\/\/localhost:4173'/);
