@@ -83,7 +83,7 @@ jobs:
       - name: Install browser test dependency
         if: steps.scope.outputs.run_full == 'true'
         run: |
-          npm install --no-save playwright@1.55.0
+          npm install --no-save playwright@1.63.0
           npx playwright install --with-deps chromium webkit
       - name: Hydrate replay shards from R2 for local browser tests
         if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
