@@ -7,6 +7,7 @@ import {loadServingSnapshot,loadCachedCustomSetMetadata} from '../worker/draft-r
 import {draftRunLeaderboardRows,currentSeasonForPlayer} from '../worker/draft-run-season.mjs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {gameDateKey} from '../game-date.mjs';
+import {PUBLIC_IDENTITY_TERMS_VERSION} from '../worker/public-identity-safety.mjs';
 
 async function main() {
 
@@ -34,8 +35,8 @@ const users=Array.from({length:1000},(_,i)=>{
 const data=JSON.stringify(users.map(({account,csrf,token,...stored})=>stored));
 await query(`INSERT INTO neon_auth."user"(id,name,email,"emailVerified")
   SELECT (u->>'auth')::uuid,u->>'name',(u->>'auth')||'@example.invalid',true FROM jsonb_array_elements($1::jsonb) u`,[data]);
-await query(`INSERT INTO players(id,display_name,username_owned,profile_public)
-  SELECT (u->>'player')::uuid,u->>'name',true,true FROM jsonb_array_elements($1::jsonb) u`,[data]);
+await query(`INSERT INTO players(id,display_name,username_owned,profile_public,public_identity_terms_version,public_identity_terms_accepted_at)
+  SELECT (u->>'player')::uuid,u->>'name',true,true,$2,now() FROM jsonb_array_elements($1::jsonb) u`,[data,PUBLIC_IDENTITY_TERMS_VERSION]);
 await query(`INSERT INTO account_links(auth_user_id,player_id)
   SELECT (u->>'auth')::uuid,(u->>'player')::uuid FROM jsonb_array_elements($1::jsonb) u`,[data]);
 await query(`INSERT INTO account_sessions(session_hash,auth_user_id,csrf_hash,expires_at)
