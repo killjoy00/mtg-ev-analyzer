@@ -38,6 +38,10 @@ test('verification-required signup offers resend and expired-link recovery',()=>
   assert.match(growth,/auth_verification_failed/);
   assert.match(growth,/auth_verification_completed/);
   assert.match(growth,/account-verification-signin/);
+  assert.match(growth,/EMAIL_NOT_VERIFIED/);
+  assert.match(growth,/account-verification-resend-signin/);
+  assert.match(growth,/Choose the name shown on leaderboards\./);
+  assert.match(growth,/account-name-prompt-skip/);
 });
 
 test('Daily auth preserves origin and returns to the completed result',()=>{
