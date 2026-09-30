@@ -1,1 +1,1 @@
-{"operation":"disable-production-localhost","reason":"Issue #245 execution request after the reviewed localhost-hardening controller landed on main; QA proof passed and was restored before production."}
+{"operation":"disable-production-localhost","reason":"Post-cutover production Auth verification after PR #794 and release PR #797: run the existing disposable signup/sign-in/reset smoke against the new serving-branch Auth base and clean up the test user."}
