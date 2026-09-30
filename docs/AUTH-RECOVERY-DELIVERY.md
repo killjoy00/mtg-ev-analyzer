@@ -35,7 +35,7 @@ The configuration is managed by the reviewed main-only workflow `.github/workflo
 
 Managed Neon issues and redeems the recovery credential. Pack One never replaces the Auth database or reset authority.
 
-After the September 30 restore-finalization incident, the secure-auth release treats Auth-host binding as an explicit production invariant. A read-only preflight requires the serving branch's Neon Auth `base_url`, the endpoint embedded in that URL, and the production `pack1-authhook` primary `AUTH_BASE` to agree before deployment. The corrective release deploys the webhook first with a temporary previous-host allowance, then deploys the backend to the new primary Auth base.
+After the September 30 restore-finalization incident, the secure-auth release treats Auth-host binding as an explicit production invariant. A read-only preflight requires the serving branch's Neon Auth `base_url`, the endpoint embedded in that URL, and the production `pack1-authhook` primary `AUTH_BASE` to agree before deployment. The corrective release initially deployed the webhook first with a temporary previous-host allowance, then deployed the backend to the new primary Auth base. After automated production validation and a real Google sign-in succeeded on the serving branch, that compatibility allowance was removed. The production receiver now validates webhook signatures and verification links only against the current serving-branch `AUTH_BASE`.
 
 ## Post-reset verification semantics
 
