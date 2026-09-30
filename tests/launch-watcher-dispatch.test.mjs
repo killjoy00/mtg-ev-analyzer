@@ -160,10 +160,11 @@ test('independent recovery is capped at three roots per stale episode',async()=>
 test('release control keeps the watchdog credential production-only and verifies both environments',()=>{
   const flow=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
   const devStart=flow.indexOf('Deploy exact revision to development');
+  const webhookStart=flow.indexOf('Deploy dedicated production recovery webhook Worker');
   const prodStart=flow.indexOf('Deploy the development-tested revision to production');
-  const prodEnd=flow.indexOf('Deploy dedicated production recovery webhook Worker',prodStart);
-  assert.ok(devStart>=0&&prodStart>devStart&&prodEnd>prodStart);
-  const dev=flow.slice(devStart,prodStart);
+  const prodEnd=flow.indexOf('Deploy fixed first-party production gateway',prodStart);
+  assert.ok(devStart>=0&&webhookStart>devStart&&prodStart>webhookStart&&prodEnd>prodStart);
+  const dev=flow.slice(devStart,webhookStart);
   const prod=flow.slice(prodStart,prodEnd);
   assert.doesNotMatch(dev,/PACK1_LAUNCH_WATCHER_GITHUB_TOKEN/);
   assert.match(prod,/secrets\.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN/);

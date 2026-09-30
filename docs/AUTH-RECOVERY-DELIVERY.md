@@ -7,8 +7,9 @@ Status: **production active**. Managed Neon remains the recovery-token issuer, A
 Production Neon Auth branch:
 
 - project: `patient-shadow-91417882`
-- branch: `br-orange-feather-ayps8kep` (`main`)
-- Auth base: `https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth`
+- serving branch: `br-orange-feather-ayps8kep` (currently named `pack1-dr-restore-drill-2026-09-30 (1)`)
+- Auth base: `https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth`
+- Neon control-plane default branch is currently a different branch, `br-dark-sound-ayxhwq1u` (`main`); do not use the default-branch label to derive the production Auth host
 
 Production recovery receiver:
 
@@ -33,6 +34,8 @@ The configuration is managed by the reviewed main-only workflow `.github/workflo
 ## Architecture
 
 Managed Neon issues and redeems the recovery credential. Pack One never replaces the Auth database or reset authority.
+
+After the September 30 restore-finalization incident, the secure-auth release treats Auth-host binding as an explicit production invariant. A read-only preflight requires the serving branch's Neon Auth `base_url`, the endpoint embedded in that URL, and the production `pack1-authhook` primary `AUTH_BASE` to agree before deployment. The corrective release deploys the webhook first with a temporary previous-host allowance, then deploys the backend to the new primary Auth base.
 
 ## Post-reset verification semantics
 

@@ -1,6 +1,6 @@
 import {randomBytes} from 'node:crypto';
 
-const AUTH_BASE='https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const AUTH_BASE='https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const ORIGIN='https://packone.pro';
 const EMAIL='delivered@resend.dev';
 

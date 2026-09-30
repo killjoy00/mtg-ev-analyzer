@@ -46,7 +46,9 @@ test('Auth webhook deployment controller pins service identity, Auth bases, send
   assert.match(source,/worker:'pack1-authhook-qa'/);
   assert.match(source,/worker:'pack1-authhook'/);
   assert.match(source,/ep-lively-river-b5tky50l\.neonauth/);
-  assert.match(source,/ep-hidden-bonus-ayfmcpys\.neonauth/);
+  assert.match(source,/authBase:'https:\/\/ep-young-hall-ayl0754j\.neonauth/);
+  assert.match(source,/previousAuthBase:'https:\/\/ep-hidden-bonus-ayfmcpys\.neonauth/);
+  assert.match(source,/AUTH_PREVIOUS_BASE/);
   assert.match(source,/Pack One QA <qa-accounts@packone\.pro>/);
   assert.match(source,/Pack One <accounts@packone\.pro>/);
   assert.match(source,/resetOrigin:'http:\/\/localhost:4173'/);
@@ -74,9 +76,14 @@ test('secure Auth release deploys the production recovery Worker from the exact 
   const workflow=fs.readFileSync(new URL('../.github/workflows/secure-auth-release.yml',import.meta.url),'utf8');
   assert.match(workflow,/PACK1_AUTH_RESEND_API_KEY: \$\{\{ secrets\.PACK1_AUTH_RESEND_API_KEY \}\}/);
   assert.match(workflow,/PACK1_AUTH_RESEND_API_KEY is missing or malformed/);
+  assert.match(workflow,/name: Verify production Auth branch binding/);
+  assert.match(workflow,/production-auth-binding-guard\.mjs/);
   assert.match(workflow,/name: Deploy dedicated production recovery webhook Worker/);
   assert.match(workflow,/RELEASE_COMMIT: \$\{\{ github\.sha \}\}/);
   assert.match(workflow,/auth-webhook-control\.mjs deploy-production/);
+  const deployWebhookIndex=workflow.indexOf('name: Deploy dedicated production recovery webhook Worker');
+  const deployBackendIndex=workflow.indexOf('name: Deploy the development-tested revision to production');
+  assert.ok(deployWebhookIndex>=0&&deployBackendIndex>=0&&deployWebhookIndex<deployBackendIndex,'production Auth webhook must deploy before backend cutover');
 });
 
 
@@ -87,7 +94,7 @@ test('production recovery smoke is main-only, fixed-target and secret-free',()=>
   assert.match(workflow,/pack1-authhook\.killjoy00\.workers\.dev\/health\?quick=1/);
   assert.match(workflow,/auth-webhook-production-smoke\.mjs/);
   assert.doesNotMatch(workflow,/secrets\./);
-  assert.match(source,/ep-hidden-bonus-ayfmcpys\.neonauth/);
+  assert.match(source,/ep-young-hall-ayl0754j\.neonauth/);
   assert.match(source,/https:\/\/packone\.pro/);
   assert.match(source,/delivered@resend\.dev/);
   assert.doesNotMatch(source,/console\.log\([^\n]*(password|token|signature|cookie)/i);

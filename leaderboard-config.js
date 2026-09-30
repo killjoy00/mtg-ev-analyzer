@@ -12,7 +12,7 @@ window.PACK1_API = {
   firstParty,
   authBase: localAuth
     ? 'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth'
-    : 'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth',
+    : 'https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth',
   url: firstParty
     ? 'https://api.packone.pro/legacy'
     : 'https://br-orange-feather-ayps8kep-pack1api.compute.c-5.us-east-2.aws.neon.tech',

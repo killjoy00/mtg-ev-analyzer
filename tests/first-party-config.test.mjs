@@ -13,7 +13,7 @@ const evaluate=hostname=>{
 test('production host uses the first-party gateway for account and Draft Run traffic',()=>{
   const config=evaluate('packone.pro');
   assert.equal(config.firstParty,true);
-  assert.equal(config.authBase,'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth');
+  assert.equal(config.authBase,'https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth');
   assert.equal(config.growthUrl,'https://api.packone.pro/growth');
   assert.equal(config.draftRunUrl,'https://api.packone.pro/draft');
 });
@@ -43,6 +43,6 @@ test('localhost keeps the direct development-compatible endpoints',()=>{
 test('query, hash, cookies and storage are not configuration channels for Auth selection',()=>{
   const local=evaluate('localhost'),prod=evaluate('packone.pro');
   assert.equal(local.authBase,'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth');
-  assert.equal(prod.authBase,'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth');
+  assert.equal(prod.authBase,'https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth');
   assert.ok(!source.includes('searchParams')&&!source.includes('localStorage')&&!source.includes('document.cookie'));
 });
