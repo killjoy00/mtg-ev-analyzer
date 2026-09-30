@@ -28,7 +28,8 @@ test('Google errors have an independent surface and account analytics keep sourc
 });
 
 test('verification-required signup offers resend and expired-link recovery',()=>{
-  assert.match(growth,/Check your email. We sent a verification link to/);
+  assert.match(growth,/We sent a verification link to/);
+  assert.doesNotMatch(growth,/Check your email\. We sent a verification link/);
   assert.match(growth,/Verification links expire after 15 minutes/);
   assert.match(growth,/account-verification-success/);
   assert.match(growth,/account-verification-resend/);
@@ -38,6 +39,15 @@ test('verification-required signup offers resend and expired-link recovery',()=>
   assert.match(growth,/auth_verification_failed/);
   assert.match(growth,/auth_verification_completed/);
   assert.match(growth,/account-verification-signin/);
+  assert.match(growth,/accountAuthCompleted\(auth\)/);
+  assert.match(growth,/EMAIL_NOT_VERIFIED/);
+  assert.match(growth,/account-signin-verification-resend/);
+  assert.match(growth,/Send a new verification link/);
+  assert.doesNotMatch(growth,/Display name<input/);
+  assert.match(growth,/name="email" autocomplete="username"/);
+  assert.match(growth,/Choose the name shown on leaderboards/);
+  assert.match(growth,/account-new-name-skip/);
+  assert.match(growth,/linked\?\.newlyClaimed/);
 });
 
 test('Daily auth preserves origin and returns to the completed result',()=>{
