@@ -56,10 +56,10 @@ jobs:
           expires_at: ${{ steps.expiry.outputs.expires_at }}
       - name: Install pinned deployment tools
         if: steps.request.outputs.operation == 'deploy-preview' || steps.request.outputs.operation == 'probe-auth-webhook' || steps.request.outputs.operation == 'stage-auth-webhook-probe' || steps.request.outputs.operation == 'cleanup-auth-webhook-probe'
-        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@4.17.4 esbuild@0.28.2 wrangler@4.143.0
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@4.17.4 esbuild@0.28.2
       - name: Install pinned email verification probe tools
         if: steps.request.outputs.operation == 'probe-email-verification'
-        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund neon@5.0.0 wrangler@4.143.0
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" neon@5.0.0
       - name: Stage email verification taxonomy receiver
         if: steps.request.outputs.operation == 'probe-email-verification'
         env:
