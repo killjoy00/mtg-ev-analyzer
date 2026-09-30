@@ -78,7 +78,6 @@ export default function AccountScreen() {
   const [profile, setProfile] = useState<CareerProfile | null>(null);
   const [catalogSets, setCatalogSets] = useState<PracticeSet[]>([]);
   const [mode, setMode] = useState<Mode>('signin');
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [profileName, setProfileName] = useState('');
@@ -207,7 +206,6 @@ export default function AccountScreen() {
       } else {
         const next = await signUpWithEmail(
           session,
-          name.trim(),
           email.trim(),
           password,
           validateDailyRunId,
@@ -809,27 +807,16 @@ export default function AccountScreen() {
               </Pressable>
             </View>
 
-            {mode === 'signup' ? (
-              <TextInput
-                accessibilityLabel="Name"
-                autoCapitalize="words"
-                autoComplete="name"
-                onChangeText={setName}
-                placeholder="Name"
-                placeholderTextColor={colors.faint}
-                style={styles.input}
-                value={name}
-              />
-            ) : null}
             <TextInput
               accessibilityLabel="Email"
               autoCapitalize="none"
-              autoComplete="email"
+              autoComplete="username"
               keyboardType="email-address"
               onChangeText={setEmail}
               placeholder="Email"
               placeholderTextColor={colors.faint}
               style={styles.input}
+              textContentType={Platform.OS === 'ios' ? 'username' : undefined}
               value={email}
             />
             <TextInput
@@ -845,9 +832,9 @@ export default function AccountScreen() {
             />
             <Pressable
               accessibilityRole="button"
-              disabled={busy || !email.trim() || !password || (mode === 'signup' && !name.trim())}
+              disabled={busy || !email.trim() || !password}
               onPress={() => void submitEmail()}
-              style={[styles.primaryButton, (busy || !email.trim() || !password || (mode === 'signup' && !name.trim())) && styles.disabled]}
+              style={[styles.primaryButton, (busy || !email.trim() || !password) && styles.disabled]}
             >
               {busy ? <ActivityIndicator color="#fff" /> : (
                 <Text style={styles.primaryButtonText}>{mode === 'signin' ? 'Sign in' : 'Create account'}</Text>
