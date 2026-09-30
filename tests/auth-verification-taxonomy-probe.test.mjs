@@ -14,7 +14,7 @@ test('verification taxonomy probe is pinned to one disposable non-serving Pack O
   assert.equal(BRANCH,'br-summer-credit-ay2vkyhc');
   const source=fs.readFileSync(new URL('../scripts/auth-verification-taxonomy-probe.mjs',import.meta.url),'utf8');
   const stage=fs.readFileSync(new URL('../scripts/auth-webhook-probe-stage.mjs',import.meta.url),'utf8');
-  for(const forbidden of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b','ep-hidden-bonus-ayfmcpys','ep-spring-dream-ayq2a5qt']){
+  for(const forbidden of ['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b','ep-hidden-bonus-ayfmcpys','ep-young-hall-ayl0754j','ep-spring-dream-ayq2a5qt']){
     assert.ok(!source.includes(forbidden));
     assert.ok(!stage.includes(forbidden));
   }
