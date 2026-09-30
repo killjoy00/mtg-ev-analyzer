@@ -6,22 +6,25 @@ This runbook separates data recovery from application rollback and corpus rebuil
 
 Neon project: `Pack 1` (`patient-shadow-91417882`).
 
-Production database branch: `main` (`br-orange-feather-ayps8kep`).
+Serving production database branch: `br-orange-feather-ayps8kep` (currently named `pack1-dr-restore-drill-2026-09-30 (1)`). Neon currently marks the restored `br-dark-sound-ayxhwq1u` branch as `main`, primary and default. Those control-plane labels do not define Pack One's serving branch.
 
 At the September 30 audit, Neon initially reported a **6-hour** history-retention window. After the restore drill and cost review, Pack One intentionally increased the production Neon history-retention setting to **86,400 seconds / 24 hours**.
 
-Current recovery assets:
+Current recovery assets and post-drill control-plane state:
 
 - Neon point-in-time history: **24 hours**;
 - one older manual snapshot: `pre-0033-unique-usernames` from September 22;
 - drill snapshot: `pack1-dr-drill-2026-09-30`;
-- non-production restored drill copy: `pack1-dr-restore-drill-2026-09-30` / `br-dark-sound-ayxhwq1u`.
+- restored/finalized branch: `br-dark-sound-ayxhwq1u`, now named `main`, primary and default, with the original `ep-hidden-bonus-ayfmcpys` endpoint attached;
+- serving branch: `br-orange-feather-ayps8kep`, renamed `pack1-dr-restore-drill-2026-09-30 (1)`, with replacement endpoint `ep-young-hall-ayl0754j`.
 
 This is deliberately lightweight disaster recovery. Pack One's user/account/history data is useful but not treated as high-value financial or safety-critical data. The goal is a practical one-day rewind window for bad migrations or accidental writes, not a high-availability or archival backup program.
 
 ## September 30 restore drill
 
-A fresh manual snapshot of production `main` was restored onto a new branch. Production was not replaced, rewound, or mutated.
+A fresh manual snapshot of the serving production branch was restored to a new branch and then finalized. The data copy itself matched the source, but finalization **did change Neon control-plane identity**: `br-dark-sound-ayxhwq1u` became `main` / primary / default, the original `ep-hidden-bonus-ayfmcpys` endpoint moved to it, and `br-orange-feather-ayps8kep` was renamed and received `ep-young-hall-ayl0754j`.
+
+Pack One's Functions, schedulers and gateway remained explicitly bound to `br-orange-feather-ayps8kep`, so application writes continued there. Neon Auth also remained enabled on that serving branch and began reporting the new `ep-young-hall-ayl0754j` Auth base. Code that still hardcoded the old Auth endpoint therefore sent Auth writes to the restored default branch while application writes continued on the serving branch, causing the September 30 sign-in incident.
 
 Critical counts matched between production and the restored branch:
 
@@ -79,15 +82,16 @@ The checked-in corpus and source/provenance workflows can reconstruct serving ev
 
 ## Isolated restore procedure
 
-1. Record the incident/recovery reason and current production branch ID.
+1. Record the incident/recovery reason and current serving production branch ID.
 2. Create or select the exact Neon snapshot/recovery point.
 3. Restore it to a new non-production branch.
-4. Do not point public Functions, the gateway, schedulers, or store clients at the restored branch yet.
+4. Do not point public Functions, the gateway, schedulers, Auth, or store clients at the restored branch yet.
 5. Run the integrity checks below.
 6. Verify schema/function compatibility with the application revision that would serve the restored data.
-7. If a real cutover is required, separately review connection-string/function/scheduler/auth implications and obtain explicit owner approval before replacing production.
-8. After cutover, run production account, Daily, Practice, entitlement and monitoring smokes before reopening normal operation.
-9. Keep the old branch/snapshot until the recovery has been independently accepted. Cleanup is a separate destructive action.
+7. **After any restore or restore finalization, re-list every endpoint and record which branch each endpoint is attached to. Re-read Neon Auth on the serving branch and record its exact `base_url`. Do not close the drill or incident until both match the intended serving branch.**
+8. If a real cutover is required, separately review connection-string/function/scheduler/Auth implications and obtain explicit owner approval before replacing production.
+9. After cutover, run production account, Daily, Practice, entitlement and monitoring smokes before reopening normal operation.
+10. Keep the old branch/snapshot until the recovery has been independently accepted. Cleanup is a separate destructive action.
 
 ## Required post-restore checks
 
@@ -123,6 +127,7 @@ Run only read-only checks until a restored branch has been explicitly approved f
 
 - Settings rows exist, but never print secret values into recovery evidence.
 - Reconcile scheduled triggers, Function deployments, custom domains and external credentials separately; branch data restoration does not prove those control-plane objects are correct.
+- After every restore/finalize operation, verify endpoint-to-branch attachments and the serving branch's Neon Auth `base_url`; a successful data restore does not prove Auth or compute routing stayed attached to the intended branch.
 - Re-enable launch monitoring only after its durable watermark/state has been checked against the recovery point.
 
 ## Pack One recovery policy
