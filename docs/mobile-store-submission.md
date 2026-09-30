@@ -268,7 +268,7 @@ Use the repository's deterministic native screenshot harness rather than mock ma
 
 ## Owner-only non-device actions still required
 
-These are the remaining **non-physical-device** actions that the current repository/API tooling cannot safely complete without the account holder using the relevant console or entering private account credentials. Everything else should remain with the automated release path.
+These are the remaining **non-physical-device** actions confirmed to be outside the current ChatGPT/GitHub-connected tooling boundary: they require the account holder to use a logged-in provider console, enter private credentials, accept legal/financial terms, supply human testers, or make an account-owner attestation. Everything else should remain with the automated release path.
 
 ### Apple / App Store Connect
 
@@ -306,12 +306,17 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
    - Under Managed publishing status, choose **Turn on managed publishing** and save.
    - Leave it on while the first production submission/review is being prepared so approval does not publish unexpectedly.
 
-6. **Verify the closed-test qualification clock and tester count.**
+6. **Set the public Production countries to United States + Canada only.**
+   - Play Console -> **Production** -> **Countries / regions**.
+   - Target **United States** and **Canada** only for the first public release.
+   - Do not assume the `production-access` closed-test geography automatically configures the Production track; treat these as separate settings.
+
+7. **Verify the closed-test qualification clock and tester count.**
    - Open **Closed testing -> production-access**.
    - Confirm the tester opt-in link is the one being used and that the required testers are shown as continuously opted in.
    - If this developer account is subject to Google's newer-personal-account rule, keep at least 12 testers continuously opted in for 14 days. Do not reset/recreate the track during that period.
 
-7. **Apply for Production access when Play enables the application.**
+8. **Apply for Production access when Play enables the application.**
    - When the Dashboard says the testing requirement is satisfied, open the Production access application.
    - Answer Google's questions about the closed test, tester engagement/feedback, app purpose, and production readiness truthfully.
    - Submit the production-access application.
@@ -319,12 +324,12 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 ### GitHub / Google Cloud release-credential boundary
 
-8. **Protect the GitHub release Environment.**
+9. **Protect the GitHub release Environment.**
    - GitHub repo -> Settings -> Environments -> `pack-one-mobile-release`.
    - Restrict deployment branches to the intended protected release branch policy and add the desired required reviewer(s).
    - Keep Apple release secrets scoped to this Environment rather than generally available repository secrets.
 
-9. **Narrow Google Workload Identity trust.**
+10. **Narrow Google Workload Identity trust.**
    - In Google Cloud IAM / Workload Identity Federation, restrict the Pack One provider/service-account trust so store credentials are accepted only from the intended Pack One repository and approved release context.
    - Do not broaden repository workflow access merely to make a release pass.
    - After you make this change, the repo can re-run the non-publishing Apple/Google access probes and record the result.
