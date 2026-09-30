@@ -57,6 +57,9 @@ jobs:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
         run: node scripts/edge-production-control.mjs preflight
 
+      - name: Verify production Auth branch binding
+        run: node scripts/production-auth-binding-guard.mjs
+
       - name: Ensure PostgreSQL client is available
         shell: bash
         run: |
@@ -151,6 +154,12 @@ jobs:
             test -n "$PATREON_CLIENT_ID" && test -n "$PATREON_CLIENT_SECRET" && test -n "$PATREON_WEBHOOK_SECRET"
           fi
 
+      - name: Deploy dedicated production recovery webhook Worker
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: node scripts/auth-webhook-control.mjs deploy-production
+
       - name: Apply additive secure-account schema to production
         shell: bash
         run: |
@@ -178,12 +187,6 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
-
-      - name: Deploy dedicated production recovery webhook Worker
-        env:
-          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
-          RELEASE_COMMIT: ${{ github.sha }}
-        run: node scripts/auth-webhook-control.mjs deploy-production
 
       - name: Deploy the development-tested revision to production
         env:
