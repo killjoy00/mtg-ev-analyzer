@@ -49,7 +49,8 @@
     "0043_corpus_activation_readiness.sql",
     "0044_snapshot_scoped_puzzle_uniqueness.sql",
     "0045_batched_practice_selector.sql",
-    "0045_apple_subscriptions.sql"
+    "0045_apple_subscriptions.sql",
+    "0046_public_identity_safety.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -146,7 +147,8 @@
         "0043_corpus_activation_readiness.sql",
         "0044_snapshot_scoped_puzzle_uniqueness.sql",
         "0045_batched_practice_selector.sql",
-        "0045_apple_subscriptions.sql"
+        "0045_apple_subscriptions.sql",
+        "0046_public_identity_safety.sql"
       ]
     },
     "daily-calendar": {
@@ -186,7 +188,8 @@
         "0042_serving_revision_snapshot_staging.sql",
         "0043_corpus_activation_readiness.sql",
         "0044_snapshot_scoped_puzzle_uniqueness.sql",
-        "0045_apple_subscriptions.sql"
+        "0045_apple_subscriptions.sql",
+        "0046_public_identity_safety.sql"
       ]
     },
     "launch-load": {
@@ -199,7 +202,8 @@
         "0040_practice_reroll_index.sql",
         "0041_corpus_source_snapshots.sql",
         "0041_apple_auth.sql",
-        "0042_serving_revision_snapshot_staging.sql"
+        "0042_serving_revision_snapshot_staging.sql",
+        "0046_public_identity_safety.sql"
       ]
     },
     "launch-distributed": {
@@ -214,7 +218,8 @@
         "0041_apple_auth.sql",
         "0042_serving_revision_snapshot_staging.sql",
         "0045_batched_practice_selector.sql",
-        "0045_apple_subscriptions.sql"
+        "0045_apple_subscriptions.sql",
+        "0046_public_identity_safety.sql"
       ]
     }
   }
