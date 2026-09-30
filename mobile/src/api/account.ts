@@ -19,9 +19,10 @@ export type AccountState = {
   };
 };
 
-type LinkState = {
+export type LinkState = {
   ok: boolean;
   merged: boolean;
+  newlyClaimed?: boolean;
   validatedDailyScore: boolean;
   playerId: string;
   token: string;
@@ -84,6 +85,19 @@ export async function signUpWithEmail(
   });
   if (!isMobileAuthResponse(result)) return { result, session: null };
   return { result, session: await persistAccount(result) };
+}
+
+export function linkMobileAccount(
+  session: MobileSession,
+  validateDailyRunId?: string,
+) {
+  if (!session.accountToken) throw new Error('Sign in before linking your Pack One account.');
+  return requestJson<LinkState>('/growth/v1/mobile/account/link', {
+    method: 'POST',
+    mobileSessionToken: session.playerToken,
+    mobileAccountToken: session.accountToken,
+    body: validateDailyRunId ? { validateDailyRunId } : {},
+  });
 }
 
 export async function startGoogleSignIn(current: MobileSession) {
