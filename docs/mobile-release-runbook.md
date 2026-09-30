@@ -1,8 +1,16 @@
 # Pack One mobile release runbook
 
-Updated 2026-09-25.
+Updated 2026-09-29.
 
 This is the owner runbook for Pack One mobile releases. It covers normal releases, emergency fixes, rollback/containment, and the external release-security boundary.
+
+## Current Pack One 1.0 candidate checkpoint — 2026-09-29
+
+- Reviewed release-request PR #772 merged as `c04ab3ba9f9def47708c67c2581596bcbd35f5c4` after required `test` and `browser` gates passed.
+- iOS build **100311** was signed from that merge and uploaded successfully to TestFlight Internal Only in run [36663311014](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36663311014).
+- Android versionCode **100311** was signed from that merge, verified against the protected Pack One upload certificate, and committed to Google Play Internal Testing in run [36663310963](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36663310963).
+- The owner reports the one-time first Google Play Closed Testing rollout has already been completed. The next release action is promotion of Android 100311 unchanged to the existing `alpha` track.
+- These store uploads establish the fresh signed RC identities; they do **not** replace physical iPhone/iPad/Android acceptance, forced-update verification, App Store reviewer/privacy completion, or Play production-access qualification.
 
 ## Plain-English meaning of the release-security requirement
 
