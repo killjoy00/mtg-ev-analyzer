@@ -128,15 +128,6 @@ test('verification event validation accepts only the measured send.magic_link em
     eventType:'send.magic_link',
     linkType:'email-verification',
   });
-  assert.deepEqual(validateVerificationEvent(fixture.payload,fixture.headers,['https://auth.current.example/pack1/auth',authBase]),{
-    eventId:'evt_test_12345678',
-    email:'person@example.com',
-    linkUrl,
-    expiresAt:fixture.payload.event_data.expires_at,
-    eventType:'send.magic_link',
-    linkType:'email-verification',
-  });
-
   assert.equal(validateRecoveryEvent(fixture.payload,fixture.headers),null);
   assert.equal(validateVerificationEvent({...fixture.payload,event_data:{...fixture.payload.event_data,link_type:'forget-password'}},fixture.headers,authBase),null);
   assert.equal(validateVerificationEvent({...fixture.payload,event_data:{...fixture.payload.event_data,link_url:'https://evil.example/verify?token=stolen'}},fixture.headers,authBase),null);
@@ -329,11 +320,11 @@ test('webhook handler accepts a verified email-verification event without forwar
   }
 });
 
-test('production Auth webhook accepts the previous Auth host during the controlled cutover',async()=>{
-  const current='https://auth.current-transition.example/pack1/auth';
-  const previous='https://auth.previous-transition.example/pack1/auth';
+test('production Auth webhook rejects a signed event from a non-current Auth host',async()=>{
+  const current='https://auth.current-only.example/pack1/auth';
+  const previous='https://auth.previous-retired.example/pack1/auth';
   const fixture=await signedFixture({
-    kid:'transition-kid',
+    kid:'retired-transition-kid',
     linkType:'email-verification',
     linkUrl:previous+'/verify-email?token=fixture-token-1234567890',
   });
@@ -345,73 +336,20 @@ test('production Auth webhook accepts the previous Auth host during the controll
     if(String(url)===previous+'/.well-known/jwks.json')return Response.json({keys:[fixture.jwk]});
     throw Error('unexpected network call');
   };
-  let received=null;
   const env={
     PACK1_AUTH_ENV:'production',
     AUTH_BASE:current,
-    AUTH_PREVIOUS_BASE:previous,
     RECOVERY_DEDUPE:{
       idFromName:value=>'id:'+value,
-      get:id=>({
-        fetch:async(_url,init)=>{
-          received={id,body:JSON.parse(init.body)};
-          return Response.json({ok:true,duplicate:false});
-        },
-      }),
+      get:()=>({fetch:async()=>Response.json({ok:true,duplicate:false})}),
     },
   };
   try{
     const response=await authWebhook(new Request('https://hook.example/webhook',{
       method:'POST',headers:fixture.headers,body:fixture.raw,
     }),env);
-    assert.equal(response.status,204);
-    assert.equal(received.id,'id:evt_test_12345678');
-    assert.equal(received.body.linkUrl,fixture.payload.event_data.link_url);
-    assert.ok(fetched.includes(current+'/.well-known/jwks.json'));
-    assert.ok(fetched.includes(previous+'/.well-known/jwks.json'));
-  }finally{
-    globalThis.fetch=originalFetch;
-  }
-});
-
-test('transition Durable Object accepts a verification link on the previous Auth host',async()=>{
-  const previous='https://auth.previous-dedupe.example/pack1/auth';
-  const originalFetch=globalThis.fetch;
-  globalThis.fetch=async url=>{
-    if(String(url)==='https://api.resend.com/emails')return Response.json({id:'email_transition_fixture'});
-    throw Error('unexpected network call');
-  };
-  const stored=new Map();
-  const dedupe=new RecoveryEventDedupe({
-    storage:{
-      get:async key=>stored.get(key),
-      put:async(key,value)=>stored.set(key,value),
-      setAlarm:async at=>stored.set('__alarm__',at),
-      deleteAll:async()=>stored.clear(),
-    },
-  },{
-    PACK1_AUTH_ENV:'production',
-    AUTH_BASE:'https://auth.current-dedupe.example/pack1/auth',
-    AUTH_PREVIOUS_BASE:previous,
-    RESEND_API_KEY:'re_fixture',
-    SENDER:'Pack One <accounts@packone.pro>',
-    VERIFICATION_SUBJECT:'Verify Your Email - Pack One',
-  });
-  try{
-    const response=await dedupe.fetch(new Request('https://pack1.internal/send',{
-      method:'POST',
-      headers:{'content-type':'application/json'},
-      body:JSON.stringify({
-        eventId:'evt_transition_12345678',
-        email:'person@example.com',
-        linkUrl:previous+'/verify-email?token=fixture-token-1234567890',
-        expiresAt:'2026-09-30T20:00:00.000Z',
-        eventType:'send.magic_link',
-        linkType:'email-verification',
-      }),
-    }));
-    assert.equal(response.status,200);
-    assert.equal(stored.get('sent').messageId,'email_transition_fixture');
+    assert.equal(response.status,401);
+    assert.deepEqual(fetched,[current+'/.well-known/jwks.json']);
   }finally{
     globalThis.fetch=originalFetch;
   }
