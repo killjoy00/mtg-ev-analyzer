@@ -43,7 +43,7 @@ const daily=await call('/draft/v1/daily-status',{headers:{origin,cookie:playerCo
 assert.deepEqual(daily.data.membership,{connected:false});
 assert.equal(daily.response.headers.get('access-control-allow-origin'),origin);
 assert.equal(daily.response.headers.get('access-control-allow-credentials'),'true');
-const neonAuth='https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const neonAuth='https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const googleResponse=await fetch(neonAuth+'/sign-in/social',{
   method:'POST',
   headers:{origin,'content-type':'application/json'},
