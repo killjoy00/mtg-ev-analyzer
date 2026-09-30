@@ -154,14 +154,55 @@ function setFormPending(form,pending,label) {
   return true;
 }
 
-async function returnToValidatedDaily(validationRunId,linked,source) {
-  event('daily_score_validated',{source});
+async function returnToValidatedDaily(validationRunId,linked,source,{confirmed=true}={}) {
+  if(confirmed)event('daily_score_validated',{source});
   const draft=await import('./draft-run-product.mjs?v=6');
-  await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null});
+  await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null,confirmed});
+}
+
+async function continueAfterSignupNamePrompt({skip=false}={}) {
+  const context=pendingSignupNamePrompt;
+  if(!context)return;
+  pendingSignupNamePrompt=null;
+  document.querySelector('#account-new-name-prompt')?.remove();
+  if(context.validationRunId) {
+    let linked=context.linked;
+    if(!skip&&!linked?.validatedDailyScore)linked=await linkAccount(undefined,{validateDailyRunId:context.validationRunId});
+    const confirmed=Boolean(linked?.validatedDailyScore);
+    pendingDailyRunValidation=null;
+    await returnToValidatedDaily(context.validationRunId,linked,context.source,{confirmed});
+    return;
+  }
+  if(context.intent==='patreon-activate'){await renderPatreonActivation({source:context.source});return;}
+  if(context.intent==='elite'){await openEliteLanding(context.source);return;}
+}
+
+async function openSignupNamePrompt({linked,validationRunId=null,intent=null,source='account'}={}) {
+  pendingSignupNamePrompt={linked,validationRunId,intent,source};
+  if(validationRunId)pendingDailyRunValidation=validationRunId;
+  const profiles=await import('./profile-product.mjs?v=7');
+  profiles.installProfileProductLayer();
+  (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+  await profiles.renderMyProfile();
+  document.querySelector('#profile-account-tab')?.click();
+  const input=document.querySelector('#profile-account input[name="displayName"]');
+  if(!input)return;
+  const prompt=document.createElement('div');
+  prompt.id='account-new-name-prompt';
+  prompt.className='form-success';
+  prompt.innerHTML='<strong>Choose the name shown on leaderboards.</strong> <button class="text-button" id="account-new-name-skip" type="button">Skip for now</button>';
+  input.closest('label')?.insertAdjacentElement('afterend',prompt);
+  input.focus();
+  document.querySelector('#account-new-name-skip')?.addEventListener('click',()=>void continueAfterSignupNamePrompt({skip:true}));
 }
 
 document.addEventListener('pack1:profile-updated',async eventObject=>{
-  if(!pendingDailyRunValidation||eventObject.detail?.usernameOwned!==true)return;
+  if(eventObject.detail?.usernameOwned!==true)return;
+  if(pendingSignupNamePrompt) {
+    try {await continueAfterSignupNamePrompt();} catch {}
+    return;
+  }
+  if(!pendingDailyRunValidation)return;
   const validationRunId=pendingDailyRunValidation;
   try {
     const linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
