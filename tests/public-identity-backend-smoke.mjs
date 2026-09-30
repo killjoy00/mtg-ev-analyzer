@@ -77,6 +77,12 @@ try {
 
   const reporterName=`PI Reporter ${tag}`;
   const targetName=`PI Target ${tag}`;
+  const prohibited=await callGrowth('/v1/profile',{
+    method:'PATCH',playerToken:target.token,accountToken:target.accountToken,status:400,
+    body:{displayName:'Pack One Support',acceptPublicIdentityTerms:true},
+  });
+  assert.equal(prohibited.code,'USERNAME_NOT_ALLOWED','server rejects prohibited public identity before publication');
+  assert.equal((await query('SELECT public_identity_terms_accepted_at FROM players WHERE id=$1::uuid',[target.playerId])).rows[0].public_identity_terms_accepted_at,null,'failed prohibited publication does not record terms acceptance');
   await callGrowth('/v1/profile',{
     method:'PATCH',playerToken:reporter.token,accountToken:reporter.accountToken,
     body:{displayName:reporterName,acceptPublicIdentityTerms:true},
