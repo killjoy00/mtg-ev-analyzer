@@ -51,7 +51,6 @@ async function fillAuth(kind='signin'){
   await form.waitFor();
   await form.locator('[name="email"]').fill('qa@example.invalid');
   await form.locator('[name="password"]').fill('fixture-password-123');
-  if(kind==='signup')await form.locator('[name="name"]').fill('Test Player');
   await form.getByRole('button',{name:kind==='signin'?'Sign in':'Create account',exact:true}).click();
 }
 
