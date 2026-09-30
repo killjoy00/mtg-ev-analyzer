@@ -8,14 +8,16 @@ Neon project: `Pack 1` (`patient-shadow-91417882`).
 
 Production database branch: `main` (`br-orange-feather-ayps8kep`).
 
-At the September 30 audit, Neon reported:
+At the September 30 audit, Neon initially reported a **6-hour** history-retention window. After the restore drill and cost review, Pack One intentionally increased the production Neon history-retention setting to **86,400 seconds / 24 hours**.
 
-- history retention: **21,600 seconds / 6 hours**;
+Current recovery assets:
+
+- Neon point-in-time history: **24 hours**;
 - one older manual snapshot: `pre-0033-unique-usernames` from September 22;
-- a new drill snapshot: `pack1-dr-drill-2026-09-30`;
-- a non-production restored copy: `pack1-dr-restore-drill-2026-09-30` / `br-dark-sound-ayxhwq1u`.
+- drill snapshot: `pack1-dr-drill-2026-09-30`;
+- non-production restored drill copy: `pack1-dr-restore-drill-2026-09-30` / `br-dark-sound-ayxhwq1u`.
 
-The six-hour history-retention value is provider configuration, not a Pack One data-loss objective. Do not describe it as an approved RPO.
+This is deliberately lightweight disaster recovery. Pack One's user/account/history data is useful but not treated as high-value financial or safety-critical data. The goal is a practical one-day rewind window for bad migrations or accidental writes, not a high-availability or archival backup program.
 
 ## September 30 restore drill
 
@@ -123,18 +125,19 @@ Run only read-only checks until a restored branch has been explicitly approved f
 - Reconcile scheduled triggers, Function deployments, custom domains and external credentials separately; branch data restoration does not prove those control-plane objects are correct.
 - Re-enable launch monitoring only after its durable watermark/state has been checked against the recovery point.
 
-## Snapshot and retention policy gap
+## Pack One recovery policy
 
-Issue #778 owns the remaining policy decision:
+Issue #778 adopts the following intentionally low-ceremony policy:
 
-- approved Pack One RPO and RTO;
-- Neon history-retention duration;
-- automatic/manual snapshot cadence and retention;
-- cost implications;
-- recurring restore-drill cadence;
-- cleanup policy for drill branches/snapshots.
+- **Point-in-time recovery window:** 24 hours in Neon.
+- **Routine snapshots:** none. Do not create daily or weekly snapshot jobs solely for backup.
+- **Pre-risk snapshots:** create a manual snapshot before a genuinely destructive or unusually risky production database operation when a clean rollback point would be useful.
+- **Restore drills:** the September 30, 2026 isolated restore proves the current mechanism. Repeat after a material change to the Neon/recovery architecture, or roughly annually if no such change occurs; there is no monthly/quarterly drill requirement.
+- **Notifications:** no success notifications and no recurring backup reminders. Surface only an actual recovery failure or a recovery event that needs owner action.
+- **RTO:** no strict uptime SLA is adopted. Recovery should use the documented runbook with correctness favored over an artificial time target.
+- **Older-than-24-hour loss:** accepted. If corruption is discovered outside the recovery window and no deliberate pre-risk snapshot covers it, Pack One may repair or recreate the affected low-value user/history state instead of maintaining longer archival recovery.
 
-Until that decision lands, the September 30 snapshot is recovery evidence, not a complete backup policy.
+At the September 2026 observed write rate, moving from 6 hours to 24 hours of Neon history was estimated to add only about **$0.20-$0.25/month** in retained-change-history cost. This is an operating estimate, not a billing guarantee.
 
 ## Safety rules
 
