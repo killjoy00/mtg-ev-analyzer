@@ -8,7 +8,7 @@ import {
 const PROJECT='patient-shadow-91417882',TITLE='[launch alert] Production capacity needs attention';
 const CONTINUATION_WORKFLOW='launch-alert.yml';
 export const MAX_CONTINUATION_DEPTH=12;
-const RECOVERABLE_ALERTS=new Set(['coverage_pending','coverage_continuation_failed']);
+const RECOVERABLE_ALERTS=new Set(['coverage_pending','coverage_continuation_failed','telemetry_unavailable']);
 export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:5000,quota_ms:1000,requests_per_day:100000,compute_cu_hours_per_day:24,compute_cu_hours_per_billing_period:200,egress_bytes_per_day:5*1024**3,egress_bytes_per_billing_period:50*1024**3};
 
 async function json(fetcher,url,token,body,method=body?'POST':'GET') {
@@ -195,7 +195,13 @@ export async function routeAlert(fetcher,env,report) {
     const persisted=report.coverage?.state_persisted===true;
     const resolved=condition==='coverage_pending'
       ?persisted&&report.coverage.pending_windows===0
-      :persisted&&['queued','not_needed'].includes(report.coverage?.continuation?.status);
+      :condition==='coverage_continuation_failed'
+        ?persisted&&['queued','not_needed'].includes(report.coverage?.continuation?.status)
+        :persisted
+          &&report.coverage.pending_windows===0
+          &&report.coverage.failed_window==null
+          &&report.coverage.unrecoverable!==true
+          &&!(report.errors?.length);
     if(!resolved)continue;
     const title=TITLE+' ('+condition+')';
     const match=issues.find(i=>!i.pull_request&&i.title===title);
