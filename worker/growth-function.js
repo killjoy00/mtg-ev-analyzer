@@ -27,6 +27,8 @@ const ALLOWED_ORIGINS=ACCOUNT_CONFIG.allowedOrigins;
 const TOKEN_PREFIX = 'p1_';
 const NEON_AUTH_BASE=ACCOUNT_CONFIG.authBase;
 const ACCOUNT_RETURN='https://packone.pro/';
+const AUTH_SIGNUP_NAME='Pack One Player';
+const EMAIL_NOT_VERIFIED_MESSAGE='Verify your email to finish creating your account. Check your inbox or send a new link.';
 const MOBILE_GOOGLE_CALLBACK='https://api.packone.pro/growth/v1/mobile/account/google/callback';
 const MOBILE_GOOGLE_RETURN='packone://account';
 const STATIC_ORIGIN = 'https://packone.pro';
@@ -689,7 +691,7 @@ async function handleAccountSignup(request) {
   requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const payload=await readJson(request);
   const data=await neonAuth('/sign-up/email',{method:'POST',body:{
-    name:String(payload.name||'').trim().slice(0,80),
+    name:AUTH_SIGNUP_NAME,
     email:String(payload.email||'').trim(),
     password:String(payload.password||''),
     callbackURL:ACCOUNT_RETURN+'?auth=verify',
@@ -699,14 +701,25 @@ async function handleAccountSignup(request) {
   return accountJson(established.auth,established.session,201);
 }
 
+function rethrowEmailNotVerified(error) {
+  if(error?.providerCode==='EMAIL_NOT_VERIFIED')
+    throw Object.assign(Error(EMAIL_NOT_VERIFIED_MESSAGE),{status:403,code:'EMAIL_NOT_VERIFIED'});
+  throw error;
+}
+
 async function handleAccountSignin(request) {
   requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const payload=await readJson(request);
-  const data=await neonAuth('/sign-in/email',{method:'POST',body:{
-    email:String(payload.email||'').trim(),
-    password:String(payload.password||''),
-    rememberMe:true,
-  }});
+  let data;
+  try {
+    data=await neonAuth('/sign-in/email',{method:'POST',body:{
+      email:String(payload.email||'').trim(),
+      password:String(payload.password||''),
+      rememberMe:true,
+    }});
+  } catch(error) {
+    rethrowEmailNotVerified(error);
+  }
   const established=await establishAccount(data);
   if(!established)throw Object.assign(Error('Sign in did not create an account session.'),{status:502});
   return accountJson(established.auth,established.session);
@@ -756,7 +769,7 @@ async function handleMobileAccountSignup(request) {
   await consumePlayerLimit(query,owner,'mobile-account-auth',{limit:12,seconds:600});
   const payload=await readJson(request);
   const data=await neonAuth('/sign-up/email',{method:'POST',body:{
-    name:String(payload.name||'').trim().slice(0,80),
+    name:AUTH_SIGNUP_NAME,
     email:String(payload.email||'').trim(),
     password:String(payload.password||''),
     callbackURL:ACCOUNT_RETURN+'?auth=verify',
@@ -773,11 +786,16 @@ async function handleMobileAccountSignin(request) {
   const owner=await player(request);
   await consumePlayerLimit(query,owner,'mobile-account-auth',{limit:12,seconds:600});
   const payload=await readJson(request);
-  const data=await neonAuth('/sign-in/email',{method:'POST',body:{
-    email:String(payload.email||'').trim(),
-    password:String(payload.password||''),
-    rememberMe:true,
-  }});
+  let data;
+  try {
+    data=await neonAuth('/sign-in/email',{method:'POST',body:{
+      email:String(payload.email||'').trim(),
+      password:String(payload.password||''),
+      rememberMe:true,
+    }});
+  } catch(error) {
+    rethrowEmailNotVerified(error);
+  }
   const established=await establishAccount(data);
   return finishMobileAccount(request,established,{
     validateDailyRunId:payload.validateDailyRunId==null?null:String(payload.validateDailyRunId),
@@ -1414,6 +1432,7 @@ async function handleLink(request,{browser=false,mobile=false}={}) {
   let id = old.rows[0]?.player_id || current;
   let merged = false;
   let linkChanged = !old.rows.length;
+  let newlyClaimed = false;
 
   if (!old.rows.length) {
     const claimed=await query(
@@ -1429,6 +1448,7 @@ async function handleLink(request,{browser=false,mobile=false}={}) {
         SELECT player_id FROM claimed`,
       [auth.user_id, current],
     );
+    newlyClaimed=claimed.rows.length>0;
     if(!claimed.rows.length) {
       const pending=await query('SELECT 1 FROM account_deletion_operations WHERE auth_user_id=$1::uuid LIMIT 1',[auth.user_id]);
       if(pending.rows.length)throw Object.assign(Error('This account is being deleted.'),{status:409,code:'ACCOUNT_DELETING'});
@@ -1466,11 +1486,17 @@ async function handleLink(request,{browser=false,mobile=false}={}) {
   const validatedDailyScore = validateDailyRunId
     ? await validateDailyRunScore(validateDailyRunId, id, auth.user_id)
     : false;
+  let newlyClaimedPasswordAccount=false;
+  if(newlyClaimed) {
+    const credential=await query('SELECT 1 FROM neon_auth.account WHERE "userId"=$1::uuid AND "providerId"=$2 LIMIT 1',[auth.user_id,'credential']);
+    newlyClaimedPasswordAccount=credential.rows.length>0;
+  }
   const playerToken=await tokenFor(id);
   let response=json({
     ok: true,
     merged,
     validatedDailyScore,
+    newlyClaimed:newlyClaimedPasswordAccount,
     playerId: id,
     ...(browser?{}:{token:playerToken}),
     displayName: profile?.display_name || auth.name || 'Pack Player',
