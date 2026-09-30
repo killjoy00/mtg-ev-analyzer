@@ -12,6 +12,10 @@ function baseUrl() { return String(window.PACK1_API?.growthUrl || window.PACK1_A
 function draftUrl() { return String(window.PACK1_API?.draftRunUrl || '').replace(/\/$/, ''); }
 function authBase() { return String(window.PACK1_API?.authBase || '').replace(/\/$/, ''); }
 export function firstPartyAuthEnabled() { return window.PACK1_API?.firstParty === true; }
+export function authCompleted(data,{firstParty=firstPartyAuthEnabled()}={}) {
+  if(data?.verificationRequired===true)return false;
+  return firstParty?Boolean(data?.session):Boolean(data?.token);
+}
 function loadPackToken() { try { return localStorage.getItem(TOKEN_KEY); } catch { return null; } }
 function loadAuthToken() { try { return localStorage.getItem(AUTH_TOKEN_KEY); } catch { return null; } }
 function displayName() { try { return localStorage.getItem(NAME_KEY) || 'Pack Player'; } catch { return 'Pack Player'; } }
@@ -292,9 +296,10 @@ export async function disconnectPatreon() {
   return data;
 }
 
-export async function signUpAccount({name,email,password}) {
+export async function signUpAccount({email,password}) {
   const firstParty=firstPartyAuthEnabled();
-  const data=await authRequest('/sign-up/email',{method:'POST',body:{name,email,password}});
+  const body=firstParty?{email,password}:{name:'Pack One Player',email,password};
+  const data=await authRequest('/sign-up/email',{method:'POST',body});
   if(firstParty)signalAccountChange();
   else if(data?.token){try{localStorage.setItem(AUTH_TOKEN_KEY,data.token);}catch{}signalAccountChange();}
   return data;
