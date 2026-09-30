@@ -1,6 +1,15 @@
 # Pack One mobile store submission packet
 
-Updated 2026-09-27. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated 2026-09-29. This file is the source-of-truth submission packet for the first free public mobile release.
+
+## Current launch-preparation checkpoint — 2026-09-29
+
+- Fresh signed source: merge `c04ab3ba9f9def47708c67c2581596bcbd35f5c4` from #772.
+- iOS 1.0 build **100311** was signed and uploaded successfully to TestFlight Internal Only in run [36663311014](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36663311014). It supersedes build 100243 as launch-candidate evidence. Physical iPhone/iPad and StoreKit acceptance still remain before App Review.
+- Android 1.0 versionCode **100311** was signed with the protected Pack One upload key and committed successfully to Google Play Internal Testing in run [36663310963](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36663310963). This packet requests promotion of that exact bundle, without rebuilding, to the existing `alpha` Closed Testing track.
+- The owner confirmed the one-time first Google Play Closed Testing rollout was completed in Play Console, so the app is no longer waiting on the original draft-app rollout action.
+- App Store listing metadata is configured with manual release; five iPhone screenshots, five iPad screenshots, and the Elite App Review screenshot are uploaded. Elite is configured at $7.00/month in the U.S., Apple's corresponding $9.00 Canadian price, USA/CAN availability only, Family Sharing off, and Production/Sandbox Server Notifications V2.
+- Google Play has the reviewed 512 icon, five phone screenshots, and 1024x500 feature graphic. The Google Play Data Safety declaration was successfully submitted in run [36632174516](https://github.com/killjoy00/mtg-ev-analyzer/actions/runs/36632174516).
 
 ## Shared release identity
 
@@ -256,14 +265,15 @@ Use the repository's deterministic native screenshot harness rather than mock ma
 - The first production release does **not** offer a staged rollout percentage; Google documents staged percentages for updates, not the first production release. The first production release goes to all users in the selected production countries.
 - Initial public regions: **United States and Canada only**.
 
-## Items that still require authenticated store-console actions
+## Remaining authenticated store-console / release actions
 
-The current ChatGPT environment cannot open the logged-in App Store Connect or Play Console UI, so these must be entered through a logged-in store session or a future store API workflow:
-- upload final screenshots / Play feature graphic
-- enter App Privacy / Data safety questionnaire responses
-- answer the Apple age-rating and Play IARC questionnaires
-- enter the final reviewer account credentials
-- set/verify public countries/regions are **United States and Canada only**
-- submit for review / start closed testing / start production release
+Already completed and verified through the protected store workflows: Apple product-page metadata and manual-release setting; Apple iPhone/iPad screenshots and Elite review screenshot; Google Play listing copy, icon, phone screenshots and feature graphic; Google Play Data Safety submission; and the owner's one-time initial Closed Testing rollout.
 
-Do not treat those clicks as engineering work; the content above is the prepared source-of-truth for them.
+Remaining launch actions that are not yet evidenced as complete:
+- complete/verify App Store App Privacy responses, reviewer account/review instructions, app-level USA/Canada distribution, final build attachment, and App Review submission;
+- complete/verify Google Play Ads, App access/reviewer credentials, target-audience declarations, IARC content rating, Managed Publishing, and production-country selection if those console-only items are not already set;
+- complete physical-device acceptance on the exact iOS/Android 100311 candidates, including iPhone/iPad StoreKit lifecycle acceptance and Android tester install/upgrade acceptance;
+- keep the Play Closed Testing tester cohort continuously qualified for the period Play requires for this developer account, then apply for Production access when Play marks the account eligible;
+- submit/release each store only after the exact accepted RC evidence is recorded in #575 and the owner gives final launch approval.
+
+Do not re-open completed screenshot, Play listing-asset, or Play Data Safety work unless the candidate UI/data behavior materially changes.
