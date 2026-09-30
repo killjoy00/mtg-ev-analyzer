@@ -29,6 +29,7 @@ type LinkState = {
   profileKey?: string | null;
   email?: string | null;
   rankingIdentity?: { eligible: boolean; reason?: string | null };
+  newlyClaimed?: boolean;
 };
 
 export type MobileAuthResponse = {
@@ -73,7 +74,6 @@ export async function signInWithEmail(
 
 export async function signUpWithEmail(
   current: MobileSession,
-  name: string,
   email: string,
   password: string,
   validateDailyRunId?: string,
@@ -81,7 +81,7 @@ export async function signUpWithEmail(
   const result = await requestJson<SignupResponse>('/growth/v1/mobile/account/signup', {
     method: 'POST',
     mobileSessionToken: current.playerToken,
-    body: { name, email, password, validateDailyRunId },
+    body: { email, password, validateDailyRunId },
   });
   if (!isMobileAuthResponse(result)) return { result, session: null };
   return { result, session: await persistAccount(result) };
