@@ -19,6 +19,8 @@ The production application must therefore use the Auth base reported for the ser
 
 During the corrective cutover, `pack1-authhook` temporarily accepts signed verification events and verification links from both the current and immediately previous Auth bases so email verification is not dropped between the Worker and backend deployments. Remove the previous-host allowance in a follow-up only after the new production round trip is accepted.
 
+Before that corrective release, the existing Google OAuth web client must authorize `https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/callback/google`. Better Auth constructs the Google callback under the configured Auth base. Pack One's Apple web flow is independent of the Neon Auth host and continues to use `https://api.packone.pro/growth/v1/account/apple/callback`.
+
 Development/QA Neon Auth:
 
 - branch: `br-twilight-hill-ayffyd2b` (`dev-draft-run-product-review`)
