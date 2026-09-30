@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Deploy one-click Admin campaign publishing through the guarded development-first release: production-only admin publish route, scoped GitHub workflow dispatch, readiness marker, and fixed gateway route."}
+{"operation":"deploy-secure-auth","reason":"Correct the September 30 production Auth branch split: deploy the reviewed webhook-first dual-host transition, bind production Auth to the serving orange branch, and verify live Google OAuth after the owner added the new authorized redirect URI."}
