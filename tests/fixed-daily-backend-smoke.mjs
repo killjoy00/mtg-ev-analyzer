@@ -63,15 +63,21 @@ assert.equal(accountRun.current.puzzle_id,schedule[0]);assert.equal(accountRun.l
 assert.equal((await call('/v1/runs',{daily:true},owner.token,auth)).id,accountRun.id);
 accountRun=await finish(accountRun,owner.token);assert.ok(accountRun.standing);
 assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid AND challenge_date=$2::date',[owner.playerId,day])).rows[0].n,'1');
-// A completed guest Daily can be validated by the explicit sign-in/link action.
+// A completed guest Daily must not become public/ranked merely because the
+// player signs in. Public Identity terms must be accepted first, and accepting
+// them later does not silently rewrite an already-finished guest result.
 const guestAuthId=crypto.randomUUID(),guestAuth=crypto.randomUUID()+crypto.randomUUID();
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[guestAuthId,'QA late link',`qa-late-${tag}@example.invalid`]);
 await query('INSERT INTO neon_auth.session(token,"userId","expiresAt","updatedAt") VALUES($1,$2::uuid,now()+interval \'1 hour\',now())',[guestAuth,guestAuthId]);
 const validated=await callGrowth('/v1/account/link',{validateDailyRunId:run.id},guest.token,guestAuth);
-assert.equal(validated.validatedDailyScore,true);
+assert.equal(validated.validatedDailyScore,false);
+assert.equal(validated.rankingIdentity.eligible,false);
+assert.equal(validated.rankingIdentity.reason,'terms_required');
+await callGrowth('/v1/profile',{displayName:'QA fixed '+tag,acceptPublicIdentityTerms:true},guest.token,guestAuth,200,{method:'PATCH'});
+assert.equal((await call('/v1/daily-status',undefined,guest.token,guestAuth)).ranking_identity.eligible,true);
 const lateResume=await call('/v1/runs',{daily:true},guest.token);
-assert.equal(lateResume.id,run.id);assert.equal(lateResume.leaderboard_eligible,true);assert.ok(lateResume.standing);
-assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid',[guest.playerId])).rows[0].n,'1');
+assert.equal(lateResume.id,run.id);assert.equal(lateResume.leaderboard_eligible,false);assert.equal(lateResume.standing,null);
+assert.equal((await query('SELECT count(*) n FROM scores WHERE player_id=$1::uuid',[guest.playerId])).rows[0].n,'0');
 // Linked player with no Auth header still cannot use paid or free account practice.
 await call('/v1/runs',{},owner.token,null,403);
 let latest=await call('/v1/runs',{daily:true,environment:'latest'},owner.token);
