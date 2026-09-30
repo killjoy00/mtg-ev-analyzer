@@ -366,7 +366,8 @@ async function leaderboard(request) {
   const season=period==='season'?await resolveCurrentSeason(query,{today,ensureSchedule:ensureDailyScheduleForQuery}):null;
   if(period==='season'&&!season)return json({period:'season',environment,start:null,today,season:null,rows:[]});
   const start=period==='daily'?today:period==='season'?season.start_date:period==='week'?(()=>{const d=new Date(today+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);})():'2000-01-01';
-  const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,limit:100});
+  const blockedByPlayerId=await player(request,false);
+  const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,blockedByPlayerId,limit:100});
   return json({period,environment,start,today,season:period==='season'?season:null,rows});
 }
 async function route(request) {
