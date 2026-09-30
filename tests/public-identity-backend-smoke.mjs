@@ -193,6 +193,6 @@ try {
   // The backend gate uses a disposable branch, but leave fixtures tidy so this
   // test is safe to rerun within the same branch.
   await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[adminId]).catch(()=>{});
-  await query('DELETE FROM neon_auth.session WHERE token=ANY($1::text[])',[[reporter.accountToken,target.accountToken,adminToken]]).catch(()=>{});
-  await query('DELETE FROM neon_auth."user" WHERE id=ANY($1::uuid[])',[[reporter.authId,target.authId,adminId]]).catch(()=>{});
+  await query('DELETE FROM neon_auth.session WHERE token IN ($1,$2,$3)',[reporter.accountToken,target.accountToken,adminToken]).catch(()=>{});
+  await query('DELETE FROM neon_auth."user" WHERE id IN ($1::uuid,$2::uuid,$3::uuid)',[reporter.authId,target.authId,adminId]).catch(()=>{});
 }
