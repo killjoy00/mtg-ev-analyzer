@@ -30,8 +30,8 @@ globalThis.fetch=async(url,options={})=>{
   if(path==='/growth/v1/player/session')return Response.json({ok:true,playerId:'player'});
   if(path==='/growth/v1/account/migrate')return Response.json({ok:true,migrated:true,user:{id:'user',email:'qa@example.invalid',name:'QA'}});
   if(path==='/growth/v1/account/session')return Response.json({user:{id:'user',email:'qa@example.invalid',name:'QA'},session:{expiresAt:'2099-01-01T00:00:00Z'}});
-  if(path==='/growth/v1/account/signup')return Response.json({user:{id:'signup-user',email:'new@example.invalid',name:'New QA'}});
-  if(path==='/growth/v1/account/signin')return Response.json({user:{id:'signin-user',email:'qa@example.invalid',name:'QA'}});
+  if(path==='/growth/v1/account/signup')return Response.json({user:{id:'signup-user',email:'new@example.invalid',name:'Pack One Player'},session:{expiresAt:'2099-01-01T00:00:00Z'}});
+  if(path==='/growth/v1/account/signin')return Response.json({user:{id:'signin-user',email:'qa@example.invalid',name:'QA'},session:{expiresAt:'2099-01-01T00:00:00Z'}});
   if(path==='/growth/v1/profile')return Response.json({player:{display_name:'QA Changed'}});
   if(path==='/growth/v1/account/request-password-reset')return Response.json({ok:true,message:'generic'});
   if(path==='/growth/v1/account/reset-password')return Response.json({ok:true});
@@ -40,6 +40,13 @@ globalThis.fetch=async(url,options={})=>{
   throw Error('Unexpected '+path);
 };
 const auth=await import('../growth-api.mjs');
+
+test('first-party auth completion requires a session and verificationRequired wins over user presence',()=>{
+  assert.equal(auth.accountAuthCompleted({verificationRequired:true,user:{id:'pending'}},{firstParty:true}),false);
+  assert.equal(auth.accountAuthCompleted({user:{id:'user-only'}},{firstParty:true}),false);
+  assert.equal(auth.accountAuthCompleted({user:{id:'ready'},session:{expiresAt:'2099-01-01T00:00:00Z'}},{firstParty:true}),true);
+  assert.equal(auth.accountAuthCompleted({token:'legacy-token'},{firstParty:false}),true);
+});
 
 test('first-party migration removes browser bearer credentials and uses credentialed cookies',async()=>{
   const session=await auth.getAuthSession();
@@ -127,6 +134,8 @@ test('first-party sign-up and sign-in dispatch account changes and rotate the cr
   assert.deepEqual(Object.keys(JSON.parse(first)),['nonce']);
   assert.deepEqual(Object.keys(JSON.parse(second)),['nonce']);
   assert.equal(dispatched.slice(before).filter(name=>name==='packone-account-changed').length,2);
-  assert.ok(calls.some(row=>row.path==='/growth/v1/account/signup'));
+  const signup=calls.findLast(row=>row.path==='/growth/v1/account/signup');
+  assert.deepEqual(JSON.parse(signup.body),{email:'new@example.invalid',password:'password-123'});
+  assert.ok(!('name' in JSON.parse(signup.body)),'first-party signup must not send the discarded display name');
   assert.ok(calls.some(row=>row.path==='/growth/v1/account/signin'));
 });
