@@ -384,15 +384,43 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     try {
       const data=Object.fromEntries(new FormData(form));
       const auth=await signInAccount(data);
-      if(!authCompleted(auth))throw Error('Sign in did not return an account session.');
+      if(!accountAuthCompleted(auth))throw Error('Sign in did not return an account session.');
       const claimed=await claimCurrentSession();
       event('auth_sign_in',{source});
+      if(claimed?.linked?.newlyClaimed) {
+        await openSignupNamePrompt({
+          linked:claimed.linked,
+          validationRunId:claimed.pendingValidationRunId,
+          intent,source,
+        });
+        return;
+      }
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
       if(activatingPatreon){await renderPatreonActivation({source});return;}
       if(upgradingElite){await openEliteLanding(source);return;}
       await renderAccount({intent,source});
     } catch(error) {
       err.textContent=error?.message||'Sign in failed.';
+      if(error?.code==='EMAIL_NOT_VERIFIED') {
+        let resend=form.querySelector('#account-signin-verification-resend');
+        if(!resend) {
+          resend=document.createElement('button');
+          resend.className='button secondary';
+          resend.id='account-signin-verification-resend';
+          resend.type='button';
+          resend.textContent='Send a new verification link';
+          form.insertBefore(resend,err);
+          resend.addEventListener('click',async()=>{
+            resend.disabled=true;
+            try {
+              const result=await requestVerificationEmail(String(new FormData(form).get('email')||''));
+              err.textContent=result?.message||"If an unverified account exists for that email, we've sent a verification link.";
+            } catch(resendError) {
+              err.textContent=resendError?.message||'Email verification is temporarily unavailable.';
+            } finally {resend.disabled=false;}
+          });
+        }
+      }
       setFormPending(form,false);
     }
   });
