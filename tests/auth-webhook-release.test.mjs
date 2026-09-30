@@ -79,6 +79,9 @@ test('secure Auth release deploys the production recovery Worker from the exact 
   assert.match(workflow,/name: Deploy dedicated production recovery webhook Worker/);
   assert.match(workflow,/RELEASE_COMMIT: \$\{\{ github\.sha \}\}/);
   assert.match(workflow,/auth-webhook-control\.mjs deploy-production/);
+  const deployWebhookIndex=workflow.indexOf('name: Deploy dedicated production recovery webhook Worker');
+  const deployBackendIndex=workflow.indexOf('name: Deploy the development-tested revision to production');
+  assert.ok(deployWebhookIndex>=0&&deployBackendIndex>=0&&deployWebhookIndex<deployBackendIndex,'production Auth webhook must deploy before backend cutover');
 });
 
 
