@@ -245,6 +245,52 @@ test('recoverable coverage issue closes after catch-up recovery',async()=>{
  assert.equal(calls.length,2);
 });
 
+test('telemetry incident closes only after a clean fully caught-up run',async()=>{
+ const calls=[];
+ const fetcher=async(url,options={})=>{
+  calls.push({url,options});
+  if((options.method||'GET')==='GET')return Response.json([{
+   title:'[launch alert] Production capacity needs attention (telemetry_unavailable)',number:88,
+  }]);
+  assert.equal(options.method,'PATCH');
+  assert.match(url,/\/issues\/88$/);
+  assert.deepEqual(JSON.parse(options.body),{state:'closed',state_reason:'completed'});
+  return Response.json({number:88,state:'closed'});
+ };
+ const action=await routeAlert(fetcher,{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{
+  alerts:[],errors:[],coverage:{
+   state_persisted:true,pending_windows:0,failed_window:null,unrecoverable:false,
+   continuation:{status:'not_needed'},
+  },
+ });
+ assert.equal(action,'recovered');
+ assert.equal(calls.length,2);
+});
+
+test('telemetry incident stays open until clean catch-up evidence exists',async()=>{
+ const unsafeCoverage=[
+  {state_persisted:false,pending_windows:0,failed_window:null,unrecoverable:false},
+  {state_persisted:true,pending_windows:1,failed_window:null,unrecoverable:false},
+  {state_persisted:true,pending_windows:0,failed_window:{error:'502'},unrecoverable:false},
+  {state_persisted:true,pending_windows:0,failed_window:null,unrecoverable:true},
+ ];
+ for(const coverage of unsafeCoverage){
+  let patches=0;
+  const fetcher=async(_url,options={})=>{
+   if((options.method||'GET')==='GET')return Response.json([{
+    title:'[launch alert] Production capacity needs attention (telemetry_unavailable)',number:88,
+   }]);
+   if(options.method==='PATCH')patches++;
+   return Response.json({number:88});
+  };
+  const action=await routeAlert(fetcher,{GITHUB_REPOSITORY:'owner/repo',GITHUB_TOKEN:'token'},{
+   alerts:[],errors:[],coverage,
+  });
+  assert.equal(action,'none');
+  assert.equal(patches,0);
+ }
+});
+
 test('recoverable coverage issue stays open when coverage persistence is unavailable',async()=>{
  let patches=0;
  const fetcher=async(url,options={})=>{
