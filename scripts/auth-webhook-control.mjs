@@ -14,7 +14,6 @@ const CONFIGS={
   production:{
     worker:'pack1-authhook',
     authBase:'https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth',
-    previousAuthBase:'https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth',
     sender:'Pack One <accounts@packone.pro>',
     subject:'Reset Your Password - Pack One',
     verificationSubject:'Verify Your Email - Pack One',
@@ -117,7 +116,6 @@ async function deploy(target,{forceFailure=false,forceRetryAfterSend=false}={}) 
     migrations:[{tag:'v1',new_sqlite_classes:['RecoveryEventDedupe']}],
     vars:{
       AUTH_BASE:cfg.authBase,
-      ...(cfg.previousAuthBase?{AUTH_PREVIOUS_BASE:cfg.previousAuthBase}:{}),
       PACK1_AUTH_ENV:target==='production'?'production':'qa',
       RESET_ORIGIN:cfg.resetOrigin,
       SENDER:cfg.sender,
