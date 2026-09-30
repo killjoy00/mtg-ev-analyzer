@@ -36,20 +36,25 @@ function resetUrl(origin,token) {
   base.hash='token='+encodeURIComponent(token);
   return base.href;
 }
+function authBases(value) {
+  const values=Array.isArray(value)?value:[value];
+  return [...new Set(values.map(item=>safeString(item,2048)).filter(Boolean))];
+}
 function validatedAuthLink(authBase,value) {
   const raw=safeString(value,2048);
-  const configured=safeString(authBase,2048);
-  if(!raw||!configured)return null;
-  try {
-    const base=new URL(configured);
-    const link=new URL(raw);
-    const basePath=base.pathname.endsWith('/')?base.pathname:base.pathname+'/';
-    if(base.protocol!=='https:'||link.protocol!=='https:'||link.username||link.password)return null;
-    if(link.origin!==base.origin||!link.pathname.startsWith(basePath))return null;
-    return link.href;
-  } catch {
-    return null;
+  const configured=authBases(authBase);
+  if(!raw||!configured.length)return null;
+  let link;
+  try {link=new URL(raw);} catch {return null;}
+  if(link.protocol!=='https:'||link.username||link.password)return null;
+  for(const candidate of configured) {
+    try {
+      const base=new URL(candidate);
+      const basePath=base.pathname.endsWith('/')?base.pathname:base.pathname+'/';
+      if(base.protocol==='https:'&&link.origin===base.origin&&link.pathname.startsWith(basePath))return link.href;
+    } catch {}
   }
+  return null;
 }
 // A wrong noun is worse than a vague one, so an unrecognised label degrades to
 // "This link" rather than inheriting whichever template was written first.
@@ -271,7 +276,7 @@ export class RecoveryEventDedupe {
     const commonValid=validEventId(event?.eventId)&&validEmail(event?.email)&&safeString(event?.expiresAt,128);
     const recoveryValid=event?.linkType==='forget-password'&&safeString(event?.token,512);
     const verificationValid=event?.linkType==='email-verification'
-      && validatedAuthLink(this.env.AUTH_BASE,event?.linkUrl)===event?.linkUrl;
+      && validatedAuthLink([this.env.AUTH_BASE,this.env.AUTH_PREVIOUS_BASE],event?.linkUrl)===event?.linkUrl;
     if(!commonValid||(!recoveryValid&&!verificationValid))return responseJson({ok:false},400);
 
     try {
@@ -375,7 +380,15 @@ export async function authWebhook(request,env) {
   if(rawBytes.byteLength===0||rawBytes.byteLength>MAX_BODY_BYTES)return new Response(null,{status:413});
 
   const verifyStarted=Date.now();
-  if(!env.AUTH_BASE||!(await verifyNeonWebhook(rawBytes,request.headers,env.AUTH_BASE))) {
+  const configuredAuthBases=authBases([env.AUTH_BASE,env.AUTH_PREVIOUS_BASE]);
+  let verified=false;
+  for(const authBase of configuredAuthBases) {
+    if(await verifyNeonWebhook(rawBytes,request.headers,authBase)) {
+      verified=true;
+      break;
+    }
+  }
+  if(!verified) {
     logTiming(env,request.headers.get('x-neon-delivery-attempt'),{status:'invalid_signature',verify_ms:Date.now()-verifyStarted,total_ms:Date.now()-started});
     return new Response(null,{status:401});
   }
@@ -387,7 +400,7 @@ export async function authWebhook(request,env) {
 
   const deliveryAttempt=request.headers.get('x-neon-delivery-attempt');
   const event=validateRecoveryEvent(payload,request.headers)
-    || validateVerificationEvent(payload,request.headers,env.AUTH_BASE);
+    || validateVerificationEvent(payload,request.headers,configuredAuthBases);
   if(!event) {
     const details={
       status:'rejected_event',
