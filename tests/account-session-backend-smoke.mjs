@@ -97,6 +97,7 @@ const linkedResponse=await growth.fetch(new Request('https://packone.pro/v1/acco
   body:'{}',
 }));
 const linked=await json(linkedResponse);
+assert.equal(linked.newlyClaimed,true,'first account attachment is identified for post-signup UX');
 assert.equal(linked.token,undefined,'browser link never exposes player bearer');
 const linkedCookies=cookies(linkedResponse);
 const rotated=value(linkedCookies,'__Host-pack1_account'),rotatedCsrf=value(linkedCookies,'__Secure-pack1_csrf'),player=value(linkedCookies,'__Host-pack1_player');
@@ -115,6 +116,7 @@ const noopResponse=await growth.fetch(new Request('https://packone.pro/v1/accoun
 }));
 const noop=await json(noopResponse);
 assert.equal(noop.merged,false);
+assert.equal(noop.newlyClaimed,false,'an existing account link is not reclassified as newly claimed');
 assert.equal(cookies(noopResponse).length,0,'no-op link rewrites no identity cookies');
 assert.equal(Number((await query('SELECT count(*) n FROM account_sessions WHERE auth_user_id=$1::uuid',[authId])).rows[0].n),beforeNoop,'no-op link creates no session row');
 assert.equal(Number((await query('SELECT count(*) n FROM account_sessions WHERE auth_user_id=$1::uuid AND revoked_at IS NULL',[authId])).rows[0].n),1,'the existing account session stays active');
