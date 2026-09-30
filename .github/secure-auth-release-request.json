@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Complete September 30 Auth branch-binding incident cleanup: deploy merged PR #799 and redeploy production pack1-authhook with only the serving-branch AUTH_BASE after successful real Google sign-in acceptance."}
+{"operation":"deploy-secure-auth","reason":"Deploy merged PR #801: correct verification-required signup/sign-in UX, remove signup display-name requirement, preserve post-claim leaderboard-name continuation, and release the tested Pack One account backend/web revision."}
