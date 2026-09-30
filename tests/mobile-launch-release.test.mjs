@@ -36,7 +36,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
     if (path === '.github/workflows/ios-testflight.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/testflight-release-request\.json'/s, path);
-      assert.match(workflow, /request\.get\('operation'\) != 'upload-testflight-internal'/, path);
+      assert.match(workflow, /request\.get\('operation'\) != 'upload-testflight-app-store-eligible'/, path);
     } else if (path === '.github/workflows/android-internal-testing.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-release-request\.json'/s, path);
@@ -120,7 +120,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   const ios = read('.github/workflows/ios-testflight.yml');
   const iosRequest = JSON.parse(read('.github/testflight-release-request.json'));
   assert.deepEqual(Object.keys(iosRequest).sort(), ['operation','reason']);
-  assert.equal(iosRequest.operation, 'upload-testflight-internal');
+  assert.equal(iosRequest.operation, 'upload-testflight-app-store-eligible');
   assert.equal(typeof iosRequest.reason, 'string');
   assert.ok(iosRequest.reason.trim().length > 0);
 
@@ -221,6 +221,13 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.ok(androidStatusRequest.reason.trim().length > 0);
 
   assert.match(ios, /CFBundleShortVersionString/);
+  assert.match(ios, /testFlightInternalTestingOnly[\s\S]*<false\/>/);
+  assert.match(ios, /app-store-finalize-release-candidate\.mjs/);
+  const iosFinalize = read('.github/scripts/app-store-finalize-release-candidate.mjs');
+  assert.match(iosFinalize, /APP_STORE_ELIGIBLE/);
+  assert.match(iosFinalize, /INTERNAL_ONLY/);
+  assert.match(iosFinalize, /relationships\/build/);
+  assert.match(iosFinalize, /reviewSubmissionCreated: false/);
   assert.match(ios, /store-release\.json/);
 
   const android = read('.github/workflows/android-internal-testing.yml');
