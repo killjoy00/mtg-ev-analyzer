@@ -14,7 +14,10 @@ let delaySignup=false;
 let delaySignin=false;
 let delayGoogle=false;
 let googleStartFails=false;
+let emailNotVerified=false;
+let newlyClaimed=false;
 let linkBodies=[];
+let verificationResends=[];
 
 const accountUser={id:'22222222-2222-4222-8222-222222222222',email:'qa@example.invalid',name:'QA Player'};
 const completedRun={
@@ -54,16 +57,26 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
   } else if(path==='/v1/account/signup') {
     const input=route.request().postDataJSON();
     if(delaySignup)await new Promise(resolve=>setTimeout(resolve,300));
-    if(verificationRequired)body={ok:true,verificationRequired:true,email:input.email};
-    else {signed=true;body={ok:true,user:{...accountUser,email:input.email,name:input.name}};}
+    if(verificationRequired){status=202;body={ok:true,verificationRequired:true,user:{...accountUser,email:input.email,name:'Pack One Player'}};}
+    else {status=201;signed=true;body={ok:true,user:{...accountUser,email:input.email,name:'Pack One Player'},session:{expiresAt:'2099-01-01T00:00:00Z'}};}
   } else if(path==='/v1/account/signin') {
     if(delaySignin)await new Promise(resolve=>setTimeout(resolve,300));
-    signed=true;
-    body={ok:true,user:accountUser};
+    if(emailNotVerified){
+      status=403;
+      body={error:'Verify your email to finish creating your account. Check your inbox or send a new link.',code:'EMAIL_NOT_VERIFIED'};
+    } else {
+      signed=true;
+      body={ok:true,user:accountUser,session:{expiresAt:'2099-01-01T00:00:00Z'}};
+    }
+  } else if(path==='/v1/account/send-verification-email') {
+    verificationResends.push(route.request().postDataJSON());
+    body={ok:true,message:"If an unverified account exists for that email, we've sent a verification link."};
   } else if(path==='/v1/account/link-browser') {
     const input=route.request().postDataJSON();
     linkBodies.push(input);
-    body={ok:true,merged:false,validatedDailyScore:Boolean(input.validateDailyRunId),displayName:'QA Player'};
+    const claimed=newlyClaimed;
+    newlyClaimed=false;
+    body={ok:true,merged:false,validatedDailyScore:Boolean(input.validateDailyRunId),newlyClaimed:claimed,displayName:'QA Player',rankingIdentity:{eligible:true,reason:null}};
   } else if(path==='/v1/account/migrate') {
     signed=true;
     body={ok:true};
@@ -102,7 +115,7 @@ await page.route('https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.ne
 });
 
 async function fresh({source='nav',validateDailyRunId=null,intent=null,width=390}={}) {
-  signed=false;verificationRequired=false;delaySignup=false;delaySignin=false;delayGoogle=false;googleStartFails=false;linkBodies=[];
+  signed=false;verificationRequired=false;delaySignup=false;delaySignin=false;delayGoogle=false;googleStartFails=false;emailNotVerified=false;newlyClaimed=false;linkBodies=[];verificationResends=[];
   await page.setViewportSize({width,height:width<700?844:900});
   await page.goto(base+'/tests/auth-context-harness.html');
   await page.waitForFunction(()=>Boolean(window.__renderAccount));
@@ -127,6 +140,8 @@ try {
   await page.locator('#account-mode-toggle').click();
   await page.locator('#account-signup').waitFor();
   assert.equal(await page.locator('#account-signin').count(),0);
+  assert.equal(await page.locator('#account-signup [name="name"]').count(),0);
+  assert.equal(await page.locator('#account-signup [name="email"]').getAttribute('autocomplete'),'username');
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'artifacts/ui-auth-signup-390.png',fullPage:true});
   await page.setViewportSize({width:1440,height:900});
@@ -154,7 +169,6 @@ try {
   await page.locator('#account-mode-toggle').click();
   delaySignup=true;
   const pendingSignup=page.locator('#account-signup');
-  await pendingSignup.locator('[name="name"]').fill('QA Player');
   await pendingSignup.locator('[name="email"]').fill('qa@example.invalid');
   await pendingSignup.locator('[name="password"]').fill('fixture-password-123');
   await pendingSignup.getByRole('button',{name:'Create account',exact:true}).click();
@@ -167,16 +181,40 @@ try {
   await page.locator('#account-mode-toggle').click();
   verificationRequired=true;
   const signup=page.locator('#account-signup');
-  await signup.locator('[name="name"]').fill('QA Player');
   await signup.locator('[name="email"]').fill('verify@example.invalid');
   await signup.locator('[name="password"]').fill('fixture-password-123');
   await signup.getByRole('button',{name:'Create account',exact:true}).click();
-  await page.getByText(/Check your email\. We sent a verification link to verify@example\.invalid/).waitFor();
+  await page.getByText(/We sent a verification link to verify@example\.invalid/).waitFor();
   assert.equal(await page.locator('.account-verification-success').count(),1);
   assert.equal(await page.locator('#account-verification-signin').count(),1);
   assert.equal(await page.locator('.account-verification-success.form-error').count(),0);
   await page.locator('#account-verification-signin').click();
   await page.locator('#account-signin').waitFor();
+
+  // Signing in before verification gives a recovery action instead of raw provider text.
+  await fresh({source:'nav'});
+  emailNotVerified=true;
+  const unverifiedSignin=page.locator('#account-signin');
+  await unverifiedSignin.locator('[name="email"]').fill('verify@example.invalid');
+  await unverifiedSignin.locator('[name="password"]').fill('fixture-password-123');
+  await unverifiedSignin.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByText('Verify your email to finish creating your account. Check your inbox or send a new link.',{exact:false}).waitFor();
+  await page.getByRole('button',{name:'Send a new verification link',exact:true}).click();
+  await page.getByText("If an unverified account exists for that email, we've sent a verification link.",{exact:true}).waitFor();
+  assert.deepEqual(verificationResends.at(-1),{email:'verify@example.invalid'});
+
+  // A newly claimed password account is routed to the skippable leaderboard-name prompt.
+  await fresh({source:'nav'});
+  newlyClaimed=true;
+  const claimedSignin=page.locator('#account-signin');
+  await claimedSignin.locator('[name="email"]').fill('qa@example.invalid');
+  await claimedSignin.locator('[name="password"]').fill('fixture-password-123');
+  await claimedSignin.getByRole('button',{name:'Sign in',exact:true}).click();
+  await page.getByText('Choose the name shown on leaderboards.',{exact:true}).waitFor();
+  assert.equal(await page.locator('#profile-account input[name="displayName"]').isFocused(),true);
+  assert.equal(await page.getByRole('button',{name:'Skip for now',exact:true}).count(),1);
+  await page.getByRole('button',{name:'Skip for now',exact:true}).click();
+  await page.locator('.my-pack-one-page').waitFor();
 
   // Email submit disables while pending and restores/finishes without double-submit.
   await fresh({source:'nav'});
