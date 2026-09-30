@@ -20,6 +20,8 @@ import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherDispatch} from './
 import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaign-link-publish.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
+import {rankingIdentityStatus} from './account-identity.mjs';
+import {PUBLIC_IDENTITY_TERMS_VERSION,assertPublicDisplayNameAllowed,normalizedReportDetails,normalizedReportReason,publicIdentityHidden,publicIdentityTermsCurrent} from './public-identity-safety.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
 import {APPLE_NATIVE_CLIENT_ID,APPLE_REDIRECT_URI,APPLE_WEB_CLIENT_ID,appleAuthorizeUrl,appleConfigured,markApplePasswordEstablished,resolveAppleAccount,revokeAppleAuthorization,sanitizeAppleFirstName,storeAppleRefreshToken,verifyAppleAuthorization} from './apple-auth.mjs';
 const ACCOUNT_CONFIG=accountRuntimeConfig();
@@ -179,23 +181,34 @@ async function upsertPlayer(id, name) {
 // identity, but only when nobody owns it yet. A taken name is left unowned so
 // linking always succeeds; the player then has to rename to publish a profile.
 async function reserveUsername(playerId) {
+  const current=(await query(
+    `SELECT display_name,public_identity_terms_version,public_identity_terms_accepted_at,public_identity_hidden_at
+     FROM players WHERE id=$1::uuid LIMIT 1`,[playerId],
+  )).rows[0];
+  if(!current||!publicIdentityTermsCurrent(current)||publicIdentityHidden(current)||isPlaceholderUsername(current.display_name))return false;
+  try { assertPublicDisplayNameAllowed(current.display_name); }
+  catch { return false; }
   try {
-    await query(
+    const updated=await query(
       `UPDATE players p SET username_owned=true,updated_at=now()
        WHERE p.id=$1::uuid
          AND NOT p.username_owned
+         AND p.public_identity_terms_version=$3
+         AND p.public_identity_terms_accepted_at IS NOT NULL
+         AND p.public_identity_hidden_at IS NULL
          AND pack1_username_key(p.display_name) <> pack1_username_key($2)
          AND NOT EXISTS (
            SELECT 1 FROM players other
            WHERE other.id <> p.id AND other.username_owned
              AND pack1_username_key(other.display_name)=pack1_username_key(p.display_name)
-         )`,
-      [playerId, PLACEHOLDER_USERNAME],
+         )
+       RETURNING id`,
+      [playerId, PLACEHOLDER_USERNAME, PUBLIC_IDENTITY_TERMS_VERSION],
     );
+    return Boolean(updated.rows[0]);
   } catch (error) {
-    // A concurrent claim of the same name is the expected loss here, and it
-    // must not fail the account link that is already committed.
     if (!isUsernameConflict(error)) throw error;
+    return false;
   }
 }
 
@@ -443,13 +456,21 @@ async function profileMetaByPlayer(playerId) {
   return result.rows[0] || null;
 }
 
-async function profileMetaByKey(profileKey) {
+async function profileMetaByKey(profileKey,{viewerPlayerId=null,ignoreBlock=false}={}) {
   const result = await query(
     `SELECT p.id::text player_id,p.display_name,p.profile_key,p.profile_public,p.favorite_set_id,p.showcase_achievement
      FROM players p
-     WHERE p.profile_key=$1 AND p.profile_public=true
+     WHERE p.profile_key=$1
+       AND p.profile_public=true
+       AND p.username_owned=true
+       AND p.public_identity_terms_version=$2
+       AND p.public_identity_terms_accepted_at IS NOT NULL
+       AND p.public_identity_hidden_at IS NULL
+       AND ($3::uuid IS NULL OR $4::boolean OR NOT EXISTS (
+         SELECT 1 FROM public_identity_blocks b WHERE b.blocker_player_id=$3::uuid AND b.target_player_id=p.id
+       ))
      LIMIT 1`,
-    [profileKey],
+    [profileKey,PUBLIC_IDENTITY_TERMS_VERSION,viewerPlayerId,ignoreBlock],
   );
   return result.rows[0] || null;
 }
@@ -593,7 +614,14 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
       profile_public: bool(meta.profile_public),
       favorite_set_id: meta.favorite_set_id || null,
       showcase_achievement: meta.showcase_achievement || null,
-      ...(own ? { claimed: bool(meta.claimed), username_owned: bool(meta.username_owned) } : {}),
+      ...(own ? {
+        claimed: bool(meta.claimed),
+        username_owned: bool(meta.username_owned),
+        public_identity_terms_version: meta.public_identity_terms_version || null,
+        public_identity_terms_current: publicIdentityTermsCurrent(meta),
+        public_identity_hidden: publicIdentityHidden(meta),
+        public_identity_hidden_reason: meta.public_identity_hidden_reason || null,
+      } : {}),
     },
     summary: normalizedSummary,
     environment_total: reportedEnvironmentTotal,
@@ -1454,9 +1482,10 @@ async function handleLink(request,{browser=false,mobile=false}={}) {
   await reserveUsername(id);
 
   const profile = await profileMetaByPlayer(id);
-  const usernameOwned=bool(profile?.username_owned);
-  const rankingReason=usernameOwned?null:(isPlaceholderUsername(profile?.display_name)?'username_required':'username_taken');
-  if(linkChanged&&!usernameOwned) {
+  const ranking=await rankingIdentityStatus(query,id);
+  const usernameOwned=ranking.eligible;
+  const rankingReason=ranking.reason;
+  if(linkChanged&&!usernameOwned&&rankingReason!=='terms_required') {
     await query(
       `INSERT INTO analytics_events(player_id,event_name,event_props)
        VALUES($1::uuid,'username_ownership_conflict',jsonb_build_object('reason',$2::text))`,
