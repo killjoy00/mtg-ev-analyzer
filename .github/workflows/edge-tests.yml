@@ -17,7 +17,7 @@ jobs:
         with:
           node-version: 24
       - name: Install pinned Workers tools
-        run: npm install --prefix "$RUNNER_TEMP/edge-tools" --no-audit --no-fund wrangler@4.132.0 esbuild@0.28.2 neon@4.17.4
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/edge-tools" esbuild@0.28.2 neon@4.17.4
       - name: Verify the pinned Neon deployment interface
         env:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools

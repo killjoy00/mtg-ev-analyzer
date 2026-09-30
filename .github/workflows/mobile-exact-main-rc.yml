@@ -97,6 +97,18 @@ jobs:
           [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$plist")" == "$PACKONE_IOS_BUILD_NUMBER" ]]
           python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); assert data.get("ITSAppUsesNonExemptEncryption") is False' "$plist"
           ditto -c -k --keepParent "$RUNNER_TEMP/PackOne.xcarchive" "$RUNNER_TEMP/PackOne-unsigned.xcarchive.zip"
+      - name: Audit generated iOS privacy surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 ./scripts/audit-ios-archive.py "$RUNNER_TEMP/PackOne.xcarchive" --output "$RUNNER_TEMP/pack-one-ios-native-audit.json"
+      - name: Upload iOS native audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-ios-native-audit
+          path: ${{ runner.temp }}/pack-one-ios-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Upload unsigned iOS RC archive
         uses: actions/upload-artifact@v4
         with:
@@ -152,6 +164,21 @@ jobs:
       - name: Build release app bundle
         working-directory: mobile/android
         run: ./gradlew :app:bundleRelease --no-daemon
+      - name: Audit generated Android privacy surface
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find app/build/intermediates/merged_manifests/release -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-native-audit.json"
+      - name: Upload Android native audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-native-audit
+          path: ${{ runner.temp }}/pack-one-android-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
       - name: Verify bundle signature
         working-directory: mobile/android
         shell: bash
