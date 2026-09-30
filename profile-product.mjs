@@ -14,6 +14,8 @@ import {
   loadProfileHistory,
   loadPublicProfile,
   lookupPublicProfiles,
+  reportPublicProfile,
+  blockPublicProfile,
   sendEvents,
   updateProfile,
 } from './growth-api.mjs';
@@ -177,13 +179,17 @@ function settingsMarkup(profile, progress, account, patreon) {
     return `<aside class="profile-claim" id="profile-account"><div><span>Guest record</span><strong>Your progress is yours to keep.</strong><p>Save it across devices whenever you’re ready.</p></div><button type="button" class="text-button" id="profile-claim-account">Sign in</button></aside>`;
   }
   const unlocked = unlockedAchievements(profile);
+  const identityHidden=profile.player.public_identity_hidden===true;
+  const identityTermsCurrent=profile.player.public_identity_terms_current===true;
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
   const membershipUrl=elite?supportUrl:'/patreon/';
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
     <header><div><p class="eyebrow">Profile</p><h2 id="profile-account-title">Profile settings</h2><p>${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     ${account?.user?`<form id="profile-settings-form">
-      <label class="profile-leaderboard-name"><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required><small>${profile.player.username_owned===false?'Choose a unique name to appear on Daily leaderboards.':'Shown on all Daily leaderboards.'}</small></label>
+      <label class="profile-leaderboard-name"><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''}><small>${identityHidden?'This public identity is hidden by moderation.':!identityTermsCurrent?'Accept the Public Identity rules below before appearing on Daily leaderboards.':profile.player.username_owned===false?'Choose a unique name to appear on Daily leaderboards.':'Shown on all Daily leaderboards.'}</small></label>
+      ${identityHidden?`<p class="profile-settings-status" role="alert">Public identity hidden. ${esc(profile.player.public_identity_hidden_reason||'Contact Pack One support if you believe this is a mistake.')}</p>`:''}
+      ${!identityTermsCurrent&&!identityHidden?`<label class="profile-toggle"><input required type="checkbox" name="acceptPublicIdentityTerms"><span><strong>I accept the Public Identity rules.</strong><small>Leaderboard names and public profiles must follow the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>, including no harassment, impersonation, spam, private contact information, or abusive content.</small></span></label>`:''}
     ${account?.user?`<section class="profile-membership profile-settings-membership" aria-labelledby="patreon-membership-title">
       <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
         ${patreon?.configured!==true
@@ -202,7 +208,7 @@ function settingsMarkup(profile, progress, account, patreon) {
         <span id="patreon-status" aria-live="polite"></span>
       </div>
     </section>`:''}
-      <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''}><span><strong>Public profile</strong><small>Allows leaderboard visitors and shared links to open your Pack One record.</small></span></label>
+      <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''} ${identityHidden?'disabled':''}><span><strong>Public profile</strong><small>Allows leaderboard visitors and shared links to open your Pack One record.</small></span></label>
       <label><span>Favorite environment</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>
       <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
       <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status" aria-live="polite"></span></div>
@@ -277,7 +283,7 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
       ${form != null ? `<div><span>Last 10 average</span><strong>${form.toFixed(1)}</strong></div>` : ''}
     </div>` : ''}
 
-    ${own ? settingsMarkup(profile, progress, account, patreon) : ''}
+    ${own ? settingsMarkup(profile, progress, account, patreon) : `<section class="profile-settings" aria-labelledby="profile-safety-title"><h2 id="profile-safety-title">Profile safety</h2><p>Report a public identity that violates the Pack One rules, or block it from this account.</p><label><span>Report reason</span><select class="select" id="profile-report-reason"><option value="offensive_name">Offensive name</option><option value="harassment">Harassment</option><option value="impersonation">Impersonation</option><option value="spam">Spam</option><option value="other">Other</option></select></label><div class="profile-settings-actions"><button type="button" class="button secondary" id="profile-report">Report profile</button><button type="button" class="button secondary" id="profile-block">Block profile</button><span class="profile-settings-status" id="profile-safety-status" aria-live="polite"></span></div></section>`}
     ${publicUrl ? `<p class="profile-public-url">Public profile: <button type="button" class="text-button" id="profile-copy-link">Copy link</button></p>` : ''}
 
     <section class="profile-section archive-progress-section">
@@ -439,6 +445,18 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   document.querySelector('#profile-share')?.addEventListener('click', async (event) => {
     await performShare(event.currentTarget,()=>shareProfileCard(profile, progress, names),'profile_share',{public:profile.player.profile_public,environments:progress.played});
   });
+  document.querySelector('#profile-report')?.addEventListener('click',async()=>{
+    const status=document.querySelector('#profile-safety-status');
+    const reason=document.querySelector('#profile-report-reason')?.value||'other';
+    try { await reportPublicProfile(profileKey,{reason}); if(status)status.textContent='Report sent to Pack One.'; }
+    catch(error) { if(status)status.textContent=error?.message||'Could not send this report.'; }
+  });
+  document.querySelector('#profile-block')?.addEventListener('click',async()=>{
+    const status=document.querySelector('#profile-safety-status');
+    if(!window.confirm('Block this public profile? You will no longer be able to open it while signed in.'))return;
+    try { await blockPublicProfile(profileKey); if(status)status.textContent='Profile blocked.'; window.location.href='./'; }
+    catch(error) { if(status)status.textContent=error?.message||'Could not block this profile.'; }
+  });
   async function performShare(button,makeCard,name,props) {
     const original=button.textContent;button.disabled=true;button.textContent='Making card…';
     let status=document.querySelector('#profile-share-status');
@@ -467,6 +485,7 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
         profilePublic: data.get('profilePublic') === 'on',
         favoriteSetId: data.get('favoriteSetId') || null,
         showcaseAchievement: data.get('showcaseAchievement') || null,
+        acceptPublicIdentityTerms: data.get('acceptPublicIdentityTerms') === 'on',
       });
       status.textContent = 'Saved';
       track('profile_settings_saved', { public: updated.player?.profile_public || false });
