@@ -15,6 +15,7 @@ const {default:growth,query,gameDateKey}=await import('../worker/growth-function
 const {default:runApi}=await import('../worker/draft-run-function.mjs');
 const {ensureDailySchedule}=await import('../worker/draft-run-daily.mjs');
 const {currentSeasonForPlayer,reconcilePersistedSeasons,resolveCurrentSeason}=await import('../worker/draft-run-season.mjs');
+const {PUBLIC_IDENTITY_TERMS_VERSION}=await import('../worker/public-identity-safety.mjs');
 
 const parse=value=>typeof value==='string'?JSON.parse(value):value;
 async function board(period,environment='mixed'){
@@ -83,7 +84,7 @@ assert.equal(oldEmpty.period,'season');assert.equal(oldEmpty.season,null);assert
 await query("UPDATE draft_run_environment_policy SET status='Live' WHERE set_id IN ('msh','hob')");
 const targetPlayer=crypto.randomUUID(),targetAuth=crypto.randomUUID(),profileKey=crypto.randomBytes(8).toString('hex');
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,false)',[targetAuth,'Season Target',`season-${targetPlayer}@example.invalid`]);
-await query('INSERT INTO players(id,display_name,profile_key,profile_public,username_owned) VALUES($1::uuid,$2,$3,true,true)',[targetPlayer,'Season Target',profileKey]);
+await query('INSERT INTO players(id,display_name,profile_key,profile_public,username_owned,public_identity_terms_version,public_identity_terms_accepted_at) VALUES($1::uuid,$2,$3,true,true,$4,now())',[targetPlayer,'Season Target',profileKey,PUBLIC_IDENTITY_TERMS_VERSION]);
 await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[targetAuth,targetPlayer]);
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) VALUES($1::uuid,'2026-07-01','mixed','draft_run',50,'C','[]'::jsonb)",[targetPlayer]);
 
@@ -159,7 +160,7 @@ await assert.rejects(()=>reconcilePersistedSeasons(query),/unvalidated regular s
 const authHeaders={'x-pack1-auth-session':profileAuthToken};
 let failOpenProfile=await growthCall('/v1/profile/me',undefined,profileOwner.token,200);
 assert.equal(failOpenProfile.current_season,null);
-failOpenProfile=await growthCall('/v1/profile',{profilePublic:true},profileOwner.token,200,{method:'PATCH',headers:authHeaders});
+failOpenProfile=await growthCall('/v1/profile',{profilePublic:true,acceptPublicIdentityTerms:true},profileOwner.token,200,{method:'PATCH',headers:authHeaders});
 assert.equal(failOpenProfile.player.profile_public,true);assert.equal(failOpenProfile.current_season,null);
 const failOpenPublic=await growthCall('/v1/profile/'+failOpenProfile.player.profile_key,undefined,undefined,200);
 assert.equal(failOpenPublic.current_season,null);
@@ -182,7 +183,7 @@ await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade
 // public board's LIMIT 100.
 const peers=Array.from({length:105},(_,i)=>({id:crypto.randomUUID(),auth_id:crypto.randomUUID(),name:`Season Peer ${String(i).padStart(3,'0')}`,email:`season-peer-${i}-${targetPlayer}@example.invalid`}));
 await query('INSERT INTO neon_auth."user"(id,name,email,"emailVerified") SELECT auth_id::uuid,name,email,false FROM jsonb_to_recordset($1::jsonb) AS x(auth_id text,name text,email text)',[JSON.stringify(peers)]);
-await query('INSERT INTO players(id,display_name,username_owned) SELECT id::uuid,name,true FROM jsonb_to_recordset($1::jsonb) AS x(id text,name text)',[JSON.stringify(peers)]);
+await query('INSERT INTO players(id,display_name,username_owned,public_identity_terms_version,public_identity_terms_accepted_at) SELECT id::uuid,name,true,$2,now() FROM jsonb_to_recordset($1::jsonb) AS x(id text,name text)',[JSON.stringify(peers),PUBLIC_IDENTITY_TERMS_VERSION]);
 await query('INSERT INTO account_links(auth_user_id,player_id) SELECT auth_id::uuid,id::uuid FROM jsonb_to_recordset($1::jsonb) AS x(id text,auth_id text)',[JSON.stringify(peers)]);
 await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) SELECT id::uuid,'2026-09-01','mixed','draft_run',20,'F','[]'::jsonb FROM jsonb_to_recordset($1::jsonb) AS x(id text)",[JSON.stringify(peers)]);
 
