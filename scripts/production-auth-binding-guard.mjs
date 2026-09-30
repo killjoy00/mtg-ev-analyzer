@@ -20,6 +20,7 @@ export function webhookProductionAuthBase(source) {
   return /\bauthBase:'([^']+)'/.exec(block)?.[1]||null;
 }
 
+// Guard reads only control-plane metadata; it must never mutate Neon state.
 async function control(route,{key=process.env.NEON_API_KEY,fetcher=fetch}={}) {
   assert(typeof key==='string'&&key.length>=20,'NEON_API_KEY is missing or too short.');
   const response=await fetcher('https://console.neon.tech/api/v2'+route,{
