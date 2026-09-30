@@ -1,6 +1,16 @@
 # Pack One mobile store submission packet
 
-Updated 2026-09-27. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated 2026-09-30. This file is the source-of-truth submission packet for the first free public mobile release.
+
+## Current store release checkpoint — 2026-09-30
+
+- **iOS 1.0:** signed build `100321`, source revision `5fce31805e277a1d234ff40ad3df381faf75602c`. GitHub Actions run `36722154047` uploaded the build, App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached that exact build to App Store version 1.0. Release type remains manual. The earlier build `100311` was TestFlight Internal Only and is not the customer-submission RC.
+- **Android 1.0:** signed versionCode `100311`, source revision `c04ab3ba9f9def47708c67c2581596bcbd35f5c4`. Internal upload run `36663310963` committed it to Google Play Internal Testing. Closed-testing run `36668780511` then promoted the same bundle unchanged to the existing `production-access` Closed Testing track with `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`.
+- **Closed-test geography:** the owner confirmed the `production-access` track is active and targets Canada and the United States. The failed `alpha` attempt is not the qualification track and was rejected before commit because that track targeted no countries.
+- **Store assets:** Apple iPhone/iPad screenshots and the Elite review screenshot are uploaded. Google Play has the reviewed icon, five phone screenshots, and the feature graphic committed.
+- **Google Data Safety:** submitted successfully by run `36632174516`.
+- **Apple metadata already live:** version 1.0 is manual release; the en-US listing copy, privacy policy/choices URLs, content-rights declaration, and reviewed 12+ age-rating answers are present.
+- **Source equivalence note:** the changes between Android RC source `c04ab3b` and current `5fce318` are release-control/test files only; no Android/iOS application runtime source changed. The current exact-main RC smoke run `36722154500` also passed all stages.
 
 ## Shared release identity
 
@@ -256,14 +266,77 @@ Use the repository's deterministic native screenshot harness rather than mock ma
 - The first production release does **not** offer a staged rollout percentage; Google documents staged percentages for updates, not the first production release. The first production release goes to all users in the selected production countries.
 - Initial public regions: **United States and Canada only**.
 
-## Items that still require authenticated store-console actions
+## Owner-only non-device actions still required
 
-The current ChatGPT environment cannot open the logged-in App Store Connect or Play Console UI, so these must be entered through a logged-in store session or a future store API workflow:
-- upload final screenshots / Play feature graphic
-- enter App Privacy / Data safety questionnaire responses
-- answer the Apple age-rating and Play IARC questionnaires
-- enter the final reviewer account credentials
-- set/verify public countries/regions are **United States and Canada only**
-- submit for review / start closed testing / start production release
+These are the remaining **non-physical-device** actions that the current repository/API tooling cannot safely complete without the account holder using the relevant console or entering private account credentials. Everything else should remain with the automated release path.
 
-Do not treat those clicks as engineering work; the content above is the prepared source-of-truth for them.
+### Apple / App Store Connect
+
+1. **Complete and publish App Privacy.**
+   - App Store Connect -> Apps -> Pack One -> **App Privacy**.
+   - Declare that Pack One collects data and use the conservative v1 declarations in this document: Name, Email Address, User ID, Purchase History, and Product Interaction; linked as described; no tracking.
+   - Confirm the Privacy Policy URL is `https://packone.pro/privacy/`.
+   - Publish the App Privacy answers.
+
+2. **Enter the private App Review account credential and contact details.**
+   - Open App Store version 1.0 -> **App Review Information**.
+   - Enter the real review contact name, phone, and email.
+   - Set demo account required as appropriate and enter the non-expiring reviewer account username/password directly in App Store Connect.
+   - Do **not** put the reviewer password in Git, an issue, or chat.
+   - Use the review notes and reviewer path already prepared in this document.
+
+3. **Verify Apple agreements, tax, and banking are active for paid subscriptions.**
+   - App Store Connect -> Business / Agreements, Tax, and Banking.
+   - Confirm there is no agreement, tax-form, or banking action blocking paid auto-renewable subscriptions.
+
+Physical iPhone/iPad acceptance remains separate and is intentionally not listed here.
+
+### Google Play Console
+
+4. **Finish the remaining App content forms.**
+   - Play Console -> Pack One -> **Policy and programs -> App content**.
+   - **Ads:** declare **Yes** using the rationale in this document (disclosed TCGplayer affiliate promotional links; no ad SDK/advertising ID).
+   - **App access:** state that some features work as a guest, but account/Elite features require sign-in. Enter the private non-expiring Elite reviewer credential directly in Play Console; do not put it in Git or chat.
+   - **Target audience and content:** select the intended **13+** audience; do not select under-13 groups.
+   - **Content rating (IARC):** complete the questionnaire from the real app: no gambling/wagering/chat, but card art can contain fantasy combat/violence.
+   - Data Safety is already submitted; do not redo it unless Play reports a new required correction.
+
+5. **Turn on Managed Publishing before production-review changes.**
+   - Play Console -> **Publishing overview**.
+   - Under Managed publishing status, choose **Turn on managed publishing** and save.
+   - Leave it on while the first production submission/review is being prepared so approval does not publish unexpectedly.
+
+6. **Verify the closed-test qualification clock and tester count.**
+   - Open **Closed testing -> production-access**.
+   - Confirm the tester opt-in link is the one being used and that the required testers are shown as continuously opted in.
+   - If this developer account is subject to Google's newer-personal-account rule, keep at least 12 testers continuously opted in for 14 days. Do not reset/recreate the track during that period.
+
+7. **Apply for Production access when Play enables the application.**
+   - When the Dashboard says the testing requirement is satisfied, open the Production access application.
+   - Answer Google's questions about the closed test, tester engagement/feedback, app purpose, and production readiness truthfully.
+   - Submit the production-access application.
+   - Record the submission/approval date in issue #575.
+
+### GitHub / Google Cloud release-credential boundary
+
+8. **Protect the GitHub release Environment.**
+   - GitHub repo -> Settings -> Environments -> `pack-one-mobile-release`.
+   - Restrict deployment branches to the intended protected release branch policy and add the desired required reviewer(s).
+   - Keep Apple release secrets scoped to this Environment rather than generally available repository secrets.
+
+9. **Narrow Google Workload Identity trust.**
+   - In Google Cloud IAM / Workload Identity Federation, restrict the Pack One provider/service-account trust so store credentials are accepted only from the intended Pack One repository and approved release context.
+   - Do not broaden repository workflow access merely to make a release pass.
+   - After you make this change, the repo can re-run the non-publishing Apple/Google access probes and record the result.
+
+### Not owner-only / leave to automation
+
+Do **not** spend console time on these unless an automated probe reports a problem:
+- uploading/replacing the current RC binaries;
+- attaching iOS build 100321 to App Store version 1.0 (already done);
+- moving Android 100311 to the `production-access` Closed Testing track (already done);
+- Google Data Safety or store graphics (already done);
+- App Store listing copy, manual-release flag, reviewed age-rating answers, or content-rights declaration (already present);
+- release-track/API status audits;
+- App Store/Play production release mechanics after all prerequisites and explicit owner approval — these can be handled through the guarded API workflows.
+
