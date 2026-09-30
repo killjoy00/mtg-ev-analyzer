@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import { completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn } from './growth-api.mjs';
+import { authCompleted, completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn } from './growth-api.mjs';
 import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
@@ -7,6 +7,7 @@ let currentAccount = null;
 let currentAccountState = 'checking';
 let currentAccountError = null;
 let pendingDailyRunValidation = null;
+let pendingNamePromptFlow = null;
 const AUTH_FLOW_KEY='pack1-auth-flow-v1';
 
 function saveAuthFlow(intent,source) {
@@ -15,8 +16,6 @@ function saveAuthFlow(intent,source) {
 function takeAuthFlow() {
   try {const raw=sessionStorage.getItem(AUTH_FLOW_KEY);sessionStorage.removeItem(AUTH_FLOW_KEY);return raw?JSON.parse(raw):null;} catch {return null;}
 }
-function authCompleted(data) {return firstPartyAuthEnabled()?Boolean(data?.user):Boolean(data?.token);}
-
 function syncAccountNav() {
   const nav=document.querySelector('#account-nav');
   if(!nav)return;
@@ -51,7 +50,7 @@ export async function renderPatreonActivation(options={}) {
 }
 
 function formMarkup(kind) {
-  return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="email"></label>${kind==='signup'?'<label>Display name<input required name="name" minlength="2" maxlength="24" autocomplete="nickname"></label>':''}<label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p class="form-error" aria-live="polite"></p></form>`;
+  return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="username"></label><label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p class="form-error" aria-live="polite"></p></form>`;
 }
 
 async function openEliteLanding(source='account') {
@@ -76,7 +75,11 @@ async function claimCurrentSession() {
   currentAccountState='signed-in';
   currentAccountError=null;
   syncAccountNav();
-  return {linked,validationRunId:linked?.validatedDailyScore?validationRunId:null};
+  return {
+    linked,
+    validationRunId:linked?.validatedDailyScore?validationRunId:null,
+    requestedValidationRunId:validationRunId,
+  };
 }
 
 export async function beginEliteUpgrade({ source='unknown' } = {}) {
@@ -156,7 +159,49 @@ async function returnToValidatedDaily(validationRunId,linked,source) {
   await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null});
 }
 
+async function resumeNamePromptFlow(flow) {
+  if(!flow)return;
+  pendingNamePromptFlow=null;
+  if(flow.validatedDailyRunId) {
+    pendingDailyRunValidation=null;
+    await returnToValidatedDaily(flow.validatedDailyRunId,flow.linked,flow.source);
+    return;
+  }
+  await renderAccount({
+    validateDailyRunId:flow.requestedDailyRunId||null,
+    intent:flow.intent||null,
+    source:flow.source||'account',
+  });
+}
+
+async function showLeaderboardNamePrompt({
+  requestedDailyRunId=null,
+  validatedDailyRunId=null,
+  linked=null,
+  intent=null,
+  source='account',
+}={}) {
+  const flow={requestedDailyRunId,validatedDailyRunId,linked,intent,source};
+  pendingNamePromptFlow=flow;
+  const profiles=await import('./profile-product.mjs?v=7');
+  profiles.installProfileProductLayer();
+  (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+  await profiles.renderMyProfile();
+  document.querySelector('#profile-account-tab')?.click();
+  const label=document.querySelector('#profile-account .profile-leaderboard-name');
+  const help=label?.querySelector('small');
+  if(help)help.textContent='Choose the name shown on leaderboards.';
+  label?.insertAdjacentHTML('afterend','<button class="text-button" id="account-name-prompt-skip" type="button">Skip for now</button>');
+  document.querySelector('#account-name-prompt-skip')?.addEventListener('click',()=>void resumeNamePromptFlow(flow));
+  document.querySelector('#profile-account input[name="displayName"]')?.focus();
+}
+
 document.addEventListener('pack1:profile-updated',async eventObject=>{
+  if(pendingNamePromptFlow) {
+    const flow=pendingNamePromptFlow;
+    try {await resumeNamePromptFlow(flow);} catch {}
+    return;
+  }
   if(!pendingDailyRunValidation||eventObject.detail?.usernameOwned!==true)return;
   const validationRunId=pendingDailyRunValidation;
   try {
@@ -193,6 +238,14 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
     } catch(error) {
       renderAccountError(app,error,()=>renderAccount({validateDailyRunId:validationRunId,intent,source,mode}));
+      return;
+    }
+    if(linked?.newlyClaimed) {
+      await showLeaderboardNamePrompt({
+        requestedDailyRunId:validationRunId,
+        validatedDailyRunId:linked?.validatedDailyScore?validationRunId:null,
+        linked,intent,source,
+      });
       return;
     }
     const usernameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required'].includes(linked?.rankingIdentity?.reason));
@@ -297,7 +350,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       event('auth_sign_up',{source});
       if(!authCompleted(auth)) {
         const card=document.querySelector('.account-auth-card');
-        if(card)card.innerHTML=`<div class="form-success account-verification-success" role="status"><h2>Check your email</h2><p>Check your email. We sent a verification link to ${esc(data.email)}. Open it to finish creating your Pack One account.</p><p>Verification links expire after 15 minutes.</p></div><button class="button secondary" id="account-verification-resend" type="button">Send a new verification link</button><button class="button secondary" id="account-verification-signin" type="button">Back to sign in</button><p id="account-verification-status" aria-live="polite"></p>`;
+        if(card)card.innerHTML=`<div class="form-success account-verification-success" role="status"><h2>Check your email</h2><p>We sent a verification link to ${esc(data.email)}. Open it to finish creating your Pack One account.</p><p>Verification links expire after 15 minutes.</p></div><button class="button secondary" id="account-verification-resend" type="button">Send a new verification link</button><button class="button secondary" id="account-verification-signin" type="button">Back to sign in</button><p id="account-verification-status" aria-live="polite"></p>`;
         document.querySelector('#account-verification-resend')?.addEventListener('click',async e=>{
           const button=e.currentTarget,status=document.querySelector('#account-verification-status');
           button.disabled=true;if(status){status.className='';status.textContent='';}
@@ -312,6 +365,14 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
         return;
       }
       const claimed=await claimCurrentSession();
+      if(claimed?.linked?.newlyClaimed) {
+        await showLeaderboardNamePrompt({
+          requestedDailyRunId:claimed.requestedValidationRunId,
+          validatedDailyRunId:claimed.validationRunId,
+          linked:claimed.linked,intent,source,
+        });
+        return;
+      }
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
       if(activatingPatreon){await renderPatreonActivation({source});return;}
       if(upgradingElite){await openEliteLanding(source);return;}
@@ -334,12 +395,35 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       if(!authCompleted(auth))throw Error('Sign in did not return an account session.');
       const claimed=await claimCurrentSession();
       event('auth_sign_in',{source});
+      if(claimed?.linked?.newlyClaimed) {
+        await showLeaderboardNamePrompt({
+          requestedDailyRunId:claimed.requestedValidationRunId,
+          validatedDailyRunId:claimed.validationRunId,
+          linked:claimed.linked,intent,source,
+        });
+        return;
+      }
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
       if(activatingPatreon){await renderPatreonActivation({source});return;}
       if(upgradingElite){await openEliteLanding(source);return;}
       await renderAccount({intent,source});
     } catch(error) {
-      err.textContent=error?.message||'Sign in failed.';
+      if(error?.code==='EMAIL_NOT_VERIFIED') {
+        const email=String(new FormData(form).get('email')||'');
+        err.innerHTML=`${esc(error?.message||'Verify your email to finish creating your account. Check your inbox or send a new link.')} <button class="text-button" id="account-verification-resend-signin" type="button">Send a new verification link</button>`;
+        document.querySelector('#account-verification-resend-signin')?.addEventListener('click',async e=>{
+          const button=e.currentTarget;
+          button.disabled=true;
+          try {
+            const result=await requestVerificationEmail(email);
+            err.textContent=result?.message||"If an unverified account exists for that email, we've sent a verification link.";
+          } catch(resendError) {
+            err.textContent=resendError?.message||'Email verification is temporarily unavailable.';
+          }
+        });
+      } else {
+        err.textContent=error?.message||'Sign in failed.';
+      }
       setFormPending(form,false);
     }
   });
