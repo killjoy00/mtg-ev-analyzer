@@ -1,1 +1,1 @@
-{"operation":"upload-testflight-internal","reason":"Upload a fresh signed Pack One 1.0 TestFlight internal candidate containing merged PR #673 Apple Elite StoreKit support, after the corresponding production backend/gateway deployment is confirmed healthy."}
+{"operation":"upload-testflight-internal","reason":"Upload a fresh signed Pack One 1.0 TestFlight launch candidate from current main after completion of the reviewed store-listing, screenshot, Elite subscription, and Google Play Data Safety work. This supersedes build 100243 as launch-candidate evidence."}
