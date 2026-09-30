@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Deploy one-click Admin campaign publishing through the guarded development-first release: production-only admin publish route, scoped GitHub workflow dispatch, readiness marker, and fixed gateway route."}
+{"operation":"deploy-secure-auth","reason":"September 30 Auth branch-binding incident: deploy merged PR #794 to restore production Auth to serving branch br-orange-feather-ayps8kep after owner added the new Google OAuth redirect URI."}
