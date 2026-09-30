@@ -221,16 +221,16 @@ function renderResult() {
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
-export async function returnToValidatedDaily(runId,{standing=null}={}) {
+export async function returnToValidatedDaily(runId,{standing=null,confirmed=true}={}) {
   styles();
   await loadSetNames();
   if(!run||run.id!==runId||!run.complete)run=await api(`/v1/runs/${runId}`);
   if(!run?.day||!run?.complete)throw new Error('Completed Daily result is unavailable.');
   environment=run.environment||environment;
   selection=null;review=null;
-  run.leaderboard_eligible=true;
-  run.standing=standing||null;
-  dailyValidationConfirmation={standing:standing||null};
+  if(confirmed)run.leaderboard_eligible=true;
+  run.standing=confirmed?(standing||null):(run.standing||null);
+  dailyValidationConfirmation=confirmed?{standing:standing||null}:null;
   renderResult();
   window.scrollTo({top:0,behavior:'instant'});
 }

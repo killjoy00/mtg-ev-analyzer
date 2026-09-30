@@ -19,7 +19,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       return route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:'Account session required.'})});
     if(path==='/v1/account/signup') {
       const body=route.request().postDataJSON();
-      return route.fulfill({status:202,contentType:'application/json',body:JSON.stringify({ok:true,verificationRequired:true,email:body.email})});
+      return route.fulfill({status:202,contentType:'application/json',body:JSON.stringify({ok:true,verificationRequired:true,user:{id:'verify-user',email:body.email,name:'Pack One Player'}})});
     }
     if(path==='/v1/account/send-verification-email') {
       resendBodies.push(route.request().postDataJSON());
@@ -36,7 +36,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
   await page.locator('#account-mode-toggle').click();
 
   const signup=page.locator('#account-signup');
-  await signup.locator('[name="name"]').fill('Verification QA');
+  assert.equal(await signup.locator('[name="name"]').count(),0);
+  assert.equal(await signup.locator('[name="email"]').getAttribute('autocomplete'),'username');
   await signup.locator('[name="email"]').fill('verify@example.invalid');
   await signup.locator('[name="password"]').fill('fixture-password-123');
   await signup.getByRole('button',{name:'Create account',exact:true}).click();

@@ -231,6 +231,11 @@ export async function lookupPublicProfiles(names) {
   try {const data=await api('/v1/profile-lookup',{method:'POST',body:{names:unique},auth:false});return data?.profiles&&typeof data.profiles==='object'?data.profiles:{};}catch{return {};}
 }
 
+export function accountAuthCompleted(data,{firstParty=firstPartyAuthEnabled()}={}) {
+  if(data?.verificationRequired===true)return false;
+  return firstParty?Boolean(data?.session):Boolean(data?.token);
+}
+
 export async function authRequest(path,{method='GET',body}={}) {
   if(firstPartyAuthEnabled()) {
     const mapped=path==='/sign-up/email'?'/v1/account/signup':path==='/sign-in/email'?'/v1/account/signin':null;
@@ -294,7 +299,10 @@ export async function disconnectPatreon() {
 
 export async function signUpAccount({name,email,password}) {
   const firstParty=firstPartyAuthEnabled();
-  const data=await authRequest('/sign-up/email',{method:'POST',body:{name,email,password}});
+  const body=firstParty
+    ? {email,password}
+    : {name:String(name||'Pack One Player'),email,password};
+  const data=await authRequest('/sign-up/email',{method:'POST',body});
   if(firstParty)signalAccountChange();
   else if(data?.token){try{localStorage.setItem(AUTH_TOKEN_KEY,data.token);}catch{}signalAccountChange();}
   return data;
