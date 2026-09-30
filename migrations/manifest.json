@@ -1,0 +1,221 @@
+{
+  "version": 1,
+  "ordered": [
+    "0002_growth_platform.sql",
+    "0003_player_profiles.sql",
+    "0004_draft_run_product.sql",
+    "0005_draft_run_identity.sql",
+    "0006_retention_funnels.sql",
+    "0007_draft_run_all_environments.sql",
+    "0008_draft_run_difficulty.sql",
+    "0009_draft_run_selection.sql",
+    "0010_retire_source_data.sql",
+    "0011_decision_measurements.sql",
+    "0012_draft_run_serving_indexes.sql",
+    "0013_player_request_limits.sql",
+    "0014_eight_pick_runs.sql",
+    "0015_draft_run_serving_statistics.sql",
+    "0016_retire_third_source.sql",
+    "0017_fixed_daily_lifecycle.sql",
+    "0018_capabilities.sql",
+    "0019_corpus_operations.sql",
+    "0020_source_eligibility.sql",
+    "0021_corpus_components.sql",
+    "0022_corpus_admin_identity.sql",
+    "0023_serving_policy_snapshots.sql",
+    "0024_serving_quality_lookup.sql",
+    "0025_traditional_phase2_components.sql",
+    "0026_provider_accounts.sql",
+    "0027_latest_daily.sql",
+    "0028_account_sessions.sql",
+    "0029_account_recovery.sql",
+    "0030_account_credential_limits.sql",
+    "0031_account_deletion.sql",
+    "0032_traditional_v4_components.sql",
+    "0033_unique_usernames.sql",
+    "0034_account_deletion_verification.sql",
+    "0035_pacific_daily_calendar.sql",
+    "0036_self_shared_run_cleanup.sql",
+    "0037_mobile_oauth_handoffs.sql",
+    "0037_pack_one_seasons.sql",
+    "0038_mobile_practice_idempotency.sql",
+    "0038_pack_one_season_hardening.sql",
+    "0039_practice_serving_cache.sql",
+    "0040_mobile_minimum_version.sql",
+    "0040_practice_reroll_index.sql",
+    "0041_corpus_source_snapshots.sql",
+    "0041_apple_auth.sql",
+    "0042_serving_revision_snapshot_staging.sql",
+    "0043_corpus_activation_readiness.sql",
+    "0044_snapshot_scoped_puzzle_uniqueness.sql",
+    "0045_batched_practice_selector.sql",
+    "0045_apple_subscriptions.sql"
+  ],
+  "same_prefix_order": {
+    "0037": [
+      "0037_mobile_oauth_handoffs.sql",
+      "0037_pack_one_seasons.sql"
+    ],
+    "0038": [
+      "0038_mobile_practice_idempotency.sql",
+      "0038_pack_one_season_hardening.sql"
+    ],
+    "0040": [
+      "0040_mobile_minimum_version.sql",
+      "0040_practice_reroll_index.sql"
+    ],
+    "0041": [
+      "0041_corpus_source_snapshots.sql",
+      "0041_apple_auth.sql"
+    ],
+    "0045": [
+      "0045_batched_practice_selector.sql",
+      "0045_apple_subscriptions.sql"
+    ]
+  },
+  "historical_or_one_time": [
+    "0002_growth_platform.sql",
+    "0003_player_profiles.sql",
+    "0004_draft_run_product.sql",
+    "0005_draft_run_identity.sql",
+    "0006_retention_funnels.sql",
+    "0007_draft_run_all_environments.sql",
+    "0008_draft_run_difficulty.sql",
+    "0009_draft_run_selection.sql",
+    "0010_retire_source_data.sql",
+    "0011_decision_measurements.sql",
+    "0012_draft_run_serving_indexes.sql",
+    "0013_player_request_limits.sql",
+    "0014_eight_pick_runs.sql",
+    "0015_draft_run_serving_statistics.sql",
+    "0027_latest_daily.sql",
+    "0033_unique_usernames.sql"
+  ],
+  "release_paths": {
+    "edge-preview": {
+      "workflow": ".github/workflows/edge-preview.yml",
+      "migrations": [
+        "0016_retire_third_source.sql"
+      ]
+    },
+    "prepare-rebuild": {
+      "workflow": ".github/workflows/prepare-rebuild.yml",
+      "migrations": [
+        "0017_fixed_daily_lifecycle.sql",
+        "0018_capabilities.sql",
+        "0019_corpus_operations.sql",
+        "0020_source_eligibility.sql",
+        "0021_corpus_components.sql",
+        "0022_corpus_admin_identity.sql",
+        "0023_serving_policy_snapshots.sql",
+        "0024_serving_quality_lookup.sql",
+        "0025_traditional_phase2_components.sql",
+        "0026_provider_accounts.sql"
+      ]
+    },
+    "publish-puzzle-components": {
+      "workflow": ".github/workflows/publish-puzzle-components.yml",
+      "migrations": [
+        "0020_source_eligibility.sql",
+        "0021_corpus_components.sql",
+        "0022_corpus_admin_identity.sql",
+        "0023_serving_policy_snapshots.sql",
+        "0024_serving_quality_lookup.sql",
+        "0025_traditional_phase2_components.sql",
+        "0026_provider_accounts.sql",
+        "0032_traditional_v4_components.sql"
+      ]
+    },
+    "secure-auth-release": {
+      "workflow": ".github/workflows/secure-auth-release.yml",
+      "migrations": [
+        "0028_account_sessions.sql",
+        "0029_account_recovery.sql",
+        "0030_account_credential_limits.sql",
+        "0031_account_deletion.sql",
+        "0032_traditional_v4_components.sql",
+        "0034_account_deletion_verification.sql",
+        "0037_mobile_oauth_handoffs.sql",
+        "0038_mobile_practice_idempotency.sql",
+        "0039_practice_serving_cache.sql",
+        "0040_mobile_minimum_version.sql",
+        "0040_practice_reroll_index.sql",
+        "0041_corpus_source_snapshots.sql",
+        "0041_apple_auth.sql",
+        "0042_serving_revision_snapshot_staging.sql",
+        "0043_corpus_activation_readiness.sql",
+        "0044_snapshot_scoped_puzzle_uniqueness.sql",
+        "0045_batched_practice_selector.sql",
+        "0045_apple_subscriptions.sql"
+      ]
+    },
+    "daily-calendar": {
+      "workflow": ".github/workflows/daily-calendar-migration.yml",
+      "migrations": [
+        "0035_pacific_daily_calendar.sql"
+      ]
+    },
+    "self-share-cleanup": {
+      "workflow": ".github/workflows/self-share-cleanup.yml",
+      "migrations": [
+        "0036_self_shared_run_cleanup.sql"
+      ]
+    },
+    "pack-one-seasons": {
+      "workflow": ".github/workflows/pack-one-season-migration.yml",
+      "migrations": [
+        "0037_pack_one_seasons.sql"
+      ]
+    },
+    "pack-one-season-hardening": {
+      "workflow": ".github/workflows/pack-one-season-hardening-migration.yml",
+      "migrations": [
+        "0038_pack_one_season_hardening.sql"
+      ]
+    },
+    "backend-gate-backlog": {
+      "workflow": ".github/workflows/backend-gate.yml",
+      "migrations": [
+        "0037_mobile_oauth_handoffs.sql",
+        "0038_mobile_practice_idempotency.sql",
+        "0039_practice_serving_cache.sql",
+        "0040_mobile_minimum_version.sql",
+        "0040_practice_reroll_index.sql",
+        "0041_corpus_source_snapshots.sql",
+        "0041_apple_auth.sql",
+        "0042_serving_revision_snapshot_staging.sql",
+        "0043_corpus_activation_readiness.sql",
+        "0044_snapshot_scoped_puzzle_uniqueness.sql",
+        "0045_apple_subscriptions.sql"
+      ]
+    },
+    "launch-load": {
+      "workflow": ".github/workflows/launch-load.yml",
+      "migrations": [
+        "0037_mobile_oauth_handoffs.sql",
+        "0038_mobile_practice_idempotency.sql",
+        "0039_practice_serving_cache.sql",
+        "0040_mobile_minimum_version.sql",
+        "0040_practice_reroll_index.sql",
+        "0041_corpus_source_snapshots.sql",
+        "0041_apple_auth.sql",
+        "0042_serving_revision_snapshot_staging.sql"
+      ]
+    },
+    "launch-distributed": {
+      "workflow": ".github/workflows/launch-distributed.yml",
+      "migrations": [
+        "0037_mobile_oauth_handoffs.sql",
+        "0038_mobile_practice_idempotency.sql",
+        "0039_practice_serving_cache.sql",
+        "0040_mobile_minimum_version.sql",
+        "0040_practice_reroll_index.sql",
+        "0041_corpus_source_snapshots.sql",
+        "0041_apple_auth.sql",
+        "0042_serving_revision_snapshot_staging.sql",
+        "0045_batched_practice_selector.sql",
+        "0045_apple_subscriptions.sql"
+      ]
+    }
+  }
+}
