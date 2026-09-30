@@ -96,7 +96,11 @@ BEGIN
         AND pack1_username_key(other.display_name) = pack1_username_key(source.display_name)
     );
 
-  -- Public Identity terms must gate publication. The merge may carry a free guest\n  -- nickname onto the account player, but it stays unowned/private here; the\n  -- application can reserve it afterward only when current terms were accepted.\n\n  -- Preserve the established account profile key. Only adopt optional profile
+  -- Public Identity terms must gate publication. The merge may carry a free guest
+  -- nickname onto the account player, but it stays unowned/private here; the
+  -- application can reserve it afterward only when current terms were accepted.
+
+  -- Preserve the established account profile key. Only adopt optional profile
   -- choices (and a free non-default display name) when the target has none.
   UPDATE players AS target
   SET favorite_set_id = COALESCE(target.favorite_set_id, source.favorite_set_id),
