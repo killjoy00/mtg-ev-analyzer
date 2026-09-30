@@ -81,7 +81,8 @@ jobs:
           neon5 neon@5.0.0
           esbuild esbuild@0.28.2
           wrangler wrangler@4.132.0
-          playwright playwright@1.55.0
+          wrangler101 wrangler@4.101.0
+          playwright playwright@1.63.0
           EOF
           printf '%s\n' "$overall" > "$RUNNER_TEMP/dependency-audit/workflow-tools.status"
 
