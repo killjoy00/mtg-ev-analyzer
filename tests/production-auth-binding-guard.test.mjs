@@ -14,17 +14,19 @@ test('production Auth binding guard pins the serving endpoint and webhook base',
     authBase:'${PROD_AUTH_BASE}',
   },};`),PROD_AUTH_BASE);
 
-  const fetcher=async url=>{
+  const calls=[];
+  const fetcher=async(url,init)=>{
+    calls.push({url:String(url),method:init?.method});
     const value=String(url);
     if(value.endsWith('/auth'))return Response.json({
       auth_provider:'better_auth',
       branch_id:'br-orange-feather-ayps8kep',
       base_url:PROD_AUTH_BASE,
     });
-    if(value.endsWith('/endpoints'))return Response.json({endpoints:[{
+    if(value.endsWith('/endpoints/ep-young-hall-ayl0754j'))return Response.json({endpoint:{
       id:'ep-young-hall-ayl0754j',
       branch_id:'br-orange-feather-ayps8kep',
-    }]});
+    }});
     throw Error('unexpected URL');
   };
   const result=await verifyProductionAuthBinding({
@@ -36,6 +38,8 @@ test('production Auth binding guard pins the serving endpoint and webhook base',
     },};`,
   });
   assert.equal(result.endpoint_id,'ep-young-hall-ayl0754j');
+  assert.equal(calls.length,2);
+  assert.ok(calls.every(call=>call.method==='GET'));
 });
 
 test('production Auth binding guard fails closed on control-plane drift',async()=>{
@@ -48,7 +52,7 @@ test('production Auth binding guard fails closed on control-plane drift',async()
     webhookSource:goodWebhook,
     fetcher:async url=>{
       if(String(url).endsWith('/auth'))return Response.json({base_url:'https://ep-wrong.neonauth.example/pack1/auth'});
-      return Response.json({endpoints:[{id:'ep-young-hall-ayl0754j',branch_id:'br-orange-feather-ayps8kep'}]});
+      return Response.json({endpoint:{id:'ep-young-hall-ayl0754j',branch_id:'br-orange-feather-ayps8kep'}});
     },
   }),/base_url/);
 
@@ -57,7 +61,7 @@ test('production Auth binding guard fails closed on control-plane drift',async()
     webhookSource:goodWebhook,
     fetcher:async url=>{
       if(String(url).endsWith('/auth'))return Response.json({base_url:PROD_AUTH_BASE});
-      return Response.json({endpoints:[{id:'ep-young-hall-ayl0754j',branch_id:'br-dark-sound-ayxhwq1u'}]});
+      return Response.json({endpoint:{id:'ep-young-hall-ayl0754j',branch_id:'br-dark-sound-ayxhwq1u'}});
     },
   }),/not attached/);
 
@@ -66,7 +70,7 @@ test('production Auth binding guard fails closed on control-plane drift',async()
     webhookSource:"const CONFIGS={production:{authBase:'https://wrong.example'}};",
     fetcher:async url=>{
       if(String(url).endsWith('/auth'))return Response.json({base_url:PROD_AUTH_BASE});
-      return Response.json({endpoints:[{id:'ep-young-hall-ayl0754j',branch_id:'br-orange-feather-ayps8kep'}]});
+      return Response.json({endpoint:{id:'ep-young-hall-ayl0754j',branch_id:'br-orange-feather-ayps8kep'}});
     },
   }),/pack1-authhook/);
 });
