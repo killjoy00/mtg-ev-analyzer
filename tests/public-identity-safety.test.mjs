@@ -1,0 +1,53 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+
+import {
+  PUBLIC_IDENTITY_TERMS_VERSION,
+  assertPublicDisplayNameAllowed,
+  normalizedReportDetails,
+  normalizedReportReason,
+  publicDisplayNameProblem,
+  publicIdentityEligibility,
+  publicIdentityTermsCurrent,
+} from '../worker/public-identity-safety.mjs';
+
+test('public identity filter allows ordinary player names and rejects clear abuse/impersonation/contact data',()=>{
+  for(const name of ['Ryan','Draft Goblin','P1P1 Enjoyer','Jace Fan']) {
+    assert.equal(publicDisplayNameProblem(name),null,name);
+    assert.equal(assertPublicDisplayNameAllowed(name),name);
+  }
+  assert.equal(publicDisplayNameProblem('Pack One Support'),'reserved_identity');
+  assert.equal(publicDisplayNameProblem('admin'),'reserved_identity');
+  assert.equal(publicDisplayNameProblem('visit https://example.com'),'contact_or_url');
+  assert.equal(publicDisplayNameProblem('me@example.com'),'contact_or_url');
+  assert.equal(publicDisplayNameProblem('+1 (702) 555-1212'),'contact_or_url');
+  assert.equal(publicDisplayNameProblem('Safe\u202EName'),'invisible_or_control');
+  assert.equal(publicDisplayNameProblem('n4zi'),'clearly_prohibited');
+  assert.throws(()=>assertPublicDisplayNameAllowed('Pack One Admin'),error=>error?.status===400&&error?.code==='USERNAME_NOT_ALLOWED');
+});
+
+test('public identity eligibility fails closed until current terms are accepted and after moderation',()=>{
+  const accepted={
+    auth_user_id:'11111111-1111-4111-8111-111111111111',
+    username_owned:true,
+    is_placeholder:false,
+    public_identity_terms_version:PUBLIC_IDENTITY_TERMS_VERSION,
+    public_identity_terms_accepted_at:'2026-09-30T00:00:00Z',
+    public_identity_hidden_at:null,
+  };
+  assert.equal(publicIdentityTermsCurrent(accepted),true);
+  assert.deepEqual(publicIdentityEligibility(accepted),{eligible:true,reason:null});
+  assert.deepEqual(publicIdentityEligibility({...accepted,auth_user_id:null}),{eligible:false,reason:'guest'});
+  assert.deepEqual(publicIdentityEligibility({...accepted,public_identity_terms_version:'old'}),{eligible:false,reason:'terms_required'});
+  assert.deepEqual(publicIdentityEligibility({...accepted,public_identity_hidden_at:'2026-09-30T01:00:00Z'}),{eligible:false,reason:'moderated'});
+  assert.deepEqual(publicIdentityEligibility({...accepted,username_owned:false,is_placeholder:true}),{eligible:false,reason:'username_required'});
+  assert.deepEqual(publicIdentityEligibility({...accepted,username_owned:false,is_placeholder:false}),{eligible:false,reason:'username_taken'});
+});
+
+test('report reasons and details are bounded and normalized',()=>{
+  assert.equal(normalizedReportReason(' IMPERSONATION '),'impersonation');
+  assert.throws(()=>normalizedReportReason('anything-goes'),{status:400});
+  assert.equal(normalizedReportDetails('  context  '),'context');
+  assert.equal(normalizedReportDetails('  '),null);
+  assert.throws(()=>normalizedReportDetails('x'.repeat(501)),{status:400});
+});
