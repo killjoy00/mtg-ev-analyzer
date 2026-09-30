@@ -1,9 +1,10 @@
 import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
+import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
 
+export {PROD_AUTH_BASE};
 export const PROJECT='patient-shadow-91417882';
 export const PROD_BRANCH='br-orange-feather-ayps8kep';
-export const PROD_AUTH_BASE='https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 
 function assert(value,message){if(!value)throw Error(message);}
 
@@ -22,6 +23,7 @@ export function webhookProductionAuthBase(source) {
 async function control(route,{key=process.env.NEON_API_KEY,fetcher=fetch}={}) {
   assert(typeof key==='string'&&key.length>=20,'NEON_API_KEY is missing or too short.');
   const response=await fetcher('https://console.neon.tech/api/v2'+route,{
+    method:'GET',
     headers:{authorization:'Bearer '+key,accept:'application/json'},
     redirect:'error',
     signal:AbortSignal.timeout(15000),
@@ -42,15 +44,14 @@ export async function verifyProductionAuthBinding({
 }={}) {
   const endpointId=endpointIdForAuthBase(PROD_AUTH_BASE);
   assert(endpointId,'PROD_AUTH_BASE does not contain a valid Neon endpoint id.');
-  const [auth,endpoints]=await Promise.all([
+  const [auth,endpointResponse]=await Promise.all([
     control('/projects/'+PROJECT+'/branches/'+PROD_BRANCH+'/auth',{key,fetcher}),
-    control('/projects/'+PROJECT+'/branches/'+PROD_BRANCH+'/endpoints',{key,fetcher}),
+    control('/projects/'+PROJECT+'/endpoints/'+endpointId,{key,fetcher}),
   ]);
   const liveAuthBase=authBaseFromResponse(auth);
   assert(liveAuthBase===PROD_AUTH_BASE,'Production Neon Auth base_url does not match PROD_AUTH_BASE.');
-  const rows=Array.isArray(endpoints?.endpoints)?endpoints.endpoints:[];
-  const endpoint=rows.find(row=>row?.id===endpointId);
-  assert(endpoint&&endpoint.branch_id===PROD_BRANCH,'PROD_AUTH_BASE endpoint is not attached to the production branch.');
+  const endpoint=endpointResponse?.endpoint||endpointResponse;
+  assert(endpoint?.id===endpointId&&endpoint?.branch_id===PROD_BRANCH,'PROD_AUTH_BASE endpoint is not attached to the production branch.');
   assert(webhookProductionAuthBase(webhookSource)===PROD_AUTH_BASE,'pack1-authhook production AUTH_BASE does not match PROD_AUTH_BASE.');
   return {project:PROJECT,branch:PROD_BRANCH,auth_base:PROD_AUTH_BASE,endpoint_id:endpointId};
 }
