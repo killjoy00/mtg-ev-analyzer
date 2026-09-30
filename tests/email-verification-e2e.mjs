@@ -19,7 +19,7 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       return route.fulfill({status:401,contentType:'application/json',body:JSON.stringify({error:'Account session required.'})});
     if(path==='/v1/account/signup') {
       const body=route.request().postDataJSON();
-      return route.fulfill({status:202,contentType:'application/json',body:JSON.stringify({ok:true,verificationRequired:true,email:body.email})});
+      return route.fulfill({status:202,contentType:'application/json',body:JSON.stringify({ok:true,verificationRequired:true,user:{id:'verify-user',email:body.email,name:'Pack One Player'}})});
     }
     if(path==='/v1/account/send-verification-email') {
       resendBodies.push(route.request().postDataJSON());
@@ -36,12 +36,13 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
   await page.locator('#account-mode-toggle').click();
 
   const signup=page.locator('#account-signup');
-  await signup.locator('[name="name"]').fill('Verification QA');
   await signup.locator('[name="email"]').fill('verify@example.invalid');
   await signup.locator('[name="password"]').fill('fixture-password-123');
   await signup.getByRole('button',{name:'Create account',exact:true}).click();
 
   await page.getByRole('heading',{name:'Check your email'}).waitFor();
+  assert.equal(await page.getByText(/^Check your email$/).count(),1);
+  assert.equal(await page.getByText(/We sent a verification link to verify@example\.invalid/).count(),1);
   await page.getByText('Verification links expire after 15 minutes.').waitFor();
   await page.getByRole('button',{name:'Send a new verification link'}).click();
   await page.getByText("If an unverified account exists for that email, we've sent a verification link.").waitFor();
