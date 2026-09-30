@@ -69,7 +69,7 @@ jobs:
           fs.appendFileSync(process.env.GITHUB_ENV,'AUTH_VERIFICATION_QA_REQUEST_PATH='+requestPath+'\n');
           NODE
       - name: Install pinned QA verification tools
-        run: npm install --prefix "$RUNNER_TEMP/auth-verification-tools" --no-audit --no-fund neon@5.0.0 wrangler@4.143.0
+        run: node .github/scripts/install-wrangler-tool.mjs "$RUNNER_TEMP/auth-verification-tools" neon@5.0.0
       - name: Run disposable email-verification acceptance
         env:
           EDGE_TOOLS_DIR: ${{ runner.temp }}/auth-verification-tools
