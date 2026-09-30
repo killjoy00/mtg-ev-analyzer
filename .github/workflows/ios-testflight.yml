@@ -88,7 +88,7 @@ jobs:
           echo "Verified Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
 
   testflight:
-    name: sign and upload TestFlight internal build
+    name: sign and upload App Store-eligible TestFlight build
     if: ${{ github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event_name == 'push') }}
     runs-on: macos-latest
     environment: pack-one-mobile-release
@@ -113,7 +113,7 @@ jobs:
           request=json.loads(Path('../.github/testflight-release-request.json').read_text())
           if set(request) != {'operation','reason'}:
               raise SystemExit('Invalid TestFlight release request keys.')
-          if request.get('operation') != 'upload-testflight-internal':
+          if request.get('operation') != 'upload-testflight-app-store-eligible':
               raise SystemExit('Invalid TestFlight release operation.')
           reason=request.get('reason')
           if not isinstance(reason,str) or not reason.strip():
@@ -216,7 +216,7 @@ jobs:
           python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
           echo "Verified signed Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
           echo "PACKONE_ARCHIVED_BUILD_NUMBER=$archived_build_number" >> "$GITHUB_ENV"
-      - name: Upload to TestFlight Internal Only
+      - name: Upload App Store-eligible TestFlight build
         shell: bash
         run: |
           set -euo pipefail
@@ -238,7 +238,7 @@ jobs:
             <key>manageAppVersionAndBuildNumber</key>
             <false/>
             <key>testFlightInternalTestingOnly</key>
-            <true/>
+            <false/>
           </dict>
           </plist>
           EOF
@@ -259,6 +259,11 @@ jobs:
             echo '- Bundle ID: `pro.packone.app`'
             echo '- App Store Connect app ID: `6814318676`'
             printf -- '- Build number: `%s`\n' "$PACKONE_ARCHIVED_BUILD_NUMBER"
-            echo "- Distribution: TestFlight Internal Only"
+            echo "- Distribution: TestFlight + App Store eligible"
             echo "- Upload completed through authenticated Xcode distribution."
           } >> "$GITHUB_STEP_SUMMARY"
+      - name: Wait for App Store-eligible processing and attach to version 1.0
+        env:
+          PACKONE_ASC_APP_ID: '6814318676'
+          PACKONE_ASC_VERSION: '1.0'
+        run: node ../.github/scripts/app-store-finalize-release-candidate.mjs "$PACKONE_ARCHIVED_BUILD_NUMBER"
