@@ -179,6 +179,12 @@ jobs:
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
+      - name: Deploy dedicated production recovery webhook Worker
+        env:
+          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
+          RELEASE_COMMIT: ${{ github.sha }}
+        run: node scripts/auth-webhook-control.mjs deploy-production
+
       - name: Deploy the development-tested revision to production
         env:
           PACK1_LAUNCH_WATCHER_GITHUB_TOKEN: ${{ secrets.PACK1_LAUNCH_WATCHER_GITHUB_TOKEN }}
@@ -207,12 +213,6 @@ jobs:
             "$neon" functions deploy "$slug" --src "$RUNNER_TEMP/pack1-bundles/$slug" --no-bundle               --project-id "$PROJECT_ID" --branch "$PROD_BRANCH" --runtime nodejs24 --wait "${extra[@]}"
           done < .github/neon-functions.txt
           node tests/secure-auth-release-smoke.mjs "$PROD_BRANCH" "$GITHUB_SHA" --settle --expect-deletion-email=true --expect-launch-recovery=true
-
-      - name: Deploy dedicated production recovery webhook Worker
-        env:
-          EDGE_TOOLS_DIR: ${{ runner.temp }}/edge-tools
-          RELEASE_COMMIT: ${{ github.sha }}
-        run: node scripts/auth-webhook-control.mjs deploy-production
 
       - name: Deploy fixed first-party production gateway
         env:
