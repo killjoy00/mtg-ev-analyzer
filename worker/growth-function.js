@@ -687,15 +687,19 @@ async function handlePlayerMigration(request) {
   return withPlayerCookie(json({ok:true,playerId:id,displayName:meta.display_name,profileKey:meta.profile_key||null,migrated:true}),legacy);
 }
 
+function providerSignupBody(payload) {
+  return {
+    name:AUTH_SIGNUP_NAME,
+    email:String(payload?.email||'').trim(),
+    password:String(payload?.password||''),
+    callbackURL:ACCOUNT_RETURN+'?auth=verify',
+  };
+}
+
 async function handleAccountSignup(request) {
   requireTrustedOrigin(request,ALLOWED_ORIGINS);
   const payload=await readJson(request);
-  const data=await neonAuth('/sign-up/email',{method:'POST',body:{
-    name:AUTH_SIGNUP_NAME,
-    email:String(payload.email||'').trim(),
-    password:String(payload.password||''),
-    callbackURL:ACCOUNT_RETURN+'?auth=verify',
-  }});
+  const data=await neonAuth('/sign-up/email',{method:'POST',body:providerSignupBody(payload)});
   const established=await establishAccount(data);
   if(!established)return json({ok:true,verificationRequired:true,user:data?.user||null},202);
   return accountJson(established.auth,established.session,201);
@@ -768,12 +772,7 @@ async function handleMobileAccountSignup(request) {
   const owner=await player(request);
   await consumePlayerLimit(query,owner,'mobile-account-auth',{limit:12,seconds:600});
   const payload=await readJson(request);
-  const data=await neonAuth('/sign-up/email',{method:'POST',body:{
-    name:AUTH_SIGNUP_NAME,
-    email:String(payload.email||'').trim(),
-    password:String(payload.password||''),
-    callbackURL:ACCOUNT_RETURN+'?auth=verify',
-  }});
+  const data=await neonAuth('/sign-up/email',{method:'POST',body:providerSignupBody(payload)});
   const established=await establishAccount(data);
   if(!established)return json({ok:true,verificationRequired:true,user:data?.user||null},202);
   return finishMobileAccount(request,established,{
@@ -2283,4 +2282,4 @@ export default {
   },
 };
 
-export { query, player, readJson, json, withCors, gameDateKey, normalizedRecoveryEmail, recoveryRateKey, consumeRecoveryLimit };
+export { query, player, readJson, json, withCors, gameDateKey, normalizedRecoveryEmail, recoveryRateKey, consumeRecoveryLimit, providerSignupBody, rethrowEmailNotVerified };
