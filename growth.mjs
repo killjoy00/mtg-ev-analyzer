@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import { completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn } from './growth-api.mjs';
+import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn } from './growth-api.mjs';
 import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
@@ -7,6 +7,7 @@ let currentAccount = null;
 let currentAccountState = 'checking';
 let currentAccountError = null;
 let pendingDailyRunValidation = null;
+let pendingSignupNamePrompt = null;
 const AUTH_FLOW_KEY='pack1-auth-flow-v1';
 
 function saveAuthFlow(intent,source) {
@@ -15,7 +16,6 @@ function saveAuthFlow(intent,source) {
 function takeAuthFlow() {
   try {const raw=sessionStorage.getItem(AUTH_FLOW_KEY);sessionStorage.removeItem(AUTH_FLOW_KEY);return raw?JSON.parse(raw):null;} catch {return null;}
 }
-function authCompleted(data) {return firstPartyAuthEnabled()?Boolean(data?.user):Boolean(data?.token);}
 
 function syncAccountNav() {
   const nav=document.querySelector('#account-nav');
@@ -51,7 +51,7 @@ export async function renderPatreonActivation(options={}) {
 }
 
 function formMarkup(kind) {
-  return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="email"></label>${kind==='signup'?'<label>Display name<input required name="name" minlength="2" maxlength="24" autocomplete="nickname"></label>':''}<label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p class="form-error" aria-live="polite"></p></form>`;
+  return `<form class="account-form" id="account-${kind}"><label>Email<input required type="email" name="email" autocomplete="username"></label><label>Password<input required type="password" name="password" minlength="8" maxlength="128" autocomplete="${kind==='signup'?'new-password':'current-password'}"></label><button class="button primary" type="submit">${kind==='signup'?'Create account':'Sign in'}</button>${kind==='signin'?'<button class="text-button" id="account-forgot" type="button">Forgot password?</button>':''}<p class="form-error" aria-live="polite"></p></form>`;
 }
 
 async function openEliteLanding(source='account') {
@@ -76,7 +76,11 @@ async function claimCurrentSession() {
   currentAccountState='signed-in';
   currentAccountError=null;
   syncAccountNav();
-  return {linked,validationRunId:linked?.validatedDailyScore?validationRunId:null};
+  return {
+    linked,
+    validationRunId:linked?.validatedDailyScore?validationRunId:null,
+    pendingValidationRunId:validationRunId,
+  };
 }
 
 export async function beginEliteUpgrade({ source='unknown' } = {}) {
