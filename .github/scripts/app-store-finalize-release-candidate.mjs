@@ -13,21 +13,23 @@ if (!issuerId || !keyId || !privateKeyText) throw new Error('ASC credentials are
 if (!/^[1-9][0-9]*$/.test(buildNumber)) throw new Error('Expected positive App Store build number.');
 
 function b64(value) { return Buffer.from(value).toString('base64url'); }
-const now = Math.floor(Date.now() / 1000);
-const h = b64(JSON.stringify({ alg: 'ES256', kid: keyId, typ: 'JWT' }));
-const p = b64(JSON.stringify({ iss: issuerId, aud: 'appstoreconnect-v1', iat: now, exp: now + 15 * 60 }));
-const input = `${h}.${p}`;
-const sig = sign('sha256', Buffer.from(input), {
-  key: createPrivateKey(privateKeyText),
-  dsaEncoding: 'ieee-p1363',
-});
-const token = `${input}.${sig.toString('base64url')}`;
+function ascToken() {
+  const now = Math.floor(Date.now() / 1000);
+  const h = b64(JSON.stringify({ alg: 'ES256', kid: keyId, typ: 'JWT' }));
+  const p = b64(JSON.stringify({ iss: issuerId, aud: 'appstoreconnect-v1', iat: now, exp: now + 15 * 60 }));
+  const input = `${h}.${p}`;
+  const sig = sign('sha256', Buffer.from(input), {
+    key: createPrivateKey(privateKeyText),
+    dsaEncoding: 'ieee-p1363',
+  });
+  return `${input}.${sig.toString('base64url')}`;
+}
 
 async function asc(path, { method = 'GET', body } = {}) {
   const response = await fetch(`https://api.appstoreconnect.apple.com${path}`, {
     method,
     headers: {
-      Authorization: `Bearer ${token}`,
+      Authorization: `Bearer ${ascToken()}`,
       Accept: 'application/json',
       ...(body === undefined ? {} : { 'Content-Type': 'application/json' }),
     },
