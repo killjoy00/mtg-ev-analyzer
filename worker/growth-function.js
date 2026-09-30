@@ -447,6 +447,7 @@ async function dailyHistoryFor(playerId) {
 async function profileMetaByPlayer(playerId) {
   const result = await query(
     `SELECT p.display_name,p.profile_key,p.profile_public,p.favorite_set_id,p.showcase_achievement,p.username_owned,
+            p.public_identity_terms_version,p.public_identity_terms_accepted_at,p.public_identity_hidden_at,p.public_identity_hidden_reason,
             EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=p.id) claimed
      FROM players p
      WHERE p.id=$1::uuid
