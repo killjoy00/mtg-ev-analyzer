@@ -46,7 +46,9 @@ test('Auth webhook deployment controller pins service identity, Auth bases, send
   assert.match(source,/worker:'pack1-authhook-qa'/);
   assert.match(source,/worker:'pack1-authhook'/);
   assert.match(source,/ep-lively-river-b5tky50l\.neonauth/);
-  assert.match(source,/ep-hidden-bonus-ayfmcpys\.neonauth/);
+  assert.match(source,/authBase:'https:\/\/ep-young-hall-ayl0754j\.neonauth/);
+  assert.match(source,/previousAuthBase:'https:\/\/ep-hidden-bonus-ayfmcpys\.neonauth/);
+  assert.match(source,/AUTH_PREVIOUS_BASE/);
   assert.match(source,/Pack One QA <qa-accounts@packone\.pro>/);
   assert.match(source,/Pack One <accounts@packone\.pro>/);
   assert.match(source,/resetOrigin:'http:\/\/localhost:4173'/);
@@ -87,7 +89,7 @@ test('production recovery smoke is main-only, fixed-target and secret-free',()=>
   assert.match(workflow,/pack1-authhook\.killjoy00\.workers\.dev\/health\?quick=1/);
   assert.match(workflow,/auth-webhook-production-smoke\.mjs/);
   assert.doesNotMatch(workflow,/secrets\./);
-  assert.match(source,/ep-hidden-bonus-ayfmcpys\.neonauth/);
+  assert.match(source,/ep-young-hall-ayl0754j\.neonauth/);
   assert.match(source,/https:\/\/packone\.pro/);
   assert.match(source,/delivered@resend\.dev/);
   assert.doesNotMatch(source,/console\.log\([^\n]*(password|token|signature|cookie)/i);
