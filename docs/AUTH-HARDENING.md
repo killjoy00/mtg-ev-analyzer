@@ -7,9 +7,17 @@ Status: **production active**. Production Managed Better Auth rejects localhost 
 Production Neon Auth:
 
 - project: `patient-shadow-91417882`
-- branch: `br-orange-feather-ayps8kep` (`main`)
-- Auth base: `https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth`
+- serving branch: `br-orange-feather-ayps8kep` (currently named `pack1-dr-restore-drill-2026-09-30 (1)`; it is not the Neon default branch)
+- Auth base: `https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth`
 - `allow_localhost: false`
+
+### September 30 restore-finalization incident
+
+A restore drill finalized `br-dark-sound-ayxhwq1u` as Neon `main` / primary / default and moved the original `ep-hidden-bonus-ayfmcpys` endpoint onto that restored branch. The application Functions, schedulers, gateway branch configuration, and every app write remained on `br-orange-feather-ayps8kep`. Neon Auth also remained registered on `br-orange-feather-ayps8kep`, where Neon now reports the `ep-young-hall-ayl0754j` Auth base above.
+
+The production application must therefore use the Auth base reported for the serving branch, not infer production identity from the endpoint that historically belonged to it or from whichever branch Neon currently names `main`. The secure-auth release now checks this binding read-only before deployment.
+
+During the corrective cutover, `pack1-authhook` temporarily accepts signed verification events and verification links from both the current and immediately previous Auth bases so email verification is not dropped between the Worker and backend deployments. Remove the previous-host allowance in a follow-up only after the new production round trip is accepted.
 
 Development/QA Neon Auth:
 
