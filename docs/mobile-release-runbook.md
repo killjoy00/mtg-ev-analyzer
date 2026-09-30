@@ -1,6 +1,6 @@
 # Pack One mobile release runbook
 
-Updated 2026-09-25.
+Updated 2026-09-30.
 
 This is the owner runbook for Pack One mobile releases. It covers normal releases, emergency fixes, rollback/containment, and the external release-security boundary.
 
@@ -49,9 +49,18 @@ Before either platform's final signed candidate is uploaded:
 2. Run the store-free `Mobile exact-main RC smoke` workflow for that exact `main` SHA.
 3. Require all four stages to pass: exact-main deterministic validation, unsigned iOS production archive, Android production bundle, and the final evidence job that re-fetches `main` after both native builds.
 4. Record the SHA/version/artifact evidence in #575.
-5. Treat **any later `main` movement as invalidating final-source status**. Re-run exact-main certification before uploading signed TestFlight or Play candidates.
+5. Treat later `main` movement as invalidating final-source status **only when it changes shipped application/runtime code, native configuration, dependencies, build inputs, or release behavior that affects the binary**. Documentation-only and store-control-only changes do not require a new binary when a reviewed compare proves the shipped app bits are unchanged; record that equivalence in #575.
 
 The store-free smoke proves source/build reproducibility only. It never substitutes for signed store processing or physical-device acceptance.
+
+## Pack One 1.0 current release checkpoint
+
+As of 2026-09-30:
+- iOS customer-submission RC: build `100321`, source `5fce31805e277a1d234ff40ad3df381faf75602c`, App Store Connect `VALID` + `APP_STORE_ELIGIBLE`, attached to App Store version 1.0 by run `36722154047`.
+- Android RC: versionCode `100311`, source `c04ab3ba9f9def47708c67c2581596bcbd35f5c4`, uploaded by run `36663310963` and promoted unchanged to `production-access` Closed Testing by run `36668780511` with release status `completed`.
+- The source difference between those RCs is store/release-control code only; no mobile application runtime source changed.
+- Current exact-main store-free certification run `36722154500` passed.
+- Owner-only non-device console/account steps are maintained in `docs/mobile-store-submission.md`.
 
 ## Apple Elite subscription prerequisites
 
@@ -69,7 +78,7 @@ Before an iOS candidate can be treated as release-ready:
 1. Merge application changes to reviewed current `main`.
 2. Update the TestFlight release-request file through a reviewed PR.
 3. Merge only after required CI is green.
-4. The guarded TestFlight workflow allocates a new App Store build number, signs the exact current-main revision, and uploads it to TestFlight Internal Only.
+4. The guarded TestFlight workflow allocates a new App Store build number, signs the exact current-main revision, uploads an App Store-eligible TestFlight build, waits for App Store Connect processing, requires `VALID` + `APP_STORE_ELIGIBLE`, and attaches that exact build to the editable App Store version.
 5. Wait for Apple processing.
 6. Install that exact build on a physical iPhone.
 7. Run the physical acceptance checklist: Dailies, practice, account flows, Apple/Google/email sign-in, career/leaderboard, share, relaunch/resume, slow-network sanity, accessibility basics, deletion, upgrade continuity, and Apple Elite subscribe/restore/manage.
@@ -90,7 +99,7 @@ Before an iOS candidate can be treated as release-ready:
 5. Verify the exact internal-track version through the read-only status workflow.
 6. Install on a representative physical Android device and run the same product/account/upgrade acceptance pass.
 7. Complete the Play App content and listing fields from `docs/mobile-store-submission.md`.
-8. Publish the approved build to the required Closed Testing track.
+8. Publish the approved build to the Pack One `production-access` Closed Testing track.
 9. Confirm installability through the tester opt-in flow and complete any Play production-access qualification period.
 10. Apply for Production access when eligible.
 11. For the first public production release, use the selected production countries. Google does not offer a percentage staged rollout for the first release.
