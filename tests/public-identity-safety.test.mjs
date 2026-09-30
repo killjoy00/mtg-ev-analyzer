@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
@@ -50,4 +51,12 @@ test('report reasons and details are bounded and normalized',()=>{
   assert.equal(normalizedReportDetails('  context  '),'context');
   assert.equal(normalizedReportDetails('  '),null);
   assert.throws(()=>normalizedReportDetails('x'.repeat(501)),{status:400});
+});
+
+
+test('public identity migration keeps merged guest nicknames private until accepted',()=>{
+  const migration=fs.readFileSync(new URL('../migrations/0046_public_identity_safety.sql',import.meta.url),'utf8');
+  assert.match(migration,/CREATE OR REPLACE FUNCTION merge_pack1_player/);
+  assert.match(migration,/SET display_name = adopt_name, username_owned = false/);
+  assert.doesNotMatch(migration,/SET display_name = adopt_name, username_owned = true/);
 });
