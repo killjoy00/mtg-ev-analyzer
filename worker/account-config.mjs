@@ -1,4 +1,4 @@
-const PROD_AUTH_BASE='https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const PROD_AUTH_BASE='https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 const QA_AUTH_BASE='https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth';
 const PROD_RESET_DESTINATION='https://packone.pro/reset-password/';
 const QA_RESET_DESTINATION='http://localhost:4173/reset-password/';
