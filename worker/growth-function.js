@@ -50,7 +50,7 @@ function cors(request) {
   if (!origin || !ALLOWED_ORIGINS.has(origin)) return {};
   return {
     'access-control-allow-origin': origin,
-    'access-control-allow-methods': 'GET,POST,PATCH,OPTIONS',
+    'access-control-allow-methods': 'GET,POST,PATCH,DELETE,OPTIONS',
     'access-control-allow-headers': 'authorization,content-type,x-pack1-auth-session,x-pack1-csrf',
     'access-control-allow-credentials': 'true',
     'access-control-max-age': '86400',
@@ -2267,7 +2267,7 @@ async function handleProfileLookup(request) {
      SELECT lookup,display_name,profile_key,showcase_achievement
      FROM matches
      WHERE match_count=1`,
-    [JSON.stringify(names)],
+    [JSON.stringify(names),PUBLIC_IDENTITY_TERMS_VERSION],
   );
   const profiles = {};
   for (const row of result.rows) {
@@ -2339,12 +2339,18 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/profile/history') return handleMyHistory(request);
   if (request.method === 'POST' && url.pathname === '/v1/profile-lookup') return handleProfileLookup(request);
 
+  const mobileIdentityAction = url.pathname.match(/^\/v1\/mobile\/profile\/([a-f0-9]{16})\/(report|block)$/);
+  if (request.method === 'POST' && mobileIdentityAction?.[2] === 'report') return handlePublicIdentityReport(request,mobileIdentityAction[1],{mobile:true});
+  if (['POST','DELETE'].includes(request.method) && mobileIdentityAction?.[2] === 'block') return handlePublicIdentityBlock(request,mobileIdentityAction[1],{mobile:true});
+  const identityAction = url.pathname.match(/^\/v1\/profile\/([a-f0-9]{16})\/(report|block)$/);
+  if (request.method === 'POST' && identityAction?.[2] === 'report') return handlePublicIdentityReport(request,identityAction[1]);
+  if (['POST','DELETE'].includes(request.method) && identityAction?.[2] === 'block') return handlePublicIdentityBlock(request,identityAction[1]);
   const mobileProfileMatch = url.pathname.match(/^\/v1\/mobile\/profile\/([a-f0-9]{16})$/);
-  if (request.method === 'GET' && mobileProfileMatch) return handlePublicProfile(mobileProfileMatch[1]);
+  if (request.method === 'GET' && mobileProfileMatch) return handlePublicProfile(mobileProfileMatch[1],request);
   const historyMatch = url.pathname.match(/^\/v1\/profile\/([a-f0-9]{16})\/history$/);
   if (request.method === 'GET' && historyMatch) return handlePublicHistory(historyMatch[1], request);
   const profileMatch = url.pathname.match(/^\/v1\/profile\/([a-f0-9]{16})$/);
-  if (request.method === 'GET' && profileMatch) return handlePublicProfile(profileMatch[1]);
+  if (request.method === 'GET' && profileMatch) return handlePublicProfile(profileMatch[1],request);
   return json({ error: 'Not found.' }, 404);
 }
 
