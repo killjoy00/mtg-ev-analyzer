@@ -38,6 +38,8 @@ jobs:
         run: |
           node ./scripts/check-build-toolchain.mjs
           npm ci --no-audit --no-fund
+      - name: Validate App Store RC helper syntax
+        run: node --check ../.github/scripts/app-store-finalize-release-candidate.mjs
       # PR smoke archives are never uploaded. The publishing job below allocates
       # against App Store Connect so workflow renames/retries cannot reuse a number.
       - name: Set smoke build number
