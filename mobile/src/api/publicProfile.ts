@@ -1,5 +1,6 @@
 import { requestJson } from '@/src/api/client';
 import type { CareerHistoryPage, CareerHistoryRow, CareerProfile } from '@/src/api/career';
+import type { MobileSession } from '@/src/storage/session';
 
 export class InvalidPublicProfileError extends Error {
   constructor() { super('This public profile could not be verified. Reload the profile.'); this.name = 'InvalidPublicProfileError'; }
@@ -42,10 +43,44 @@ function checkedHistory(value: unknown): CareerHistoryPage {
 // These already-public routes enforce the subject's opt-in on the server.
 // Never create a guest, send a native account token, or inherit browser cookies
 // just to view someone else's public record.
-export async function loadPublicProfile(key: string) {
+export async function loadPublicProfile(key: string, session: MobileSession | null = null) {
   const id = publicProfileKey(key);
-  const value = await requestJson<unknown>(`/growth/v1/profile/${id}`, { timeoutMs: 20_000, credentials: 'omit' });
+  const value = session
+    ? await requestJson<unknown>(`/growth/v1/mobile/profile/${id}`, {
+        timeoutMs: 20_000,
+        mobileSessionToken: session.playerToken,
+        mobileAccountToken: session.accountToken ?? null,
+      })
+    : await requestJson<unknown>(`/growth/v1/profile/${id}`, { timeoutMs: 20_000, credentials: 'omit' });
   return checkedProfile(value, id);
+}
+
+export async function reportPublicProfile(
+  key: string,
+  session: MobileSession,
+  reason: 'offensive_name' | 'harassment' | 'impersonation' | 'spam' | 'other',
+) {
+  const id=publicProfileKey(key);
+  if(!session.accountToken)throw new Error('Sign in to report a public profile.');
+  return requestJson<{ok:boolean;report_id?:string|null}>(`/growth/v1/mobile/profile/${id}/report`,{
+    method:'POST',
+    mobileSessionToken:session.playerToken,
+    mobileAccountToken:session.accountToken,
+    body:{reason},
+    timeoutMs:15_000,
+  });
+}
+
+export async function blockPublicProfile(key: string, session: MobileSession) {
+  const id=publicProfileKey(key);
+  if(!session.accountToken)throw new Error('Sign in to block a public profile.');
+  return requestJson<{ok:boolean;blocked:boolean}>(`/growth/v1/mobile/profile/${id}/block`,{
+    method:'POST',
+    mobileSessionToken:session.playerToken,
+    mobileAccountToken:session.accountToken,
+    body:{},
+    timeoutMs:15_000,
+  });
 }
 
 export async function loadPublicProfileHistory(key: string, cursor: string | null = null) {
