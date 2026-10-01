@@ -16,10 +16,8 @@ export const LONG_LIVED_BRANCHES=new Map([
 // must be deleted or adopted into .github/neon-functions.txt by the review date;
 // after it they fail the audit like any other unowned Function.
 export const UNMANAGED_FUNCTION_REVIEW_BY='2026-10-15T00:00:00Z';
-export const KNOWN_UNMANAGED_FUNCTIONS=new Set([
-  'drbootstrap','drdispatch','drfetchtest','drheader','dringest','drkick','drmsh',
-  'drprobe','drsampletmt','drsize','drsos','drstx2','drstxmini','drtmt',
-]);
+// dringest was invoked on 2026-09-26 by an unidentified caller; the other dr* helpers were deleted on 2026-10-01.
+export const KNOWN_UNMANAGED_FUNCTIONS=new Set(['dringest']);
 
 export function manifestSlugs(text) {
   return String(text||'').trim().split('\n').map(line=>line.trim().split(':')[0]).filter(Boolean);

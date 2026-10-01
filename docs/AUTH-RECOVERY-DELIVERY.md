@@ -7,9 +7,9 @@ Status: **production active**. Managed Neon remains the recovery-token issuer, A
 Production Neon Auth branch:
 
 - project: `patient-shadow-91417882`
-- serving branch: `br-orange-feather-ayps8kep` (currently named `pack1-dr-restore-drill-2026-09-30 (1)`)
+- serving branch: `br-orange-feather-ayps8kep` (named `production`)
 - Auth base: `https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth`
-- Neon control-plane default branch is currently a different branch, `br-dark-sound-ayxhwq1u` (`main`); do not use the default-branch label to derive the production Auth host
+- the serving branch is also Neon's default branch since 2026-10-01, but still derive the production Auth host from the branch ID, never from the default-branch label
 
 Production recovery receiver:
 
