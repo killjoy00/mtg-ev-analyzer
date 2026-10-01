@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {
   PROD_AUTH_BASE,
   endpointIdForAuthBase,
@@ -73,4 +74,16 @@ test('production Auth binding guard fails closed on control-plane drift',async()
       return Response.json({endpoint:{id:'ep-young-hall-ayl0754j',branch_id:'br-orange-feather-ayps8kep'}});
     },
   }),/pack1-authhook/);
+});
+
+const scheduledWorkflow=fs.readFileSync(new URL('../.github/workflows/production-auth-binding-guard.yml',import.meta.url),'utf8');
+
+test('hourly production Auth binding job is read-only',()=>{
+  assert.match(scheduledWorkflow,/schedule:\\s*\\n\\s*- cron: '17 \\* \\* \\* \\*'/);
+  assert.match(scheduledWorkflow,/permissions:\\s*\\n\\s*contents: read/);
+  assert.match(scheduledWorkflow,/NEON_API_KEY: \\$\\{\\{ secrets\\.NEON_API_KEY \\}\\}/);
+  assert.match(scheduledWorkflow,/run: node scripts\\/production-auth-binding-guard\\.mjs/);
+  assert.equal((scheduledWorkflow.match(/\\brun:/g)||[]).length,1,'scheduled guard has exactly one executable shell command');
+  assert.doesNotMatch(scheduledWorkflow,/\\b(?:contents|actions|issues|pull-requests): write\\b/);
+  assert.doesNotMatch(scheduledWorkflow,/slack|webhook|notify|notification|create.issue/i);
 });
