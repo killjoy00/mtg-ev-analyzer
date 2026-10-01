@@ -123,6 +123,107 @@ Cleanup preserves the provider deletion outcome instead of collapsing failures i
 
 After the final production run, a read-only query confirmed **zero** remaining `pack1-auth-hardening-* @example.com` or `delivered@resend.dev` smoke users.
 
+## Open owner follow-ups from the September 30 incident
+
+These are owner-run actions. Do not perform them from an automated recovery or release workflow.
+
+### Retire the old Auth host, reversibly first
+
+The restored branch `br-dark-sound-ayxhwq1u` is a stale public copy of production Auth data. As of the incident closeout it still retained 9 unexpired Neon sessions across 3 users. Pack One application writes did not go to that branch during the split, so account deletions on the serving branch do not propagate there. Old passwords may therefore still work against the old Auth host; that is an inference from the stale copy, not a tested claim.
+
+First disable the old compute endpoint `ep-hidden-bonus-ayfmcpys`; do not delete the branch or endpoint. This is reversible and is preferred over destructive cleanup.
+
+Exact Neon API call:
+
+```sh
+curl --fail-with-body --request PATCH \
+  --url https://console.neon.tech/api/v2/projects/patient-shadow-91417882/endpoints/ep-hidden-bonus-ayfmcpys \
+  --header "Authorization: Bearer $NEON_API_KEY" \
+  --header 'accept: application/json' \
+  --header 'content-type: application/json' \
+  --data '{"endpoint":{"disabled":true}}'
+```
+
+To reverse that containment step, send the same request with `"disabled":false`.
+
+After disabling the old endpoint, verify all four conditions before changing Google OAuth configuration:
+
+1. `https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/ok` no longer returns HTTP 200.
+2. `https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/ok` still returns HTTP 200.
+3. From a reviewed checkout with `NEON_API_KEY` available, `node scripts/production-auth-binding-guard.mjs` passes.
+4. A normal production sign-in on `https://packone.pro` still works.
+
+Only after those checks pass, remove the old Google OAuth redirect URI from **Google Cloud Console -> APIs & Services -> Credentials -> the existing Pack One Web OAuth client -> Authorized redirect URIs**:
+
+- remove `https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/callback/google`;
+- keep `https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/callback/google`.
+
+Deleting `br-dark-sound-ayxhwq1u`, renaming branches, or changing Neon's default/primary branch is a separate later decision and is not part of this containment step.
+
+### Tester re-registration
+
+Ask the affected tester to register again on `https://packone.pro`. The corrected signup flow is already live: signup should stop at the **Check your email** screen, and the resend-verification action is available there. The tester's successful re-registration can also serve as the signup acceptance check below.
+
+### Owner acceptance: signup and password reset
+
+Record the UTC timestamp immediately before starting these two checks; use that value as `QA_START_UTC` in the read-only SQL below.
+
+Signup acceptance:
+
+1. Register the affected tester again, or use another real inbox.
+2. Confirm the **Check your email** screen appears.
+3. Confirm the verification email arrives through `pack1-authhook`.
+4. Open the verification link.
+5. Sign in successfully.
+
+Password-reset acceptance:
+
+1. Use a dedicated test account, not the owner's main account.
+2. Request a password reset.
+3. Confirm the reset email arrives.
+4. Open the reset link and set a new password.
+5. Sign in successfully with the new password.
+
+After both flows pass, run only count-only/read-only checks. Replace the timestamp literal with the recorded `QA_START_UTC`.
+
+On the serving branch `br-orange-feather-ayps8kep`, expect at least one new verified credential user that also has a new Pack One application session:
+
+```sql
+WITH params(qa_start) AS (
+  VALUES (TIMESTAMPTZ '2026-10-01T00:00:00Z')
+)
+SELECT count(*) AS new_verified_credential_users_with_session
+FROM neon_auth."user" u
+CROSS JOIN params p
+WHERE u."createdAt" >= p.qa_start
+  AND u."emailVerified" IS TRUE
+  AND EXISTS (
+    SELECT 1
+    FROM neon_auth.account a
+    WHERE a."userId" = u.id
+      AND a."providerId" = 'credential'
+  )
+  AND EXISTS (
+    SELECT 1
+    FROM public.account_sessions s
+    WHERE s.auth_user_id = u.id
+      AND s.created_at >= p.qa_start
+  );
+```
+
+On the stale branch `br-dark-sound-ayxhwq1u`, expect zero new users and zero new Pack One application sessions:
+
+```sql
+WITH params(qa_start) AS (
+  VALUES (TIMESTAMPTZ '2026-10-01T00:00:00Z')
+)
+SELECT
+  (SELECT count(*) FROM neon_auth."user" u, params p WHERE u."createdAt" >= p.qa_start) AS new_users,
+  (SELECT count(*) FROM public.account_sessions s, params p WHERE s.created_at >= p.qa_start) AS new_sessions;
+```
+
+Once both owner-run flows are reported complete, re-run those count-only checks and confirm the `pack1growth` logs contain no new PostgreSQL `23503` errors.
+
 ## Security boundaries preserved
 
 This work did **not** change:
