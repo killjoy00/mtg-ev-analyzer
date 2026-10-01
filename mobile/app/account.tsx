@@ -25,6 +25,7 @@ import {
   finishGoogleSignIn,
   finishNativeAppleSignIn,
   forgetAccountLocally,
+  linkMobileAccount,
   loadMobileAccount,
   requestMobilePasswordReset,
   requestMobileVerificationEmail,
@@ -78,6 +79,8 @@ export default function AccountScreen() {
   const [profile, setProfile] = useState<CareerProfile | null>(null);
   const [catalogSets, setCatalogSets] = useState<PracticeSet[]>([]);
   const [mode, setMode] = useState<Mode>('signin');
+  const [promptLeaderboardName, setPromptLeaderboardName] = useState(false);
+  const [pendingClaimValidatedDaily, setPendingClaimValidatedDaily] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [profileName, setProfileName] = useState('');
@@ -156,17 +159,37 @@ export default function AccountScreen() {
     };
   }, [applyProfile, loadOptionalEnrichment]);
 
+  const continueAfterLeaderboardNamePrompt = (validatedDailyScore = pendingClaimValidatedDaily) => {
+    setPromptLeaderboardName(false);
+    setPendingClaimValidatedDaily(false);
+    if (validateDailyRunId) {
+      setTimeout(() => router.replace({
+        pathname: '/draft-run',
+        params: { environment: returnEnvironment },
+      }), 300);
+    } else if (returnToPractice) {
+      setTimeout(() => router.replace('/practice'), 300);
+    }
+    return validatedDailyScore;
+  };
+
   const finish = async (next: MobileSession, result: MobileAuthResponse) => {
     setSession(next);
     setPassword('');
-    const successMessage = result.linked.validatedDailyScore
-      ? 'Signed in. Today\'s guest Daily was validated for this account.'
-      : result.linked.rankingIdentity?.eligible === false
-        ? 'Signed in. Choose a unique leaderboard name below before using ranked public identity.'
-        : 'Signed in to your Pack One account.';
+    const newlyClaimed = result.linked.newlyClaimed === true;
+    const successMessage = newlyClaimed
+      ? 'Choose the name shown on leaderboards.'
+      : result.linked.validatedDailyScore
+        ? 'Signed in. Today\'s guest Daily was validated for this account.'
+        : result.linked.rankingIdentity?.eligible === false
+          ? 'Signed in. Choose a unique leaderboard name below before using ranked public identity.'
+          : 'Signed in to your Pack One account.';
     setMessage(successMessage);
 
-    if (result.linked.validatedDailyScore) {
+    if (newlyClaimed) {
+      setPromptLeaderboardName(true);
+      setPendingClaimValidatedDaily(Boolean(result.linked.validatedDailyScore));
+    } else if (result.linked.validatedDailyScore) {
       setTimeout(() => router.replace({
         pathname: '/draft-run',
         params: { environment: returnEnvironment },
@@ -316,6 +339,8 @@ export default function AccountScreen() {
       const fresh = await ensureGuestSession();
       setSession(fresh);
       setAccount(null);
+      setPromptLeaderboardName(false);
+      setPendingClaimValidatedDaily(false);
       applyProfile(null);
       setCatalogSets([]);
       setEnrichmentWarning(null);
@@ -339,6 +364,18 @@ export default function AccountScreen() {
         showcaseAchievement: showcaseAchievement || null,
       });
       applyProfile(updated);
+      if (promptLeaderboardName && updated.player.username_owned !== false) {
+        let validatedDailyScore = pendingClaimValidatedDaily;
+        if (validateDailyRunId && !validatedDailyScore) {
+          const linked = await linkMobileAccount(session, validateDailyRunId);
+          validatedDailyScore = Boolean(linked.validatedDailyScore);
+        }
+        setMessage(validatedDailyScore
+          ? 'Profile saved. Today\'s guest Daily was validated for this account.'
+          : 'Profile settings saved.');
+        continueAfterLeaderboardNamePrompt(validatedDailyScore);
+        return;
+      }
       setMessage(updated.player.username_owned === false
         ? 'Profile saved. Choose a different unique leaderboard name to become rank-eligible.'
         : 'Profile settings saved.');
@@ -511,6 +548,22 @@ export default function AccountScreen() {
           <View style={styles.panel}>
             <Text style={styles.panelTitle}>{signedInLabel}</Text>
             <Text style={styles.body}>This device has a revocable Pack One account session stored in the platform secure store.</Text>
+
+            {promptLeaderboardName ? (
+              <View style={styles.warning}>
+                <Text style={styles.warningTitle}>Choose the name shown on leaderboards.</Text>
+                <Text style={styles.body}>Use the prefilled leaderboard name below, change it, or skip for now.</Text>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Skip leaderboard name for now"
+                  disabled={busy}
+                  onPress={() => continueAfterLeaderboardNamePrompt()}
+                  style={styles.textButton}
+                >
+                  <Text style={styles.textButtonText}>Skip for now</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {profile ? (
               <View style={styles.settingsSection}>

@@ -2235,6 +2235,7 @@ async function route(request) {
   if (request.method === 'POST' && url.pathname === '/v1/results') return handleResult(request);
   if (request.method === 'GET' && url.pathname === '/v1/stats') return handleStats(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/link') return handleLink(request);
+  if (request.method === 'POST' && url.pathname === '/v1/mobile/account/link') return handleLink(request,{mobile:true});
   if (request.method === 'GET' && url.pathname === '/v1/account/session') return handleAccount(request);
   if (request.method === 'POST' && url.pathname === '/v1/account/signout') return handleSignout(request);
   if (request.method === 'GET' && url.pathname === '/v1/mobile/account/session') return handleMobileAccount(request);

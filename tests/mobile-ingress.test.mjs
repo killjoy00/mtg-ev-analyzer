@@ -139,6 +139,7 @@ test('native account parity routes stay inside the mobile bridge',async()=>{
 
   for(const [path,method,body] of [
     ['/growth/v1/mobile/profile','PATCH',{displayName:'Native Player'}],
+    ['/growth/v1/mobile/account/link','POST',{validateDailyRunId:'123e4567-e89b-12d3-a456-426614174000'}],
     ['/growth/v1/mobile/account/password-change','POST',{currentPassword:'old-password',newPassword:'new-password'}],
   ]) {
     let forwarded=null;
