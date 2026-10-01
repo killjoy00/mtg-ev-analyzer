@@ -3,7 +3,26 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 const storeRelease = JSON.parse(readFileSync(new URL('../store-release.json', import.meta.url), 'utf8'));
+const appJson = JSON.parse(readFileSync(new URL('../app.json', import.meta.url), 'utf8'));
 assert.equal(storeRelease.appStoreVersion, storeRelease.playVersionName);
+
+const secureStorePlugin = appJson.expo?.plugins?.find(
+  (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-secure-store',
+);
+assert.ok(secureStorePlugin, 'expo-secure-store must remain explicitly configured');
+assert.equal(
+  secureStorePlugin[1]?.faceIDPermission,
+  false,
+  'Pack One does not use biometric SecureStore access; production must not declare Face ID usage',
+);
+assert.deepEqual(
+  new Set(appJson.expo?.android?.blockedPermissions || []),
+  new Set([
+    'android.permission.READ_EXTERNAL_STORAGE',
+    'android.permission.WRITE_EXTERNAL_STORAGE',
+  ]),
+  'legacy external-storage permissions must remain blocked from generated Android manifests',
+);
 
 const npx = process.platform === 'win32' ? 'npx.cmd' : 'npx';
 
@@ -57,6 +76,13 @@ assert.equal(production.android.package, 'pro.packone.app');
 assert.equal(production.icon, './assets/images/icon.png');
 assert.equal(production.extra.buildProfile, 'production');
 assert.equal(production.extra?.eas?.projectId, undefined);
+assert.deepEqual(
+  new Set(production.android.blockedPermissions || []),
+  new Set([
+    'android.permission.READ_EXTERNAL_STORAGE',
+    'android.permission.WRITE_EXTERNAL_STORAGE',
+  ]),
+);
 
 const numberedProduction = loadConfig('production', {
   PACKONE_IOS_BUILD_NUMBER: '100123',
