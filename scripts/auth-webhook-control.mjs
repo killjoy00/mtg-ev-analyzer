@@ -1,11 +1,13 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import {execFileSync} from 'node:child_process';
+import {pathToFileURL} from 'node:url';
+import {PROD_AUTH_BASE,QA_AUTH_BASE} from '../worker/account-config.mjs';
 
-const CONFIGS={
+export const AUTH_WEBHOOK_CONFIGS={
   qa:{
     worker:'pack1-authhook-qa',
-    authBase:'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
+    authBase:QA_AUTH_BASE,
     sender:'Pack One QA <qa-accounts@packone.pro>',
     subject:'Reset Your Password - Pack One QA',
     verificationSubject:'Verify Your Email - Pack One QA',
@@ -13,13 +15,14 @@ const CONFIGS={
   },
   production:{
     worker:'pack1-authhook',
-    authBase:'https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth',
+    authBase:PROD_AUTH_BASE,
     sender:'Pack One <accounts@packone.pro>',
     subject:'Reset Your Password - Pack One',
     verificationSubject:'Verify Your Email - Pack One',
     resetOrigin:'https://packone.pro',
   },
 };
+const CONFIGS=AUTH_WEBHOOK_CONFIGS;
 
 function requireSecret(value,name) {
   if(typeof value!=='string'||value.length<20)throw Error(name+' is missing or too short.');
@@ -181,8 +184,10 @@ async function main(action) {
   throw Error('Unknown Auth webhook control action.');
 }
 
-main(process.argv[2]).catch(error=>{
-  const message=String(error?.message||'');
-  console.error(/^(CLOUDFLARE_EDGE_TOKEN|PACK1_AUTH_RESEND_API_KEY|Pinned deployment|Cloudflare|Expected the active|Invalid Cloudflare|Workers\.dev|Unknown Auth webhook|Exact release|Auth webhook|QA Auth webhook)/.test(message)?message:'Auth webhook control failed; inspect the sanitized step status.');
-  process.exitCode=1;
-});
+if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url){
+  main(process.argv[2]).catch(error=>{
+    const message=String(error?.message||'');
+    console.error(/^(CLOUDFLARE_EDGE_TOKEN|PACK1_AUTH_RESEND_API_KEY|Pinned deployment|Cloudflare|Expected the active|Invalid Cloudflare|Workers\.dev|Unknown Auth webhook|Exact release|Auth webhook|QA Auth webhook)/.test(message)?message:'Auth webhook control failed; inspect the sanitized step status.');
+    process.exitCode=1;
+  });
+}

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
 
 const store=new Map([
   ['pack1-api-session-v1','p1_00000000-0000-4000-8000-000000000000.'+'p'.repeat(43)],
@@ -14,7 +15,7 @@ globalThis.localStorage={
 globalThis.document={cookie:'__Secure-pack1_csrf='+'c'.repeat(43)};
 globalThis.window={PACK1_API:{
   firstParty:true,
-  authBase:'https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth',
+  authBase:PROD_AUTH_BASE,
   growthUrl:'https://api.packone.pro/growth',
   draftRunUrl:'https://api.packone.pro/draft',
 }};
@@ -78,7 +79,7 @@ test('first-party writes use CSRF without exposing an account bearer',async()=>{
 test('Google starts on Neon Auth and returns to Pack One with a verifier',async()=>{
   await auth.startGoogleSignIn();
   const call=calls.findLast(row=>row.path==='/pack1/auth/sign-in/social');
-  assert.equal(call.host,'ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech');
+  assert.equal(call.host,new URL(PROD_AUTH_BASE).host);
   assert.equal(call.method,'POST');
   assert.equal(call.credentials,'include');
   const body=JSON.parse(call.body);

@@ -1,6 +1,6 @@
-import fs from 'node:fs';
 import {pathToFileURL} from 'node:url';
 import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
+import {AUTH_WEBHOOK_CONFIGS} from './auth-webhook-control.mjs';
 
 export {PROD_AUTH_BASE};
 export const PROJECT='patient-shadow-91417882';
@@ -15,9 +15,8 @@ export function endpointIdForAuthBase(value) {
   return match?.[1]||null;
 }
 
-export function webhookProductionAuthBase(source) {
-  const block=/production:\s*\{([\s\S]*?)\n\s*\},/.exec(String(source||''))?.[1]||'';
-  return /\bauthBase:'([^']+)'/.exec(block)?.[1]||null;
+export function webhookProductionAuthBase(configs=AUTH_WEBHOOK_CONFIGS) {
+  return String(configs?.production?.authBase||'');
 }
 
 // Guard reads only control-plane metadata; it must never mutate Neon state.
@@ -41,7 +40,7 @@ function authBaseFromResponse(value) {
 export async function verifyProductionAuthBinding({
   key=process.env.NEON_API_KEY,
   fetcher=fetch,
-  webhookSource=fs.readFileSync(new URL('./auth-webhook-control.mjs',import.meta.url),'utf8'),
+  webhookConfigs=AUTH_WEBHOOK_CONFIGS,
 }={}) {
   const endpointId=endpointIdForAuthBase(PROD_AUTH_BASE);
   assert(endpointId,'PROD_AUTH_BASE does not contain a valid Neon endpoint id.');
@@ -53,7 +52,7 @@ export async function verifyProductionAuthBinding({
   assert(liveAuthBase===PROD_AUTH_BASE,'Production Neon Auth base_url does not match PROD_AUTH_BASE.');
   const endpoint=endpointResponse?.endpoint||endpointResponse;
   assert(endpoint?.id===endpointId&&endpoint?.branch_id===PROD_BRANCH,'PROD_AUTH_BASE endpoint is not attached to the production branch.');
-  assert(webhookProductionAuthBase(webhookSource)===PROD_AUTH_BASE,'pack1-authhook production AUTH_BASE does not match PROD_AUTH_BASE.');
+  assert(webhookProductionAuthBase(webhookConfigs)===PROD_AUTH_BASE,'pack1-authhook production AUTH_BASE does not match PROD_AUTH_BASE.');
   return {project:PROJECT,branch:PROD_BRANCH,auth_base:PROD_AUTH_BASE,endpoint_id:endpointId};
 }
 
