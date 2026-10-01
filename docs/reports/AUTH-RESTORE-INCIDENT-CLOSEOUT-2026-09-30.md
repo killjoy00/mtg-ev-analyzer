@@ -40,7 +40,7 @@ Separately, the web client treated any sign-up response containing a `user` as a
 
 - QA localhost toggles: run 36797780678 (accidental, from a PR edit) and 36807107096 (approved); both restored.
 - Production hardening run 36811306347 (approved); its disposable identity was removed (0 users, accounts or sessions remained, verified 10-01 04:08).
-- 10-01: endpoint `ep-hidden-bonus-ayfmcpys` disabled; `br-orange-feather-ayps8kep` set as default and renamed `production`; `br-dark-sound-ayxhwq1u`, snapshot `pack1-dr-drill-2026-09-30`, `br-calm-pond-ayh8f671` and `br-lively-silence-ayiptwkk` deleted; `pg_stat_statements` enabled on production. The deletes were accepted by the Neon API; absence was not re-read afterwards.
+- 10-01: endpoint `ep-hidden-bonus-ayfmcpys` disabled; `br-orange-feather-ayps8kep` set as default and renamed `production`; `br-dark-sound-ayxhwq1u`, snapshot `pack1-dr-drill-2026-09-30`, `br-calm-pond-ayh8f671` and `br-lively-silence-ayiptwkk` deleted; `pg_stat_statements` enabled on production; 13 unmanaged `dr*` Functions deleted (`dringest` kept). A later branch, snapshot and Function listing confirmed the deletes.
 
 ## Related fixes shipped alongside
 
@@ -52,5 +52,5 @@ Separately, the web client treated any sign-up response containing a `user` as a
 
 - Optional email/password acceptance with a real inbox (`docs/AUTH-HARDENING.md`).
 - Optional removal of the old Google OAuth redirect URI (now points at a deleted host).
-- Follow-up issues #802 (launch watcher cadence), #803 (guest analytics 401s), #804 (origin instrumentation), #805 (remaining Neon hygiene: unmanaged `dr*` Functions).
-- `docs/DATABASE-RECOVERY.md` and `docs/AUTH-RECOVERY-DELIVERY.md` still describe the pre-cleanup branch labels and should be updated.
+- Follow-up issues #802 (launch watcher cadence), #803 (guest analytics 401s) and #804 (origin instrumentation): shipped in #820 and released by #823; each needs production log evidence before closing.
+- #805: decide `dringest` (register or delete) before the inventory audit's 2026-10-15 review date.

@@ -25,15 +25,16 @@ test('manifest lists exactly the three managed production Functions',()=>{
 
 test('a healthy inventory passes and known unmanaged helpers only warn before the review date',()=>{
   assert.deepEqual(auditInventory({functions:managedFunctions,branches:healthyBranches,manifest,now:beforeReview}).problems,[]);
-  const withHelpers=auditInventory({functions:[...managedFunctions,{slug:'drkick'}],branches:healthyBranches,manifest,now:beforeReview});
+  const withHelpers=auditInventory({functions:[...managedFunctions,{slug:'dringest'}],branches:healthyBranches,manifest,now:beforeReview});
   assert.deepEqual(withHelpers.problems,[]);
   assert.equal(withHelpers.warnings.length,1);
-  assert.equal(KNOWN_UNMANAGED_FUNCTIONS.size,14);
+  assert.equal(KNOWN_UNMANAGED_FUNCTIONS.size,1);
 });
 
 test('the audit fails on unowned Functions, missing managed Functions, default drift and unexpiring branches',()=>{
-  const expired=auditInventory({functions:[...managedFunctions,{slug:'drkick'}],branches:healthyBranches,manifest,now:afterReview});
-  assert.match(expired.problems.join('\n'),/unmanaged Function drkick/);
+  const expired=auditInventory({functions:[...managedFunctions,{slug:'dringest'}],branches:healthyBranches,manifest,now:afterReview});
+  assert.match(expired.problems.join('\n'),/unmanaged Function dringest/);
+  assert.match(auditInventory({functions:[...managedFunctions,{slug:'drkick'}],branches:healthyBranches,manifest,now:beforeReview}).problems.join('\n'),/unmanaged Function drkick/,'deleted helpers are no longer allowlisted');
   assert.match(auditInventory({functions:[...managedFunctions,{slug:'surprise'}],branches:healthyBranches,manifest,now:beforeReview}).problems.join('\n'),/unmanaged Function surprise/);
   assert.match(auditInventory({functions:managedFunctions.slice(1),branches:healthyBranches,manifest,now:beforeReview}).problems.join('\n'),/managed Function draftrunapi is missing/);
   const drifted=healthyBranches.map(branch=>({...branch,default:branch.id==='br-restored-copy'}));

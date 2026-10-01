@@ -6,17 +6,17 @@ This runbook separates data recovery from application rollback and corpus rebuil
 
 Neon project: `Pack 1` (`patient-shadow-91417882`).
 
-Serving production database branch: `br-orange-feather-ayps8kep` (currently named `pack1-dr-restore-drill-2026-09-30 (1)`). Neon currently marks the restored `br-dark-sound-ayxhwq1u` branch as `main`, primary and default. Those control-plane labels do not define Pack One's serving branch.
+Serving production database branch: `br-orange-feather-ayps8kep`, named `production`. Since 2026-10-01 it is also Neon's primary and default branch. Pack One's Functions, schedulers, gateway and CI bind to the branch ID explicitly; Neon's name and default labels do not define the serving branch.
 
 At the September 30 audit, Neon initially reported a **6-hour** history-retention window. After the restore drill and cost review, Pack One intentionally increased the production Neon history-retention setting to **86,400 seconds / 24 hours**.
 
-Current recovery assets and post-drill control-plane state:
+Current recovery assets (verified 2026-10-01):
 
 - Neon point-in-time history: **24 hours**;
-- one older manual snapshot: `pre-0033-unique-usernames` from September 22;
-- drill snapshot: `pack1-dr-drill-2026-09-30`;
-- restored/finalized branch: `br-dark-sound-ayxhwq1u`, now named `main`, primary and default, with the original `ep-hidden-bonus-ayfmcpys` endpoint attached;
-- serving branch: `br-orange-feather-ayps8kep`, renamed `pack1-dr-restore-drill-2026-09-30 (1)`, with replacement endpoint `ep-young-hall-ayl0754j`.
+- one manual snapshot: `pre-0033-unique-usernames` from September 22;
+- serving branch: `br-orange-feather-ayps8kep` (`production`), with endpoint `ep-young-hall-ayl0754j`.
+
+The drill's restored branch `br-dark-sound-ayxhwq1u`, its `ep-hidden-bonus-ayfmcpys` endpoint and the drill snapshot `pack1-dr-drill-2026-09-30` were removed on 2026-10-01 (see `docs/AUTH-HARDENING.md`). The only other long-lived branch is the development/QA branch `br-twilight-hill-ayffyd2b`.
 
 This is deliberately lightweight disaster recovery. Pack One's user/account/history data is useful but not treated as high-value financial or safety-critical data. The goal is a practical one-day rewind window for bad migrations or accidental writes, not a high-availability or archival backup program.
 
