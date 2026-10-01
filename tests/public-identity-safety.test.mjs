@@ -27,7 +27,7 @@ test('public identity filter allows ordinary player names and rejects clear abus
   assert.throws(()=>assertPublicDisplayNameAllowed('Pack One Admin'),error=>error?.status===400&&error?.code==='USERNAME_NOT_ALLOWED');
 });
 
-test('public identity eligibility fails closed until current terms are accepted and after moderation',()=>{
+test('public identity eligibility requires a signed-in owned name and fails closed after moderation',()=>{
   const accepted={
     auth_user_id:'11111111-1111-4111-8111-111111111111',
     username_owned:true,
@@ -39,10 +39,23 @@ test('public identity eligibility fails closed until current terms are accepted 
   assert.equal(publicIdentityTermsCurrent(accepted),true);
   assert.deepEqual(publicIdentityEligibility(accepted),{eligible:true,reason:null});
   assert.deepEqual(publicIdentityEligibility({...accepted,auth_user_id:null}),{eligible:false,reason:'guest'});
-  assert.deepEqual(publicIdentityEligibility({...accepted,public_identity_terms_version:'old'}),{eligible:false,reason:'terms_required'});
+  // Acceptance is recorded at sign-in/save, never a separate ranking gate, so
+  // players who predate the rules keep their leaderboard place.
+  const legacy={...accepted,public_identity_terms_version:null,public_identity_terms_accepted_at:null};
+  assert.equal(publicIdentityTermsCurrent(legacy),false);
+  assert.deepEqual(publicIdentityEligibility(legacy),{eligible:true,reason:null});
+  assert.deepEqual(publicIdentityEligibility({...accepted,public_identity_terms_version:'old'}),{eligible:true,reason:null});
   assert.deepEqual(publicIdentityEligibility({...accepted,public_identity_hidden_at:'2026-09-30T01:00:00Z'}),{eligible:false,reason:'moderated'});
   assert.deepEqual(publicIdentityEligibility({...accepted,username_owned:false,is_placeholder:true}),{eligible:false,reason:'username_required'});
   assert.deepEqual(publicIdentityEligibility({...accepted,username_owned:false,is_placeholder:false}),{eligible:false,reason:'username_taken'});
+});
+
+test('leaderboards rank signed-in owned names without a separate rules-acceptance gate',()=>{
+  for(const file of ['../worker/draft-run-function.mjs','../worker/draft-run-season.mjs']) {
+    const source=fs.readFileSync(new URL(file,import.meta.url),'utf8');
+    assert.doesNotMatch(source,/public_identity_terms/,file);
+    assert.match(source,/public_identity_hidden_at IS NULL/,file);
+  }
 });
 
 test('report reasons and details are bounded and normalized',()=>{
@@ -54,7 +67,7 @@ test('report reasons and details are bounded and normalized',()=>{
 });
 
 
-test('public identity migration keeps merged guest nicknames private until accepted',()=>{
+test('public identity migration leaves merged guest nicknames unowned for the application filter to claim',()=>{
   const migration=fs.readFileSync(new URL('../migrations/0046_public_identity_safety.sql',import.meta.url),'utf8');
   assert.match(migration,/CREATE OR REPLACE FUNCTION merge_pack1_player/);
   assert.match(migration,/SET display_name = adopt_name, username_owned = false/);

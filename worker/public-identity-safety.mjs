@@ -69,10 +69,12 @@ export function assertPublicDisplayNameAllowed(value) {
   return value;
 }
 
+// Ranking is a signed-in-player feature: guests never rank, and moderated
+// identities are hidden. Rules acceptance is part of signing in/saving a name,
+// so it is recorded but never gates leaderboard eligibility.
 export function publicIdentityEligibility(row) {
   if(!row?.auth_user_id)return {eligible:false,reason:'guest'};
   if(publicIdentityHidden(row))return {eligible:false,reason:'moderated'};
-  if(!publicIdentityTermsCurrent(row))return {eligible:false,reason:'terms_required'};
   const owned=row.username_owned===true||row.username_owned==='t'||row.username_owned==='true'||row.username_owned===1||row.username_owned==='1';
   if(!owned)return {eligible:false,reason:row.is_placeholder?'username_required':'username_taken'};
   return {eligible:true,reason:null};

@@ -194,12 +194,16 @@ async function upsertPlayer(id, name) {
 // Claiming an account makes the name this browser was already using a real
 // identity, but only when nobody owns it yet. A taken name is left unowned so
 // linking always succeeds; the player then has to rename to publish a profile.
+// Signing in carries the Public Identity rules notice, so no separate
+// acceptance step gates the claim; prohibited names never claim, and neither
+// does an identity with moderation history (a restore never re-owns the old
+// name; the player saves a name explicitly).
 async function reserveUsername(playerId) {
   const current=(await query(
-    `SELECT display_name,public_identity_terms_version,public_identity_terms_accepted_at,public_identity_hidden_at
+    `SELECT display_name,public_identity_hidden_at
      FROM players WHERE id=$1::uuid LIMIT 1`,[playerId],
   )).rows[0];
-  if(!current||!publicIdentityTermsCurrent(current)||publicIdentityHidden(current)||isPlaceholderUsername(current.display_name))return false;
+  if(!current||publicIdentityHidden(current)||isPlaceholderUsername(current.display_name))return false;
   try { assertPublicDisplayNameAllowed(current.display_name); }
   catch { return false; }
   try {
@@ -207,9 +211,8 @@ async function reserveUsername(playerId) {
       `UPDATE players p SET username_owned=true,updated_at=now()
        WHERE p.id=$1::uuid
          AND NOT p.username_owned
-         AND p.public_identity_terms_version=$3
-         AND p.public_identity_terms_accepted_at IS NOT NULL
          AND p.public_identity_hidden_at IS NULL
+         AND NOT EXISTS (SELECT 1 FROM public_identity_moderation_actions m WHERE m.target_player_id=p.id)
          AND pack1_username_key(p.display_name) <> pack1_username_key($2)
          AND NOT EXISTS (
            SELECT 1 FROM players other
@@ -217,7 +220,7 @@ async function reserveUsername(playerId) {
              AND pack1_username_key(other.display_name)=pack1_username_key(p.display_name)
          )
        RETURNING id`,
-      [playerId, PLACEHOLDER_USERNAME, PUBLIC_IDENTITY_TERMS_VERSION],
+      [playerId, PLACEHOLDER_USERNAME],
     );
     return Boolean(updated.rows[0]);
   } catch (error) {
@@ -478,14 +481,12 @@ async function profileMetaByKey(profileKey,{viewerPlayerId=null,ignoreBlock=fals
      WHERE p.profile_key=$1
        AND p.profile_public=true
        AND p.username_owned=true
-       AND p.public_identity_terms_version=$2
-       AND p.public_identity_terms_accepted_at IS NOT NULL
        AND p.public_identity_hidden_at IS NULL
-       AND ($3::uuid IS NULL OR $4::boolean OR NOT EXISTS (
-         SELECT 1 FROM public_identity_blocks b WHERE b.blocker_player_id=$3::uuid AND b.target_player_id=p.id
+       AND ($2::uuid IS NULL OR $3::boolean OR NOT EXISTS (
+         SELECT 1 FROM public_identity_blocks b WHERE b.blocker_player_id=$2::uuid AND b.target_player_id=p.id
        ))
      LIMIT 1`,
-    [profileKey,PUBLIC_IDENTITY_TERMS_VERSION,viewerPlayerId,ignoreBlock],
+    [profileKey,viewerPlayerId,ignoreBlock],
   );
   return result.rows[0] || null;
 }
@@ -1526,7 +1527,7 @@ async function handleLink(request,{browser=false,mobile=false}={}) {
   const ranking=await rankingIdentityStatus(query,id);
   const usernameOwned=ranking.eligible;
   const rankingReason=ranking.reason;
-  if(linkChanged&&!usernameOwned&&rankingReason!=='terms_required') {
+  if(linkChanged&&!usernameOwned) {
     await query(
       `INSERT INTO analytics_events(player_id,event_name,event_props)
        VALUES($1::uuid,'username_ownership_conflict',jsonb_build_object('reason',$2::text))`,
@@ -2196,10 +2197,8 @@ async function handlePublicIdentityBlock(request,profileKey,{mobile=false}={}) {
   const target=(await query(
     `SELECT id::text player_id FROM players
      WHERE profile_key=$1 AND username_owned=true
-       AND public_identity_terms_version=$2
-       AND public_identity_terms_accepted_at IS NOT NULL
        AND public_identity_hidden_at IS NULL
-     LIMIT 1`,[profileKey,PUBLIC_IDENTITY_TERMS_VERSION],
+     LIMIT 1`,[profileKey],
   )).rows[0];
   if(!target)return json({error:'Profile not found or private.'},404);
   if(target.player_id===blocker)throw Object.assign(new Error('You cannot block your own profile.'),{status:400});
@@ -2248,16 +2247,17 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
   const favorite = payload.favoriteSetId === undefined ? meta.favorite_set_id || null : String(payload.favoriteSetId || '').trim().toLowerCase() || null;
   const showcase = payload.showcaseAchievement === undefined ? meta.showcase_achievement || null : String(payload.showcaseAchievement || '').trim().toLowerCase() || null;
   const acceptsTerms=payload.acceptPublicIdentityTerms===true;
-  const termsCurrent=acceptsTerms||publicIdentityTermsCurrent(meta);
+  const hidden=publicIdentityHidden(meta);
   const wantsOwned=!isPlaceholderUsername(displayName);
+  // Saving a leaderboard name or public profile happens next to the Public
+  // Identity rules notice, so the save itself records acceptance; there is no
+  // separate checkbox and acceptance never gates ranking.
+  const recordsAcceptance=!hidden&&(acceptsTerms||wantsOwned||profilePublic)&&!publicIdentityTermsCurrent(meta);
 
   if (favorite && !allowedSets.has(favorite)) throw Object.assign(new Error('Choose a playable environment.'), { status: 400 });
   if (showcase && !unlocked.has(showcase)) throw Object.assign(new Error('Showcase an achievement you have unlocked.'), { status: 400 });
-  if(publicIdentityHidden(meta)&&(payload.displayName!==undefined||payload.profilePublic===true||acceptsTerms)) {
+  if(hidden&&(payload.displayName!==undefined||payload.profilePublic===true||acceptsTerms)) {
     throw Object.assign(new Error('This public identity is unavailable. Contact Pack One support if you believe this is a mistake.'),{status:403,code:'PUBLIC_IDENTITY_MODERATED'});
-  }
-  if((wantsOwned||profilePublic)&&!termsCurrent) {
-    throw Object.assign(new Error('Accept the Public Identity rules before using a leaderboard name or public profile.'),{status:409,code:'PUBLIC_IDENTITY_TERMS_REQUIRED'});
   }
   if(profilePublic&&!wantsOwned)throw Object.assign(new Error('Choose a leaderboard name before publishing a profile.'),{status:400});
   if(wantsOwned)assertPublicDisplayNameAllowed(displayName);
@@ -2283,7 +2283,7 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
          SELECT 'public_identity_terms_accepted' FROM changed WHERE $7::boolean
        )
        INSERT INTO analytics_events(player_id,event_name) SELECT $1::uuid,event_name FROM events`,
-      [id,displayName,profilePublic,favorite,showcase,wantsOwned&&termsCurrent,acceptsTerms,PUBLIC_IDENTITY_TERMS_VERSION],
+      [id,displayName,profilePublic,favorite,showcase,wantsOwned&&!hidden,recordsAcceptance,PUBLIC_IDENTITY_TERMS_VERSION],
     );
   } catch (error) {
     rethrowUsernameConflict(error);
@@ -2324,13 +2324,11 @@ async function handleProfileLookup(request) {
          AND EXISTS(SELECT 1 FROM account_links a WHERE a.player_id=p.id)
          AND p.username_owned=true
          AND p.public_identity_hidden_at IS NULL
-         AND p.public_identity_terms_accepted_at IS NOT NULL
-         AND p.public_identity_terms_version=$2
      )
      SELECT lookup,display_name,profile_key,showcase_achievement
      FROM matches
      WHERE match_count=1`,
-    [JSON.stringify(names),PUBLIC_IDENTITY_TERMS_VERSION],
+    [JSON.stringify(names)],
   );
   const profiles = {};
   for (const row of result.rows) {

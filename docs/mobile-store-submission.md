@@ -351,7 +351,7 @@ Pack One has no posts, comments, DMs, image uploads, or anonymous chat. Its user
 
 Reviewer notes should state the following safeguards exactly:
 
-- a user must accept the current **Public Identity rules** before first publishing an account-owned username or public profile;
+- only signed-in accounts appear on leaderboards; the sign-in/sign-up screens and the leaderboard-name/public-profile save controls state that continuing or saving means agreeing to the Pack One Terms, including the **Public Identity rules**, and saving records the accepted rules version;
 - Pack One rejects clearly prohibited usernames server-side, including severe abusive content, Pack One staff impersonation, contact/URL patterns, and invisible/control-character abuse;
 - public profiles expose in-app **Report** and **Block** controls on web, iOS, and Android;
 - reports are persisted with reporter, target, reason, status, and timestamps, with duplicate-open-report suppression;

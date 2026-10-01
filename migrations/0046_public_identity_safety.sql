@@ -59,7 +59,8 @@ CREATE INDEX IF NOT EXISTS public_identity_moderation_target_idx
   ON public_identity_moderation_actions(target_player_id,created_at DESC);
 
 -- Public Identity-safe identity merge. Replaces the pre-0046 merge function,
--- which could mark an adopted guest nickname as owned before terms acceptance.
+-- which marked an adopted guest nickname as owned without the server-side
+-- prohibited-name and moderation checks.
 CREATE OR REPLACE FUNCTION merge_pack1_player(source_player uuid, target_player uuid)
 RETURNS void
 LANGUAGE plpgsql
@@ -96,9 +97,9 @@ BEGIN
         AND pack1_username_key(other.display_name) = pack1_username_key(source.display_name)
     );
 
-  -- Public Identity terms must gate publication. The merge may carry a free guest
-  -- nickname onto the account player, but it stays unowned/private here; the
-  -- application can reserve it afterward only when current terms were accepted.
+  -- The merge may carry a free guest nickname onto the account player, but it
+  -- stays unowned here; the application reserves it right after sign-in only
+  -- when it passes the prohibited-name filter and is not moderated.
 
   -- Preserve the established account profile key. Only adopt optional profile
   -- choices (and a free non-default display name) when the target has none.

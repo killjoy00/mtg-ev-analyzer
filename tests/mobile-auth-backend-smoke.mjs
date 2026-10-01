@@ -81,7 +81,6 @@ const renamed='Mobile '+userId.slice(0,8);
 const updatedProfile=await call('/v1/mobile/profile',{
   displayName:renamed,
   profilePublic:true,
-  acceptPublicIdentityTerms:true,
 },{playerToken:signed.linked.token,accountToken:signed.session.token,method:'PATCH'});
 assert.equal(updatedProfile.player.display_name,renamed);
 assert.equal(updatedProfile.player.profile_public,true);

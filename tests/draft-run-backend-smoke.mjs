@@ -141,7 +141,7 @@ assert.equal(history.summary.games,1);assert.ok(history.by_set.length>=s.run_len
 assert.equal(history.player.profile_key,(await call(growth,'/v1/profile/me',undefined,owner.token)).player.profile_key);
 const leaderboardName='AA Drafter '+tag;
 await call(growth,'/v1/profile',{displayName:leaderboardName},owner.token,401,{method:'PATCH'});
-let renamed=await call(growth,'/v1/profile',{displayName:leaderboardName,acceptPublicIdentityTerms:true},owner.token,200,{method:'PATCH',headers:authHeaders});
+let renamed=await call(growth,'/v1/profile',{displayName:leaderboardName},owner.token,200,{method:'PATCH',headers:authHeaders});
 assert.equal(renamed.player.display_name,leaderboardName);
 renamed=await call(growth,'/v1/profile',{displayName:leaderboardName},owner.token,200,{method:'PATCH',headers:authHeaders});
 assert.equal(renamed.player.display_name,leaderboardName);

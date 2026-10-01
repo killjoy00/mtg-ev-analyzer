@@ -85,7 +85,6 @@ export default function AccountScreen() {
   const [password, setPassword] = useState('');
   const [profileName, setProfileName] = useState('');
   const [profilePublic, setProfilePublic] = useState(false);
-  const [acceptPublicIdentityTerms, setAcceptPublicIdentityTerms] = useState(false);
   const [favoriteSetId, setFavoriteSetId] = useState('');
   const [showcaseAchievement, setShowcaseAchievement] = useState('');
   const [currentPassword, setCurrentPassword] = useState('');
@@ -103,7 +102,6 @@ export default function AccountScreen() {
     setProfile(next);
     setProfileName(next?.player.display_name ?? '');
     setProfilePublic(Boolean(next?.player.profile_public));
-    setAcceptPublicIdentityTerms(false);
     setFavoriteSetId(next?.player.favorite_set_id ?? '');
     setShowcaseAchievement(next?.player.showcase_achievement ?? '');
   }, []);
@@ -364,7 +362,6 @@ export default function AccountScreen() {
         profilePublic,
         favoriteSetId: favoriteSetId || null,
         showcaseAchievement: showcaseAchievement || null,
-        acceptPublicIdentityTerms: acceptPublicIdentityTerms || undefined,
       });
       applyProfile(updated);
       if (promptLeaderboardName && updated.player.username_owned !== false) {
@@ -578,13 +575,6 @@ export default function AccountScreen() {
                       {profile.player.public_identity_hidden_reason || 'Contact Pack One support if you believe this is a mistake.'}
                     </Text>
                   </View>
-                ) : profile.player.public_identity_terms_current !== true ? (
-                  <View style={styles.warning}>
-                    <Text style={styles.warningTitle}>Public Identity rules required</Text>
-                    <Text style={styles.body}>
-                      Accept the current rules below before this account can use a leaderboard name or public profile.
-                    </Text>
-                  </View>
                 ) : profile.player.username_owned === false ? (
                   <View style={styles.warning}>
                     <Text style={styles.warningTitle}>Username needs attention</Text>
@@ -607,24 +597,13 @@ export default function AccountScreen() {
                   style={styles.input}
                   value={profileName}
                 />
-                <Text style={styles.fieldHelp}>Shown on Pack One Daily leaderboards after the current Public Identity rules are accepted.</Text>
+                <Text style={styles.fieldHelp}>Shown on Pack One Daily leaderboards.</Text>
 
-                {profile.player.public_identity_terms_current !== true && !profile.player.public_identity_hidden ? (
+                {!profile.player.public_identity_hidden ? (
                   <View style={styles.termsBox}>
-                    <Pressable
-                      accessibilityRole="checkbox"
-                      accessibilityState={{ checked: acceptPublicIdentityTerms }}
-                      onPress={() => setAcceptPublicIdentityTerms((value) => !value)}
-                      style={[styles.toggle, acceptPublicIdentityTerms && styles.toggleActive]}
-                    >
-                      <View style={styles.toggleCopy}>
-                        <Text style={styles.toggleTitle}>I accept the Public Identity rules</Text>
-                        <Text style={styles.fieldHelp}>No harassment, impersonation, spam, private contact information, or abusive public identity content.</Text>
-                      </View>
-                      <Text style={[styles.toggleValue, acceptPublicIdentityTerms && styles.toggleValueActive]}>
-                        {acceptPublicIdentityTerms ? 'YES' : 'NO'}
-                      </Text>
-                    </Pressable>
+                    <Text style={styles.fieldHelp}>
+                      By saving a leaderboard name or public profile, you agree to the Public Identity rules: no harassment, impersonation, spam, private contact information, or abusive content.
+                    </Text>
                     <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
                       <Text style={styles.linkText}>Read the Public Identity rules</Text>
                     </Pressable>
@@ -700,11 +679,9 @@ export default function AccountScreen() {
                 <Pressable
                   accessibilityRole="button"
                   disabled={busy || profileName.trim().length < 2
-                    || (profile.player.public_identity_terms_current !== true && !acceptPublicIdentityTerms)
                     || Boolean(profile.player.public_identity_hidden)}
                   onPress={() => void saveProfile()}
                   style={[styles.primaryButton, (busy || profileName.trim().length < 2
-                    || (profile.player.public_identity_terms_current !== true && !acceptPublicIdentityTerms)
                     || Boolean(profile.player.public_identity_hidden)) && styles.disabled]}
                 >
                   <Text style={styles.primaryButtonText}>Save profile</Text>
@@ -889,6 +866,17 @@ export default function AccountScreen() {
             <Pressable accessibilityRole="button" disabled={busy} onPress={() => void openGoogle()} style={[styles.googleButton, busy && styles.disabled]}>
               <Text style={styles.googleButtonText}>Continue with Google</Text>
             </Pressable>
+
+            {/* Signing in is how a player joins the leaderboards, so the Public
+                Identity rules are agreed here rather than with a separate checkbox. */}
+            <View style={styles.termsBox}>
+              <Text style={styles.fieldHelp}>
+                By continuing, you agree to the Pack One Terms, including the Public Identity rules for leaderboard names and profiles.
+              </Text>
+              <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
+                <Text style={styles.linkText}>Read the Pack One Terms</Text>
+              </Pressable>
+            </View>
 
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />

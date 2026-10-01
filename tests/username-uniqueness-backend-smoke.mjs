@@ -47,7 +47,7 @@ async function account(label) {
 }
 
 const rename=(player,displayName,status=200)=>
-  call(growth,'/v1/profile',{displayName,acceptPublicIdentityTerms:true},player.token,status,{method:'PATCH',headers:player.auth.headers});
+  call(growth,'/v1/profile',{displayName},player.token,status,{method:'PATCH',headers:player.auth.headers});
 
 async function claim(label,displayName) {
   const session=await guest(displayName);
@@ -128,9 +128,9 @@ console.log('Owned usernames survive legacy nickname writes',tag);
 // ---------------------------------------------------------------------------
 // Identity linking and merging still work.
 // ---------------------------------------------------------------------------
-// A merge may carry a free guest nickname onto the established account, but it
-// must remain private/unowned until the account explicitly accepts the current
-// Public Identity rules.
+// A merge adopts a free source name onto a target still holding the placeholder.
+// The merge itself leaves it unowned; sign-in then claims it through the same
+// prohibited-name and moderation checks as any other claim.
 const adoptable=`Carol ${tag}`;
 const adoptSource=await guest(adoptable);
 const adoptTarget=await claim('adopt','Pack Player');
@@ -138,12 +138,10 @@ const adopted=await call(growth,'/v1/account/link',{},adoptSource.token,200,{hea
 assert.equal(adopted.token,adoptTarget.token,'the established account player survives the merge');
 assert.equal(adopted.displayName,adoptable);
 assert.equal((await stored(adoptTarget.playerId)).display_name,adoptable);
-assert.equal(await owned(adoptTarget.playerId),false,'linking alone never publishes an adopted nickname');
-assert.deepEqual(adopted.rankingIdentity,{eligible:false,reason:'terms_required'});
+assert.equal(await owned(adoptTarget.playerId),true,'an adopted username is owned by the target');
+assert.deepEqual(adopted.rankingIdentity,{eligible:true,reason:null});
 assert.equal(Number((await query('SELECT count(*) n FROM players WHERE id=$1::uuid',[adoptSource.playerId])).rows[0].n),0);
-assert.equal((await rename(adoptTarget,adoptable)).player.display_name,adoptable,'explicit terms acceptance publishes the adopted nickname');
-assert.equal(await owned(adoptTarget.playerId),true);
-console.log('Merge keeps a free source nickname private until explicit acceptance',tag);
+console.log('Merge adopts a free source username',tag);
 
 // A merge whose source name belongs to somebody else must not steal it, and
 // must not raise a constraint error: linking has to keep working.
@@ -157,32 +155,42 @@ assert.equal((await stored(first.playerId)).display_name,username,'the legitimat
 assert.equal(await owned(first.playerId),true);
 console.log('Merge refuses to steal an owned username',tag);
 
-// Linking never publishes the browser nickname by itself, even when it is free.
+// Claiming an account takes ownership of the nickname the browser already used,
+// but only when it is free. A taken one links successfully and stays unowned.
 const freeNickname=`Dana ${tag}`;
 const adopter=await claim('adopter',freeNickname);
-assert.equal(await owned(adopter.playerId),false,'linking does not publish a free nickname before terms acceptance');
+assert.equal(await owned(adopter.playerId),true,'linking reserves a free nickname');
 assert.equal((await stored(adopter.playerId)).display_name,freeNickname);
-assert.deepEqual(adopter.link.rankingIdentity,{eligible:false,reason:'terms_required'});
-await rename(adopter,freeNickname);
-assert.equal(await owned(adopter.playerId),true,'explicit acceptance reserves a free nickname');
+assert.deepEqual(adopter.link.rankingIdentity,{eligible:true,reason:null});
+
+// Guest nicknames are private and unfiltered, so sign-in must not publish one the
+// Public Identity filter rejects; the account has to choose an allowed name.
+const prohibitedNickname=`QA www.${tag}.io`;
+const prohibited=await claim('prohibited',prohibitedNickname);
+assert.equal((await stored(prohibited.playerId)).display_name,prohibitedNickname);
+assert.equal(await owned(prohibited.playerId),false,'linking never reserves a prohibited nickname');
+assert.equal(prohibited.link.rankingIdentity.eligible,false);
+await rename(prohibited,prohibitedNickname,400);
+assert.equal(await owned(prohibited.playerId),false);
+console.log('Linking claims only free, allowed nicknames',tag);
 
 const contender=await claim('contender',username);
 assert.equal((await stored(contender.playerId)).display_name,username,'linking never fails over a taken nickname');
 assert.equal(await owned(contender.playerId),false,'a taken nickname is not reserved');
-assert.deepEqual(contender.link.rankingIdentity,{eligible:false,reason:'terms_required'},
-  'terms acceptance is required before a linked nickname can become public');
+assert.deepEqual(contender.link.rankingIdentity,{eligible:false,reason:'username_taken'},
+  'linking reports why this account is not rank-eligible');
 assert.equal(await linkedPlayerIdentity(query,contender.playerId),null,
   'an unowned collision is linked but is not a public ranked identity');
 const attentionProfile=await call(growth,'/v1/profile/me',undefined,contender.token,200);
 assert.equal(attentionProfile.player.username_owned,false,'My Pack One receives the persistent attention state');
 const attentionStatus=await call(draftRun,'/v1/daily-status',undefined,contender.token,200);
-assert.deepEqual(attentionStatus.ranking_identity,{eligible:false,reason:'terms_required'},
-  'Daily home explicitly requires Public Identity acceptance rather than treating the account as a guest');
+assert.deepEqual(attentionStatus.ranking_identity,{eligible:false,reason:'username_taken'},
+  'Daily home receives an explicit username reason rather than treating the account as a guest');
 const conflictEvents=await query(
   "SELECT count(*) n FROM analytics_events WHERE player_id=$1::uuid AND event_name='username_ownership_conflict'",
   [contender.playerId],
 );
-assert.equal(Number(conflictEvents.rows[0].n),0,'pre-acceptance linking does not mislabel the state as a username conflict');
+assert.equal(Number(conflictEvents.rows[0].n),1,'the collision emits one structured admin-observable event');
 
 // Recreate the original bug directly: both linked players have the same stored
 // nickname, but only the legitimate owner may surface on public leaderboards.
@@ -261,7 +269,7 @@ const race=await Promise.all(racers.map(async(player)=>{
   const response=await growth.fetch(new Request('https://packone.pro/v1/profile',{
     method:'PATCH',
     headers:{'content-type':'application/json',origin,authorization:'Bearer '+player.token,...player.auth.headers},
-    body:JSON.stringify({displayName:contested,acceptPublicIdentityTerms:true}),
+    body:JSON.stringify({displayName:contested}),
   }));
   return {status:response.status,body:await response.json()};
 }));

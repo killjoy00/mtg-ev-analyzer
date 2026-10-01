@@ -180,16 +180,15 @@ function settingsMarkup(profile, progress, account, patreon) {
   }
   const unlocked = unlockedAchievements(profile);
   const identityHidden=profile.player.public_identity_hidden===true;
-  const identityTermsCurrent=profile.player.public_identity_terms_current===true;
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
   const supportUrl=esc(patreon?.support_url||PATREON_POLICY.supportUrl);
   const membershipUrl=elite?supportUrl:'/patreon/';
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
     <header><div><p class="eyebrow">Profile</p><h2 id="profile-account-title">Profile settings</h2><p>${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     ${account?.user?`<form id="profile-settings-form">
-      <label class="profile-leaderboard-name"><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''}><small>${identityHidden?'This public identity is hidden by moderation.':!identityTermsCurrent?'Accept the Public Identity rules below before appearing on Daily leaderboards.':profile.player.username_owned===false?'Choose a unique name to appear on Daily leaderboards.':'Shown on all Daily leaderboards.'}</small></label>
+      <label class="profile-leaderboard-name"><span>Leaderboard name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''}><small>${identityHidden?'This public identity is hidden by moderation.':profile.player.username_owned===false?'Choose a unique name to appear on Daily leaderboards.':'Shown on all Daily leaderboards.'}</small></label>
       ${identityHidden?`<p class="profile-settings-status" role="alert">Public identity hidden. ${esc(profile.player.public_identity_hidden_reason||'Contact Pack One support if you believe this is a mistake.')}</p>`:''}
-      ${!identityTermsCurrent&&!identityHidden?`<label class="profile-toggle"><input required type="checkbox" name="acceptPublicIdentityTerms"><span><strong>I accept the Public Identity rules.</strong><small>Leaderboard names and public profiles must follow the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>, including no harassment, impersonation, spam, private contact information, or abusive content.</small></span></label>`:''}
+      ${!identityHidden?`<p class="profile-identity-rules"><small>By saving a leaderboard name or public profile, you agree to the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>: no harassment, impersonation, spam, private contact information, or abusive content.</small></p>`:''}
     ${account?.user?`<section class="profile-membership profile-settings-membership" aria-labelledby="patreon-membership-title">
       <div><p class="eyebrow">Membership</p><h3 id="patreon-membership-title">Patreon</h3>
         ${patreon?.configured!==true
@@ -485,7 +484,6 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
         profilePublic: data.get('profilePublic') === 'on',
         favoriteSetId: data.get('favoriteSetId') || null,
         showcaseAchievement: data.get('showcaseAchievement') || null,
-        acceptPublicIdentityTerms: data.get('acceptPublicIdentityTerms') === 'on',
       });
       status.textContent = 'Saved';
       track('profile_settings_saved', { public: updated.player?.profile_public || false });

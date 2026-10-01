@@ -27,8 +27,6 @@ const fixture = {
     showcase_achievement:'explorer5',
     claimed:true,
     username_owned:true,
-    public_identity_terms_current:false,
-    public_identity_hidden:false,
   },
   summary: {
     games:42,
@@ -128,7 +126,6 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         profile_public:Boolean(updatePayload.profilePublic),
         favorite_set_id:updatePayload.favoriteSetId || null,
         showcase_achievement:updatePayload.showcaseAchievement || null,
-        public_identity_terms_current:updatePayload.acceptPublicIdentityTerms===true || fixture.player.public_identity_terms_current,
       },
     };
   } else if (url.pathname === '/v1/profile-lookup') {
@@ -205,13 +202,16 @@ try {
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-manage-account,#profile-share-progress').count(),0);
   assert.equal(await page.locator('input[name="displayName"]').inputValue(), 'Profile Tester');
+  // Saving carries the Public Identity rules as a notice, never a required checkbox.
+  assert.match((await page.locator('.profile-identity-rules').textContent())||'',/By saving a leaderboard name or public profile, you agree/);
+  assert.equal(await page.locator('.profile-identity-rules a[href="/terms/#public-identity-rules"]').count(),1);
+  assert.equal(await page.locator('input[name="acceptPublicIdentityTerms"]').count(),0);
   await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
   await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
-  await page.locator('input[name="acceptPublicIdentityTerms"]').check();
   await page.locator('#profile-settings-form button[type="submit"]').click();
   await page.waitForFunction(() => document.querySelector('input[name="displayName"]')?.value === 'Leaderboard Ace' && document.querySelector('select[name="favoriteSetId"]')?.value === 'ktk');
-  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
+  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10' });
   await page.waitForFunction(() => localStorage.getItem('pack1-player-name-v1') === 'Leaderboard Ace');
   assert.equal(await page.evaluate(() => localStorage.getItem('pack1-player-name-v1')), 'Leaderboard Ace');
 

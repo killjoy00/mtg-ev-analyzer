@@ -79,20 +79,21 @@ try {
   const targetName=`PI Target ${tag}`;
   const prohibited=await callGrowth('/v1/profile',{
     method:'PATCH',playerToken:target.token,accountToken:target.accountToken,status:400,
-    body:{displayName:'Pack One Support',acceptPublicIdentityTerms:true},
+    body:{displayName:'Pack One Support'},
   });
   assert.equal(prohibited.code,'USERNAME_NOT_ALLOWED','server rejects prohibited public identity before publication');
   assert.equal((await query('SELECT public_identity_terms_accepted_at FROM players WHERE id=$1::uuid',[target.playerId])).rows[0].public_identity_terms_accepted_at,null,'failed prohibited publication does not record terms acceptance');
   await callGrowth('/v1/profile',{
     method:'PATCH',playerToken:reporter.token,accountToken:reporter.accountToken,
-    body:{displayName:reporterName,acceptPublicIdentityTerms:true},
+    body:{displayName:reporterName},
   });
   const published=await callGrowth('/v1/profile',{
     method:'PATCH',playerToken:target.token,accountToken:target.accountToken,
-    body:{displayName:targetName,profilePublic:true,acceptPublicIdentityTerms:true},
+    body:{displayName:targetName,profilePublic:true},
   });
   const key=published.player.profile_key;
   assert.match(key,/^[a-f0-9]{16}$/);
+  // Saving a name next to the rules notice records acceptance; no checkbox flag.
   assert.equal(published.player.public_identity_terms_current,true);
   assert.equal((await query('SELECT public_identity_terms_version FROM players WHERE id=$1::uuid',[target.playerId])).rows[0].public_identity_terms_version,PUBLIC_IDENTITY_TERMS_VERSION);
 
@@ -164,7 +165,7 @@ try {
 
   const denied=await callGrowth('/v1/profile',{
     method:'PATCH',playerToken:target.token,accountToken:target.accountToken,status:403,
-    body:{displayName:targetName,profilePublic:true,acceptPublicIdentityTerms:true},
+    body:{displayName:targetName,profilePublic:true},
   });
   assert.equal(denied.code,'PUBLIC_IDENTITY_MODERATED','hidden identity cannot immediately republish');
 
@@ -185,6 +186,11 @@ try {
     "SELECT count(*) n FROM public_identity_moderation_actions WHERE target_player_id=$1::uuid AND admin_auth_user_id=$2::uuid AND action='restore'",
     [target.playerId,adminId],
   )).rows[0].n),1);
+  // Sign-in normally claims a free nickname, but never re-owns a restored one.
+  const relinked=await callGrowth('/v1/account/link',{playerToken:target.token,accountToken:target.accountToken,body:{}});
+  assert.equal(relinked.rankingIdentity.eligible,false,'signing in again does not re-own a restored identity');
+  const relinkedRow=(await query('SELECT username_owned FROM players WHERE id=$1::uuid',[target.playerId])).rows[0];
+  assert.equal(relinkedRow.username_owned===true||relinkedRow.username_owned==='t',false);
 
   const republished=await callGrowth('/v1/profile',{
     method:'PATCH',playerToken:target.token,accountToken:target.accountToken,
