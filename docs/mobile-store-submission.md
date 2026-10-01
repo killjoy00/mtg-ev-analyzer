@@ -345,3 +345,21 @@ Do **not** spend console time on these unless an automated probe reports a probl
 - release-track/API status audits;
 - App Store/Play production release mechanics after all prerequisites and explicit owner approval — these can be handled through the guarded API workflows.
 
+## Public identity / UGC safeguards for store review
+
+Pack One has no posts, comments, DMs, image uploads, or anonymous chat. Its user-generated-content surface is limited to an account-owned public username/profile identity that can appear on leaderboards, public profiles, and attributed shares.
+
+Reviewer notes should state the following safeguards exactly:
+
+- a user must accept the current **Public Identity rules** before first publishing an account-owned username or public profile;
+- Pack One rejects clearly prohibited usernames server-side, including severe abusive content, Pack One staff impersonation, contact/URL patterns, and invisible/control-character abuse;
+- public profiles expose in-app **Report** and **Block** controls on web, iOS, and Android;
+- reports are persisted with reporter, target, reason, status, and timestamps, with duplicate-open-report suppression;
+- blocking removes the target identity from the blocking viewer's personalized public-profile/leaderboard experience where viewer identity is available;
+- authenticated admin moderation can hide a public identity, records an audit action, resolves open reports as appropriate, and scrubs attributed shared identity without deleting gameplay/career history;
+- a moderated identity cannot republish until an admin restores eligibility, and restore does not automatically re-own or republish the old name;
+- private profiles remain private by default; gameplay data is not made public merely by signing in;
+- community rules and a contact path are published in Pack One Terms and at **admin@packone.pro**.
+
+Moderation operations and response procedure are documented in `docs/PUBLIC-IDENTITY-SAFETY.md`.
+
