@@ -73,8 +73,10 @@ try {
   assert.ok((await page.getByText('Authenticated Pack One accounts only.',{exact:false}).innerText()).includes('Anonymous and guest gameplay identities'));
   assert.equal(await page.locator('#user-rows tr').count(),2);
   await page.getByLabel('Find a user').fill('member@example.com');
+  // The click resolves before the search request is sent, so wait for it instead of checking the log.
+  const search=page.waitForRequest(request=>request.url().includes('/v1/admin/users?search=member%40example.com'));
   await page.getByRole('button',{name:'Refresh',exact:true}).click();
-  assert.ok(requests.some(url=>url.includes('/v1/admin/users?search=member%40example.com')));
+  await search;
   await page.getByRole('button',{name:/Test Member/}).click();
   await page.locator('#user-detail').getByRole('heading',{name:'Test Member'}).waitFor();
   assert.ok((await page.locator('#user-detail').innerText()).includes('Custom sets'));
