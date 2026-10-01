@@ -1,6 +1,7 @@
 import {createHmac} from 'node:crypto';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
+import {classifyRejectedOrigin} from './origin-telemetry.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
@@ -16,7 +17,7 @@ import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
-import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
+import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
 import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaign-link-publish.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
@@ -154,10 +155,20 @@ async function verifyToken(value) {
 
 async function player(request, required = true) {
   const header = request.headers.get('authorization') || '';
-  let id = await verifyToken(header.startsWith('Bearer ') ? header.slice(7) : '');
-  if(id&&await deletedPlayerTombstone(query,id))id=null;
-  if (required && !id) throw Object.assign(new Error('Player session required.'), { status: 401 });
+  const bearer = header.startsWith('Bearer ') ? header.slice(7) : '';
+  let id = await verifyToken(bearer);
+  let reason = !bearer ? 'missing' : id ? null : 'invalid';
+  if(id&&await deletedPlayerTombstone(query,id)){id=null;reason='retired';}
+  // The reason is for server-side logs only (#803); the response stays generic.
+  if (required && !id) throw Object.assign(new Error('Player session required.'), { status: 401, playerSessionReason: reason });
   return id;
+}
+
+// Low-cardinality, PII-free description of a rejected player session (#803).
+export function playerSessionRejection(request,reason) {
+  const path=new URL(request.url).pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}|[0-9a-f]{16,}/gi,':id').slice(0,80);
+  const client=request.headers.has('x-pack1-mobile-account')?'native_account':request.headers.get('origin')?'browser':'no_origin';
+  return {event:'player_session_rejected',reason:String(reason||'unknown'),path,client,release_commit:releaseMetadata().release_commit};
 }
 
 // A browser nickname must never overwrite an owned username: the client replays
@@ -648,7 +659,17 @@ async function historyPage(playerId, cursor, limit = 25) {
 }
 
 async function handleBrowserPlayerSession(request,{existingOnly=false}={}) {
-  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  try {
+    requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  } catch(error) {
+    if(error?.status===403)console.log(JSON.stringify({
+      event:'player_session_origin_rejected',
+      ...classifyRejectedOrigin(request.headers.get('origin')),
+      route_class:existingOnly?'player_session_refresh':'player_session',
+      release_commit:releaseMetadata().release_commit,
+    }));
+    throw error;
+  }
   const current=await player(request,false);
   if(current) {
     const meta=await profileMetaByPlayer(current);
@@ -1994,6 +2015,23 @@ async function launchWatcherSignal(trigger,response) {
         launch_watcher_recovery:{action:'failed',reason:'dispatch_state_failed'},
       },503);
     }
+    // Keep coverage advancing before it goes stale (#802). A cadence failure is
+    // logged but never fails this call: coverage is still fresh, and the stale
+    // path above remains the incident signal if coverage stops advancing.
+    let cadence;
+    try {
+      cadence=await reconcileLaunchWatcherCadence({query,freshness,now:scheduledAt});
+    } catch(error) {
+      cadence={action:'failed',reason:String(error?.message||error).slice(0,120)};
+    }
+    if(cadence.action==='dispatched'||cadence.action==='failed')console.log(JSON.stringify({
+      event:'launch_watcher_cadence_dispatch',
+      action:cadence.action,
+      ...(cadence.reason?{reason:cadence.reason}:{}),
+      covered_through:freshness.covered_through||null,
+      age_minutes:Number.isFinite(freshness.age_minutes)?freshness.age_minutes:null,
+      release_commit:releaseMetadata().release_commit,
+    }));
     return response;
   }
 
@@ -2267,7 +2305,10 @@ export default {
     try {
       return withCors(await route(request), request);
     } catch (error) {
-      console.error(error);
+      // Expected guest-session 401s become one structured line naming why,
+      // instead of an untyped stack trace per request (#803).
+      if(error?.status===401&&error?.playerSessionReason)console.log(JSON.stringify(playerSessionRejection(request,error.playerSessionReason)));
+      else console.error(error);
       const status=Number(error?.status||500);
       const response=json({ error: status===500?'Request failed. Please try again.':error.message,...(error?.code?{code:String(error.code)}:{}) },status);
       if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));

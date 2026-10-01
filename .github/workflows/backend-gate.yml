@@ -64,6 +64,8 @@ jobs:
         with:
           project_id: patient-shadow-91417882
           api_key: ${{ secrets.NEON_API_KEY }}
+          # Explicit parent: never inherit Neon's default-branch label (see docs/DATABASE-RECOVERY.md).
+          parent_branch: br-orange-feather-ayps8kep
           branch_name: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
           database: pack1
           role: pack1_owner

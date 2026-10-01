@@ -154,9 +154,21 @@ async function api(path,{method='GET',body,auth=true,authSession=null}={}) {
   return data;
 }
 
+// A 401 on events means the cached player session is no longer valid (cookie
+// lost or identity retired). Re-establish it and resend the same batch once per
+// page, so a recoverable 401 does not drop analytics. Once per page bounds the
+// extra player-session calls from clients that never keep the cookie.
+let eventSessionRecoveryUsed=false;
 export async function sendEvents(events) {
   if(!packApiConfigured())return null;
-  try{return await api('/v1/events',{method:'POST',body:{events},auth:true});}catch{return null;}
+  try{return await api('/v1/events',{method:'POST',body:{events},auth:true});}
+  catch(error) {
+    if(error?.status!==401||eventSessionRecoveryUsed||identityRetired)return null;
+    eventSessionRecoveryUsed=true;
+    sessionPromise=null;
+    if(!firstPartyAuthEnabled()){try{localStorage.removeItem(TOKEN_KEY);}catch{}}
+    try{return await api('/v1/events',{method:'POST',body:{events},auth:true});}catch{return null;}
+  }
 }
 export async function saveGameResult(result) {
   if(!packApiConfigured())return null;
