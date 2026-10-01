@@ -3,13 +3,12 @@ import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
 import {removeProviderUser} from '../worker/account-deletion.mjs';
-import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
 
 export const PROJECT_ID='patient-shadow-91417882';
 export const QA_BRANCH='br-twilight-hill-ayffyd2b';
 export const PROD_BRANCH='br-orange-feather-ayps8kep';
 export const QA_AUTH_BASE='https://ep-spring-dream-ayq2a5qt.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
-export {PROD_AUTH_BASE};
+export const PROD_AUTH_BASE='https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
 export const PROD_ORIGINS=['https://packone.pro','https://api.packone.pro','https://magic.planitnow.us'];
 const LOCAL_ORIGIN='http://localhost:4173';
 const REQUEST_FILE='.github/auth-localhost-hardening-request.json';
