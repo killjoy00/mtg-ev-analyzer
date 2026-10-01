@@ -79,13 +79,13 @@ export async function accountSession(request,query,{required=true,allowLegacy=tr
   const mobileRaw=String(request.headers.get('x-pack1-mobile-account')||'');
   if(mobileRaw) {
     const mobile=mobileAccountToken(request);
-    if(!mobile)throw Object.assign(Error('Account session expired.'),{status:401});
+    if(!mobile)throw Object.assign(Error('Account session expired.'),{status:401,accountSessionReason:'mobile_invalid'});
     const result=await query(`SELECT s.session_hash,s.expires_at,u.id user_id,u.email,u.name
       FROM account_sessions s JOIN neon_auth."user" u ON u.id=s.auth_user_id
       WHERE s.session_hash=$1 AND s.revoked_at IS NULL AND s.expires_at>now()
       LIMIT 1`,[digest(mobile)]);
     const account=result.rows[0];
-    if(!account)throw Object.assign(Error('Account session expired.'),{status:401});
+    if(!account)throw Object.assign(Error('Account session expired.'),{status:401,accountSessionReason:'mobile_expired'});
     return {...account,source:'mobile'};
   }
 
@@ -96,10 +96,11 @@ export async function accountSession(request,query,{required=true,allowLegacy=tr
         FROM neon_auth.session s JOIN neon_auth."user" u ON u.id=s."userId"
         WHERE s.token=$1 AND s."expiresAt">now() LIMIT 1`,[token]);
       if(result.rows[0])return {...result.rows[0],source:'legacy'};
-      throw Object.assign(Error('Account session expired.'),{status:401});
+      throw Object.assign(Error('Account session expired.'),{status:401,accountSessionReason:'legacy_expired'});
     }
   }
-  if(required)throw Object.assign(Error(opaque?'Account session expired.':'Account session required.'),{status:401});
+  // The reason is for server-side logs only; the response stays the same.
+  if(required)throw Object.assign(Error(opaque?'Account session expired.':'Account session required.'),{status:401,accountSessionReason:opaque?'stale_cookie':'missing'});
   return null;
 }
 

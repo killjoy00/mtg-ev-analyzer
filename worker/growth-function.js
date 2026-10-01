@@ -164,12 +164,14 @@ async function player(request, required = true) {
   return id;
 }
 
-// Low-cardinality, PII-free description of a rejected player session (#803).
-export function playerSessionRejection(request,reason) {
+// Low-cardinality, PII-free description of a rejected player or account session (#803).
+function sessionRejection(event,request,reason) {
   const path=new URL(request.url).pathname.replace(/[0-9a-f]{8}-[0-9a-f-]{27,}|[0-9a-f]{16,}/gi,':id').slice(0,80);
   const client=request.headers.has('x-pack1-mobile-account')?'native_account':request.headers.get('origin')?'browser':'no_origin';
-  return {event:'player_session_rejected',reason:String(reason||'unknown'),path,client,release_commit:releaseMetadata().release_commit};
+  return {event,reason:String(reason||'unknown'),path,client,release_commit:releaseMetadata().release_commit};
 }
+export const playerSessionRejection=(request,reason)=>sessionRejection('player_session_rejected',request,reason);
+export const accountSessionRejection=(request,reason)=>sessionRejection('account_session_rejected',request,reason);
 
 // A browser nickname must never overwrite an owned username: the client replays
 // whatever localStorage holds, so an established account would otherwise have
@@ -2305,9 +2307,10 @@ export default {
     try {
       return withCors(await route(request), request);
     } catch (error) {
-      // Expected guest-session 401s become one structured line naming why,
-      // instead of an untyped stack trace per request (#803).
+      // Expected guest- and account-session 401s become one structured line
+      // naming why, instead of an untyped stack trace per request (#803).
       if(error?.status===401&&error?.playerSessionReason)console.log(JSON.stringify(playerSessionRejection(request,error.playerSessionReason)));
+      else if(error?.status===401&&error?.accountSessionReason)console.log(JSON.stringify(accountSessionRejection(request,error.accountSessionReason)));
       else console.error(error);
       const status=Number(error?.status||500);
       const response=json({ error: status===500?'Request failed. Please try again.':error.message,...(error?.code?{code:String(error.code)}:{}) },status);
