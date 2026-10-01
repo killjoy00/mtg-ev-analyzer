@@ -125,68 +125,37 @@ After the final production run, a read-only query confirmed **zero** remaining `
 
 ## Open owner follow-ups from the September 30 incident
 
-These are owner-run actions. Do not perform them from an automated recovery or release workflow.
+These are owner-run actions. Do not perform them from an automated recovery or release workflow. Keep this order: acceptance checks and read-only SQL first; then disable the retired endpoint; then remove the old Google redirect URI. After the endpoint is disabled, SQL against `br-dark-sound-ayxhwq1u` is expected to stop working.
 
-### Retire the old Auth host, reversibly first
+### 1. Tester re-registration and password-reset acceptance
 
-The restored branch `br-dark-sound-ayxhwq1u` is a stale public copy of production Auth data. As of the incident closeout it still retained 9 unexpired Neon sessions across 3 users. Pack One application writes did not go to that branch during the split, so account deletions on the serving branch do not propagate there. Old passwords may therefore still work against the old Auth host; that is an inference from the stale copy, not a tested claim.
-
-First disable the old compute endpoint `ep-hidden-bonus-ayfmcpys`; do not delete the branch or endpoint. This is reversible and is preferred over destructive cleanup.
-
-Exact Neon API call:
-
-```sh
-curl --fail-with-body --request PATCH \
-  --url https://console.neon.tech/api/v2/projects/patient-shadow-91417882/endpoints/ep-hidden-bonus-ayfmcpys \
-  --header "Authorization: Bearer $NEON_API_KEY" \
-  --header 'accept: application/json' \
-  --header 'content-type: application/json' \
-  --data '{"endpoint":{"disabled":true}}'
-```
-
-To reverse that containment step, send the same request with `"disabled":false`.
-
-After disabling the old endpoint, verify all four conditions before changing Google OAuth configuration:
-
-1. `https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/ok` no longer returns HTTP 200.
-2. `https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/ok` still returns HTTP 200.
-3. From a reviewed checkout with `NEON_API_KEY` available, `node scripts/production-auth-binding-guard.mjs` passes.
-4. A normal production sign-in on `https://packone.pro` still works.
-
-Only after those checks pass, remove the old Google OAuth redirect URI from **Google Cloud Console -> APIs & Services -> Credentials -> the existing Pack One Web OAuth client -> Authorized redirect URIs**:
-
-- remove `https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/callback/google`;
-- keep `https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/callback/google`.
-
-Deleting `br-dark-sound-ayxhwq1u`, renaming branches, or changing Neon's default/primary branch is a separate later decision and is not part of this containment step.
-
-### Tester re-registration
-
-Ask the affected tester to register again on `https://packone.pro`. The corrected signup flow is already live: signup should stop at the **Check your email** screen, and the resend-verification action is available there. The tester's successful re-registration can also serve as the signup acceptance check below.
-
-### Owner acceptance: signup and password reset
-
-Record the UTC timestamp immediately before starting these two checks; use that value as `QA_START_UTC` in the read-only SQL below.
+Record the UTC timestamp immediately before starting these checks; use that value as `QA_START_UTC` in the read-only SQL below.
 
 Signup acceptance:
 
-1. Register the affected tester again, or use another real inbox.
+1. Ask the affected tester to register again on `https://packone.pro`.
 2. Confirm the **Check your email** screen appears.
 3. Confirm the verification email arrives through `pack1-authhook`.
 4. Open the verification link.
 5. Sign in successfully.
 
+The tester's successful re-registration doubles as the signup acceptance check.
+
 Password-reset acceptance:
 
-1. Use a dedicated test account, not the owner's main account.
+1. Use a dedicated pre-existing credential test account, not the owner's main account.
 2. Request a password reset.
 3. Confirm the reset email arrives.
 4. Open the reset link and set a new password.
 5. Sign in successfully with the new password.
 
-After both flows pass, run only count-only/read-only checks. Replace the timestamp literal with the recorded `QA_START_UTC`.
+The password-reset evidence below deliberately does **not** read the password hash. Better Auth stores a credential password on `neon_auth.account` with `providerId='credential'`; the live Pack One schema has both `password` and `updatedAt` on that table. A completed password reset updates the credential account password and therefore its account row timestamp. Use `account.updatedAt` as the read-only marker.
 
-On the serving branch `br-orange-feather-ayps8kep`, expect at least one new verified credential user that also has a new Pack One application session:
+### 2. Read-only SQL before disabling the retired endpoint
+
+Run these checks **before** disabling `ep-hidden-bonus-ayfmcpys`. Replace the timestamp literal with the recorded `QA_START_UTC`.
+
+On the serving branch `br-orange-feather-ayps8kep`, expect at least one newly verified credential user with a new Neon Auth session:
 
 ```sql
 WITH params(qa_start) AS (
@@ -205,13 +174,27 @@ WHERE u."createdAt" >= p.qa_start
   )
   AND EXISTS (
     SELECT 1
-    FROM public.account_sessions s
-    WHERE s.auth_user_id = u.id
-      AND s.created_at >= p.qa_start
+    FROM neon_auth.session s
+    WHERE s."userId" = u.id
+      AND s."createdAt" >= p.qa_start
   );
 ```
 
-On the stale branch `br-dark-sound-ayxhwq1u`, expect zero new users and zero new Pack One application sessions:
+For the password-reset acceptance, the dedicated account should have a credential-account row that predates `QA_START_UTC` and was updated afterward. Expect at least one:
+
+```sql
+WITH params(qa_start) AS (
+  VALUES (TIMESTAMPTZ '2026-10-01T00:00:00Z')
+)
+SELECT count(*) AS preexisting_credential_accounts_updated_after_qa_start
+FROM neon_auth.account a
+CROSS JOIN params p
+WHERE a."providerId" = 'credential'
+  AND a."createdAt" < p.qa_start
+  AND a."updatedAt" >= p.qa_start;
+```
+
+On the stale branch `br-dark-sound-ayxhwq1u`, expect zero new Neon Auth users and zero new Neon Auth sessions during the acceptance window:
 
 ```sql
 WITH params(qa_start) AS (
@@ -219,10 +202,75 @@ WITH params(qa_start) AS (
 )
 SELECT
   (SELECT count(*) FROM neon_auth."user" u, params p WHERE u."createdAt" >= p.qa_start) AS new_users,
-  (SELECT count(*) FROM public.account_sessions s, params p WHERE s.created_at >= p.qa_start) AS new_sessions;
+  (SELECT count(*) FROM neon_auth.session s, params p WHERE s."createdAt" >= p.qa_start) AS new_sessions;
 ```
 
-Once both owner-run flows are reported complete, re-run those count-only checks and confirm the `pack1growth` logs contain no new PostgreSQL `23503` errors.
+Do not use `public.account_sessions` for this incident check. Pack One does not write that table, so it cannot prove which Neon Auth branch handled the acceptance flows.
+
+Once both owner-run flows are complete, confirm the `pack1growth` logs contain no new PostgreSQL `23503` errors.
+
+### 3. Disable the retired endpoint, then verify it is actually disabled
+
+The restored branch `br-dark-sound-ayxhwq1u` is a stale public copy of production Auth data. At incident closeout it retained 9 unexpired Neon sessions across 3 users. Pack One application writes did not go to that branch during the split.
+
+Disable the old compute endpoint `ep-hidden-bonus-ayfmcpys`; do not delete the branch or endpoint. This is reversible.
+
+Exact Neon API call:
+
+```sh
+curl --fail-with-body --request PATCH \
+  --url https://console.neon.tech/api/v2/projects/patient-shadow-91417882/endpoints/ep-hidden-bonus-ayfmcpys \
+  --header "Authorization: Bearer $NEON_API_KEY" \
+  --header 'accept: application/json' \
+  --header 'content-type: application/json' \
+  --data '{"endpoint":{"disabled":true}}'
+```
+
+To reverse that containment step, send the same request with `"disabled":false`.
+
+Do **not** use Better Auth `/ok` as the retirement check. `/ok` may answer without opening a database connection and can therefore stay HTTP 200 even when the backing endpoint is disabled.
+
+Post-disable check A — read-only Neon control-plane GET. Expected result is **unverified until the owner runs it**:
+
+```sh
+curl --fail-with-body \
+  --url https://console.neon.tech/api/v2/projects/patient-shadow-91417882/endpoints/ep-hidden-bonus-ayfmcpys \
+  --header "Authorization: Bearer $NEON_API_KEY" \
+  --header 'accept: application/json'
+```
+
+Confirm the returned endpoint object reports `disabled: true`.
+
+Post-disable check B — database-dependent Auth probe. Expected result is **unverified until the owner runs it**. Use a nonexistent throwaway address and print only the HTTP status:
+
+```sh
+probe_email="retired-auth-probe-$(date +%s)-$RANDOM@example.invalid"
+curl --silent --show-error --output /dev/null --write-out '%{http_code}\n' \
+  --request POST \
+  --url https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/sign-in/email \
+  --header 'content-type: application/json' \
+  --data "{\"email\":\"$probe_email\",\"password\":\"not-a-real-password\"}"
+```
+
+While the endpoint is enabled, a nonexistent credential should normally reach the database and return an authentication rejection such as HTTP 401. Once the endpoint is disabled, expect a server/connection failure rather than a normal credential rejection. The exact post-disable status is intentionally marked unverified until the owner performs the check.
+
+This sign-in probe may write a rate-limit row on the retired branch while that branch is still reachable. That limited write is acceptable for this retirement check.
+
+Also verify:
+
+1. From a reviewed checkout with `NEON_API_KEY` available, `node scripts/production-auth-binding-guard.mjs` passes.
+2. A normal production sign-in on `https://packone.pro` still works.
+
+Do not try the stale-branch SQL after the endpoint is disabled; loss of database access there is expected.
+
+### 4. Remove the old Google redirect URI
+
+Only after the acceptance checks, read-only SQL, endpoint disable, and post-disable checks are complete, remove the old Google OAuth redirect URI from **Google Cloud Console -> APIs & Services -> Credentials -> the existing Pack One Web OAuth client -> Authorized redirect URIs**:
+
+- remove `https://ep-hidden-bonus-ayfmcpys.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/callback/google`;
+- keep `https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth/callback/google`.
+
+Deleting `br-dark-sound-ayxhwq1u`, renaming branches, or changing Neon's default/primary branch is a separate later decision and is not part of this containment step.
 
 ## Security boundaries preserved
 
