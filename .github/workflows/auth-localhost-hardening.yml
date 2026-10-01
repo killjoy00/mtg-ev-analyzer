@@ -9,6 +9,7 @@ on:
       - 'scripts/auth-localhost-hardening.mjs'
       - 'tests/auth-localhost-hardening.test.mjs'
   pull_request:
+    types: [opened, synchronize, reopened, edited]
     branches: [main]
     paths:
       - '.github/auth-localhost-hardening-request.json'
@@ -25,7 +26,27 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  qa-mutation-opt-in:
+    name: require explicit QA mutation opt-in
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require approval for this exact PR revision
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected="AUTH_HARDENING_QA_MUTATION_APPROVED=$HEAD_SHA"
+          if ! printf '%s\n' "$PR_BODY" | grep -Fqx "$expected"; then
+            echo "This PR changes Auth-hardening trigger paths that can mutate QA Neon Auth." >&2
+            echo "Explicit per-revision opt-in required: $expected" >&2
+            exit 1
+          fi
+
   qa:
+    needs: qa-mutation-opt-in
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
