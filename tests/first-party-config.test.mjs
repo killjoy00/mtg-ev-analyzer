@@ -2,6 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
+import path from 'node:path';
+import {fileURLToPath} from 'node:url';
+import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
 
 const source=fs.readFileSync(new URL('../leaderboard-config.js',import.meta.url),'utf8');
 const evaluate=hostname=>{
@@ -13,7 +16,7 @@ const evaluate=hostname=>{
 test('production host uses the first-party gateway for account and Draft Run traffic',()=>{
   const config=evaluate('packone.pro');
   assert.equal(config.firstParty,true);
-  assert.equal(config.authBase,'https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth');
+  assert.equal(config.authBase,PROD_AUTH_BASE);
   assert.equal(config.growthUrl,'https://api.packone.pro/growth');
   assert.equal(config.draftRunUrl,'https://api.packone.pro/draft');
 });
@@ -43,6 +46,43 @@ test('localhost keeps the direct development-compatible endpoints',()=>{
 test('query, hash, cookies and storage are not configuration channels for Auth selection',()=>{
   const local=evaluate('localhost'),prod=evaluate('packone.pro');
   assert.equal(local.authBase,'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth');
-  assert.equal(prod.authBase,'https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth');
+  assert.equal(prod.authBase,PROD_AUTH_BASE);
   assert.ok(!source.includes('searchParams')&&!source.includes('localStorage')&&!source.includes('document.cookie'));
+});
+
+
+test('every remaining production Neon Auth literal equals PROD_AUTH_BASE',()=>{
+  const root=fileURLToPath(new URL('..',import.meta.url));
+  const skipped=new Set(['.git','node_modules','data','generated','results','artifacts','tests']);
+  const files=[];
+  const walk=dir=>{
+    for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
+      if(entry.isDirectory()&&skipped.has(entry.name))continue;
+      const full=path.join(dir,entry.name);
+      if(entry.isDirectory())walk(full);
+      else if(/\.(?:m?js)$/.test(entry.name))files.push(full);
+    }
+  };
+  walk(root);
+  const hardeningRelative='scripts/auth-localhost-hardening.mjs';
+  const hardeningSource=fs.readFileSync(path.join(root,hardeningRelative),'utf8');
+  const hardeningProduction=hardeningSource.match(/export const PROD_AUTH_BASE='([^']+)'/);
+  assert.equal(hardeningProduction?.[1],PROD_AUTH_BASE,'localhost-hardening production Auth base must match the canonical production base');
+
+  const qaOnlyRelatives=new Set([
+    'scripts/auth-verification-taxonomy-probe.mjs',
+    'scripts/auth-webhook-probe-stage.mjs',
+  ]);
+  const pattern=/https:\/\/ep-[a-z0-9-]+\.neonauth\.[a-z0-9.-]+\/pack1\/auth/g;
+  const literals=[];
+  for(const file of files){
+    const relative=path.relative(root,file);
+    if(relative===hardeningRelative||qaOnlyRelatives.has(relative))continue;
+    const matches=fs.readFileSync(file,'utf8').match(pattern)||[];
+    for(const value of matches)literals.push({file:path.relative(root,file),value});
+  }
+  assert.ok(literals.length>=1,'expected at least the canonical production Auth literal');
+  for(const literal of literals){
+    assert.equal(literal.value,PROD_AUTH_BASE,literal.file+' contains a stale production Auth literal');
+  }
 });

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
 const commit=process.argv[2];
 assert.match(commit||'',/^[a-f0-9]{40}$/);
 const base='https://api.packone.pro';
@@ -43,7 +44,7 @@ const daily=await call('/draft/v1/daily-status',{headers:{origin,cookie:playerCo
 assert.deepEqual(daily.data.membership,{connected:false});
 assert.equal(daily.response.headers.get('access-control-allow-origin'),origin);
 assert.equal(daily.response.headers.get('access-control-allow-credentials'),'true');
-const neonAuth='https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth';
+const neonAuth=PROD_AUTH_BASE;
 const googleResponse=await fetch(neonAuth+'/sign-in/social',{
   method:'POST',
   headers:{origin,'content-type':'application/json'},
