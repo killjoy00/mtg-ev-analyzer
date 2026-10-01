@@ -45,7 +45,7 @@ test('player-session rejections carry a log-only reason and are logged as one st
   assert.match(source,/let reason = !bearer \? 'missing' : id \? null : 'invalid';/);
   assert.match(source,/if\(id&&await deletedPlayerTombstone\(query,id\)\)\{id=null;reason='retired';\}/);
   assert.match(source,/new Error\('Player session required\.'\), \{ status: 401, playerSessionReason: reason \}/);
-  assert.match(source,/if\(error\?\.status===401&&error\?\.playerSessionReason\)console\.log\(JSON\.stringify\(playerSessionRejection\(request,error\.playerSessionReason\)\)\);\n      else console\.error\(error\);/);
+  assert.match(source,/if\(error\?\.status===401&&error\?\.playerSessionReason\)console\.log\(JSON\.stringify\(playerSessionRejection\(request,error\.playerSessionReason\)\)\);\n      else if\(error\?\.status===401&&error\?\.accountSessionReason\)console\.log\(JSON\.stringify\(accountSessionRejection\(request,error\.accountSessionReason\)\)\);\n      else console\.error\(error\);/);
 
   const {playerSessionRejection}=await import('../worker/growth-function.js');
   const browser=playerSessionRejection(new Request('https://growth.example/v1/events',{method:'POST',headers:{origin:'https://packone.pro'}}),'missing');
@@ -58,4 +58,9 @@ test('player-session rejections carry a log-only reason and are logged as one st
   assert.equal(native.path,'/v1/profile/:id/history');
   assert.doesNotMatch(JSON.stringify(native),/secret-token|0123456789abcdef/);
   assert.equal(playerSessionRejection(new Request('https://growth.example/v1/patreon/status'),'invalid').client,'no_origin');
+
+  const {accountSessionRejection}=await import('../worker/growth-function.js');
+  const account=accountSessionRejection(new Request('https://growth.example/v1/account/session',{headers:{origin:'https://packone.pro'}}),'stale_cookie');
+  assert.deepEqual({event:account.event,reason:account.reason,path:account.path,client:account.client},
+    {event:'account_session_rejected',reason:'stale_cookie',path:'/v1/account/session',client:'browser'});
 });

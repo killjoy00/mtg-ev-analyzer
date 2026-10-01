@@ -89,6 +89,15 @@ test('no credential at all stays 401 for required callers and null for optional 
   assert.equal(await accountSession(request(null),fakeQuery(),{required:false}),null);
 });
 
+test('every account-session 401 names a log-only reason',async()=>{
+  const reason=async(...args)=>{try{await accountSession(...args);}catch(error){assert.equal(error.status,401);return error.accountSessionReason;}assert.fail('expected a 401');};
+  assert.equal(await reason(request(null),fakeQuery()),'missing');
+  assert.equal(await reason(request(accountCookie(STALE)),fakeQuery()),'stale_cookie');
+  assert.equal(await reason(request(null,{headers:{'x-pack1-mobile-account':'short'}}),fakeQuery()),'mobile_invalid');
+  assert.equal(await reason(request(null,{headers:{'x-pack1-mobile-account':STALE}}),fakeQuery()),'mobile_expired');
+  assert.equal(await reason(request(null,{headers:{'x-pack1-auth-session':'unknown-token'}}),fakeQuery()),'legacy_expired');
+});
+
 // Verified against the deployed Neon runtime with a throwaway probe function:
 // three appended Set-Cookie entries arrive at the client as one, and so does
 // the Response constructor's array form. Only a single joined header survives,

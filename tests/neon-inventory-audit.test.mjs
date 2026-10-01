@@ -3,7 +3,6 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {
   PROD_BRANCH,
-  KNOWN_UNMANAGED_FUNCTIONS,
   auditInventory,
   manifestSlugs,
   runInventoryAudit,
@@ -16,33 +15,26 @@ const healthyBranches=[
   {id:'br-twilight-hill-ayffyd2b',default:false},
   {id:'br-ci-temporary',default:false,expires_at:'2026-10-01T09:00:00Z'},
 ];
-const beforeReview=new Date('2026-10-02T00:00:00Z');
-const afterReview=new Date('2026-10-16T00:00:00Z');
 
 test('manifest lists exactly the three managed production Functions',()=>{
   assert.deepEqual(manifest,['draftrunapi','pack1growth','pack1api']);
 });
 
-test('a healthy inventory passes and known unmanaged helpers only warn before the review date',()=>{
-  assert.deepEqual(auditInventory({functions:managedFunctions,branches:healthyBranches,manifest,now:beforeReview}).problems,[]);
-  const withHelpers=auditInventory({functions:[...managedFunctions,{slug:'dringest'}],branches:healthyBranches,manifest,now:beforeReview});
-  assert.deepEqual(withHelpers.problems,[]);
-  assert.equal(withHelpers.warnings.length,1);
-  assert.equal(KNOWN_UNMANAGED_FUNCTIONS.size,1);
+test('a healthy inventory passes',()=>{
+  assert.deepEqual(auditInventory({functions:managedFunctions,branches:healthyBranches,manifest}).problems,[]);
 });
 
 test('the audit fails on unowned Functions, missing managed Functions, default drift and unexpiring branches',()=>{
-  const expired=auditInventory({functions:[...managedFunctions,{slug:'dringest'}],branches:healthyBranches,manifest,now:afterReview});
-  assert.match(expired.problems.join('\n'),/unmanaged Function dringest/);
-  assert.match(auditInventory({functions:[...managedFunctions,{slug:'drkick'}],branches:healthyBranches,manifest,now:beforeReview}).problems.join('\n'),/unmanaged Function drkick/,'deleted helpers are no longer allowlisted');
-  assert.match(auditInventory({functions:[...managedFunctions,{slug:'surprise'}],branches:healthyBranches,manifest,now:beforeReview}).problems.join('\n'),/unmanaged Function surprise/);
-  assert.match(auditInventory({functions:managedFunctions.slice(1),branches:healthyBranches,manifest,now:beforeReview}).problems.join('\n'),/managed Function draftrunapi is missing/);
+  for(const slug of ['dringest','drkick'])
+    assert.match(auditInventory({functions:[...managedFunctions,{slug}],branches:healthyBranches,manifest}).problems.join('\n'),new RegExp('unmanaged Function '+slug),'deleted helpers are no longer allowlisted');
+  assert.match(auditInventory({functions:[...managedFunctions,{slug:'surprise'}],branches:healthyBranches,manifest}).problems.join('\n'),/unmanaged Function surprise/);
+  assert.match(auditInventory({functions:managedFunctions.slice(1),branches:healthyBranches,manifest}).problems.join('\n'),/managed Function draftrunapi is missing/);
   const drifted=healthyBranches.map(branch=>({...branch,default:branch.id==='br-restored-copy'}));
   drifted.push({id:'br-restored-copy',default:true});
-  const result=auditInventory({functions:managedFunctions,branches:drifted,manifest,now:beforeReview}).problems.join('\n');
+  const result=auditInventory({functions:managedFunctions,branches:drifted,manifest}).problems.join('\n');
   assert.match(result,/default branch is br-restored-copy/);
   assert.match(result,/branch br-restored-copy has no expiry/);
-  assert.match(auditInventory({functions:managedFunctions,branches:healthyBranches.slice(1),manifest,now:beforeReview}).problems.join('\n'),/long-lived branch br-orange-feather-ayps8kep is missing/);
+  assert.match(auditInventory({functions:managedFunctions,branches:healthyBranches.slice(1),manifest}).problems.join('\n'),/long-lived branch br-orange-feather-ayps8kep is missing/);
 });
 
 test('the audit only reads the Neon control plane',async()=>{
@@ -50,7 +42,6 @@ test('the audit only reads the Neon control plane',async()=>{
   const result=await runInventoryAudit({
     key:'n'.repeat(32),
     manifestText:'draftrunapi:x\npack1growth:y\npack1api:z\n',
-    now:beforeReview,
     fetcher:async(url,init)=>{
       calls.push({url:String(url),method:init.method});
       if(String(url).endsWith('/functions'))return Response.json({functions:managedFunctions});
