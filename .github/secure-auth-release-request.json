@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Deploy merged PR #801: correct verification-required signup/sign-in UX, remove signup display-name requirement, preserve post-claim leaderboard-name continuation, and release the tested Pack One account backend/web revision."}
+{"operation":"deploy-secure-auth","reason":"Deploy merged PR #807: complete native first-claim leaderboard-name prompt and native account relink continuation while preserving the reviewed account verification/signup behavior from #801."}
