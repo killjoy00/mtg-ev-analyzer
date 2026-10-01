@@ -82,6 +82,8 @@ The checked-in corpus and source/provenance workflows can reconstruct serving ev
 
 ## Isolated restore procedure
 
+**Restore drills must not finalize or swap branches.** Finalizing a restore is a production cutover and requires explicit owner approval. On September 30, finalizing moved the original endpoint and the default/`main` label to the restored branch, which caused the Auth incident.
+
 1. Record the incident/recovery reason and current serving production branch ID.
 2. Create or select the exact Neon snapshot/recovery point.
 3. Restore it to a new non-production branch.
