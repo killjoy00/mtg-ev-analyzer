@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {parseAuthWebhookRequest} from '../scripts/auth-webhook-request.mjs';
+import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
 
 const commit='a'.repeat(40);
 
@@ -95,7 +96,10 @@ test('production recovery smoke is main-only, fixed-target and secret-free',()=>
   assert.match(workflow,/pack1-authhook\.killjoy00\.workers\.dev\/health\?quick=1/);
   assert.match(workflow,/auth-webhook-production-smoke\.mjs/);
   assert.doesNotMatch(workflow,/secrets\./);
-  assert.match(source,/ep-young-hall-ayl0754j\.neonauth/);
+  assert.match(source,/import \{PROD_AUTH_BASE\} from '\.\.\/worker\/account-config\.mjs';/);
+  assert.match(source,/const AUTH_BASE=PROD_AUTH_BASE;/);
+  assert.doesNotMatch(source,/https:\/\/ep-[a-z0-9-]+\.neonauth\.[a-z0-9.-]+\/pack1\/auth/);
+  assert.match(PROD_AUTH_BASE,/^https:\/\/[^/]+\/pack1\/auth$/);
   assert.match(source,/https:\/\/packone\.pro/);
   assert.match(source,/delivered@resend\.dev/);
   assert.doesNotMatch(source,/console\.log\([^\n]*(password|token|signature|cookie)/i);
