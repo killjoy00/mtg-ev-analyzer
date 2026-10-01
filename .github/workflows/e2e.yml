@@ -88,6 +88,10 @@ jobs:
       - name: Hydrate replay shards from R2 for local browser tests
         if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         run: bash scripts/r2_replay_shards.sh hydrate
+      - name: Block the production API in browser tests
+        if: steps.scope.outputs.run_full == 'true'
+        # Every later `node` step preloads the guard; see tests/e2e-production-guard.mjs (#803).
+        run: echo "NODE_OPTIONS=--import $GITHUB_WORKSPACE/tests/e2e-production-guard.mjs" >> "$GITHUB_ENV"
       - name: Start static site
         if: steps.scope.outputs.run_full == 'true'
         run: |
@@ -163,6 +167,9 @@ jobs:
       - name: Run corpus readiness browser contract
         if: steps.scope.outputs.run_full == 'true'
         run: node tests/corpus-readiness-e2e.mjs
+      - name: Stop preloading the production API guard
+        if: always() && steps.scope.outputs.run_full == 'true'
+        run: echo "NODE_OPTIONS=" >> "$GITHUB_ENV"
       - name: Upload UI screenshots
         if: always() && steps.scope.outputs.run_full == 'true'
         uses: actions/upload-artifact@v4
