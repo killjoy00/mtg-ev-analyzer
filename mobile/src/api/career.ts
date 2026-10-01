@@ -66,6 +66,10 @@ export type CareerProfile = {
     showcase_achievement?: string | null;
     claimed?: boolean;
     username_owned?: boolean;
+    public_identity_terms_version?: string | null;
+    public_identity_terms_current?: boolean;
+    public_identity_hidden?: boolean;
+    public_identity_hidden_reason?: string | null;
   };
   summary: CareerSummary;
   environment_total: number;
@@ -118,6 +122,7 @@ export function updateMobileProfile(
     profilePublic?: boolean;
     favoriteSetId?: string | null;
     showcaseAchievement?: string | null;
+    acceptPublicIdentityTerms?: boolean;
   },
 ) {
   return requestJson<CareerProfile>('/growth/v1/mobile/profile', {
