@@ -1,6 +1,9 @@
 name: production Auth binding guard
 
 on:
+  workflow_run:
+    workflows: ['production launch telemetry and usage alert']
+    types: [completed]
   schedule:
     - cron: '17 * * * *'
   workflow_dispatch:
@@ -14,6 +17,7 @@ concurrency:
 
 jobs:
   guard:
+    if: github.event_name != 'workflow_run' || (github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.event != 'pull_request')
     runs-on: ubuntu-latest
     timeout-minutes: 5
     env:
