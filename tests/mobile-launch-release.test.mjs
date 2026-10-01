@@ -235,6 +235,16 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.match(android, /store-release\.json/);
 });
 
+test('native release config blocks unused biometric and external-storage permissions', () => {
+  const app = JSON.parse(read('mobile/app.json'));
+  const secureStore = app.expo.plugins.find((entry) => Array.isArray(entry) && entry[0] === 'expo-secure-store');
+  assert.deepEqual(secureStore, ['expo-secure-store', { faceIDPermission: false }]);
+  assert.deepEqual(
+    [...app.expo.android.blockedPermissions].sort(),
+    ['android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE'].sort(),
+  );
+});
+
 test('privacy page exposes the stable Play deletion resource and fallback request path', () => {
   const privacy = read('privacy/index.html');
   assert.match(privacy, /<h2 id="delete-account">Deleting your account<\/h2>/);
