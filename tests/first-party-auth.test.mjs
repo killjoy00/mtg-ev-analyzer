@@ -1,5 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import {PROD_AUTH_BASE} from '../worker/account-config.mjs';
+
+const PROD_AUTH_HOST=new URL(PROD_AUTH_BASE).host;
 
 const store=new Map([
   ['pack1-api-session-v1','p1_00000000-0000-4000-8000-000000000000.'+'p'.repeat(43)],
@@ -14,7 +17,7 @@ globalThis.localStorage={
 globalThis.document={cookie:'__Secure-pack1_csrf='+'c'.repeat(43)};
 globalThis.window={PACK1_API:{
   firstParty:true,
-  authBase:'https://ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech/pack1/auth',
+  authBase:PROD_AUTH_BASE,
   growthUrl:'https://api.packone.pro/growth',
   draftRunUrl:'https://api.packone.pro/draft',
 }};
@@ -78,7 +81,7 @@ test('first-party writes use CSRF without exposing an account bearer',async()=>{
 test('Google starts on Neon Auth and returns to Pack One with a verifier',async()=>{
   await auth.startGoogleSignIn();
   const call=calls.findLast(row=>row.path==='/pack1/auth/sign-in/social');
-  assert.equal(call.host,'ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech');
+  assert.equal(call.host,PROD_AUTH_HOST);
   assert.equal(call.method,'POST');
   assert.equal(call.credentials,'include');
   const body=JSON.parse(call.body);
@@ -93,7 +96,7 @@ test('Google verifier is exchanged in the browser and immediately migrated to a 
   const result=await auth.completeGoogleSignIn();
   assert.equal(result.user.id,'google-user');
   const exchange=calls.findLast(row=>row.path==='/pack1/auth/get-session');
-  assert.equal(exchange.host,'ep-young-hall-ayl0754j.neonauth.c-5.us-east-2.aws.neon.tech');
+  assert.equal(exchange.host,PROD_AUTH_HOST);
   assert.equal(exchange.credentials,'include');
   const migrate=calls.findLast(row=>row.path==='/growth/v1/account/migrate');
   assert.equal(migrate.headers.get('x-pack1-auth-session'),'google-neon-session');
