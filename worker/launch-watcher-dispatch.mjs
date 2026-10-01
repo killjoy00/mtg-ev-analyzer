@@ -119,6 +119,50 @@ async function dispatchLaunchWatcher(fetcher,env) {
     throw Object.assign(Error('Launch watcher GitHub dispatch was rejected'),{code:'dispatch_http_'+response.status,status:response.status});
 }
 
+// Cadence (#802): GitHub's five-minute schedule for launch-alert.yml rarely
+// materializes, so coverage used to advance only after it went stale. While
+// coverage is still fresh but due, the Neon-scheduled maintenance call
+// dispatches the same workflow ahead of time, at most once per interval. The
+// stale/recovery path above stays the incident path for real failures.
+export const LAUNCH_WATCHER_CADENCE_STATE_KEY='launch_watcher_cadence_dispatch_v1';
+export const LAUNCH_WATCHER_CADENCE_DUE_MS=20*60*1000;
+export const LAUNCH_WATCHER_CADENCE_MIN_INTERVAL_MS=15*60*1000;
+
+function parseCadenceState(value) {
+  if(value===null||value===undefined||value==='')return {version:1,last_dispatch_at:null};
+  let parsed;
+  try {parsed=JSON.parse(value);} catch {throw Error('Invalid launch watcher cadence state');}
+  if(!parsed||parsed.version!==1)throw Error('Invalid launch watcher cadence state');
+  return {version:1,last_dispatch_at:parseTime(parsed.last_dispatch_at)};
+}
+
+export async function reconcileLaunchWatcherCadence({query,freshness,now=Date.now(),env=process.env,fetcher=fetch}={}) {
+  if(typeof query!=='function')throw Error('Launch watcher cadence query is required');
+  if(!freshness?.ok)return {action:'not_fresh'};
+  const age=Number(freshness.age_minutes)*60*1000;
+  if(!Number.isFinite(age)||age<LAUNCH_WATCHER_CADENCE_DUE_MS)return {action:'not_due'};
+  if(!launchWatcherRecoveryConfigured(env))return {action:'unconfigured'};
+  const result=await query('SELECT value FROM settings WHERE key=$1 LIMIT 1',[LAUNCH_WATCHER_CADENCE_STATE_KEY]);
+  const raw=result?.rows?.[0]?.value??null;
+  const state=parseCadenceState(raw===null?null:String(raw));
+  if(elapsed(now,state.last_dispatch_at)<LAUNCH_WATCHER_CADENCE_MIN_INTERVAL_MS)return {action:'cooldown'};
+  const value=JSON.stringify({version:1,last_dispatch_at:iso(now)});
+  const claimed=raw===null
+    ?await query(`INSERT INTO settings(key,value) VALUES($1,$2)
+      ON CONFLICT(key) DO NOTHING
+      RETURNING value`,[LAUNCH_WATCHER_CADENCE_STATE_KEY,value])
+    :await query(`UPDATE settings SET value=$3
+      WHERE key=$1 AND value=$2
+      RETURNING value`,[LAUNCH_WATCHER_CADENCE_STATE_KEY,String(raw),value]);
+  if(!claimed?.rows?.[0]?.value)return {action:'contended'};
+  try {
+    await dispatchLaunchWatcher(fetcher,env);
+    return {action:'dispatched'};
+  } catch(error) {
+    return {action:'failed',reason:String(error?.code||'dispatch_failed').slice(0,80)};
+  }
+}
+
 export async function reconcileLaunchWatcherDispatch({query,freshness,now=Date.now(),env=process.env,fetcher=fetch}={}) {
   if(typeof query!=='function')throw Error('Launch watcher dispatch query is required');
   if(!freshness||typeof freshness.ok!=='boolean')throw Error('Launch watcher freshness result is required');

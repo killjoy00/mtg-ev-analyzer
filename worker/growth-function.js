@@ -17,7 +17,7 @@ import {verifyDeletionMaintenanceToken} from './account-deletion-auth.mjs';
 import {neonTriggerInvocationHeader,verifyNeonScheduleTrigger} from './neon-trigger.mjs';
 import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
-import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
+import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
 import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaign-link-publish.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
@@ -2015,6 +2015,23 @@ async function launchWatcherSignal(trigger,response) {
         launch_watcher_recovery:{action:'failed',reason:'dispatch_state_failed'},
       },503);
     }
+    // Keep coverage advancing before it goes stale (#802). A cadence failure is
+    // logged but never fails this call: coverage is still fresh, and the stale
+    // path above remains the incident signal if coverage stops advancing.
+    let cadence;
+    try {
+      cadence=await reconcileLaunchWatcherCadence({query,freshness,now:scheduledAt});
+    } catch(error) {
+      cadence={action:'failed',reason:String(error?.message||error).slice(0,120)};
+    }
+    if(cadence.action==='dispatched'||cadence.action==='failed')console.log(JSON.stringify({
+      event:'launch_watcher_cadence_dispatch',
+      action:cadence.action,
+      ...(cadence.reason?{reason:cadence.reason}:{}),
+      covered_through:freshness.covered_through||null,
+      age_minutes:Number.isFinite(freshness.age_minutes)?freshness.age_minutes:null,
+      release_commit:releaseMetadata().release_commit,
+    }));
     return response;
   }
 
