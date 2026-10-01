@@ -40,7 +40,7 @@ Separately, the web client treated any sign-up response containing a `user` as a
 
 - QA localhost toggles: run 36797780678 (accidental, from a PR edit) and 36807107096 (approved); both restored.
 - Production hardening run 36811306347 (approved); its disposable identity was removed (0 users, accounts or sessions remained, verified 10-01 04:08).
-- 10-01: endpoint `ep-hidden-bonus-ayfmcpys` disabled; `br-orange-feather-ayps8kep` set as default and renamed `production`; `br-dark-sound-ayxhwq1u`, snapshot `pack1-dr-drill-2026-09-30`, `br-calm-pond-ayh8f671` and `br-lively-silence-ayiptwkk` deleted; `pg_stat_statements` enabled on production; 13 unmanaged `dr*` Functions deleted (`dringest` kept). A later branch, snapshot and Function listing confirmed the deletes.
+- 10-01: endpoint `ep-hidden-bonus-ayfmcpys` disabled; `br-orange-feather-ayps8kep` set as default and renamed `production`; `br-dark-sound-ayxhwq1u`, snapshot `pack1-dr-drill-2026-09-30`, `br-calm-pond-ayh8f671` and `br-lively-silence-ayiptwkk` deleted; `pg_stat_statements` enabled on production; all 14 unmanaged `dr*` Functions deleted (`dringest` last, after review). A later branch, snapshot and Function listing confirmed the deletes.
 
 ## Related fixes shipped alongside
 
@@ -52,5 +52,10 @@ Separately, the web client treated any sign-up response containing a `user` as a
 
 - Optional email/password acceptance with a real inbox (`docs/AUTH-HARDENING.md`).
 - Optional removal of the old Google OAuth redirect URI (now points at a deleted host).
-- Follow-up issues #802 (launch watcher cadence), #803 (guest analytics 401s) and #804 (origin instrumentation): shipped in #820 and released by #823; each needs production log evidence before closing.
-- #805: decide `dringest` (register or delete) before the inventory audit's 2026-10-15 review date.
+
+## Follow-ups resolved (2026-10-01)
+
+- #802: after the #823 release, the Neon trigger dispatched coverage every 20 minutes (coverage 24–29 minutes old at dispatch) and logged no `launch_watcher_stale` event.
+- #803: the `invalid` `/v1/events` 401 stream came from the browser e2e job reaching the production API from `127.0.0.1`. In a seven-hour window with no e2e run there was one rejection; #825 blocks the production API in e2e, and its first guarded run produced none.
+- #804: no `player_session_origin_rejected` events after the release.
+- #805: all unmanaged Functions deleted; the daily inventory audit fails on any new one.

@@ -12,27 +12,17 @@ export const LONG_LIVED_BRANCHES=new Map([
   ['br-twilight-hill-ayffyd2b','development/QA'],
 ]);
 
-// Unmanaged helper Functions found on production on 2026-09-30 (#805). Each
-// must be deleted or adopted into .github/neon-functions.txt by the review date;
-// after it they fail the audit like any other unowned Function.
-export const UNMANAGED_FUNCTION_REVIEW_BY='2026-10-15T00:00:00Z';
-// dringest was invoked on 2026-09-26 by an unidentified caller; the other dr* helpers were deleted on 2026-10-01.
-export const KNOWN_UNMANAGED_FUNCTIONS=new Set(['dringest']);
-
 export function manifestSlugs(text) {
   return String(text||'').trim().split('\n').map(line=>line.trim().split(':')[0]).filter(Boolean);
 }
 
-export function auditInventory({functions,branches,manifest,now=new Date()}) {
-  const problems=[],warnings=[];
+// The 14 unmanaged dr* helpers found on 2026-09-30 were all deleted by 2026-10-01
+// (#805), so any Function outside .github/neon-functions.txt now fails.
+export function auditInventory({functions,branches,manifest}) {
+  const problems=[];
   const deployed=functions.map(fn=>fn.slug);
   const managed=new Set(manifest);
-  const reviewOpen=now.getTime()<Date.parse(UNMANAGED_FUNCTION_REVIEW_BY);
-  for(const slug of deployed) {
-    if(managed.has(slug))continue;
-    if(KNOWN_UNMANAGED_FUNCTIONS.has(slug)&&reviewOpen)warnings.push(`unmanaged Function ${slug} (decide by ${UNMANAGED_FUNCTION_REVIEW_BY})`);
-    else problems.push(`unmanaged Function ${slug} is not in .github/neon-functions.txt`);
-  }
+  for(const slug of deployed)if(!managed.has(slug))problems.push(`unmanaged Function ${slug} is not in .github/neon-functions.txt`);
   for(const slug of managed)if(!deployed.includes(slug))problems.push(`managed Function ${slug} is missing from production`);
   const defaults=branches.filter(branch=>branch.default);
   if(defaults.length!==1||defaults[0].id!==PROD_BRANCH)problems.push(`Neon default branch is ${defaults.map(b=>b.id).join(',')||'unset'}, not ${PROD_BRANCH}`);
@@ -41,7 +31,7 @@ export function auditInventory({functions,branches,manifest,now=new Date()}) {
     problems.push(`branch ${branch.id} has no expiry and is not a declared long-lived branch`);
   }
   for(const id of LONG_LIVED_BRANCHES.keys())if(!branches.some(branch=>branch.id===id))problems.push(`declared long-lived branch ${id} is missing`);
-  return {problems,warnings,functions:deployed.length,branches:branches.length};
+  return {problems,functions:deployed.length,branches:branches.length};
 }
 
 // Guard reads only control-plane metadata; it must never mutate Neon state.
@@ -61,20 +51,18 @@ export async function runInventoryAudit({
   key=process.env.NEON_API_KEY,
   fetcher=fetch,
   manifestText=fs.readFileSync(new URL('../.github/neon-functions.txt',import.meta.url),'utf8'),
-  now=new Date(),
 }={}) {
   const [functionBody,branchBody]=await Promise.all([
     control('/projects/'+PROJECT+'/branches/'+PROD_BRANCH+'/functions',{key,fetcher}),
     control('/projects/'+PROJECT+'/branches',{key,fetcher}),
   ]);
   if(!Array.isArray(functionBody?.functions)||!Array.isArray(branchBody?.branches))throw Error('Neon returned an unexpected inventory.');
-  return auditInventory({functions:functionBody.functions,branches:branchBody.branches,manifest:manifestSlugs(manifestText),now});
+  return auditInventory({functions:functionBody.functions,branches:branchBody.branches,manifest:manifestSlugs(manifestText)});
 }
 
 async function main() {
   const result=await runInventoryAudit();
   console.log('NEON_INVENTORY_AUDIT '+JSON.stringify(result));
-  for(const warning of result.warnings)console.log('::warning::'+warning);
   for(const problem of result.problems)console.log('::error::'+problem);
   if(result.problems.length)process.exitCode=1;
 }
