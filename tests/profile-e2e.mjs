@@ -27,6 +27,8 @@ const fixture = {
     showcase_achievement:'explorer5',
     claimed:true,
     username_owned:true,
+    public_identity_terms_current:false,
+    public_identity_hidden:false,
   },
   summary: {
     games:42,
@@ -126,6 +128,7 @@ await page.route(`${growthOrigin}/**`, async (route) => {
         profile_public:Boolean(updatePayload.profilePublic),
         favorite_set_id:updatePayload.favoriteSetId || null,
         showcase_achievement:updatePayload.showcaseAchievement || null,
+        public_identity_terms_current:updatePayload.acceptPublicIdentityTerms===true || fixture.player.public_identity_terms_current,
       },
     };
   } else if (url.pathname === '/v1/profile-lookup') {
@@ -205,9 +208,10 @@ try {
   await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
   await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
+  await page.locator('input[name="acceptPublicIdentityTerms"]').check();
   await page.locator('#profile-settings-form button[type="submit"]').click();
   await page.waitForFunction(() => document.querySelector('input[name="displayName"]')?.value === 'Leaderboard Ace' && document.querySelector('select[name="favoriteSetId"]')?.value === 'ktk');
-  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10' });
+  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
   await page.waitForFunction(() => localStorage.getItem('pack1-player-name-v1') === 'Leaderboard Ace');
   assert.equal(await page.evaluate(() => localStorage.getItem('pack1-player-name-v1')), 'Leaderboard Ace');
 
