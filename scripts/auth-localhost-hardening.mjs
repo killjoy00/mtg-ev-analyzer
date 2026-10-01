@@ -1,3 +1,4 @@
+// SAFETY: Editing this file triggers .github/workflows/auth-localhost-hardening.yml, whose PR QA job mutates Neon Auth state before restoring it and whose main-branch job can mutate production. Do not push or merge changes without explicit reviewed opt-in.
 import fs from 'node:fs';
 import {execFileSync} from 'node:child_process';
 import {randomBytes} from 'node:crypto';

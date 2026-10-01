@@ -86,7 +86,12 @@ test('hardening contract is QA-first, production-fixed, reversible on failure, a
   assert.doesNotMatch(source,/runNeon\(\['psql'[\s\S]{0,400}?\b(DELETE|UPDATE|INSERT|TRUNCATE|ALTER)\b/i);
   assert.match(source,/runNeon\(\['psql',branch,'--project-id',PROJECT_ID,'--database-name','pack1'/);
   assert.match(workflow,/pull_request:/);
+  assert.match(workflow,/types: \[opened, synchronize, reopened, edited\]/);
   assert.match(workflow,/branches:\s*\[main\]/);
+  assert.match(workflow,/qa-mutation-opt-in:/);
+  assert.match(workflow,/AUTH_HARDENING_QA_MUTATION_APPROVED=\$HEAD_SHA/);
+  assert.match(workflow,/needs: qa-mutation-opt-in/);
+  assert.match(source,/^\/\/ SAFETY: Editing this file triggers \.github\/workflows\/auth-localhost-hardening\.yml,/);
   assert.match(workflow,/github\.event_name == 'pull_request'/);
   assert.match(workflow,/NEON_API_KEY: \$\{\{ secrets\.NEON_API_KEY \}\}/);
   assert.match(workflow,/PACK1_DELETION_ADMIN_EMAIL: \$\{\{ secrets\.PACK1_DELETION_ADMIN_EMAIL \}\}/);
