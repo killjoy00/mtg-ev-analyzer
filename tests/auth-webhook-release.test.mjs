@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {parseAuthWebhookRequest} from '../scripts/auth-webhook-request.mjs';
+import {AUTH_WEBHOOK_CONFIGS} from '../scripts/auth-webhook-control.mjs';
+import {PROD_AUTH_BASE,QA_AUTH_BASE} from '../worker/account-config.mjs';
 
 const commit='a'.repeat(40);
 
