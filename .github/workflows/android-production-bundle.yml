@@ -66,6 +66,21 @@ jobs:
       - name: Verify PR smoke bundle exists
         working-directory: mobile/android
         run: test -s app/build/outputs/bundle/release/app-release.aab
+      - name: Audit PR Android privacy surface
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find app/build/intermediates/merged_manifests/release -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-native-audit.json"
+      - name: Upload PR Android native audit evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-pr-native-audit
+          path: ${{ runner.temp }}/pack-one-android-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
 
   signed-bundle:
     name: build protected Play-signed Android bundle
