@@ -3,6 +3,7 @@ import {accountCapabilities,providerMembership,requireCapability,practiceCapabil
 import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity,linkedPlayerIdentity,rankingIdentityStatus} from './account-identity.mjs';
+import {PUBLIC_IDENTITY_TERMS_VERSION} from './public-identity-safety.mjs';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
 import {verifyDailyGenerationToken} from './daily-generation-auth.mjs';
@@ -82,7 +83,11 @@ async function persistResult(s) {
     WHERE $2::date IS NOT NULL AND $18::boolean
       AND EXISTS (
         SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
-        WHERE a.player_id=$1::uuid AND p.username_owned=true
+        WHERE a.player_id=$1::uuid
+          AND p.username_owned=true
+          AND p.public_identity_terms_version=$19
+          AND p.public_identity_terms_accepted_at IS NOT NULL
+          AND p.public_identity_hidden_at IS NULL
       )
     ON CONFLICT(player_id,challenge_date,set_id,mode) DO NOTHING
   ), result AS (
@@ -96,7 +101,7 @@ async function persistResult(s) {
   ), events AS (INSERT INTO analytics_events(player_id,event_name,event_props)
     SELECT $1::uuid,event_name,$14::jsonb FROM result CROSS JOIN jsonb_array_elements_text($15::jsonb) n(event_name)
   ) UPDATE draft_run_sessions SET result_persisted_at=now() WHERE id=$17::uuid AND player_id=$1::uuid`,
-  [s.player_id,s.day,score,grade,JSON.stringify(s.answers.map(a=>a.selectedId)),JSON.stringify({run:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,scoring_version:s.scoring_version,historical_matches:s.answers.filter(a=>a.historicalMatch).length,run_length:runLength(s),selection_version:s.selection_version}),s.seed,other?s.challenge_id:null,exact?other.display_name:null,exact?other.score:null,outcome,`draft-run:${s.id}`,JSON.stringify(sets),JSON.stringify({mode:'draft_run',set_id:environmentOf(s),daily:Boolean(s.day),score,run_id:s.id,challenge:Boolean(other),outcome}),JSON.stringify(['game_completed',...(environmentOf(s)==='powered-cube'?['cube_completed']:[]),...(s.day?['daily_completed']:[]),...(exact?['challenge_complete']:[])]) ,environmentOf(s),s.id,s.leaderboard_eligible]);
+  [s.player_id,s.day,score,grade,JSON.stringify(s.answers.map(a=>a.selectedId)),JSON.stringify({run:s.id,corpus_version:s.corpus_version,source_components:s.source_components,serving_policy_version:s.serving_policy_version||LEGACY_SERVING_POLICY_VERSION,scoring_version:s.scoring_version,historical_matches:s.answers.filter(a=>a.historicalMatch).length,run_length:runLength(s),selection_version:s.selection_version}),s.seed,other?s.challenge_id:null,exact?other.display_name:null,exact?other.score:null,outcome,`draft-run:${s.id}`,JSON.stringify(sets),JSON.stringify({mode:'draft_run',set_id:environmentOf(s),daily:Boolean(s.day),score,run_id:s.id,challenge:Boolean(other),outcome}),JSON.stringify(['game_completed',...(environmentOf(s)==='powered-cube'?['cube_completed']:[]),...(s.day?['daily_completed']:[]),...(exact?['challenge_complete']:[])]) ,environmentOf(s),s.id,s.leaderboard_eligible,PUBLIC_IDENTITY_TERMS_VERSION]);
 }
 
 async function responseFor(s,timing=null) {
@@ -117,8 +122,12 @@ async function responseFor(s,timing=null) {
       WHERE challenge_date=$1::date AND mode='draft_run' AND set_id=$3
         AND EXISTS (
           SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
-          WHERE a.player_id=scores.player_id AND p.username_owned=true
-        )`,[s.day,s.score,environmentOf(s)]);
+          WHERE a.player_id=scores.player_id
+            AND p.username_owned=true
+            AND p.public_identity_terms_version=$4
+            AND p.public_identity_terms_accepted_at IS NOT NULL
+            AND p.public_identity_hidden_at IS NULL
+        )`,[s.day,s.score,environmentOf(s),PUBLIC_IDENTITY_TERMS_VERSION]);
     const row=r.rows[0],total=Number(row.total);
     standing={rank:Number(row.rank),total,percentile:total>=10?Math.max(1,Math.ceil(Number(row.through_ties)/total*100)):null,final:s.day<gameDateKey()};
   }
@@ -357,7 +366,8 @@ async function leaderboard(request) {
   const season=period==='season'?await resolveCurrentSeason(query,{today,ensureSchedule:ensureDailyScheduleForQuery}):null;
   if(period==='season'&&!season)return json({period:'season',environment,start:null,today,season:null,rows:[]});
   const start=period==='daily'?today:period==='season'?season.start_date:period==='week'?(()=>{const d=new Date(today+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);})():'2000-01-01';
-  const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,limit:100});
+  const blockedByPlayerId=await player(request,false);
+  const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,blockedByPlayerId,limit:100});
   return json({period,environment,start,today,season:period==='season'?season:null,rows});
 }
 async function route(request) {
@@ -426,7 +436,15 @@ async function route(request) {
     if(request.method==='POST'&&['pick','reroll'].includes(match[2])) return change(request,match[1],match[2]);
   }
   const shared=path.match(/^\/v1\/(?:challenges|shared-runs)\/([a-f0-9]+)$/);
-  if(request.method==='GET'&&shared) { const s=await share(shared[1]);const scores=await query(`SELECT p.display_name name,r.score FROM draft_run_sessions r JOIN players p ON p.id=r.player_id WHERE r.score IS NOT NULL AND r.puzzle_ids=$2::jsonb AND (r.id=$3::uuid OR (r.challenge_id=$1 AND r.player_id<>$4::uuid)) ORDER BY r.score DESC,r.created_at LIMIT 100`,[s.id,JSON.stringify(s.puzzle_ids),s.session_id,s.owner_player_id]);return json({id:s.id,name:s.display_name,score:s.score,scores:scores.rows,environment:s.environment,run_length:s.puzzle_ids.length}); }
+  if(request.method==='GET'&&shared) { const s=await share(shared[1]);const scores=await query(`SELECT CASE WHEN p.username_owned
+      AND p.public_identity_terms_version=$5
+      AND p.public_identity_terms_accepted_at IS NOT NULL
+      AND p.public_identity_hidden_at IS NULL
+      THEN p.display_name ELSE 'A friend' END name,r.score
+      FROM draft_run_sessions r JOIN players p ON p.id=r.player_id
+      WHERE r.score IS NOT NULL AND r.puzzle_ids=$2::jsonb
+        AND (r.id=$3::uuid OR (r.challenge_id=$1 AND r.player_id<>$4::uuid))
+      ORDER BY r.score DESC,r.created_at LIMIT 100`,[s.id,JSON.stringify(s.puzzle_ids),s.session_id,s.owner_player_id,PUBLIC_IDENTITY_TERMS_VERSION]);return json({id:s.id,name:s.display_name,score:s.score,scores:scores.rows,environment:s.environment,run_length:s.puzzle_ids.length}); }
   return json({error:'Not found.'},404);
 }
 
