@@ -7,12 +7,29 @@ import { spawnSync } from 'node:child_process';
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const icon = resolve(root, 'assets/images/icon.png');
 const storeReleasePath = resolve(root, 'store-release.json');
+const appConfigPath = resolve(root, 'app.json');
 
 if (!existsSync(storeReleasePath)) {
   throw new Error('Pack One production preflight failed. Missing mobile/store-release.json.');
 }
 
 const storeRelease = JSON.parse(readFileSync(storeReleasePath, 'utf8'));
+const appJson = JSON.parse(readFileSync(appConfigPath, 'utf8'));
+const secureStorePlugin = appJson.expo?.plugins?.find(
+  (plugin) => Array.isArray(plugin) && plugin[0] === 'expo-secure-store',
+);
+if (!secureStorePlugin || secureStorePlugin[1]?.faceIDPermission !== false) {
+  throw new Error('Pack One production preflight failed. SecureStore must not declare unused Face ID permission.');
+}
+const blockedPermissions = new Set(appJson.expo?.android?.blockedPermissions || []);
+for (const permission of [
+  'android.permission.READ_EXTERNAL_STORAGE',
+  'android.permission.WRITE_EXTERNAL_STORAGE',
+]) {
+  if (!blockedPermissions.has(permission)) {
+    throw new Error(`Pack One production preflight failed. Missing blocked Android permission: ${permission}`);
+  }
+}
 for (const [name, value] of Object.entries({
   appStoreVersion: storeRelease.appStoreVersion,
   playVersionName: storeRelease.playVersionName,
@@ -113,6 +130,14 @@ if (config.android?.package !== 'pro.packone.app') {
 }
 if (config.extra?.eas?.projectId) {
   throw new Error('Production config must not require an Expo/EAS project ID.');
+}
+for (const permission of [
+  'android.permission.READ_EXTERNAL_STORAGE',
+  'android.permission.WRITE_EXTERNAL_STORAGE',
+]) {
+  if (!(config.android?.blockedPermissions || []).includes(permission)) {
+    throw new Error(`Production Expo config must block ${permission}.`);
+  }
 }
 
 console.log('Pack One local/native production preflight passed.');
