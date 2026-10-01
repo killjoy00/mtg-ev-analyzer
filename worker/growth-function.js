@@ -1,6 +1,7 @@
 import {createHmac} from 'node:crypto';
 import {releaseMetadata} from './release.mjs';
 import {guardIngress} from './ingress-auth.mjs';
+import {classifyRejectedOrigin} from './origin-telemetry.mjs';
 import {consumePlayerLimit} from './request-limits.mjs';
 import {readJson} from './request-json.mjs';
 import {gameDateKey} from '../game-date.mjs';
@@ -648,7 +649,17 @@ async function historyPage(playerId, cursor, limit = 25) {
 }
 
 async function handleBrowserPlayerSession(request,{existingOnly=false}={}) {
-  requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  try {
+    requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  } catch(error) {
+    if(error?.status===403)console.log(JSON.stringify({
+      event:'player_session_origin_rejected',
+      ...classifyRejectedOrigin(request.headers.get('origin')),
+      route_class:existingOnly?'player_session_refresh':'player_session',
+      release_commit:releaseMetadata().release_commit,
+    }));
+    throw error;
+  }
   const current=await player(request,false);
   if(current) {
     const meta=await profileMetaByPlayer(current);
