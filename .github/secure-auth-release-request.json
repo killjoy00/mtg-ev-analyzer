@@ -1,1 +1,1 @@
-{"operation":"deploy-secure-auth","reason":"Deploy merged PR #807: complete native first-claim leaderboard-name prompt and native account relink continuation while preserving the reviewed account verification/signup behavior from #801."}
+{"operation":"deploy-secure-auth","reason":"Deploy merged PR #820: advance launch coverage before it goes stale (#802), typed player-session 401 logging with once-per-page guest analytics recovery (#803), bounded rejected-origin telemetry (#804). No Auth host, schema or policy change."}
