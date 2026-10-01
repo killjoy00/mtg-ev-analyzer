@@ -6,10 +6,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import type { CareerHistoryRow, CareerProfile } from '@/src/api/career';
 import { ApiError } from '@/src/api/client';
 import { DAILY_ENVIRONMENT_META, isDailyEnvironment } from '@/src/api/draftRun';
-import { InvalidPublicProfileError, loadPublicProfile, loadPublicProfileHistory, publicProfileUrl } from '@/src/api/publicProfile';
+import { blockPublicProfile, InvalidPublicProfileError, loadPublicProfile, loadPublicProfileHistory, publicProfileUrl, reportPublicProfile } from '@/src/api/publicProfile';
 import { ProfileOverview } from '@/src/components/ProfileOverview';
 import { useAppResume } from '@/src/hooks/useAppResume';
+import { readSession, type MobileSession } from '@/src/storage/session';
 import { colors, spacing } from '@/src/theme';
+
+type ReportReason = 'offensive_name' | 'harassment' | 'impersonation' | 'spam' | 'other';
+const reportReasons: {id:ReportReason;label:string}[]=[
+  {id:'offensive_name',label:'Offensive name'},
+  {id:'harassment',label:'Harassment'},
+  {id:'impersonation',label:'Impersonation'},
+  {id:'spam',label:'Spam'},
+  {id:'other',label:'Other'},
+];
 
 type State = {
   phase: 'loading' | 'ready' | 'error';
@@ -81,6 +91,10 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
   const shareId = useRef(0);
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
+  const [viewerSession,setViewerSession]=useState<MobileSession|null>(null);
+  const [reportReason,setReportReason]=useState<ReportReason>('offensive_name');
+  const [safetyBusy,setSafetyBusy]=useState(false);
+  const [safetyMessage,setSafetyMessage]=useState<string|null>(null);
   const commit = useCallback((next: State) => { stateRef.current = next; setState(next); }, []);
 
   const deny = useCallback((error: unknown) => {
@@ -135,7 +149,10 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
     setShareError(null);
     commit({ ...(stateRef.current.profile ? stateRef.current : initial), refreshing: true, loadingMore: false, error: null, pageError: null });
     try {
-      const profile = await loadPublicProfile(profileKey);
+      const currentSession=await readSession().catch(()=>null);
+      if (generation !== requestId.current) return;
+      setViewerSession(currentSession);
+      const profile = await loadPublicProfile(profileKey,currentSession);
       if (generation !== requestId.current) return;
       commit({ ...initial, phase: 'ready', profile, rows: profile.recent, refreshing: true });
       await history(null, generation);
@@ -159,6 +176,32 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
   }, [load]));
   useAppResume(load);
 
+  const report = async () => {
+    if(safetyBusy)return;
+    if(!viewerSession?.accountToken) { setSafetyMessage('Sign in to report a public profile.'); return; }
+    setSafetyBusy(true);setSafetyMessage(null);
+    try {
+      await reportPublicProfile(profileKey,viewerSession,reportReason);
+      setSafetyMessage('Report sent to Pack One.');
+    } catch(error:unknown) {
+      setSafetyMessage(error instanceof Error?error.message:'Could not send this report.');
+    } finally { setSafetyBusy(false); }
+  };
+
+  const block = async () => {
+    if(safetyBusy)return;
+    if(!viewerSession?.accountToken) { setSafetyMessage('Sign in to block a public profile.'); return; }
+    setSafetyBusy(true);setSafetyMessage(null);
+    try {
+      await blockPublicProfile(profileKey,viewerSession);
+      setSafetyMessage('Profile blocked.');
+      router.back();
+    } catch(error:unknown) {
+      setSafetyMessage(error instanceof Error?error.message:'Could not block this profile.');
+      setSafetyBusy(false);
+    }
+  };
+
   const share = async () => {
     if (stateRef.current.phase !== 'ready' || stateRef.current.refreshing || sharing) return;
     const generation = requestId.current;
@@ -169,7 +212,7 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
     try {
       // Recheck the subject's public opt-in before handing a cached record to
       // the share sheet. The URL carries only the public profile key.
-      const profile = await loadPublicProfile(profileKey);
+      const profile = await loadPublicProfile(profileKey,viewerSession);
       if (!current()) return;
       commit({ ...stateRef.current, profile });
       await Share.share({ message: `${profile.player.display_name}'s Pack One profile\n${publicProfileUrl(profileKey)}` });
@@ -213,6 +256,27 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
       </View>
       <Text selectable accessibilityLabel="Public profile link" style={styles.meta}>{publicProfileUrl(profileKey)}</Text>
       {shareError ? <Text accessibilityRole="alert" style={styles.error}>{shareError}</Text> : null}
+      <View style={styles.safetyPanel}>
+        <Text style={styles.heading}>Profile safety</Text>
+        <Text style={styles.body}>Report a public identity that violates the Pack One rules, or block it from your account.</Text>
+        <View style={styles.reasonRow}>
+          {reportReasons.map((reason)=><Pressable key={reason.id} accessibilityRole="button"
+            accessibilityState={{selected:reportReason===reason.id}}
+            disabled={safetyBusy} onPress={()=>setReportReason(reason.id)}
+            style={[styles.reasonChip,reportReason===reason.id&&styles.reasonChipSelected]}>
+            <Text style={[styles.reasonText,reportReason===reason.id&&styles.reasonTextSelected]}>{reason.label}</Text>
+          </Pressable>)}
+        </View>
+        <View style={styles.actions}>
+          <Pressable accessibilityRole="button" disabled={safetyBusy} onPress={()=>void report()} style={styles.button}>
+            <Text style={styles.buttonText}>{safetyBusy?'Working...':'Report profile'}</Text>
+          </Pressable>
+          <Pressable accessibilityRole="button" disabled={safetyBusy} onPress={()=>void block()} style={styles.button}>
+            <Text style={styles.buttonText}>Block profile</Text>
+          </Pressable>
+        </View>
+        {safetyMessage?<Text accessibilityRole="alert" style={styles.meta}>{safetyMessage}</Text>:null}
+      </View>
       <Text style={styles.heading}>Recent Games</Text>
     </View>
   );
@@ -273,6 +337,12 @@ const styles = StyleSheet.create({
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   panel: { backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: colors.line },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  safetyPanel: { backgroundColor: colors.surface, padding: spacing.lg, gap: spacing.md, borderWidth: 1, borderColor: colors.line },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+  reasonChip: { minHeight: 36, borderWidth: 1, borderColor: colors.line, paddingHorizontal: spacing.sm, alignItems: 'center', justifyContent: 'center' },
+  reasonChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
+  reasonText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  reasonTextSelected: { color: colors.accentDark },
   button: { minHeight: 48, borderWidth: 1, borderColor: colors.accent, padding: spacing.md, alignItems: 'center', justifyContent: 'center' },
   buttonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800' },
   error: { color: colors.danger, fontSize: 14, lineHeight: 21 },

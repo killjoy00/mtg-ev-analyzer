@@ -119,6 +119,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 
@@ -185,6 +186,7 @@ jobs:
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0044_snapshot_scoped_puzzle_uniqueness.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
           psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0045_apple_subscriptions.sql
+          psql "$connection" -v ON_ERROR_STOP=1 -f migrations/0046_public_identity_safety.sql
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           DATABASE_URL="$connection" node scripts/warm-practice-cache.mjs
 

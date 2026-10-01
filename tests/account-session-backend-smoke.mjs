@@ -127,7 +127,7 @@ assert.equal(Number((await query('SELECT count(*) n FROM account_sessions WHERE 
 await json(await growth.fetch(new Request('https://packone.pro/v1/profile',{
   method:'PATCH',
   headers:{origin,'content-type':'application/json',authorization:'Bearer '+player,cookie:cookieHeader(rotated,rotatedCsrf,player),'x-pack1-csrf':rotatedCsrf},
-  body:JSON.stringify({displayName:'QA Secure Same Session'}),
+  body:JSON.stringify({displayName:'QA Secure Same Session',acceptPublicIdentityTerms:true}),
 })));
 
 const profileDenied=await growth.fetch(new Request('https://packone.pro/v1/profile',{
