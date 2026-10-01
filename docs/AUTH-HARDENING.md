@@ -155,13 +155,13 @@ The password-reset evidence below deliberately does **not** read the password ha
 
 Run these checks **before** disabling `ep-hidden-bonus-ayfmcpys`. Replace the timestamp literal with the recorded `QA_START_UTC`.
 
-On the serving branch `br-orange-feather-ayps8kep`, expect at least one newly verified credential user with a new Neon Auth session:
+On the serving branch `br-orange-feather-ayps8kep`, expect at least one newly verified credential user with a new Pack One account session:
 
 ```sql
 WITH params(qa_start) AS (
   VALUES (TIMESTAMPTZ '2026-10-01T00:00:00Z')
 )
-SELECT count(*) AS new_verified_credential_users_with_session
+SELECT count(*) AS new_verified_credential_users_with_pack1_session
 FROM neon_auth."user" u
 CROSS JOIN params p
 WHERE u."createdAt" >= p.qa_start
@@ -174,13 +174,15 @@ WHERE u."createdAt" >= p.qa_start
   )
   AND EXISTS (
     SELECT 1
-    FROM neon_auth.session s
-    WHERE s."userId" = u.id
-      AND s."createdAt" >= p.qa_start
+    FROM public.account_sessions s
+    WHERE s.auth_user_id = u.id
+      AND s.created_at >= p.qa_start
   );
 ```
 
-For the password-reset acceptance, the dedicated account should have a credential-account row that predates `QA_START_UTC` and was updated afterward. Expect at least one:
+This checks `public.account_sessions`, not `neon_auth.session`: after Pack One issues its own session it deletes the Neon session it signed in with (`consumeNeonSession` in `worker/account-session.mjs`), so a Neon session row does not prove a Pack One sign-in. A new `account_sessions` row for the new user is exactly the step that failed with `23503` during the incident.
+
+For the password-reset acceptance, the dedicated account should have a credential-account row that predates `QA_START_UTC` and was updated afterward. This counts any credential account updated in the window, not only the dedicated one; at current volume that is sufficient, and the owner may add `AND a."userId" = '<dedicated account user id>'` from their own records (never commit that id). Expect at least one:
 
 ```sql
 WITH params(qa_start) AS (
@@ -205,7 +207,7 @@ SELECT
   (SELECT count(*) FROM neon_auth.session s, params p WHERE s."createdAt" >= p.qa_start) AS new_sessions;
 ```
 
-Do not use `public.account_sessions` for this incident check. Pack One does not write that table, so it cannot prove which Neon Auth branch handled the acceptance flows.
+Pack One writes `public.account_sessions` only on the serving branch. It never writes to `br-dark-sound-ayxhwq1u`, so that table cannot show which branch Neon Auth used there; the stale-branch check must use the `neon_auth` tables above.
 
 Once both owner-run flows are complete, confirm the `pack1growth` logs contain no new PostgreSQL `23503` errors.
 

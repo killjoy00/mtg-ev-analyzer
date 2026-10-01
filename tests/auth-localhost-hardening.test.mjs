@@ -208,3 +208,20 @@ test('deleteAuthUser does not retry provider timeouts near the job budget',async
   assert.equal(attempts,1);
   assert.deepEqual(sleeps,[]);
 });
+
+test('production hardening runs on main only for a reviewed request change, never for code-only merges',()=>{
+  const workflow=fs.readFileSync(new URL('../.github/workflows/auth-localhost-hardening.yml',import.meta.url),'utf8');
+  const pushBlock=workflow.slice(workflow.indexOf('  push:\n'),workflow.indexOf('  pull_request:\n'));
+  const prBlock=workflow.slice(workflow.indexOf('  pull_request:\n'),workflow.indexOf('  workflow_dispatch:'));
+  const listed=block=>[...block.matchAll(/^\s+- '([^']+)'$/gm)].map(match=>match[1]);
+  assert.deepEqual(listed(pushBlock),['.github/auth-localhost-hardening-request.json']);
+  assert.deepEqual(listed(prBlock),[
+    '.github/auth-localhost-hardening-request.json',
+    '.github/workflows/auth-localhost-hardening.yml',
+    'scripts/auth-localhost-hardening.mjs',
+    'tests/auth-localhost-hardening.test.mjs',
+  ]);
+  assert.match(workflow,/production:\n    if: github\.ref == 'refs\/heads\/main' && github\.event_name != 'pull_request'\n/);
+  const qaGate="if: github.event_name == 'pull_request' && (github.event.action != 'edited' || github.event.changes.body != null)";
+  assert.equal(workflow.split(qaGate).length-1,2,'both QA jobs skip title-only edits');
+});
