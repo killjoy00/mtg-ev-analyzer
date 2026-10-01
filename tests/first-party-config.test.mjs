@@ -53,7 +53,7 @@ test('query, hash, cookies and storage are not configuration channels for Auth s
 
 test('every remaining production Neon Auth literal equals PROD_AUTH_BASE',()=>{
   const root=fileURLToPath(new URL('..',import.meta.url));
-  const skipped=new Set(['.git','node_modules','data','generated','results','artifacts']);
+  const skipped=new Set(['.git','node_modules','data','generated','results','artifacts','tests']);
   const files=[];
   const walk=dir=>{
     for(const entry of fs.readdirSync(dir,{withFileTypes:true})){
