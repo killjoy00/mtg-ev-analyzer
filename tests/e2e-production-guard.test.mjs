@@ -19,15 +19,12 @@ test('every API host the site config can select is blocked for browser e2e tests
     assert.doesNotMatch(host,PRODUCTION_API_HOST,`${host} stays reachable`);
 });
 
-test('the e2e job preloads the guard for every browser test step and clears it afterwards',()=>{
+test('every browser test step in the e2e job preloads the guard',()=>{
   const workflow=read('.github/workflows/e2e.yml');
-  const enable=workflow.indexOf('echo "NODE_OPTIONS=--import $GITHUB_WORKSPACE/tests/e2e-production-guard.mjs" >> "$GITHUB_ENV"');
-  const disable=workflow.indexOf('echo "NODE_OPTIONS=" >> "$GITHUB_ENV"');
-  const browserSteps=[...workflow.matchAll(/run: node tests\/[\w-]+-?e2e\.mjs/g)].map(match=>match.index);
-  assert.ok(enable>0&&disable>enable,'guard is enabled, then cleared');
-  assert.ok(browserSteps.length>=15);
-  assert.ok(browserSteps.every(index=>index>enable&&index<disable),'every browser test runs with the guard');
-  assert.match(workflow.slice(workflow.lastIndexOf('- name:',disable),disable),/if: always\(\)/,'the guard is cleared even after a failed test');
-  assert.ok(disable<workflow.indexOf('uses: actions/upload-artifact'),'actions run without the preload');
+  const runs=[...workflow.matchAll(/^\s+run: (.*\bnode\b.*tests\/.*\.mjs.*)$/gm)].map(match=>match[1]);
+  assert.ok(runs.length>=20);
+  for(const run of runs)assert.match(run,/(^|\s)node --import \.\/tests\/e2e-production-guard\.mjs tests\/[\w-]+\.mjs$/,run);
+  // GitHub rejects NODE_OPTIONS written to GITHUB_ENV, which silently left the guard off.
+  assert.doesNotMatch(workflow,/NODE_OPTIONS=.*GITHUB_ENV/);
   assert.match(read('tests/e2e-production-guard.mjs'),/from '\.\/e2e-production-hosts\.mjs'/);
 });

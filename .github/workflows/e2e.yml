@@ -88,88 +88,83 @@ jobs:
       - name: Hydrate replay shards from R2 for local browser tests
         if: steps.scope.outputs.run_full == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository)
         run: bash scripts/r2_replay_shards.sh hydrate
-      - name: Block the production API in browser tests
-        if: steps.scope.outputs.run_full == 'true'
-        # Every later `node` step preloads the guard; see tests/e2e-production-guard.mjs (#803).
-        run: echo "NODE_OPTIONS=--import $GITHUB_WORKSPACE/tests/e2e-production-guard.mjs" >> "$GITHUB_ENV"
       - name: Start static site
         if: steps.scope.outputs.run_full == 'true'
         run: |
           nohup python -m http.server 4173 >/tmp/pack1-http.log 2>&1 &
           echo $! > /tmp/pack1-http.pid
           curl --fail --silent --show-error --retry 20 --retry-connrefused --retry-delay 1 http://127.0.0.1:4173/ -o /dev/null
+      # Every browser test preloads tests/e2e-production-guard.mjs so it cannot reach the
+      # production API (#803). GitHub refuses NODE_OPTIONS from GITHUB_ENV, hence the flag.
       - name: Run browser regression
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/e2e.mjs
       - name: Run set archive regression
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/sets-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/sets-e2e.mjs
       - name: Run Daily / Set Practice regression
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/practice-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/practice-e2e.mjs
       - name: Run dedicated Practice hub regression
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/practice-hub-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/practice-hub-e2e.mjs
       - name: Run account practice and custom corpus regression
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/practice-access-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/practice-access-e2e.mjs
       - name: Run Player Profile / Progression regression
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/profile-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/profile-e2e.mjs
       - name: Run Today refresh and Pacific rollover regression
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/home-today-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/home-today-e2e.mjs
       - name: Run homepage auth hydration regression
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/home-auth-hydration-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/home-auth-hydration-e2e.mjs
       - name: Run eight-decision Draft Run regression
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/draft-run-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
       - name: Run Powered Cube eight-decision regression
         if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_ENVIRONMENT=powered-cube node tests/draft-run-e2e.mjs
+        run: PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
       - name: Run fixed Daily sharing regression
         if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_DAILY=1 node tests/draft-run-e2e.mjs
+        run: PACK1_TEST_DAILY=1 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
       - name: Run fixed Cube Daily sharing regression
         if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_DAILY=1 PACK1_TEST_ENVIRONMENT=powered-cube node tests/draft-run-e2e.mjs
+        run: PACK1_TEST_DAILY=1 PACK1_TEST_ENVIRONMENT=powered-cube node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
       - name: Run historical ten-decision compatibility regression
         if: steps.scope.outputs.run_full == 'true'
-        run: PACK1_TEST_SELECTION_VERSION=first-pack-v2 node tests/draft-run-e2e.mjs
+        run: PACK1_TEST_SELECTION_VERSION=first-pack-v2 node --import ./tests/e2e-production-guard.mjs tests/draft-run-e2e.mjs
       - name: Run account browser contract
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/account-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/account-e2e.mjs
       - name: Run auth simplification and Daily return contract
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/auth-context-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/auth-context-e2e.mjs
       - name: Run email verification Chromium/WebKit mobile contract
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/email-verification-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/email-verification-e2e.mjs
       - name: Run Patreon activation mobile contract
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/patreon-activation-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/patreon-activation-e2e.mjs
       - name: Run password recovery Chromium/WebKit mobile contract
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/password-recovery-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/password-recovery-e2e.mjs
       - name: Run credential management Chromium/WebKit mobile contract
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/credential-management-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/credential-management-e2e.mjs
       - name: Run account deletion Chromium/WebKit mobile contract
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/account-deletion-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/account-deletion-e2e.mjs
       - name: Verify display-ad membership suppression with intercepted requests
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/ads-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/ads-e2e.mjs
       - name: Run admin reporting browser contract
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/admin-e2e.mjs
+        run: node --import ./tests/e2e-production-guard.mjs tests/admin-e2e.mjs
       - name: Run corpus readiness browser contract
         if: steps.scope.outputs.run_full == 'true'
-        run: node tests/corpus-readiness-e2e.mjs
-      - name: Stop preloading the production API guard
-        if: always() && steps.scope.outputs.run_full == 'true'
-        run: echo "NODE_OPTIONS=" >> "$GITHUB_ENV"
+        run: node --import ./tests/e2e-production-guard.mjs tests/corpus-readiness-e2e.mjs
       - name: Upload UI screenshots
         if: always() && steps.scope.outputs.run_full == 'true'
         uses: actions/upload-artifact@v4

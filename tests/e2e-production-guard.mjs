@@ -1,4 +1,4 @@
-// Preloaded with `node --import` by the e2e browser job (.github/workflows/e2e.yml).
+// Preloaded with `node --import` by every e2e browser step (.github/workflows/e2e.yml).
 // On any host but packone.pro, leaderboard-config.js points the app straight at the
 // production Neon Functions, so every request a test did not stub reached production:
 // fixture tokens produced a steady stream of 401s on /v1/events and unstubbed guest
@@ -27,3 +27,4 @@ for(const type of [chromium,firefox,webkit]) {
     return browser;
   };
 }
+process.stderr.write('[e2e-production-guard] production API blocked for this run\n');
