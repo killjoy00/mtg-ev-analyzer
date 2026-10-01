@@ -91,19 +91,43 @@ async function main() {
     // Prepare the page/account first, then verify database idle through the
     // control plane without touching the data plane before the timed click.
     const cold=async configuration=>{
-    const click=await ready(configuration),deadline=Date.now()+9*60000;
+    const click=await ready(configuration);
+    // Make the cold-start claim deterministic. Autosuspend is still configured
+    // on the disposable compute, but CI should not spend nine minutes waiting
+    // for the control plane's inactivity sweep. Explicit suspension is a
+    // control-plane operation and does not touch the preview data plane.
+    const endpointResponse=await fetch('https://console.neon.tech/api/v2/projects/patient-shadow-91417882/branches/'+fixture.branch+'/endpoints',{
+      headers:{authorization:'Bearer '+process.env.NEON_API_KEY,accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(30000),
+    });
+    assert.equal(endpointResponse.status,200);
+    const endpoints=(await endpointResponse.json()).endpoints.filter(e=>e.branch_id===fixture.branch&&e.type==='read_write');
+    assert.equal(endpoints.length,1);
+    const endpoint=endpoints[0],apiBeforeSuspend=apiCalls;
+    let suspendResponse;
+    for(let attempt=0;attempt<3;attempt++) {
+      suspendResponse=await fetch('https://console.neon.tech/api/v2/projects/patient-shadow-91417882/endpoints/'+endpoint.id+'/suspend',{
+        method:'POST',headers:{authorization:'Bearer '+process.env.NEON_API_KEY,accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(30000),
+      });
+      if(suspendResponse.status===200)break;
+      if(![423,503].includes(suspendResponse.status))break;
+      await new Promise(resolve=>setTimeout(resolve,2000));
+    }
+    assert.equal(suspendResponse.status,200,'Could not suspend isolated compute for deterministic cold-start acceptance.');
+    const deadline=Date.now()+2*60000;
     let idle;
     while(Date.now()<deadline) {
       const r=await fetch('https://console.neon.tech/api/v2/projects/patient-shadow-91417882/branches/'+fixture.branch+'/endpoints',{
-        headers:{authorization:'Bearer '+process.env.NEON_API_KEY},redirect:'error',signal:AbortSignal.timeout(30000),
+        headers:{authorization:'Bearer '+process.env.NEON_API_KEY,accept:'application/json'},redirect:'error',signal:AbortSignal.timeout(30000),
       });
       assert.equal(r.status,200);
-      const endpoints=(await r.json()).endpoints.filter(e=>e.branch_id===fixture.branch&&e.type==='read_write');
-      assert.equal(endpoints.length,1);
-      if(endpoints[0].current_state==='idle'){idle={state:'idle',checked_at:new Date().toISOString()};break;}
-      await new Promise(resolve=>setTimeout(resolve,15000));
+      const current=(await r.json()).endpoints.filter(e=>e.branch_id===fixture.branch&&e.type==='read_write');
+      assert.equal(current.length,1);
+      if(current[0].current_state==='idle'){idle={state:'idle',endpoint_id:endpoint.id,checked_at:new Date().toISOString(),forced:true};break;}
+      await new Promise(resolve=>setTimeout(resolve,2000));
     }
-    assert.ok(idle,'Isolated compute did not become idle; no cold claim is permitted.');
+    assert.ok(idle,'Isolated compute did not suspend; no cold claim is permitted.');
+    await new Promise(resolve=>setTimeout(resolve,1000));
+    assert.equal(apiCalls,apiBeforeSuspend,'Practice page made a preview API request after forced suspension; no cold claim is permitted.');
     await sample(configuration,click,'confirmed_idle',idle);
     };
     if(process.env.PACK1_BROWSER_SMOKE!=='1')await cold({name:'mixed'});

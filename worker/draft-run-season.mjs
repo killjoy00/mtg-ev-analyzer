@@ -39,30 +39,41 @@ export async function resolveCurrentSeason(query,{today=gameDateKey(),ensureSche
   return reconcilePersistedSeasons(query);
 }
 
-export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,limit=100}={}) {
+export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,blockedByPlayerId=null,limit=100}={}) {
   const result=await query(`WITH results AS (
       SELECT player_id,round(avg(score),1) score,count(*) days
       FROM scores
       WHERE mode='draft_run' AND set_id=$3
         AND EXISTS (
           SELECT 1 FROM account_links a JOIN players owned ON owned.id=a.player_id
-          WHERE a.player_id=scores.player_id AND owned.username_owned=true
+          WHERE a.player_id=scores.player_id
+            AND owned.username_owned=true
+            AND owned.public_identity_hidden_at IS NULL
         )
+        AND ($6::uuid IS NULL OR NOT EXISTS (
+          SELECT 1 FROM public_identity_blocks b WHERE b.blocker_player_id=$6::uuid AND b.target_player_id=scores.player_id
+        ))
         AND challenge_date BETWEEN $1::date AND $2::date
       GROUP BY player_id
     ), ranked AS (
       SELECT rank() OVER(ORDER BY r.score DESC) rank,r.player_id,r.score,r.days,p.display_name,p.showcase_achievement,
-        CASE WHEN p.profile_public AND p.username_owned AND
-          (SELECT count(*) FROM players x WHERE x.profile_public AND x.username_owned AND lower(x.display_name)=lower(p.display_name))=1
+        CASE WHEN p.profile_public AND p.username_owned
+          AND p.public_identity_hidden_at IS NULL
+          AND (SELECT count(*) FROM players x
+            WHERE x.profile_public AND x.username_owned
+              AND x.public_identity_hidden_at IS NULL
+              AND lower(x.display_name)=lower(p.display_name))=1
           THEN p.profile_key END profile_key
       FROM results r
-      JOIN players p ON p.id=r.player_id AND p.username_owned=true
+      JOIN players p ON p.id=r.player_id
+        AND p.username_owned=true
+        AND p.public_identity_hidden_at IS NULL
     )
     SELECT rank,player_id::text,score,days,display_name,showcase_achievement,profile_key
     FROM ranked
     WHERE ($4::uuid IS NULL OR player_id=$4::uuid)
     ORDER BY score DESC,days DESC,display_name
-    LIMIT $5::int`,[start,end,environment,playerId,limit]);
+    LIMIT $5::int`,[start,end,environment,playerId,limit,blockedByPlayerId]);
   return result.rows.map(row=>({
     ...row,
     rank:num(row.rank),

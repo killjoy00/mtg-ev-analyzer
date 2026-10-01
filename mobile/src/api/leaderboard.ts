@@ -1,5 +1,6 @@
 import { requestJson } from '@/src/api/client';
 import type { DailyEnvironment } from '@/src/api/draftRun';
+import { readSession } from '@/src/storage/session';
 
 export type LeaderboardPeriod = 'daily' | 'week' | 'season' | 'all';
 
@@ -26,12 +27,14 @@ export type DraftRunLeaderboard = {
   } | null;
 };
 
-export function loadDraftRunLeaderboard(
+export async function loadDraftRunLeaderboard(
   period: LeaderboardPeriod,
   environment: DailyEnvironment,
 ) {
   const query = new URLSearchParams({ period, environment });
+  const session=await readSession().catch(()=>null);
   return requestJson<DraftRunLeaderboard>(`/draft/v1/leaderboard?${query.toString()}`, {
     timeoutMs: 15_000,
+    mobileSessionToken: session?.playerToken ?? null,
   });
 }

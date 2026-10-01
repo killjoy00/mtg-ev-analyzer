@@ -1,5 +1,6 @@
 import {accountSession} from './account-session.mjs';
 import {isPlaceholderUsername} from './username.mjs';
+import {publicIdentityEligibility} from './public-identity-safety.mjs';
 
 // Player bearer tokens identify a device/session. Account capabilities require
 // a currently valid first-party account session and the authoritative link.
@@ -18,16 +19,15 @@ export async function accountIdentity(request, query, owner) {
 // username before it can participate in ranked/public identity surfaces.
 export async function rankingIdentityStatus(query, owner) {
   const result=await query(
-    'SELECT a.auth_user_id,a.player_id,p.display_name,p.username_owned FROM players p LEFT JOIN account_links a ON a.player_id=p.id WHERE p.id=$1::uuid LIMIT 1',
+    'SELECT a.auth_user_id,a.player_id,p.display_name,p.username_owned,p.public_identity_terms_version,p.public_identity_terms_accepted_at,p.public_identity_hidden_at FROM players p LEFT JOIN account_links a ON a.player_id=p.id WHERE p.id=$1::uuid LIMIT 1',
     [owner],
   );
   const row=result.rows[0];
   if(!row?.auth_user_id)return {eligible:false,reason:'guest',display_name:null};
-  const owned=row.username_owned===true||row.username_owned==='t'||row.username_owned==='true'||row.username_owned===1||row.username_owned==='1';
-  if(owned)return {eligible:true,reason:null,auth_user_id:row.auth_user_id,player_id:row.player_id,display_name:row.display_name};
+  const eligibility=publicIdentityEligibility({...row,is_placeholder:isPlaceholderUsername(row.display_name)});
   return {
-    eligible:false,
-    reason:isPlaceholderUsername(row.display_name)?'username_required':'username_taken',
+    eligible:eligibility.eligible,
+    reason:eligibility.reason,
     auth_user_id:row.auth_user_id,
     player_id:row.player_id,
     display_name:row.display_name,

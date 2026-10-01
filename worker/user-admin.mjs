@@ -39,16 +39,75 @@ function normalizeUser(row) {
   };
 }
 
-export async function handleUserAdmin(request,query,url=new URL(request.url)) {
+export async function handleUserAdmin(request,query,url=new URL(request.url),{readJson=null,adminAuthUserId=null}={}) {
+  const moderation=url.pathname.match(/^\/v1\/admin\/users\/([a-f0-9-]+)\/public-identity$/i);
+  if(moderation&&request.method==='POST') {
+    if(!UUID.test(moderation[1])||!readJson||!adminAuthUserId)fail('Invalid moderation request.',400);
+    const body=await readJson(request);
+    const action=String(body.action||'').trim();
+    const reason=String(body.reason||'').trim();
+    if(!['hide','restore'].includes(action))fail('Choose hide or restore.',400);
+    if(reason.length<1||reason.length>500)fail('Moderation reason must be 1-500 characters.',400);
+    const target=await query('SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid LIMIT 1',[moderation[1]]);
+    const playerId=target.rows[0]?.player_id;
+    if(!playerId)fail('User has no linked public identity.',404);
+    if(action==='hide') {
+      await query(
+        `WITH snapshot AS MATERIALIZED (
+           SELECT id,username_owned,profile_public FROM players WHERE id=$1::uuid FOR UPDATE
+         ), share_ids AS MATERIALIZED (
+           SELECT sh.id FROM draft_run_shares sh JOIN draft_run_sessions s ON s.id=sh.session_id
+           WHERE s.player_id=$1::uuid
+         ), hidden AS (
+           UPDATE players p SET username_owned=false,profile_public=false,public_identity_hidden_at=now(),
+             public_identity_hidden_reason=$2,updated_at=now()
+           FROM snapshot s WHERE p.id=s.id RETURNING p.id
+         ), scrub_shares AS (
+           UPDATE draft_run_shares SET display_name='A friend'
+           WHERE id IN (SELECT id FROM share_ids) RETURNING id
+         ), scrub_results AS (
+           UPDATE game_results SET opponent_name='A friend'
+           WHERE challenge_id IN (SELECT id FROM share_ids) RETURNING id
+         ), reports AS (
+           UPDATE public_identity_reports SET status='resolved',resolved_at=now(),resolved_by=$3::uuid,updated_at=now()
+           WHERE target_player_id=$1::uuid AND status='open' RETURNING id
+         )
+         INSERT INTO public_identity_moderation_actions(
+           target_player_id,admin_auth_user_id,action,reason,previous_username_owned,previous_profile_public
+         )
+         SELECT s.id,$3::uuid,'hide',$2,s.username_owned,s.profile_public FROM snapshot s`,
+        [playerId,reason,adminAuthUserId],
+      );
+    } else {
+      await query(
+        `WITH snapshot AS MATERIALIZED (
+           SELECT id,username_owned,profile_public FROM players WHERE id=$1::uuid FOR UPDATE
+         ), restored AS (
+           UPDATE players p SET public_identity_hidden_at=NULL,public_identity_hidden_reason=NULL,
+             username_owned=false,profile_public=false,updated_at=now()
+           FROM snapshot s WHERE p.id=s.id RETURNING p.id
+         )
+         INSERT INTO public_identity_moderation_actions(
+           target_player_id,admin_auth_user_id,action,reason,previous_username_owned,previous_profile_public
+         )
+         SELECT s.id,$2::uuid,'restore',$3,s.username_owned,s.profile_public FROM snapshot s`,
+        [playerId,adminAuthUserId,reason],
+      );
+    }
+    return {ok:true,action,player_id:playerId};
+  }
   if(request.method!=='GET')fail('Method not allowed.',405);
   const detail=url.pathname.match(/^\/v1\/admin\/users\/([a-f0-9-]+)$/i);
   if(detail) {
     if(!UUID.test(detail[1]))fail('Invalid user.',400);
     const id=detail[1];
-    const [account,stats,entitlements,providers,runs,events,authActivity]=await Promise.all([
+    const [account,stats,entitlements,providers,runs,events,authActivity,identityReports,moderationActions]=await Promise.all([
       query(`SELECT u.id,u.name,u.email,u."emailVerified" email_verified,u."createdAt" created_at,u."updatedAt" updated_at,
           u.banned,u."banReason" ban_reason,u."banExpires" ban_expires,
           a.claimed_at,p.display_name profile_name,p.profile_public,p.username_owned,
+          p.public_identity_terms_version,p.public_identity_terms_accepted_at,
+          p.public_identity_hidden_at,p.public_identity_hidden_reason,
+          (SELECT count(*)::int FROM public_identity_reports pir WHERE pir.target_player_id=p.id AND pir.status='open') open_identity_reports,
           EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id) is_admin
         FROM neon_auth."user" u
         LEFT JOIN account_links a ON a.auth_user_id=u.id
@@ -84,6 +143,14 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
         WHERE player_id=(SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid)
         ORDER BY created_at DESC LIMIT 25`,[id]),
       query(`SELECT max("updatedAt") last_auth FROM neon_auth.session WHERE "userId"=$1::uuid`,[id]),
+      query(`SELECT id::text,reason,details,status,created_at,updated_at,resolved_at
+        FROM public_identity_reports
+        WHERE target_player_id=(SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid)
+        ORDER BY created_at DESC LIMIT 25`,[id]),
+      query(`SELECT action,reason,created_at,admin_auth_user_id::text
+        FROM public_identity_moderation_actions
+        WHERE target_player_id=(SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid)
+        ORDER BY created_at DESC LIMIT 25`,[id]),
     ]);
     if(!account.rows[0])fail('User not found.',404);
     const user=normalizeUser(account.rows[0]);
@@ -108,6 +175,8 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
       providers:providers.rows.map(row=>({...row,currently_entitled_amount_cents:num(row.currently_entitled_amount_cents),is_free_trial:bool(row.is_free_trial),is_gifted:bool(row.is_gifted)})),
       recent_runs:runs.rows.map(row=>({...row,score:row.score==null?null:Number(row.score),answered:num(row.answered),total:num(row.total),leaderboard_eligible:bool(row.leaderboard_eligible)})),
       recent_events:recentEvents,
+      identity_reports:identityReports.rows,
+      moderation_actions:moderationActions.rows,
     };
   }
 
@@ -140,7 +209,8 @@ export async function handleUserAdmin(request,query,url=new URL(request.url)) {
       FROM neon_auth."user" u JOIN activity ON activity.id=u.id`),
     query(`SELECT count(*)::int total FROM neon_auth."user" u ${where}`,params),
     query(`SELECT u.id,u.name,u.email,u."emailVerified" email_verified,u."createdAt" created_at,u.banned,
-        a.claimed_at,p.display_name profile_name,p.username_owned,
+        a.claimed_at,p.display_name profile_name,p.username_owned,p.public_identity_hidden_at,
+        (SELECT count(*)::int FROM public_identity_reports pir WHERE pir.target_player_id=p.id AND pir.status='open') open_identity_reports,
         EXISTS(SELECT 1 FROM pack1_admins pa WHERE pa.auth_user_id=u.id) is_admin,
         EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon') patreon_connected,
         (SELECT count(*)::int FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())) active_entitlements,

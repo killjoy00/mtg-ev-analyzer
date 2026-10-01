@@ -568,7 +568,14 @@ export default function AccountScreen() {
             {profile ? (
               <View style={styles.settingsSection}>
                 <Text style={styles.sectionTitle}>Profile settings</Text>
-                {profile.player.username_owned === false ? (
+                {profile.player.public_identity_hidden ? (
+                  <View style={styles.warning}>
+                    <Text style={styles.warningTitle}>Public identity hidden</Text>
+                    <Text style={styles.body}>
+                      {profile.player.public_identity_hidden_reason || 'Contact Pack One support if you believe this is a mistake.'}
+                    </Text>
+                  </View>
+                ) : profile.player.username_owned === false ? (
                   <View style={styles.warning}>
                     <Text style={styles.warningTitle}>Username needs attention</Text>
                     <Text style={styles.body}>
@@ -583,6 +590,7 @@ export default function AccountScreen() {
                   autoCapitalize="words"
                   autoComplete="nickname"
                   maxLength={24}
+                  editable={!profile.player.public_identity_hidden}
                   onChangeText={setProfileName}
                   placeholder="Leaderboard name"
                   placeholderTextColor={colors.faint}
@@ -591,9 +599,21 @@ export default function AccountScreen() {
                 />
                 <Text style={styles.fieldHelp}>Shown on Pack One Daily leaderboards.</Text>
 
+                {!profile.player.public_identity_hidden ? (
+                  <View style={styles.termsBox}>
+                    <Text style={styles.fieldHelp}>
+                      By saving a leaderboard name or public profile, you agree to the Public Identity rules: no harassment, impersonation, spam, private contact information, or abusive content.
+                    </Text>
+                    <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
+                      <Text style={styles.linkText}>Read the Public Identity rules</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
+
                 <Pressable
                   accessibilityRole="switch"
-                  accessibilityState={{ checked: profilePublic }}
+                  accessibilityState={{ checked: profilePublic, disabled: Boolean(profile.player.public_identity_hidden) }}
+                  disabled={Boolean(profile.player.public_identity_hidden)}
                   onPress={() => setProfilePublic((value) => !value)}
                   style={[styles.toggle, profilePublic && styles.toggleActive]}
                 >
@@ -658,9 +678,11 @@ export default function AccountScreen() {
 
                 <Pressable
                   accessibilityRole="button"
-                  disabled={busy || profileName.trim().length < 2}
+                  disabled={busy || profileName.trim().length < 2
+                    || Boolean(profile.player.public_identity_hidden)}
                   onPress={() => void saveProfile()}
-                  style={[styles.primaryButton, (busy || profileName.trim().length < 2) && styles.disabled]}
+                  style={[styles.primaryButton, (busy || profileName.trim().length < 2
+                    || Boolean(profile.player.public_identity_hidden)) && styles.disabled]}
                 >
                   <Text style={styles.primaryButtonText}>Save profile</Text>
                 </Pressable>
@@ -845,6 +867,17 @@ export default function AccountScreen() {
               <Text style={styles.googleButtonText}>Continue with Google</Text>
             </Pressable>
 
+            {/* Signing in is how a player joins the leaderboards, so the Public
+                Identity rules are agreed here rather than with a separate checkbox. */}
+            <View style={styles.termsBox}>
+              <Text style={styles.fieldHelp}>
+                By continuing, you agree to the Pack One Terms, including the Public Identity rules for leaderboard names and profiles.
+              </Text>
+              <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
+                <Text style={styles.linkText}>Read the Pack One Terms</Text>
+              </Pressable>
+            </View>
+
             <View style={styles.dividerRow}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>or use email</Text>
@@ -965,6 +998,8 @@ const styles = StyleSheet.create({
   sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   fieldLabel: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   fieldHelp: { color: colors.muted, fontSize: 12, lineHeight: 18 },
+  termsBox: { gap: spacing.sm },
+  linkText: { color: colors.accentDark, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
   warning: { borderWidth: 1, borderLeftWidth: 4, borderColor: colors.accent, padding: spacing.md, gap: spacing.xs },
   warningTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
   toggle: {

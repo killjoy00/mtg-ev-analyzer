@@ -82,7 +82,9 @@ async function persistResult(s) {
     WHERE $2::date IS NOT NULL AND $18::boolean
       AND EXISTS (
         SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
-        WHERE a.player_id=$1::uuid AND p.username_owned=true
+        WHERE a.player_id=$1::uuid
+          AND p.username_owned=true
+          AND p.public_identity_hidden_at IS NULL
       )
     ON CONFLICT(player_id,challenge_date,set_id,mode) DO NOTHING
   ), result AS (
@@ -117,7 +119,9 @@ async function responseFor(s,timing=null) {
       WHERE challenge_date=$1::date AND mode='draft_run' AND set_id=$3
         AND EXISTS (
           SELECT 1 FROM account_links a JOIN players p ON p.id=a.player_id
-          WHERE a.player_id=scores.player_id AND p.username_owned=true
+          WHERE a.player_id=scores.player_id
+            AND p.username_owned=true
+            AND p.public_identity_hidden_at IS NULL
         )`,[s.day,s.score,environmentOf(s)]);
     const row=r.rows[0],total=Number(row.total);
     standing={rank:Number(row.rank),total,percentile:total>=10?Math.max(1,Math.ceil(Number(row.through_ties)/total*100)):null,final:s.day<gameDateKey()};
@@ -357,7 +361,8 @@ async function leaderboard(request) {
   const season=period==='season'?await resolveCurrentSeason(query,{today,ensureSchedule:ensureDailyScheduleForQuery}):null;
   if(period==='season'&&!season)return json({period:'season',environment,start:null,today,season:null,rows:[]});
   const start=period==='daily'?today:period==='season'?season.start_date:period==='week'?(()=>{const d=new Date(today+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-((d.getUTCDay()+6)%7));return d.toISOString().slice(0,10);})():'2000-01-01';
-  const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,limit:100});
+  const blockedByPlayerId=await player(request,false);
+  const rows=await draftRunLeaderboardRows(query,{start,end:today,environment,blockedByPlayerId,limit:100});
   return json({period,environment,start,today,season:period==='season'?season:null,rows});
 }
 async function route(request) {
@@ -426,7 +431,13 @@ async function route(request) {
     if(request.method==='POST'&&['pick','reroll'].includes(match[2])) return change(request,match[1],match[2]);
   }
   const shared=path.match(/^\/v1\/(?:challenges|shared-runs)\/([a-f0-9]+)$/);
-  if(request.method==='GET'&&shared) { const s=await share(shared[1]);const scores=await query(`SELECT p.display_name name,r.score FROM draft_run_sessions r JOIN players p ON p.id=r.player_id WHERE r.score IS NOT NULL AND r.puzzle_ids=$2::jsonb AND (r.id=$3::uuid OR (r.challenge_id=$1 AND r.player_id<>$4::uuid)) ORDER BY r.score DESC,r.created_at LIMIT 100`,[s.id,JSON.stringify(s.puzzle_ids),s.session_id,s.owner_player_id]);return json({id:s.id,name:s.display_name,score:s.score,scores:scores.rows,environment:s.environment,run_length:s.puzzle_ids.length}); }
+  if(request.method==='GET'&&shared) { const s=await share(shared[1]);const scores=await query(`SELECT CASE WHEN p.username_owned
+      AND p.public_identity_hidden_at IS NULL
+      THEN p.display_name ELSE 'A friend' END name,r.score
+      FROM draft_run_sessions r JOIN players p ON p.id=r.player_id
+      WHERE r.score IS NOT NULL AND r.puzzle_ids=$2::jsonb
+        AND (r.id=$3::uuid OR (r.challenge_id=$1 AND r.player_id<>$4::uuid))
+      ORDER BY r.score DESC,r.created_at LIMIT 100`,[s.id,JSON.stringify(s.puzzle_ids),s.session_id,s.owner_player_id]);return json({id:s.id,name:s.display_name,score:s.score,scores:scores.rows,environment:s.environment,run_length:s.puzzle_ids.length}); }
   return json({error:'Not found.'},404);
 }
 

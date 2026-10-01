@@ -129,6 +129,8 @@ console.log('Owned usernames survive legacy nickname writes',tag);
 // Identity linking and merging still work.
 // ---------------------------------------------------------------------------
 // A merge adopts a free source name onto a target still holding the placeholder.
+// The merge itself leaves it unowned; sign-in then claims it through the same
+// prohibited-name and moderation checks as any other claim.
 const adoptable=`Carol ${tag}`;
 const adoptSource=await guest(adoptable);
 const adoptTarget=await claim('adopt','Pack Player');
@@ -137,6 +139,7 @@ assert.equal(adopted.token,adoptTarget.token,'the established account player sur
 assert.equal(adopted.displayName,adoptable);
 assert.equal((await stored(adoptTarget.playerId)).display_name,adoptable);
 assert.equal(await owned(adoptTarget.playerId),true,'an adopted username is owned by the target');
+assert.deepEqual(adopted.rankingIdentity,{eligible:true,reason:null});
 assert.equal(Number((await query('SELECT count(*) n FROM players WHERE id=$1::uuid',[adoptSource.playerId])).rows[0].n),0);
 console.log('Merge adopts a free source username',tag);
 
@@ -158,6 +161,18 @@ const freeNickname=`Dana ${tag}`;
 const adopter=await claim('adopter',freeNickname);
 assert.equal(await owned(adopter.playerId),true,'linking reserves a free nickname');
 assert.equal((await stored(adopter.playerId)).display_name,freeNickname);
+assert.deepEqual(adopter.link.rankingIdentity,{eligible:true,reason:null});
+
+// Guest nicknames are private and unfiltered, so sign-in must not publish one the
+// Public Identity filter rejects; the account has to choose an allowed name.
+const prohibitedNickname=`QA www.${tag}.io`;
+const prohibited=await claim('prohibited',prohibitedNickname);
+assert.equal((await stored(prohibited.playerId)).display_name,prohibitedNickname);
+assert.equal(await owned(prohibited.playerId),false,'linking never reserves a prohibited nickname');
+assert.equal(prohibited.link.rankingIdentity.eligible,false);
+await rename(prohibited,prohibitedNickname,400);
+assert.equal(await owned(prohibited.playerId),false);
+console.log('Linking claims only free, allowed nicknames',tag);
 
 const contender=await claim('contender',username);
 assert.equal((await stored(contender.playerId)).display_name,username,'linking never fails over a taken nickname');

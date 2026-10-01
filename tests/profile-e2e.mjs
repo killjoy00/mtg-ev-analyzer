@@ -202,6 +202,10 @@ try {
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-manage-account,#profile-share-progress').count(),0);
   assert.equal(await page.locator('input[name="displayName"]').inputValue(), 'Profile Tester');
+  // Saving carries the Public Identity rules as a notice, never a required checkbox.
+  assert.match((await page.locator('.profile-identity-rules').textContent())||'',/By saving a leaderboard name or public profile, you agree/);
+  assert.equal(await page.locator('.profile-identity-rules a[href="/terms/#public-identity-rules"]').count(),1);
+  assert.equal(await page.locator('input[name="acceptPublicIdentityTerms"]').count(),0);
   await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
   await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');

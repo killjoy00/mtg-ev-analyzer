@@ -219,17 +219,34 @@ export async function loadDailyStatus() {
 
 export async function loadMyProfile(){return api('/v1/profile/me',{auth:true});}
 export async function loadPublicProfile(profileKey){return api(`/v1/profile/${encodeURIComponent(profileKey)}`,{auth:false});}
-export async function updateProfile({displayName,profilePublic,favoriteSetId,showcaseAchievement}={}) {
+export async function updateProfile({displayName,profilePublic,favoriteSetId,showcaseAchievement,acceptPublicIdentityTerms}={}) {
   const body={};
   if(displayName!==undefined)body.displayName=String(displayName??'');
   if(typeof profilePublic==='boolean')body.profilePublic=profilePublic;
   if(favoriteSetId!==undefined)body.favoriteSetId=favoriteSetId;
   if(showcaseAchievement!==undefined)body.showcaseAchievement=showcaseAchievement;
+  if(acceptPublicIdentityTerms===true)body.acceptPublicIdentityTerms=true;
   if(firstPartyAuthEnabled())await ensureMigrations();
   else if(!loadAuthToken())throw new Error('Sign in to change account settings.');
   const data=await api('/v1/profile',{method:'PATCH',body,auth:true,authSession:firstPartyAuthEnabled()?null:loadAuthToken()});
   if(data?.player?.display_name){try{localStorage.setItem(NAME_KEY,data.player.display_name);}catch{}}
   return data;
+}
+export async function reportPublicProfile(profileKey,{reason='other',details=''}={}) {
+  if(!/^[a-f0-9]{16}$/.test(String(profileKey||'')))throw new Error('Invalid public profile.');
+  if(firstPartyAuthEnabled())await ensureMigrations();
+  else if(!loadAuthToken())throw new Error('Sign in to report a public profile.');
+  return api(`/v1/profile/${encodeURIComponent(profileKey)}/report`,{
+    method:'POST',body:{reason,details},auth:true,authSession:firstPartyAuthEnabled()?null:loadAuthToken(),
+  });
+}
+export async function blockPublicProfile(profileKey) {
+  if(!/^[a-f0-9]{16}$/.test(String(profileKey||'')))throw new Error('Invalid public profile.');
+  if(firstPartyAuthEnabled())await ensureMigrations();
+  else if(!loadAuthToken())throw new Error('Sign in to block a public profile.');
+  return api(`/v1/profile/${encodeURIComponent(profileKey)}/block`,{
+    method:'POST',body:{},auth:true,authSession:firstPartyAuthEnabled()?null:loadAuthToken(),
+  });
 }
 export async function loadProfileHistory({profileKey=null,cursor=null,limit=25}={}) {
   const params=new URLSearchParams({limit:String(limit)});
