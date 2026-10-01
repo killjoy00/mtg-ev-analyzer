@@ -69,12 +69,15 @@ test('every remaining production Neon Auth literal equals PROD_AUTH_BASE',()=>{
   const hardeningProduction=hardeningSource.match(/export const PROD_AUTH_BASE='([^']+)'/);
   assert.equal(hardeningProduction?.[1],PROD_AUTH_BASE,'localhost-hardening production Auth base must match the canonical production base');
 
-  const qaProbeRelative='scripts/auth-verification-taxonomy-probe.mjs';
+  const qaOnlyRelatives=new Set([
+    'scripts/auth-verification-taxonomy-probe.mjs',
+    'scripts/auth-webhook-probe-stage.mjs',
+  ]);
   const pattern=/https:\/\/ep-[a-z0-9-]+\.neonauth\.[a-z0-9.-]+\/pack1\/auth/g;
   const literals=[];
   for(const file of files){
     const relative=path.relative(root,file);
-    if(relative===hardeningRelative||relative===qaProbeRelative)continue;
+    if(relative===hardeningRelative||qaOnlyRelatives.has(relative))continue;
     const matches=fs.readFileSync(file,'utf8').match(pattern)||[];
     for(const value of matches)literals.push({file:path.relative(root,file),value});
   }
