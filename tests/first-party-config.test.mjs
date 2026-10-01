@@ -64,13 +64,19 @@ test('every remaining production Neon Auth literal equals PROD_AUTH_BASE',()=>{
     }
   };
   walk(root);
+  const hardeningRelative='scripts/auth-localhost-hardening.mjs';
+  const hardeningSource=fs.readFileSync(path.join(root,hardeningRelative),'utf8');
+  const hardeningProduction=hardeningSource.match(/export const PROD_AUTH_BASE='([^']+)'/);
+  assert.equal(hardeningProduction?.[1],PROD_AUTH_BASE,'localhost-hardening production Auth base must match the canonical production base');
+
   const pattern=/https:\/\/ep-[a-z0-9-]+\.neonauth\.[a-z0-9.-]+\/pack1\/auth/g;
   const literals=[];
   for(const file of files){
+    if(path.relative(root,file)===hardeningRelative)continue;
     const matches=fs.readFileSync(file,'utf8').match(pattern)||[];
     for(const value of matches)literals.push({file:path.relative(root,file),value});
   }
-  assert.ok(literals.length>=2,'expected canonical and classic-browser production Auth literals');
+  assert.ok(literals.length>=1,'expected at least the canonical production Auth literal');
   for(const literal of literals){
     assert.equal(literal.value,PROD_AUTH_BASE,literal.file+' contains a stale production Auth literal');
   }
