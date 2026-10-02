@@ -1,7 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -111,7 +111,7 @@ export default function AccountScreen() {
   const [actionBusy, setActionBusy] = useState(false);
   const verificationReturnHandled = useRef(false);
 
-  const returnAfterAccount = (fallbackToCareer = false) => {
+  const returnAfterAccount = useCallback((fallbackToCareer = false) => {
     if (validateDailyRunId) {
       router.replace({
         pathname: '/draft-run',
@@ -135,16 +135,16 @@ export default function AccountScreen() {
       return;
     }
     if (fallbackToCareer) router.replace('/career');
-  };
+  }, [validateDailyRunId, returnEnvironment, returnToPractice, returnProfileKey, pendingAction, reportReason]);
 
-  const continueAfterDisplayNamePrompt = (validatedDailyScore = pendingClaimValidatedDaily) => {
+  const continueAfterDisplayNamePrompt = useCallback((validatedDailyScore = pendingClaimValidatedDaily) => {
     setPromptDisplayName(false);
     setPendingClaimValidatedDaily(false);
     returnAfterAccount(true);
     return validatedDailyScore;
-  };
+  }, [pendingClaimValidatedDaily, returnAfterAccount]);
 
-  const finish = async (next: Parameters<typeof adoptSession>[0], result: MobileAuthResponse) => {
+  const finish = useCallback(async (next: Parameters<typeof adoptSession>[0], result: MobileAuthResponse) => {
     setPassword('');
     setSigninNeedsVerification(false);
     const newlyClaimed = result.linked.newlyClaimed === true;
@@ -171,7 +171,7 @@ export default function AccountScreen() {
         returnAfterAccount(false);
       }
     }
-  };
+  }, [adoptSession, returnToPractice, returnProfileKey, returnAfterAccount, setMessage]);
 
   const submitEmail = async () => {
     if (!session || actionBusy) return;
