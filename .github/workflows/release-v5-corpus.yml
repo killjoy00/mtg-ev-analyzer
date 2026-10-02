@@ -53,6 +53,7 @@ jobs:
       STAGE_RUN_ID: ${{ inputs.stage_run_id }}
       BRIDGE_COMMIT: ${{ inputs.bridge_commit }}
       V5_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -94,6 +95,17 @@ jobs:
           esac
 
       - run: npm install -g neon@4.17.4
+
+      - name: Require successful reviewed source runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate=$(gh run view "$CANDIDATE_RUN_ID" --json conclusion,workflowName,headBranch,event)
+          echo "$candidate" | jq -e 'select(.conclusion=="success" and .workflowName=="rebuild-v5-draft-run-corpus" and .headBranch=="main" and .event=="workflow_dispatch")' >/dev/null
+          if [[ "$ACTION" != stage ]]; then
+            staged=$(gh run view "$STAGE_RUN_ID" --json conclusion,workflowName,headBranch,event)
+            echo "$staged" | jq -e 'select(.conclusion=="success" and .workflowName=="Release exact v5 corpus" and .headBranch=="main" and .event=="workflow_dispatch")' >/dev/null
+          fi
 
       - name: Download exact validated rebuild artifact
         uses: actions/download-artifact@v4
