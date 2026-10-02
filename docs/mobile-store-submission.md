@@ -289,11 +289,19 @@ These are the remaining **non-physical-device** actions confirmed to be outside 
    - App Store Connect -> Business / Agreements, Tax, and Banking.
    - Confirm there is no agreement, tax-form, or banking action blocking paid auto-renewable subscriptions.
 
+4. **Set the app's first public availability to United States + Canada only.**
+   - App Store Connect -> Apps -> Pack One -> **Pricing and Availability** -> **App Availability** -> **Set Up Availability**.
+   - Choose **Specific Countries or Regions**, select **United States** and **Canada** only, then confirm.
+   - Do **not** choose **Publish as Pre-Order**.
+   - Live API probing on 2026-10-01 returned `404 NOT_FOUND` for Pack One's `appAvailabilityV2`, confirming no availability resource exists yet.
+   - Apple's current App Store Connect API can read/edit an existing availability resource, but its create endpoint (`POST /v2/appAvailabilities`) is documented specifically as **Create an app pre-order**. Therefore the first-time non-preorder availability setup remains an owner UI action.
+   - After this one-time setup, the repo can verify the live territory state through the read-only App Store Connect API.
+
 Physical iPhone/iPad acceptance remains separate and is intentionally not listed here.
 
 ### Google Play Console
 
-4. **Finish the remaining App content forms.**
+5. **Finish the remaining App content forms.**
    - Play Console -> Pack One -> **Policy and programs -> App content**.
    - **Ads:** declare **Yes** using the rationale in this document (disclosed TCGplayer affiliate promotional links; no ad SDK/advertising ID).
    - **App access:** state that some features work as a guest, but account/Elite features require sign-in. Enter the private non-expiring Elite reviewer credential directly in Play Console; do not put it in Git or chat.
@@ -301,22 +309,22 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
    - **Content rating (IARC):** complete the questionnaire from the real app: no gambling/wagering/chat, but card art can contain fantasy combat/violence.
    - Data Safety is already submitted; do not redo it unless Play reports a new required correction.
 
-5. **Turn on Managed Publishing before production-review changes.**
+6. **Turn on Managed Publishing before production-review changes.**
    - Play Console -> **Publishing overview**.
    - Under Managed publishing status, choose **Turn on managed publishing** and save.
    - Leave it on while the first production submission/review is being prepared so approval does not publish unexpectedly.
 
-6. **Set the public Production countries to United States + Canada only.**
+7. **Set the public Production countries to United States + Canada only.**
    - Play Console -> **Production** -> **Countries / regions**.
    - Target **United States** and **Canada** only for the first public release.
    - Do not assume the `production-access` closed-test geography automatically configures the Production track; treat these as separate settings.
 
-7. **Verify the closed-test qualification clock and tester count.**
+8. **Verify the closed-test qualification clock and tester count.**
    - Open **Closed testing -> production-access**.
    - Confirm the tester opt-in link is the one being used and that the required testers are shown as continuously opted in.
    - If this developer account is subject to Google's newer-personal-account rule, keep at least 12 testers continuously opted in for 14 days. Do not reset/recreate the track during that period.
 
-8. **Apply for Production access when Play enables the application.**
+9. **Apply for Production access when Play enables the application.**
    - When the Dashboard says the testing requirement is satisfied, open the Production access application.
    - Answer Google's questions about the closed test, tester engagement/feedback, app purpose, and production readiness truthfully.
    - Submit the production-access application.
@@ -324,13 +332,13 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 ### GitHub / Google Cloud release-credential boundary
 
-9. **Finish the account-level release-credential boundary without adding unwanted manual approvals.**
+10. **Finish the account-level release-credential boundary without adding unwanted manual approvals.**
    - GitHub repo -> Settings -> Environments -> `pack-one-mobile-release`.
    - Restrict deployment branches to the intended release branch policy.
    - Keep Apple release secrets scoped to this Environment rather than generally available repository secrets.
    - Do **not** add required reviewers unless you intentionally want every release job to wait for a human approval; the current desired workflow does not require that manual gate.
 
-10. **Narrow Google Workload Identity trust.**
+11. **Narrow Google Workload Identity trust.**
    - In Google Cloud IAM / Workload Identity Federation, restrict the Pack One provider/service-account trust so store credentials are accepted only from the intended Pack One repository and approved release context.
    - Do not broaden repository workflow access merely to make a release pass.
    - After you make this change, the repo can re-run the non-publishing Apple/Google access probes and record the result.
