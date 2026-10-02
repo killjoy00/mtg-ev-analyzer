@@ -1,7 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -69,6 +69,7 @@ export default function AccountScreen() {
     pendingAction?: string;
     reportReason?: string;
     notice?: string;
+    emailVerified?: string;
   }>();
   const validateDailyRunId = typeof params.validateDailyRunId === 'string'
     ? params.validateDailyRunId
@@ -184,7 +185,6 @@ export default function AccountScreen() {
         const next = await signUpWithEmail(session, email.trim(), password, validateDailyRunId);
         if (!next.session || !authResult(next.result)) {
           setVerificationPending(true);
-          setPassword('');
         } else {
           await finish(next.session, next.result);
         }
@@ -364,6 +364,35 @@ export default function AccountScreen() {
     }
   };
 
+  useEffect(() => {
+    if (params.emailVerified !== '1' || account || actionBusy) return;
+    if (verificationPending && session && email.trim() && password) {
+      let cancelled = false;
+      void (async () => {
+        setActionBusy(true);
+        setMessage('Email verified. Finishing your account…');
+        try {
+          const next = await signInWithEmail(session, email.trim(), password, validateDailyRunId);
+          if (!cancelled) await finish(next.session, next.result);
+        } catch (error: unknown) {
+          if (!cancelled) {
+            setVerificationPending(false);
+            setMode('signin');
+            setMessage(error instanceof Error
+              ? `Email verified. ${error.message}`
+              : 'Email verified. Sign in to finish setting up your account.');
+          }
+        } finally {
+          if (!cancelled) setActionBusy(false);
+        }
+      })();
+      return () => { cancelled = true; };
+    }
+    setVerificationPending(false);
+    setMode('signin');
+    setMessage('Email verified. Sign in to finish setting up your account on this device.');
+  }, [params.emailVerified, account, actionBusy, verificationPending, session, email, password, validateDailyRunId]);
+
   const signedInLabel = account?.user.email ?? account?.user.name ?? 'Pack One account';
   const disabled = actionBusy || busy;
 
@@ -399,12 +428,9 @@ export default function AccountScreen() {
                 <Text style={styles.fieldHelp}>Optional. Choose a display name if you want to join Daily leaderboards.</Text>
               ) : null}
               <View style={styles.termsBox}>
-                <Text style={styles.fieldHelp}>
-                  By saving a display name, you agree to the Public Identity rules: no harassment,
-                  impersonation, spam, private contact information, or abusive content.
-                </Text>
+                <Text style={styles.fieldHelp}>Display names and public profiles follow the Pack One Public Identity rules.</Text>
                 <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
-                  <Text style={styles.linkText}>Read the Public Identity rules</Text>
+                  <Text style={styles.linkText}>Public Identity rules</Text>
                 </Pressable>
               </View>
               {readyError ? <Text accessibilityRole="alert" style={styles.error}>{readyError}</Text> : null}
@@ -478,7 +504,7 @@ export default function AccountScreen() {
           </>
         ) : (
           <>
-            <Text style={styles.title}>Sign in to Pack One.</Text>
+            <Text style={styles.title}>{mode === 'signup' ? 'Create your Pack One account.' : 'Sign in to Pack One.'}</Text>
             <Text style={styles.body}>
               {validateDailyRunId
                 ? 'Sign in to save this Daily score to your Pack One career and add it to the leaderboard when eligible.'
@@ -488,33 +514,35 @@ export default function AccountScreen() {
               {Platform.OS === 'ios' ? (
                 <AppleAuthentication.AppleAuthenticationButton
                   buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                  buttonType={mode === 'signup'
+                    ? AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP
+                    : AppleAuthentication.AppleAuthenticationButtonType.SIGN_IN}
                   cornerRadius={6}
                   onPress={() => void openApple()}
                   style={[styles.appleButton, disabled && styles.disabled]}
                 />
               ) : (
                 <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void openApple()} style={[styles.appleWebButton, disabled && styles.disabled]}>
-                  <Text style={styles.appleWebButtonText}>Continue with Apple</Text>
+                  <Text style={styles.appleWebButtonText}>{mode === 'signup' ? 'Create with Apple' : 'Sign in with Apple'}</Text>
                 </Pressable>
               )}
 
               <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void openGoogle()} style={[styles.googleButton, disabled && styles.disabled]}>
-                <Text style={styles.googleButtonText}>Continue with Google</Text>
+                <Text style={styles.googleButtonText}>{mode === 'signup' ? 'Create with Google' : 'Sign in with Google'}</Text>
               </Pressable>
 
-              <View style={styles.termsBox}>
-                <Text style={styles.fieldHelp}>
-                  By continuing, you agree to the Pack One Terms, including the Public Identity rules for display names and profiles.
-                </Text>
-                <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
-                  <Text style={styles.linkText}>Read the Pack One Terms</Text>
-                </Pressable>
-              </View>
+              {mode === 'signup' ? (
+                <View style={styles.termsBox}>
+                  <Text style={styles.fieldHelp}>By creating an account, you agree to the Pack One Terms.</Text>
+                  <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/')}>
+                    <Text style={styles.linkText}>Pack One Terms</Text>
+                  </Pressable>
+                </View>
+              ) : null}
 
               <View style={styles.dividerRow}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>or use email</Text>
+                <Text style={styles.dividerText}>or</Text>
                 <View style={styles.dividerLine} />
               </View>
 
@@ -583,7 +611,7 @@ export default function AccountScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   page: { padding: spacing.lg, paddingBottom: spacing.xxl, gap: spacing.lg, alignSelf: 'center', width: '100%', maxWidth: 760 },
-  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
+  eyebrow: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
   title: { color: colors.ink, fontSize: 34, lineHeight: 38, fontWeight: '800', letterSpacing: -0.8 },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   panel: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.lg, gap: spacing.md },
@@ -595,7 +623,7 @@ const styles = StyleSheet.create({
   googleButtonText: { color: colors.ink, fontSize: 15, fontWeight: '800' },
   dividerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   dividerLine: { flex: 1, height: 1, backgroundColor: colors.line },
-  dividerText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
+  dividerText: { color: colors.muted, fontSize: 13, fontWeight: '700' },
   modeRow: { flexDirection: 'row', borderBottomWidth: 1, borderColor: colors.line },
   modeButton: { flex: 1, minHeight: 44, alignItems: 'center', justifyContent: 'center' },
   modeButtonActive: { borderBottomWidth: 3, borderColor: colors.accent },
