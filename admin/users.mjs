@@ -213,7 +213,99 @@ export async function renderUsers(root,request,growthRequest=request) {
         <section class="user-section"><h3>Recent activity</h3>
           ${events.length?`<div class="scroll"><table class="user-events"><thead><tr><th>When</th><th>Event</th><th>Context</th></tr></thead><tbody>${events.map(event=>`<tr><td>${esc(dateTime(event.created_at))}</td><td>${esc(event.event_name)}</td><td><small>${props(event.event_props)}</small></td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No recent tracked activity for this account.</p>'}
         </section>`;
-      document.querySelector('#user-detail-close').onclick=()=>dialog.close();
+      document.querySelector('#user-detail-close').onclick=()=>{detailLoadSerial++;dialog.close();};
+
+      function disableRenameForDeletion() {
+        const form=body.querySelector('#change-username-form');
+        if(!form)return;
+        if(!form.querySelector('[data-deletion-blocked]'))
+          form.insertAdjacentHTML('afterbegin','<p class="error" data-deletion-blocked="true">Username changes are disabled because account deletion has already started.</p>');
+        form.querySelectorAll('button,input').forEach(control=>control.disabled=true);
+      }
+
+      function renderDeletionState(deletion,{statusUnavailable=false,recoveryMessage=null}={}) {
+        if(detailSerial!==detailLoadSerial||!dialog.open)return;
+        const section=body.querySelector('#permanent-deletion-section');
+        if(!section)return;
+        section.innerHTML=`<h3>Permanent account deletion</h3>${deletionPanel(u,id,deletion,{statusUnavailable})}`;
+        if(deletion)disableRenameForDeletion();
+        if(recoveryMessage) {
+          const target=section.querySelector('#deletion-status');
+          if(target)target.insertAdjacentHTML('beforeend',`<p class="error">${esc(recoveryMessage)}</p>`);
+        }
+        wireDeletionControls();
+      }
+
+      function wireDeletionControls() {
+        const deleteForm=body.querySelector('#delete-account-form');
+        if(deleteForm)deleteForm.onsubmit=async event=>{
+          event.preventDefault();
+          const form=event.currentTarget,status=form.querySelector('#delete-account-status'),values=new FormData(form);
+          const controls=form.querySelectorAll('button,input');
+          controls.forEach(control=>control.disabled=true);status.textContent='Starting permanent deletion…';
+          try {
+            const result=await growthRequest('/v1/admin/users/'+encodeURIComponent(id)+'/delete',{
+              confirm:String(values.get('confirm')||''),
+              reason:String(values.get('reason')||''),
+              acknowledgeAdmin:values.get('acknowledgeAdmin')==='yes',
+            },'POST');
+            if(result.deletion==='complete') {
+              detailLoadSerial++;
+              dialog.close();
+              await load();
+              const globalStatus=document.querySelector('#status');
+              if(globalStatus)globalStatus.textContent='Account deletion completed.';
+              return;
+            }
+            if(result.operation) {
+              renderDeletionState(result.operation);
+              return;
+            }
+            const recovered=await deletionStatus(id);
+            renderDeletionState(recovered);
+          } catch(error) {
+            const committed=error.data?.deletionCommitted&&error.data?.deletion?error.data.deletion:null;
+            if(committed) {
+              renderDeletionState(committed,{
+                recoveryMessage:'The request was interrupted after permanent deletion committed. The account remains in deletion; refresh status to continue monitoring it.',
+              });
+              return;
+            }
+            try {
+              const recovered=await deletionStatus(id);
+              if(recovered) {
+                renderDeletionState(recovered,{
+                  recoveryMessage:'Deletion started even though the initiating request did not finish cleanly. Refresh status to continue monitoring it.',
+                });
+                return;
+              }
+            } catch {}
+            status.textContent=error.message;
+            controls.forEach(control=>control.disabled=false);
+          }
+        };
+
+        const refresh=body.querySelector('#deletion-refresh');
+        if(refresh)refresh.onclick=async()=>{
+          refresh.disabled=true;
+          try {
+            const current=await deletionStatus(id);
+            if(current?.state==='complete') {
+              detailLoadSerial++;
+              dialog.close();
+              await load();
+              const globalStatus=document.querySelector('#status');
+              if(globalStatus)globalStatus.textContent='Account deletion completed.';
+            } else {
+              renderDeletionState(current);
+            }
+          } catch(error) {
+            const target=body.querySelector('#deletion-status');
+            if(target)target.insertAdjacentHTML('beforeend',`<p class="error">${esc(error.message)}</p>`);
+            refresh.disabled=false;
+          }
+        };
+      }
 
       const renameForm=document.querySelector('#change-username-form');
       if(renameForm&&!renameBlocked)renameForm.onsubmit=async event=>{
@@ -234,62 +326,14 @@ export async function renderUsers(root,request,growthRequest=request) {
         }
       };
 
-      const deleteForm=document.querySelector('#delete-account-form');
-      if(deleteForm)deleteForm.onsubmit=async event=>{
-        event.preventDefault();
-        const form=event.currentTarget,status=form.querySelector('#delete-account-status'),values=new FormData(form);
-        const controls=form.querySelectorAll('button,input');
-        controls.forEach(control=>control.disabled=true);status.textContent='Starting permanent deletion…';
-        try {
-          const result=await growthRequest('/v1/admin/users/'+encodeURIComponent(id)+'/delete',{
-            confirm:String(values.get('confirm')||''),
-            reason:String(values.get('reason')||''),
-            acknowledgeAdmin:values.get('acknowledgeAdmin')==='yes',
-          },'POST');
-          if(result.deletion==='complete') {
-            dialog.close();
-            await load();
-            const globalStatus=document.querySelector('#status');
-            if(globalStatus)globalStatus.textContent='Account deletion completed.';
-            return;
-          }
-          await openDetail(id);
-        } catch(error) {
-          try {
-            const recovered=await deletionStatus(id);
-            if(recovered) {
-              status.textContent='Deletion started. Reloading its persisted status…';
-              await openDetail(id);
-              return;
-            }
-          } catch {}
-          status.textContent=error.message;
-          controls.forEach(control=>control.disabled=false);
-        }
-      };
-
-      const refresh=document.querySelector('#deletion-refresh');
-      if(refresh)refresh.onclick=async()=>{
-        refresh.disabled=true;
-        try {
-          const current=await deletionStatus(id);
-          if(current?.state==='complete') {
-            dialog.close();
-            await load();
-            const globalStatus=document.querySelector('#status');
-            if(globalStatus)globalStatus.textContent='Account deletion completed.';
-          } else {
-            await openDetail(id);
-          }
-        } catch(error) {
-          const target=document.querySelector('#deletion-status');
-          if(target)target.insertAdjacentHTML('beforeend',`<p class="error">${esc(error.message)}</p>`);
-          refresh.disabled=false;
-        }
-      };
+      wireDeletionControls();
+      void deletionPromise.then(result=>{
+        if(detailSerial!==detailLoadSerial||!dialog.open)return;
+        renderDeletionState(result.ok?result.value:null,{statusUnavailable:!result.ok});
+      });
     } catch(error) {
       body.innerHTML=`<div class="user-detail-heading"><h2>User unavailable</h2><button type="button" class="secondary" id="user-detail-close">Close</button></div><p class="error">${esc(error.message)}</p>`;
-      document.querySelector('#user-detail-close').onclick=()=>dialog.close();
+      document.querySelector('#user-detail-close').onclick=()=>{detailLoadSerial++;dialog.close();};
     }
   }
 
