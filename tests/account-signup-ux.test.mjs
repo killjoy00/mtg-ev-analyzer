@@ -33,13 +33,13 @@ test('native signup has no name field or name payload and uses username autofill
   assert.match(signup,/body: \{ email, password, validateDailyRunId \}/);
 });
 
-test('native first claim prompts for leaderboard name before continuing',()=>{
+test('native first claim shows the account-ready display-name step before continuing',()=>{
   assert.match(mobileApi,/newlyClaimed\?: boolean/);
   assert.match(mobileApi,/\/growth\/v1\/mobile\/account\/link/);
   assert.match(worker,/url\.pathname === '\/v1\/mobile\/account\/link'/);
   assert.match(mobileScreen,/result\.linked\.newlyClaimed === true/);
-  assert.match(mobileScreen,/Choose the name shown on leaderboards\./);
-  assert.match(mobileScreen,/accessibilityLabel="Skip leaderboard name for now"/);
+  assert.match(mobileScreen,/Your account is ready\./);
+  assert.match(mobileScreen,/accessibilityLabel="Skip display name for now"/);
   assert.match(mobileScreen,/linkMobileAccount\(session, validateDailyRunId\)/);
-  assert.match(mobileScreen,/continueAfterLeaderboardNamePrompt/);
+  assert.match(mobileScreen,/continueAfterDisplayNamePrompt/);
 });
