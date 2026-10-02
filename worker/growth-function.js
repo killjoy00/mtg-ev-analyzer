@@ -598,7 +598,6 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     best_streak:longestStreak,
   };
   const achievements = buildAchievements({
-    ...(own?{ranking_identity:{eligible:Boolean(rankingIdentity?.eligible),reason:rankingIdentity?.reason||null}}:{}),
     summary: normalizedSummary,
     bySet,
     byMode,
