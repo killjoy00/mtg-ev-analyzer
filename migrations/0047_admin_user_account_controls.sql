@@ -5,11 +5,11 @@ ALTER TABLE public_identity_moderation_actions
   ADD COLUMN IF NOT EXISTS previous_display_name text,
   ADD COLUMN IF NOT EXISTS new_display_name text;
 
-UPDATE public_identity_moderation_actions action
+UPDATE public_identity_moderation_actions moderation
 SET target_auth_user_id=link.auth_user_id
 FROM account_links link
-WHERE action.target_auth_user_id IS NULL
-  AND action.target_player_id=link.player_id;
+WHERE moderation.target_auth_user_id IS NULL
+  AND moderation.target_player_id=link.player_id;
 
 ALTER TABLE public_identity_moderation_actions
   ALTER COLUMN reason DROP NOT NULL,
@@ -86,11 +86,11 @@ BEGIN
     RETURN QUERY SELECT 'invalid'::text,NULL::uuid,NULL::text,NULL::text,NULL::boolean;
     RETURN;
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM pack1_admins WHERE auth_user_id=p_admin_auth_user_id) THEN
+  IF NOT EXISTS(SELECT 1 FROM pack1_admins actor WHERE actor.auth_user_id=p_admin_auth_user_id) THEN
     RETURN QUERY SELECT 'forbidden'::text,NULL::uuid,NULL::text,NULL::text,NULL::boolean;
     RETURN;
   END IF;
-  IF p_display_name IS NULL OR char_length(p_display_name) NOT BETWEEN 2 AND 24
+  IF p_display_name IS NULL OR p_username_owned IS NULL OR char_length(p_display_name) NOT BETWEEN 2 AND 24
      OR (p_reason IS NOT NULL AND char_length(p_reason) NOT BETWEEN 1 AND 200)
      OR ((pack1_username_key(p_display_name)='pack player') = p_username_owned) THEN
     RETURN QUERY SELECT 'invalid'::text,NULL::uuid,NULL::text,NULL::text,NULL::boolean;
@@ -197,7 +197,7 @@ BEGIN
       NULL::text,NULL::uuid,NULL::text,NULL::boolean;
     RETURN;
   END IF;
-  IF NOT EXISTS(SELECT 1 FROM pack1_admins WHERE auth_user_id=p_admin_auth_user_id) THEN
+  IF NOT EXISTS(SELECT 1 FROM pack1_admins actor WHERE actor.auth_user_id=p_admin_auth_user_id) THEN
     RETURN QUERY SELECT 'forbidden'::text,NULL::uuid,NULL::uuid,NULL::uuid,NULL::text,NULL::integer,NULL::text,
       NULL::timestamptz,NULL::timestamptz,NULL::timestamptz,NULL::timestamptz,NULL::timestamptz,
       NULL::text,NULL::uuid,NULL::text,NULL::boolean;
@@ -206,7 +206,7 @@ BEGIN
 
   PERFORM pg_advisory_xact_lock(hashtextextended(p_target_auth_user_id::text,0));
 
-  SELECT * INTO op FROM account_deletion_operations WHERE auth_user_id=p_target_auth_user_id;
+  SELECT existing.* INTO op FROM account_deletion_operations existing WHERE existing.auth_user_id=p_target_auth_user_id;
   IF FOUND THEN
     RETURN QUERY SELECT 'existing'::text,op.operation_id,op.auth_user_id,op.player_id,op.state,op.attempts,
       op.last_error_code,op.created_at,op.updated_at,op.app_cleanup_completed_at,op.provider_deleted_at,op.completed_at,
@@ -221,7 +221,7 @@ BEGIN
     RETURN;
   END IF;
 
-  SELECT EXISTS(SELECT 1 FROM pack1_admins WHERE auth_user_id=p_target_auth_user_id) INTO target_admin;
+  SELECT EXISTS(SELECT 1 FROM pack1_admins target_admin_row WHERE target_admin_row.auth_user_id=p_target_auth_user_id) INTO target_admin;
   IF target_admin AND NOT p_acknowledge_admin THEN
     RETURN QUERY SELECT 'admin_ack_required'::text,NULL::uuid,NULL::uuid,NULL::uuid,NULL::text,NULL::integer,NULL::text,
       NULL::timestamptz,NULL::timestamptz,NULL::timestamptz,NULL::timestamptz,NULL::timestamptz,
@@ -243,7 +243,7 @@ BEGIN
 
   UPDATE account_sessions
   SET revoked_at=COALESCE(revoked_at,now())
-  WHERE auth_user_id=p_target_auth_user_id AND revoked_at IS NULL;
+  WHERE account_sessions.auth_user_id=p_target_auth_user_id AND account_sessions.revoked_at IS NULL;
 
   RETURN QUERY SELECT 'created'::text,op.operation_id,op.auth_user_id,op.player_id,op.state,op.attempts,
     op.last_error_code,op.created_at,op.updated_at,op.app_cleanup_completed_at,op.provider_deleted_at,op.completed_at,
