@@ -99,6 +99,7 @@ export function useAccountState({
         if (requireAccount) router.replace('/account');
         return null;
       }
+      clearEnrichment();
       setMessage(error instanceof Error ? error.message : 'Could not restore your account.');
       return null;
     }
