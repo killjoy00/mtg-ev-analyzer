@@ -38,3 +38,25 @@ test('targeted mobile validation ignores PR metadata edits',()=>{
   assert.match(mobile,/group: mobile-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}/);
   assert.match(mobile,/cancel-in-progress: true/);
 });
+
+
+test('Gradle cache is main-seeded, PR-read-only, and absent from signed jobs',()=>{
+  const mainRc = readFileSync('.github/workflows/mobile-exact-main-rc.yml','utf8');
+  const android = readFileSync('.github/workflows/android-production-bundle.yml','utf8');
+  assert.match(mainRc,/actions\/cache\/restore@v4/);
+  assert.match(mainRc,/actions\/cache\/save@v4/);
+  assert.match(mainRc,/mobile\/node_modules\/\*\*\/\.cxx/);
+  assert.match(mainRc,/Verify unsigned Gradle cache contains no signing material/);
+  assert.match(android,/Restore main-seeded unsigned Gradle cache[\s\S]*actions\/cache\/restore@v4/);
+  const signed = android.split('  signed-bundle:')[1] ?? '';
+  assert.doesNotMatch(signed,/actions\/cache\/(?:restore|save)@/);
+  assert.doesNotMatch(mainRc,/~\/\.gradle\/gradle\.properties/);
+});
+
+test('exact-main RC treats main movement as stale evidence, not a build failure',()=>{
+  const mainRc = readFileSync('.github/workflows/mobile-exact-main-rc.yml','utf8');
+  assert.match(mainRc,/id: freshness/);
+  assert.match(mainRc,/echo "current=false" >> "\$GITHUB_OUTPUT"/);
+  assert.match(mainRc,/::notice::RC source/);
+  assert.match(mainRc,/if: steps\.freshness\.outputs\.current == 'true'/);
+});
