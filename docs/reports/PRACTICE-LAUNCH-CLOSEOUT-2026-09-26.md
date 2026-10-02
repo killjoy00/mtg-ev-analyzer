@@ -1,5 +1,9 @@
 # Practice and launch acceptance: issues #516 and #527
 
+## 2026-10-02 update: 100-player stages dropped
+
+The owner dropped 100 players as a target. The NAT gate (`launch-load-policy.json` version 2) now runs 25/50, and the distributed ladder (`launch-distributed-policy.json` version 3) runs 25→50 with the 600-second sustained hold at 50. The 100-player results below remain historical evidence and are not reinterpreted. See `DISTRIBUTED-CAPACITY-629.md`.
+
 ## 2026-09-27 distributed qualification update (#629)
 
 The original #516/#527 evidence below remains historical and valid. A later persistent five-egress 25→50→100 qualification on PR #655 materially improves the distributed evidence without changing its predeclared SLOs.

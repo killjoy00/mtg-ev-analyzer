@@ -1,0 +1,126 @@
+{
+  "version": 1,
+  "full_paths": [
+    ".github/workflows/backend-gate.yml",
+    ".github/workflows/prepare-rebuild.yml",
+    "scripts/backend-gate-scope.mjs",
+    "scripts/backend-gate-map.json",
+    "tests/backend-gate-scope.test.mjs",
+    "migrations/**",
+    "worker/schema.sql",
+    "worker/core.mjs",
+    "worker/index.js",
+    "worker/growth-function.js",
+    "worker/draft-run-function.mjs",
+    "worker/request-json.mjs",
+    "worker/request-limits.mjs",
+    "worker/ingress-auth.mjs",
+    "worker/release.mjs",
+    "worker/neon-trigger.mjs",
+    "worker/origin-telemetry.mjs",
+    "game-date.mjs",
+    "scripts/verify-neon-schema.mjs",
+    "scripts/load_verified_draft_run.mjs"
+  ],
+  "domains": {
+    "account": {
+      "paths": [
+        "worker/account-*.mjs",
+        "worker/username.mjs",
+        "worker/public-identity-safety.mjs",
+        "worker/user-admin.mjs",
+        "worker/apple-auth.mjs"
+      ],
+      "suites": [
+        "tests/account-session-backend-smoke.mjs",
+        "tests/mobile-auth-backend-smoke.mjs",
+        "tests/username-uniqueness-backend-smoke.mjs",
+        "tests/public-identity-backend-smoke.mjs",
+        "tests/account-deletion-backend-smoke.mjs",
+        "tests/request-integrity-backend-smoke.mjs"
+      ]
+    },
+    "subscriptions": {
+      "paths": [
+        "worker/patreon*.mjs",
+        "worker/apple-subscription*.mjs",
+        "worker/apple-subscriptions.mjs",
+        "worker/apple-jws.mjs",
+        "worker/apple-root-certificates.mjs",
+        "worker/capabilities.mjs"
+      ],
+      "suites": [
+        "tests/patreon-backend-smoke.mjs",
+        "tests/patreon-webhook-backend-smoke.mjs",
+        "tests/apple-subscription-backend-smoke.mjs",
+        "tests/capabilities-backend-smoke.mjs"
+      ]
+    },
+    "draft_run": {
+      "paths": [
+        "worker/decision-measurements.mjs",
+        "worker/measurement-admin.mjs",
+        "worker/draft-start-timing.mjs",
+        "worker/draft-run-pool.mjs",
+        "draft-run.mjs",
+        "draft-run-policy.mjs",
+        "draft-run-difficulty.mjs"
+      ],
+      "suites": [
+        "tests/draft-run-backend-smoke.mjs",
+        "tests/cube-run-backend-smoke.mjs",
+        "tests/decision-measurements-backend-smoke.mjs",
+        "tests/measurement-report-math.mjs",
+        "tests/eight-pick-backend-smoke.mjs"
+      ]
+    },
+    "daily": {
+      "paths": [
+        "worker/daily-generation-*.mjs",
+        "worker/draft-run-daily.mjs",
+        "daily-selection.mjs",
+        "data/selection-policy.json"
+      ],
+      "suites": [
+        "tests/selection-backend-smoke.mjs",
+        "tests/fixed-daily-backend-smoke.mjs",
+        "tests/daily-generation-backend-smoke.mjs"
+      ]
+    },
+    "corpus": {
+      "paths": [
+        "worker/corpus-*.mjs",
+        "worker/serving-statistics.mjs",
+        "worker/activated-snapshot-smoke.mjs",
+        "worker/draft-run-selection.mjs",
+        "worker/draft-run-health.mjs",
+        "worker/trophy-import*.mjs",
+        "scripts/*corpus*manifest.mjs",
+        "scripts/load*tro*.mjs"
+      ],
+      "suites": [
+        "tests/staged-manifest-backend-smoke.mjs",
+        "tests/source-eligibility-backend-smoke.mjs",
+        "tests/corpus-components-backend-smoke.mjs",
+        "tests/retirement-backend-smoke.mjs",
+        "tests/corpus-version-backend-smoke.mjs",
+        "tests/serving-statistics-backend-smoke.mjs",
+        "tests/serving-cache-backend-smoke.mjs",
+        "tests/corpus-admin-backend-smoke.mjs",
+        "tests/snapshot-uniqueness-backend-smoke.mjs",
+        "tests/corpus-health-freshness-backend-smoke.mjs",
+        "tests/activated-snapshot-backend-smoke.mjs",
+        "tests/health-serving-backend-smoke.mjs",
+        "tests/corpus-readiness-backend-smoke.mjs"
+      ]
+    },
+    "seasons": {
+      "paths": [
+        "worker/draft-run-season.mjs"
+      ],
+      "suites": [
+        "tests/season-backend-smoke.mjs"
+      ]
+    }
+  }
+}
