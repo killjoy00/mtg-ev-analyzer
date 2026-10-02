@@ -247,6 +247,7 @@ test('Career rejects a stale pagination page after account identity changes', as
       View: host('View'),
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/client': { ApiError: class ApiError extends Error {} },
     '@/src/api/career': {
       loadMobileCareer: async (session) => profile(session === sessionA ? 'Player A' : 'Player B'),
       loadMobileCareerHistory: async (session, cursor) => {
@@ -528,6 +529,7 @@ test('Profile visibility toggles an initially public profile off on the first ta
         enrichmentBusy: false,
         enrichmentWarning: null,
         refresh: async () => null,
+        adoptProfile: () => null,
       }),
     },
     '@/src/theme': theme,
