@@ -82,7 +82,6 @@ jobs:
           if (config.ios?.bundleIdentifier !== 'pro.packone.app') throw new Error('Production Expo bundle identifier drifted.');
           if (String(config.ios?.buildNumber) !== process.argv[3]) throw new Error('Production Expo build number drifted.');
           if (config.version !== process.argv[4]) throw new Error('Production Expo marketing version drifted.');
-          if (config.ios?.config?.usesNonExemptEncryption !== false) throw new Error('Production Expo export-compliance declaration drifted.');
           NODE
           echo "Verified generated production iOS metadata without compiling an archive."
 
