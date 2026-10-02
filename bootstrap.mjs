@@ -80,7 +80,7 @@ function syncPrimaryNavState(state) {
     account.dataset.accountState=state;
     account.toggleAttribute('aria-busy',checking);
     account.textContent=signed?'My Pack One':state==='signed-out'?'Sign in':unavailable?'Retry account':'Account';
-    account.title=unavailable?'Account status is temporarily unavailable. Retry the session check.':'';
+    account.title=unavailable?'Account status is temporarily unavailable. Try checking your account again.':'';
   }
 }
 syncPrimaryNavState('checking');
