@@ -86,8 +86,11 @@ export default function RootLayout() {
           <Stack.Screen name="method" options={{ title: 'Method' }} />
           <Stack.Screen name="sets" options={{ title: 'Sets' }} />
           <Stack.Screen name="set-archive" options={{ title: 'Set Archive' }} />
-          <Stack.Screen name="account" options={{ title: 'Account', headerRight: MembershipEntry }} />
+          <Stack.Screen name="account" options={{ title: 'Account' }} />
+          <Stack.Screen name="account-profile" options={{ title: 'Profile & visibility' }} />
           <Stack.Screen name="membership" options={{ title: 'Membership' }} />
+          <Stack.Screen name="account-security" options={{ title: 'Sign-in & security' }} />
+          <Stack.Screen name="account-delete" options={{ title: 'Delete account' }} />
         </Stack>
       </>
     </VersionGate>
