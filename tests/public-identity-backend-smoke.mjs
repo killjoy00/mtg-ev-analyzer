@@ -83,7 +83,7 @@ async function account(label) {
 const reporter=await account('reporter');
 const target=await account('target');
 const hideRaceTarget=await account('hide-race');
-const deletionRaceTarget=await account('delete-race');
+const deletionRaceTarget=await account('del-race');
 const adminId=crypto.randomUUID(),adminToken=crypto.randomUUID()+crypto.randomUUID();
 
 try {
@@ -255,12 +255,12 @@ try {
   // reject without an audit row.
   await callGrowth('/v1/profile',{
     method:'PATCH',playerToken:deletionRaceTarget.token,accountToken:deletionRaceTarget.accountToken,
-    body:{displayName:`PI Delete Race ${tag}`,profilePublic:false},
+    body:{displayName:`PI Del Race ${tag}`,profilePublic:false},
   });
   const [renameVsDelete,deleteVsRename]=await Promise.all([
     callAdminRaw(`/v1/admin/users/${deletionRaceTarget.authId}/username`,{
       method:'PATCH',accountToken:adminToken,
-      body:{displayName:`PI Delete Renamed ${tag}`,reason:'QA rename-delete race'},
+      body:{displayName:`PI Del Rename ${tag}`,reason:'QA rename-delete race'},
     }),
     beginAdminDeletion(query,{
       authUserId:deletionRaceTarget.authId,
