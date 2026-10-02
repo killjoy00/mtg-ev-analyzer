@@ -81,7 +81,7 @@ if(action==='activate') {
       FROM requested r
       JOIN draft_run_environment_policy e ON e.set_id=r.set_id AND e.active_snapshot_id=r.previous_snapshot_id
       JOIN corpus_source_snapshots old ON old.source_snapshot_id=r.previous_snapshot_id
-        AND old.set_id=r.set_id AND old.corpus_version=$2
+        AND old.set_id=r.set_id AND old.corpus_version=$2 AND old.lifecycle_status IN ('Approved','Candidate')
       JOIN corpus_source_snapshots target ON target.source_snapshot_id=r.target_snapshot_id
         AND target.set_id=r.set_id AND target.corpus_version=$3 AND target.lifecycle_status='Candidate'
       JOIN LATERAL (
@@ -122,7 +122,7 @@ if(action==='activate') {
       (SELECT count(*) FROM superseded)::int superseded,
       (SELECT count(*) FROM audit)::int audited`,
     [mapJson,modelVersions.v4.corpus_version,modelVersions.v5.corpus_version,CORPUS_GATE_VERSION,mapping.length,reason,identityJson])).rows[0];
-  if(Number(result?.changed)!==mapping.length||Number(result?.audited)!==mapping.length)throw Error('Cross-version activation compare-and-swap failed: '+JSON.stringify(result));
+  if(Number(result?.changed)!==mapping.length||Number(result?.superseded)!==mapping.length||Number(result?.audited)!==mapping.length)throw Error('Cross-version activation compare-and-swap failed: '+JSON.stringify(result));
   await registerServingReadiness(query);
   const readiness=await advanceServingReadiness(query);
   if(!readiness.ready)throw Error('v9 parent activation committed but readiness is not ready: '+JSON.stringify(readiness));
