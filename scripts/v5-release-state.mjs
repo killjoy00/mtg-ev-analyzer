@@ -1,5 +1,6 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import {pathToFileURL} from 'node:url';
 import modelVersions from '../model-versions.json' with {type:'json'};
 import {corpusDatabase} from './neon-corpus-db.mjs';
 
@@ -66,4 +67,4 @@ async function main() {
       before_history_counts:before.history_counts,after_history_counts:after.history_counts}));
   }
 }
-if(process.argv[1]&&new URL('file://'+process.argv[1]).pathname===new URL(import.meta.url).pathname)await main();
+if(process.argv[1]&&pathToFileURL(path.resolve(process.argv[1])).href===import.meta.url)await main();
