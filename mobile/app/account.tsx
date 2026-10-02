@@ -62,6 +62,7 @@ export default function AccountScreen() {
     profileKey?: string;
     pendingAction?: string;
     reportReason?: string;
+    notice?: string;
   }>();
   const validateDailyRunId = typeof params.validateDailyRunId === 'string'
     ? params.validateDailyRunId
@@ -76,6 +77,7 @@ export default function AccountScreen() {
     ? params.pendingAction
     : undefined;
   const reportReason = typeof params.reportReason === 'string' ? params.reportReason : undefined;
+  const routeNotice = typeof params.notice === 'string' ? params.notice : null;
 
   const {
     session,
@@ -555,7 +557,7 @@ export default function AccountScreen() {
           </>
         )}
 
-        {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
+        {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
         {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
       </ScrollView>
     </SafeAreaView>
