@@ -2,15 +2,16 @@
 
 Updated 2026-10-01. This file is the source-of-truth submission packet for the first free public mobile release.
 
-## Current store release checkpoint — 2026-09-30
+## Current store release checkpoint — 2026-10-01
 
-- **iOS 1.0:** signed build `100321`, source revision `5fce31805e277a1d234ff40ad3df381faf75602c`. GitHub Actions run `36722154047` uploaded the build, App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached that exact build to App Store version 1.0. Release type remains manual. The earlier build `100311` was TestFlight Internal Only and is not the customer-submission RC.
-- **Android 1.0:** signed versionCode `100311`, source revision `c04ab3ba9f9def47708c67c2581596bcbd35f5c4`. Internal upload run `36663310963` committed it to Google Play Internal Testing. Closed-testing run `36668780511` then promoted the same bundle unchanged to the existing `production-access` Closed Testing track with `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`.
-- **Closed-test geography:** the owner confirmed the `production-access` track is active and targets Canada and the United States. The failed `alpha` attempt is not the qualification track and was rejected before commit because that track targeted no countries.
-- **Store assets:** Apple iPhone/iPad screenshots and the Elite review screenshot are uploaded. Google Play has the reviewed icon, five phone screenshots, and the feature graphic committed.
+- **iOS 1.0 current post-#837 candidate:** signed build `100415`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. GitHub Actions run `36957484955` uploaded it; App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached build `100415` to App Store version 1.0. Release type remains manual.
+- **Android 1.0 current post-#837 build artifact:** signed versionCode `100444`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. Run `36957485029` built the Play-signed production AAB and verified the registered Google Play upload certificate. **It has not yet been uploaded to Google Play or promoted to `production-access`.**
+- **Current live Closed Testing candidate:** versionCode `100368` remains active on `production-access` with `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true` from run `36945786549`. It is superseded for final device acceptance by post-#837 Android build `100444`, but remains the live qualification-track release until the newer bundle is uploaded and promoted.
+- **Closed-test geography:** the `production-access` track targets Canada and the United States. Legacy `alpha` is not the qualification track.
+- **Apple public availability:** the owner completed first-time App Store availability setup for **United States + Canada only** in App Store Connect on 2026-10-01. The repo now carries a read-only API verifier; it must confirm exactly `CAN,USA`, `availableInNewTerritories=false`, and no pre-order state.
+- **Store assets:** Apple iPhone/iPad screenshots and the Elite review screenshot are uploaded. Google Play has the reviewed icon, five phone screenshots, and the feature graphic committed. Re-capture only if the final accepted RC materially changes a captured scene.
 - **Google Data Safety:** submitted successfully by run `36632174516`.
 - **Apple metadata already live:** version 1.0 is manual release; the en-US listing copy, privacy policy/choices URLs, content-rights declaration, and reviewed 12+ age-rating answers are present.
-- **Source equivalence note:** the changes between Android RC source `c04ab3b` and current `5fce318` are release-control/test files only; no Android/iOS application runtime source changed. The current exact-main RC smoke run `36722154500` also passed all stages.
 
 ## Shared release identity
 
@@ -194,15 +195,15 @@ Pack One is unofficial Fan Content permitted under the Wizards Fan Content Polic
 
 ### App content declarations
 
-- Ads: **Yes**. Native Pack One intentionally renders clearly disclosed TCGplayer affiliate promotional links (the Daily-home fallback and reviewed revealed-card destinations). The binary still has no third-party ad SDK and does not use an advertising ID.
-  - Rationale: Google Play's current App Content guidance requires an ads declaration and explicitly includes display/native/banner ads; its examples are non-exhaustive. Pack One's affiliate promotional surfaces are therefore declared conservatively as ads even though they are first-party-rendered links rather than an ad SDK.
+- Ads: **Yes (conservative declaration).** Native Pack One renders a dedicated, clearly disclosed Daily-home TCGplayer sponsored affiliate promotion/banner outside gameplay, plus contextual revealed-card affiliate links. The binary has no third-party ad SDK and does not use an advertising ID.
+  - Rationale: Play's ads declaration explicitly covers display/native/banner advertising but does not specifically classify every affiliate link as an ad. Pack One therefore bases the conservative **Yes** on the dedicated banner-like sponsored promotion, not on contextual revealed-card links alone.
 - App access: Some features are available without login; account and Elite features require access. Supply one non-expiring Elite reviewer account in Play Console Sign-in details. Do not store its password in Git.
 - Privacy policy: https://packone.pro/privacy/
 - Account deletion URL: https://packone.pro/privacy/#delete-account
 - Target audience: default recommendation is ages 13 and over; do not select under-13 groups unless the product is intentionally redesigned for children.
 - Content rating: complete IARC from the actual content. No gambling/wagering/chat. Card art may contain fantasy violence and must be reflected accurately.
 - Data safety: use the declaration below.
-- Contains ads: **Yes** for Play's declaration because the app contains disclosed third-party affiliate promotional surfaces; this is true even though there is no ad SDK.
+- Contains ads: **Yes** as the conservative declaration because Pack One contains the dedicated Daily-home sponsored affiliate promotion/banner; there is still no ad SDK or advertising ID.
 - In-app purchases: No for v1; Pack One does not sell digital access in the Android app.
 
 ### Data safety - conservative v1 declaration
@@ -289,34 +290,40 @@ These are the remaining **non-physical-device** actions confirmed to be outside 
    - App Store Connect -> Business / Agreements, Tax, and Banking.
    - Confirm there is no agreement, tax-form, or banking action blocking paid auto-renewable subscriptions.
 
+4. **Apple public availability — completed by owner on 2026-10-01.**
+   - App Store Connect was set to **Specific Countries or Regions** with **United States** and **Canada** only.
+   - **Publish as Pre-Order** was not selected.
+   - The repo's guarded App Store availability workflow is now **read-only verification only**. It verifies exactly `CAN,USA`, `availableInNewTerritories=false`, and no pre-order state; it cannot change availability.
+
+
 Physical iPhone/iPad acceptance remains separate and is intentionally not listed here.
 
 ### Google Play Console
 
-4. **Finish the remaining App content forms.**
+5. **Finish the remaining App content forms.**
    - Play Console -> Pack One -> **Policy and programs -> App content**.
-   - **Ads:** declare **Yes** using the rationale in this document (disclosed TCGplayer affiliate promotional links; no ad SDK/advertising ID).
+   - **Ads:** declare **Yes** conservatively because Pack One has the dedicated Daily-home sponsored TCGplayer affiliate promotion/banner. Do not rely on contextual revealed-card affiliate links alone as the rationale; there is no ad SDK or advertising ID.
    - **App access:** state that some features work as a guest, but account/Elite features require sign-in. Enter the private non-expiring Elite reviewer credential directly in Play Console; do not put it in Git or chat.
    - **Target audience and content:** select the intended **13+** audience; do not select under-13 groups.
    - **Content rating (IARC):** complete the questionnaire from the real app: no gambling/wagering/chat, but card art can contain fantasy combat/violence.
    - Data Safety is already submitted; do not redo it unless Play reports a new required correction.
 
-5. **Turn on Managed Publishing before production-review changes.**
+6. **Turn on Managed Publishing before production-review changes.**
    - Play Console -> **Publishing overview**.
    - Under Managed publishing status, choose **Turn on managed publishing** and save.
    - Leave it on while the first production submission/review is being prepared so approval does not publish unexpectedly.
 
-6. **Set the public Production countries to United States + Canada only.**
+7. **Set the public Production countries to United States + Canada only.**
    - Play Console -> **Production** -> **Countries / regions**.
    - Target **United States** and **Canada** only for the first public release.
    - Do not assume the `production-access` closed-test geography automatically configures the Production track; treat these as separate settings.
 
-7. **Verify the closed-test qualification clock and tester count.**
+8. **Verify the closed-test qualification clock and tester count.**
    - Open **Closed testing -> production-access**.
    - Confirm the tester opt-in link is the one being used and that the required testers are shown as continuously opted in.
    - If this developer account is subject to Google's newer-personal-account rule, keep at least 12 testers continuously opted in for 14 days. Do not reset/recreate the track during that period.
 
-8. **Apply for Production access when Play enables the application.**
+9. **Apply for Production access when Play enables the application.**
    - When the Dashboard says the testing requirement is satisfied, open the Production access application.
    - Answer Google's questions about the closed test, tester engagement/feedback, app purpose, and production readiness truthfully.
    - Submit the production-access application.
@@ -324,13 +331,13 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 ### GitHub / Google Cloud release-credential boundary
 
-9. **Finish the account-level release-credential boundary without adding unwanted manual approvals.**
+10. **Finish the account-level release-credential boundary without adding unwanted manual approvals.**
    - GitHub repo -> Settings -> Environments -> `pack-one-mobile-release`.
    - Restrict deployment branches to the intended release branch policy.
    - Keep Apple release secrets scoped to this Environment rather than generally available repository secrets.
    - Do **not** add required reviewers unless you intentionally want every release job to wait for a human approval; the current desired workflow does not require that manual gate.
 
-10. **Narrow Google Workload Identity trust.**
+11. **Narrow Google Workload Identity trust.**
    - In Google Cloud IAM / Workload Identity Federation, restrict the Pack One provider/service-account trust so store credentials are accepted only from the intended Pack One repository and approved release context.
    - Do not broaden repository workflow access merely to make a release pass.
    - After you make this change, the repo can re-run the non-publishing Apple/Google access probes and record the result.
@@ -339,8 +346,8 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 Do **not** spend console time on these unless an automated probe reports a problem:
 - uploading/replacing the current RC binaries;
-- attaching the current successful App Store-eligible iOS RC to App Store version 1.0; build `100321` is already attached, and run `36945800291` is producing the next current-main replacement;
-- moving Android to the `production-access` Closed Testing track; versionCode `100368` is active there with `releaseStatus=completed`;
+- attaching the current successful App Store-eligible iOS RC to App Store version 1.0; post-#837 build `100415` is already `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `36957484955`;
+- building the post-#837 Android RC; versionCode `100444` is already signed and built. The remaining automated Android work is to upload that exact candidate and promote it unchanged to `production-access`; versionCode `100368` remains the currently active closed-test release until then;
 - Google Data Safety or store graphics (already done);
 - App Store listing copy, manual-release flag, reviewed age-rating answers, or content-rights declaration (already present);
 - release-track/API status audits;

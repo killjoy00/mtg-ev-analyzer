@@ -56,10 +56,10 @@ The store-free smoke proves source/build reproducibility only. It never substitu
 ## Pack One 1.0 current release checkpoint
 
 As of 2026-10-01:
-- Android current candidate: versionCode `100368`, originally uploaded to Internal Testing by run `36942689929` from source `8cd42a70344f9f2000f8652babc63d7d65af7a38`, then promoted to the existing `production-access` Closed Testing track by run `36945786549`. Google returned `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`.
-- The `production-access` track is the canonical production-qualification closed-test track. It targets United States + Canada. Do not use the legacy `alpha` track for qualification.
-- iOS last fully verified customer-submission RC remains build `100321`, source `5fce31805e277a1d234ff40ad3df381faf75602c`, App Store Connect `VALID` + `APP_STORE_ELIGIBLE`, attached to App Store version 1.0 by run `36722154047`.
-- A fresh current-main iOS replacement from `304cc1cb007361ff61722ce3439a669405a406a1` is being produced by run `36945800291`; it does not supersede build `100321` until that workflow finishes successfully and records the new App Store Connect processing/attachment evidence.
+- iOS current post-#837 candidate: build `100415`, source `fa588b40bc380946735385abfac0ff52586e1873`. Run `36957484955` completed successfully; App Store Connect reports `VALID` + `APP_STORE_ELIGIBLE`, and build `100415` is attached to App Store version 1.0.
+- Android current post-#837 build artifact: versionCode `100444`, same source revision. Run `36957485029` built and signed the production AAB and verified the registered Play upload certificate. It is not yet uploaded/promoted.
+- Android live qualification-track release remains versionCode `100368` on `production-access` with `releaseStatus=completed`. Upload/promote `100444` unchanged before final Android physical acceptance/submission.
+- Apple first public app availability was set manually to **United States + Canada only** on 2026-10-01. The guarded repo path is now read-only verification only.
 - Owner-only non-device console/account steps are maintained in `docs/mobile-store-submission.md`. Physical-device acceptance remains separate.
 
 ## Apple Elite subscription prerequisites
@@ -85,10 +85,11 @@ Before an iOS candidate can be treated as release-ready:
 8. Confirm Sign in with Apple Hide My Email delivery and Apple-confirmed account deletion/revocation. Separately exercise StoreKit Sandbox/TestFlight renewal, cancellation-at-period-end, billing grace, refund/revocation, Restore Purchases, same-account binding, wrong-account rejection, and duplicate-provider protection.
 9. In App Store Connect version 1.0, attach that exact build.
 10. Fill metadata from `docs/mobile-store-submission.md`.
-11. Select **Manually release this version**.
-12. Submit for App Review.
-13. After approval, keep the app in Pending Developer Release until the owner explicitly approves launch.
-14. Manually release.
+11. Confirm the already-completed App Store availability setting remains **United States + Canada only** using the repo's read-only availability verifier; do not enable pre-order.
+12. Select **Manually release this version**.
+13. Submit for App Review.
+14. After approval, keep the app in Pending Developer Release until the owner explicitly approves launch.
+15. Manually release.
 
 ## Android normal release
 

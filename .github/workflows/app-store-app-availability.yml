@@ -1,4 +1,4 @@
-name: App Store public availability
+name: App Store public availability verification
 
 on:
   push:
@@ -10,12 +10,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: app-store-public-availability
+  group: app-store-public-availability-verification
   cancel-in-progress: false
 
 jobs:
-  configure:
-    name: configure App Store public availability
+  verify:
+    name: verify App Store public availability
     if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
     runs-on: ubuntu-latest
     environment: pack-one-mobile-release
@@ -25,7 +25,7 @@ jobs:
       ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
     steps:
       - uses: actions/checkout@v4
-      - name: Validate guarded availability request
+      - name: Validate guarded verification request
         shell: bash
         run: |
           set -euo pipefail
@@ -35,10 +35,10 @@ jobs:
           r=json.loads(Path('.github/app-store-app-availability-request.json').read_text())
           if set(r) != {'operation','reason','territories'}:
               raise SystemExit('Invalid App Store availability request keys.')
-          if r.get('operation') != 'configure-app-store-availability':
+          if r.get('operation') != 'verify-app-store-availability':
               raise SystemExit('Invalid App Store availability operation.')
           if r.get('territories') != ['USA','CAN']:
-              raise SystemExit('This guarded request is pinned to USA + CAN only.')
+              raise SystemExit('This verification is pinned to USA + CAN only.')
           if not isinstance(r.get('reason'),str) or not r['reason'].strip():
               raise SystemExit('Request reason is required.')
           PY
@@ -51,5 +51,5 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Configure Pack One App Store availability to USA + Canada only
+      - name: Verify Pack One App Store availability is USA + Canada only
         run: node .github/scripts/app-store-app-availability.mjs

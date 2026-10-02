@@ -113,8 +113,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
     } else if (path === '.github/workflows/app-store-app-availability.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && github\.event_name == 'push'/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/app-store-app-availability-request\.json'/s, path);
-      assert.match(workflow, /configure-app-store-availability/, path);
-      assert.match(workflow, /\['USA','CAN'\]/, path);
+      assert.match(workflow, /verify-app-store-availability/, path);
       assert.doesNotMatch(workflow, /workflow_dispatch:/, path);
       assert.doesNotMatch(workflow, /pull_request:/, path);
     } else if (path === '.github/workflows/android-internal-status.yml') {
@@ -176,26 +175,21 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
 
   const appAvailabilityRequest = JSON.parse(read('.github/app-store-app-availability-request.json'));
   assert.deepEqual(Object.keys(appAvailabilityRequest).sort(), ['operation','reason','territories']);
-  assert.equal(appAvailabilityRequest.operation, 'configure-app-store-availability');
+  assert.equal(appAvailabilityRequest.operation, 'verify-app-store-availability');
   assert.deepEqual(appAvailabilityRequest.territories, ['USA','CAN']);
   assert.equal(typeof appAvailabilityRequest.reason, 'string');
   assert.ok(appAvailabilityRequest.reason.trim().length > 0);
 
   const appAvailabilityScript = read('.github/scripts/app-store-app-availability.mjs');
-  assert.match(appAvailabilityScript, /targetTerritories=\['USA','CAN'\]/);
-  assert.match(appAvailabilityScript, /availableInNewTerritories:false/);
-  assert.match(appAvailabilityScript, /appAvailabilityV2\?fields%5BappAvailabilities%5D=availableInNewTerritories/);
-  assert.match(appAvailabilityScript, /\/v1\/apps\/\$\{appId\}\/appAvailability\?include=availableTerritories/);
-  assert.match(appAvailabilityScript, /api\('\/v1\/appAvailabilities'/);
-  assert.match(appAvailabilityScript, /availableTerritories:\{data:targetTerritories\.map/);
-  assert.match(appAvailabilityScript, /exactTarget\(ids\)/);
+  assert.match(appAvailabilityScript, /appAvailabilityV2/);
+  assert.match(appAvailabilityScript, /available\.join\(','\)!=='CAN,USA'/);
   assert.match(appAvailabilityScript, /preOrderEnabled===true/);
-  assert.match(appAvailabilityScript, /Refusing to repurpose an existing v2 availability resource/);
-  assert.doesNotMatch(appAvailabilityScript, /fields%5Bapps%5D=bundleId,availableInNewTerritories/);
-  assert.doesNotMatch(appAvailabilityScript, /method:'POST'[\s\S]*?\/v2\/appAvailabilities/);
+  assert.match(appAvailabilityScript, /PREORDER/);
+  assert.match(appAvailabilityScript, /readOnly:true/);
+  assert.doesNotMatch(appAvailabilityScript, /method:\s*['"]POST['"]/);
+  assert.doesNotMatch(appAvailabilityScript, /method:\s*['"]PATCH['"]/);
   assert.doesNotMatch(appAvailabilityScript, /reviewSubmissions/);
   assert.doesNotMatch(appAvailabilityScript, /appStoreVersionReleaseRequests/);
-  assert.doesNotMatch(appAvailabilityScript, /endAppAvailabilityPreOrders/);
 
   const dataSafetyRequest = JSON.parse(read('.github/google-play-data-safety-request.json'));
   assert.deepEqual(Object.keys(dataSafetyRequest).sort(), ['mode','operation','reason']);
