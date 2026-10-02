@@ -17,12 +17,12 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
   const dailyDate=new Intl.DateTimeFormat('en-US',{month:'long',day:'numeric',timeZone:'UTC'}).format(new Date(day+'T12:00:00Z'));
   const claimed=ready&&Boolean(profile?.player?.claimed);
   const rankingReason=ready?profile?.ranking_identity?.reason:null;
-  const usernameAttention=rankingReason==='username_taken'||rankingReason==='username_required';
+  const displayNameAttention=['username_taken','username_required','name_not_allowed'].includes(rankingReason);
   const dailyStreak=ready?Number(profile?.daily_streak||0):0;
   const nextDailyCue=`${dailyResetCue()}${dailyStreak>=2?` · ${dailyStreak}-day streak`:''}`;
   return `<section class="daily-home" data-daily-home data-home-state="${state}" data-completed="${ready?status.completed:'pending'}">
     <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Make your pick, then see what the trophy drafter chose and how strong your pick was.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
-    ${usernameAttention?'<aside class="daily-home-identity-warning" role="alert"><div><strong>Choose a unique username before playing a Daily.</strong><p>Your account still needs a unique username. Until you choose one, Daily results will not appear on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change username</button></aside>':''}
+    ${displayNameAttention?`<aside class="daily-home-identity-warning" role="alert"><div><strong>${rankingReason==='name_not_allowed'?'That display name is not allowed. Choose another to join Daily leaderboards.':rankingReason==='username_taken'?'Choose a different display name. That one is already taken.':'Choose a display name before playing a Daily.'}</strong><p>Until you choose an available display name, Daily results will not appear on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change display name</button></aside>`:''}
     <div class="daily-home-games">${games.map(game => {
       const result = status[game.key];
       const complete=ready&&result.complete;
@@ -49,9 +49,9 @@ export function renderDailyHome(profile = null, state = 'ready') {
   }
   lastDay = gameDateKey();
   document.querySelector('#app').innerHTML = dailyHomeMarkup(profile, lastDay, state);
-  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=7')).renderAccount());
+  document.querySelector('[data-home-account]')?.addEventListener('click', async () => (await import('./growth.mjs?v=8')).renderAccount());
   document.querySelector('[data-home-username]')?.addEventListener('click', async () => {
-    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=7')).renderAccount({notice:'Choose a unique username to join Daily leaderboards.'});return;}
+    if(!profile?.player?.claimed){await (await import('./growth.mjs?v=8')).renderAccount({notice:'Choose a display name to join Daily leaderboards.'});return;}
     const profiles=await import('./profile-product.mjs?v=7');
     await profiles.renderMyProfile();
     document.querySelector('#profile-account-tab')?.click();
