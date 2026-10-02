@@ -407,7 +407,7 @@ export default function AccountScreen() {
             <Text style={styles.title}>Account</Text>
             <View style={styles.panel}>
               <Text style={styles.panelTitle}>{signedInLabel}</Text>
-              <Text style={styles.body}>You're signed in on this device. Your Pack One progress syncs with this account.</Text>
+              <Text style={styles.body}>You&apos;re signed in on this device. Your Pack One progress syncs with this account.</Text>
 
               <Pressable accessibilityRole="button" onPress={() => router.push('/account-profile')} style={styles.row}>
                 <View style={styles.rowCopy}>
