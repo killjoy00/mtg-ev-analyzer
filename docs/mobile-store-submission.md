@@ -1,6 +1,6 @@
 # Pack One mobile store submission packet
 
-Updated 2026-10-01. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated 2026-10-02. This file is the source-of-truth submission packet for the first free public mobile release.
 
 ## Current store release checkpoint — 2026-10-01
 
@@ -268,79 +268,67 @@ Use the repository's deterministic native screenshot harness rather than mock ma
 
 ## Owner-only non-device actions still required
 
-These are the remaining **non-physical-device** actions confirmed to be outside the current ChatGPT/GitHub-connected tooling boundary: they require the account holder to use a logged-in provider console, enter private credentials, accept legal/financial terms, supply human testers, or make an account-owner attestation. Everything else should remain with the automated release path.
+Only unfinished owner actions are listed here. Completed, intentionally declined, and intentionally skipped items are omitted so this section functions as an actionable launch checklist.
 
 ### Apple / App Store Connect
 
-1. **Apple App Privacy — completed by owner on 2026-10-02.**
-   - The published answers use the conservative v1 declaration in this document: Name, Email Address, User ID, Purchase History, and Product Interaction; linked as described; no tracking.
-
-2. **Enter the private App Review account credential and contact details.**
-   - Open App Store version 1.0 -> **App Review Information**.
-   - Enter the real review contact name, phone, and email.
-   - Set demo account required as appropriate and enter the non-expiring reviewer account username/password directly in App Store Connect.
-   - Do **not** put the reviewer password in Git, an issue, or chat.
-   - Use the review notes and reviewer path already prepared in this document.
-
-3. **Apple agreements, tax, and banking — completed by owner on 2026-10-02.**
-
-4. **Apple public availability — completed by owner on 2026-10-01.**
-   - App Store Connect was set to **Specific Countries or Regions** with **United States** and **Canada** only.
-   - **Publish as Pre-Order** was not selected.
-   - The repo's guarded App Store availability workflow is now **read-only verification only**. It verifies exactly `CAN,USA`, `availableInNewTerritories=false`, and no pre-order state; it cannot change availability.
-
+1. **Create and enter the shared store-review account.**
+   - Create a normal Pack One account using `ryanmindell+packone-app-review@gmail.com`.
+   - Complete the normal Pack One email verification/password flow; keep the password private and do not put it in Git, an issue, or chat.
+   - After the account exists, add non-expiring manual grants for both Elite capabilities: `custom_corpus` and `unlimited_cube_practice`.
+   - In App Store Connect -> Apps -> Pack One -> version 1.0 -> **App Review Information**, enter the review contact name, phone, and email.
+   - Enter the reviewer account email/password there and use the review notes/reviewer path already prepared in this document.
 
 Physical iPhone/iPad acceptance remains separate and is intentionally not listed here.
 
 ### Google Play Console
 
-5. **Finish the remaining App content forms.**
+2. **Finish the remaining App content forms.**
    - Play Console -> Pack One -> **Policy and programs -> App content**.
-   - **Ads:** declare **Yes** conservatively because Pack One has the dedicated Daily-home sponsored TCGplayer affiliate promotion/banner. Do not rely on contextual revealed-card affiliate links alone as the rationale; there is no ad SDK or advertising ID.
-   - **App access:** state that some features work as a guest, but account/Elite features require sign-in. Enter the private non-expiring Elite reviewer credential directly in Play Console; do not put it in Git or chat.
+   - **Ads:** answer **Yes** because Pack One has the dedicated Daily-home sponsored TCGplayer affiliate promotion/banner. There is no ad SDK or advertising ID.
+   - **App access / Sign-in details:** state that some features work as a guest but account/Elite features require sign-in. Enter the same non-expiring Elite reviewer account used for Apple.
    - **Target audience and content:** select the intended **13+** audience; do not select under-13 groups.
-   - **Content rating (IARC):** complete the questionnaire from the real app: no gambling/wagering/chat, but card art can contain fantasy combat/violence.
-   - Data Safety is already submitted; do not redo it unless Play reports a new required correction.
+   - **Content rating (IARC):** complete the questionnaire from the real app: no gambling/wagering/chat; card art can contain fantasy combat/violence.
+   - Data Safety is already submitted; do not redo it unless Play reports a required correction.
 
-6. **Managed Publishing — intentionally not used.**
-   - The owner chose the normal Google Play publishing flow for the first production launch.
-   - Do not treat Managed Publishing as a launch prerequisite.
+3. **Set public Production countries to United States + Canada only.**
+   - Play Console -> Pack One -> **Production** -> **Countries / regions**.
+   - Target **United States** and **Canada** only.
+   - Treat Production geography as separate from the `production-access` closed-test geography.
 
-7. **Set the public Production countries to United States + Canada only.**
-   - Play Console -> **Production** -> **Countries / regions**.
-   - Target **United States** and **Canada** only for the first public release.
-   - Do not assume the `production-access` closed-test geography automatically configures the Production track; treat these as separate settings.
+4. **Keep the closed-test qualification alive until Google marks it complete.**
+   - Play Console -> Pack One -> **Closed testing -> production-access**.
+   - Do not recreate, reset, or replace the track while the qualification clock is running.
+   - Keep at least 12 testers continuously opted in for the required 14-day period.
+   - No additional action is required unless Play shows that the tester count or continuity requirement has been broken.
 
-8. **Verify the closed-test qualification clock and tester count.**
-   - Open **Closed testing -> production-access**.
-   - Confirm the tester opt-in link is the one being used and that the required testers are shown as continuously opted in.
-   - If this developer account is subject to Google's newer-personal-account rule, keep at least 12 testers continuously opted in for 14 days. Do not reset/recreate the track during that period.
-
-9. **Apply for Production access when Play enables the application.**
-   - When the Dashboard says the testing requirement is satisfied, open the Production access application.
+5. **Apply for Production access when Google enables the application.**
+   - When Play Console says the testing requirement is satisfied, open the Production access application.
    - Answer Google's questions about the closed test, tester engagement/feedback, app purpose, and production readiness truthfully.
-   - Submit the production-access application.
-   - Record the submission/approval date in issue #575.
+   - Submit the application.
+   - Record the submission date and later the approval date in issue #575.
 
-### GitHub / Google Cloud release-credential boundary
+### Google Cloud release-credential boundary
 
-10. **GitHub release Environment branch restriction — completed by owner on 2026-10-02.**
-   - `pack-one-mobile-release` is restricted to **`main` only**.
-   - **Required reviewers remain disabled**; the owner does not want a human approval gate on every release.
-   - **Secret re-scoping is intentionally declined and is not a launch blocker.** The owner no longer has access to the existing Apple release secret values and does not want to regenerate them solely to move them from repository scope to Environment scope.
-   - Do **not** reopen, re-request, or treat Apple secret re-scoping as remaining #575 owner work unless the owner explicitly changes this decision.
-
-11. **Narrow Google Workload Identity trust.**
-   - In Google Cloud IAM / Workload Identity Federation, restrict the Pack One provider/service-account trust so store credentials are accepted only from the intended Pack One repository and approved release context.
-   - Do not broaden repository workflow access merely to make a release pass.
-   - After you make this change, the repo can re-run the non-publishing Apple/Google access probes and record the result.
+6. **Narrow Google Workload Identity Federation trust.**
+   - Open Google Cloud Shell while signed into the `pack-one` project owner/admin account.
+   - Run:
+```bash
+gcloud iam workload-identity-pools providers update-oidc "mtg-ev-analyzer" \
+  --project="pack-one" \
+  --location="global" \
+  --workload-identity-pool="github" \
+  --attribute-condition="assertion.repository == 'killjoy00/mtg-ev-analyzer' && assertion.ref == 'refs/heads/main' && assertion.environment == 'pack-one-mobile-release'"
+```
+   - This keeps Google store credentials usable only from the Pack One repository, `main`, and the `pack-one-mobile-release` GitHub Environment.
+   - After this change, re-run the repo's non-publishing Google Play access probe and record the passing evidence in #575.
 
 ### Not owner-only / leave to automation
 
 Do **not** spend console time on these unless an automated probe reports a problem:
 - uploading/replacing the current RC binaries;
 - attaching the current successful App Store-eligible iOS RC to App Store version 1.0; post-#837 build `100415` is already `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `36957484955`;
-- building the post-#837 Android RC; versionCode `100444` is already signed and built. The remaining automated Android work is to upload that exact candidate and promote it unchanged to `production-access`; versionCode `100368` remains the currently active closed-test release until then;
+- building/uploading/promoting the Android RC; versionCode `100444` is already signed, uploaded, and active on `production-access`;
 - Google Data Safety or store graphics (already done);
 - App Store listing copy, manual-release flag, reviewed age-rating answers, or content-rights declaration (already present);
 - release-track/API status audits;
