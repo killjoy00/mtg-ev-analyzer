@@ -2,13 +2,14 @@
 
 Updated 2026-10-02. This file is the source-of-truth submission packet for the first free public mobile release.
 
-## Current store release checkpoint — 2026-10-01
+## Current store release checkpoint — 2026-10-02
 
 - **iOS 1.0 current post-#837 candidate:** signed build `100415`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. GitHub Actions run `36957484955` uploaded it; App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached build `100415` to App Store version 1.0. Release type remains manual.
 - **Android 1.0 current post-#837 candidate:** versionCode `100444`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. Build run `36957485029` produced the Play-signed production AAB and exact-artifact release run `36965315032` uploaded it unchanged to Internal Testing, then promoted that same version unchanged to Closed Testing `production-access`. Google reported `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`. VersionCode `100444` is the live qualification-track candidate.
 - **Closed-test geography:** the `production-access` track targets Canada and the United States. Legacy `alpha` is not the qualification track.
 - **Apple public availability:** the owner completed first-time App Store availability setup for **United States + Canada only** in App Store Connect on 2026-10-01. The repo now carries a read-only API verifier; it must confirm exactly `CAN,USA`, `availableInNewTerritories=false`, and no pre-order state.
 - **Store assets:** Apple iPhone/iPad screenshots and the Elite review screenshot are uploaded. Google Play has the reviewed icon, five phone screenshots, and the feature graphic committed. Re-capture only if the final accepted RC materially changes a captured scene.
+- **Google Play console setup:** complete for the currently available first-launch forms/settings: Ads, Sign-in details/App access, Target audience/content, IARC content rating, Data Safety, listing/assets, and Production countries **United States + Canada**. The remaining Google owner gate is the closed-test qualification clock followed by the Production-access application when Google enables it.
 - **Google Data Safety:** submitted successfully by run `36632174516`.
 - **Apple metadata already live:** version 1.0 is manual release; the en-US listing copy, privacy policy/choices URLs, content-rights declaration, and reviewed 12+ age-rating answers are present.
 
