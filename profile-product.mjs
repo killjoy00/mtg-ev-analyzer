@@ -515,7 +515,6 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
         profilePublic: data.get('profilePublic') === 'on',
         favoriteSetId: data.get('favoriteSetId') || null,
         showcaseAchievement: data.get('showcaseAchievement') || null,
-        acceptPublicIdentityTerms: true,
       });
       status.textContent = 'Saved';
       track('profile_settings_saved', { public: updated.player?.profile_public || false });
