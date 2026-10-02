@@ -5,9 +5,8 @@ import {quantiles} from './launch-distributed-core.mjs';
 const PREVIEW_PAGE_SIZE=2000,PREVIEW_MAX_PAGES=32;
 
 // The finite preview emits every success/error, so use the telemetry API's
-// event-page cursor directly instead of the production watcher's 200-row
-// sampling-oriented recursive splitter. The production watcher remains
-// byte-for-byte unchanged. Every retained row is still validated fail-closed.
+// bounded event-page cursor pattern shared with the production watcher.
+// Every retained preview row is still validated fail-closed.
 export async function queryPreviewEvents(fetcher,token,account,from,to) {
   const url=`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`,seen=new Map();
   let offset=null;
