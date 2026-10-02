@@ -210,6 +210,33 @@ for (const [code, status, message] of [
   });
 }
 
+test('a successful correction releases unchanged local edits to the authoritative response', async (t) => {
+  const invalid = makeProfile({
+    player: {
+      display_name: 'Taken Name',
+      username_owned: false,
+      display_name_reason: 'username_taken',
+      profile_public: false,
+    },
+    ranking_identity: { eligible: false, reason: 'username_taken' },
+  });
+  const saved = makeProfile({
+    player: {
+      display_name: 'Available Name',
+      username_owned: true,
+      display_name_reason: null,
+      profile_public: false,
+    },
+    ranking_identity: { eligible: true, reason: null },
+  });
+  const f = await fixture(t, { profile: invalid, update: async () => saved });
+  await f.changeName(' Available Name ');
+  await f.save();
+  assert.equal(f.inputValue(), 'Available Name', 'server-normalized saved name should replace the submitted edit');
+  assert.doesNotMatch(f.text(), /Display name needs attention/);
+  assert.match(f.text(), /Profile saved\./);
+});
+
 test('a successful correction adopts the returned profile without overwriting a newer in-flight edit', async (t) => {
   const pending = deferred();
   const invalid = makeProfile({
