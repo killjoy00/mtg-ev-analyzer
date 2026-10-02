@@ -122,7 +122,14 @@ await page.route(`${growthOrigin}/**`, async (route) => {
     if(updateMode === 'network') {
       status = 503;
       body = { error:'Profile save fixture unavailable.' };
+    } else if(updateMode === 'taken') {
+      status = 409;
+      body = { error:'That display name is already taken.', code:'USERNAME_TAKEN' };
+    } else if(updateMode === 'not_allowed') {
+      status = 400;
+      body = { error:'That display name is not allowed.', code:'USERNAME_NOT_ALLOWED' };
     } else {
+      const placeholder = updateMode === 'placeholder';
       body = {
         ...fixture,
         player:{
@@ -131,8 +138,8 @@ await page.route(`${growthOrigin}/**`, async (route) => {
           profile_public:Boolean(updatePayload.profilePublic),
           favorite_set_id:updatePayload.favoriteSetId || null,
           showcase_achievement:updatePayload.showcaseAchievement || null,
-          username_owned:updateMode === 'name' ? false : true,
-          display_name_reason:updateMode === 'name' ? 'username_taken' : null,
+          username_owned:!placeholder,
+          display_name_reason:placeholder ? 'username_required' : null,
         },
       };
     }
@@ -231,11 +238,18 @@ try {
   assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
   await page.waitForFunction(() => localStorage.getItem('pack1-player-name-v1') === 'Leaderboard Ace');
 
-  updateMode='name';
+  updateMode='taken';
   await page.locator('input[name="displayName"]').fill('Taken Name');
   await topSave.click();
   await page.getByText('That display name is already taken.',{exact:true}).waitFor();
   assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Taken Name');
+  assert.match((await page.locator('#profile-save-status').textContent())||'',/Profile not saved/);
+
+  updateMode='not_allowed';
+  await page.locator('input[name="displayName"]').fill('Pack One Support');
+  await topSave.click();
+  await page.getByText('That display name is not allowed.',{exact:true}).waitFor();
+  assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Pack One Support');
   assert.match((await page.locator('#profile-save-status').textContent())||'',/Profile not saved/);
 
   updateMode='network';
@@ -246,14 +260,28 @@ try {
   assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Unsaved Edit');
   assert.equal(await page.locator('select[name="favoriteSetId"]').inputValue(),'neo');
 
+  updateMode='placeholder';
+  await page.locator('input[name="displayName"]').fill('Pack Player');
+  await page.locator('input[name="profilePublic"]').uncheck();
+  await topSave.click();
+  await page.getByText('Profile saved.',{exact:true}).waitFor();
+  assert.equal(await page.locator('#profile-display-name-error').textContent(),'Choose a display name to join Daily leaderboards.');
+  assert.deepEqual(updatePayload, {
+    displayName:'Pack Player',
+    profilePublic:false,
+    favoriteSetId:'neo',
+    showcaseAchievement:'top10',
+    acceptPublicIdentityTerms:true,
+  });
+
   await page.evaluate(()=>{document.documentElement.style.fontSize='125%';});
   await noOverflow();
   await page.screenshot({path:'artifacts/ui-profile-settings-large-text-390.png',fullPage:true});
   await page.evaluate(()=>{document.documentElement.style.fontSize='';});
 
   await page.locator('#profile-stats-tab').click();
-  assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Leaderboard Ace');
-  assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="top10"]').count(),1,'successful save refreshes the authoritative profile while later failed edits stay local');
+  assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Pack Player');
+  assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="top10"]').count(),1,'successful placeholder-name save refreshes the authoritative profile while prior failed edits stayed local');
   await page.locator('#profile-share').click();
   await page.waitForFunction(() => (window.__pack1ShareCalls || 0) > 0, null, { timeout:5000 });
   shareCalls = await page.evaluate(() => window.__pack1ShareCalls || 0);
