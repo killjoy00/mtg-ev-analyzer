@@ -85,10 +85,11 @@ Before an iOS candidate can be treated as release-ready:
 8. Confirm Sign in with Apple Hide My Email delivery and Apple-confirmed account deletion/revocation. Separately exercise StoreKit Sandbox/TestFlight renewal, cancellation-at-period-end, billing grace, refund/revocation, Restore Purchases, same-account binding, wrong-account rejection, and duplicate-provider protection.
 9. In App Store Connect version 1.0, attach that exact build.
 10. Fill metadata from `docs/mobile-store-submission.md`.
-11. Select **Manually release this version**.
-12. Submit for App Review.
-13. After approval, keep the app in Pending Developer Release until the owner explicitly approves launch.
-14. Manually release.
+11. For the first public release, the owner must use App Store Connect -> Pricing and Availability -> App Availability -> Set Up Availability -> **Specific Countries or Regions**, select **United States** and **Canada** only, and **not** choose pre-order. Pack One currently has no `appAvailabilityV2` resource; Apple's API creation endpoint is pre-order-specific, so this one-time non-preorder setup is not automated.
+12. Select **Manually release this version**.
+13. Submit for App Review.
+14. After approval, keep the app in Pending Developer Release until the owner explicitly approves launch.
+15. Manually release.
 
 ## Android normal release
 
