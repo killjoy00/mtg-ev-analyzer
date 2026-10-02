@@ -319,7 +319,7 @@ test('Apple launch hardening blocks pre-hijack, separates token keys, and uses A
   const apple = read('worker/apple-auth.mjs');
   const worker = read('worker/growth-function.js');
   const workflow = read('.github/workflows/secure-auth-release.yml');
-  const mobile = read('mobile/app/account.tsx');
+  const mobile = read('mobile/app/account-delete.tsx');
   const api = read('mobile/src/api/account.ts');
   const docs = read('docs/mobile-release-config.md');
 
