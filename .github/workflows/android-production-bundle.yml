@@ -72,9 +72,11 @@ jobs:
           grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle
           expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
           grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle || grep -Fq "versionName '$expected_version_name'" android/app/build.gradle
+      # PR smoke compiles the production arm64 path only. Exact-main RC and
+      # protected signed/publishing jobs keep the default full ABI set.
       - name: Build non-publishing PR smoke bundle
         working-directory: mobile/android
-        run: ./gradlew :app:bundleRelease --no-daemon --build-cache
+        run: ./gradlew :app:bundleRelease --no-daemon --build-cache -PreactNativeArchitectures=arm64-v8a
       - name: Verify PR smoke bundle exists
         working-directory: mobile/android
         run: test -s app/build/outputs/bundle/release/app-release.aab
