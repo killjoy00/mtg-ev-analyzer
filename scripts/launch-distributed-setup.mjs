@@ -23,8 +23,17 @@ export async function preflightTelemetry({fetcher=fetch,sleep=ms=>new Promise(r=
   // private health traffic. No production probe or mutation can be supplied.
   await queryPreviewEvents(fetcher,process.env.CLOUDFLARE_EDGE_TOKEN,account,from-60000,from);
   for(let i=0;i<healthRequests;i++) {
-    const r=await fetcher('https://api-preview.packone.pro/draft/health?quick=1',{headers:{'x-pack1-preview-key':key},redirect:'error',signal:AbortSignal.timeout(10000)});
-    assert.ok(r.ok&&(await r.json()).release_commit===sha,'private_preview_revision');await sleep(500);
+    let status=null,release=null,ok=false;
+    try {
+      const r=await fetcher('https://api-preview.packone.pro/draft/health?quick=1',{headers:{'x-pack1-preview-key':key},redirect:'error',signal:AbortSignal.timeout(10000)});
+      status=r.status;ok=r.ok;
+      try {const body=await r.json();if(/^[a-f0-9]{40}$/.test(body?.release_commit||''))release=body.release_commit;} catch {}
+    } catch(error) {
+      console.error(JSON.stringify({event:'private_preview_health_failure',request:i+1,status:null,release_commit:null,error_name:error?.name||'Error'}));
+      throw error;
+    }
+    if(!(ok&&release===sha))console.error(JSON.stringify({event:'private_preview_revision_mismatch',request:i+1,status,release_commit:release}));
+    assert.ok(ok&&release===sha,'private_preview_revision');await sleep(500);
   }
   const to=clock(),deadline=to+policy.telemetry_timeout_seconds*1000,checks=[];
   await sleep(policy.telemetry_settlement_seconds*1000);

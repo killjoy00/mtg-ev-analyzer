@@ -8,11 +8,19 @@ import {inspectBin,inspectPreviewTelemetry,previewTelemetryFailure,queryPreviewE
 import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
 import {transportFailureEvidence,undiciTransportObserver} from '../scripts/launch-distributed-transport.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
+import {waitForPreviewReadiness} from '../scripts/edge-control.mjs';
 const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
 const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
 const formed=()=>{let s=initialControl(scope,start,policy);for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,policy);return s;};
 const released=()=>{let s=formed();for(let i=0;i<5;i++)s=transition(s,msg(i,{ack:0}),start+200,policy);return s;};
 
+test('preview readiness cannot pass on one good response followed by a stale response',async()=>{
+ let now=0,index=0;
+ const responses=[{status:200,release:scope.sha},{status:403,release:null}];
+ const result=await waitForPreviewReadiness({commit:scope.sha,required:2,interval_ms:1,deadline_ms:2,
+   clock:()=>now,sleep:async ms=>{now+=ms;},probe:async()=>responses[Math.min(index++,responses.length-1)]});
+ assert.equal(result.ready,false);assert.equal(result.attempts,2);assert.equal(result.consecutive,0);
+});
 test('committed policy is bounded and cannot silently claim 100 or launch 500 players',()=>{
  assert.equal(validatePolicy(policy),policy);
  assert.deepEqual(policy.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600}]);assert.equal(policy.proposed_target,50);
