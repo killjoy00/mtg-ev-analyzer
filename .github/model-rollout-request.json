@@ -1,7 +1,5 @@
 {
-  "operation": "card-image-release",
-  "request_id": "tishana-card-image-release-hotfix-replay-20260928",
-  "replay_of": "tishana-card-image-release-hotfix-20260928",
-  "reason": "Intentional retry after the prior equivalent rollout request was rejected by the replay guard before dispatch. Deploy #736 and rerun the guarded Tishana/card-art release.",
-  "commit": "8c3c4df35f53e99c63cbbe3fe2c675a8e2b21203"
+  "operation": "distributed-capacity",
+  "request_id": "distributed-capacity-v3-preview-readiness-20261002",
+  "reason": "Owner-approved single live distributed capacity workflow_dispatch on merged main after the private-preview readiness fix; run policy v3 stages 25 then 50 with the declared 600 second hold."
 }
