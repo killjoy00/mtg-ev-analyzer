@@ -63,6 +63,8 @@ test('historical membership survives source pauses; new generation requires expl
  const serving=corpusMembership({serving:true});
  assert.ok(serving.includes("c.status='Live'"));
  assert.ok(serving.includes('active_snapshot_id=p.source_snapshot_id'));
+ assert.ok(serving.includes('historical.corpus_version=p.corpus_version'));
+ assert.ok(serving.includes('next_snapshot.corpus_version<>p.corpus_version'));
  assert.ok(serving.includes('p.corpus_version<>$1'));
  assert.ok(serving.includes('c.parent_version=$1'));
  assert.ok(!corpusMembership().includes('active_snapshot_id'));
@@ -72,6 +74,14 @@ test('historical membership survives source pauses; new generation requires expl
  assert.equal(await componentBelongsTo(query,v4Candidate(),DRAFT_RUN_CORPUS_VERSION),true);assert.equal(queries,2);
  assert.equal(await componentBelongsTo(query,{...v4Candidate(),model_version:model},DRAFT_RUN_CORPUS_VERSION),false);assert.equal(queries,2);
  assert.equal(await componentBelongsTo(query,{...candidate(),corpus_version:'arbitrary'},DRAFT_RUN_CORPUS_VERSION),false);
+});
+
+const cutoverMigration=fs.readFileSync(new URL('../migrations/0049_cross_version_corpus_cutover.sql',import.meta.url),'utf8');
+test('cross-version cutover patches only the readiness builder and stays fail-closed within one corpus version',()=>{
+ assert.match(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_build_serving_snapshot/);
+ assert.doesNotMatch(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_serving_snapshot\(/);
+ assert.match(cutoverMigration,/next_snapshot\.corpus_version<>p\.corpus_version/);
+ assert.match(cutoverMigration,/historical\.schema_version='historical-frozen'/);
 });
 
 import {sourceQuality,importComponents} from '../scripts/load-traditional-components.mjs';
