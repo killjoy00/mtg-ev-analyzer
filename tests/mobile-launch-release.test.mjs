@@ -182,13 +182,17 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.ok(appAvailabilityRequest.reason.trim().length > 0);
 
   const appAvailabilityScript = read('.github/scripts/app-store-app-availability.mjs');
-  assert.match(appAvailabilityScript, /targetTerritories=new Set\(\['USA','CAN'\]\)/);
+  assert.match(appAvailabilityScript, /targetTerritories=\['USA','CAN'\]/);
   assert.match(appAvailabilityScript, /availableInNewTerritories:false/);
   assert.match(appAvailabilityScript, /appAvailabilityV2\?fields%5BappAvailabilities%5D=availableInNewTerritories/);
-  assert.doesNotMatch(appAvailabilityScript, /fields%5Bapps%5D=bundleId,availableInNewTerritories/);
-  assert.match(appAvailabilityScript, /\/v1\/territoryAvailabilities\//);
-  assert.match(appAvailabilityScript, /available\.join\(','\)==='CAN,USA'/);
+  assert.match(appAvailabilityScript, /\/v1\/apps\/\$\{appId\}\/appAvailability\?include=availableTerritories/);
+  assert.match(appAvailabilityScript, /api\('\/v1\/appAvailabilities'/);
+  assert.match(appAvailabilityScript, /availableTerritories:\{data:targetTerritories\.map/);
+  assert.match(appAvailabilityScript, /exactTarget\(ids\)/);
   assert.match(appAvailabilityScript, /preOrderEnabled===true/);
+  assert.match(appAvailabilityScript, /Refusing to repurpose an existing v2 availability resource/);
+  assert.doesNotMatch(appAvailabilityScript, /fields%5Bapps%5D=bundleId,availableInNewTerritories/);
+  assert.doesNotMatch(appAvailabilityScript, /method:'POST'[\s\S]*?\/v2\/appAvailabilities/);
   assert.doesNotMatch(appAvailabilityScript, /reviewSubmissions/);
   assert.doesNotMatch(appAvailabilityScript, /appStoreVersionReleaseRequests/);
   assert.doesNotMatch(appAvailabilityScript, /endAppAvailabilityPreOrders/);
