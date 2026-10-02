@@ -480,7 +480,7 @@ export default function MembershipScreen() {
               </Pressable>
             ) : null}
             {current.connected && current.configured ? (
-              <Pressable accessibilityRole="button" accessibilityLabel="Request Patreon refresh" disabled={state.busy}
+              <Pressable accessibilityRole="button" accessibilityLabel="Refresh Patreon access" disabled={state.busy}
                 onPress={() => void controller.refresh()} style={[styles.button, state.busy && styles.disabled]}>
                 <Text style={styles.buttonText}>Refresh Patreon access</Text>
               </Pressable>
@@ -505,7 +505,7 @@ export default function MembershipScreen() {
             <Text style={styles.buttonText}>Sign in to manage membership</Text>
           </Pressable>
         ) : null}
-        <Text style={styles.help}>Sign in with Patreon connects an existing Patreon account. Patreon membership changes remain managed through Patreon.</Text>
+        <Text style={styles.help}>Connect Patreon links an existing Patreon account. Patreon membership changes remain managed through Patreon.</Text>
         <Text style={styles.help}>When Patreon authorization finishes, close the browser and return here. Check status verifies the current account; a browser message alone does not grant access.</Text>
       </ScrollView>
     </SafeAreaView>
