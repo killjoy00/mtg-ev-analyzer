@@ -35,6 +35,8 @@ test('Admin Users browser uses PATCH rename, typed destructive confirmation, sta
   assert.match(users,/\/username'.*'PATCH'/s);
   assert.match(users,/confirm:String\(values\.get\('confirm'\)/);
   assert.match(users,/acknowledgeAdmin/);
+  assert.match(users,/Promise\.allSettled/);
+  assert.match(users,/Deletion status is temporarily unavailable/);
   assert.match(users,/Refresh deletion status/);
   assert.match(users,/Apple subscriptions or Patreon memberships/);
   assert.match(users,/Public username/);
