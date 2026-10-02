@@ -1,5 +1,5 @@
 export const PUBLIC_IDENTITY_TERMS_VERSION='2026-09-30-v1';
-export const PUBLIC_IDENTITY_NOT_ALLOWED_MESSAGE='That leaderboard name is not allowed.';
+export const PUBLIC_IDENTITY_NOT_ALLOWED_MESSAGE='That display name is not allowed.';
 export const PUBLIC_IDENTITY_REPORT_REASONS=new Set(['offensive_name','harassment','impersonation','spam','other']);
 
 const RESERVED=new Set([
@@ -76,7 +76,7 @@ export function publicIdentityEligibility(row) {
   if(!row?.auth_user_id)return {eligible:false,reason:'guest'};
   if(publicIdentityHidden(row))return {eligible:false,reason:'moderated'};
   const owned=row.username_owned===true||row.username_owned==='t'||row.username_owned==='true'||row.username_owned===1||row.username_owned==='1';
-  if(!owned)return {eligible:false,reason:row.is_placeholder?'username_required':'username_taken'};
+  if(!owned)return {eligible:false,reason:row.is_placeholder?'username_required':publicDisplayNameProblem(row.display_name)?'name_not_allowed':'username_taken'};
   return {eligible:true,reason:null};
 }
 
