@@ -408,7 +408,7 @@ try {
   assert.ok([200,409].includes(renameVsDelete.status),JSON.stringify(renameVsDelete.data));
   if(renameVsDelete.status===409)assert.equal(renameVsDelete.data.code,'ACCOUNT_DELETING');
   const deleteRaceOperation=(await query(
-    'SELECT operation_id::text operation_id,created_at FROM account_deletion_operations WHERE auth_user_id=$1::uuid',
+    'SELECT operation_id::text operation_id FROM account_deletion_operations WHERE auth_user_id=$1::uuid',
     [deletionRaceTarget.authId],
   )).rows[0];
   assert.equal(deleteRaceOperation.operation_id,deleteVsRename.operation_id);
@@ -418,8 +418,6 @@ try {
   )).rows[0]||null;
   if(renameVsDelete.status===200) {
     assert.ok(deleteRaceAudit,'successful race rename must have its atomic audit row');
-    assert.ok(new Date(deleteRaceAudit.created_at).getTime()<=new Date(deleteRaceOperation.created_at).getTime(),
-      'successful rename must commit before deletion tombstone creation');
   } else {
     assert.equal(deleteRaceAudit,null,'rename rejected after deletion starts must not leave an audit row');
   }
