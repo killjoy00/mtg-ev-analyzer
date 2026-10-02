@@ -229,10 +229,14 @@ export default function CareerScreen() {
           <Text style={styles.body}>Loading My Pack One...</Text>
         </> : state.status === 'signed-out' ? <>
           <Text style={styles.eyebrow}>MY PACK ONE</Text>
-          <Text style={styles.title}>Sign in to see your full career.</Text>
-          <Text style={styles.body}>Your Pack One account keeps the same scores, achievements, season standings, and history across web, iPhone, iPad, and Android.</Text>
-          <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.primaryButton}>
-            <Text style={styles.primaryButtonText}>Sign in or create an account</Text>
+          <Text style={styles.title}>Welcome to My Pack One.</Text>
+          <Text style={styles.body}>Your scores, streaks, achievements, and history will appear here after you play. Empty data is not a zero score.</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Play Daily" onPress={() => router.push('/')} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>Play Daily</Text>
+          </Pressable>
+          <Text style={styles.body}>Want to keep this record across devices?</Text>
+          <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.secondaryButton}>
+            <Text style={styles.secondaryButtonText}>Sign in or create an account</Text>
           </Pressable>
         </> : <>
           <Text style={styles.title}>Couldn&apos;t load My Pack One.</Text>
@@ -245,25 +249,35 @@ export default function CareerScreen() {
     </SafeAreaView>
   );
 
+  const firstRun = Number(state.profile.summary.games || 0) === 0;
   const header = (
     <View style={styles.header}>
-      <ProfileOverview profile={state.profile} />
+      {firstRun ? (
+        <View style={styles.firstRunCard}>
+          <Text style={styles.eyebrow}>WELCOME TO MY PACK ONE</Text>
+          <Text style={styles.firstRunTitle}>Start with today&apos;s Daily.</Text>
+          <Text style={styles.firstRunBody}>Your real scores, streaks, environments, achievements, and history will appear here after you play.</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Play Daily" onPress={() => router.push('/')} style={styles.primaryButton}>
+            <Text style={styles.primaryButtonText}>Play Daily</Text>
+          </Pressable>
+        </View>
+      ) : <ProfileOverview profile={state.profile} />}
       {refreshing ? <Text style={styles.refreshing}>Refreshing My Pack One...</Text> : null}
       {refreshError ? <Text accessibilityRole="alert" style={styles.error}>{refreshError}</Text> : null}
       <View style={styles.actions}>
-        <Pressable accessibilityRole="button" accessibilityLabel="Share Pack One profile or record" disabled={refreshing}
+        {!firstRun ? <Pressable accessibilityRole="button" accessibilityLabel="Share Pack One profile or record" disabled={refreshing}
           onPress={() => void shareProfile()} style={styles.secondaryButton}>
           <Text style={styles.secondaryButtonText}>{state.profile.player.profile_public ? 'Share public profile' : 'Share my record'}</Text>
-        </Pressable>
+        </Pressable> : null}
         <Pressable accessibilityRole="button" onPress={() => router.push('/account')} style={styles.secondaryButton}>
-          <Text style={styles.secondaryButtonText}>Account &amp; profile settings</Text>
+          <Text style={styles.secondaryButtonText}>Account settings</Text>
         </Pressable>
         <Pressable accessibilityRole="button" disabled={refreshing} onPress={() => void load()} style={styles.secondaryButton}>
           <Text style={styles.secondaryButtonText}>Refresh My Pack One</Text>
         </Pressable>
       </View>
       {shareError ? <Text accessibilityRole="alert" style={styles.error}>{shareError}</Text> : null}
-      <Text style={styles.sectionTitle}>Recent Games</Text>
+      {!firstRun ? <Text style={styles.sectionTitle}>Recent Games</Text> : null}
     </View>
   );
   const footer = (
@@ -279,7 +293,7 @@ export default function CareerScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <FlatList data={state.rows} keyExtractor={(item) => item.cursor} renderItem={({ item }) => <HistoryRow item={item} />}
-        ListHeaderComponent={header} ListEmptyComponent={<Text style={styles.empty}>No completed Pack One games yet.</Text>}
+        ListHeaderComponent={header} ListEmptyComponent={firstRun ? null : <Text style={styles.empty}>No completed Pack One games yet.</Text>}
         ListFooterComponent={footer} contentContainerStyle={styles.list} refreshing={refreshing} onRefresh={() => void load()}
         onEndReached={() => { if (!pageError) void loadMore(); }} onEndReachedThreshold={0.35} />
     </SafeAreaView>
@@ -290,8 +304,11 @@ const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.page },
   list: { paddingBottom: spacing.xxl, alignSelf: 'center', width: '100%', maxWidth: 980 },
   header: { padding: spacing.lg, gap: spacing.lg },
+  firstRunCard: { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.line, padding: spacing.xl, gap: spacing.md },
+  firstRunTitle: { color: colors.ink, fontSize: 28, lineHeight: 33, fontWeight: '800', letterSpacing: -0.5 },
+  firstRunBody: { color: colors.muted, fontSize: 15, lineHeight: 22 },
   center: { flex: 1, padding: spacing.xl, alignItems: 'center', justifyContent: 'center', gap: spacing.md },
-  eyebrow: { color: colors.accent, fontSize: 10, fontWeight: '800', letterSpacing: 1.4 },
+  eyebrow: { color: colors.accent, fontSize: 12, fontWeight: '800', letterSpacing: 0.8 },
   title: { color: colors.ink, fontSize: 32, lineHeight: 36, fontWeight: '800', letterSpacing: -0.7, textAlign: 'center' },
   body: { color: colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' },
   actions: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
