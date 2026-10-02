@@ -47,7 +47,7 @@ async function listAll(path){
 }
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-const app=await api(`/v1/apps/${appId}?fields%5Bapps%5D=bundleId,availableInNewTerritories`);
+const app=await api(`/v1/apps/${appId}?fields%5Bapps%5D=bundleId`);
 if(app.data?.attributes?.bundleId!==bundleId)throw Error('Unexpected App Store Connect bundle ID.');
 
 const versions=await api(`/v1/apps/${appId}/appStoreVersions?filter%5Bplatform%5D=IOS&limit=200`);
@@ -65,7 +65,7 @@ const before=await listAll(`/v2/appAvailabilities/${encodeURIComponent(availabil
 if(before.length<2)throw Error(`Unexpected territory availability count: ${before.length}`);
 if(before.some(x=>x.attributes?.preOrderEnabled===true))throw Error('Refusing to modify availability while any territory has pre-order enabled.');
 
-if(app.data.attributes?.availableInNewTerritories!==false){
+if(availability.attributes?.availableInNewTerritories!==false){
   await api(`/v1/apps/${appId}`,{
     method:'PATCH',
     body:{data:{type:'apps',id:appId,attributes:{availableInNewTerritories:false}}},
@@ -86,17 +86,17 @@ for(const row of before){
 }
 
 let finalRows=null;
-let finalApp=null;
+let finalAvailability=null;
 for(let attempt=1;attempt<=8;attempt++){
-  finalApp=await api(`/v1/apps/${appId}?fields%5Bapps%5D=bundleId,availableInNewTerritories`);
+  finalAvailability=await api(`/v1/apps/${appId}/appAvailabilityV2?fields%5BappAvailabilities%5D=availableInNewTerritories,territoryAvailabilities`);
   finalRows=await listAll(`/v2/appAvailabilities/${encodeURIComponent(availability.id)}/territoryAvailabilities?fields%5BterritoryAvailabilities%5D=available,releaseDate,preOrderEnabled,preOrderPublishDate,contentStatuses,territory&include=territory&limit=200`);
   const available=finalRows
     .filter(x=>x.attributes?.available===true)
     .map(x=>x.relationships?.territory?.data?.id)
     .filter(Boolean)
     .sort();
-  if(finalApp.data?.attributes?.availableInNewTerritories===false&&available.join(',')==='CAN,USA')break;
-  if(attempt===8)throw Error(`App availability did not settle to USA+CAN only: ${JSON.stringify({availableInNewTerritories:finalApp.data?.attributes?.availableInNewTerritories,available})}`);
+  if(finalAvailability.data?.attributes?.availableInNewTerritories===false&&available.join(',')==='CAN,USA')break;
+  if(attempt===8)throw Error(`App availability did not settle to USA+CAN only: ${JSON.stringify({availableInNewTerritories:finalAvailability.data?.attributes?.availableInNewTerritories,available})}`);
   await sleep(5000);
 }
 
@@ -114,7 +114,7 @@ console.log(JSON.stringify({
   versionState:state,
   releaseType:version.attributes?.releaseType??'MANUAL',
   availabilityId:availability.id,
-  availableInNewTerritories:finalApp.data.attributes.availableInNewTerritories,
+  availableInNewTerritories:finalAvailability.data.attributes.availableInNewTerritories,
   availableTerritories,
   changedTerritoryCount:changed,
   reviewSubmissionCreated:false,
