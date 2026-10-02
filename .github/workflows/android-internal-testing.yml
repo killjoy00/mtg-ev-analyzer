@@ -127,7 +127,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          manifest="$(find app/build/intermediates/merged_manifests/release -name AndroidManifest.xml -print -quit)"
+          manifest="$(find app/build/intermediates -type f -name AndroidManifest.xml -path '*merged*manifest*release*' -print -quit)"
           test -n "$manifest"
           python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-internal-native-audit.json"
       - name: Apply upload-signing configuration
