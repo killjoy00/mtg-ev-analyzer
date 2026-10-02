@@ -22,6 +22,7 @@ export function dailyHomeMarkup(profile, day = gameDateKey(), state = 'ready') {
   const nextDailyCue=`${dailyResetCue()}${dailyStreak>=2?` · ${dailyStreak}-day streak`:''}`;
   return `<section class="daily-home" data-daily-home data-home-state="${state}" data-completed="${ready?status.completed:'pending'}">
     <header class="daily-home-heading"><p class="eyebrow">The daily draft</p><h1>Eight picks. Your call.</h1><p>Make your pick, then see what the trophy drafter chose and how strong your pick was.</p><time datetime="${day}">${dailyDate}’s Daily Runs</time></header>
+    <div class="daily-home-status" role="status" aria-label="Daily reset and streak"><strong data-daily-reset>${dailyResetCue()}</strong>${ready&&dailyStreak>0?`<span class="daily-home-streak">${dailyStreak}-day streak</span>`:checking?'<span class="daily-home-streak is-loading">Checking streak…</span>':''}</div>
     ${displayNameAttention?`<aside class="daily-home-identity-warning" role="alert"><div><strong>${rankingReason==='name_not_allowed'?'That display name is not allowed. Choose another to join Daily leaderboards.':rankingReason==='username_taken'?'Choose a different display name. That one is already taken.':'Choose a display name before playing a Daily.'}</strong><p>Until you choose an available display name, Daily results will not appear on the leaderboard.</p></div><button class="button secondary" type="button" data-home-username>Change display name</button></aside>`:''}
     <div class="daily-home-games">${games.map(game => {
       const result = status[game.key];
@@ -82,6 +83,10 @@ export function installDailyHome(identityReady = Promise.resolve()) {
   document.addEventListener('pack1:daily-home-retry', refresh);
   window.addEventListener('focus', refresh);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) void refresh(); });
-  setInterval(() => { if (lastDay !== gameDateKey()) void refresh(); }, 60000);
+  setInterval(() => {
+    const reset=document.querySelector('[data-daily-reset]');
+    if(reset)reset.textContent=dailyResetCue();
+    if (lastDay !== gameDateKey()) void refresh();
+  }, 60000);
   void refresh();
 }
