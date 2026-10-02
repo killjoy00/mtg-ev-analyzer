@@ -165,9 +165,11 @@ jobs:
           done
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
           node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" capture generated/v5-candidate generated/v5-release-baseline.json
-          # The rebuild artifact stores only Premier additions. Stage the exact
-          # checked-in v9 baseline from RELEASE_COMMIT before applying them.
-          node scripts/load_verified_draft_run.mjs "$RUNNER_TEMP/target.connection" --stage-only
+          # Validate the checked-in v9 baseline and stage only its version
+          # manifests. The exact all-trophies artifact below contains every v9
+          # Premier puzzle and loads them snapshot-scoped; never insert the
+          # checked-in baseline as NULL-snapshot rows during staging.
+          node scripts/load_verified_draft_run.mjs "$RUNNER_TEMP/target.connection" --stage-only --manifest-only
           node scripts/load_all_trophies.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --stage-only
           node scripts/load-traditional-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional
           node scripts/check-corpus-health.mjs "$RUNNER_TEMP/target.connection"
