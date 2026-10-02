@@ -311,7 +311,7 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 ### Not owner-only / leave to automation
 
 Do **not** spend console time on these unless an automated probe reports a problem:
-- Google Cloud WIF narrowing is owner-complete; the repo-side non-publishing Google Play access probe is the remaining automated verification;
+- Google Cloud WIF narrowing and the repo-side non-publishing Google Play access probe are complete; run `37017937127` passed on `main` and verified WIF authentication, Play track-read access, and Play signing fingerprint coverage in `.well-known/assetlinks.json`;
 - uploading/replacing the current RC binaries;
 - attaching the current successful App Store-eligible iOS RC to App Store version 1.0; post-#837 build `100415` is already `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `36957484955`;
 - building/uploading/promoting the Android RC; versionCode `100444` is already signed, uploaded, and active on `production-access`;
