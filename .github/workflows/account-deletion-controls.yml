@@ -30,6 +30,7 @@ concurrency:
 
 jobs:
   toggle:
+    environment: ${{ inputs.target == 'production' && 'pack-one-production' || 'pack-one-development' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:

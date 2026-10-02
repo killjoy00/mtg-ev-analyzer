@@ -22,14 +22,31 @@ on:
     paths: ['scripts/launch-alert.mjs', 'launch-monitoring.mjs', '.github/workflows/launch-alert.yml']
 permissions:
   contents: read
-  issues: write
-  actions: write
 concurrency:
   group: pack1-production-launch-alert
   cancel-in-progress: false
 jobs:
+  # Pull requests run unreviewed code, so they get no production credentials
+  # and no write permissions. The live telemetry check runs after merge.
+  validate:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Check the watcher offline
+        run: |
+          node --check scripts/launch-alert.mjs
+          node --test tests/launch-alert.test.mjs tests/launch-watcher-*.test.mjs
   alert:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event_name != 'pull_request'
+    permissions:
+      contents: read
+      issues: write
+      actions: write
     runs-on: ubuntu-latest
     timeout-minutes: 10
     env:
@@ -43,11 +60,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-      - name: Verify telemetry access without sending an alert
-        if: github.event_name == 'pull_request'
-        run: node scripts/launch-alert.mjs check
       - name: Route production threshold breaches
-        if: github.event_name != 'pull_request'
         run: node scripts/launch-alert.mjs alert
       - uses: actions/upload-artifact@v4
         if: always()

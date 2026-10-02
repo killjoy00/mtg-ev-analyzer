@@ -109,7 +109,7 @@ The workflow uses:
 
 The verified Workload Identity Provider is source-controlled as the non-secret resource name `projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer`; no GitHub repository variable or JSON key is required.
 
-The Workload Identity provider must restrict admission to exactly `killjoy00/mtg-ev-analyzer`, and that repository identity must receive only `roles/iam.workloadIdentityUser` on the Pack One service account. Long-lived service-account JSON keys are intentionally not used.
+The Workload Identity provider must restrict admission to `killjoy00/mtg-ev-analyzer` jobs that run from `refs/heads/main` inside the `pack-one-mobile-release` GitHub Environment, and that repository identity must receive only `roles/iam.workloadIdentityUser` on the Pack One service account. Every Google-authenticating job already runs in that environment, and only those jobs request `id-token: write`; pull-request smoke jobs get no OIDC token. Long-lived service-account JSON keys are intentionally not used.
 
 
 ### One-time Google Cloud trust setup
@@ -151,7 +151,7 @@ if ! gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
     --workload-identity-pool="$POOL_ID" \
     --display-name="mtg-ev-analyzer GitHub Actions" \
     --attribute-mapping="google.subject=assertion.sub,attribute.repository=assertion.repository" \
-    --attribute-condition="assertion.repository == '$REPO'" \
+    --attribute-condition="assertion.repository == '$REPO' && assertion.ref == 'refs/heads/main' && assertion.environment == 'pack-one-mobile-release'" \
     --issuer-uri="https://token.actions.githubusercontent.com"
 fi
 
@@ -171,6 +171,20 @@ gcloud iam workload-identity-pools providers describe "$PROVIDER_ID" \
 ```
 
 The verified provider resource is `projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer`. The GitHub workflow now uses it directly.
+
+### Narrowing the existing provider
+
+The provider was originally created with the repo-wide condition `assertion.repository == 'killjoy00/mtg-ev-analyzer'`, which admits any workflow on any branch. Narrow it in place (same Cloud Shell variables as above):
+
+```bash
+gcloud iam workload-identity-pools providers update-oidc "$PROVIDER_ID" \
+  --project="$PROJECT_ID" \
+  --location="global" \
+  --workload-identity-pool="$POOL_ID" \
+  --attribute-condition="assertion.repository == '$REPO' && assertion.ref == 'refs/heads/main' && assertion.environment == 'pack-one-mobile-release'"
+```
+
+Then dispatch `google-play-access.yml` from `main`; it must still pass. A token without the `environment` claim (any job outside `pack-one-mobile-release`) or from another ref is rejected by the provider.
 
 
 ## Store build numbering
@@ -197,7 +211,7 @@ The native root layout blocks navigation only for the initial cold-start check. 
 
 The TestFlight and Google Play Internal publishing workflows are manual-only and their publishing jobs fail closed unless the dispatch is from `main` and the checked-out commit still equals current `origin/main`. Store status/probe workflows use the same current-main check. These jobs reference the `pack-one-mobile-release` GitHub Environment so repository owners can apply required-review / protected-branch rules at one release boundary.
 
-Before the first public release candidate, the owner still needs to configure that GitHub Environment as protected, move Apple release credentials to environment-scoped secrets (or an equivalent protected secret boundary), and narrow Google Workload Identity Federation from repo-wide trust to the same protected release context. The workflow checks in this repository do not by themselves change Google Cloud IAM policy.
+Before the first public release candidate, the owner still needs to configure that GitHub Environment as protected, move Apple release credentials to environment-scoped secrets (or an equivalent protected secret boundary), and narrow Google Workload Identity Federation from repo-wide trust to the same protected release context (see **Narrowing the existing provider**). The workflow checks in this repository do not by themselves change Google Cloud IAM policy.
 
 ## Review deadlines for deferred items
 
@@ -206,4 +220,4 @@ Before the first public release candidate, the owner still needs to configure th
 - **Apple Private Email Relay:** register Pack One's exact outbound email source/domain under Apple Developer → Sign in with Apple for Email Communication and verify SPF/DKIM before launch. Apple relay users can use legacy `privaterelay.appleid.com` or new `private.icloud.com` addresses. Apple-linked account deletion does **not** depend on relay email: Pack One requires a fresh Apple authorization bound to the existing Apple subject before deletion. Relay delivery still needs a real-device/inbox test because account/recovery communications to an unregistered sender can bounce.
 - **Physical iPhone SIWA validation:** on the exact public RC, verify (1) first sign-in with both shared email and Hide My Email, (2) a real Pack One email reaches the relay address, (3) Apple re-authentication can permanently delete the Apple-linked account and the authorization is revoked, (4) the deleted Apple authorization cannot be reused, and (5) the Sign in with Apple control is at least as prominent as the Google control. The current native layout renders both social controls full-width at the same 52-point height.
 - **Payments / Patreon access:** native purchase steering is removed and Patreon is presented only as existing-account OAuth. That presentation hardening does **not** settle Apple payment eligibility. Pack One is not a Reader app, and current 3.1.3(b) requires externally acquired digital features to also be available as IAP. Before App Store review, either ship equivalent StoreKit access, make/disable those premium practice modes on iOS so no external purchase unlock is required, or obtain explicit Apple confirmation of another applicable exception.
-- **Production Google Play:** narrow the current repo-wide Workload Identity trust to a protected release branch or GitHub Environment before granting any production-release permission.
+- **Production Google Play:** run **Narrowing the existing provider** before granting any production-release permission.

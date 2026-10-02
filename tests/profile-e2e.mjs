@@ -3,7 +3,7 @@ import { mkdir } from 'node:fs/promises';
 import { chromium } from 'playwright';
 
 const base = process.env.PACK1_E2E_URL || 'http://127.0.0.1:4173';
-const growthOrigin = 'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech';
+const growthOrigin = 'https://br-twilight-hill-ayffyd2b-pack1growth.compute.c-5.us-east-2.aws.neon.tech';
 const profileKey = '0123456789abcdef';
 await mkdir('artifacts', { recursive: true });
 
