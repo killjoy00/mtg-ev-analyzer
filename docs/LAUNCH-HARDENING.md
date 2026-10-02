@@ -94,7 +94,8 @@ The first live isolated 25-player test stopped on the eleventh new guest:
 `session` 429, Retry-After 589 s. Its 97 requests had already consumed most of
 its separate 120/minute budget. See `results/launch-nat-baseline-2026-09-25`.
 
-The candidate policy supports 100 shared-network players' complete paced runs:
+The candidate policy was validated with 100 shared-network players' complete
+paced runs on 2026-09-26 (the NAT gate has run 25/50 only since 2026-10-02):
 3,600 general requests/minute, a separate 600-request/10-second burst bucket,
 and 120 new identities/10 minutes. Every actual creation (including invalid
 cookies) consumes the creation bucket. Existing verified players retain access
@@ -109,7 +110,8 @@ arithmetic. Real Workers tests verify concurrency/persistence; the isolated NAT
 workload must pass its predefined gates before production uses this policy.
 
 The original workload selected a supported launch target of 25 active players, with
-25/50/100 NAT stages and 25/100/500/1,000 distributed targets. The #629 follow-up
+25/50/100 NAT stages and 25/100/500/1,000 distributed targets (NAT policy
+version 2, 2026-10-02, dropped the 100 stage and the unused distributed list). The #629 follow-up
 replaced the distributed escalation path with a persistent five-runner 25/50/100
 ladder and stricter sustained/telemetry/cleanup evidence; policy version 3
 (2026-10-02) dropped the 100 stage, leaving 25/50. Stage escalation still
