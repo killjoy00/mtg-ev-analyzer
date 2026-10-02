@@ -64,6 +64,8 @@ test('signed-in progression uses My Pack One stats and Account settings tabs', (
   assert.match(myPack, /Shared W–L/);
   assert.match(myPack, /Welcome to My Pack One/);
   assert.match(myPack, /Empty data is not treated as a zero score/);
+  assert.match(myPack, /membershipLabel=patreon\?\.configured!==true\?'Status unavailable'/);
+  assert.doesNotMatch(myPack, /elite\?'Elite':'Free'/);
   assert.match(product, /Your record starts when you play/);
   assert.match(product, /Sign in or create account/);
   assert.doesNotMatch(product, /Back to game/);
