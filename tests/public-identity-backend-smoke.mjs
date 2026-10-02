@@ -140,6 +140,181 @@ try {
     'SELECT public_identity_terms_version,public_identity_terms_accepted_at,profile_public FROM players WHERE id=$1::uuid',
     [target.playerId],
   )).rows[0];
+
+  // Force the audit INSERT to fail inside the rename function. Because the
+  // player UPDATE and audit INSERT share one database transaction, neither
+  // mutation may survive.
+  const auditFailFunction=`qa_fail_rename_audit_${tag}`;
+  const auditFailTrigger=`qa_fail_rename_audit_trigger_${tag}`;
+  await query(`CREATE FUNCTION ${auditFailFunction}() RETURNS trigger LANGUAGE plpgsql AS $qa$
+    BEGIN
+      IF NEW.action='rename' AND NEW.reason='QA force audit rollback' THEN
+        RAISE EXCEPTION 'QA forced rename audit failure';
+      END IF;
+      RETURN NEW;
+    END
+  $qa// End-to-end Public Identity / UGC safety gate against an isolated Neon branch.
+// Usage: node tests/public-identity-backend-smoke.mjs /path/to/dev.connection --dev-fixtures
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+
+if(!process.argv.includes('--dev-fixtures'))throw new Error('Use an isolated development database and --dev-fixtures.');
+process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
+
+const {default:growth,query}=await import('../worker/growth-function.js');
+const {default:draftRun}=await import('../worker/draft-run-function.mjs');
+const {beginAdminDeletion}=await import('../worker/account-deletion.mjs');
+const {PUBLIC_IDENTITY_TERMS_VERSION}=await import('../worker/public-identity-safety.mjs');
+
+const tag=crypto.randomUUID().slice(0,8);
+const origin='https://packone.pro';
+
+async function responseJson(response,status,path) {
+  const data=await response.json();
+  assert.equal(response.status,status,`${path}: ${JSON.stringify(data)}`);
+  return data;
+}
+
+async function callGrowth(path,{body,playerToken,accountToken,method,status=200}={}) {
+  const resolvedMethod=method||(body===undefined?'GET':'POST');
+  const response=await growth.fetch(new Request(origin+path,{
+    method:resolvedMethod,
+    headers:{
+      ...(body===undefined?{}:{'content-type':'application/json'}),
+      ...(playerToken?{authorization:'Bearer '+playerToken}:{}),
+      ...(accountToken?{'x-pack1-auth-session':accountToken}:{}),
+    },
+    body:body===undefined?undefined:JSON.stringify(body),
+  }));
+  return responseJson(response,status,path);
+}
+
+async function callAdminRaw(path,{body,accountToken,method}={}) {
+  const response=await draftRun.fetch(new Request(origin+path,{
+    method:method||(body===undefined?'GET':'POST'),
+    headers:{
+      ...(body===undefined?{}:{'content-type':'application/json'}),
+      ...(accountToken?{'x-pack1-auth-session':accountToken}:{}),
+    },
+    body:body===undefined?undefined:JSON.stringify(body),
+  }));
+  return {status:response.status,data:await response.json()};
+}
+
+async function callAdmin(path,{body,accountToken,method,status=200}={}) {
+  const result=await callAdminRaw(path,{body,accountToken,method});
+  assert.equal(result.status,status,`${path}: ${JSON.stringify(result.data)}`);
+  return result.data;
+}
+
+async function callAdminGrowth(path,{body,accountToken,method,status=200}={}) {
+  const response=await growth.fetch(new Request(origin+path,{
+    method:method||(body===undefined?'GET':'POST'),
+    headers:{
+      origin,
+      ...(body===undefined?{}:{'content-type':'application/json'}),
+      ...(accountToken?{'x-pack1-auth-session':accountToken}:{}),
+    },
+    body:body===undefined?undefined:JSON.stringify(body),
+  }));
+  return responseJson(response,status,path);
+}
+
+async function account(label) {
+  const guest=await callGrowth('/v1/session',{body:{displayName:`QA PI ${label} ${tag}`}});
+  const authId=crypto.randomUUID(),accountToken=crypto.randomUUID()+crypto.randomUUID();
+  await query(
+    'INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',
+    [authId,`QA PI ${label}`,`qa-pi-${label}-${tag}@example.invalid`],
+  );
+  await query(
+    'INSERT INTO neon_auth.session(id,"userId",token,"updatedAt","expiresAt") VALUES($1::uuid,$2::uuid,$3,now(),now()+interval \'1 hour\')',
+    [crypto.randomUUID(),authId,accountToken],
+  );
+  await query('INSERT INTO account_links(auth_user_id,player_id) VALUES($1::uuid,$2::uuid)',[authId,guest.playerId]);
+  return {...guest,authId,accountToken};
+}
+
+const reporter=await account('reporter');
+const target=await account('target');
+const hideRaceTarget=await account('hide-race');
+const deletionRaceTarget=await account('delete-race');
+const adminId=crypto.randomUUID(),adminToken=crypto.randomUUID()+crypto.randomUUID();
+
+try {
+  await query(
+    'INSERT INTO neon_auth."user"(id,name,email,"emailVerified") VALUES($1::uuid,$2,$3,true)',
+    [adminId,'QA PI admin',`qa-pi-admin-${tag}@example.invalid`],
+  );
+  await query(
+    'INSERT INTO neon_auth.session(id,"userId",token,"updatedAt","expiresAt") VALUES($1::uuid,$2::uuid,$3,now(),now()+interval \'1 hour\')',
+    [crypto.randomUUID(),adminId,adminToken],
+  );
+  await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid)',[adminId]);
+
+  const reporterName=`PI Reporter ${tag}`;
+  let targetName=`PI Target ${tag}`;
+  const unauthRename=await callAdmin(`/v1/admin/users/${target.authId}/username`,{
+    method:'PATCH',status:401,body:{displayName:'Denied Rename'},
+  });
+  assert.match(unauthRename.error,/session/i);
+  const nonAdminRename=await callAdmin(`/v1/admin/users/${target.authId}/username`,{
+    method:'PATCH',accountToken:target.accountToken,status:403,body:{displayName:'Denied Rename'},
+  });
+  assert.match(nonAdminRename.error,/admin access/i);
+  const unauthDelete=await callAdminGrowth(`/v1/admin/users/${target.authId}/delete`,{
+    status:401,body:{confirm:'DELETE'},
+  });
+  assert.match(unauthDelete.error,/session/i);
+  const nonAdminDelete=await callAdminGrowth(`/v1/admin/users/${target.authId}/delete`,{
+    accountToken:target.accountToken,status:403,body:{confirm:'DELETE'},
+  });
+  assert.match(nonAdminDelete.error,/admin access/i);
+  const prohibited=await callGrowth('/v1/profile',{
+    method:'PATCH',playerToken:target.token,accountToken:target.accountToken,status:400,
+    body:{displayName:'Pack One Support'},
+  });
+  assert.equal(prohibited.code,'USERNAME_NOT_ALLOWED','server rejects prohibited public identity before publication');
+  assert.equal((await query('SELECT public_identity_terms_accepted_at FROM players WHERE id=$1::uuid',[target.playerId])).rows[0].public_identity_terms_accepted_at,null,'failed prohibited publication does not record terms acceptance');
+  await callGrowth('/v1/profile',{
+    method:'PATCH',playerToken:reporter.token,accountToken:reporter.accountToken,
+    body:{displayName:reporterName},
+  });
+  const published=await callGrowth('/v1/profile',{
+    method:'PATCH',playerToken:target.token,accountToken:target.accountToken,
+    body:{displayName:targetName,profilePublic:true},
+  });
+  const key=published.player.profile_key;
+  assert.match(key,/^[a-f0-9]{16}$/);
+  // Saving a name next to the rules notice records acceptance; no checkbox flag.
+  assert.equal(published.player.public_identity_terms_current,true);
+  assert.equal((await query('SELECT public_identity_terms_version FROM players WHERE id=$1::uuid',[target.playerId])).rows[0].public_identity_terms_version,PUBLIC_IDENTITY_TERMS_VERSION);
+
+);
+  await query(`CREATE TRIGGER ${auditFailTrigger}
+    BEFORE INSERT ON public_identity_moderation_actions
+    FOR EACH ROW EXECUTE FUNCTION ${auditFailFunction}()`);
+  try {
+    const failedRename=await callAdminRaw(`/v1/admin/users/${target.authId}/username`,{
+      method:'PATCH',accountToken:adminToken,
+      body:{displayName:`PI Rollback ${tag}`,reason:'QA force audit rollback'},
+    });
+    assert.equal(failedRename.status,500,JSON.stringify(failedRename.data));
+    const rolledBack=(await query(
+      'SELECT display_name,username_owned,profile_public FROM players WHERE id=$1::uuid',
+      [target.playerId],
+    )).rows[0];
+    assert.equal(rolledBack.display_name,`PI Target ${tag}`,'failed audit insert rolls back the player rename');
+    assert.equal(rolledBack.username_owned===true||rolledBack.username_owned==='t',true);
+    assert.equal(rolledBack.profile_public===true||rolledBack.profile_public==='t',true);
+    assert.equal(Number((await query(
+      "SELECT count(*)::int n FROM public_identity_moderation_actions WHERE target_player_id=$1::uuid AND reason='QA force audit rollback'",
+      [target.playerId],
+    )).rows[0].n),0,'failed audit insert leaves no partial audit row');
+  } finally {
+    await query(`DROP TRIGGER IF EXISTS ${auditFailTrigger} ON public_identity_moderation_actions`);
+    await query(`DROP FUNCTION IF EXISTS ${auditFailFunction}()`);
+  }
   const renamedName=`PI Renamed ${tag}`;
   const renamed=await callAdmin(`/v1/admin/users/${target.authId}/username`,{
     method:'PATCH',accountToken:adminToken,body:{displayName:`  PI   Renamed ${tag}  `,reason:'QA admin rename'},
