@@ -27,11 +27,16 @@ test('native inputs and classifier infrastructure force the full path', () => {
     'mobile/assets/images/icon.png',
     'mobile/scripts/audit-ios-archive.py',
     'mobile/scripts/configure-android-upload-signing.mjs',
+    'mobile/plugins/with-pack-one.js',
+    'mobile/config-plugins/with-pack-one.js',
     'mobile/scripts/native-ci-scope.mjs',
     'mobile/tests/native-ci-scope.test.mjs',
+    'mobile/tests/gradle-cache-key.test.mjs',
     '.github/workflows/android-production-bundle.yml',
     '.github/workflows/android-internal-testing.yml',
     '.github/workflows/ios-testflight.yml',
+    '.github/workflows/mobile-exact-main-rc.yml',
+    '.github/workflows/mobile.yml',
   ]) full([path]);
 });
 
