@@ -154,6 +154,19 @@ jobs:
           CI: '1'
           PACKONE_BUILD_PROFILE: production
         run: npx expo prebuild --platform android --clean
+      - name: Compute unsigned Gradle cache key
+        id: gradle-cache
+        env:
+          PACKONE_GRADLE_CACHE_JAVA: '17'
+        run: node ./scripts/gradle-cache-key.mjs
+      - name: Restore unsigned Gradle cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            mobile/node_modules/**/.cxx
+          key: ${{ steps.gradle-cache.outputs.key }}
       - name: Verify native Android version
         shell: bash
         run: |
@@ -163,7 +176,7 @@ jobs:
           grep -Eq "versionName[[:space:]]+['\"]$expected['\"]" android/app/build.gradle
       - name: Build release app bundle
         working-directory: mobile/android
-        run: ./gradlew :app:bundleRelease --no-daemon
+        run: ./gradlew :app:bundleRelease --no-daemon --build-cache
       - name: Audit generated Android privacy surface
         working-directory: mobile/android
         shell: bash
@@ -195,6 +208,36 @@ jobs:
           path: mobile/android/app/build/outputs/bundle/release/app-release.aab
           if-no-files-found: error
           retention-days: 7
+      - name: Verify unsigned Gradle cache contains no signing material
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ -z "${PACKONE_ANDROID_UPLOAD_KEYSTORE:-}" ]]
+          [[ -z "${PACKONE_ANDROID_UPLOAD_PASSWORD:-}" ]]
+          [[ -z "${PACKONE_ANDROID_UPLOAD_KEY_ALIAS:-}" ]]
+          forbidden="$RUNNER_TEMP/pack-one-gradle-cache-forbidden.txt"
+          : > "$forbidden"
+          for root in "$HOME/.gradle/caches" "$HOME/.gradle/wrapper"; do
+            [[ -d "$root" ]] || continue
+            find "$root" -type f \( -name 'gradle.properties' -o -iname '*.jks' -o -iname '*.p12' -o -iname '*.keystore' \) -print >> "$forbidden"
+          done
+          while IFS= read -r -d '' dir; do
+            find "$dir" -type f \( -name 'gradle.properties' -o -iname '*.jks' -o -iname '*.p12' -o -iname '*.keystore' \) -print >> "$forbidden"
+          done < <(find node_modules -type d -name .cxx -print0)
+          if [[ -s "$forbidden" ]]; then
+            echo '::error::Unsigned Gradle cache contains a forbidden signing/config file:'
+            cat "$forbidden"
+            exit 1
+          fi
+          echo 'Verified Gradle cache roots exclude Gradle user properties and keystore material.'
+      - name: Save unsigned Gradle cache from main
+        uses: actions/cache/save@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            mobile/node_modules/**/.cxx
+          key: ${{ steps.gradle-cache.outputs.key }}
 
   manifest:
     name: record RC evidence
@@ -203,6 +246,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Reconfirm exact current main after both builds
+        id: freshness
         shell: bash
         run: |
           set -euo pipefail
@@ -210,12 +254,15 @@ jobs:
           git fetch --no-tags --depth=1 origin main
           head_sha="$(git rev-parse HEAD)"
           main_sha="$(git rev-parse FETCH_HEAD)"
-          [[ "$head_sha" == "$main_sha" ]] || {
-            echo "RC source $head_sha became stale while builds ran; current main is $main_sha." >&2
-            exit 1
-          }
+          if [[ "$head_sha" != "$main_sha" ]]; then
+            echo "current=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::RC source $head_sha became stale while native builds ran; current main is $main_sha. Build/audit results remain attached to the source run, but no exact-main RC manifest will be written."
+            exit 0
+          fi
+          echo "current=true" >> "$GITHUB_OUTPUT"
           echo "Reconfirmed exact current main after native builds: $head_sha"
       - name: Write exact-main RC manifest
+        if: steps.freshness.outputs.current == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -238,6 +285,7 @@ jobs:
           NODE
           cat rc-evidence/mobile-exact-main-rc.json
       - uses: actions/upload-artifact@v4
+        if: steps.freshness.outputs.current == 'true'
         with:
           name: pack-one-mobile-rc-evidence
           path: rc-evidence/mobile-exact-main-rc.json
