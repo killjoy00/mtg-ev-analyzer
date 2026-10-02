@@ -82,6 +82,10 @@ test('cross-version cutover patches only the readiness builder and stays fail-cl
  assert.doesNotMatch(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_serving_snapshot\(/);
  assert.match(cutoverMigration,/next_snapshot\.corpus_version<>p\.corpus_version/);
  assert.match(cutoverMigration,/historical\.schema_version='historical-frozen'/);
+ assert.match(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_serving_snapshot_matches_current/);
+ assert.match(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_enqueue_readiness/);
+ assert.match(cutoverMigration,/exact-serving-input-carry-forward/);
+ assert.match(cutoverMigration,/new_inputs WHERE status='Live'/);
 });
 
 import {sourceQuality,importComponents} from '../scripts/load-traditional-components.mjs';
