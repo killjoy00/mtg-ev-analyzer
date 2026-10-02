@@ -5,7 +5,7 @@ const keyId=process.env.ASC_KEY_ID?.trim();
 const privateKeyText=process.env.ASC_PRIVATE_KEY;
 const appId='6814318676';
 const bundleId='pro.packone.app';
-const targetTerritories=new Set(['USA','CAN']);
+const targetTerritories=['USA','CAN'];
 const versionString='1.0';
 
 if(!issuerId||!keyId||!privateKeyText)throw Error('ASC credentials are required.');
@@ -35,9 +35,30 @@ async function api(path,options={}){
   if(!result.ok)throw Error(`${options.method??'GET'} ${path} HTTP ${result.status}: ${result.text}`);
   return result.data;
 }
-async function listAll(path){
+function territoryIdsFromLegacy(doc){
+  const relationship=doc?.data?.relationships?.availableTerritories?.data||[];
+  return relationship.map(x=>x.id).filter(Boolean).sort();
+}
+function exactTarget(ids){
+  return [...ids].sort().join(',')==='CAN,USA';
+}
+async function readLegacyAvailability(){
+  const path=`/v1/apps/${appId}/appAvailability?include=availableTerritories&limit%5BavailableTerritories%5D=200`;
+  const result=await apiRaw(path);
+  if(result.status===404)return null;
+  if(!result.ok)throw Error(`GET ${path} HTTP ${result.status}: ${result.text}`);
+  return result.data;
+}
+async function readV2Availability(){
+  const path=`/v1/apps/${appId}/appAvailabilityV2?fields%5BappAvailabilities%5D=availableInNewTerritories,territoryAvailabilities&include=territoryAvailabilities&fields%5BterritoryAvailabilities%5D=available,preOrderEnabled,territory&limit%5BterritoryAvailabilities%5D=50`;
+  const result=await apiRaw(path);
+  if(result.status===404)return null;
+  if(!result.ok)throw Error(`GET ${path} HTTP ${result.status}: ${result.text}`);
+  return result.data;
+}
+async function listV2Territories(availabilityId){
   const rows=[];
-  let next=path;
+  let next=`/v2/appAvailabilities/${encodeURIComponent(availabilityId)}/territoryAvailabilities?fields%5BterritoryAvailabilities%5D=available,releaseDate,preOrderEnabled,preOrderPublishDate,contentStatuses,territory&include=territory&limit=200`;
   while(next){
     const page=await api(next);
     rows.push(...(page?.data||[]));
@@ -47,76 +68,99 @@ async function listAll(path){
 }
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-const app=await api(`/v1/apps/${appId}?fields%5Bapps%5D=bundleId`);
+const app=await api(`/v1/apps/${appId}`);
 if(app.data?.attributes?.bundleId!==bundleId)throw Error('Unexpected App Store Connect bundle ID.');
 
-const versions=await api(`/v1/apps/${appId}/appStoreVersions?filter%5Bplatform%5D=IOS&limit=200`);
+const versions=await api(`/v1/apps/${appId}/appStoreVersions?filter%5Bplatform%5D=IOS&fields%5BappStoreVersions%5D=platform,versionString,appVersionState,releaseType&limit=200`);
 const version=(versions?.data||[]).find(x=>x.attributes?.platform==='IOS'&&x.attributes?.versionString===versionString);
 if(!version)throw Error(`No iOS version ${versionString} found.`);
 const state=version.attributes?.appVersionState||version.attributes?.appStoreState;
 if(state!=='PREPARE_FOR_SUBMISSION')throw Error(`Refusing to change public availability while iOS ${versionString} state is ${state}.`);
-if(version.attributes?.releaseType&&version.attributes.releaseType!=='MANUAL')throw Error(`Refusing to change public availability unless releaseType is MANUAL; found ${version.attributes.releaseType}.`);
+if(version.attributes?.releaseType!=='MANUAL')throw Error(`Refusing to change public availability unless releaseType is MANUAL; found ${version.attributes?.releaseType}.`);
 
-const availabilityLink=await api(`/v1/apps/${appId}/appAvailabilityV2?fields%5BappAvailabilities%5D=availableInNewTerritories,territoryAvailabilities`);
-const availability=availabilityLink?.data;
-if(!availability?.id)throw Error('App availability resource is missing; refusing to create a pre-order or new availability resource.');
-
-const before=await listAll(`/v2/appAvailabilities/${encodeURIComponent(availability.id)}/territoryAvailabilities?fields%5BterritoryAvailabilities%5D=available,releaseDate,preOrderEnabled,preOrderPublishDate,contentStatuses,territory&include=territory&limit=200`);
-if(before.length<2)throw Error(`Unexpected territory availability count: ${before.length}`);
-if(before.some(x=>x.attributes?.preOrderEnabled===true))throw Error('Refusing to modify availability while any territory has pre-order enabled.');
-
-if(availability.attributes?.availableInNewTerritories!==false){
-  await api(`/v1/apps/${appId}`,{
-    method:'PATCH',
-    body:{data:{type:'apps',id:appId,attributes:{availableInNewTerritories:false}}},
-  });
+const existingV2=await readV2Availability();
+if(existingV2){
+  const rows=await listV2Territories(existingV2.data.id);
+  if(rows.some(x=>x.attributes?.preOrderEnabled===true))throw Error('Refusing to modify availability while any territory has pre-order enabled.');
+  const available=rows.filter(x=>x.attributes?.available===true).map(x=>x.relationships?.territory?.data?.id).filter(Boolean).sort();
+  if(existingV2.data.attributes?.availableInNewTerritories===false&&exactTarget(available)){
+    console.log(JSON.stringify({
+      configured:true,
+      alreadyConfigured:true,
+      apiMode:'v2-existing',
+      appId,bundleId,versionString,versionState:state,releaseType:version.attributes.releaseType,
+      availabilityId:existingV2.data.id,
+      availableInNewTerritories:false,
+      availableTerritories:available,
+      changedTerritoryCount:0,
+      reviewSubmissionCreated:false,
+      versionReleased:false,
+      preOrderChanged:false,
+    },null,2));
+    process.exit(0);
+  }
+  throw Error(`Refusing to repurpose an existing v2 availability resource because that API surface is pre-order-oriented: ${JSON.stringify({availableInNewTerritories:existingV2.data.attributes?.availableInNewTerritories,available})}`);
 }
 
-let changed=0;
-for(const row of before){
-  const territory=row.relationships?.territory?.data?.id;
-  if(!territory)throw Error(`Territory relationship missing for availability ${row.id}`);
-  const desired=targetTerritories.has(territory);
-  if(Boolean(row.attributes?.available)===desired)continue;
-  await api(`/v1/territoryAvailabilities/${encodeURIComponent(row.id)}`,{
-    method:'PATCH',
-    body:{data:{type:'territoryAvailabilities',id:row.id,attributes:{available:desired}}},
-  });
-  changed+=1;
+const before=await readLegacyAvailability();
+if(before){
+  const beforeTerritories=territoryIdsFromLegacy(before);
+  if(before.data?.attributes?.availableInNewTerritories===false&&exactTarget(beforeTerritories)){
+    console.log(JSON.stringify({
+      configured:true,
+      alreadyConfigured:true,
+      apiMode:'v1-legacy',
+      appId,bundleId,versionString,versionState:state,releaseType:version.attributes.releaseType,
+      availabilityId:before.data.id,
+      availableInNewTerritories:false,
+      availableTerritories:beforeTerritories,
+      changedTerritoryCount:0,
+      reviewSubmissionCreated:false,
+      versionReleased:false,
+      preOrderChanged:false,
+    },null,2));
+    process.exit(0);
+  }
 }
 
-let finalRows=null;
-let finalAvailability=null;
+const configured=await api('/v1/appAvailabilities',{
+  method:'POST',
+  body:{data:{
+    type:'appAvailabilities',
+    attributes:{availableInNewTerritories:false},
+    relationships:{
+      app:{data:{type:'apps',id:appId}},
+      availableTerritories:{data:targetTerritories.map(id=>({type:'territories',id}))},
+    },
+  }},
+});
+if(configured?.data?.type!=='appAvailabilities')throw Error('Legacy availability write returned an unexpected resource type.');
+
+let final=null;
 for(let attempt=1;attempt<=8;attempt++){
-  finalAvailability=await api(`/v1/apps/${appId}/appAvailabilityV2?fields%5BappAvailabilities%5D=availableInNewTerritories,territoryAvailabilities`);
-  finalRows=await listAll(`/v2/appAvailabilities/${encodeURIComponent(availability.id)}/territoryAvailabilities?fields%5BterritoryAvailabilities%5D=available,releaseDate,preOrderEnabled,preOrderPublishDate,contentStatuses,territory&include=territory&limit=200`);
-  const available=finalRows
-    .filter(x=>x.attributes?.available===true)
-    .map(x=>x.relationships?.territory?.data?.id)
-    .filter(Boolean)
-    .sort();
-  if(finalAvailability.data?.attributes?.availableInNewTerritories===false&&available.join(',')==='CAN,USA')break;
-  if(attempt===8)throw Error(`App availability did not settle to USA+CAN only: ${JSON.stringify({availableInNewTerritories:finalAvailability.data?.attributes?.availableInNewTerritories,available})}`);
-  await sleep(5000);
+  final=await readLegacyAvailability();
+  if(final){
+    const ids=territoryIdsFromLegacy(final);
+    if(final.data?.attributes?.availableInNewTerritories===false&&exactTarget(ids))break;
+  }
+  if(attempt===8)throw Error(`Legacy App Store availability did not settle to USA+CAN only: ${JSON.stringify(final)}`);
+  await sleep(3000);
 }
 
-const availableTerritories=finalRows
-  .filter(x=>x.attributes?.available===true)
-  .map(x=>x.relationships?.territory?.data?.id)
-  .filter(Boolean)
-  .sort();
-
+const finalTerritories=territoryIdsFromLegacy(final);
 console.log(JSON.stringify({
   configured:true,
+  alreadyConfigured:false,
+  apiMode:'v1-legacy',
   appId,
   bundleId,
   versionString,
   versionState:state,
-  releaseType:version.attributes?.releaseType??'MANUAL',
-  availabilityId:availability.id,
-  availableInNewTerritories:finalAvailability.data.attributes.availableInNewTerritories,
-  availableTerritories,
-  changedTerritoryCount:changed,
+  releaseType:version.attributes.releaseType,
+  availabilityId:final.data.id,
+  availableInNewTerritories:final.data.attributes.availableInNewTerritories,
+  availableTerritories:finalTerritories,
+  changedTerritoryCount:targetTerritories.length,
   reviewSubmissionCreated:false,
   versionReleased:false,
   preOrderChanged:false,
