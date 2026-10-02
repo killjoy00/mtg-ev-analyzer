@@ -214,7 +214,8 @@ try {
   assert.match((await page.locator('.profile-identity-rules').textContent())||'',/Display names and public profiles follow the Pack One Public Identity rules/);
   assert.equal(await page.locator('.profile-identity-rules a[href="/terms/#public-identity-rules"]').count(),1);
   assert.equal(await page.locator('input[name="acceptPublicIdentityTerms"]').count(),0);
-  assert.equal((await page.locator('.profile-toggle').textContent())?.trim().replace(/\s+/g,' '),'Public profile Let players view your Pack One record from leaderboards and shared links.');
+  assert.equal((await page.locator('.profile-toggle strong').textContent())?.trim(),'Public profile');
+  assert.equal((await page.locator('.profile-toggle small').textContent())?.trim(),'Let players view your Pack One record from leaderboards and shared links.');
   const toggleBox=await page.locator('.profile-toggle').boundingBox();
   assert.ok(toggleBox&&toggleBox.height>=43.5,'public profile row is a full touch target');
   const topSave=page.locator('button[form="profile-settings-form"][type="submit"]');
