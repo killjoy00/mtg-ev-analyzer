@@ -8,6 +8,7 @@ process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 
 const {default:growth,query}=await import('../worker/growth-function.js');
 const {default:draftRun}=await import('../worker/draft-run-function.mjs');
+const {beginAdminDeletion}=await import('../worker/account-deletion.mjs');
 const {PUBLIC_IDENTITY_TERMS_VERSION}=await import('../worker/public-identity-safety.mjs');
 
 const tag=crypto.randomUUID().slice(0,8);
@@ -33,7 +34,7 @@ async function callGrowth(path,{body,playerToken,accountToken,method,status=200}
   return responseJson(response,status,path);
 }
 
-async function callAdmin(path,{body,accountToken,method,status=200}={}) {
+async function callAdminRaw(path,{body,accountToken,method}={}) {
   const response=await draftRun.fetch(new Request(origin+path,{
     method:method||(body===undefined?'GET':'POST'),
     headers:{
@@ -42,7 +43,13 @@ async function callAdmin(path,{body,accountToken,method,status=200}={}) {
     },
     body:body===undefined?undefined:JSON.stringify(body),
   }));
-  return responseJson(response,status,path);
+  return {status:response.status,data:await response.json()};
+}
+
+async function callAdmin(path,{body,accountToken,method,status=200}={}) {
+  const result=await callAdminRaw(path,{body,accountToken,method});
+  assert.equal(result.status,status,`${path}: ${JSON.stringify(result.data)}`);
+  return result.data;
 }
 
 async function callAdminGrowth(path,{body,accountToken,method,status=200}={}) {
@@ -75,6 +82,8 @@ async function account(label) {
 
 const reporter=await account('reporter');
 const target=await account('target');
+const hideRaceTarget=await account('hide-race');
+const deletionRaceTarget=await account('delete-race');
 const adminId=crypto.randomUUID(),adminToken=crypto.randomUUID()+crypto.randomUUID();
 
 try {
