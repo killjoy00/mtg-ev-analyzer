@@ -26,7 +26,7 @@ export function ipNetwork(value) {
   return parts.slice(0,4).map(x=>parseInt(x,16).toString(16)).join(':')+'::/64';
 }
 
-function adminPath(path,method) {
+export function adminPath(path,method) {
   if(method==='POST'&&path==='/v1/admin/claim')return true;
   if(method==='GET'&&path==='/v1/admin/measurements')return true;
   if(method==='GET'&&/^\/v1\/admin\/decisions\/[a-z0-9_-]{6,120}$/.test(path))return true;
@@ -41,12 +41,18 @@ function adminPath(path,method) {
   return false;
 }
 
+export function adminGrowthPath(path,method,mode) {
+  if(mode!=='production')return false;
+  if(method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
+  if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
+  return false;
+}
+
 function permitted(service,path,method,search,mode) {
   if(service==='growth'&&(nativePatreonAction(path,method)||appleSubscriptionAction(path,method)))return true;
   if(method==='GET'&&path==='/health')return search==='?quick=1';
   if(service==='growth') {
-    if(mode==='production'&&method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
-    if(mode==='production'&&method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
+    if(adminGrowthPath(path,method,mode))return true;
     if(mode==='production'&&method==='POST'&&path==='/v1/admin/campaign-links/publish')return true;
     if(method==='POST'&&[
       '/v1/session','/v1/player/session','/v1/player/migrate',
