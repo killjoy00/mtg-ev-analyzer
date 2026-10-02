@@ -60,6 +60,8 @@ test('completed deletion redacts rename and deletion free text while retaining o
   assert.match(deletion,/previous_display_name=NULL/);
   assert.match(deletion,/new_display_name=NULL/);
   assert.match(deletion,/reason=CASE WHEN action='rename' THEN NULL ELSE reason END/);
+  assert.match(deletion,/target_auth_user_id=\$2::uuid/);
+  assert.match(deletion,/OR target_auth_user_id=\$2::uuid/);
   assert.match(deletion,/deletion_reason=NULL/);
   assert.match(deletion,/initiated_by_admin_auth_user_id/);
 });
