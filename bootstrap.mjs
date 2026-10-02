@@ -104,9 +104,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
   // Paint the real Daily layout immediately, but keep account/progress-specific
   // claims neutral until the cookie-backed session and Daily status resolve.
   const home = params.get('game') !== 'draft-run' && !params.has('profile') && !params.has('account') && !params.has('patreon')
-    ? await import('./daily-home.mjs?v=8') : null;
+    ? await import('./daily-home.mjs?v=9') : null;
   home?.renderDailyHome(null,'checking');
-  const growthReady = import('./growth.mjs?v=7');
+  const growthReady = import('./growth.mjs?v=8');
   const identityReady = growthReady.then(m => m.installGrowthLayer());
 
   if(account)account.onclick = async () => {
@@ -138,7 +138,7 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     if(patreonResult==='activate'||growth.hasPatreonActivationIntent()) {
       await growth.renderPatreonActivation({result:patreonResult==='activate'?null:patreonResult,source:patreonResult==='activate'?'welcome_note':'oauth_return'});
     } else {
-      const profiles=await import('./profile-product.mjs?v=7');
+      const profiles=await import('./profile-product.mjs?v=8');
       profiles.installProfileProductLayer();
       (await import('./profile-polish.mjs?v=6')).installProfilePolish();
       await profiles.renderMyProfile();
@@ -154,9 +154,9 @@ if (deletionState==='deleted'||deletionState==='deleting') {
     }
   } else if (params.has('profile')) {
     await identityReady;
-    (await import('./profile-product.mjs?v=7')).installProfileProductLayer();
+    (await import('./profile-product.mjs?v=8')).installProfileProductLayer();
   } else {
-    const game = await import('./draft-run-product.mjs?v=8');
+    const game = await import('./draft-run-product.mjs?v=9');
     await identityReady;
     await refreshPrimaryNav();
     await game.installDraftRunPage();
