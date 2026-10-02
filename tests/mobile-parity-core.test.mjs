@@ -16,6 +16,7 @@ const [
   accountDeleteScreen,
   accountStateHook,
   accountLayout,
+  homeScreen,
   webHowTo,
   webScoring,
 ] = await Promise.all([
@@ -32,6 +33,7 @@ const [
   readFile(new URL('../mobile/app/account-delete.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/src/hooks/useAccountState.ts', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/_layout.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/index.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../how-it-works/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
 ]);
@@ -107,4 +109,7 @@ test('native Account keeps auth on /account and splits signed-in management into
   assert.match(accountLayout, /name="account-profile" options=\{\{ title: 'Profile & visibility' \}\}/);
   assert.match(accountLayout, /name="account-security" options=\{\{ title: 'Sign-in & security' \}\}/);
   assert.match(accountLayout, /name="account-delete" options=\{\{ title: 'Delete account' \}\}/);
+  assert.match(homeScreen, /name_not_allowed/);
+  assert.match(homeScreen, /That display name is not allowed\. Choose another to join Daily leaderboards\./);
+  assert.match(homeScreen, /Choose a different display name\. That one is already taken\./);
 });
