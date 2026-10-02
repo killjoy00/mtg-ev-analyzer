@@ -230,7 +230,7 @@ function AppleElitePanel({
       return;
     }
     if (otherProviderActive) {
-      setError('Elite access is already active from another provider. Apple purchase is disabled to avoid duplicate billing.');
+      setError('Elite is already active through Patreon. Apple purchase is disabled to avoid duplicate billing.');
       return;
     }
     setRequesting(true);
@@ -311,7 +311,7 @@ function AppleElitePanel({
           ? ` through ${new Date(status.subscription.expiresAt).toLocaleDateString()}`
           : ''}.</Text>
       ) : otherProviderActive ? (
-        <Text style={styles.body}>Elite access is already active from another provider. Apple purchase is disabled here to avoid duplicate billing.</Text>
+        <Text style={styles.body}>Elite is already active through Patreon. Apple purchase is disabled here to avoid duplicate billing.</Text>
       ) : (
         <Text style={styles.body}>{product
           ? `Apple price: ${product.displayPrice}${period ? ` ${period}` : ''}.`
