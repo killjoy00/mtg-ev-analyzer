@@ -18,7 +18,7 @@ const deletionStateLabel=value=>({
 })[value]||value||'Unknown';
 
 export async function renderUsers(root,request,growthRequest=request) {
-  let data=null,filters={search:'',status:'all'};
+  let data=null,filters={search:'',status:'all'},detailLoadSerial=0;
 
   async function load() {
     root.innerHTML='<p>Loading users…</p>';
@@ -95,7 +95,12 @@ export async function renderUsers(root,request,growthRequest=request) {
     </tbody></table></div>`:'<p class="muted">No public-identity admin actions recorded.</p>';
   }
 
-  function deletionPanel(user,id,deletion,{statusUnavailable=false}={}) {
+  function deletionPanel(user,id,deletion,{statusUnavailable=false,statusLoading=false}={}) {
+    if(statusLoading) {
+      return `<div id="deletion-status">
+        <p class="muted">Checking deletion status… Permanent deletion is disabled until this check completes.</p>
+      </div>`;
+    }
     if(statusUnavailable) {
       return `<div id="deletion-status">
         <p class="error">Deletion status is temporarily unavailable. Other user-management controls remain available, but permanent deletion is disabled until the deletion service responds.</p>
@@ -124,24 +129,24 @@ export async function renderUsers(root,request,growthRequest=request) {
 
   async function openDetail(id) {
     const dialog=document.querySelector('#user-detail'),body=document.querySelector('#user-detail-body');
+    const detailSerial=++detailLoadSerial;
     body.innerHTML='<p>Loading user…</p>';
     if(!dialog.open)dialog.showModal();
     try {
-      const [deletionResult,detailResult]=await Promise.allSettled([
-        deletionStatus(id),
-        request('/v1/admin/users/'+encodeURIComponent(id)),
-      ]);
-      const deletion=deletionResult.status==='fulfilled'?deletionResult.value:null;
-      const deletionUnavailable=deletionResult.status==='rejected';
+      const deletionPromise=deletionStatus(id).then(
+        value=>({ok:true,value}),
+        error=>({ok:false,error}),
+      );
       let detail;
-      if(detailResult.status==='fulfilled') {
-        detail=detailResult.value;
-      } else {
-        const error=detailResult.reason;
+      try {
+        detail=await request('/v1/admin/users/'+encodeURIComponent(id));
+      } catch(error) {
+        const deletionResult=await deletionPromise;
+        const deletion=deletionResult.ok?deletionResult.value:null;
         if(error.status===404&&deletion) {
           body.innerHTML=`<div class="user-detail-heading"><div><p class="muted">Deleted / deleting account</p><h2>Deletion status</h2><p><code>${esc(id)}</code></p></div><button type="button" class="secondary" id="user-detail-close">Close</button></div>
             <section class="user-section"><h3>Permanent account deletion</h3>${deletionPanel({is_self:false,is_admin:Boolean(deletion.target_was_admin)},id,deletion)}</section>`;
-          document.querySelector('#user-detail-close').onclick=()=>dialog.close();
+          document.querySelector('#user-detail-close').onclick=()=>{detailLoadSerial++;dialog.close();};
           const refresh=document.querySelector('#deletion-refresh');
           if(refresh)refresh.onclick=async()=>{
             refresh.disabled=true;
@@ -168,7 +173,7 @@ export async function renderUsers(root,request,growthRequest=request) {
       const u=detail.user,stats=detail.stats;
       const entitlements=detail.entitlements||[],providers=detail.providers||[],runs=detail.recent_runs||[],events=detail.recent_events||[];
       const actions=detail.moderation_actions||[];
-      const renameBlocked=Boolean(u.public_identity_hidden_at||deletion);
+      const renameBlocked=Boolean(u.public_identity_hidden_at);
       body.innerHTML=`<div class="user-detail-heading"><div><p class="muted">Authenticated account</p><h2>${esc(u.name||'Unnamed account')}</h2><p>${esc(u.email||'No email')}</p></div><button type="button" class="secondary" id="user-detail-close">Close</button></div>
         <dl class="user-metrics">
           <dt>Auth account name</dt><dd>${esc(u.name||'N/A')}</dd>
@@ -187,7 +192,6 @@ export async function renderUsers(root,request,growthRequest=request) {
           ${u.linked?`<form id="change-username-form">
             <p class="muted">Changes the public Pack One / leaderboard identity only. It does not change the auth account name, email, credentials, profile key, or Public Identity terms acceptance.</p>
             ${u.public_identity_hidden_at?'<p class="error">This public identity is moderated. Use the existing audited restore action before renaming; restore does not republish or re-own the identity.</p>':''}
-            ${deletion?'<p class="error">Username changes are disabled because account deletion has already started.</p>':''}
             <label>Public username<input name="displayName" value="${esc(u.profile_name||'Pack Player')}" minlength="2" maxlength="24" required ${renameBlocked?'disabled':''}></label>
             <p class="muted">2–24 characters. Whitespace/case equivalence, prohibited-name checks, placeholder release behavior, and database uniqueness are the same as the normal profile flow.</p>
             <label>Reason (optional)<input name="reason" maxlength="200" autocomplete="off" ${renameBlocked?'disabled':''}></label>
@@ -196,7 +200,7 @@ export async function renderUsers(root,request,growthRequest=request) {
           </form>`:'<p class="muted">This account has no linked Pack One player, so it has no public username to change.</p>'}
         </section>
         <section class="user-section"><h3>Public identity action history</h3>${identityHistory(actions)}</section>
-        <section class="user-section"><h3>Permanent account deletion</h3>${deletionPanel(u,id,deletion,{statusUnavailable:deletionUnavailable})}</section>
+        <section class="user-section" id="permanent-deletion-section"><h3>Permanent account deletion</h3>${deletionPanel(u,id,null,{statusLoading:true})}</section>
         <section class="user-section"><h3>Connected providers</h3>
           ${providers.length?`<div class="scroll"><table><thead><tr><th>Provider</th><th>Membership</th><th>Access</th><th>Last synced</th></tr></thead><tbody>${providers.map(item=>`<tr><td>${esc(item.provider)}</td><td>${esc(item.membership_status||'Connected')}</td><td>${item.is_gifted?'Gifted':item.is_free_trial?'Free trial':item.currently_entitled_amount_cents?'Paid':'Free'}</td><td>${esc(dateTime(item.last_synced_at))}</td></tr>`).join('')}</tbody></table></div>`:'<p class="muted">No external membership provider is connected.</p>'}
         </section>
