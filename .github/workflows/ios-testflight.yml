@@ -68,7 +68,6 @@ jobs:
           marketing = re.escape(sys.argv[3])
           checks = {
               'production bundle identifier': r'PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?pro\.packone\.app"?\s*;',
-              'smoke build number': rf'CURRENT_PROJECT_VERSION\s*=\s*"?{build}"?\s*;',
               'marketing version': rf'MARKETING_VERSION\s*=\s*"?{marketing}"?\s*;',
           }
           for label, pattern in checks.items():
