@@ -499,6 +499,29 @@ export async function startGoogleSignIn() {
   location.assign(target.toString());
 }
 
+export async function completeEmailVerification() {
+  if(!firstPartyAuthEnabled())return getAuthSession();
+  await ensurePackSession();
+  const provider=authBase();
+  if(!/^https:\/\//.test(provider))throw new Error('Email verification is temporarily unavailable.');
+  const verifier=new URL(location.href).searchParams.get('neon_auth_session_verifier');
+  const suffix=verifier?'?neon_auth_session_verifier='+encodeURIComponent(verifier):'';
+  const sessionResponse=await fetch(provider+'/get-session'+suffix,{
+    credentials:'include',
+    headers:{accept:'application/json'},
+  });
+  const data=await sessionResponse.json().catch(()=>({}));
+  if(sessionResponse.status===401||sessionResponse.status===403||!data?.session?.token||!data?.user)return null;
+  if(!sessionResponse.ok)throw new Error(data.message||data.error||'Email verification could not establish your account session.');
+  await raw('/v1/account/migrate',{
+    method:'POST',
+    body:{},
+    headers:new Headers({'content-type':'application/json','x-pack1-auth-session':data.session.token}),
+  });
+  clearLegacyAuth();
+  return {user:data.user,session:data.session};
+}
+
 export async function completeGoogleSignIn() {
   if(!firstPartyAuthEnabled())throw new Error('Google sign in is not available on this release yet.');
   const verifier=new URL(location.href).searchParams.get('neon_auth_session_verifier');
