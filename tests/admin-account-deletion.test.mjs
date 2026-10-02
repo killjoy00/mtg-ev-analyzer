@@ -138,3 +138,27 @@ test('retrying an existing self-service operation preserves its original attribu
   assert.equal(result.body.operation.initiation_source,'self_service');
   assert.equal(result.body.operation.initiated_by_admin_auth_user_id,null);
 });
+
+
+test('admin deletion rejects malformed and unknown target identities',async()=>{
+  await assert.rejects(
+    handleAdminAccountDeletion(
+      request('/v1/admin/users/not-a-uuid/delete',{method:'POST',body:{confirm:'DELETE'}}),
+      async()=>{throw Error('must not query');},undefined,
+      {readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,resumeDeletionOperation:async x=>x},
+    ),
+    error=>error?.status===400,
+  );
+  const query=async(sql)=>{
+    if(sql.includes('SELECT email FROM neon_auth."user"'))return {rows:[],rowCount:0};
+    if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'unknown_target'}],rowCount:1};
+    throw Error('unexpected SQL');
+  };
+  await assert.rejects(
+    handleAdminAccountDeletion(
+      request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE'}}),
+      query,undefined,{readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,resumeDeletionOperation:async x=>x},
+    ),
+    error=>error?.status===404,
+  );
+});
