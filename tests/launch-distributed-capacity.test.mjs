@@ -1,9 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import http from 'node:http';
 import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy} from '../scripts/launch-distributed-core.mjs';
 import {policy,heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
 import {inspectBin,inspectPreviewTelemetry,previewTelemetryFailure,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
 import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
+import {transportFailureEvidence,undiciTransportObserver} from '../scripts/launch-distributed-transport.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
 const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
 const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
@@ -128,6 +131,136 @@ test('client really preserves cookies, CSRF and idempotency without forwarding-h
  let failures=0;const broken=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:new AbortController().signal,fetcher:async()=>{failures++;return Response.json({error:'busy'},{status:503});}});
  await assert.rejects(()=>broken(actor,'start','/draft/v1/runs',{environment:'mixed'}),/http_503/);assert.equal(failures,1);
 });
+
+const fakeTransportObserver=state=>({begin:()=>({bound:false,body_present:true,headers_sent:false,body_sent:false,socket:'unknown',connect_ms:null,tls:null,...state}),end(){}});
+async function capturedTransportFailure({error,state={},aborted=false}) {
+ const budget={gateway_requests:0,response_bytes:0},report={requests:[]},controller=new AbortController(),actor={id:17,cookies:new Map(),csrf:null};if(aborted)controller.abort();
+ let calls=0;const fetcher=async()=>{calls++;throw error;};
+ const client=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:controller.signal,fetcher,
+   transportObserver:fakeTransportObserver(state),request_timeout_ms:5});
+ let caught=null;
+ try {await client(actor,'pick','/draft/v1/runs/11111111-1111-4111-8111-111111111111/pick',{revision:1,round:0,puzzleId:'p',cardId:'c'},{report});}
+ catch(error){caught=error;}
+ assert.ok(caught);assert.equal(calls,1,'transport failure must never retry a mutation');
+ assert.equal(report.requests[0].actor,17);assert.equal(report.requests[0].actor_request,1);
+ return {record:report.requests[0],caught};
+}
+test('transport diagnostics retain reset evidence on a reused socket without changing failure acceptance',async()=>{
+ const cause=Object.assign(Error('other side closed'),{name:'SocketError',code:'UND_ERR_SOCKET'});
+ const {record,caught}=await capturedTransportFailure({error:Object.assign(new TypeError('fetch failed'),{cause}),
+   state:{bound:true,headers_sent:true,body_sent:true,socket:'reused',tls:true}});
+ assert.equal(caught.message,'fetch failed');assert.equal(caught.category,'application');
+ assert.equal(record.transport.label,'post_send');assert.equal(record.transport.role,'unclassified');
+ assert.equal(record.transport.error_name,'TypeError');assert.equal(record.transport.cause_code,'UND_ERR_SOCKET');assert.equal(record.transport.cause_name,'SocketError');
+ assert.equal(record.transport.message,'fetch failed');assert.equal(record.transport.cause_message,'other side closed');
+ assert.equal(record.transport.headers_sent,true);assert.equal(record.transport.body_present,true);assert.equal(record.transport.body_sent,true);
+ assert.equal(record.transport.socket,'reused');assert.equal(record.transport.connect_ms,null);assert.equal(record.transport.tls,true);assert.equal(record.transport.tls_ms,null);
+ assert.ok(record.transport.elapsed_ms>=0);assert.equal(record.status,0);
+});
+test('transport diagnostics retain connect timeout and TLS causes as proven pre-send failures',async()=>{
+ for(const [code,name] of [['UND_ERR_CONNECT_TIMEOUT','ConnectTimeoutError'],['ERR_TLS_CERT_ALTNAME_INVALID','Error']]) {
+   const cause=Object.assign(Error('connect failed to 192.0.2.44 token_ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789'),{name,code});
+   const {record,caught}=await capturedTransportFailure({error:Object.assign(new TypeError('fetch failed'),{cause}),state:{bound:true}});
+   assert.equal(caught.message,'fetch failed');assert.equal(caught.category,'application');assert.equal(record.transport.label,'pre_send');
+   assert.equal(record.transport.headers_sent,false);assert.equal(record.transport.body_sent,false);assert.equal(record.transport.socket,'unknown');
+   assert.equal(record.transport.cause_code,code);assert.equal(record.transport.cause_name,name);assert.equal(record.transport.message,'fetch failed');
+   assert.match(record.transport.cause_message,/\[ip\].*\[redacted\]/);assert.doesNotMatch(record.transport.cause_message,/192\.0\.2\.44|ABCDEFGHIJKLMNOPQRSTUVWXYZ123456789/);
+ }
+});
+test('unbound diagnostics never overclaim a proven pre-send failure',async()=>{
+ const {record}=await capturedTransportFailure({error:new TypeError('fetch failed')});
+ assert.equal(record.transport.label,'unknown');assert.equal(record.transport.headers_sent,false);assert.equal(record.transport.socket,'unknown');
+});
+test('AbortSignal timeout is distinct from cohort abort fallout',async()=>{
+ const timeout=await capturedTransportFailure({error:new DOMException('The operation was aborted due to timeout','TimeoutError'),
+   state:{bound:true,headers_sent:true,body_sent:true,socket:'new',connect_ms:11.23,tls:true}});
+ assert.equal(timeout.record.transport.label,'post_send');assert.equal(timeout.record.transport.error_name,'TimeoutError');
+ assert.equal(timeout.record.transport.socket,'new');assert.equal(timeout.record.transport.connect_ms,11.23);assert.equal(timeout.caught.message,'The operation was aborted due to timeout');assert.equal(timeout.caught.category,'application');
+ const fallout=await capturedTransportFailure({error:new DOMException('This operation was aborted','AbortError'),
+   state:{bound:true,headers_sent:true,body_sent:true,socket:'reused',tls:true},aborted:true});
+ assert.equal(fallout.record.transport.label,'abort_fallout');assert.equal(fallout.record.transport.error_name,'AbortError');
+ assert.equal(fallout.caught.message,'This operation was aborted');assert.equal(fallout.caught.category,'application');
+});
+
+async function listenLoopback(server) {
+ await new Promise((resolve,reject)=>{server.once('error',reject);server.listen(0,'127.0.0.1',resolve);});
+ return server.address().port;
+}
+async function closeLoopback(server) {
+ server.closeAllConnections?.();
+ if(server.listening)await new Promise(resolve=>server.close(resolve));
+}
+function loopbackFixture() {
+ const socketIds=new WeakMap(),socketUses=new WeakMap(),requests=[];let nextSocketId=1;
+ const server=http.createServer((request,response)=>{
+   const socket=request.socket,id=socketIds.get(socket)||nextSocketId++;
+   socketIds.set(socket,id);const use=(socketUses.get(socket)||0)+1;socketUses.set(socket,use);
+   const label=use===1?'new':'reused',row={method:request.method,path:request.url,socket:id,use,label};requests.push(row);request.resume();
+   if(request.url==='/reset'&&label==='reused'){socket.resetAndDestroy();return;}
+   if(request.url==='/destroy'&&label==='reused'){socket.destroy();return;}
+   const finish=()=>{if(response.destroyed)return;response.setHeader('x-test-socket-id',String(id));response.setHeader('x-test-socket-label',label);response.end('ok');};
+   if(request.url==='/concurrent')setTimeout(finish,25);else finish();
+ });
+ server.keepAliveTimeout=10000;server.headersTimeout=12000;server.on('clientError',()=>{});
+ return {server,requests};
+}
+async function observedLoopbackFetch(url,options={}) {
+ const method=options.method||'GET',bodyPresent=options.body!==undefined,state=undiciTransportObserver.begin({url:new URL(url),method,bodyPresent});
+ try {
+   const response=await fetch(url,options),serverLabel=response.headers.get('x-test-socket-label'),socketId=response.headers.get('x-test-socket-id');
+   await response.text();assert.ok(['new','reused'].includes(serverLabel));assert.equal(state.socket,serverLabel);
+   return {state,serverLabel,socketId};
+ } finally {undiciTransportObserver.end(state);}
+}
+async function observedLoopbackFailure(url,options={}) {
+ const method=options.method||'GET',bodyPresent=options.body!==undefined,state=undiciTransportObserver.begin({url:new URL(url),method,bodyPresent}),started=performance.now();
+ try {await fetch(url,options);return null;}
+ catch(error){return {state,error,evidence:transportFailureEvidence(error,state,{elapsedMs:performance.now()-started})};}
+ finally {undiciTransportObserver.end(state);}
+}
+
+test('real global fetch transport diagnostics match loopback socket ground truth',async t=>{
+ t.diagnostic('runtime Node '+process.versions.node+' / undici '+(process.versions.undici||'unknown'));
+ const dead=http.createServer(),deadPort=await listenLoopback(dead);await closeLoopback(dead);
+ const refused=await observedLoopbackFailure('http://127.0.0.1:'+deadPort+'/refused');
+ assert.ok(refused);assert.equal(refused.evidence.label,'pre_send');assert.equal(refused.evidence.cause_code,'ECONNREFUSED');assert.equal(refused.evidence.headers_sent,false);
+ assert.match(refused.evidence.cause_message,/\[ip\]/);assert.doesNotMatch(refused.evidence.cause_message,/127\.0\.0\.1/);
+
+ const fixture=loopbackFixture(),port=await listenLoopback(fixture.server),origin='http://127.0.0.1:'+port;t.after(()=>closeLoopback(fixture.server));
+ const sequential=[await observedLoopbackFetch(origin+'/sequential'),await observedLoopbackFetch(origin+'/sequential')];
+ t.diagnostic('sequential socket labels observer/server: '+sequential.map(r=>r.state.socket+'/'+r.serverLabel+'#'+r.socketId).join(', '));
+
+ // Warm reusable connections, then compare six identical concurrent requests
+ // against the server's per-socket request count. This exercises the FIFO
+ // method+origin+path request:create binding under real concurrency.
+ await Promise.all([observedLoopbackFetch(origin+'/warm-a'),observedLoopbackFetch(origin+'/warm-b')]);
+ const concurrent=await Promise.all(Array.from({length:6},()=>observedLoopbackFetch(origin+'/concurrent')));
+ for(const row of concurrent)assert.equal(row.state.socket,row.serverLabel);
+ t.diagnostic('six concurrent identical GETs observer/server: '+concurrent.map(r=>r.state.socket+'/'+r.serverLabel+'#'+r.socketId).join(', '));
+
+ const failOnReused=async(path,code,messagePattern)=>{
+   for(let attempt=0;attempt<8;attempt++) {
+     await observedLoopbackFetch(origin+'/warm-failure');
+     const before=fixture.requests.length,result=await observedLoopbackFailure(origin+path,{method:'POST',body:'payload'}),serverRow=fixture.requests.slice(before).find(r=>r.path===path);
+     if(!result){assert.equal(serverRow?.label,'new');continue;}
+     assert.ok(serverRow,'server must have received the failing POST');assert.equal(serverRow.label,'reused');assert.equal(result.state.socket,'reused');
+     assert.equal(result.evidence.label,'post_send');assert.equal(result.evidence.headers_sent,true);assert.equal(result.evidence.cause_code,code);
+     assert.match(result.evidence.cause_message,messagePattern);return result;
+   }
+   assert.fail('did not place '+path+' on a reused loopback socket');
+ };
+ const reset=await failOnReused('/reset','ECONNRESET',/reset/i);assert.equal(reset.evidence.socket,'reused');
+ const destroyed=await failOnReused('/destroy','UND_ERR_SOCKET',/other side closed/i);assert.equal(destroyed.evidence.socket,'reused');
+});
+
+test('draft PRs cannot provision preview resources and ready-for-review can trigger the scoped workflow',()=>{
+ const workflow=fs.readFileSync(new URL('../.github/workflows/launch-distributed.yml',import.meta.url),'utf8');
+ assert.match(workflow,/pull_request:\n\s+types: \[opened, synchronize, reopened, ready_for_review\]/);
+ assert.match(workflow,/github\.event\.pull_request\.draft == false/);
+ const artifactLines=workflow.split('\n').filter(line=>/name: (?:isolated-encrypted-fixtures|distributed-capacity-)|pattern: distributed-capacity-/.test(line));
+ assert.ok(artifactLines.length>=6);for(const line of artifactLines)assert.match(line,/github\.run_attempt/);
+});
+
 test('runner retains bounded preview timings beside unsampled client duration',async()=>{
  const headers=new Headers({
    'x-pack1-gateway-timing':JSON.stringify({duration_ms:130,quota_ms:20,upstream_ms:90,secret:'discard'}),
