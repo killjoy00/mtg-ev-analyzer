@@ -143,7 +143,7 @@ test('retrying an existing self-service operation preserves its original attribu
 test('admin deletion rejects malformed and unknown target identities',async()=>{
   await assert.rejects(
     handleAdminAccountDeletion(
-      request('/v1/admin/users/not-a-uuid/delete',{method:'POST',body:{confirm:'DELETE'}}),
+      request('/v1/admin/users/aaaaaaaa-aaaa-0aaa-aaaa-aaaaaaaaaaaa/delete',{method:'POST',body:{confirm:'DELETE'}}),
       async()=>{throw Error('must not query');},undefined,
       {readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,resumeDeletionOperation:async x=>x},
     ),
