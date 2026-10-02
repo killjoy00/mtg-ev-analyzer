@@ -26,6 +26,11 @@ test('rollout requests can target only fixed workflows on main',()=>{
     {...common,operation:'import',target:'another-database',sets:'all'},
   ])assert.throws(()=>rolloutDispatch(request));
 });
+test('distributed capacity dispatch is fixed to the reviewed main-branch workflow',()=>{
+  const request={...common,operation:'distributed-capacity'};
+  assert.deepEqual(rolloutDispatch(request),{workflow:'launch-distributed.yml',body:{ref:'main',inputs:{}}});
+  for(const extra of [{ref:'branch'},{target:'production'},{workflow:'other.yml'}])assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
 test('the issue 164 v4 rebuild can only dispatch its fixed reviewed workflow',()=>{
   const request={...common,operation:'rebuild-v4'};
   assert.deepEqual(rolloutDispatch(request),{
