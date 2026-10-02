@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -27,20 +27,17 @@ export default function AccountProfileScreen() {
     enrichmentWarning,
     refresh,
   } = useAccountState({ requireAccount: true, loadProfile: true, loadCatalog: true });
-  const [displayName, setDisplayName] = useState('');
-  const [profilePublic, setProfilePublic] = useState(false);
-  const [favoriteSetId, setFavoriteSetId] = useState('');
-  const [showcaseAchievement, setShowcaseAchievement] = useState('');
+  const [displayNameEdit, setDisplayName] = useState<string | null>(null);
+  const [profilePublicEdit, setProfilePublic] = useState<boolean | null>(null);
+  const [favoriteSetIdEdit, setFavoriteSetId] = useState<string | null>(null);
+  const [showcaseAchievementEdit, setShowcaseAchievement] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!profile) return;
-    setDisplayName(profile.player.display_name ?? '');
-    setProfilePublic(Boolean(profile.player.profile_public));
-    setFavoriteSetId(profile.player.favorite_set_id ?? '');
-    setShowcaseAchievement(profile.player.showcase_achievement ?? '');
-  }, [profile]);
+  const displayName = displayNameEdit ?? profile?.player.display_name ?? '';
+  const profilePublic = profilePublicEdit ?? Boolean(profile?.player.profile_public);
+  const favoriteSetId = favoriteSetIdEdit ?? profile?.player.favorite_set_id ?? '';
+  const showcaseAchievement = showcaseAchievementEdit ?? profile?.player.showcase_achievement ?? '';
 
   const favorites = useMemo(() => [...catalogSets].sort((a, b) => (
     String(b.release_date ?? '').localeCompare(String(a.release_date ?? ''))
