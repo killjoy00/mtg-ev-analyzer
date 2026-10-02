@@ -34,7 +34,7 @@ async function health(snapshot,setId,ready) {
   SELECT $2,corpus_version,source_snapshot_id,md5(manifest::text),$3,$4,$5::jsonb FROM corpus_source_snapshots WHERE source_snapshot_id=$1 RETURNING id`,
  [snapshot,setId,CORPUS_GATE_VERSION,ready,JSON.stringify({fixture:reason})])).rows[0].id;
 }
-let original,setId,component,componentHealth,child,crossSnapshot;
+let original,setId,component,componentHealth,child,crossSnapshot,futurePuzzle;
 try {
  await query('DELETE FROM draft_run_readiness_keys');
  const initial=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
@@ -51,6 +51,30 @@ try {
  const baseline=await advanceServingReadiness(query,{release:process.env.GITHUB_SHA});
  assert.equal(baseline.ready,true,JSON.stringify(baseline));
  check('registered key blocks player builders; automatic baseline verification succeeds');
+
+ // The rebuilt checked-in baseline is loaded before its first-class full
+ // snapshots. Its rows deliberately have no source_snapshot_id. A future parent
+ // with no readiness key/cache must therefore remain inert until publication.
+ const futureVersion='qa-future-parent-'+tag;
+ futurePuzzle=randomBytes(16).toString('hex');
+ const beforeFutureStage=await revision();
+ await query(`INSERT INTO draft_run_verified_puzzles
+  SELECT (jsonb_populate_record(NULL::draft_run_verified_puzzles,to_jsonb(p)||jsonb_build_object(
+    'puzzle_id',$1,'corpus_version',$2,'source_snapshot_id',NULL,
+    'payload',p.payload||jsonb_build_object('corpus_version',$2)))).*
+  FROM draft_run_verified_puzzles p
+  WHERE p.set_id=$3 AND p.corpus_version=$4
+  ORDER BY p.puzzle_id LIMIT 1`,[futurePuzzle,futureVersion,setId,DRAFT_RUN_CORPUS_VERSION]);
+ await query(`INSERT INTO draft_run_puzzle_ratings(puzzle_id,difficulty_version,rating,top_two_ratio,target_support_ratio,band)
+  SELECT $1,r.difficulty_version,r.rating,r.top_two_ratio,r.target_support_ratio,r.band
+  FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r USING(puzzle_id)
+  WHERE p.set_id=$2 AND p.corpus_version=$3 AND r.difficulty_version=$4
+  ORDER BY p.puzzle_id LIMIT 1`,[futurePuzzle,setId,DRAFT_RUN_CORPUS_VERSION,DRAFT_RUN_DIFFICULTY_VERSION]);
+ assert.equal(await revision(),beforeFutureStage,'Inactive future-parent baseline and ratings must not churn the serving revision');
+ await query('DELETE FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[futurePuzzle]);
+ futurePuzzle=null;
+ assert.equal(await revision(),beforeFutureStage,'Removing inactive future-parent fixtures must remain non-serving');
+ check('future-parent NULL-snapshot baseline and ratings stage without serving revision churn');
 
  // A future-corpus pointer must not strand the still-deployed parent release.
  // The bridge keeps historical-frozen v8 membership stable, and migration 0049
@@ -200,6 +224,7 @@ try {
   await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2,status=$3 WHERE set_id=$1',[setId,original.active_snapshot_id,original.status]);
   await query('UPDATE corpus_source_snapshots SET lifecycle_status=$2,superseded_by=$3 WHERE source_snapshot_id=$1',[original.active_snapshot_id,original.lifecycle_status,original.superseded_by]);
  }
+ if(futurePuzzle)await query('DELETE FROM draft_run_verified_puzzles WHERE puzzle_id=$1',[futurePuzzle]);
  if(crossSnapshot)await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[crossSnapshot]);
  await query('DELETE FROM corpus_status_events WHERE reason=$1',[reason]);
  await query('DELETE FROM corpus_source_exclusions WHERE reason=$1',[reason]);
