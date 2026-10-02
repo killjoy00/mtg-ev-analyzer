@@ -104,7 +104,7 @@ $$;
 CREATE OR REPLACE FUNCTION pack1_puzzle_can_affect_serving(
   p_set_id text,p_corpus_version text,p_source_snapshot_id text
 )
-RETURNS boolean LANGUAGE sql STABLE AS $$
+RETURNS boolean LANGUAGE sql STABLE AS $puzzle$
   SELECT pack1_version_can_affect_serving(p_corpus_version) AND (
     p_source_snapshot_id IS NULL OR EXISTS(
       SELECT 1 FROM draft_run_environment_policy e
@@ -112,10 +112,10 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
         AND e.active_snapshot_id=p_source_snapshot_id
     )
   );
-$$;
+$puzzle$;
 
 CREATE OR REPLACE FUNCTION pack1_invalidate_inserted_puzzles()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql AS $insert_puzzles$
 BEGIN
   IF EXISTS(
     SELECT 1 FROM new_rows p
@@ -125,10 +125,10 @@ BEGIN
   END IF;
   RETURN NULL;
 END;
-$$;
+$insert_puzzles$;
 
 CREATE OR REPLACE FUNCTION pack1_invalidate_deleted_puzzles()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql AS $delete_puzzles$
 BEGIN
   IF EXISTS(
     SELECT 1 FROM old_rows p
@@ -138,10 +138,10 @@ BEGIN
   END IF;
   RETURN NULL;
 END;
-$$;
+$delete_puzzles$;
 
 CREATE OR REPLACE FUNCTION pack1_invalidate_updated_puzzle()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql AS $update_puzzle$
 BEGIN
   IF ROW(
     OLD.puzzle_id,OLD.set_id,OLD.corpus_version,OLD.source_snapshot_id,
@@ -160,26 +160,26 @@ BEGIN
   END IF;
   RETURN NULL;
 END;
-$$;
+$update_puzzle$;
 
 CREATE OR REPLACE FUNCTION pack1_rating_can_affect_serving(p_puzzle_id text)
-RETURNS boolean LANGUAGE sql STABLE AS $$
+RETURNS boolean LANGUAGE sql STABLE AS $rating$
   SELECT EXISTS(
     SELECT 1 FROM draft_run_verified_puzzles p
     WHERE p.puzzle_id=p_puzzle_id
       AND pack1_puzzle_can_affect_serving(p.set_id,p.corpus_version,p.source_snapshot_id)
   );
-$$;
+$rating$;
 
 CREATE OR REPLACE FUNCTION pack1_invalidate_inserted_versions()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql AS $insert_versions$
 BEGIN
   IF EXISTS(SELECT 1 FROM new_versions v WHERE pack1_version_can_affect_serving(v.corpus_version)) THEN
     PERFORM pack1_bump_serving_revision();
   END IF;
   RETURN NULL;
 END;
-$$;
+$insert_versions$;
 
 CREATE OR REPLACE FUNCTION pack1_invalidate_deleted_versions()
 RETURNS trigger LANGUAGE plpgsql AS $$
