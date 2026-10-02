@@ -310,17 +310,16 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 ### Google Cloud release-credential boundary
 
-6. **Narrow Google Workload Identity Federation trust.**
-   - Open Google Cloud Shell while signed into the `pack-one` project owner/admin account.
-   - Run:
-```bash
-gcloud iam workload-identity-pools providers update-oidc "mtg-ev-analyzer" \
-  --project="pack-one" \
-  --location="global" \
-  --workload-identity-pool="github" \
-  --attribute-condition="assertion.repository == 'killjoy00/mtg-ev-analyzer' && assertion.ref == 'refs/heads/main' && assertion.environment == 'pack-one-mobile-release'"
-```
-   - This keeps Google store credentials usable only from the Pack One repository, `main`, and the `pack-one-mobile-release` GitHub Environment.
+6. **Narrow Google Workload Identity Federation trust in the Google Cloud Console.**
+   - No command line or Cloud Shell is required.
+   - Open Google Cloud Console and select project **Pack One** (`pack-one`).
+   - Go to **IAM & Admin -> Workload Identity Federation** / **Workload Identity Pools**.
+   - Find and expand the pool **github**.
+   - Find provider **mtg-ev-analyzer** and click **Edit**.
+   - In **Attribute conditions**, replace the current repo-only condition with:
+     `assertion.repository == 'killjoy00/mtg-ev-analyzer' && assertion.ref == 'refs/heads/main' && assertion.environment == 'pack-one-mobile-release'`
+   - Click **Save**.
+   - Do not change the issuer, provider ID, pool, attribute mappings, service account, or any other IAM setting.
    - After this change, re-run the repo's non-publishing Google Play access probe and record the passing evidence in #575.
 
 ### Not owner-only / leave to automation
