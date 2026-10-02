@@ -61,13 +61,31 @@ jobs:
           plist='ios/PackOne/Info.plist'
           test -f "$project"
           test -f "$plist"
-          grep -Fq 'PRODUCT_BUNDLE_IDENTIFIER = pro.packone.app;' "$project"
-          grep -Fq "CURRENT_PROJECT_VERSION = $PACKONE_IOS_BUILD_NUMBER;" "$project"
           expected_marketing_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
-          grep -Fq "MARKETING_VERSION = $expected_marketing_version;" "$project"
+          python3 - "$project" "$PACKONE_IOS_BUILD_NUMBER" "$expected_marketing_version" <<'PY'
+          import re, sys
+          project = open(sys.argv[1], encoding='utf-8').read()
+          build = re.escape(sys.argv[2])
+          marketing = re.escape(sys.argv[3])
+          checks = {
+              'production bundle identifier': r'PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?pro\.packone\.app"?\s*;',
+              'smoke build number': rf'CURRENT_PROJECT_VERSION\s*=\s*"?{build}"?\s*;',
+              'marketing version': rf'MARKETING_VERSION\s*=\s*"?{marketing}"?\s*;',
+          }
+          for label, pattern in checks.items():
+              if not re.search(pattern, project):
+                  raise SystemExit(f'Missing generated iOS {label}: {pattern}')
+          PY
           python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$plist"
-          privacy_manifest="$(find ios/PackOne -name PrivacyInfo.xcprivacy -print -quit)"
-          test -n "$privacy_manifest"
+          PACKONE_BUILD_PROFILE=production npx expo config --type public --json > "$RUNNER_TEMP/pack-one-production-expo-config.json"
+          node - "$RUNNER_TEMP/pack-one-production-expo-config.json" "$PACKONE_IOS_BUILD_NUMBER" "$expected_marketing_version" <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (config.ios?.bundleIdentifier !== 'pro.packone.app') throw new Error('Production Expo bundle identifier drifted.');
+          if (String(config.ios?.buildNumber) !== process.argv[3]) throw new Error('Production Expo build number drifted.');
+          if (config.version !== process.argv[4]) throw new Error('Production Expo marketing version drifted.');
+          if (config.ios?.config?.usesNonExemptEncryption !== false) throw new Error('Production Expo export-compliance declaration drifted.');
+          NODE
           echo "Verified generated production iOS metadata without compiling an archive."
 
   testflight:
