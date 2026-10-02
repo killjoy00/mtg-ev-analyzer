@@ -1,7 +1,7 @@
 {
-  "operation": "card-image-release",
-  "request_id": "tishana-card-image-release-hotfix-replay-20260928",
-  "replay_of": "tishana-card-image-release-hotfix-20260928",
-  "reason": "Intentional retry after the prior equivalent rollout request was rejected by the replay guard before dispatch. Deploy #736 and rerun the guarded Tishana/card-art release.",
-  "commit": "8c3c4df35f53e99c63cbbe3fe2c675a8e2b21203"
+  "operation": "deploy",
+  "request_id": "read-stall-fix-dev-20261002",
+  "reason": "Deploy the exact capacity-tested Daily-status fanout fix revision to development before production promotion.",
+  "commit": "d8632a8bca21bb0bc5bc713b5e395b42fc5c7ef0",
+  "target": "development"
 }
