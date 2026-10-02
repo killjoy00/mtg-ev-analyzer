@@ -428,8 +428,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
         document.querySelector('#account-verification-signin')?.addEventListener('click',()=>void renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode:'signin'}));
         return;
       }
-      if(Object.prototype.hasOwnProperty.call(flow,'validateDailyRunId'))pendingDailyRunValidation=flow.validateDailyRunId||null;
-    const claimed=await claimCurrentSession();
+      const claimed=await claimCurrentSession();
       if(claimed?.linked?.newlyClaimed) {
         await openSignupNamePrompt({
           linked:claimed.linked,
@@ -551,6 +550,7 @@ export async function resumeAccountAuth(status) {
           : 'Email verified. Sign in to continue on this browser.',
       });
     }
+    if(Object.prototype.hasOwnProperty.call(flow,'validateDailyRunId'))pendingDailyRunValidation=flow.validateDailyRunId||null;
     const claimed=await claimCurrentSession();
     if(claimed?.linked?.newlyClaimed) {
       return openSignupNamePrompt({
