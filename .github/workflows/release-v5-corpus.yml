@@ -194,6 +194,7 @@ jobs:
           node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" verify-active generated/v5-candidate generated/v5-release-baseline.json
           node scripts/verify-serving-quality.mjs "$RUNNER_TEMP/target.connection"
           node scripts/verify-cube-expansion.mjs "$RUNNER_TEMP/target.connection" traditional-cube-p2p7-v5-v1
+          node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
 
       - name: Roll back to captured v8 pointers after bridge redeploy
         if: inputs.action == 'rollback'
