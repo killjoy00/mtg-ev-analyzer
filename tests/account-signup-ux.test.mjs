@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [worker,mobileScreen,mobileApi]=await Promise.all([
+const [worker,growth,mobileScreen,mobileApi]=await Promise.all([
   readFile(new URL('../worker/growth-function.js',import.meta.url),'utf8'),
+  readFile(new URL('../growth.mjs',import.meta.url),'utf8'),
   readFile(new URL('../mobile/app/account.tsx',import.meta.url),'utf8'),
   readFile(new URL('../mobile/src/api/account.ts',import.meta.url),'utf8'),
 ]);
@@ -42,4 +43,12 @@ test('native first claim shows the account-ready display-name step before contin
   assert.match(mobileScreen,/accessibilityLabel="Skip display name for now"/);
   assert.match(mobileScreen,/linkMobileAccount\(session, validateDailyRunId\)/);
   assert.match(mobileScreen,/continueAfterDisplayNamePrompt/);
+});
+
+
+test('web signed-in auth callbacks route newly claimed accounts through account-ready',()=>{
+  const signedInBranch=growth.slice(growth.indexOf('if(currentAccount?.user)'),growth.indexOf('const validatingDaily='));
+  assert.match(signedInBranch,/if\(linked\?\.newlyClaimed\)/);
+  assert.match(signedInBranch,/openSignupNamePrompt\(\{linked,validationRunId,intent,source\}\)/);
+  assert.match(growth,/profile\?\.player\?\.display_name_reason\|\|profile\?\.ranking_identity\?\.reason\|\|linked\?\.rankingIdentity\?\.reason/);
 });
