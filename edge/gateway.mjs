@@ -45,8 +45,8 @@ function permitted(service,path,method,search,mode) {
   if(service==='growth'&&(nativePatreonAction(path,method)||appleSubscriptionAction(path,method)))return true;
   if(method==='GET'&&path==='/health')return search==='?quick=1';
   if(service==='growth') {
-    if(method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
-    if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
+    if(mode==='production'&&method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
+    if(mode==='production'&&method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
     if(mode==='production'&&method==='POST'&&path==='/v1/admin/campaign-links/publish')return true;
     if(method==='POST'&&[
       '/v1/session','/v1/player/session','/v1/player/migrate',
