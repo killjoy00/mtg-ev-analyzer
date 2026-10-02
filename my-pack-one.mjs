@@ -177,9 +177,14 @@ function statsMarkup(profile,catalog,account,patreon) {
 
 function usernameAttentionMarkup(profile) {
   if(!profile?.player?.claimed||profile.player.username_owned!==false)return '';
-  return '<aside class="profile-claim profile-username-attention" role="alert"><div><span>Username needs attention</span><strong>Choose a unique username to join Daily leaderboards.</strong><p>Your account is linked, but this name cannot be used as your ranked public identity yet.</p></div><button type="button" class="button secondary" id="profile-username-fix">Change username</button></aside>';
+  const reason=profile.player.display_name_reason||profile.ranking_identity?.reason||null;
+  const message=reason==='name_not_allowed'
+    ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+    : reason==='username_taken'
+      ? 'Choose a different display name. That one is already taken.'
+      : 'Choose a display name to join Daily leaderboards.';
+  return '<aside class="profile-claim profile-username-attention" role="alert"><div><span>Display name needs attention</span><strong>'+esc(message)+'</strong><p>Your account is linked, but this display name cannot be shown on Daily leaderboards yet.</p></div><button type="button" class="button secondary" id="profile-username-fix">Change display name</button></aside>';
 }
-
 export function resetMyPackOneTab() {
   activeTab='stats';
 }
@@ -227,7 +232,7 @@ export function myPackOneMarkup(profile,catalog,{account=null,patreon=null,setti
     '<div class="my-pack-one-tabs" role="tablist" aria-label="My Pack One"><button type="button" role="tab" id="profile-stats-tab" aria-controls="profile-stats-panel" aria-selected="'+String(!accountSelected)+'" tabindex="'+(!accountSelected?'0':'-1')+'">Stats</button><button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(accountSelected)+'" tabindex="'+(accountSelected?'0':'-1')+'">Account</button></div>'+
     '<section class="my-pack-one-panel" id="profile-stats-panel" role="tabpanel" aria-labelledby="profile-stats-tab" data-profile-panel="stats" '+(accountSelected?'hidden':'')+'>'+statsMarkup(profile,catalog,account,patreon)+'</section>'+
     '<section class="my-pack-one-panel my-pack-one-account-panel" id="profile-account-panel" role="tabpanel" aria-labelledby="profile-account-tab" data-profile-panel="account" '+(!accountSelected?'hidden':'')+'>'+
-      '<div class="my-account-heading"><h2>Account</h2><p>Manage your profile, sign-in security, membership, and account lifecycle.</p></div>'+
+      '<div class="my-account-heading"><h2>Account</h2><p>Manage your profile, membership, and sign-in.</p></div>'+
       (typeof settingsMarkup==='function'?settingsMarkup(profile,progress,account,patreon):'')+
     '</section>'+
   '</section>';
