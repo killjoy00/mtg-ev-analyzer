@@ -80,3 +80,29 @@ test('user search includes the linked public username without broadening beyond 
   assert.match(sql,/FROM neon_auth\."user" u/);
   assert.match(sql,/LIMIT 100/);
 });
+
+
+test('admin username placeholder releases ownership through the same atomic function',async()=>{
+  const calls=[];
+  const query=async(sql,params)=>{
+    calls.push({sql,params});
+    return {rows:[{result_status:'renamed',player_id:PLAYER,previous_display_name:'Owned Name',new_display_name:'Pack Player',username_owned:'f'}],rowCount:1};
+  };
+  const request=new Request('https://packone.pro/v1/admin/users/'+TARGET+'/username',{
+    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({displayName:' Pack   Player '}),
+  });
+  const result=await handleUserAdmin(request,query,undefined,{readJson:req=>req.json(),adminAuthUserId:ADMIN});
+  assert.equal(result.display_name,'Pack Player');
+  assert.equal(result.username_owned,false);
+  assert.deepEqual(calls[0].params,[TARGET,ADMIN,'Pack Player',false,null]);
+});
+
+test('admin username rejects unlinked accounts cleanly',async()=>{
+  const request=new Request('https://packone.pro/v1/admin/users/'+TARGET+'/username',{
+    method:'PATCH',headers:{'content-type':'application/json'},body:JSON.stringify({displayName:'Allowed Name'}),
+  });
+  await assert.rejects(
+    handleUserAdmin(request,async()=>({rows:[{result_status:'unlinked'}]}),undefined,{readJson:req=>req.json(),adminAuthUserId:ADMIN}),
+    error=>error?.status===409&&/linked public identity/i.test(error.message),
+  );
+});
