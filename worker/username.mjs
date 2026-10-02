@@ -9,7 +9,7 @@
 // name. Keep them in step (migrations/0033_unique_usernames.sql).
 
 export const PLACEHOLDER_USERNAME = 'Pack Player';
-export const USERNAME_TAKEN_MESSAGE = 'That username is already taken.';
+export const USERNAME_TAKEN_MESSAGE = 'That display name is already taken.';
 export const USERNAME_INDEX = 'players_username_uq';
 
 // Existing normalization: trim, collapse runs of whitespace, cap at 24 chars,
