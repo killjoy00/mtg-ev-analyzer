@@ -30,14 +30,19 @@ test('Elite acquisition routes through the Pack One Patreon landing page',async(
     read('patreon-activation.mjs'),
   ]);
   assert.match(html,/Pack One Elite/);
-  assert.match(html,/Unlimited Powered Cube/);
-  assert.match(html,/Choose the sets you want/);
-  assert.match(html,/Joining Patreon and connecting Patreon to Pack One are two separate steps/);
+  assert.match(html,/Current access/);
+  assert.match(html,/Practice whenever you want/);
+  assert.match(html,/Choose what to work on/);
+  assert.match(html,/Having trouble with Patreon access/);
+  assert.match(html,/Do not buy another membership/);
   assert.match(html,/https:\/\/www\.patreon\.com\/c\/PackOne/);
   assert.match(page,/getAuthSession/);
   assert.match(page,/loadPatreonStatus/);
   assert.match(page,/startPatreonOAuth\('patreon_landing'\)/);
   assert.match(page,/Open Practice/);
+  assert.match(page,/Refresh Patreon access/);
+  assert.match(page,/Connect Patreon to activate Elite/);
+  assert.match(page,/Patreon connected/);
   assert.match(growth,/location\.assign\('\/patreon\/'\)/);
   assert.doesNotMatch(growth,/handoffToPatreon/);
   assert.match(myPack,/membershipUrl=elite\?supportUrl:'\/patreon\/'/);
