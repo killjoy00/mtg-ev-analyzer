@@ -24,6 +24,7 @@ export default function AccountProfileScreen() {
     catalogSets,
     busy,
     enrichmentBusy,
+    message: loadMessage,
     enrichmentWarning,
     refresh,
   } = useAccountState({ requireAccount: true, loadProfile: true, loadCatalog: true });
@@ -32,7 +33,7 @@ export default function AccountProfileScreen() {
   const [favoriteSetIdEdit, setFavoriteSetId] = useState<string | null>(null);
   const [showcaseAchievementEdit, setShowcaseAchievement] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
 
   const displayName = displayNameEdit ?? profile?.player.display_name ?? '';
   const profilePublic = profilePublicEdit ?? Boolean(profile?.player.profile_public);
@@ -49,35 +50,47 @@ export default function AccountProfileScreen() {
   const save = async () => {
     if (!session?.accountToken || !profile || saving) return;
     setSaving(true);
-    setMessage(null);
+    setSaveMessage(null);
     try {
       const updated = await updateMobileProfile(session, {
         displayName: displayName.trim(),
         profilePublic,
         favoriteSetId: favoriteSetId || null,
         showcaseAchievement: showcaseAchievement || null,
-        acceptPublicIdentityTerms: true,
       });
       if (updated.player.username_owned === false) {
-        setMessage(updated.player.display_name_reason === 'name_not_allowed'
+        setSaveMessage(updated.player.display_name_reason === 'name_not_allowed'
           ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
           : 'Choose a different display name. That one is already taken.');
       } else {
-        setMessage('Profile settings saved.');
+        setSaveMessage('Profile settings saved.');
       }
       await refresh();
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : 'Could not save profile settings.');
+      setSaveMessage(error instanceof Error ? error.message : 'Could not save profile settings.');
     } finally {
       setSaving(false);
     }
   };
 
-  if (busy || enrichmentBusy || !account || !profile) return (
+  if (busy || enrichmentBusy) return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} />
         <Text style={styles.body}>Loading profile settings...</Text>
+      </View>
+    </SafeAreaView>
+  );
+
+  if (!account || !profile) return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.center}>
+        <Text accessibilityRole="alert" style={styles.message}>
+          {loadMessage || enrichmentWarning || 'Could not load profile settings.'}
+        </Text>
+        <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>Retry</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
@@ -186,7 +199,7 @@ export default function AccountProfileScreen() {
             ))}
           </View>
 
-          {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
+          {saveMessage ? <Text accessibilityRole="alert" style={styles.message}>{saveMessage}</Text> : null}
           {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.help}>{enrichmentWarning}</Text> : null}
 
           <Pressable accessibilityRole="button"
