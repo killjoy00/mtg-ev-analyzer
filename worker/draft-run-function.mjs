@@ -1,5 +1,5 @@
 import {SERVING_POLICY_VERSION,LEGACY_SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs';
-import {accountCapabilities,providerMembership,requireCapability,practiceCapability} from './capabilities.mjs';
+import {accountCapabilities,requireCapability,practiceCapability} from './capabilities.mjs';
 import {componentBelongsTo,corpusMembership} from './corpus-components.mjs';
 import {liveRegularSets,recencyWeight} from '../daily-selection.mjs';
 import {accountIdentity,linkedPlayerIdentity,rankingIdentityStatus} from './account-identity.mjs';
@@ -332,25 +332,40 @@ async function createShare(request,id) {
 
 async function dailyStatus(request) {
   const owner=await player(request),account=await accountIdentity(request,query,owner),day=gameDateKey();
-  // This is the homepage's request, so the membership lookup rides alongside
-  // the other two rather than adding a round trip.
-  const [result,capabilities,membership,rankingIdentity,streak]=await Promise.all([
-    query(`SELECT day::text date,environment set_id,'draft_run' mode,score,id run_id
-      FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date
-        AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)`,[owner,day]),
-    accountCapabilities(account,query),
-    providerMembership(account,query),
-    rankingIdentityStatus(query,owner),
-    query(`WITH completed_days AS (
+  // Keep ranking-identity policy in its existing helper, but collapse the other
+  // independent homepage reads into one SQL-over-HTTP request. The distributed
+  // hold opens synchronously, so fanning every status request into several
+  // simultaneous database requests amplifies the burst before practice starts.
+  const [statusResult,rankingIdentity]=await Promise.all([
+    query(`WITH history AS (
+        SELECT day::text date,environment set_id,'draft_run' mode,score,id run_id
+        FROM draft_run_sessions WHERE player_id=$1::uuid AND day=$2::date
+          AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)
+      ), completed_days AS (
         SELECT DISTINCT day FROM draft_run_sessions
         WHERE player_id=$1::uuid AND day IS NOT NULL AND day<=$2::date
           AND jsonb_array_length(answers)=jsonb_array_length(puzzle_ids)
       ), ordered AS (
         SELECT day,(row_number() OVER(ORDER BY day DESC)-1)::int day_offset FROM completed_days
       )
-      SELECT count(*)::int streak FROM ordered WHERE day=$2::date-day_offset`,[owner,day]),
+      SELECT
+        COALESCE((SELECT jsonb_agg(to_jsonb(h)) FROM history h),'[]'::jsonb) daily_history,
+        (SELECT count(*)::int FROM ordered WHERE day=$2::date-day_offset) streak,
+        COALESCE((SELECT jsonb_agg(DISTINCT capability ORDER BY capability)
+          FROM entitlement_grants
+          WHERE $3::uuid IS NOT NULL AND auth_user_id=$3::uuid
+            AND capability IN ('custom_corpus','unlimited_cube_practice')
+            AND revoked_at IS NULL AND (expires_at IS NULL OR expires_at>now())),'[]'::jsonb) paid_capabilities,
+        EXISTS(SELECT 1 FROM provider_accounts
+          WHERE $3::uuid IS NOT NULL AND auth_user_id=$3::uuid AND provider='patreon') membership_connected`,
+      [owner,day,account?.auth_user_id||null]),
+    rankingIdentityStatus(query,owner),
   ]);
-  return json({day,capabilities,player:{claimed:Boolean(account)},membership,ranking_identity:{eligible:rankingIdentity.eligible,reason:rankingIdentity.reason},daily_streak:Number(streak.rows[0]?.streak||0),daily_history:result.rows.map(r=>({...r,score:Number(r.score)}))});
+  const status=statusResult.rows[0]||{},paid=parse(status.paid_capabilities||'[]');
+  const capabilities=account?['account','unlimited_regular_practice',...paid]:[];
+  const membership={connected:['t','true','1'].includes(String(status.membership_connected))};
+  const history=parse(status.daily_history||'[]');
+  return json({day,capabilities,player:{claimed:Boolean(account)},membership,ranking_identity:{eligible:rankingIdentity.eligible,reason:rankingIdentity.reason},daily_streak:Number(status.streak||0),daily_history:history.map(r=>({...r,score:Number(r.score)}))});
 }
 
 async function leaderboard(request) {
