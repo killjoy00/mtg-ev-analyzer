@@ -2453,7 +2453,15 @@ export default {
       else if(error?.status===401&&error?.accountSessionReason)console.log(JSON.stringify(accountSessionRejection(request,error.accountSessionReason)));
       else console.error(error);
       const status=Number(error?.status||500);
-      const response=json({ error: status===500?'Request failed. Please try again.':error.message,...(error?.code?{code:String(error.code)}:{}) },status);
+      const response=json({
+        error: status===500?'Request failed. Please try again.':error.message,
+        ...(error?.code?{code:String(error.code)}:{}),
+        ...(error?.deletionCommitted&&error?.deletion?{
+          deletionCommitted:true,
+          operationId:error.operationId||error.deletion.operation_id||null,
+          deletion:error.deletion,
+        }:{}),
+      },status);
       if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));
       return withCors(response, request);
     }
