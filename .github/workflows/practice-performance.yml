@@ -34,7 +34,7 @@ jobs:
           fi
       - name: Set emergency expiry
         id: expiry
-        run: echo "expires_at=$(date -u --date '+2 hours' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
+        run: echo "expires_at=$(date -u --date '+75 minutes' +'%Y-%m-%dT%H:%M:%SZ')" >> "$GITHUB_OUTPUT"
       - name: Create disposable production-sized copy
         id: neon
         uses: neondatabase/create-branch-action@v6
@@ -51,6 +51,21 @@ jobs:
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
         run: psql -X -d "$DATABASE_URL" -v ON_ERROR_STOP=1 -f migrations/0045_batched_practice_selector.sql
+      - name: Prepare launch-sized identities and 180k score rows
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PREVIEW_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          PREVIEW_CREATED: 'true'
+          LOAD_FIXTURE_FILE: /tmp/pack1-burst-fixtures.json
+        run: node scripts/launch-distributed-fixtures.mjs
+      - name: Reproduce synchronized read/start burst and compare fanout/min-CU variants
+        env:
+          DATABASE_URL: ${{ steps.neon.outputs.db_url }}
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          PACK1_BURST_BRANCH: ${{ steps.neon.outputs.branch_id }}
+          LOAD_FIXTURE_FILE: /tmp/pack1-burst-fixtures.json
+        run: node scripts/burst-read-performance.mjs
       - name: Verify isolated target, build derived cache and compare selection
         env:
           DATABASE_URL: ${{ steps.neon.outputs.db_url }}
@@ -85,3 +100,14 @@ jobs:
           project_id: patient-shadow-91417882
           api_key: ${{ secrets.NEON_API_KEY }}
           branch: ${{ steps.neon.outputs.branch_id }}
+      - name: Verify disposable branch GET 404
+        if: always() && steps.neon.outputs.branch_id != '' && steps.neon.outputs.created == 'true'
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          DELETED_BRANCH: ${{ steps.neon.outputs.branch_id }}
+        run: |
+          node --input-type=module - <<'NODE'
+          const response=await fetch('https://console.neon.tech/api/v2/projects/patient-shadow-91417882/branches/'+process.env.DELETED_BRANCH,{headers:{authorization:'Bearer '+process.env.NEON_API_KEY},redirect:'error'});
+          if(response.status!==404)throw Error('Deleted benchmark branch still resolves: HTTP '+response.status);
+          console.log('Disposable branch GET 404 verified.');
+          NODE
