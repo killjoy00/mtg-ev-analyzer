@@ -232,18 +232,24 @@ export async function updateProfile({displayName,profilePublic,favoriteSetId,sho
   if(data?.player?.display_name){try{localStorage.setItem(NAME_KEY,data.player.display_name);}catch{}}
   return data;
 }
+async function requireProfileSafetyAccount(action) {
+  if(firstPartyAuthEnabled()) {
+    await ensureMigrations();
+    const session=await getAuthSession();
+    if(session?.user)return;
+  } else if(loadAuthToken())return;
+  throw Object.assign(new Error(`Sign in to ${action} this profile.`),{code:'SIGN_IN_REQUIRED'});
+}
 export async function reportPublicProfile(profileKey,{reason='other',details=''}={}) {
   if(!/^[a-f0-9]{16}$/.test(String(profileKey||'')))throw new Error('Invalid public profile.');
-  if(firstPartyAuthEnabled())await ensureMigrations();
-  else if(!loadAuthToken())throw new Error('Sign in to report a public profile.');
+  await requireProfileSafetyAccount('report');
   return api(`/v1/profile/${encodeURIComponent(profileKey)}/report`,{
     method:'POST',body:{reason,details},auth:true,authSession:firstPartyAuthEnabled()?null:loadAuthToken(),
   });
 }
 export async function blockPublicProfile(profileKey) {
   if(!/^[a-f0-9]{16}$/.test(String(profileKey||'')))throw new Error('Invalid public profile.');
-  if(firstPartyAuthEnabled())await ensureMigrations();
-  else if(!loadAuthToken())throw new Error('Sign in to block a public profile.');
+  await requireProfileSafetyAccount('block');
   return api(`/v1/profile/${encodeURIComponent(profileKey)}/block`,{
     method:'POST',body:{},auth:true,authSession:firstPartyAuthEnabled()?null:loadAuthToken(),
   });
