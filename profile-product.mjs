@@ -288,8 +288,8 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
 
     <div class="profile-scoreboard">
       <div><span>Games</span><strong>${Number(summary.games || 0)}</strong></div>
-      <div><span>Average</span><strong>${Number(summary.games||0)>0?Number(summary.average_score||0).toFixed(1):'—'}</strong></div>
-      <div><span>Best</span><strong>${Number(summary.games||0)>0?Number(summary.best_score||0):'—'}</strong></div>
+      <div><span>Average</span><strong>${Number(summary.games||0)>0?Number(summary.average_score||0).toFixed(1):'Not yet'}</strong></div>
+      <div><span>Best</span><strong>${Number(summary.games||0)>0?Number(summary.best_score||0):'Not yet'}</strong></div>
       <div><span>Daily streak</span><strong>${Number(summary.current_streak || 0)}</strong></div>
       <div title="Shared run wins and losses"><span>Shared W–L</span><strong>${esc(formatChallengeRecord(summary))}</strong></div>
       <div><span>Environments</span><strong>${progress.played}/${progress.total}</strong></div>
