@@ -17,6 +17,7 @@ const [
   accountStateHook,
   accountLayout,
   homeScreen,
+  publicProfileScreen,
   webHowTo,
   webScoring,
 ] = await Promise.all([
@@ -34,6 +35,7 @@ const [
   readFile(new URL('../mobile/src/hooks/useAccountState.ts', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/_layout.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/index.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/profile.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../how-it-works/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
 ]);
@@ -112,4 +114,13 @@ test('native Account keeps auth on /account and splits signed-in management into
   assert.match(homeScreen, /name_not_allowed/);
   assert.match(homeScreen, /That display name is not allowed\. Choose another to join Daily leaderboards\./);
   assert.match(homeScreen, /Choose a different display name\. That one is already taken\./);
+  assert.match(accountProfileScreen, /if \(!account \|\| !profile\)/);
+  assert.match(accountSecurityScreen, /if \(!account\)/);
+  assert.match(accountDeleteScreen, /if \(!account\)/);
+  assert.match(accountProfileScreen, />Retry</);
+  assert.match(accountSecurityScreen, />Retry</);
+  assert.match(accountDeleteScreen, />Retry</);
+  assert.match(accountStateHook, /clearEnrichment\(\);\n\s+setMessage\(error instanceof Error/);
+  assert.equal((publicProfileScreen.match(/router\.replace\(\{\s*pathname: '\/account'/g)||[]).length,2);
+  assert.match(publicProfileScreen, /pendingActionShown=useRef\(false\)/);
 });
