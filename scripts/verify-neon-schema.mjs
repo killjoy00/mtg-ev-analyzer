@@ -16,7 +16,7 @@ const result=await query(`SELECT
     'serving_components_insert','serving_components_delete','serving_components_update','serving_components_truncate',
     'serving_policy_insert','serving_policy_delete','serving_policy_update','serving_policy_truncate'
   ) AND tgenabled='O') practice_invalidation,
-  to_regprocedure('pack1_puzzle_can_affect_serving(text,text)') IS NOT NULL snapshot_aware_practice_invalidation,
+  to_regprocedure('pack1_puzzle_can_affect_serving(text,text,text)') IS NOT NULL snapshot_aware_practice_invalidation,
   to_regprocedure('pack1_serving_snapshot_matches_current(text,text,text,bigint)') IS NOT NULL cross_version_cutover,
   (SELECT count(*)=2 FROM pg_constraint WHERE conname IN ('draft_run_sessions_environment_check','draft_run_schedules_environment_check') AND pg_get_constraintdef(oid) LIKE '%latest%') latest_daily,
   (SELECT count(*)=2 FROM information_schema.columns WHERE table_name IN ('draft_run_sessions','draft_run_schedules') AND column_name='serving_policy_version') serving_policy,
