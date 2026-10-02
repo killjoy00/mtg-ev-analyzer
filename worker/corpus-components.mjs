@@ -9,7 +9,18 @@ export function corpusMembership({serving=false,parameter=1}={}) {
        OR (p.source_snapshot_id IS NULL AND EXISTS(
          SELECT 1 FROM corpus_source_snapshots hs
          WHERE hs.source_snapshot_id=e.active_snapshot_id AND hs.schema_version='historical-frozen'
-       )))
+       ))
+       OR (p.source_snapshot_id IS NULL
+         AND EXISTS(
+           SELECT 1 FROM corpus_source_snapshots historical
+           WHERE historical.set_id=p.set_id AND historical.corpus_version=p.corpus_version
+             AND historical.schema_version='historical-frozen'
+         )
+         AND EXISTS(
+           SELECT 1 FROM corpus_source_snapshots next_snapshot
+           WHERE next_snapshot.source_snapshot_id=e.active_snapshot_id
+             AND next_snapshot.corpus_version<>p.corpus_version
+         )))
  ))`:'';
  // Bound the version index, enforce publication independently per set, and for
  // the parent Premier corpus expose only the environment's explicitly active
