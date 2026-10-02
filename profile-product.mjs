@@ -540,8 +540,8 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       track('profile_settings_saved', { public: updated.player?.profile_public || false });
       document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:updated.player?.username_owned===true}}));
       if(updated.player?.display_name){try{localStorage.setItem('pack1-player-name-v1',updated.player.display_name);}catch{}}
-      await renderProfile(updated,{own:true});
-      const savedStatus=document.querySelector('#profile-save-status');
+      try {await renderProfile(updated,{own:true});} catch {}
+      const savedStatus=document.querySelector('#profile-save-status')||status;
       if(savedStatus){savedStatus.className='profile-settings-status profile-save-status is-success';savedStatus.textContent='Profile saved.';}
     } catch (error) {
       if(status){status.className='profile-settings-status profile-save-status is-error';status.textContent=(error?.message||'Profile could not be saved.')+' Your edits are still here.';}
