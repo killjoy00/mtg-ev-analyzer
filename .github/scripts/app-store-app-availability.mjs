@@ -57,33 +57,69 @@ const state=version.attributes?.appVersionState||version.attributes?.appStoreSta
 if(state!=='PREPARE_FOR_SUBMISSION')throw Error(`Refusing to change public availability while iOS ${versionString} state is ${state}.`);
 if(version.attributes?.releaseType&&version.attributes.releaseType!=='MANUAL')throw Error(`Refusing to change public availability unless releaseType is MANUAL; found ${version.attributes.releaseType}.`);
 
-const availabilityLink=await api(`/v1/apps/${appId}/appAvailabilityV2?fields%5BappAvailabilities%5D=availableInNewTerritories,territoryAvailabilities`);
-const availability=availabilityLink?.data;
-if(!availability?.id)throw Error('App availability resource is missing; refusing to create a pre-order or new availability resource.');
-
-const before=await listAll(`/v2/appAvailabilities/${encodeURIComponent(availability.id)}/territoryAvailabilities?fields%5BterritoryAvailabilities%5D=available,releaseDate,preOrderEnabled,preOrderPublishDate,contentStatuses,territory&include=territory&limit=200`);
-if(before.length<2)throw Error(`Unexpected territory availability count: ${before.length}`);
-if(before.some(x=>x.attributes?.preOrderEnabled===true))throw Error('Refusing to modify availability while any territory has pre-order enabled.');
-
-if(availability.attributes?.availableInNewTerritories!==false){
-  await api(`/v1/apps/${appId}`,{
-    method:'PATCH',
-    body:{data:{type:'apps',id:appId,attributes:{availableInNewTerritories:false}}},
-  });
-}
-
+const availabilityPath=`/v1/apps/${appId}/appAvailabilityV2?fields%5BappAvailabilities%5D=availableInNewTerritories,territoryAvailabilities`;
+const availabilityResult=await apiRaw(availabilityPath);
+let availability=null;
+let createdAvailability=false;
 let changed=0;
-for(const row of before){
-  const territory=row.relationships?.territory?.data?.id;
-  if(!territory)throw Error(`Territory relationship missing for availability ${row.id}`);
-  const desired=targetTerritories.has(territory);
-  if(Boolean(row.attributes?.available)===desired)continue;
-  await api(`/v1/territoryAvailabilities/${encodeURIComponent(row.id)}`,{
-    method:'PATCH',
-    body:{data:{type:'territoryAvailabilities',id:row.id,attributes:{available:desired}}},
+
+if(availabilityResult.status===404){
+  const territories=[...targetTerritories];
+  const localId=territory=>'$'+'{'+territory+'}';
+  const created=await api('/v2/appAvailabilities',{
+    method:'POST',
+    body:{
+      data:{
+        type:'appAvailabilities',
+        attributes:{availableInNewTerritories:false},
+        relationships:{
+          app:{data:{type:'apps',id:appId}},
+          territoryAvailabilities:{
+            data:territories.map(territory=>({type:'territoryAvailabilities',id:localId(territory)}))
+          }
+        }
+      },
+      included:territories.map(territory=>({
+        type:'territoryAvailabilities',
+        id:localId(territory),
+        attributes:{available:true},
+        relationships:{territory:{data:{type:'territories',id:territory}}}
+      }))
+    }
   });
-  changed+=1;
+  availability=created?.data;
+  createdAvailability=true;
+  changed=territories.length;
+}else{
+  if(!availabilityResult.ok)throw Error(`GET ${availabilityPath} HTTP ${availabilityResult.status}: ${availabilityResult.text}`);
+  availability=availabilityResult.data?.data;
+  if(!availability?.id)throw Error('App availability response is missing its resource ID.');
+
+  const before=await listAll(`/v2/appAvailabilities/${encodeURIComponent(availability.id)}/territoryAvailabilities?fields%5BterritoryAvailabilities%5D=available,releaseDate,preOrderEnabled,preOrderPublishDate,contentStatuses,territory&include=territory&limit=200`);
+  if(before.length<2)throw Error(`Unexpected territory availability count: ${before.length}`);
+  if(before.some(x=>x.attributes?.preOrderEnabled===true))throw Error('Refusing to modify availability while any territory has pre-order enabled.');
+
+  if(availability.attributes?.availableInNewTerritories!==false){
+    await api(`/v1/apps/${appId}`,{
+      method:'PATCH',
+      body:{data:{type:'apps',id:appId,attributes:{availableInNewTerritories:false}}},
+    });
+  }
+
+  for(const row of before){
+    const territory=row.relationships?.territory?.data?.id;
+    if(!territory)throw Error(`Territory relationship missing for availability ${row.id}`);
+    const desired=targetTerritories.has(territory);
+    if(Boolean(row.attributes?.available)===desired)continue;
+    await api(`/v1/territoryAvailabilities/${encodeURIComponent(row.id)}`,{
+      method:'PATCH',
+      body:{data:{type:'territoryAvailabilities',id:row.id,attributes:{available:desired}}},
+    });
+    changed+=1;
+  }
 }
+
+if(!availability?.id)throw Error('App availability create/read did not return a resource ID.');
 
 let finalRows=null;
 let finalAvailability=null;
@@ -113,7 +149,8 @@ console.log(JSON.stringify({
   versionString,
   versionState:state,
   releaseType:version.attributes?.releaseType??'MANUAL',
-  availabilityId:availability.id,
+  availabilityId:finalAvailability.data.id,
+  createdAvailability,
   availableInNewTerritories:finalAvailability.data.attributes.availableInNewTerritories,
   availableTerritories,
   changedTerritoryCount:changed,
