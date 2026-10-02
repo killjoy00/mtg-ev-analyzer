@@ -8,6 +8,7 @@ import {inspectBin,inspectPreviewTelemetry,previewTelemetryFailure,queryPreviewE
 import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
 import {transportFailureEvidence,undiciTransportObserver} from '../scripts/launch-distributed-transport.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
+import {waitForPreviewReadiness} from '../scripts/edge-control.mjs';
 const start=1_000_000,scope={sha:'a'.repeat(40),branch:'br-capacity-fixture',run_id:'123',attempt:'2',policy_hash:fingerprint(policy)};
 const msg=(shard,extra={})=>({scope,shard,nonce:`00000000-0000-4000-8000-${String(shard).padStart(12,'0')}`,network:String(shard+1).repeat(64),ready:0,ack:null,done:null,...extra});
 const formed=()=>{let s=initialControl(scope,start,policy);for(let i=0;i<5;i++)s=transition(s,msg(i),start+100,policy);return s;};
@@ -319,6 +320,22 @@ test('telemetry artifact exposes only bounded failure codes',()=>{
  assert.equal(previewTelemetryFailure(Error('invalid_preview_log_schema')),'invalid_preview_log_schema');
  assert.equal(previewTelemetryFailure(Error('credential secret text')),'preview_telemetry_unclassified');
 });
+test('preview readiness rejects one good response followed by a bad response and requires fresh connections',async()=>{
+ const preview='b'.repeat(64);
+ const run=async releases=>{
+  let now=0,calls=0;
+  const fetcher=async(url,options)=>{
+   calls++;assert.equal(new URL(url).hostname,'api-preview.packone.pro');assert.equal(options.headers.connection,'close');
+   return Response.json({release_commit:releases.shift()});
+  };
+  const result=await waitForPreviewReadiness({fetcher,preview,commit:scope.sha,requiredSuccesses:2,deadlineMs:3,intervalMs:2,clock:()=>now,sleep:async ms=>{now+=ms;}});
+  return {result,calls};
+ };
+ const unstable=await run([scope.sha,'b'.repeat(40)]);
+ assert.equal(unstable.calls,2);assert.equal(unstable.result.ready,false);assert.equal(unstable.result.consecutive,0);assert.equal(unstable.result.last_release,'b'.repeat(40));
+ const stable=await run([scope.sha,scope.sha]);
+ assert.equal(stable.calls,2);assert.equal(stable.result.ready,true);assert.equal(stable.result.consecutive,2);assert.equal(stable.result.last_release,scope.sha);
+});
 test('telemetry preflight requires exact health evidence but tolerates ambient boundary rejects',()=>{
  const health=event({route:'health'}),ambient=event({id:'ambient',status:403,route:'other'});
  const accepted=inspectPreflightEvents([health,ambient],scope.sha);
@@ -335,7 +352,7 @@ test('preview telemetry preflight waits beyond initial settlement but still fail
   const fetcher=async(url,options)=>{
    if(url.includes('/zones?'))return Response.json({success:true,result:[{account:{id:'a'.repeat(32)}}]});
    if(url.includes('/telemetry/query')){queries++;const rows=delayed&&queries>=4?[row]:[];return Response.json({success:true,result:{events:{events:rows}}});}
-   if(url.startsWith('https://api-preview.packone.pro/')){health++;return Response.json({release_commit:scope.sha});}
+   if(url.startsWith('https://api-preview.packone.pro/')){health++;assert.equal(options.headers.connection,'close');return Response.json({release_commit:scope.sha});}
    throw Error('unexpected_preflight_url');
   };
   const report=await preflightTelemetry({fetcher,clock:()=>now,sleep:async ms=>{now+=ms;}});
