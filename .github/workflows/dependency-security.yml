@@ -12,6 +12,7 @@ on:
       - '.github/workflows/dependency-security.yml'
       - '.github/workflows/**'
       - '.github/scripts/install-wrangler-tool.mjs'
+      - '.github/scripts/npm-audit-gate.mjs'
   push:
     branches: [main]
     paths:
@@ -19,6 +20,7 @@ on:
       - 'mobile/package-lock.json'
       - '.github/workflows/dependency-security.yml'
       - '.github/scripts/install-wrangler-tool.mjs'
+      - '.github/scripts/npm-audit-gate.mjs'
 
 permissions:
   contents: read
@@ -47,6 +49,9 @@ jobs:
           cd mobile
           set +e
           npm audit --omit=dev --audit-level=high --json > "$RUNNER_TEMP/dependency-audit/mobile-runtime.json"
+          # Blocks on any high/critical advisory except dated, unpatchable ones
+          # listed in .github/scripts/npm-audit-gate.mjs.
+          node ../.github/scripts/npm-audit-gate.mjs "$RUNNER_TEMP/dependency-audit/mobile-runtime.json"
           status=$?
           set -e
           printf '%s\n' "$status" > "$RUNNER_TEMP/dependency-audit/mobile-runtime.status"
