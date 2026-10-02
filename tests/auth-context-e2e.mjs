@@ -127,7 +127,7 @@ try {
   await fresh({source:'nav',width:390});
   await page.locator('#account-signin').waitFor();
   assert.equal(await page.locator('#account-signup').count(),0);
-  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Sign in with Google');
+  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Continue with Google');
   assert.equal((await page.locator('.account-page h1').textContent())?.trim(),'Sign In');
   assert.match((await page.locator('.account-new-user').textContent())||'',/New to Pack One\?\s*Create account/i);
   await page.screenshot({path:'artifacts/ui-auth-signin-390.png',fullPage:true});
@@ -203,19 +203,18 @@ try {
   await page.getByText("If an unverified account exists for that email, we've sent a verification link.",{exact:true}).waitFor();
   assert.deepEqual(resendBodies.at(-1),{email:'qa@example.invalid'});
 
-  // A first account claim routes through the existing profile name field.
+  // A first account claim routes through the compact account-ready step.
   await fresh({source:'nav'});
   nextLinkNewlyClaimed=true;
   const newlyClaimed=page.locator('#account-signin');
   await newlyClaimed.locator('[name="email"]').fill('qa@example.invalid');
   await newlyClaimed.locator('[name="password"]').fill('fixture-password-123');
   await newlyClaimed.getByRole('button',{name:'Sign in',exact:true}).click();
-  await page.getByText('Choose the name shown on leaderboards.',{exact:true}).waitFor();
-  assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
-  assert.equal(await page.locator('#profile-account input[name="displayName"]').evaluate(el=>document.activeElement===el),true);
-  assert.equal(await page.locator('#profile-account input[name="displayName"]').inputValue(),'QA Player');
+  await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
+  assert.equal(await page.locator('#account-ready input[name="displayName"]').evaluate(el=>document.activeElement===el),true);
+  assert.equal(await page.locator('#account-ready input[name="displayName"]').inputValue(),'QA Player');
   await page.getByRole('button',{name:'Skip for now',exact:true}).click();
-  assert.equal(await page.locator('#account-new-name-prompt').count(),0);
+  assert.equal(await page.locator('#account-ready').count(),0);
 
   // Email submit disables while pending and restores/finishes without double-submit.
   await fresh({source:'nav'});
