@@ -324,12 +324,11 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 ### GitHub / Google Cloud release-credential boundary
 
-10. **Finish the account-level release-credential boundary without adding unwanted manual approvals.**
-   - GitHub repo -> Settings -> Environments -> `pack-one-mobile-release`.
-   - Set deployment branches/tags to **Selected branches and tags**, with **`main` only**.
-   - Keep **Required reviewers disabled**; the release workflows already fail closed to current `main` and the owner does not want a human approval gate on every release.
-   - Keep the Apple release credentials used by the protected workflows scoped as Environment secrets: `ASC_KEY_ID`, `ASC_ISSUER_ID`, `ASC_KEY_P8`, and `APPLE_TEAM_ID`, rather than generally usable repository secrets.
-   - This is a credential-scope hardening step, not a request to add another release approval.
+10. **GitHub release Environment branch restriction — completed by owner on 2026-10-02.**
+   - `pack-one-mobile-release` is restricted to **`main` only**.
+   - **Required reviewers remain disabled**; the owner does not want a human approval gate on every release.
+   - **Secret re-scoping is intentionally declined and is not a launch blocker.** The owner no longer has access to the existing Apple release secret values and does not want to regenerate them solely to move them from repository scope to Environment scope.
+   - Do **not** reopen, re-request, or treat Apple secret re-scoping as remaining #575 owner work unless the owner explicitly changes this decision.
 
 11. **Narrow Google Workload Identity trust.**
    - In Google Cloud IAM / Workload Identity Federation, restrict the Pack One provider/service-account trust so store credentials are accepted only from the intended Pack One repository and approved release context.
