@@ -123,6 +123,33 @@ test('admin initiation needs no target credential and runs the supplied complete
   assert.equal(calls.some(call=>/verify-password|account_deletion_verifications|account_credential_rate_limits|neon_auth\.account/i.test(call.sql)),false);
 });
 
+test('admin deletion lifecycle failures propagate after the durable start so normal route logging can report them',async()=>{
+  const created=row({state:'pending',attempts:'0',last_error_code:null,app_cleanup_completed_at:null});
+  const query=async(sql)=>{
+    if(sql.includes('SELECT email FROM neon_auth."user"'))return {rows:[{email:'target@example.test'}],rowCount:1};
+    if(sql.includes('pack1_begin_admin_account_deletion'))return {rows:[{start_status:'created',...created}],rowCount:1};
+    if(sql.includes('FROM account_deletion_operations WHERE auth_user_id='))return {rows:[created],rowCount:1};
+    throw Error('unexpected SQL');
+  };
+  const logged=[];const originalError=console.error;console.error=(...args)=>logged.push(args.join(' '));
+  try {
+    await assert.rejects(
+      handleAdminAccountDeletion(
+        request('/v1/admin/users/'+TARGET+'/delete',{method:'POST',body:{confirm:'DELETE'}}),
+        query,undefined,{
+          readJson,adminAuthUserId:ADMIN,deletionEnabled:()=>true,
+          resumeDeletionOperation:async()=>{throw Object.assign(Error('synthetic resume failure'),{code:'PROVIDER_NETWORK'});},
+        },
+      ),
+      error=>error?.code==='PROVIDER_NETWORK',
+    );
+  } finally {
+    console.error=originalError;
+  }
+  assert.match(logged.join('\n'),/admin_account_deletion_resume_error/);
+  assert.match(logged.join('\n'),/PROVIDER_NETWORK/);
+});
+
 test('retrying an existing self-service operation preserves its original attribution',async()=>{
   const existing=row({state:'provider_delete_pending',initiation_source:'self_service',initiated_by_admin_auth_user_id:null,target_was_admin:false});
   const query=async(sql)=>{
