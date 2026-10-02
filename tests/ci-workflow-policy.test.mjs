@@ -56,8 +56,31 @@ test('exact-main RC treats main movement as stale evidence, not a build failure'
 
 test('backend Neon job is wired fail-closed behind the fork-safety guard', () => {
   const backend = readFileSync('.github/workflows/backend-gate.yml','utf8');
-  assert.match(backend, /always\(\).*github\.event\.pull_request\.head\.repo\.full_name == github\.repository.*needs\.precheck\.result != 'success'.*needs\.precheck\.outputs\.needs_neon != 'false'/);
+  assert.match(backend, /!cancelled\(\).*github\.event\.pull_request\.head\.repo\.full_name == github\.repository.*needs\.precheck\.result != 'success'.*needs\.precheck\.outputs\.needs_neon != 'false'/);
   assert.match(backend, /scripts\/backend-gate-scope\.mjs/);
   assert.match(backend, /scripts\/backend-gate-map\.json/);
   assert.match(backend, /tests\/backend-gate-scope\.test\.mjs/);
+});
+
+
+test('expensive PR jobs stay cancellable and no job-level condition uses always()', () => {
+  const workflows = [
+    ['Android production', readFileSync('.github/workflows/android-production-bundle.yml', 'utf8')],
+    ['Android internal', readFileSync('.github/workflows/android-internal-testing.yml', 'utf8')],
+    ['iOS TestFlight', readFileSync('.github/workflows/ios-testflight.yml', 'utf8')],
+    ['backend gate', readFileSync('.github/workflows/backend-gate.yml', 'utf8')],
+  ];
+  for (const [name, flow] of workflows) {
+    const jobLevelIfs = flow.split('\n').filter((line) => /^    if:/.test(line));
+    for (const condition of jobLevelIfs) assert.doesNotMatch(condition, /always\(\)/, name + ': ' + condition);
+  }
+});
+
+test('native PR workflows trigger for root helpers they consume', () => {
+  const android = readFileSync('.github/workflows/android-production-bundle.yml', 'utf8');
+  const internal = readFileSync('.github/workflows/android-internal-testing.yml', 'utf8');
+  const ios = readFileSync('.github/workflows/ios-testflight.yml', 'utf8');
+  assert.match(android, /- 'scripts\/audit-android-manifest\.py'/);
+  assert.match(internal, /- 'scripts\/audit-android-manifest\.py'/);
+  assert.match(ios, /- '\.github\/scripts\/app-store-\*\.mjs'/);
 });

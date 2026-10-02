@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { classifyNativeChanges } from '../scripts/native-ci-scope.mjs';
+import { classifyNativeChanges, filterNativeChangedPaths } from '../scripts/native-ci-scope.mjs';
 
 const full = (paths) => assert.equal(classifyNativeChanges(paths).nativeFull, true, paths.join(', '));
 const fast = (paths) => assert.equal(classifyNativeChanges(paths).nativeFull, false, paths.join(', '));
@@ -12,7 +12,6 @@ test('JS and TS-only mobile changes use the native fast path', () => {
     'mobile/src/api/client.ts',
     'mobile/src/components/Card.tsx',
     'mobile/tests/profile-browsing.test.cjs',
-    'docs/mobile-release-config.md',
   ]);
 });
 
@@ -32,6 +31,9 @@ test('native inputs and classifier infrastructure force the full path', () => {
     'mobile/scripts/native-ci-scope.mjs',
     'mobile/tests/native-ci-scope.test.mjs',
     'mobile/tests/gradle-cache-key.test.mjs',
+    'scripts/audit-android-manifest.py',
+    '.github/scripts/app-store-finalize-release-candidate.mjs',
+    '.github/scripts/app-store-next-build-number.mjs',
     '.github/workflows/android-production-bundle.yml',
     '.github/workflows/android-internal-testing.yml',
     '.github/workflows/ios-testflight.yml',
@@ -40,8 +42,15 @@ test('native inputs and classifier infrastructure force the full path', () => {
   ]) full([path]);
 });
 
-test('unknown mobile paths and empty diffs fail closed to full native validation', () => {
+test('mixed PR noise outside native inputs is filtered before classification', () => {
+  const paths = ['mobile/app/index.tsx', 'docs/mobile.md', 'worker/account-session.mjs', 'tests/unit.test.mjs', 'web-only.mjs'];
+  assert.deepEqual(filterNativeChangedPaths(paths), ['mobile/app/index.tsx']);
+  fast(paths);
+});
+
+test('unknown mobile paths and empty or fully-filtered diffs fail closed to full native validation', () => {
   full(['mobile/metro.config.js']);
   full(['mobile/native-plugin/custom.js']);
   full([]);
+  full(['docs/release.md', 'worker/account-session.mjs']);
 });

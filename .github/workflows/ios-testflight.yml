@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'mobile/**'
+      - '.github/scripts/app-store-*.mjs'
       - '.github/workflows/ios-testflight.yml'
   push:
     branches: [main]
@@ -65,7 +66,7 @@ jobs:
   archive-smoke:
     name: production iOS archive structure
     needs: native-scope
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     runs-on: ${{ (needs.native-scope.result == 'success' && needs.native-scope.outputs.native_full == 'false') && 'ubuntu-latest' || 'macos-latest' }}
     env:
       NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}

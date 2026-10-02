@@ -5,6 +5,7 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - 'mobile/**'
+      - 'scripts/audit-android-manifest.py'
       - '.github/workflows/android-internal-testing.yml'
   push:
     branches: [main]
@@ -65,7 +66,7 @@ jobs:
   signing-config-smoke:
     name: validate Android upload signing config
     needs: native-scope
-    if: ${{ always() && github.event_name == 'pull_request' }}
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
     env:
       NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}

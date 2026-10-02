@@ -84,7 +84,7 @@ jobs:
     needs: precheck
     # Fork PRs do not receive repository secrets. Keep them skipped rather than
     # failing or ever pointing the fixture suites at the production branch.
-    if: ${{ always() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
