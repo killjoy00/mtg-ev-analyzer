@@ -11,6 +11,11 @@ const [
   howToScreen,
   scoringScreen,
   accountScreen,
+  accountProfileScreen,
+  accountSecurityScreen,
+  accountDeleteScreen,
+  accountStateHook,
+  accountLayout,
   webHowTo,
   webScoring,
 ] = await Promise.all([
@@ -22,6 +27,11 @@ const [
   readFile(new URL('../mobile/app/how-to.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/scoring.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/account.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account-profile.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account-security.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account-delete.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/hooks/useAccountState.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/_layout.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../how-it-works/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
 ]);
@@ -80,4 +90,21 @@ test('native instructional copy preserves current web Daily eligibility semantic
   assert.match(leaderboardScreen, /validated to an eligible account/);
   assert.doesNotMatch(leaderboardScreen, /signed-in Pack One Daily runs/);
   assert.match(accountScreen, /web, iPhone, iPad, and Android/);
+});
+
+
+test('native Account keeps auth on /account and splits signed-in management into flat routes', () => {
+  assert.match(accountScreen, /Profile &amp; visibility/);
+  assert.match(accountScreen, /router\.push\('\/account-profile'\)/);
+  assert.match(accountScreen, /router\.push\('\/membership'\)/);
+  assert.match(accountScreen, /router\.push\('\/account-security'\)/);
+  assert.match(accountScreen, /router\.push\('\/account-delete'\)/);
+  assert.match(accountProfileScreen, /Shown on Daily leaderboards and your public profile\./);
+  assert.match(accountSecurityScreen, /Changing your password signs out every device\./);
+  assert.match(accountDeleteScreen, /Deleting your Pack One account does not cancel subscriptions\./);
+  assert.match(accountStateHook, /useFocusEffect/);
+  assert.match(accountStateHook, /generation\.current/);
+  assert.match(accountLayout, /name="account-profile" options=\{\{ title: 'Profile & visibility' \}\}/);
+  assert.match(accountLayout, /name="account-security" options=\{\{ title: 'Sign-in & security' \}\}/);
+  assert.match(accountLayout, /name="account-delete" options=\{\{ title: 'Delete account' \}\}/);
 });
