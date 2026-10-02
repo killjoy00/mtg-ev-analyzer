@@ -151,12 +151,17 @@ function statsMarkup(profile,catalog,account,patreon) {
   const daily=(profile.daily_history||[]).slice(0,12);
   const unlocked=unlockedAchievements(profile).length;
   const totalAchievements=(profile.achievements||[]).length;
+  if(num(summary.games)===0) {
+    return '<div class="my-pack-one-grid is-first-run"><main class="my-pack-one-main">'+
+      '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>Your scores, streaks, environments, achievements, and history will appear here after you play. Empty data is not treated as a zero score.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
+      '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
+  }
   const metrics=[
     ['Games',num(summary.games)],
     ['Average',num(summary.average_score).toFixed(1)],
     ['Best',num(summary.best_score)],
     ['Daily streak',num(summary.current_streak)],
-    ['Shared runs',esc(formatChallengeRecord(summary))],
+    ['Shared W–L',esc(formatChallengeRecord(summary))],
     ['Environments',progress.played+'/'+progress.total],
   ];
   const metricHtml=metrics.map(([label,value])=>'<div><strong>'+value+'</strong><span>'+label+'</span></div>').join('');
