@@ -221,7 +221,7 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
   let profile=null;
   try {profile=await loadMyProfile();} catch {}
   const initialReason=profile?.player?.display_name_reason||profile?.ranking_identity?.reason||linked?.rankingIdentity?.reason||null;
-  const storedInitial=String(profile?.player?.display_name||'').trim();
+  const storedInitial=String(profile?.player?.display_name||linked?.displayName||'').trim();
   const initial=initialReason==='username_required'?'':storedInitial;
   const initialWarning=initialReason==='name_not_allowed'
     ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
