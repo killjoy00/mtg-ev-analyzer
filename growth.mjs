@@ -437,7 +437,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     try {
       const data=Object.fromEntries(new FormData(form));
       const auth=await signInAccount(data);
-      if(!accountAuthCompleted(auth))throw Error('Sign in did not return an account session.');
+      if(!accountAuthCompleted(auth))throw Error('Sign in did not finish. Please try again.');
       const claimed=await claimCurrentSession();
       event('auth_sign_in',{source});
       if(claimed?.linked?.newlyClaimed) {
