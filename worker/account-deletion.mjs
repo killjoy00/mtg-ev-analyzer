@@ -101,14 +101,13 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
       )`,[player]);
   }
 
-  if(player) {
-    await query(`UPDATE public_identity_moderation_actions
-      SET target_auth_user_id=COALESCE(target_auth_user_id,$2::uuid),
-          previous_display_name=NULL,
-          new_display_name=NULL,
-          reason=CASE WHEN action='rename' THEN NULL ELSE reason END
-      WHERE target_player_id=$1::uuid`,[player,auth]);
-  }
+  await query(`UPDATE public_identity_moderation_actions
+    SET target_auth_user_id=COALESCE(target_auth_user_id,$2::uuid),
+        previous_display_name=NULL,
+        new_display_name=NULL,
+        reason=CASE WHEN action='rename' THEN NULL ELSE reason END
+    WHERE ($1::uuid IS NOT NULL AND target_player_id=$1::uuid)
+       OR target_auth_user_id=$2::uuid`,[player,auth]);
 
   await query('UPDATE pack1_admin_invites SET redeemed_by=NULL WHERE redeemed_by=$1::uuid',[auth]);
   await query('DELETE FROM corpus_status_events WHERE auth_user_id=$1::uuid',[auth]);
