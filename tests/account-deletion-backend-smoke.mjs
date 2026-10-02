@@ -5,7 +5,7 @@ if(!process.argv.includes('--dev-fixtures'))throw Error('Requires an isolated fi
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 
 const {default:growth,query}=await import('../worker/growth-function.js');
-const {beginDeletion,cleanupPackOne,sweepExpiredVerification}=await import('../worker/account-deletion.mjs');
+const {beginAdminDeletion,beginDeletion,cleanupPackOne,loadDeletionForAuth,sweepExpiredVerification}=await import('../worker/account-deletion.mjs');
 const {issueAccountSession}=await import('../worker/account-session.mjs');
 const {
   consumeDeletionVerification,
@@ -25,6 +25,7 @@ const recovery='b'.repeat(64);
 const deletionEnv={PACK1_RATE_LIMIT_SECRET:'h'.repeat(64)};
 const verificationAuth=crypto.randomUUID();
 const verificationRaceAuth=crypto.randomUUID();
+let adminActor=null,adminTarget=null;
 
 async function deletionTrigger(name='pack1-account-deletion-maintenance',status=[200,503]) {
   const invocationId='qa-delete-trigger-'+crypto.randomUUID();
@@ -72,6 +73,40 @@ try {
     WHERE auth_user_id=$1::uuid AND revoked_at IS NULL AND expires_at>now()`,[raceAuth])).rows[0].n);
   assert.equal(raceLive,0,'a concurrent account session must never remain live after deletion commits');
   assert.equal(Number((await query('SELECT count(*)::int n FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[raceAuth])).rows[0].n),1);
+
+  // Admin initiation uses the same durable tombstone while preserving original
+  // source/actor attribution and rechecking admin-target acknowledgement.
+  const adminFixtures=(await query(`SELECT u.id
+    FROM neon_auth."user" u
+    WHERE u.id<>$1::uuid
+      AND NOT EXISTS(SELECT 1 FROM account_deletion_operations d WHERE d.auth_user_id=u.id)
+    ORDER BY u."createdAt",u.id
+    LIMIT 2`,[raceAuth])).rows;
+  assert.equal(adminFixtures.length,2,'isolated branch needs two Auth identities for admin deletion attribution');
+  adminActor=adminFixtures[0].id;
+  adminTarget=adminFixtures[1].id;
+  await query('INSERT INTO pack1_admins(auth_user_id) VALUES($1::uuid),($2::uuid) ON CONFLICT DO NOTHING',[adminActor,adminTarget]);
+  const needsAck=await beginAdminDeletion(query,{
+    authUserId:adminTarget,adminAuthUserId:adminActor,reason:'QA admin deletion',acknowledgeAdmin:false,
+  });
+  assert.equal(needsAck.start_status,'admin_ack_required');
+  assert.equal(Number((await query('SELECT count(*)::int n FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[adminTarget])).rows[0].n),0);
+  const adminOperation=await beginAdminDeletion(query,{
+    authUserId:adminTarget,adminAuthUserId:adminActor,reason:'QA admin deletion',acknowledgeAdmin:true,
+  });
+  assert.equal(adminOperation.start_status,'created');
+  assert.equal(adminOperation.initiation_source,'admin');
+  assert.equal(adminOperation.initiated_by_admin_auth_user_id,adminActor);
+  assert.equal(adminOperation.deletion_reason,'QA admin deletion');
+  assert.equal(adminOperation.target_was_admin===true||adminOperation.target_was_admin==='t',true);
+  const adminAgain=await beginAdminDeletion(query,{
+    authUserId:adminTarget,adminAuthUserId:adminActor,reason:'must not replace original',acknowledgeAdmin:false,
+  });
+  assert.equal(adminAgain.start_status,'existing');
+  assert.equal(adminAgain.deletion_reason,'QA admin deletion','retry preserves original free-text attribution');
+  const persistedAdmin=await loadDeletionForAuth(query,adminTarget);
+  assert.equal(persistedAdmin.operation_id,adminOperation.operation_id);
+  assert.equal(persistedAdmin.initiated_by_admin_auth_user_id,adminActor);
 
   // The maintenance sweep must delete only expired verification rows. The
   // unexpired fixture is intentionally left for disposal with the CI branch.
@@ -224,7 +259,7 @@ try {
   const again=await cleanupPackOne(query,cleaned,{recoveryKey:recovery});
   assert.equal(again.state,'provider_delete_pending','cleanup is rerunnable while provider deletion is pending');
 
-  console.log('Account deletion SQL cleanup passed: Neon trigger auth, durable tombstone, cross-player preservation, hard deletes, and idempotent resume without managed-Auth fixture mutation.');
+  console.log('Account deletion SQL cleanup passed: admin/self-service attribution, admin acknowledgement, Neon trigger auth, durable tombstone, cross-player preservation, hard deletes, and idempotent resume without managed-Auth fixture mutation.');
 } finally {
   await query(`DELETE FROM draft_run_shares WHERE session_id IN (
     SELECT id FROM draft_run_sessions WHERE player_id=$1::uuid OR player_id=$2::uuid
@@ -233,5 +268,7 @@ try {
   await query('DELETE FROM game_results WHERE player_id=$1::uuid OR player_id=$2::uuid',[other,player]);
   await query('DELETE FROM share_challenges WHERE player_id=$1::uuid',[player]);
   await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid OR auth_user_id=$2::uuid',[verificationAuth,verificationRaceAuth]);
+  if(adminTarget)await query('DELETE FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[adminTarget]).catch(()=>{});
+  if(adminActor||adminTarget)await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid OR auth_user_id=$2::uuid',[adminActor,adminTarget]).catch(()=>{});
   await query('DELETE FROM players WHERE id=$1::uuid OR id=$2::uuid',[other,player]);
 }
