@@ -283,26 +283,13 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 ### Google Play Console
 
-2. **Finish the remaining App content forms.**
-   - Play Console -> Pack One -> **Policy and programs -> App content**.
-   - Google Play **Sign-in details / App access is complete**; the shared non-expiring reviewer account is already entered.
-   - **Ads:** answer **Yes** because Pack One has the dedicated Daily-home sponsored TCGplayer affiliate promotion/banner. There is no ad SDK or advertising ID.
-   - **Target audience and content:** select the intended **13+** audience; do not select under-13 groups.
-   - **Content rating (IARC):** complete the questionnaire from the real app: no gambling/wagering/chat; card art can contain fantasy combat/violence.
-   - Data Safety is already submitted; do not redo it unless Play reports a required correction.
-
-3. **Set public Production countries to United States + Canada only.**
-   - Play Console -> Pack One -> **Production** -> **Countries / regions**.
-   - Target **United States** and **Canada** only.
-   - Treat Production geography as separate from the `production-access` closed-test geography.
-
-4. **Keep the closed-test qualification alive until Google marks it complete.**
-   - Play Console -> Pack One -> **Closed testing -> production-access**.
-   - Do not recreate, reset, or replace the track while the qualification clock is running.
+2. **Wait for the closed-test qualification clock to complete.**
+   - All currently available Google Play console setup is complete, including App content, Ads, Sign-in details/App access, Target audience/content, IARC content rating, Data Safety, store assets/listing, and Production countries **United States + Canada**.
+   - Leave **Closed testing -> production-access** unchanged while the qualification clock is running.
    - Keep at least 12 testers continuously opted in for the required 14-day period.
-   - No additional action is required unless Play shows that the tester count or continuity requirement has been broken.
+   - No owner action is required unless Play reports that tester count/continuity was broken.
 
-5. **Apply for Production access when Google enables the application.**
+3. **Apply for Production access when Google enables the application.**
    - When Play Console says the testing requirement is satisfied, open the Production access application.
    - Answer Google's questions about the closed test, tester engagement/feedback, app purpose, and production readiness truthfully.
    - Submit the application.
