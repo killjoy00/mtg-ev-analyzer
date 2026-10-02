@@ -4,9 +4,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 import {randomBytes} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
+import {request as httpsRequest} from 'node:https';
 import {pathToFileURL} from 'node:url';
 import {deployPreviewFunction} from './edge-neon-deploy.mjs';
 const HOST='api-preview.packone.pro',WORKER='pack1-gateway-preview';
+const READINESS_CONSECUTIVE=20,READINESS_INTERVAL_MS=2000,READINESS_DEADLINE_MS=180000;
 export function parseRequest(value) {
   if(!value||Array.isArray(value)||Object.keys(value).some(k=>!['operation','reason'].includes(k))||
     !['idle','check-access','deploy-preview','disable-preview','probe-auth-webhook','stage-auth-webhook-probe','run-auth-webhook-probe','cleanup-auth-webhook-probe','probe-email-verification'].includes(value.operation)||typeof value.reason!=='string'||!value.reason.trim())throw Error('Invalid preview request.');
@@ -31,6 +33,45 @@ export function commandFailure(name,args,error) {
   const category=/unknown arguments?/i.test(output)?'unsupported argument':/unauthorized|authentication|api.key/i.test(output)?'authentication':/permission|forbidden/i.test(output)?'permission':/not found/i.test(output)?'not found':'unclassified';
   const stage=name==='neon'?`functions ${['list','delete','deploy'].includes(args[1])?args[1]:'operation'}`:args[0]==='secret'?'secret installation':'Worker upload';
   return `${name} failed during ${stage}; exit ${Number.isInteger(error.status)?error.status:'unknown'}; category ${category}${status?`; HTTP ${status}`:''}.`;
+}
+export function freshPreviewHealth({preview,request=httpsRequest,timeout_ms=10000}={}) {
+  return new Promise(resolve=>{
+    let settled=false;const done=value=>{if(settled)return;settled=true;resolve(value);};
+    let req;
+    try {
+      req=request({protocol:'https:',hostname:HOST,port:443,path:'/draft/health?quick=1',method:'GET',agent:false,
+        headers:{'x-pack1-preview-key':preview}},response=>{
+        let body='';response.setEncoding('utf8');
+        response.on('data',chunk=>{body=(body+chunk).slice(0,8192);});
+        response.on('end',()=>{
+          let release=null;try {const parsed=JSON.parse(body);if(/^[a-f0-9]{40}$/.test(parsed?.release_commit||''))release=parsed.release_commit;} catch {}
+          done({status:response.statusCode||0,release});
+        });
+        response.on('error',()=>done({status:response.statusCode||0,release:null}));
+      });
+    } catch {done({status:0,release:null});return;}
+    req.setTimeout(timeout_ms,()=>req.destroy(Error('timeout')));
+    req.on('error',()=>done({status:0,release:null}));
+    req.end();
+  });
+}
+export async function waitForPreviewReadiness({probe,commit,clock=Date.now,sleep=ms=>new Promise(r=>setTimeout(r,ms)),
+  required=READINESS_CONSECUTIVE,interval_ms=READINESS_INTERVAL_MS,deadline_ms=READINESS_DEADLINE_MS}={}) {
+  if(typeof probe!=='function'||!/^[a-f0-9]{40}$/.test(commit||'')||!Number.isInteger(required)||required<2||
+    !Number.isFinite(interval_ms)||interval_ms<0||!Number.isFinite(deadline_ms)||deadline_ms<=0)throw Error('Invalid preview readiness probe configuration.');
+  const deadline=clock()+deadline_ms;let consecutive=0,attempts=0,last={status:0,release:null};
+  while(clock()<deadline) {
+    try {last=await probe();} catch {last={status:0,release:null};}
+    attempts++;
+    const matches=last?.status===200&&last?.release===commit;
+    consecutive=matches?consecutive+1:0;
+    if(!matches)console.log(JSON.stringify({event:'preview_readiness_mismatch',attempt:attempts,
+      status:Number.isInteger(last?.status)?last.status:null,release_commit:/^[a-f0-9]{40}$/.test(last?.release||'')?last.release:null}));
+    if(consecutive>=required)return {ready:true,attempts,consecutive,last};
+    if(clock()>=deadline)break;
+    await sleep(interval_ms);
+  }
+  return {ready:false,attempts,consecutive,last};
 }
 async function cf(route,{method='GET',body,allow404=false}={}) {
   let r;
@@ -133,17 +174,12 @@ async function main(action) {
   run('wrangler',['deploy','--config',configPath]);
   run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({ORIGIN_SECRET:origin,PREVIEW_KEY:preview,QUOTA_KEY:quota}));
   await cf(`/accounts/${zone.account.id}/workers/domains`,{method:'PUT',body:{hostname:HOST,service:WORKER,zone_id:zone.id}});
-  // A newly attached hostname can lag the control-plane response. Verify the
-  // public preview route and exact revision before handing it to any browser.
-  let ready=false;const deadline=Date.now()+90000;
-  while(Date.now()<deadline&&!ready) {
-    try {
-      const r=await fetch(`https://${HOST}/draft/health?quick=1`,{headers:{'x-pack1-preview-key':preview},redirect:'error',signal:AbortSignal.timeout(10000)});
-      ready=r.status===200&&(await r.json()).release_commit===commit;
-    } catch { /* bounded read-only propagation probe */ }
-    if(!ready)await new Promise(resolve=>setTimeout(resolve,2000));
-  }
-  if(!ready)throw Error('Preview hostname did not serve the reviewed revision before the readiness deadline.');
+  // A newly attached hostname or Worker version can lag the control-plane
+  // response. Require sustained exact-revision health from fresh TLS
+  // connections so one warm edge connection cannot declare propagation done.
+  const readiness=await waitForPreviewReadiness({commit,probe:()=>freshPreviewHealth({preview})});
+  if(!readiness.ready)throw Error('Preview hostname did not serve the reviewed revision consistently before the readiness deadline.');
+  console.log(`Preview hostname stable after ${readiness.consecutive} consecutive fresh-connection revision checks.`);
   variable('PREVIEW_ACCESS_KEY',preview);variable('PREVIEW_ORIGIN_SECRET',origin);
   console.log('Private preview deployed. Live acceptance must still pass.');
 }
