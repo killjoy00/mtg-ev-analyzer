@@ -157,17 +157,17 @@ test('expired or revoked Patreon grants do not erase current grants from another
 test('refresh has explicit pending semantics and never reports completed reconciliation', async (t) => {
   const h = await mount(t, { data: connected() });
   h.value = connected({ membership: { effective_state: 'elite_entitled', sync_pending: true } });
-  await h.press('Request Patreon refresh');
+  await h.press('Refresh Patreon access');
   assert.deepEqual(h.posts('refresh')[0].config.body, { confirm: true });
   assert.match(h.text(), /Refresh requested/);
-  assert.match(h.text(), /reconciliation is pending/);
+  assert.match(h.text(), /still updating your membership/);
   assert.doesNotMatch(h.text(), /successfully refreshed|membership status refreshed/);
 });
 
 test('failed refresh is exposed and access becomes unverified rather than Free', async (t) => {
   const h = await mount(t, { data: connected() });
   h.handler = (route) => { if (route.endsWith('/refresh')) throw Error('Provider unavailable'); };
-  await h.press('Request Patreon refresh');
+  await h.press('Refresh Patreon access');
   assert.match(h.text(), /Provider unavailable/);
   assert.match(h.text(), /Account access not verified/);
 });
@@ -180,13 +180,13 @@ test('Patreon stays passive while iOS exposes Apple-native Elite billing', async
   assert.match(copy, /Sign in with Patreon connects an existing Patreon account/);
   assert.match(copy, /Patreon membership changes remain managed through Patreon/);
   assert.doesNotMatch(copy, /join Patreon|upgrade with Patreon/i);
-  const patreon = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Sign in with Patreon')[0];
+  const patreon = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Connect Patreon')[0];
   assert.ok(patreon);
 });
 
 test('browser cancellation is not reported as successful connection', async (t) => {
   const h = await mount(t);
-  await h.press('Sign in with Patreon');
+  await h.press('Connect Patreon');
   assert.equal(h.opened.length, 1);
   assert.match(h.text(), /No Patreon account is connected/);
   assert.match(h.text(), /Only the checked account status/);
