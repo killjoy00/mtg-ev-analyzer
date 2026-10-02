@@ -272,12 +272,12 @@ Only unfinished owner actions are listed here. Completed, intentionally declined
 
 ### Apple / App Store Connect
 
-1. **Create and enter the shared store-review account.**
-   - Create a normal Pack One account using `ryanmindell+packone-app-review@gmail.com`.
-   - Complete the normal Pack One email verification/password flow; keep the password private and do not put it in Git, an issue, or chat.
-   - After the account exists, add non-expiring manual grants for both Elite capabilities: `custom_corpus` and `unlimited_cube_practice`.
-   - In App Store Connect -> Apps -> Pack One -> version 1.0 -> **App Review Information**, enter the review contact name, phone, and email.
-   - Enter the reviewer account email/password there and use the review notes/reviewer path already prepared in this document.
+1. **Enter the prepared reviewer account in App Store Connect.**
+   - The shared reviewer account `ryanmindell+packone-app-review@gmail.com` is verified and already has non-expiring manual Elite access for both `custom_corpus` and `unlimited_cube_practice`.
+   - App Store Connect -> Apps -> Pack One -> version 1.0 -> **App Review Information**.
+   - Enter the review contact name, phone, and email.
+   - Enter the reviewer account email/password there. Keep the password private and do not put it in Git, an issue, or chat.
+   - Use the review notes/reviewer path already prepared in this document.
 
 Physical iPhone/iPad acceptance remains separate and is intentionally not listed here.
 
@@ -308,23 +308,10 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
    - Submit the application.
    - Record the submission date and later the approval date in issue #575.
 
-### Google Cloud release-credential boundary
-
-6. **Narrow Google Workload Identity Federation trust in the Google Cloud Console.**
-   - No command line or Cloud Shell is required.
-   - Open Google Cloud Console and select project **Pack One** (`pack-one`).
-   - Go to **IAM & Admin -> Workload Identity Federation** / **Workload Identity Pools**.
-   - Find and expand the pool **github**.
-   - Find provider **mtg-ev-analyzer** and click **Edit**.
-   - In **Attribute conditions**, replace the current repo-only condition with:
-     `assertion.repository == 'killjoy00/mtg-ev-analyzer' && assertion.ref == 'refs/heads/main' && assertion.environment == 'pack-one-mobile-release'`
-   - Click **Save**.
-   - Do not change the issuer, provider ID, pool, attribute mappings, service account, or any other IAM setting.
-   - After this change, re-run the repo's non-publishing Google Play access probe and record the passing evidence in #575.
-
 ### Not owner-only / leave to automation
 
 Do **not** spend console time on these unless an automated probe reports a problem:
+- Google Cloud WIF narrowing is owner-complete; the repo-side non-publishing Google Play access probe is the remaining automated verification;
 - uploading/replacing the current RC binaries;
 - attaching the current successful App Store-eligible iOS RC to App Store version 1.0; post-#837 build `100415` is already `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `36957484955`;
 - building/uploading/promoting the Android RC; versionCode `100444` is already signed, uploaded, and active on `production-access`;
