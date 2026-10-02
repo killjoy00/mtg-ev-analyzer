@@ -166,7 +166,13 @@ try {
   assert.equal(await page.getByRole('button',{name:'Save username'}).isDisabled(),true);
   assert.ok(adminControlRequests.some(item=>item.path===`/v1/admin/users/${userId}/delete`&&item.method==='POST'));
 
-  // Status recovery remains available after the interrupted request.
+  // A failed follow-up status lookup must preserve the known committed state.
+  await page.getByRole('button',{name:'Refresh deletion status'}).click();
+  await page.getByText('Synthetic deletion status outage',{exact:false}).waitFor();
+  assert.equal(await page.locator('#delete-account-form').count(),0);
+  assert.equal(await page.getByRole('button',{name:'Save username'}).isDisabled(),true);
+
+  // Status recovery remains available once Growth responds again.
   failDeleteAfterCommit=false;deletionStatusFailure=false;
   await page.getByRole('button',{name:'Refresh deletion status'}).click();
   await page.locator('#deletion-status').getByText('Deletion has started and is continuing.',{exact:false}).waitFor();
