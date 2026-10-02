@@ -510,6 +510,7 @@ test('Profile visibility toggles an initially public profile off on the first ta
       View: host('View'),
     },
     'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/client': { ApiError: class ApiError extends Error {} },
     '@/src/api/career': {
       updateMobileProfile: async (_session, body) => {
         writes.push(body);
