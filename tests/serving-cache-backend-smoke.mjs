@@ -84,15 +84,20 @@ for(const sql of [
   const before=await revision();await query(sql);
   assert.equal(await revision(),before,sql);
 }
-// Version registry changes retain the existing conservative statement-level
-// invalidation because they can change parent/component membership globally.
-for(const sql of [
-  'UPDATE corpus_set_versions SET corpus_version=corpus_version WHERE false',
-  'DELETE FROM corpus_set_versions WHERE false',
-]) {
-  const before=await revision();await query(sql);
-  assert.equal(await revision(),before+1n,sql);
-}
+// A future parent version that is not registered for serving is staging data.
+// Its version manifest can be inserted, enriched and removed without churning
+// the currently registered release.
+const futureVersion='qa-future-'+crypto.randomUUID();
+let futureBefore=await revision();
+await query('INSERT INTO corpus_set_versions(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)',[stageSet,futureVersion,JSON.stringify({qa:true})]);
+assert.equal(await revision(),futureBefore,'non-serving future version insert must not invalidate Practice');
+futureBefore=await revision();
+await query('UPDATE corpus_set_versions SET manifest=manifest || $3::jsonb WHERE set_id=$1 AND corpus_version=$2',[stageSet,futureVersion,JSON.stringify({staged:true})]);
+assert.equal(await revision(),futureBefore,'non-serving future version manifest update must not invalidate Practice');
+futureBefore=await revision();
+await query('DELETE FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2',[stageSet,futureVersion]);
+assert.equal(await revision(),futureBefore,'non-serving future version removal must not invalidate Practice');
+
 assert.equal(await servingRevisionMatches(query,snapshot.revision),false,'old generation cannot be accepted after real serving changes');
 const before=await revision();
 await query("UPDATE draft_run_verified_puzzles SET payload=payload WHERE false");
@@ -103,9 +108,9 @@ const fixture='qa-cache-'+crypto.randomUUID();
 const first=await loadServingSnapshot(query,fixture);
 assert.deepEqual(first.groups,[]);
 for(let i=0;i<3;i++) {
-  // Version registry statements retain conservative invalidation, providing a
-  // data-preserving revision bump for this bounded-generation cache fixture.
-  await query('UPDATE corpus_set_versions SET corpus_version=corpus_version WHERE false');
+  // Exercise bounded generations without coupling this cache test to an
+  // unrelated statement-trigger side effect.
+  await query('SELECT pack1_bump_serving_revision()');
   assert.notEqual((await loadServingSnapshot(query,fixture)).id,first.id);
 }
 assert.equal(Number((await query('SELECT count(*) n FROM draft_run_serving_snapshots WHERE corpus_version=$1',[fixture])).rows[0].n),2);
