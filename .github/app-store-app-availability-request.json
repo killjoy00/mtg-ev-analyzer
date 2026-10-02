@@ -1,6 +1,6 @@
 {
   "operation": "configure-app-store-availability",
-  "reason": "Owner-authorized Pack One v1 public App Store availability: make the app available only in the United States and Canada, disable automatic availability in newly added territories, and verify the final available territory set is exactly USA + CAN. Do not submit for review, release the app, enable pre-order, or modify subscription availability.",
+  "reason": "Execute the owner-authorized Pack One v1 App Store availability change now that the guarded workflow is present on main: United States and Canada only, with automatic availability in newly added territories disabled. Verify the final available territory set is exactly USA + CAN. Do not submit for review, release the app, enable pre-order, or modify subscription availability.",
   "territories": [
     "USA",
     "CAN"
