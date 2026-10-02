@@ -49,7 +49,8 @@ export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch,tr
   return async(actor,route,path,body,{report=null,windows=null}={})=>{
     const url=permittedRequest(path,body);
     if(++budget.gateway_requests>Math.floor((policy.maximum_requests-policy.telemetry_preflight_requests)/policy.generators))throw Object.assign(Error('request_ceiling'),{category:'cost'});
-    const at=now(),record={route,at,status:0,ms:0,bytes:0,phase:!windows||at<windows.hold?'initial':at<windows.drain?'hold':at<windows.recovery?'drain':'recovery'};
+    const at=now(),actorRequest=actor?(actor.request_sequence=(actor.request_sequence||0)+1):null,
+      record={route,at,status:0,ms:0,bytes:0,actor:actor?.id??null,actor_request:actorRequest,phase:!windows||at<windows.hold?'initial':at<windows.drain?'hold':at<windows.recovery?'drain':'recovery'};
     const endpoint=requestEndpoint(path);if(endpoint)record.endpoint=endpoint;
     const request_index=report?report.requests.length:null;
     if(report){record.index=request_index;report.requests.push(record);}
@@ -74,8 +75,9 @@ export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch,tr
     } catch(error) {
       if(record.status===0) {
         const evidence=transportFailureEvidence(error,transport,{cohortAborted:signal.aborted,elapsedMs:performance.now()-start});record.transport=evidence;
-        const reason=evidence.label==='abort_fallout'?'cohort_aborted':`transport_${evidence.label}`;
-        throw Object.assign(Error(reason),{category:evidence.label==='abort_fallout'?'generator':'application',request_index,transport:evidence});
+        if(error&&typeof error==='object') {
+          error.category||='application';error.request_index=request_index;error.transport=evidence;
+        } else error=Object.assign(Error('request_or_generator_failure'),{category:'application',request_index,transport:evidence});
       }
       throw error;
     } finally {
@@ -105,7 +107,14 @@ export async function runPlayerStage({fixture,policy,scope,stage,shard,start_at,
     if(category==='correctness')report.correctness_failures++;
     const reason=/^[a-z0-9_]{1,80}$/.test(e.message)?e.message:category==='correctness'?'assertion_failed':'request_or_generator_failure';
     const failure={category,reason};if(Number.isInteger(e.request_index))failure.request_index=e.request_index;if(e.transport?.label)failure.transport=e.transport.label;
-    if(!report.failure_category)report.failure_category=category;if(!report.root_failure&&reason!=='cohort_aborted')report.root_failure={...failure};report.failures.push(failure);onFailure({category,reason});
+    const request=Number.isInteger(e.request_index)?report.requests[e.request_index]:null;
+    if(request?.transport) {
+      request.transport.role=request.transport.label==='abort_fallout'?'abort_fallout':report.root_failure?'coincident':'root';
+    }
+    report.failure_category=category;
+    if(!report.root_failure&&request?.transport?.role==='root')report.root_failure={...failure};
+    else if(!report.root_failure&&reason!=='cohort_aborted'&&!e.transport)report.root_failure={...failure};
+    report.failures.push(failure);onFailure({category,reason});
   };
   const actors=Array.from({length:population},(_,i)=>{
     const id=shard*population+i,user=fixture.users[offset+id],guest=id%10<5;
