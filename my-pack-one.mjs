@@ -154,7 +154,7 @@ function statsMarkup(profile,catalog,account,patreon) {
   const totalAchievements=(profile.achievements||[]).length;
   if(num(summary.games)===0) {
     return '<div class="my-pack-one-grid is-first-run"><main class="my-pack-one-main">'+
-      '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>Your scores, streaks, environments, achievements, and history will appear here after you play. Empty data is not treated as a zero score.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
+      '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>Play your first Daily to start your record. Your scores, streaks, environments, achievements, and history will appear here as you play.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
       '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
   }
   const metrics=[
