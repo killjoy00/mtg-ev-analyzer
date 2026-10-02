@@ -214,15 +214,16 @@ try {
   // A first account claim routes through the compact account-ready step.
   await fresh({source:'nav'});
   nextLinkNewlyClaimed=true;
-  nextLinkRankingReason='username_taken';
+  nextLinkRankingReason='username_required';
   const newlyClaimed=page.locator('#account-signin');
   await newlyClaimed.locator('[name="email"]').fill('qa@example.invalid');
   await newlyClaimed.locator('[name="password"]').fill('fixture-password-123');
   await newlyClaimed.getByRole('button',{name:'Sign in',exact:true}).click();
   await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
   assert.equal(await page.locator('#account-ready input[name="displayName"]').evaluate(el=>document.activeElement===el),true);
-  assert.equal(await page.locator('#account-ready input[name="displayName"]').inputValue(),'QA Player');
-  await page.getByText('Choose a different display name. That one is already taken.',{exact:true}).waitFor();
+  assert.equal(await page.locator('#account-ready input[name="displayName"]').inputValue(),'');
+  await page.getByText('Optional. Choose a display name if you want to join Daily leaderboards. Shown on Daily leaderboards and your public profile.',{exact:true}).waitFor();
+  assert.equal((await page.locator('#account-ready .form-error').textContent())?.trim(),'');
   await page.getByRole('button',{name:'Skip for now',exact:true}).click();
   assert.equal(await page.locator('#account-ready').count(),0);
 
@@ -236,7 +237,10 @@ try {
   });
   await page.evaluate(async()=>{const growth=await import('/growth.mjs');await growth.resumeAccountAuth('google');});
   await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
+  const socialError=page.locator('#account-ready .form-error');
   await page.getByText('That display name is not allowed. Choose another to join Daily leaderboards.',{exact:true}).waitFor();
+  await page.locator('#account-ready input[name="displayName"]').fill('New Display Name');
+  assert.equal((await socialError.textContent())?.trim(),'');
   await page.getByRole('button',{name:'Skip for now',exact:true}).click();
 
   // A verification callback that returns authenticated also uses account-ready.
