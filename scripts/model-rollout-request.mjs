@@ -77,6 +77,8 @@ export function rolloutDispatch(request) {
     if(action==='enable'&&!/^[a-f0-9]{40}$/.test(commit||''))throw Error('Enabling Neon schedulers requires an exact main SHA.');
     if(action==='disable'&&commit!==undefined)throw Error('Disabling Neon schedulers does not accept a commit.');
     workflow='neon-scheduler-release.yml';inputs={action,...(action==='enable'?{commit}:{})};extra=['action',...(action==='enable'?['commit']:[])];
+  } else if(operation==='distributed-capacity') {
+    workflow='launch-distributed.yml';
   } else if(operation==='browser') {
     workflow='e2e.yml';
   } else if(operation==='deploy') {
