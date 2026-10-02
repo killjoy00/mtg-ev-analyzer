@@ -202,15 +202,14 @@ function settingsMarkup(profile, progress, account, patreon) {
   return `<section class="profile-settings profile-account" id="profile-account" aria-labelledby="profile-account-title">
     <header><div><p class="eyebrow">Account</p><h2 id="profile-account-title">Account settings</h2><p>${account?.unavailable?'Account status is temporarily unavailable. Your career is still here.':account?.user?.email?`Signed in as <strong>${esc(account.user.email)}</strong>`:'Your saved profile and preferences.'}</p></div>${account?.unavailable?'<button type="button" class="button secondary" id="account-status-retry">Retry account</button>':account?.user?'<button type="button" class="button secondary" id="account-signout">Sign out</button>':'<button type="button" class="button secondary" id="profile-claim-account">Sign in</button>'}</header>
     ${account?.user?`<section class="profile-settings-group" aria-labelledby="profile-visibility-title">
-      <div><p class="eyebrow">Profile</p><h3 id="profile-visibility-title">Profile &amp; visibility</h3></div>
+      <div class="profile-settings-heading-row"><div><p class="eyebrow">Profile</p><h3 id="profile-visibility-title">Profile &amp; visibility</h3></div><div class="profile-settings-top-actions"><a class="button secondary" href="#profile-display-name">Change name</a><button class="button primary" type="submit" form="profile-settings-form">Save profile</button><span class="profile-settings-status profile-save-status" id="profile-save-status" aria-live="polite"></span></div></div>
       <form id="profile-settings-form">
-        <label class="profile-leaderboard-name"><span>Display name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''}><small>${identityHidden?'This display name is hidden by moderation.':'Shown on Daily leaderboards and your public profile.'}</small></label>
-        ${identityHidden?`<p class="profile-settings-status" role="alert">Display name hidden. ${esc(profile.player.public_identity_hidden_reason||'Contact Pack One support if you believe this is a mistake.')}</p>`:nameAttention?`<p class="profile-settings-status" role="alert">${esc(nameAttention)}</p>`:''}
-        ${!identityHidden?`<p class="profile-identity-rules"><small>By saving a display name or public profile, you agree to the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>: no harassment, impersonation, spam, private contact information, or abusive content.</small></p>`:''}
-        <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''} ${identityHidden?'disabled':''}><span><strong>Public profile</strong><small>Allows leaderboard visitors and shared links to open your Pack One record.</small></span></label>
+        <label class="profile-leaderboard-name" id="profile-display-name"><span>Display name</span><input class="select" type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(profile.player.display_name)}" required ${identityHidden?'disabled':''} aria-describedby="profile-display-name-help profile-display-name-error"><small id="profile-display-name-help">${identityHidden?'This display name is hidden by moderation.':'Shown on Daily leaderboards and your public profile.'}</small><small class="profile-field-error" id="profile-display-name-error" role="alert">${esc(identityHidden?`Display name hidden. ${profile.player.public_identity_hidden_reason||'Contact Pack One support if you believe this is a mistake.'}`:nameAttention)}</small></label>
+        ${!identityHidden?`<p class="profile-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules" target="_blank" rel="noopener">Pack One Public Identity rules</a>.</small></p>`:''}
+        <label class="profile-toggle"><input type="checkbox" name="profilePublic" ${profile.player.profile_public ? 'checked' : ''} ${identityHidden?'disabled':''}><span><strong>Public profile</strong><small>Let players view your Pack One record from leaderboards and shared links.</small></span></label>
         <label><span>Favorite environment</span><select class="select" name="favoriteSetId"><option value="">No favorite selected</option>${progress.environments.map((entry) => `<option value="${esc(entry.id)}" ${entry.id === profile.player.favorite_set_id ? 'selected' : ''}>${esc(entry.name)}</option>`).join('')}</select></label>
         <label><span>Showcase achievement</span><select class="select" name="showcaseAchievement"><option value="">No showcase selected</option>${unlocked.map((item) => `<option value="${esc(item.id)}" ${item.id === profile.player.showcase_achievement ? 'selected' : ''}>${esc(item.label)}</option>`).join('')}</select></label>
-        <div class="profile-settings-actions"><button class="button primary" type="submit">Save profile</button><span class="profile-settings-status" aria-live="polite"></span></div>
+
       </form>
     </section>`:`<p class="profile-empty">${account?.unavailable?'Profile settings are temporarily unavailable.':'Sign in to edit your profile settings.'}</p>`}
     ${account?.user?`<section class="profile-membership profile-settings-membership profile-settings-group" aria-labelledby="patreon-membership-title">
@@ -227,7 +226,7 @@ function settingsMarkup(profile, progress, account, patreon) {
       <div class="profile-membership-actions">
         <a class="button ${patreon?.configured===true&&!elite?'primary':'secondary'}" href="${membershipUrl}"${elite?' rel="noopener noreferrer"':''}>${patreon?.configured!==true?'Learn about Elite':elite?'Open Patreon':patreon?.connected?'Upgrade to Elite':'Become Elite'}</a>
         ${patreon?.configured===true?`<button type="button" class="button secondary" id="patreon-connect">${patreon?.connected?'Refresh Patreon access':'Already a member? Connect Patreon'}</button>`:''}
-        ${patreon?.connected?'<button type="button" class="text-button" id="patreon-disconnect">Disconnect Patreon</button>':''}
+        ${patreon?.connected?'<button type="button" class="button secondary destructive" id="patreon-disconnect">Disconnect Patreon</button><small class="profile-membership-note">Disconnecting Patreon from Pack One does not cancel Patreon billing.</small>':''}
         <span id="patreon-status" aria-live="polite"></span>
       </div>
     </section>`:''}
@@ -506,23 +505,40 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
   document.querySelector('#profile-settings-form')?.addEventListener('submit', async (event) => {
     event.preventDefault();
     const form = event.currentTarget;
-    const status = form.querySelector('.profile-settings-status');
+    const status = document.querySelector('#profile-save-status');
+    const fieldError = form.querySelector('#profile-display-name-error');
+    const button = document.querySelector('button[form="profile-settings-form"][type="submit"]');
     const data = new FormData(form);
-    status.textContent = 'Saving…';
+    if(fieldError)fieldError.textContent='';
+    if(status){status.className='profile-settings-status profile-save-status is-saving';status.textContent='Saving profile…';}
+    if(button)button.disabled=true;
     try {
       const updated = await updateProfile({
         displayName: data.get('displayName') || '',
         profilePublic: data.get('profilePublic') === 'on',
         favoriteSetId: data.get('favoriteSetId') || null,
         showcaseAchievement: data.get('showcaseAchievement') || null,
+        acceptPublicIdentityTerms: true,
       });
-      status.textContent = 'Saved';
+      if(updated.player?.username_owned===false) {
+        const reason=updated.player?.display_name_reason;
+        if(fieldError)fieldError.textContent=reason==='name_not_allowed'
+          ? 'That display name is not allowed.'
+          : reason==='username_required'
+            ? 'Choose a display name to join Daily leaderboards.'
+            : 'That display name is already taken.';
+        if(status){status.className='profile-settings-status profile-save-status is-error';status.textContent='Profile not saved. Fix the display name and try again.';}
+        return;
+      }
+      if(status){status.className='profile-settings-status profile-save-status is-success';status.textContent='Profile saved.';}
+      window.PACK1_LAST_PROFILE=updated;
       track('profile_settings_saved', { public: updated.player?.profile_public || false });
-      await renderProfile(updated, { own: true });
       document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:updated.player?.username_owned===true}}));
       if(updated.player?.display_name){try{localStorage.setItem('pack1-player-name-v1',updated.player.display_name);}catch{}}
     } catch (error) {
-      status.textContent = error.message;
+      if(status){status.className='profile-settings-status profile-save-status is-error';status.textContent=(error?.message||'Profile could not be saved.')+' Your edits are still here.';}
+    } finally {
+      if(button)button.disabled=false;
     }
   });
 
