@@ -95,6 +95,7 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
   const [reportReason,setReportReason]=useState<ReportReason>(pendingReportReason || 'offensive_name');
   const [safetyBusy,setSafetyBusy]=useState(false);
   const [safetyMessage,setSafetyMessage]=useState<string|null>(null);
+  const pendingActionShown=useRef(false);
   const commit = useCallback((next: State) => { stateRef.current = next; setState(next); }, []);
 
   const deny = useCallback((error: unknown) => {
@@ -152,7 +153,8 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
       const currentSession=await readSession().catch(()=>null);
       if (generation !== requestId.current) return;
       setViewerSession(currentSession);
-      if (currentSession?.accountToken && pendingAction) {
+      if (currentSession?.accountToken && pendingAction && !pendingActionShown.current) {
+        pendingActionShown.current=true;
         setSafetyMessage(pendingAction === 'block'
           ? 'Signed in. Review this profile, then choose Block profile to continue.'
           : 'Signed in. Review the reason, then choose Report profile to continue.');
@@ -184,7 +186,7 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
   const report = async () => {
     if(safetyBusy)return;
     if(!viewerSession?.accountToken) {
-      router.push({
+      router.replace({
         pathname: '/account',
         params: { profileKey, pendingAction: 'report', reportReason },
       });
@@ -202,7 +204,7 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
   const block = async () => {
     if(safetyBusy)return;
     if(!viewerSession?.accountToken) {
-      router.push({
+      router.replace({
         pathname: '/account',
         params: { profileKey, pendingAction: 'block' },
       });
