@@ -1,6 +1,6 @@
 # Pack One mobile release runbook
 
-Updated 2026-10-01.
+Updated 2026-10-02.
 
 This is the owner runbook for Pack One mobile releases. It covers normal releases, emergency fixes, rollback/containment, and the external release-security boundary.
 
@@ -15,13 +15,12 @@ Repository code already enforces:
 - PR jobs are validation-only and cannot publish
 - release-request files create reviewed, auditable triggers
 
-The final external evidence is outside Git:
-1. Protect the `pack-one-mobile-release` GitHub Environment with the desired reviewer/branch rules.
-2. Store Apple release secrets at that protected environment boundary, not as generally usable repository secrets.
-3. Narrow Google Workload Identity so the Google service account accepts only the protected release-context OIDC subject, not every workflow in the repository.
-4. Re-run the non-publishing Apple/Google access probes after the change.
+Current external-boundary status for the 1.0 launch:
+- `pack-one-mobile-release` is restricted to `main`; required reviewers are intentionally disabled.
+- Google Workload Identity Federation is narrowed to the Pack One repository + `refs/heads/main` + `pack-one-mobile-release`. Non-publishing Google Play access probe run `37017937127` passed after the change.
+- Re-scoping the existing Apple release secrets into the Environment is explicitly owner-declined and non-blocking. The owner does not want those values regenerated solely for re-scoping. Do not reopen that as #575 owner work unless the owner explicitly changes the decision.
 
-Until those account-level settings are verified, the code is fail-closed but the cloud credential boundary is broader than ideal.
+Repository workflows remain fail-closed around current `main` and the release Environment.
 
 ## Plain-English meaning of the release-operations requirement
 
@@ -55,12 +54,13 @@ The store-free smoke proves source/build reproducibility only. It never substitu
 
 ## Pack One 1.0 current release checkpoint
 
-As of 2026-10-01:
+As of 2026-10-02:
 - iOS current post-#837 candidate: build `100415`, source `fa588b40bc380946735385abfac0ff52586e1873`. Run `36957484955` completed successfully; App Store Connect reports `VALID` + `APP_STORE_ELIGIBLE`, and build `100415` is attached to App Store version 1.0.
-- Android current post-#837 build artifact: versionCode `100444`, same source revision. Run `36957485029` built and signed the production AAB and verified the registered Play upload certificate. It is not yet uploaded/promoted.
-- Android live qualification-track release remains versionCode `100368` on `production-access` with `releaseStatus=completed`. Upload/promote `100444` unchanged before final Android physical acceptance/submission.
-- Apple first public app availability was set manually to **United States + Canada only** on 2026-10-01. The guarded repo path is now read-only verification only.
-- Owner-only non-device console/account steps are maintained in `docs/mobile-store-submission.md`. Physical-device acceptance remains separate.
+- Android current post-#837 candidate: versionCode `100444`, same source revision. Build run `36957485029` produced the signed production AAB; exact-artifact run `36965315032` uploaded it unchanged and promoted it to Closed Testing `production-access`, where Google reported `releaseStatus=completed`.
+- Apple public availability is **United States + Canada only** and remains manual release.
+- Google Play first-launch console setup is complete for the currently available forms/settings, including Ads, App access/Sign-in details, Target audience/content, IARC, Data Safety, listing/assets, and Production countries **United States + Canada**.
+- The remaining Google owner gate is the closed-test qualification period, followed by the Production-access application when Google enables it.
+- Owner-only non-device state is maintained in `docs/mobile-store-submission.md`. Physical-device acceptance remains separate.
 
 ## Apple Elite subscription prerequisites
 
@@ -136,7 +136,7 @@ Before an iOS candidate can be treated as release-ready:
 - If an unsafe old client must be retired, raise the server-controlled minimum supported iOS version/build only after the replacement is actually available in the App Store.
 
 ### Google Play
-- Before publish, use Managed Publishing to keep approved changes from going live.
+- Pack One intentionally does **not** use Managed Publishing for the first production launch. Before launch, keep control by not starting the public production release until owner approval and all gates are satisfied.
 - For later staged updates, halt/pause the rollout if metrics or acceptance show a problem.
 - Google can halt a fully rolled-out release when there is a prior version to restore, but the first release on a track cannot be halted back to a prior version because none exists.
 - If an unsafe old client must be retired, raise the server-controlled minimum supported Android version/build only after the replacement is available to affected users.
