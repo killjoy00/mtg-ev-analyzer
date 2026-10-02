@@ -121,10 +121,38 @@ export async function renderUsers(root,request,growthRequest=request) {
     body.innerHTML='<p>Loading user…</p>';
     if(!dialog.open)dialog.showModal();
     try {
-      const [detail,deletion]=await Promise.all([
-        request('/v1/admin/users/'+encodeURIComponent(id)),
-        deletionStatus(id),
-      ]);
+      const deletion=await deletionStatus(id);
+      let detail;
+      try {
+        detail=await request('/v1/admin/users/'+encodeURIComponent(id));
+      } catch(error) {
+        if(error.status===404&&deletion) {
+          body.innerHTML=`<div class="user-detail-heading"><div><p class="muted">Deleted / deleting account</p><h2>Deletion status</h2><p><code>${esc(id)}</code></p></div><button type="button" class="secondary" id="user-detail-close">Close</button></div>
+            <section class="user-section"><h3>Permanent account deletion</h3>${deletionPanel({is_self:false,is_admin:Boolean(deletion.target_was_admin)},id,deletion)}</section>`;
+          document.querySelector('#user-detail-close').onclick=()=>dialog.close();
+          const refresh=document.querySelector('#deletion-refresh');
+          if(refresh)refresh.onclick=async()=>{
+            refresh.disabled=true;
+            try {
+              const current=await deletionStatus(id);
+              if(current?.state==='complete') {
+                dialog.close();
+                await load();
+                const globalStatus=document.querySelector('#status');
+                if(globalStatus)globalStatus.textContent='Account deletion completed.';
+              } else {
+                await openDetail(id);
+              }
+            } catch(refreshError) {
+              const target=document.querySelector('#deletion-status');
+              if(target)target.insertAdjacentHTML('beforeend',`<p class="error">${esc(refreshError.message)}</p>`);
+              refresh.disabled=false;
+            }
+          };
+          return;
+        }
+        throw error;
+      }
       const u=detail.user,stats=detail.stats;
       const entitlements=detail.entitlements||[],providers=detail.providers||[],runs=detail.recent_runs||[],events=detail.recent_events||[];
       const actions=detail.moderation_actions||[];
