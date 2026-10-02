@@ -31,6 +31,7 @@ function adminPath(path,method) {
   if(method==='GET'&&path==='/v1/admin/measurements')return true;
   if(method==='GET'&&/^\/v1\/admin\/decisions\/[a-z0-9_-]{6,120}$/.test(path))return true;
   if(/^\/v1\/admin\/users(?:\/[a-f0-9-]{36})?$/.test(path)&&method==='GET')return true;
+  if(/^\/v1\/admin\/users\/[a-f0-9-]{36}\/username$/.test(path)&&method==='PATCH')return true;
   if(/^\/v1\/admin\/users\/[a-f0-9-]{36}\/public-identity$/.test(path)&&method==='POST')return true;
   if(path==='/v1/admin/corpus'&&method==='GET')return true;
   if(path==='/v1/admin/corpus/readiness'&&method==='GET')return true;
@@ -44,6 +45,8 @@ function permitted(service,path,method,search,mode) {
   if(service==='growth'&&(nativePatreonAction(path,method)||appleSubscriptionAction(path,method)))return true;
   if(method==='GET'&&path==='/health')return search==='?quick=1';
   if(service==='growth') {
+    if(method==='POST'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/delete$/.test(path))return true;
+    if(method==='GET'&&/^\/v1\/admin\/users\/[a-f0-9-]{36}\/deletion$/.test(path))return true;
     if(mode==='production'&&method==='POST'&&path==='/v1/admin/campaign-links/publish')return true;
     if(method==='POST'&&[
       '/v1/session','/v1/player/session','/v1/player/migrate',
@@ -212,6 +215,7 @@ export class NetworkQuota {
 }
 
 export function routeFamily(path) {
+  if(/^\/(?:growth|draft)\/v1\/admin\/users(?:\/|$)/.test(path))return 'admin_users';
   if(/^\/growth\/v1\/patreon\/mobile\/(status|connect|refresh|disconnect)$/.test(path))return 'patreon_mobile_'+path.split('/').at(-1);
   if(/^\/growth\/v1\/apple-subscriptions\/mobile\/(status|verify)$/.test(path))return 'apple_subscription_'+path.split('/').at(-1);
   if(path==='/growth/v1/apple-subscriptions/notifications')return 'apple_subscription_notification';
