@@ -138,7 +138,6 @@ export function useAccountState({
 
   const adoptProfile = useCallback((next: CareerProfile) => {
     setProfile(next);
-    setEnrichmentWarning(null);
   }, []);
 
   useFocusEffect(useCallback(() => {
