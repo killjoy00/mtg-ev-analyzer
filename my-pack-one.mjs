@@ -115,10 +115,11 @@ function profileAside(profile,progress,account,patreon) {
   const favorite=progress.environments.find(entry=>entry.id===profile.player.favorite_set_id);
   const showcased=(profile.achievements||[]).find(item=>item.id===profile.player.showcase_achievement&&item.unlocked);
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
+  const membershipLabel=patreon?.configured!==true?'Status unavailable':elite?'Elite':patreon?.connected?'Patreon connected':'Free';
   const email=account?.user?.email||'';
   return '<section class="my-side-card my-profile-card" aria-labelledby="my-profile-card-title">'+
     '<div class="my-profile-head"><div class="my-avatar" aria-hidden="true">'+esc(initials(profile.player.display_name))+'</div><div><h2 id="my-profile-card-title" class="profile-name-line">'+esc(profile.player.display_name)+(showcased?achievementMark(showcased.id,{compact:true}):'')+'</h2>'+(email?'<p>'+esc(email)+'</p>':'')+'</div></div>'+
-    '<ul class="my-profile-facts"><li><span>Membership</span><strong>'+(elite?'Elite':'Free')+'</strong></li><li><span>Public profile</span><strong>'+(profile.player.profile_public?'On':'Off')+'</strong></li>'+(favorite?'<li><span>Favorite environment</span><strong>'+esc(favorite.name)+'</strong></li>':'')+(showcased?'<li><span>Showcase</span><strong class="profile-showcase-label">'+achievementMark(showcased.id,{decorative:true,compact:true})+esc(showcased.label)+'</strong></li>':'')+'</ul>'+
+    '<ul class="my-profile-facts"><li><span>Membership</span><strong>'+membershipLabel+'</strong></li><li><span>Public profile</span><strong>'+(profile.player.profile_public?'On':'Off')+'</strong></li>'+(favorite?'<li><span>Favorite environment</span><strong>'+esc(favorite.name)+'</strong></li>':'')+(showcased?'<li><span>Showcase</span><strong class="profile-showcase-label">'+achievementMark(showcased.id,{decorative:true,compact:true})+esc(showcased.label)+'</strong></li>':'')+'</ul>'+
   '</section>';
 }
 
