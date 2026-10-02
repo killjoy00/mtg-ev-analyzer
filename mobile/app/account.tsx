@@ -1,7 +1,7 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
@@ -109,6 +109,7 @@ export default function AccountScreen() {
   const [readyError, setReadyError] = useState<string | null>(null);
   const [readyNameOptionalHint, setReadyNameOptionalHint] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  const verificationReturnHandled = useRef(false);
 
   const returnAfterAccount = (fallbackToCareer = false) => {
     if (validateDailyRunId) {
@@ -365,7 +366,8 @@ export default function AccountScreen() {
   };
 
   useEffect(() => {
-    if (params.emailVerified !== '1' || account) return;
+    if (params.emailVerified !== '1' || account || verificationReturnHandled.current) return;
+    verificationReturnHandled.current = true;
     if (verificationPending && session && email.trim() && password) {
       void (async () => {
         setActionBusy(true);
