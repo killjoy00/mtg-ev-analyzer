@@ -66,11 +66,13 @@ export type CareerProfile = {
     showcase_achievement?: string | null;
     claimed?: boolean;
     username_owned?: boolean;
+    display_name_reason?: string | null;
     public_identity_terms_version?: string | null;
     public_identity_terms_current?: boolean;
     public_identity_hidden?: boolean;
     public_identity_hidden_reason?: string | null;
   };
+  ranking_identity?: { eligible: boolean; reason?: string | null } | null;
   summary: CareerSummary;
   environment_total: number;
   by_set: ProfileEnvironment[];
