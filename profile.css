@@ -35,18 +35,29 @@
 .profile-settings { margin:0 0 24px; border:1px solid var(--line); border-radius:0; background:var(--surface); }
 .profile-settings summary { cursor:pointer; padding:16px 18px; font-weight:750; }
 .profile-settings form { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:14px; padding:0 18px 18px; }
-.profile-settings label > span { display:block; margin-bottom:6px; color:var(--muted); font-size:11px; font-weight:750; }
+.profile-settings-heading-row { display:flex; align-items:flex-start; justify-content:space-between; gap:16px; margin:0 18px 18px; }
+.profile-settings-heading-row h3 { margin:2px 0 0; }
+.profile-settings-top-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:8px; }
+.profile-settings-top-actions .button { min-height:44px; text-decoration:none; }
+.profile-settings label > span { display:block; margin-bottom:6px; color:var(--muted); font-size:13px; font-weight:750; }
 .profile-settings .select { width:100%; }
-.profile-settings label > small { display:block; margin-top:6px; color:var(--muted); font-size:10px; font-weight:500; line-height:1.4; }
-.profile-toggle { grid-column:1/-1; display:flex; align-items:flex-start; gap:12px; padding:14px; border-radius:0; background:var(--surface-soft); }
-.profile-toggle input { margin-top:3px; }
+.profile-settings label > small { display:block; margin-top:6px; color:var(--muted); font-size:13px; font-weight:500; line-height:1.45; }
+.profile-field-error { color:var(--red)!important; font-weight:650!important; }
+.profile-field-error:empty { display:none!important; }
+.profile-toggle { grid-column:1/-1; display:grid; grid-template-columns:24px minmax(0,1fr); align-items:start; gap:10px; min-height:58px; padding:14px; border-radius:0; background:var(--surface-soft); cursor:pointer; }
+.profile-toggle input { width:20px; height:20px; margin:1px 0 0; }
 .profile-toggle span { margin:0!important; color:var(--ink)!important; }
 .profile-toggle strong,
 .profile-toggle small { display:block; }
 .profile-toggle strong { font-size:16px; line-height:1.35; }
-.profile-toggle small { margin-top:5px; color:var(--muted); font-size:13px; font-weight:500; line-height:1.5; }
+.profile-toggle small { margin-top:4px; color:var(--muted); font-size:13px; font-weight:500; line-height:1.5; }
 .profile-settings-actions { grid-column:1/-1; display:flex; align-items:center; gap:12px; }
-.profile-settings-status { color:var(--muted); font-size:12px; }
+.profile-settings-status { color:var(--muted); font-size:13px; line-height:1.4; }
+.profile-save-status { flex-basis:100%; text-align:right; }
+.profile-save-status:empty { display:none; }
+.profile-save-status.is-saving { color:var(--muted); }
+.profile-save-status.is-success { color:var(--green-dark); font-weight:700; }
+.profile-save-status.is-error { color:var(--red); font-weight:700; }
 .profile-public-url { margin:-8px 0 22px; color:var(--muted); font-size:12px; }
 
 .profile-account { margin:32px 0; padding:clamp(22px,4vw,32px); border:1px solid var(--line); border-radius:0; background:var(--surface); }
@@ -77,7 +88,11 @@
 .profile-credentials span { overflow-wrap:anywhere; }
 .profile-membership-actions { display:flex; align-items:center; justify-content:flex-end; flex-wrap:wrap; gap:10px; }
 .profile-membership-actions .text-button { min-height:44px; }
-.profile-membership-actions #patreon-status { color:var(--muted); font-size:12px; }
+.profile-membership-actions .button { min-height:44px; text-decoration:none; }
+.profile-membership-actions .destructive { border-color:var(--red); color:var(--red); background:transparent; }
+.profile-membership-actions .destructive:hover { background:color-mix(in srgb,var(--red) 8%,transparent); }
+.profile-membership-note { flex-basis:100%; max-width:360px; text-align:right; }
+.profile-membership-actions #patreon-status { color:var(--muted); font-size:13px; }
 .profile-delete-title { margin:0 0 8px; color:var(--blue); font-size:16px; }
 
 .profile-section { min-width:0; margin-top:18px; padding:22px 0; border:1px solid var(--line); border-width:1px 0 0; border-radius:0; background:transparent; }
@@ -221,6 +236,11 @@
   .profile-account { margin-top:24px; }
   .profile-account > header { align-items:start; flex-direction:column; }
   .profile-account form { grid-template-columns:minmax(0,1fr); }
+  .profile-settings-heading-row { align-items:stretch; flex-direction:column; }
+  .profile-settings-top-actions { justify-content:flex-start; }
+  .profile-settings-top-actions .button { flex:1 1 140px; }
+  .profile-save-status { text-align:left; }
+  .profile-membership-note { text-align:left; }
   .profile-hero-actions > * { min-height:44px; }
 }
 
