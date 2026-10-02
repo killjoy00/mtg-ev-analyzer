@@ -119,13 +119,17 @@ jobs:
             exit 1
           fi
           echo "Verified Android versionName: $expected_version_name"
-      - name: Audit generated Android manifest
+      - name: Merge release Android manifest for privacy audit
+        working-directory: mobile/android
+        run: ./gradlew :app:processReleaseMainManifest --no-daemon
+      - name: Audit merged Android manifest
+        working-directory: mobile/android
         shell: bash
         run: |
           set -euo pipefail
-          manifest="android/app/src/main/AndroidManifest.xml"
-          test -f "$manifest"
-          python3 ./scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-internal-native-audit.json"
+          manifest="$(find app/build/intermediates/merged_manifests/release -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-internal-native-audit.json"
       - name: Apply upload-signing configuration
         if: env.NATIVE_FULL == 'true'
         env:
