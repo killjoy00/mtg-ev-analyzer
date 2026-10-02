@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -115,7 +117,8 @@ export default function AccountDeleteScreen() {
   const manageSubscription = async () => {
     setMessage(null);
     try {
-      await openAppleSubscriptionManagement();
+      if (Platform.OS === 'ios') await openAppleSubscriptionManagement();
+      else await Linking.openURL('https://apps.apple.com/account/subscriptions');
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Apple subscription management could not be opened.');
     }
