@@ -340,6 +340,7 @@ jobs:
         env:
           DOMAIN: ${{ matrix.domain }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PACK1_CI_BRANCH_ID: ${{ steps.neon.outputs.branch_id }}
         shell: bash
         run: |
           set -euo pipefail
