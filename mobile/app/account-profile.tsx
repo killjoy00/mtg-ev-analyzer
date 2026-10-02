@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ApiError } from '@/src/api/client';
 import { updateMobileProfile } from '@/src/api/career';
 import { useAccountState } from '@/src/hooks/useAccountState';
 import { colors, spacing } from '@/src/theme';
@@ -27,6 +28,7 @@ export default function AccountProfileScreen() {
     message: loadMessage,
     enrichmentWarning,
     refresh,
+    adoptProfile,
   } = useAccountState({ requireAccount: true, loadProfile: true, loadCatalog: true });
   const [displayNameEdit, setDisplayName] = useState<string | null>(null);
   const [profilePublicEdit, setProfilePublic] = useState<boolean | null>(null);
@@ -64,21 +66,24 @@ export default function AccountProfileScreen() {
         showcaseAchievement: showcaseAchievement || null,
         acceptPublicIdentityTerms: true,
       });
-      if (updated.player.username_owned === false) {
-        setDisplayNameError(updated.player.display_name_reason === 'name_not_allowed'
-          ? 'That display name is not allowed.'
-          : updated.player.display_name_reason === 'username_required'
-            ? 'Choose a display name to join Daily leaderboards.'
-            : 'That display name is already taken.');
-        setSaveTone('error');
-        setSaveMessage('Profile not saved. Fix the display name and try again.');
-      } else {
-        setSaveTone('success');
-        setSaveMessage('Profile saved.');
-      }
+      adoptProfile(updated);
+      setSaveTone('success');
+      setSaveMessage('Profile saved.');
     } catch (error: unknown) {
+      const body = error instanceof ApiError && error.body && typeof error.body === 'object'
+        ? error.body as { code?: unknown }
+        : null;
+      const code = typeof body?.code === 'string' ? body.code : null;
+      const nameError = code === 'USERNAME_NOT_ALLOWED'
+        ? 'That display name is not allowed.'
+        : code === 'USERNAME_TAKEN'
+          ? 'That display name is already taken.'
+          : null;
+      if (nameError) setDisplayNameError(nameError);
       setSaveTone('error');
-      setSaveMessage(`${error instanceof Error ? error.message : 'Could not save profile settings.'} Your edits are still here.`);
+      setSaveMessage(nameError
+        ? 'Profile not saved. Fix the display name and try again.'
+        : `${error instanceof Error ? error.message : 'Could not save profile settings.'} Your edits are still here.`);
     } finally {
       setSaving(false);
     }
