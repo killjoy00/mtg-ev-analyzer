@@ -54,6 +54,13 @@ function unverified(error: unknown) {
   return 'code' in error.body && error.body.code === 'EMAIL_NOT_VERIFIED';
 }
 
+function displayNameReasonMessage(reason?: string | null) {
+  if (reason === 'name_not_allowed') return 'That display name is not allowed. Choose another to join Daily leaderboards.';
+  if (reason === 'username_taken') return 'Choose a different display name. That one is already taken.';
+  if (reason === 'username_required') return 'Choose a display name to join Daily leaderboards.';
+  return null;
+}
+
 export default function AccountScreen() {
   const params = useLocalSearchParams<{
     validateDailyRunId?: string;
@@ -142,7 +149,7 @@ export default function AccountScreen() {
     if (newlyClaimed) {
       setReadyInitialName(result.linked.displayName || '');
       setReadyDisplayName(result.linked.displayName || '');
-      setReadyError(null);
+      setReadyError(displayNameReasonMessage(result.linked.rankingIdentity?.reason));
       setPromptDisplayName(true);
       setPendingClaimValidatedDaily(Boolean(result.linked.validatedDailyScore));
       setMessage(null);
@@ -375,7 +382,10 @@ export default function AccountScreen() {
                 autoCapitalize="words"
                 autoComplete="nickname"
                 maxLength={24}
-                onChangeText={setReadyDisplayName}
+                onChangeText={(value) => {
+                  setReadyDisplayName(value);
+                  if (value.trim() !== readyInitialName.trim()) setReadyError(null);
+                }}
                 placeholder="Display name"
                 placeholderTextColor={colors.faint}
                 style={styles.input}
