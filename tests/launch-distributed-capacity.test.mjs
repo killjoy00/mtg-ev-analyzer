@@ -4,7 +4,7 @@ import fs from 'node:fs';
 import http from 'node:http';
 import {fingerprint,initialControl,transition,evaluateStage,timing,permittedRequest,quantiles,validatePolicy} from '../scripts/launch-distributed-core.mjs';
 import {policy,heartbeat,coordinatorSQL} from '../scripts/launch-distributed-control.mjs';
-import {inspectBin,inspectPreviewTelemetry,previewTelemetryFailure,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
+import {inspectBin,inspectPreviewTelemetry,settlePreviewTelemetry,previewTelemetryFailure,queryPreviewEvents} from '../scripts/launch-distributed-telemetry.mjs';
 import {parseStartDiagnostics,requestClient} from '../scripts/launch-distributed-player.mjs';
 import {transportFailureEvidence,undiciTransportObserver} from '../scripts/launch-distributed-transport.mjs';
 import {inspectPreflightEvents,preflightTelemetry} from '../scripts/launch-distributed-setup.mjs';
@@ -23,13 +23,13 @@ test('preview readiness cannot pass on one good response followed by a stale res
 });
 test('committed policy is bounded and cannot silently claim 100 or launch 500 players',()=>{
  assert.equal(validatePolicy(policy),policy);
- assert.deepEqual(policy.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600}]);assert.equal(policy.proposed_target,50);
+ assert.deepEqual(policy.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600}]);assert.equal(policy.supported_launch_target,50);assert.equal(policy.proposed_target,50);
  assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:100,hold_seconds:600}],proposed_target:100}));
  assert.throws(()=>validatePolicy({...policy,stages:[policy.stages[0],{players:50,hold_seconds:180}]}),'final stage keeps the 600 s sustained hold');
  const nat=JSON.parse(fs.readFileSync(new URL('../scripts/launch-load-policy.json',import.meta.url),'utf8'));
  assert.deepEqual(nat.nat_stages,[25,50]);assert.equal('distributed_stages' in nat,false);
  assert.deepEqual(policy.route_budgets_ms.start,{p95:3000,p99:8000});
- for(const patch of [{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101}])assert.throws(()=>validatePolicy({...policy,...patch}));
+ for(const patch of [{supported_launch_target:25},{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101}])assert.throws(()=>validatePolicy({...policy,...patch}));
  assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:500,hold_seconds:600}]}));
  assert.throws(()=>initialControl({...scope,branch:'br-orange-feather-ayps8kep'},start,policy));
 });
@@ -362,6 +362,33 @@ test('complete preview inspection rejects a missing active minute, not just an e
  const to=120000,requests=[{at:1},{at:60001}],row={$metadata:{id:'retained'},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:.1,route:'draft_pick'}};
  const report=await inspectPreviewTelemetry({reports:[{requests}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>to+120000,fetcher:async(url,options)=>Response.json({result:{events:{events:JSON.parse(options.body).timeframe.from===0?[row]:[]}}})});
  assert.equal(report.passed,false);assert.equal(report.bins[0].passed,true);assert.equal(report.bins[1].passed,false);
+});
+test('stage telemetry rereads the same fixed windows until delayed retained coverage appears',async()=>{
+ const to=120000,requests=[{at:1},{at:60001}],frames=[];let now=to+policy.telemetry_settlement_seconds*1000,tailQueries=0;
+ const row=id=>({$metadata:{id},source:{event:'gateway_request',release:scope.sha,status:200,duration_ms:10,sample_rate:1,route:'draft_pick'}});
+ const fetcher=async(url,options)=>{
+  const timeframe=JSON.parse(options.body).timeframe;frames.push(timeframe);
+  if(timeframe.from===0)return Response.json({result:{events:{events:[row('first-bin')]}}});
+  tailQueries++;return Response.json({result:{events:{events:tailQueries>=2?[row('delayed-tail')]:[]}}});
+ };
+ const report=await settlePreviewTelemetry({reports:[{requests}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>now,sleep:async ms=>{now+=ms;},fetcher});
+ assert.equal(report.passed,true);assert.equal(report.checks.length,2);assert.equal(report.checks[0].missing_or_sparse_bins.length,1);
+ assert.deepEqual(report.checks[0].missing_or_sparse_bins[0],{from:60000,to:120000,client_requests:1,retained_events:0,required_events:1});
+ assert.equal(report.checks[1].missing_or_sparse_bins.length,0);assert.equal(tailQueries,2);
+ assert.deepEqual(frames,[{from:0,to:60000},{from:60000,to:120000},{from:0,to:60000},{from:60000,to:120000}]);
+ assert.equal(report.settlement_seconds,policy.telemetry_settlement_seconds);assert.equal(report.timeout_seconds,policy.telemetry_timeout_seconds);
+});
+test('stage telemetry preserves coverage requirements through the hard timeout and never polls hard failures',async()=>{
+ const to=120000,requests=[{at:1},{at:60001}],row=(id,status=200)=>({$metadata:{id},source:{event:'gateway_request',release:scope.sha,status,duration_ms:10,sample_rate:1,route:'draft_pick'}});
+ let now=to+policy.telemetry_settlement_seconds*1000,sleeps=0;
+ const absent=await settlePreviewTelemetry({reports:[{requests}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>now,sleep:async ms=>{sleeps++;now+=ms;},
+  fetcher:async(url,options)=>Response.json({result:{events:{events:JSON.parse(options.body).timeframe.from===0?[row('first-bin')]:[]}}})});
+ assert.equal(absent.passed,false);assert.equal(now,to+policy.telemetry_timeout_seconds*1000);assert.ok(sleeps>0);
+ assert.equal(absent.checks.at(-1).missing_or_sparse_bins[0].required_events,1);
+ let hardSleeps=0,hardNow=to+policy.telemetry_settlement_seconds*1000;
+ const hard=await settlePreviewTelemetry({reports:[{requests}],sha:scope.sha,from:0,to,policy,account:'a',token:'t',clock:()=>hardNow,sleep:async ms=>{hardSleeps++;hardNow+=ms;},
+  fetcher:async(url,options)=>Response.json({result:{events:{events:JSON.parse(options.body).timeframe.from===0?[row('first-bin')]:[row('system-error',503)]}}})});
+ assert.equal(hard.passed,false);assert.equal(hardSleeps,0);assert.ok(hard.bins[1].failures.includes('retained_system_error'));
 });
 
 test('paced harness executes eight picks, repeated practice/rerolls and recovery against a stateful application fixture',async()=>{
