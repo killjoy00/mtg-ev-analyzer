@@ -136,6 +136,11 @@ export function useAccountState({
     clearEnrichment();
   }, [clearEnrichment]);
 
+  const adoptProfile = useCallback((next: CareerProfile) => {
+    setProfile(next);
+    setEnrichmentWarning(null);
+  }, []);
+
   useFocusEffect(useCallback(() => {
     void refresh();
     return () => { generation.current += 1; };
@@ -154,6 +159,7 @@ export function useAccountState({
     refresh,
     adoptSession,
     clearAccount,
+    adoptProfile,
     invalidate,
   };
 }
