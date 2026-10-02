@@ -1,6 +1,6 @@
 # Pack One mobile release runbook
 
-Updated 2026-09-30.
+Updated 2026-10-01.
 
 This is the owner runbook for Pack One mobile releases. It covers normal releases, emergency fixes, rollback/containment, and the external release-security boundary.
 
@@ -55,12 +55,12 @@ The store-free smoke proves source/build reproducibility only. It never substitu
 
 ## Pack One 1.0 current release checkpoint
 
-As of 2026-09-30:
-- iOS customer-submission RC: build `100321`, source `5fce31805e277a1d234ff40ad3df381faf75602c`, App Store Connect `VALID` + `APP_STORE_ELIGIBLE`, attached to App Store version 1.0 by run `36722154047`.
-- Android RC: versionCode `100311`, source `c04ab3ba9f9def47708c67c2581596bcbd35f5c4`, uploaded by run `36663310963` and promoted unchanged to `production-access` Closed Testing by run `36668780511` with release status `completed`.
-- The source difference between those RCs is store/release-control code only; no mobile application runtime source changed.
-- Current exact-main store-free certification run `36722154500` passed.
-- Owner-only non-device console/account steps are maintained in `docs/mobile-store-submission.md`.
+As of 2026-10-01:
+- Android current candidate: versionCode `100368`, originally uploaded to Internal Testing by run `36942689929` from source `8cd42a70344f9f2000f8652babc63d7d65af7a38`, then promoted to the existing `production-access` Closed Testing track by run `36945786549`. Google returned `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`.
+- The `production-access` track is the canonical production-qualification closed-test track. It targets United States + Canada. Do not use the legacy `alpha` track for qualification.
+- iOS last fully verified customer-submission RC remains build `100321`, source `5fce31805e277a1d234ff40ad3df381faf75602c`, App Store Connect `VALID` + `APP_STORE_ELIGIBLE`, attached to App Store version 1.0 by run `36722154047`.
+- A fresh current-main iOS replacement from `304cc1cb007361ff61722ce3439a669405a406a1` is being produced by run `36945800291`; it does not supersede build `100321` until that workflow finishes successfully and records the new App Store Connect processing/attachment evidence.
+- Owner-only non-device console/account steps are maintained in `docs/mobile-store-submission.md`. Physical-device acceptance remains separate.
 
 ## Apple Elite subscription prerequisites
 

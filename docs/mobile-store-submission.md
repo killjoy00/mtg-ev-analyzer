@@ -1,6 +1,6 @@
 # Pack One mobile store submission packet
 
-Updated 2026-09-30. This file is the source-of-truth submission packet for the first free public mobile release.
+Updated 2026-10-01. This file is the source-of-truth submission packet for the first free public mobile release.
 
 ## Current store release checkpoint — 2026-09-30
 
@@ -324,10 +324,11 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 ### GitHub / Google Cloud release-credential boundary
 
-9. **Protect the GitHub release Environment.**
+9. **Finish the account-level release-credential boundary without adding unwanted manual approvals.**
    - GitHub repo -> Settings -> Environments -> `pack-one-mobile-release`.
-   - Restrict deployment branches to the intended protected release branch policy and add the desired required reviewer(s).
+   - Restrict deployment branches to the intended release branch policy.
    - Keep Apple release secrets scoped to this Environment rather than generally available repository secrets.
+   - Do **not** add required reviewers unless you intentionally want every release job to wait for a human approval; the current desired workflow does not require that manual gate.
 
 10. **Narrow Google Workload Identity trust.**
    - In Google Cloud IAM / Workload Identity Federation, restrict the Pack One provider/service-account trust so store credentials are accepted only from the intended Pack One repository and approved release context.
@@ -338,8 +339,8 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 Do **not** spend console time on these unless an automated probe reports a problem:
 - uploading/replacing the current RC binaries;
-- attaching iOS build 100321 to App Store version 1.0 (already done);
-- moving Android 100311 to the `production-access` Closed Testing track (already done);
+- attaching the current successful App Store-eligible iOS RC to App Store version 1.0; build `100321` is already attached, and run `36945800291` is producing the next current-main replacement;
+- moving Android to the `production-access` Closed Testing track; versionCode `100368` is active there with `releaseStatus=completed`;
 - Google Data Safety or store graphics (already done);
 - App Store listing copy, manual-release flag, reviewed age-rating answers, or content-rights declaration (already present);
 - release-track/API status audits;
