@@ -2,7 +2,7 @@ name: Android internal testing
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
     paths:
       - 'mobile/**'
       - '.github/workflows/android-internal-testing.yml'
