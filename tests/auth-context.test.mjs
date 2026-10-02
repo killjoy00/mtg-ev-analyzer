@@ -7,8 +7,8 @@ const [growth,draft]=await Promise.all([
   readFile(new URL('../draft-run-product.mjs',import.meta.url),'utf8'),
 ]);
 
-test('account access renders one contextual email mode with explicit Google sign-in copy',()=>{
-  assert.match(growth,/Sign in with Google/);
+test('account access renders one contextual email mode with explicit Google continue copy',()=>{
+  assert.match(growth,/Continue with Google/);
   const render=growth.slice(growth.indexOf('export async function renderAccount'),growth.indexOf('function shareCompletedAnalytics'));
   assert.doesNotMatch(render,/account-columns/,'auth screen must not render both email columns');
   assert.match(render,/validatingDaily\|\|upgradingElite\|\|activatingPatreon\?'signup':'signin'/);
@@ -45,8 +45,8 @@ test('verification-required signup offers resend and expired-link recovery',()=>
   assert.match(growth,/Send a new verification link/);
   assert.doesNotMatch(growth,/Display name<input/);
   assert.match(growth,/name="email" autocomplete="username"/);
-  assert.match(growth,/Choose the name shown on leaderboards/);
-  assert.match(growth,/account-new-name-skip/);
+  assert.match(growth,/Your account is ready\./);
+  assert.match(growth,/account-ready-skip/);
   assert.match(growth,/linked\?\.newlyClaimed/);
 });
 
