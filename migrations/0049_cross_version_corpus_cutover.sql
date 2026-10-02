@@ -97,8 +97,82 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
     OR EXISTS(SELECT 1 FROM draft_run_serving_snapshots WHERE corpus_version=p_version);
 $$;
 
+-- Puzzle/rating staging follows the same parent-version rule. The v9 checked-in
+-- baseline intentionally has NULL source_snapshot_id, so snapshot-awareness
+-- alone is insufficient: before v9 has a readiness key/cache, those rows are
+-- retained future data and cannot invalidate the serving v8 generation.
+CREATE OR REPLACE FUNCTION pack1_puzzle_can_affect_serving(
+  p_set_id text,p_corpus_version text,p_source_snapshot_id text
+)
+RETURNS boolean LANGUAGE sql STABLE AS $
+  SELECT pack1_version_can_affect_serving(p_corpus_version) AND (
+    p_source_snapshot_id IS NULL OR EXISTS(
+      SELECT 1 FROM draft_run_environment_policy e
+      WHERE e.set_id=p_set_id AND e.status='Live'
+        AND e.active_snapshot_id=p_source_snapshot_id
+    )
+  );
+$;
+
+CREATE OR REPLACE FUNCTION pack1_invalidate_inserted_puzzles()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  IF EXISTS(
+    SELECT 1 FROM new_rows p
+    WHERE pack1_puzzle_can_affect_serving(p.set_id,p.corpus_version,p.source_snapshot_id)
+  ) THEN
+    PERFORM pack1_bump_serving_revision();
+  END IF;
+  RETURN NULL;
+END;
+$;
+
+CREATE OR REPLACE FUNCTION pack1_invalidate_deleted_puzzles()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  IF EXISTS(
+    SELECT 1 FROM old_rows p
+    WHERE pack1_puzzle_can_affect_serving(p.set_id,p.corpus_version,p.source_snapshot_id)
+  ) THEN
+    PERFORM pack1_bump_serving_revision();
+  END IF;
+  RETURN NULL;
+END;
+$;
+
+CREATE OR REPLACE FUNCTION pack1_invalidate_updated_puzzle()
+RETURNS trigger LANGUAGE plpgsql AS $
+BEGIN
+  IF ROW(
+    OLD.puzzle_id,OLD.set_id,OLD.corpus_version,OLD.source_snapshot_id,
+    OLD.source_draft_hash,OLD.interesting,OLD.pack_number,OLD.pick_number,
+    OLD.candidate_count,OLD.consensus_top_gap,OLD.support_entropy
+  ) IS NOT DISTINCT FROM ROW(
+    NEW.puzzle_id,NEW.set_id,NEW.corpus_version,NEW.source_snapshot_id,
+    NEW.source_draft_hash,NEW.interesting,NEW.pack_number,NEW.pick_number,
+    NEW.candidate_count,NEW.consensus_top_gap,NEW.support_entropy
+  ) THEN
+    RETURN NULL;
+  END IF;
+  IF pack1_puzzle_can_affect_serving(OLD.set_id,OLD.corpus_version,OLD.source_snapshot_id)
+     OR pack1_puzzle_can_affect_serving(NEW.set_id,NEW.corpus_version,NEW.source_snapshot_id) THEN
+    PERFORM pack1_bump_serving_revision();
+  END IF;
+  RETURN NULL;
+END;
+$;
+
+CREATE OR REPLACE FUNCTION pack1_rating_can_affect_serving(p_puzzle_id text)
+RETURNS boolean LANGUAGE sql STABLE AS $
+  SELECT EXISTS(
+    SELECT 1 FROM draft_run_verified_puzzles p
+    WHERE p.puzzle_id=p_puzzle_id
+      AND pack1_puzzle_can_affect_serving(p.set_id,p.corpus_version,p.source_snapshot_id)
+  );
+$;
+
 CREATE OR REPLACE FUNCTION pack1_invalidate_inserted_versions()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql AS $
 BEGIN
   IF EXISTS(SELECT 1 FROM new_versions v WHERE pack1_version_can_affect_serving(v.corpus_version)) THEN
     PERFORM pack1_bump_serving_revision();
