@@ -106,10 +106,17 @@ function cardGrid(p,answer=null) {
 function rankingStateMarkup(value=run) {
   if(!value?.day)return '';
   if(value.leaderboard_eligible)return `<p class="run-ranking-state" role="status">Ranked as ${esc(value.ranked_name||'your account')}</p>`;
-  if(['username_taken','username_required','name_not_allowed'].includes(value.ranking_identity?.reason))
+  if(['username_taken','username_required','name_not_allowed'].includes(value.ranking_identity?.reason)) {
+    const reason=value.ranking_identity?.reason;
+    const fix=reason==='name_not_allowed'
+      ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+      : reason==='username_taken'
+        ? 'Choose a different display name. That one is already taken.'
+        : 'Choose a display name to join Daily leaderboards.';
     return value.complete
-      ? '<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> Choose an available display name to add this score to the leaderboard.</p>'
-      : '<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> Your account needs a unique username. Choose one in My Pack One; you can add the completed score afterward.</p>';
+      ? `<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> ${fix} You can add this score afterward.</p>`
+      : `<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> ${fix} You can add the completed score afterward.</p>`;
+  }
   return value.complete
     ? '<p class="run-ranking-state" role="status">Playing as guest. Sign in to add this score to the leaderboard.</p>'
     : '<p class="run-ranking-state is-quiet" role="status">Playing as guest.</p>';
