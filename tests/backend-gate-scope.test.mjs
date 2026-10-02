@@ -48,7 +48,7 @@ test('representative domain-owned files select only their mapped group', () => {
     ['worker/apple-subscription-policy.mjs', 'subscriptions'],
     ['worker/decision-measurements.mjs', 'draft_run'],
     ['worker/daily-generation-results.mjs', 'daily'],
-    ['worker/corpus-readiness.mjs', 'corpus'],
+    ['tests/corpus-version-backend-smoke.mjs', 'corpus'],
     ['worker/draft-run-season.mjs', 'seasons'],
   ];
   for (const [path, domain] of cases) {
