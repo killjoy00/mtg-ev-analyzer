@@ -259,9 +259,9 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
   const summary = profile.summary || {};
   if(own&&!profile.player.claimed&&Number(summary.games||0)===0) {
     return `<section class="player-profile-page growth-page first-run-profile" data-profile-key="${esc(profile.player.profile_key||'')}">
-      <header class="profile-hero"><div><p class="eyebrow">My Pack One</p><h1>Welcome to My Pack One.</h1><p>Your record starts when you play. We’ll show real scores and history here instead of filling an empty record with zeroes.</p></div></header>
+      <header class="profile-hero"><div><p class="eyebrow">My Pack One</p><h1>Welcome to My Pack One.</h1><p>Play your first Daily to start your record. Your scores and history will appear here as you play.</p></div></header>
       <section class="profile-welcome"><h2>Start with today’s Daily.</h2><p>Make eight picks, get feedback, and begin your Pack One record.</p><a class="button primary" href="?game=draft-run&daily=1">Play Daily</a></section>
-      <aside class="profile-claim" id="profile-account"><div><span>Save your progress</span><strong>Keep this record across devices.</strong><p>Create a free account or sign in when you’re ready. One account prompt is enough; your guest progress stays here until you claim it.</p></div><button type="button" class="button secondary" id="profile-claim-account">Sign in or create account</button></aside>
+      <aside class="profile-claim" id="profile-account"><div><span>Save your progress</span><strong>Keep this record across devices.</strong><p>Create a free account or sign in when you’re ready. Your guest progress stays here until you claim it.</p></div><button type="button" class="button secondary" id="profile-claim-account">Sign in or create account</button></aside>
     </section>`;
   }
   const favorite = progress.environments.find((entry) => entry.id === profile.player.favorite_set_id);
@@ -527,16 +527,6 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
         showcaseAchievement: data.get('showcaseAchievement') || null,
         acceptPublicIdentityTerms: true,
       });
-      if(updated.player?.username_owned===false) {
-        const reason=updated.player?.display_name_reason;
-        if(fieldError)fieldError.textContent=reason==='name_not_allowed'
-          ? 'That display name is not allowed.'
-          : reason==='username_required'
-            ? 'Choose a display name to join Daily leaderboards.'
-            : 'That display name is already taken.';
-        if(status){status.className='profile-settings-status profile-save-status is-error';status.textContent='Profile not saved. Fix the display name and try again.';}
-        return;
-      }
       track('profile_settings_saved', { public: updated.player?.profile_public || false });
       document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:updated.player?.username_owned===true}}));
       if(updated.player?.display_name){try{localStorage.setItem('pack1-player-name-v1',updated.player.display_name);}catch{}}
@@ -544,7 +534,18 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
       const savedStatus=document.querySelector('#profile-save-status')||status;
       if(savedStatus){savedStatus.className='profile-settings-status profile-save-status is-success';savedStatus.textContent='Profile saved.';}
     } catch (error) {
-      if(status){status.className='profile-settings-status profile-save-status is-error';status.textContent=(error?.message||'Profile could not be saved.')+' Your edits are still here.';}
+      const nameError=error?.code==='USERNAME_NOT_ALLOWED'
+        ? 'That display name is not allowed.'
+        : error?.code==='USERNAME_TAKEN'
+          ? 'That display name is already taken.'
+          : null;
+      if(nameError&&fieldError)fieldError.textContent=nameError;
+      if(status){
+        status.className='profile-settings-status profile-save-status is-error';
+        status.textContent=nameError
+          ? 'Profile not saved. Fix the display name and try again.'
+          : (error?.message||'Profile could not be saved.')+' Your edits are still here.';
+      }
     } finally {
       if(button)button.disabled=false;
     }
