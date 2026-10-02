@@ -76,6 +76,10 @@ const result=await query(`SELECT
   EXISTS(SELECT 1 FROM pg_indexes WHERE indexname='players_username_uq') unique_usernames,
   (SELECT pg_get_functiondef('merge_pack1_player(uuid,uuid)'::regprocedure) LIKE '%username_owned%') username_safe_merge,
   EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='account_deletion_operations'::regclass AND pg_get_constraintdef(oid) LIKE '%operator_review%') account_deletion_states,
+  to_regprocedure('pack1_admin_rename_public_username(uuid,uuid,text,boolean,text)') IS NOT NULL admin_username_rename,
+  to_regprocedure('pack1_begin_admin_account_deletion(uuid,uuid,text,boolean)') IS NOT NULL admin_account_deletion_begin,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='account_deletion_operations' AND column_name='initiation_source') admin_deletion_attribution,
+  EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='public_identity_moderation_actions' AND column_name='new_display_name') admin_username_audit,
   EXISTS(SELECT 1 FROM pg_constraint WHERE conrelid='account_credential_rate_limits'::regclass AND pg_get_constraintdef(oid) LIKE '%account_delete_init%') account_deletion_limits,
   EXISTS(SELECT 1 FROM information_schema.columns WHERE table_name='account_sessions' AND column_name='csrf_hash') account_session_csrf,
   to_regclass('provider_accounts') IS NOT NULL provider_accounts,
@@ -101,6 +105,6 @@ const result=await query(`SELECT
   position('America/New_York' in pg_get_viewdef('analytics_daily_next_day_retention'::regclass))=0 daily_retention_not_eastern`);
 // Worker SQL references `username_owned` and `pack1_username_key` on the
 // session and profile paths, so 0033 has to land before the code that reads it.
-for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0045 first.`);
+for(const [name,value] of Object.entries(result.rows[0]))assert.equal(value,'t',`Missing release schema prerequisite: ${name}; apply the reviewed pending migrations through 0047 first.`);
 await verifyServingStatistics(query);
 console.log('Neon schema and serving-statistics prerequisites verified.');

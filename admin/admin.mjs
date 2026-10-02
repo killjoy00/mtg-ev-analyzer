@@ -12,15 +12,15 @@ let report,params=new URLSearchParams(),invite=null;
 const hash=new URLSearchParams(location.hash.slice(1));
 if(hash.has('invite')){invite=hash.get('invite');sessionStorage.setItem('pack1-admin-invite',invite);history.replaceState({},'',location.pathname);}
 invite=invite||sessionStorage.getItem('pack1-admin-invite');
-async function requestAt(base,path,body) {
-  const method=body?'POST':'GET',headers={'content-type':'application/json'};
-  if(firstPartyAuthEnabled()){const csrf=accountCsrfToken();if(body&&csrf)headers['x-pack1-csrf']=csrf;}
+async function requestAt(base,path,body,method=body?'POST':'GET') {
+  const headers={'content-type':'application/json'};
+  if(firstPartyAuthEnabled()){const csrf=accountCsrfToken();if(!['GET','HEAD'].includes(method)&&csrf)headers['x-pack1-csrf']=csrf;}
   else headers['x-pack1-auth-session']=storedAccountToken()||'';
-  const r=await fetch(base+path,{method,headers,body:body?JSON.stringify(body):undefined,credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(45000)});
-  const d=await r.json();if(!r.ok)throw Object.assign(Error(d.error||'Report unavailable.'),{status:r.status});return d;
+  const r=await fetch(base+path,{method,headers,body:body===undefined?undefined:JSON.stringify(body),credentials:firstPartyAuthEnabled()?'include':'omit',signal:AbortSignal.timeout(45000)});
+  const d=await r.json();if(!r.ok)throw Object.assign(Error(d.error||'Report unavailable.'),{status:r.status,code:d.code||null,data:d});return d;
 }
-const request=(path,body)=>requestAt(draftBase,path,body);
-const growthRequest=(path,body)=>requestAt(growthBase,path,body);
+const request=(path,body,method)=>requestAt(draftBase,path,body,method);
+const growthRequest=(path,body,method)=>requestAt(growthBase,path,body,method);
 function login(message='') {
   root.innerHTML=`<section class="login"><h1>Pack One administration</h1><p>${invite?'Your private invitation is ready. Sign in, or create your admin account below.':'Sign in with the account granted admin access.'}</p><form id="login"><label>Name<input name="name" autocomplete="name"></label><label>Email<input name="email" type="email" autocomplete="username" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="8" required></label><label>Setup code (first visit only)<input name="invite" autocomplete="off" spellcheck="false" value="${esc(invite||'')}" placeholder="Paste your private setup code"></label><div class="actions"><button type="submit">Sign in</button><button type="submit" name="create" value="yes" class="secondary">Create account</button></div></form><p id="status" class="error" role="alert">${esc(message)}</p><a href="/">Back to Pack One</a></section>`;
   document.querySelector('#login').onsubmit=async e=>{e.preventDefault();const form=e.currentTarget,data=Object.fromEntries(new FormData(form));form.querySelectorAll('button').forEach(b=>b.disabled=true);try{if(data.invite){if(!/^[a-f0-9]{64}$/.test(data.invite))throw Error('The setup code must contain 64 letters and numbers.');invite=data.invite;sessionStorage.setItem('pack1-admin-invite',invite);}const result=e.submitter?.name==='create'?await signUpAccount({...data,name:data.name||'Pack One Admin'}):await signInAccount(data);if(!(firstPartyAuthEnabled()?result?.user:result?.token)){document.querySelector('#status').textContent='Account created. Complete any requested email verification, then sign in to continue.';return;}await load();}catch(err){document.querySelector('#status').textContent=err.message;}finally{form.querySelectorAll('button').forEach(b=>b.disabled=false);}};
@@ -67,7 +67,7 @@ function render() {
 }
 async function load() {
   if(!hasAccountSession()){login();return;}
-  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request);return;}if(area==='campaign-links'){await renderCampaignLinks(root,growthRequest);return;}report=await request('/v1/admin/measurements?'+params);render();}
+  try{if(invite){await request('/v1/admin/claim',{invite});sessionStorage.removeItem('pack1-admin-invite');invite=null;}const area=new URLSearchParams(location.search).get('area');if(area==='corpus'){await renderCorpus(root,request);return;}if(area==='users'){await renderUsers(root,request,growthRequest);return;}if(area==='campaign-links'){await renderCampaignLinks(root,growthRequest);return;}report=await request('/v1/admin/measurements?'+params);render();}
   catch(err){if(err.status===401||err.status===403){login(err.message);return;}const status=document.querySelector('#status');if(status)status.textContent=err.message;else root.innerHTML=`<h1>Report unavailable</h1><p class="error">${esc(err.message)}</p><button id="retry">Try again</button>`;document.querySelector('#retry')?.addEventListener('click',load);}
 }
 document.addEventListener('pack1:admin-signout',async()=>{await signOutAccount();login();});

@@ -37,3 +37,13 @@ There is no requirement for routine alert spam. Review reports through the admin
 ## Verification
 
 Automated coverage must continue to prove prohibited-name rejection (including on the sign-in nickname claim), that leaderboards do not gate on rules acceptance, that saving records acceptance, report/block behavior, moderation hide/restore, prevention of immediate republishing after moderation, block-aware public reads, and preservation of gameplay/career records.
+
+## Admin username changes
+
+Admin Users may change an account-linked Pack One public username, but the admin action is not user consent and must never write `public_identity_terms_version` or `public_identity_terms_accepted_at`. It reuses the normal username normalization, prohibited-name filter, placeholder ownership behavior and `players_username_uq` race-safe uniqueness authority. An ordinary rename preserves `profile_public`; releasing to the shared placeholder is rejected while an already-public profile still requires an owned username.
+
+The mutation serializes against account deletion and locks the player row before rechecking moderation state. A hidden identity returns the existing `PUBLIC_IDENTITY_MODERATED` boundary: rename does not clear moderation, restore ownership, republish, or combine restore and rename. The existing audited restore action remains separate and still leaves the identity private and unowned.
+
+Successful changes append a `rename` entry to the existing public-identity admin audit stream in the same database transaction as the player update. The entry records target Auth/player attribution, acting admin UUID, previous/new stored names, timestamp and an optional bounded reason. Admin user detail renders bounded rename and moderation history with escaped text.
+
+On permanent account deletion, the cleanup path clears previous/new username text and a rename action's optional free-text reason before the player foreign key is removed. It retains the target Auth UUID and acting-admin attribution already permitted by the durable deletion/audit model. Hide/restore moderation reasons remain part of the moderation record.
