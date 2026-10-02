@@ -199,6 +199,7 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
     if(!account.rows[0])fail('User not found.',404);
     const user=normalizeUser(account.rows[0]);
     user.profile_public=bool(user.profile_public);
+    user.is_self=String(user.id)===String(adminAuthUserId);
     const summary={
       ...stats.rows[0],
       runs:num(stats.rows[0]?.runs),
