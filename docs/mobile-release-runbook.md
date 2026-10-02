@@ -59,7 +59,7 @@ As of 2026-10-01:
 - Android current pre-#837 candidate: versionCode `100368`, uploaded to Internal Testing by run `36942689929` from source `8cd42a70344f9f2000f8652babc63d7d65af7a38`, then promoted to the existing `production-access` Closed Testing track by run `36945786549`. Google returned `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`.
 - The `production-access` track is the canonical production-qualification closed-test track. It targets United States + Canada. Do not use the legacy `alpha` track for qualification.
 - iOS current pre-#837 candidate: build `100383`, source `304cc1cb007361ff61722ce3439a669405a406a1`. Run `36945800291` completed successfully; App Store Connect reports `VALID` + `APP_STORE_ELIGIBLE`, and the build is attached to App Store version 1.0.
-- PR #837 changes native application surfaces and explicitly requires fresh mobile release candidates after merge. If #837 is included in v1, merge it before final physical acceptance/store submission, then cut fresh iOS and Android candidates and promote the new Android bundle unchanged to `production-access`.
+- PR #837 merged as `f9e8a79f1eac34637faa443d19bc1ced31ff49c1` with native application changes. iOS 100383 and Android 100368 are therefore superseded as final candidates. Cut fresh post-#837 iOS and Android candidates and promote the new Android bundle unchanged to `production-access` before final physical acceptance/store submission.
 - Owner-only non-device console/account steps are maintained in `docs/mobile-store-submission.md`. Physical-device acceptance remains separate.
 
 ## Apple Elite subscription prerequisites
