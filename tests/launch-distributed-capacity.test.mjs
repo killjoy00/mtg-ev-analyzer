@@ -128,6 +128,48 @@ test('client really preserves cookies, CSRF and idempotency without forwarding-h
  let failures=0;const broken=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:new AbortController().signal,fetcher:async()=>{failures++;return Response.json({error:'busy'},{status:503});}});
  await assert.rejects(()=>broken(actor,'start','/draft/v1/runs',{environment:'mixed'}),/http_503/);assert.equal(failures,1);
 });
+
+const fakeTransportObserver=state=>({begin:()=>({body_present:true,headers_sent:false,body_sent:false,socket:'unknown',connect_ms:null,tls:null,...state}),end(){}});
+async function capturedTransportFailure({error,state={},aborted=false}) {
+ const budget={gateway_requests:0,response_bytes:0},report={requests:[]},controller=new AbortController();if(aborted)controller.abort();
+ let calls=0;const fetcher=async()=>{calls++;throw error;};
+ const client=requestClient({fixture:{preview:'a'.repeat(64)},policy,budget,now:()=>start,signal:controller.signal,fetcher,
+   transportObserver:fakeTransportObserver(state),request_timeout_ms:5});
+ let caught=null;
+ try {await client(null,'pick','/draft/v1/runs/11111111-1111-4111-8111-111111111111/pick',{revision:1,round:0,puzzleId:'p',cardId:'c'},{report});}
+ catch(error){caught=error;}
+ assert.ok(caught);assert.equal(calls,1,'transport failure must never retry a mutation');
+ return {record:report.requests[0],caught};
+}
+test('transport diagnostics retain reset evidence on a reused socket without changing failure acceptance',async()=>{
+ const cause=Object.assign(Error('other side closed'),{name:'SocketError',code:'UND_ERR_SOCKET'});
+ const {record,caught}=await capturedTransportFailure({error:Object.assign(new TypeError('fetch failed'),{cause}),
+   state:{headers_sent:true,body_sent:true,socket:'reused',tls:true}});
+ assert.equal(caught.message,'transport_post_send');assert.equal(caught.category,'application');
+ assert.deepEqual(record.transport,{label:'post_send',error_name:'TypeError',cause_code:'UND_ERR_SOCKET',cause_name:'SocketError',message:'fetch failed',
+   elapsed_ms:record.transport.elapsed_ms,headers_sent:true,body_sent:true,socket:'reused',connect_ms:null,tls:true,tls_ms:null});
+ assert.ok(record.transport.elapsed_ms>=0);assert.equal(record.status,0);
+});
+test('transport diagnostics retain connect timeout and TLS causes as proven pre-send failures',async()=>{
+ for(const [code,name] of [['UND_ERR_CONNECT_TIMEOUT','ConnectTimeoutError'],['ERR_TLS_CERT_ALTNAME_INVALID','Error']]) {
+   const cause=Object.assign(Error('private endpoint text must not be retained'),{name,code});
+   const {record,caught}=await capturedTransportFailure({error:Object.assign(new TypeError('fetch failed'),{cause})});
+   assert.equal(caught.message,'transport_pre_send');assert.equal(caught.category,'application');assert.equal(record.transport.label,'pre_send');
+   assert.equal(record.transport.headers_sent,false);assert.equal(record.transport.body_sent,false);assert.equal(record.transport.socket,'unknown');
+   assert.equal(record.transport.cause_code,code);assert.equal(record.transport.cause_name,name);assert.equal(record.transport.message,'fetch failed');
+ }
+});
+test('AbortSignal timeout is distinct from cohort abort fallout',async()=>{
+ const timeout=await capturedTransportFailure({error:new DOMException('The operation was aborted due to timeout','TimeoutError'),
+   state:{headers_sent:true,body_sent:true,socket:'new',connect_ms:11.23,tls:true}});
+ assert.equal(timeout.record.transport.label,'post_send');assert.equal(timeout.record.transport.error_name,'TimeoutError');
+ assert.equal(timeout.record.transport.socket,'new');assert.equal(timeout.record.transport.connect_ms,11.23);assert.equal(timeout.caught.category,'application');
+ const fallout=await capturedTransportFailure({error:new DOMException('This operation was aborted','AbortError'),
+   state:{headers_sent:true,body_sent:true,socket:'reused',tls:true},aborted:true});
+ assert.equal(fallout.record.transport.label,'abort_fallout');assert.equal(fallout.record.transport.error_name,'AbortError');
+ assert.equal(fallout.caught.message,'cohort_aborted');assert.equal(fallout.caught.category,'generator');
+});
+
 test('runner retains bounded preview timings beside unsampled client duration',async()=>{
  const headers=new Headers({
    'x-pack1-gateway-timing':JSON.stringify({duration_ms:130,quota_ms:20,upstream_ms:90,secret:'discard'}),
