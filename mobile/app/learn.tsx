@@ -67,7 +67,7 @@ export default function LearnScreen() {
           ))}
         </View>
         {error ? <Text accessibilityRole="alert" style={styles.error}>{error}</Text> : null}
-        <Text style={styles.note}>Opening these pages does not sign you in to a different Pack One account or pass native account credentials in the URL.</Text>
+        <Text style={styles.note}>Opening these pages does not sign you in to a different Pack One account or share your Pack One sign-in in the URL.</Text>
       </ScrollView>
     </SafeAreaView>
   );
