@@ -42,3 +42,40 @@ jobs:
           npm ci --no-audit --no-fund
       - name: Lint, typecheck and validate Expo config
         run: npm test
+
+  metro-negative-proof:
+    name: prove native Metro export catches broken imports
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install mobile dependencies
+        run: npm ci --no-audit --no-fund
+      - name: Prove iOS and Android production exports reject a missing import
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp app/index.tsx "$RUNNER_TEMP/index.tsx"
+          trap 'cp "$RUNNER_TEMP/index.tsx" app/index.tsx' EXIT
+          printf "\nimport './__ci_missing_import_probe__';\n" >> app/index.tsx
+          for platform in ios android; do
+            log="$RUNNER_TEMP/broken-${platform}.log"
+            if PACKONE_BUILD_PROFILE=production npx expo export --platform "$platform" --output-dir "$RUNNER_TEMP/broken-${platform}" >"$log" 2>&1; then
+              cat "$log"
+              echo "::error::Expo export unexpectedly succeeded with a broken import on $platform."
+              exit 1
+            fi
+            echo "Expo export correctly rejected the broken import on $platform."
+            tail -n 20 "$log"
+          done
+          cp "$RUNNER_TEMP/index.tsx" app/index.tsx
+          trap - EXIT
+          git diff --exit-code -- app/index.tsx
