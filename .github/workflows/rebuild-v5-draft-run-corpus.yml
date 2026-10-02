@@ -1,0 +1,247 @@
+name: rebuild-v5-draft-run-corpus
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  actions: read
+
+concurrency:
+  group: set-data-import-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  PYTHONPATH: scripts:.
+  AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+  R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+  R2_BUCKET: ${{ secrets.R2_BUCKET }}
+  AWS_DEFAULT_REGION: auto
+
+jobs:
+  prepare:
+    if: github.ref_name == 'main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      build_id: ${{ steps.plan.outputs.build_id }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Validate immutable build policy and plan one recoverable job per environment
+        id: plan
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+          from scripts.v5_rebuild import identity
+
+          pins=json.loads(Path('research/v5-build-source-pins.json').read_text())
+          catalog=json.loads(Path('data/catalog.json').read_text())
+          components=json.loads(Path('research/v5-production-component-pins.json').read_text())
+          ids={p['id'] for p in pins['sets']}
+          if len(ids)!=32 or ids!={p['id'] for p in catalog['sets']}:
+              raise SystemExit('Incomplete source/environment plan')
+          if {p['model_version'] for p in catalog['sets']}!={'strong-player-colour-stage-v4'}:
+              raise SystemExit('Expected immutable v4 replay baseline')
+          admitted={p['set_id'] for p in components['sets']}
+          matrix={'include':[{'set':sid,'traditional':sid in admitted} for sid in sorted(ids)]}
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:
+              output.write('matrix='+json.dumps(matrix,separators=(',',':'))+'\n')
+              output.write('build_id='+identity()+'\n')
+          PY
+      - name: Hydrate historical replay shards for the normal repository suite
+        run: bash scripts/r2_replay_shards.sh hydrate
+      - run: npm test
+
+  environments:
+    name: v5 ${{ matrix.set }}
+    needs: prepare
+    runs-on: ubuntu-latest
+    timeout-minutes: 330
+    env:
+      V5_BUILD_ID: ${{ needs.prepare.outputs.build_id }}
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Download the exact original admitted Traditional artifact
+        if: matrix.traditional
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35662906382
+          name: traditional-v4-revalidation-${{ matrix.set }}
+          path: generated/v5-original-traditional
+      - name: Rebuild replays, paths, all trophies and admitted Traditional decisions
+        run: python -u scripts/v5_rebuild.py environment --set '${{ matrix.set }}'
+      - name: Verify isolated replay and path output
+        run: |
+          python scripts/validate_dataset.py 'data/${{ matrix.set }}/manifest.json' --minimum-replays 100
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from scripts.model_training import validate_training_manifest, V5_MODEL
+          sid='${{ matrix.set }}'
+          manifest=json.loads(Path('data',sid,'manifest.json').read_text())
+          validate_training_manifest(manifest)
+          if manifest['model']['holdout']!='5-fold by draft_id':
+              raise SystemExit('Holdout drift')
+          path=json.loads(Path('data',sid,'path-model.json').read_text())
+          if path.get('context_model_version')!=V5_MODEL or path['training'].get('training_mode')!='all-qualified' or path['training'].get('training_cap') is not None:
+              raise SystemExit('Path evidence is mixed or capped')
+          PY
+      - name: Checkpoint replay shards in the new model namespace
+        env:
+          REPLAY_MODEL_VERSION: strong-player-colour-stage-v5
+          REPLAY_SETS: ${{ matrix.set }}
+        run: |
+          bash scripts/r2_replay_shards.sh upload
+          bash scripts/r2_replay_shards.sh verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: v5-environment-${{ matrix.set }}
+          retention-days: 90
+          if-no-files-found: error
+          path: generated/v5-build/${{ matrix.set }}
+
+  finalize:
+    name: Assemble, validate, publish exact candidate, open rollout PR
+    needs: [prepare, environments]
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    env:
+      V5_BUILD_ID: ${{ needs.prepare.outputs.build_id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: v5-environment-*
+          path: generated/v5-downloads
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 35646313155
+          name: verified-premier-trophies-35646313155-1
+          path: generated/v5-production-baseline
+      - name: Assemble only the 32 complete identity-checked environments
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import shutil
+          root=Path('generated/v5-build')
+          root.mkdir(parents=True,exist_ok=True)
+          for p in Path('generated/v5-downloads').glob('v5-environment-*'):
+              shutil.copytree(p,root/p.name.removeprefix('v5-environment-'),dirs_exist_ok=True)
+          PY
+          python scripts/v5_rebuild.py assemble
+      - name: Generate post-build v4 to v5 implementation QA
+        run: python scripts/v5_rebuild_qa.py --baseline generated/v5-production-baseline
+      - name: Validate corpus accounting, source trajectories, models and Traditional gates
+        run: |
+          python scripts/audit_datasets.py --fail-on-error
+          node scripts/load_all_trophies.mjs unused generated/v5-trophy-import --validate-only
+          node scripts/load-traditional-components.mjs unused generated/v5-traditional --validate-only > generated/v5-traditional-health.json
+          npm test
+      - name: Verify every new replay byte against versioned R2
+        run: |
+          bash scripts/r2_replay_shards.sh verify
+          mkdir -p generated/v5-r2-readback
+          aws s3 sync "s3://$R2_BUCKET/replay-models/strong-player-colour-stage-v5/data/" generated/v5-r2-readback --endpoint-url "$R2_ENDPOINT" --exclude '*' --include '*/shards/*.json'
+          python - <<'PY'
+          from pathlib import Path
+          from scripts.v5_rebuild import sha
+          for local in Path('data').glob('*/shards/*.json'):
+              remote=Path('generated/v5-r2-readback')/local.relative_to('data')
+              if not remote.exists() or sha(local)!=sha(remote):
+                  raise SystemExit(f'R2 byte mismatch: {local}')
+          PY
+      - name: Preserve exact validated artifacts and reviewed QA
+        run: |
+          set -euo pipefail
+          mkdir -p results/v5-rebuild
+          cp generated/v5-rebuild-accounting.json generated/v5-rebuild-qa.json generated/V5-REBUILD-QA.md generated/v5-traditional-health.json results/v5-rebuild/
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          from scripts.v5_rebuild import phase_files, write
+          write('generated/v5-artifact-identity.json',{'run_id':os.environ['GITHUB_RUN_ID'],
+              'commit':os.environ['GITHUB_SHA'],'build_identity':os.environ['V5_BUILD_ID'],
+              'premier_files':phase_files(Path('generated/v5-trophy-import')),
+              'traditional_files':phase_files(Path('generated/v5-traditional'))})
+          PY
+      - uses: actions/upload-artifact@v4
+        id: candidate
+        with:
+          name: validated-v5-candidate-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            generated/v5-trophy-import
+            generated/v5-traditional
+            generated/v5-artifact-identity.json
+            generated/v5-rebuild-accounting.json
+            generated/v5-rebuild-qa.json
+            generated/V5-REBUILD-QA.md
+      - name: Open or update the generated-data rollout PR without switching serving
+        run: |
+          set -euo pipefail
+          branch="rollout/v5-v9-${V5_BUILD_ID:0:16}"
+          git switch -c "$branch"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          python - <<'PY'
+          import os
+          from scripts.v5_rebuild import write
+          write('research/v5-validated-release.json',{'run_id':os.environ['GITHUB_RUN_ID'],
+              'commit':os.environ['GITHUB_SHA'],'build_identity':os.environ['V5_BUILD_ID'],
+              'corpus_version':'elite-trophy-colour-stage-v9','model_version':'strong-player-colour-stage-v5'})
+          PY
+          git add data corpus/draft-run draft-run.mjs results/v5-rebuild research/v5-validated-release.json
+          git commit -m 'Build all-qualified v5 as elite-trophy-colour-stage-v9 [data-generated]'
+          if git ls-remote --exit-code --heads origin "$branch" >/dev/null 2>&1; then
+            git fetch origin "$branch"
+            git merge --no-edit FETCH_HEAD
+          fi
+          git push origin "HEAD:$branch"
+          cat > "$RUNNER_TEMP/v5-pr-body.md" <<'EOF'
+          Rebuilds all 32 environments under strong-player-colour-stage-v5 and creates the separate elite-trophy-colour-stage-v9 corpus. Every environment uses its complete unchanged qualified behavior-training cohort, with unchanged five-fold and puzzle-source isolation. The explicitly authorized updated HOB archives are recorded separately from immutable production v8 inputs.
+
+          The admitted Traditional sources are rescored using Premier-trained v5 graders with their original membership and Cube P2-P7 window. Rebuild accounting, probability/leader/score/rating QA and source-quality checks are in results/v5-rebuild. Exact validated load artifacts are attached to the rebuild run; historical v4/v8 data remains available.
+
+          Validation: full npm test, replay/path audits, complete trophy accounting, Traditional frozen quality gates, R2 byte readback. This PR does not stage or switch Neon serving. Production promotion must follow identical development artifact verification and acceptance.
+
+          Ref #889.
+          EOF
+          if ! gh pr view "$branch" --json number >/dev/null 2>&1; then
+            gh pr create --base main --head "$branch" --title 'Release all-qualified v5 corpus v9' --body-file "$RUNNER_TEMP/v5-pr-body.md"
+          else
+            gh pr edit "$branch" --body-file "$RUNNER_TEMP/v5-pr-body.md"
+          fi

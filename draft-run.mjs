@@ -1,4 +1,5 @@
 import {effectiveCardMetadata} from './card-metadata.mjs';
+import modelVersions from './model-versions.json' with {type:'json'};
 import {meetsServingQuality} from './serving-quality.mjs';
 import {DAILY_SELECTION_VERSION,dailySetPlan,liveRegularSets} from './daily-selection.mjs';
 import { rankCandidates } from './scoring.mjs';
@@ -18,6 +19,8 @@ export const DRAFT_RUN_SCORING_VERSION = 'trophy-consensus-v3';
 // refuses any stale literal elsewhere - a half-landed bump is what lets the
 // importer reuse old payloads under a new label and ship two models as one.
 export const DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v8';
+export const V5_CORPUS_VERSION = modelVersions.v5.corpus_version;
+export const V5_CONTEXT_MODEL_VERSION = 'strong-player-colour-stage-v5';
 // Pooled validation fitted 2.0 for the old pair model and 1.75 for the
 // colour-stage model. Display calibration follows the puzzle's pinned model.
 export function supportSharpening(corpusVersion=DRAFT_RUN_CORPUS_VERSION) {
@@ -207,6 +210,7 @@ export function eligiblePickForRound(roundIndex, pickNumber, environment = 'mixe
 // supply the version pinned when they were created; a release does not rewrite
 // their immutable evidence or make their still-present puzzles unreadable.
 export function validateDraftRunPuzzle(puzzle, expectedVersion = DRAFT_RUN_CORPUS_VERSION) {
+  if(puzzle?.corpus_version===V5_CORPUS_VERSION && puzzle.model_version!==V5_CONTEXT_MODEL_VERSION)return false;
   const cards = puzzle?.candidates || [];
   const prior = puzzle?.prior_picks || [];
   const pick = Number(puzzle?.pick_number);

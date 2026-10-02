@@ -15,6 +15,8 @@ export function rolloutDispatch(request) {
     workflow='regenerate-draft-run-corpus.yml';inputs={corpus_version};extra=['corpus_version'];
   } else if(operation==='rebuild-v4') {
     workflow='rebuild-v4-draft-run-corpus.yml';
+  } else if(operation==='rebuild-v5') {
+    workflow='rebuild-v5-draft-run-corpus.yml';
   } else if(operation==='import') {
     if(!/^(all|[a-z0-9-]+(?:,[a-z0-9-]+)*)$/.test(sets||'')||!['build-only','development','production'].includes(target))throw Error('Invalid import request.');
     workflow='import-all-trophies.yml';inputs={sets,target};extra=['sets','target'];

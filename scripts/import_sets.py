@@ -20,6 +20,11 @@ Powered Cube is deliberately excluded from this queue and has its own builder.
 
 from __future__ import annotations
 
+try:
+    from model_training import parser_training_arguments, resolve_training_arguments
+except ModuleNotFoundError:
+    from scripts.model_training import parser_training_arguments, resolve_training_arguments
+
 import argparse
 import datetime as dt
 import email.utils
@@ -469,6 +474,8 @@ def build_one(remote: RemoteDataset, args: argparse.Namespace) -> ImportResult:
             str(args.minimum_games),
             "--top-fraction",
             str(args.top_fraction),
+            "--model-version",
+            args.model_version,
             "--max-training-drafts",
             str(args.max_training_drafts),
             "--max-output-drafts",
@@ -498,6 +505,8 @@ def build_one(remote: RemoteDataset, args: argparse.Namespace) -> ImportResult:
             str(args.minimum_games),
             "--top-fraction",
             str(args.top_fraction),
+            "--model-version",
+            args.model_version,
             "--max-training-drafts",
             str(args.max_training_drafts),
             "--max-bytes",
@@ -554,7 +563,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--queue", default=str(QUEUE_PATH.relative_to(REPO_ROOT)))
     parser.add_argument("--minimum-games", type=int, default=100)
     parser.add_argument("--top-fraction", type=float, default=0.15)
-    parser.add_argument("--max-training-drafts", type=int, default=5000)
+    parser_training_arguments(parser, 5000)
     parser.add_argument("--max-output-drafts", type=int, default=300)
     parser.add_argument("--minimum-replays", type=int, default=100)
     parser.add_argument("--minimum-picks", type=int, default=30)
@@ -563,7 +572,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--max-path-bytes", type=int, default=4_000_000)
     parser.add_argument("--report", default="generated/import-report.json")
     parser.add_argument("--dry-run", action="store_true", help="Probe the queue but do not download or build sets.")
-    return parser.parse_args(argv)
+    return resolve_training_arguments(parser.parse_args(argv), 5000)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

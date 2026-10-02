@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import assert from 'node:assert/strict';
-import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
+import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from '../draft-run.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION} from '../draft-run-difficulty.mjs';
 import {corpusDatabase} from './neon-corpus-db.mjs';
 
@@ -50,7 +50,11 @@ for(const set of [...baseline.sets,...imported.sets.filter(s=>!baselineIds.has(s
     assert.equal(supplement.model_version,baseline.model_version,`${set.id}: supplement model`);
     assert.equal(manifest.full_import?.input_signature,supplement.input_signature,`${set.id}: import input signature`);
     assert.equal(manifest.full_import?.puzzle_file_sha256,supplement.puzzle_file_sha256,`${set.id}: supplement checksum`);
-    assert.equal(Number(rows.puzzles),supplement.total_puzzles,`${set.id}: full puzzle count`);
+    if(DRAFT_RUN_CORPUS_VERSION===V5_CORPUS_VERSION) {
+      const snapshot=(await query('SELECT count(*)::int puzzles FROM draft_run_verified_puzzles WHERE set_id=$1 AND corpus_version=$2 AND source_snapshot_id=$3',[set.id,DRAFT_RUN_CORPUS_VERSION,supplement.source_snapshot_id])).rows[0];
+      assert.equal(Number(snapshot?.puzzles),supplement.total_puzzles,`${set.id}: exact full snapshot count`);
+      assert.equal(Number(rows.puzzles),supplement.total_puzzles+set.puzzles,`${set.id}: separate baseline and complete snapshot count`);
+    } else assert.equal(Number(rows.puzzles),supplement.total_puzzles,`${set.id}: full puzzle count`);
   } else assert.ok(Number(rows.puzzles)>=set.puzzles,`${set.id}: missing baseline puzzles`);
   total+=Number(rows.puzzles);
 }
