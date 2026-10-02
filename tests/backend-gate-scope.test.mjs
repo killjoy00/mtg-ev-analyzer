@@ -4,8 +4,8 @@ import { ALWAYS_STEPS, classifyBackendChanges, filterBackendChangedPaths, loadBa
 
 const map = loadBackendMap();
 
-test('account-only worker change selects the account suites plus the always-run foundation', () => {
-  const result = classifyBackendChanges(['worker/account-deletion-verification.mjs'], { map });
+test('account backend-smoke change selects account suites plus the always-run foundation', () => {
+  const result = classifyBackendChanges(['tests/account-deletion-backend-smoke.mjs'], { map });
   assert.equal(result.fullSuite, false);
   assert.deepEqual(result.domains, ['account']);
   assert.deepEqual(result.alwaysSteps, [...ALWAYS_STEPS]);
@@ -39,17 +39,17 @@ test('gate infrastructure, migrations, shared core, unmapped files, and empty di
 
 test('neutral files are removed before backend classification and mixed PR noise can stay narrow', () => {
   const paths = [
-    'worker/apple-subscription-policy.mjs',
+    'worker/draft-run-pool.mjs',
     'docs/backend-gate.md',
     'mobile/app/index.tsx',
-    'tests/apple-subscriptions.test.mjs',
+    'tests/draft-run-pool.test.mjs',
     'README.md',
     '.github/dependabot.yml',
   ];
-  assert.deepEqual(filterBackendChangedPaths(paths), ['worker/apple-subscription-policy.mjs']);
+  assert.deepEqual(filterBackendChangedPaths(paths), ['worker/draft-run-pool.mjs']);
   const result = classifyBackendChanges(paths, { map });
   assert.equal(result.fullSuite, false);
-  assert.deepEqual(result.domains, ['subscriptions']);
+  assert.deepEqual(result.domains, ['draft_run']);
 });
 
 test('modules reached through full-path handlers are shared and force the full suite', () => {
@@ -72,11 +72,12 @@ test('a module reached from more than one mapped domain is treated as shared and
   assert.match(result.reasons.join('\n'), /shared across domains/);
 });
 
-test('representative domain-owned files select only their mapped group', () => {
+test('narrow routes are limited to backend smoke tests or mapped modules outside handler imports', () => {
   const cases = [
-    ['worker/apple-subscription-policy.mjs', 'subscriptions'],
-    ['worker/decision-measurements.mjs', 'draft_run'],
-    ['worker/daily-generation-results.mjs', 'daily'],
+    ['worker/draft-run-pool.mjs', 'draft_run'],
+    ['tests/account-deletion-backend-smoke.mjs', 'account'],
+    ['tests/apple-subscription-backend-smoke.mjs', 'subscriptions'],
+    ['tests/daily-generation-backend-smoke.mjs', 'daily'],
     ['tests/corpus-version-backend-smoke.mjs', 'corpus'],
   ];
   for (const [path, domain] of cases) {
