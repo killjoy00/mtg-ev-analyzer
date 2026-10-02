@@ -158,6 +158,17 @@ async function captureProductionAuthEvidence() {
   nextLinkNewlyClaimed=false;
   nextLinkRankingReason=null;
   linkBodies=[];
+  await page.route('**/leaderboard-config.js',route=>route.fulfill({
+    status:200,
+    contentType:'application/javascript',
+    body:`window.PACK1_API={
+      firstParty:true,
+      authBase:'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
+      url:'https://api.packone.pro/legacy',
+      growthUrl:'https://api.packone.pro/growth',
+      draftRunUrl:'https://api.packone.pro/draft'
+    };`,
+  }));
   await page.setViewportSize({width:390,height:844});
   await page.goto(base+'/',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>Boolean(document.querySelector('#account-nav')));
