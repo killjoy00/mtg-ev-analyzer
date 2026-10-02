@@ -1,8 +1,8 @@
 # Pack One Android first-release signing
 
-Pack One's Google Play application `pro.packone.app` is currently unpublished.
+This file records the original Android signing/bootstrap path. For current launch status, use `docs/mobile-store-submission.md` and issue #575.
 
-The production AAB build is verified, but Google Play rejected Internal App Sharing with `FAILED_PRECONDITION: NOT_PUBLISHED`. The bootstrap distribution path is therefore a normal **Internal Testing** draft release.
+Current 1.0 state as of 2026-10-02: signed versionCode `100444` is uploaded and active on Closed Testing `production-access` for the qualification period. The original Internal App Sharing rejection and Internal Testing bootstrap below are historical evidence, not current release instructions.
 
 ## Signing boundary
 
@@ -31,9 +31,9 @@ The upload certificate SHA-256 fingerprint is:
 
 The keystore and password were not written to the repository or pasted into chat.
 
-## First-release behavior
+## First-release behavior — historical bootstrap
 
-Because `pro.packone.app` is still a draft/unpublished Play app, the API creates Internal Testing releases with status `draft`.
+During the original unpublished-app bootstrap, the API created Internal Testing releases with status `draft`.
 
 The first authenticated release was uploaded successfully on 2026-09-24:
 
@@ -47,7 +47,7 @@ The first authenticated release was uploaded successfully on 2026-09-24:
 
 The owner then completed the first rollout in Google Play Console. A live Google Play API status probe confirmed the same release and version code on the `internal` track with status `completed`.
 
-The release workflow intentionally creates draft releases for the unpublished app. It can be started either by an explicit manual dispatch from current `main` or by a reviewed change to `.github/android-internal-release-request.json` on `main`; both paths retain the protected `pack-one-mobile-release` environment and exact-current-main guard. The reusable read-only status workflow `.github/workflows/android-internal-status.yml` can verify the current Internal Testing track without uploading a new bundle. It also supports a reviewed `.github/android-internal-status-request.json` on current `main`; that path posts only release name, version code, status, and verified revision to launch tracker #524 and never posts tester identities.
+The Internal Testing workflow remains available for future candidate uploads. For the current 1.0 launch, versionCode `100444` has already been uploaded and promoted unchanged to `production-access`; do not treat another Internal Testing bootstrap as required launch work. The reusable read-only status workflow `.github/workflows/android-internal-status.yml` can verify Internal Testing without uploading a new bundle.
 
 ## Build numbering
 
@@ -78,12 +78,6 @@ A live non-publishing probe after version code `100015` confirmed the allocator 
 
 No production-track release is created by this workflow.
 
-## Credential cleanup
+## Historical credential cleanup notes
 
-The intended active Android upload key lives only in Google Secret Manager. The temporary project-level `Secret Manager Admin` grant used for one-time bootstrap should be removed from `packone-play-ci@pack-one.iam.gserviceaccount.com`; the workflow only needs the per-secret accessor bindings created above.
-
-Older GitHub repository secrets named `ANDROID_UPLOAD_KEYSTORE_BASE64` and `ANDROID_UPLOAD_KEY_PASSWORD`, if still present, are obsolete and should be deleted.
-
-Any pre-WIF `GOOGLE_PLAY_SERVICE_ACCOUNT_JSON` repository secret and its corresponding Google Cloud service-account key should also be deleted.
-
-The temporary `PACKONE_SECRETS_TOKEN` repository secret, if still present, should be deleted.
+The active Android upload key path is Google Secret Manager through WIF. Legacy/bootstrap cleanup notes are retained only as historical maintenance context and are **not #575 launch blockers or owner tasks**. Do not ask the owner to recreate, recover, or rotate lost secret values solely to satisfy historical cleanup/re-scoping guidance unless the owner explicitly reopens that work.
