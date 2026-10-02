@@ -412,6 +412,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       const auth=await signUpAccount(data);
       event('auth_sign_up',{source});
       if(!accountAuthCompleted(auth)) {
+        saveAuthFlow(intent,source);
         const card=document.querySelector('.account-auth-card');
         if(card)card.innerHTML=`<div class="form-success account-verification-success" role="status"><h2>Check your email</h2><p>We sent a verification link to ${esc(data.email)}. Open it to finish creating your Pack One account.</p><p>Verification links expire after 15 minutes.</p></div><button class="button secondary" id="account-verification-resend" type="button">Send a new verification link</button><button class="button secondary" id="account-verification-signin" type="button">Back to sign in</button><p id="account-verification-status" aria-live="polite"></p>`;
         document.querySelector('#account-verification-resend')?.addEventListener('click',async e=>{
@@ -427,7 +428,8 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
         document.querySelector('#account-verification-signin')?.addEventListener('click',()=>void renderAccount({validateDailyRunId:pendingDailyRunValidation,intent,source,mode:'signin'}));
         return;
       }
-      const claimed=await claimCurrentSession();
+      if(Object.prototype.hasOwnProperty.call(flow,'validateDailyRunId'))pendingDailyRunValidation=flow.validateDailyRunId||null;
+    const claimed=await claimCurrentSession();
       if(claimed?.linked?.newlyClaimed) {
         await openSignupNamePrompt({
           linked:claimed.linked,
