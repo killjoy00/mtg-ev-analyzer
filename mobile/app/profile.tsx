@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -96,14 +96,6 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
   const [safetyBusy,setSafetyBusy]=useState(false);
   const [safetyMessage,setSafetyMessage]=useState<string|null>(null);
   const commit = useCallback((next: State) => { stateRef.current = next; setState(next); }, []);
-  useEffect(() => {
-    if (pendingReportReason) setReportReason(pendingReportReason);
-    if (!viewerSession?.accountToken || !pendingAction) return;
-    setSafetyMessage(pendingAction === 'block'
-      ? 'Signed in. Review this profile, then choose Block profile to continue.'
-      : 'Signed in. Review the reason, then choose Report profile to continue.');
-  }, [pendingAction, pendingReportReason, viewerSession?.accountToken]);
-
 
   const deny = useCallback((error: unknown) => {
     requestId.current += 1;
@@ -160,6 +152,11 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
       const currentSession=await readSession().catch(()=>null);
       if (generation !== requestId.current) return;
       setViewerSession(currentSession);
+      if (currentSession?.accountToken && pendingAction) {
+        setSafetyMessage(pendingAction === 'block'
+          ? 'Signed in. Review this profile, then choose Block profile to continue.'
+          : 'Signed in. Review the reason, then choose Report profile to continue.');
+      }
       const profile = await loadPublicProfile(profileKey,currentSession);
       if (generation !== requestId.current) return;
       commit({ ...initial, phase: 'ready', profile, rows: profile.recent, refreshing: true });
@@ -350,7 +347,8 @@ export default function PublicProfileScreen() {
   </View></SafeAreaView>;
   // A -> B is a new browsing scope, not a refresh of A. React discards all old
   // rows/actions synchronously and effect cleanup rejects late A responses.
-  return <PublicProfileRecord key={key} profileKey={key} pendingAction={pendingAction} pendingReportReason={pendingReportReason} />;
+  const recordKey = `${key}:${pendingAction || ''}:${pendingReportReason || ''}`;
+  return <PublicProfileRecord key={recordKey} profileKey={key} pendingAction={pendingAction} pendingReportReason={pendingReportReason} />;
 }
 
 const styles = StyleSheet.create({
