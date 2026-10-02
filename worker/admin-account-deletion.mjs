@@ -95,6 +95,7 @@ export async function handleAdminAccountDeletion(
     try {
       operation=await loadDeletionForAuth(query,targetAuthUserId)||operation;
     } catch {}
+    const committed=adminDeletionStatus(operation);
     console.error(JSON.stringify({
       event:'admin_account_deletion_resume_error',
       operation_id:operation.operation_id,
@@ -102,7 +103,11 @@ export async function handleAdminAccountDeletion(
       error_code:safeErrorCode(error?.code)||safeErrorCode(operation.last_error_code)||'ADMIN_DELETE_RESUME',
       error_name:String(error?.name||'Error').slice(0,80),
     }));
-    throw error;
+    throw Object.assign(error,{
+      deletionCommitted:true,
+      operationId:committed?.operation_id||null,
+      deletion:committed,
+    });
   }
 
   const view=adminDeletionStatus(operation);
