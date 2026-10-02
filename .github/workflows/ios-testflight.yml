@@ -184,6 +184,12 @@ jobs:
           printf '%s' "$ASC_PRIVATE_KEY" > "$key_path"
           chmod 600 "$key_path"
           echo "ASC_KEY_PATH=$key_path" >> "$GITHUB_ENV"
+      # Automatic signing creates a new Apple Development certificate on every
+      # fresh runner; record the team's certificates so the final step can
+      # revoke only the one this run created.
+      - name: Snapshot team signing certificates before automatic signing
+        continue-on-error: true
+        run: node ../.github/scripts/app-store-runner-certificates.mjs snapshot "$RUNNER_TEMP/asc-certificates-before.json"
       - name: Generate production iOS project
         env:
           CI: '1'
@@ -293,3 +299,7 @@ jobs:
           PACKONE_ASC_APP_ID: '6814318676'
           PACKONE_ASC_VERSION: '1.0'
         run: node ../.github/scripts/app-store-finalize-release-candidate.mjs "$PACKONE_ARCHIVED_BUILD_NUMBER"
+      - name: Revoke the development certificate this runner created
+        if: always()
+        continue-on-error: true
+        run: node ../.github/scripts/app-store-runner-certificates.mjs revoke "$RUNNER_TEMP/asc-certificates-before.json"
