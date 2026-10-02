@@ -34,7 +34,7 @@ async function health(snapshot,setId,ready) {
   SELECT $2,corpus_version,source_snapshot_id,md5(manifest::text),$3,$4,$5::jsonb FROM corpus_source_snapshots WHERE source_snapshot_id=$1 RETURNING id`,
  [snapshot,setId,CORPUS_GATE_VERSION,ready,JSON.stringify({fixture:reason})])).rows[0].id;
 }
-let original,setId,component,componentHealth,child;
+let original,setId,component,componentHealth,child,crossSnapshot;
 try {
  await query('DELETE FROM draft_run_readiness_keys');
  const initial=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
@@ -51,6 +51,31 @@ try {
  const baseline=await advanceServingReadiness(query,{release:process.env.GITHUB_SHA});
  assert.equal(baseline.ready,true,JSON.stringify(baseline));
  check('registered key blocks player builders; automatic baseline verification succeeds');
+
+ // A future-corpus pointer must not strand the still-deployed parent release.
+ // The bridge keeps historical-frozen v8 membership stable, and migration 0049
+ // carries the exact verified cache to the new global revision atomically.
+ crossSnapshot=randomBytes(32).toString('hex');
+ const crossVersion='qa-cross-version-'+tag;
+ const bridgeBefore=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
+ const bridgeRevision=await revision();
+ await query(`INSERT INTO corpus_source_snapshots(source_snapshot_id,set_id,event_type,corpus_version,schema_version,importer_identity,model_identity,manifest,lifecycle_status)
+  VALUES($1,$2,'PremierDraft',$3,'qa-cross-version-v1','isolated-fixture','future-model',$4::jsonb,'Candidate')`,
+ [crossSnapshot,setId,crossVersion,JSON.stringify({fixture:reason,cross_version:true})]);
+ await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[setId,crossSnapshot]);
+ const bridged=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
+ const bridgedReadiness=await readServingReadiness(query);
+ assert.notEqual(bridgedReadiness.revision,bridgeRevision);
+ assert.equal(bridgedReadiness.ready,true,JSON.stringify(bridgedReadiness));
+ assert.equal(String(bridged.id),String(bridgeBefore.id),'Exact-equivalent bridge should retain the verified cache identity');
+ assert.equal(bridgedReadiness.evidence.samples[0].mode,'exact-serving-input-carry-forward');
+ await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2 WHERE set_id=$1',[setId,original.active_snapshot_id]);
+ const restoredBridge=await readServingReadiness(query);
+ assert.equal(restoredBridge.ready,true,JSON.stringify(restoredBridge));
+ assert.equal(String((await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION)).id),String(bridgeBefore.id));
+ await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[crossSnapshot]);
+ crossSnapshot=null;
+ check('cross-version pointer changes preserve an exactly equivalent verified parent cache without a 503 window');
 
  const beforeStaging=await revision();
  await query(`INSERT INTO corpus_source_snapshots(source_snapshot_id,set_id,event_type,corpus_version,schema_version,importer_identity,model_identity,manifest,lifecycle_status)
@@ -175,6 +200,7 @@ try {
   await query('UPDATE draft_run_environment_policy SET active_snapshot_id=$2,status=$3 WHERE set_id=$1',[setId,original.active_snapshot_id,original.status]);
   await query('UPDATE corpus_source_snapshots SET lifecycle_status=$2,superseded_by=$3 WHERE source_snapshot_id=$1',[original.active_snapshot_id,original.lifecycle_status,original.superseded_by]);
  }
+ if(crossSnapshot)await query('DELETE FROM corpus_source_snapshots WHERE source_snapshot_id=$1',[crossSnapshot]);
  await query('DELETE FROM corpus_status_events WHERE reason=$1',[reason]);
  await query('DELETE FROM corpus_source_exclusions WHERE reason=$1',[reason]);
  await query('DELETE FROM draft_run_verified_puzzles WHERE source_snapshot_id=$1',[candidate]);
