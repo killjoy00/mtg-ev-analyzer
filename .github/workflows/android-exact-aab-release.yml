@@ -1,0 +1,223 @@
+name: Android exact AAB release
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/android-exact-aab-release-request.json'
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: android-exact-aab-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: upload and promote exact Android AAB
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      PACKONE_ANDROID_PACKAGE: pro.packone.app
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: request
+        name: Resolve reviewed exact-AAB release request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          r=json.loads(Path('.github/android-exact-aab-release-request.json').read_text())
+          expected={'operation','reason','source_run_id','source_artifact_id','source_sha','artifact_name','artifact_digest','version_code','track'}
+          if set(r) != expected:
+              raise SystemExit(f'Invalid exact-AAB request keys: {sorted(r)}')
+          if r.get('operation') != 'upload-promote-existing-android-aab':
+              raise SystemExit('Invalid exact-AAB release operation.')
+          if not isinstance(r.get('reason'),str) or not r['reason'].strip():
+              raise SystemExit('Release reason is required.')
+          if r.get('artifact_name') != 'pack-one-play-signed-aab':
+              raise SystemExit('Unexpected artifact name.')
+          if str(r.get('track')) != 'production-access':
+              raise SystemExit('Exact AAB release is pinned to production-access.')
+          if not str(r.get('version_code','')).isdigit() or str(r['version_code']).startswith('0'):
+              raise SystemExit('version_code must be a positive integer.')
+          if not isinstance(r.get('source_run_id'),int) or r['source_run_id'] <= 0:
+              raise SystemExit('source_run_id must be positive.')
+          if not isinstance(r.get('source_artifact_id'),int) or r['source_artifact_id'] <= 0:
+              raise SystemExit('source_artifact_id must be positive.')
+          if not isinstance(r.get('source_sha'),str) or len(r['source_sha']) != 40:
+              raise SystemExit('source_sha must be a full commit SHA.')
+          if not isinstance(r.get('artifact_digest'),str) or not r['artifact_digest'].startswith('sha256:'):
+              raise SystemExit('artifact_digest must be a sha256 digest.')
+          for key in ['source_run_id','source_artifact_id','source_sha','artifact_name','artifact_digest','version_code','track']:
+              print(f"{key}={r[key]}")
+          PY
+
+      - name: Require current approved main and unchanged mobile source
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]] || {
+            echo "Checked-out revision is no longer current main." >&2
+            exit 1
+          }
+          source_sha="${{ steps.request.outputs.source_sha }}"
+          git fetch --no-tags --depth=100 origin main
+          git cat-file -e "$source_sha^{commit}"
+          changed="$(git diff --name-only "$source_sha" HEAD -- mobile/)"
+          if [[ -n "$changed" ]]; then
+            echo "Refusing to release stale Android artifact because mobile/ changed after source $source_sha:" >&2
+            printf '%s\n' "$changed" >&2
+            exit 1
+          fi
+          echo "Verified no mobile/ changes after exact artifact source $source_sha."
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Verify pinned GitHub artifact metadata
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_RUN_ID: ${{ steps.request.outputs.source_run_id }}
+          SOURCE_ARTIFACT_ID: ${{ steps.request.outputs.source_artifact_id }}
+          SOURCE_SHA: ${{ steps.request.outputs.source_sha }}
+          ARTIFACT_NAME: ${{ steps.request.outputs.artifact_name }}
+          ARTIFACT_DIGEST: ${{ steps.request.outputs.artifact_digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, urllib.request
+          headers={
+              'Authorization': f"Bearer {os.environ['GITHUB_TOKEN']}",
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28',
+          }
+          def get(url):
+              req=urllib.request.Request(url,headers=headers)
+              with urllib.request.urlopen(req) as resp:
+                  return json.load(resp)
+          repo=os.environ['GITHUB_REPOSITORY']
+          run=get(f"https://api.github.com/repos/{repo}/actions/runs/{os.environ['SOURCE_RUN_ID']}")
+          if run.get('conclusion') != 'success' or run.get('head_sha') != os.environ['SOURCE_SHA']:
+              raise SystemExit(f"Unexpected source run identity/state: conclusion={run.get('conclusion')} head_sha={run.get('head_sha')}")
+          art=get(f"https://api.github.com/repos/{repo}/actions/artifacts/{os.environ['SOURCE_ARTIFACT_ID']}")
+          if art.get('name') != os.environ['ARTIFACT_NAME']:
+              raise SystemExit(f"Unexpected artifact name: {art.get('name')}")
+          if art.get('expired') is True:
+              raise SystemExit('Pinned Android AAB artifact has expired.')
+          if art.get('digest') != os.environ['ARTIFACT_DIGEST']:
+              raise SystemExit(f"Unexpected artifact digest: {art.get('digest')}")
+          wr=art.get('workflow_run') or {}
+          if str(wr.get('id')) != os.environ['SOURCE_RUN_ID'] or wr.get('head_sha') != os.environ['SOURCE_SHA']:
+              raise SystemExit(f"Artifact source run mismatch: {wr}")
+          print('Verified pinned artifact metadata.')
+          PY
+
+      - id: artifact
+        name: Download and verify exact signed AAB
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          SOURCE_ARTIFACT_ID: ${{ steps.request.outputs.source_artifact_id }}
+          ARTIFACT_DIGEST: ${{ steps.request.outputs.artifact_digest }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          zip="$RUNNER_TEMP/android-exact-aab.zip"
+          out="$RUNNER_TEMP/android-exact-aab"
+          curl --fail --location --silent --show-error             -H "Authorization: Bearer $GITHUB_TOKEN"             -H "Accept: application/vnd.github+json"             -H "X-GitHub-Api-Version: 2022-11-28"             "https://api.github.com/repos/$GITHUB_REPOSITORY/actions/artifacts/$SOURCE_ARTIFACT_ID/zip"             -o "$zip"
+          expected="$(printf '%s' "$ARTIFACT_DIGEST" | sed 's/^sha256://')"
+          actual="$(sha256sum "$zip" | awk '{print $1}')"
+          [[ "$actual" == "$expected" ]] || {
+            echo "Artifact ZIP digest mismatch." >&2
+            exit 1
+          }
+          mkdir -p "$out"
+          unzip -q "$zip" -d "$out"
+          count="$(find "$out" -type f -name '*.aab' | wc -l | tr -d ' ')"
+          [[ "$count" == "1" ]] || {
+            echo "Expected exactly one AAB in pinned artifact; found $count." >&2
+            exit 1
+          }
+          aab="$(find "$out" -type f -name '*.aab' -print -quit)"
+          signer="$(keytool -printcert -jarfile "$aab" | awk -F': ' '/SHA1:/{print $2; exit}')"
+          expected_signer='83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B'
+          [[ "$signer" == "$expected_signer" ]] || {
+            echo "Pinned AAB signer does not match registered Google Play upload certificate." >&2
+            exit 1
+          }
+          echo "aab=$aab" >> "$GITHUB_OUTPUT"
+          echo "Verified pinned AAB ZIP digest and upload certificate SHA-1."
+
+      - id: auth
+        name: Authenticate to Google Cloud and Google Play
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: pack-one
+          workload_identity_provider: projects/77537515004/locations/global/workloadIdentityPools/github/providers/mtg-ev-analyzer
+          service_account: packone-play-ci@pack-one.iam.gserviceaccount.com
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/androidpublisher
+
+      - id: upload
+        name: Upload exact AAB to Google Play Internal Testing
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(node .github/scripts/play-exact-internal-release.mjs             "${{ steps.artifact.outputs.aab }}"             "${{ steps.request.outputs.version_code }}")"
+          echo "$result"
+          version="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.versionCode))' "$result")"
+          [[ "$version" == "${{ steps.request.outputs.version_code }}" ]]
+          echo "version_code=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Verify live links and Google Play app signing
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/verify-live-mobile-links.mjs
+          node mobile/scripts/verify-play-signing.mjs "${{ steps.upload.outputs.version_code }}"
+
+      - id: promote
+        name: Promote exact AAB to production-access Closed Testing
+        env:
+          PLAY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          result="$(node mobile/scripts/play-closed-release.mjs             "${{ steps.upload.outputs.version_code }}"             "${{ steps.request.outputs.track }}")"
+          echo "$result"
+          release_status="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(v.releaseStatus))' "$result")"
+          committed="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(Boolean(v.committed)))' "$result")"
+          requires_console="$(node -e 'const v=JSON.parse(process.argv[1]); process.stdout.write(String(Boolean(v.requiresConsoleRollout)))' "$result")"
+          [[ "$committed" == "true" ]]
+          {
+            echo "## Pack One exact Android candidate release"
+            echo
+            echo "- Source artifact run: `${{ steps.request.outputs.source_run_id }}`"
+            echo "- Source revision: `${{ steps.request.outputs.source_sha }}`"
+            echo "- Artifact ID: `${{ steps.request.outputs.source_artifact_id }}`"
+            echo "- Artifact digest: `${{ steps.request.outputs.artifact_digest }}`"
+            echo "- Version code: `${{ steps.upload.outputs.version_code }}`"
+            echo "- Internal Testing upload: committed"
+            echo "- Closed Testing track: `${{ steps.request.outputs.track }}`"
+            printf -- '- Closed release status: `%s`\n' "$release_status"
+            printf -- '- Requires console rollout: `%s`\n' "$requires_console"
+            echo "- Exact AAB reused unchanged; no rebuild occurred in this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"

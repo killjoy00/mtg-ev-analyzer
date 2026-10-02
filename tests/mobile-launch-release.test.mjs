@@ -22,6 +22,7 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
     '.github/workflows/android-internal-testing.yml',
     '.github/workflows/android-production-bundle.yml',
     '.github/workflows/android-closed-testing.yml',
+    '.github/workflows/android-exact-aab-release.yml',
     '.github/workflows/google-play-access.yml',
     '.github/workflows/google-play-listing-assets.yml',
     '.github/workflows/google-play-feature-graphic.yml',
@@ -61,6 +62,21 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /Verify live Universal Links and App Links associations/);
       assert.match(workflow, /Verify Google Play app-signing certificate matches assetlinks\.json/);
       assert.match(workflow, /track != 'production-access'/);
+    } else if (path === '.github/workflows/android-exact-aab-release.yml') {
+      assert.match(workflow, /github\.ref == 'refs\/heads\/main' && github\.event_name == 'push'/, path);
+      assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-exact-aab-release-request\.json'/s, path);
+      assert.match(workflow, /upload-promote-existing-android-aab/, path);
+      assert.match(workflow, /actions: read/, path);
+      assert.match(workflow, /git diff --name-only "\$source_sha" HEAD -- mobile\//, path);
+      assert.match(workflow, /actions\/artifacts\/\$SOURCE_ARTIFACT_ID\/zip/, path);
+      assert.match(workflow, /sha256sum "\$zip"/, path);
+      assert.match(workflow, /83:BB:D7:ED:15:27:BA:BE:18:B6:E7:FD:92:F5:A3:50:BD:62:7B:2B/, path);
+      assert.match(workflow, /play-exact-internal-release\.mjs/, path);
+      assert.match(workflow, /verify-play-signing\.mjs/, path);
+      assert.match(workflow, /play-closed-release\.mjs/, path);
+      assert.doesNotMatch(workflow, /gradlew|expo prebuild|bundleRelease/, path);
+      assert.doesNotMatch(workflow, /workflow_dispatch:/, path);
+      assert.doesNotMatch(workflow, /pull_request:/, path);
     } else if (path === '.github/workflows/google-play-access.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/google-play-access-request\.json'/s, path);
@@ -154,6 +170,27 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   assert.match(String(androidClosedRequest.version_code), /^[1-9][0-9]*$/);
   assert.equal(typeof androidClosedRequest.reason, 'string');
   assert.ok(androidClosedRequest.reason.trim().length > 0);
+
+  const exactAndroidRequest = JSON.parse(read('.github/android-exact-aab-release-request.json'));
+  assert.deepEqual(Object.keys(exactAndroidRequest).sort(), ['artifact_digest','artifact_name','operation','reason','source_artifact_id','source_run_id','source_sha','track','version_code']);
+  assert.equal(exactAndroidRequest.operation, 'upload-promote-existing-android-aab');
+  assert.equal(exactAndroidRequest.source_run_id, 36957485029);
+  assert.equal(exactAndroidRequest.source_artifact_id, 11206639352);
+  assert.equal(exactAndroidRequest.source_sha, 'fa588b40bc380946735385abfac0ff52586e1873');
+  assert.equal(exactAndroidRequest.artifact_name, 'pack-one-play-signed-aab');
+  assert.equal(exactAndroidRequest.artifact_digest, 'sha256:9aa25360201435a68facc6ed25c21d965e883bcd1ae42204b2b7e4e0d219c20d');
+  assert.equal(exactAndroidRequest.version_code, '100444');
+  assert.equal(exactAndroidRequest.track, 'production-access');
+  assert.equal(typeof exactAndroidRequest.reason, 'string');
+  assert.ok(exactAndroidRequest.reason.trim().length > 0);
+
+  const exactAndroidUpload = read('.github/scripts/play-exact-internal-release.mjs');
+  assert.match(exactAndroidUpload, /expectedVersionCode/);
+  assert.match(exactAndroidUpload, /versionCode!==expectedVersionCode/);
+  assert.match(exactAndroidUpload, /Refusing to commit unexpected uploaded versionCode/);
+  assert.match(exactAndroidUpload, /exactVersionVerified:true/);
+  assert.match(exactAndroidUpload, /:commit/);
+  assert.match(exactAndroidUpload, /method:'DELETE'/);
 
   const closedRelease = read('mobile/scripts/play-closed-release.mjs');
   assert.match(closedRelease, /releaseStatus = 'completed'/);
