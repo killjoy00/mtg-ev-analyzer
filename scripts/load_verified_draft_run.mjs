@@ -1,4 +1,4 @@
-// Usage: node scripts/load_verified_draft_run.mjs /absolute/path/to/connection
+// Usage: node scripts/load_verified_draft_run.mjs /absolute/path/to/connection [--stage-only] [--manifest-only]
 // Credentials stay outside the repo and are sent only to the selected Neon SQL endpoint.
 import fs from 'node:fs';
 import zlib from 'node:zlib';
@@ -9,6 +9,9 @@ import {corpusDatabase} from './neon-corpus-db.mjs';
 
 import {stageCorpusManifest} from './stage-corpus-manifest.mjs';
 const query=corpusDatabase(process.argv[2]);
+const stageOnly=process.argv.includes('--stage-only');
+const manifestOnly=process.argv.includes('--manifest-only');
+if(manifestOnly&&!stageOnly)throw new Error('--manifest-only requires --stage-only so serving state cannot be replaced.');
 if (process.argv.includes('--schema')) {
   for(const sql of fs.readFileSync('migrations/0004_draft_run_product.sql','utf8').split('-- statement')) await query(sql);
   console.log('Additive schema applied.');
@@ -25,7 +28,8 @@ const prepared=catalog.sets.map(set=>{
   return {set,rows};
 });
 async function loadSet({set,rows}) {
-  await stageCorpusManifest(query,set.id,catalog.corpus_version,{...set,model_version:catalog.model_version},{preserveServing:process.argv.includes('--stage-only')});
+  await stageCorpusManifest(query,set.id,catalog.corpus_version,{...set,model_version:catalog.model_version},{preserveServing:stageOnly});
+  if(manifestOnly)return;
   for(let i=0;i<rows.length;i+=250) {
     // The same immutable insert is used for baselines and supplements. A
     // conflicting payload is an error, not an apparently successful no-op.
@@ -39,8 +43,15 @@ let next=0;
 await Promise.all(Array.from({length:4},async()=>{
   while(next<prepared.length)await loadSet(prepared[next++]);
 }));
-const actual=await query('SELECT set_id,count(*)::int puzzles FROM draft_run_verified_puzzles WHERE corpus_version=$1 GROUP BY set_id',[catalog.corpus_version]);
-// A retry after supplement loading legitimately contains more than the
-// baseline. Every baseline ID and its exact payload was checked above.
-if(catalog.sets.some(s=>Number(actual.rows.find(r=>r.set_id===s.id)?.puzzles)<s.puzzles))throw new Error('Loaded corpus count mismatch.');
-console.log('Verified corpus loaded.');
+if(manifestOnly) {
+  const staged=await query('SELECT set_id FROM corpus_set_versions WHERE corpus_version=$1',[catalog.corpus_version]);
+  const ids=new Set(staged.rows.map(r=>r.set_id));
+  if(catalog.sets.some(s=>!ids.has(s.id)))throw new Error('Staged corpus manifest coverage mismatch.');
+  console.log('Verified corpus manifests staged without puzzle insertion.');
+} else {
+  const actual=await query('SELECT set_id,count(*)::int puzzles FROM draft_run_verified_puzzles WHERE corpus_version=$1 GROUP BY set_id',[catalog.corpus_version]);
+  // A retry after supplement loading legitimately contains more than the
+  // baseline. Every baseline ID and its exact payload was checked above.
+  if(catalog.sets.some(s=>Number(actual.rows.find(r=>r.set_id===s.id)?.puzzles)<s.puzzles))throw new Error('Loaded corpus count mismatch.');
+  console.log('Verified corpus loaded.');
+}
