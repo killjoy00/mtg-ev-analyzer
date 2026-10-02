@@ -30,7 +30,7 @@ const ScrollView = React.forwardRef(function ScrollViewHost(props, ref) {
   return React.createElement('ScrollView', props, props.children);
 });
 
-function compileScreen(relativePath, mocks) {
+function compileModule(relativePath, mocks) {
   const filename = path.join(process.cwd(), relativePath);
   const source = fs.readFileSync(filename, 'utf8');
   const output = ts.transpileModule(source, {
@@ -55,7 +55,11 @@ function compileScreen(relativePath, mocks) {
   } finally {
     Module._load = priorLoad;
   }
-  return compiled.exports.default;
+  return compiled.exports;
+}
+
+function compileScreen(relativePath, mocks) {
+  return compileModule(relativePath, mocks).default;
 }
 
 function renderedText(node) {
@@ -415,6 +419,22 @@ test('successful authentication returns to Practice even when optional profile/c
       loadSetCatalog: async () => { throw new Error('catalog enrichment offline'); },
     },
     '@/src/api/guest': { ensureGuestSession: async () => guest },
+    '@/src/hooks/useAccountState': {
+      useAccountState: () => {
+        const [current, setCurrent] = React.useState(guest);
+        const [hookMessage, setHookMessage] = React.useState(null);
+        return {
+          session: current,
+          account: null,
+          busy: false,
+          message: hookMessage,
+          enrichmentWarning: 'Some profile details could not refresh. Try again.',
+          setMessage: setHookMessage,
+          adoptSession: async (next) => { setCurrent(next); return accountState; },
+          clearAccount: (next) => setCurrent(next),
+        };
+      },
+    },
     '@/src/theme': theme,
   };
 
@@ -459,6 +479,63 @@ test('successful authentication returns to Practice even when optional profile/c
   assert.match(renderedText(root.toJSON()), /Signed in to your Pack One account/);
   assert.match(renderedText(root.toJSON()), /profile details could not refresh/i);
 
+  await act(async () => root.unmount());
+});
+
+
+test('shared account state hook keeps focus refreshes ordered and rejects late enrichment', async () => {
+  const focus = focusControl();
+  const oldProfile = deferred();
+  const sessionA = { playerToken: 'player-a', accountToken: 'account-a', accountUser: { id: 'a' } };
+  const sessionB = { playerToken: 'player-b', accountToken: 'account-b', accountUser: { id: 'b' } };
+  let sessionReads = 0;
+  const hook = compileModule('src/hooks/useAccountState.ts', {
+    'expo-router': { router: { replace() {} }, useFocusEffect: focus.useFocusEffect },
+    '@/src/api/client': { ApiError: class ApiError extends Error {} },
+    '@/src/api/account': {
+      forgetAccountLocally: async (value) => value,
+      loadMobileAccount: async (value) => ({
+        user: value.accountUser,
+        session: {},
+        credentials: { password: true, google: false, apple: false },
+        deletion: { enabled: true, available: true, googleOnly: false, method: 'password' },
+      }),
+    },
+    '@/src/api/career': {
+      loadMobileCareer: async (value) => value === sessionA ? oldProfile.promise : profile('Player B'),
+    },
+    '@/src/api/draftRun': {
+      loadSetCatalog: async () => ({ sets: [] }),
+    },
+    '@/src/api/guest': {
+      ensureGuestSession: async () => (++sessionReads === 1 ? sessionA : sessionB),
+    },
+  }).useAccountState;
+
+  function Harness() {
+    const state = hook({ loadProfile: true, loadCatalog: true });
+    return React.createElement('Text', null, state.profile?.player.display_name || 'none');
+  }
+
+  let root;
+  await act(async () => {
+    root = TestRenderer.create(React.createElement(Harness));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    await focus.trigger();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  assert.match(renderedText(root.toJSON()), /Player B/);
+  await act(async () => {
+    oldProfile.resolve(profile('Player A'));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  assert.match(renderedText(root.toJSON()), /Player B/);
+  assert.doesNotMatch(renderedText(root.toJSON()), /Player A/);
   await act(async () => root.unmount());
 });
 
