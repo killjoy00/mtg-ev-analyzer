@@ -1,0 +1,54 @@
+name: temporary retained preview evidence read
+on:
+  pull_request:
+    types: [synchronize]
+    paths: ['.github/workflows/telemetry-evidence-read.yml']
+permissions:
+  contents: read
+concurrency:
+  group: pack1-gateway-preview
+  cancel-in-progress: false
+jobs:
+  evidence:
+    if: github.event.pull_request.draft == true && github.head_ref == 'fix/distributed-telemetry-settlement-poll-20261002'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Re-query sanitized retained counts for the failed historical tail
+        env:
+          CLOUDFLARE_EDGE_TOKEN: ${{ secrets.CLOUDFLARE_EDGE_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          import {previewAccount,queryPreviewEvents} from './scripts/launch-distributed-telemetry.mjs';
+          const token=process.env.CLOUDFLARE_EDGE_TOKEN;
+          if(!token)throw Error('missing scoped Cloudflare telemetry credential');
+          const account=await previewAccount({token});
+          const sha='d8632a8bca21bb0bc5bc713b5e395b42fc5c7ef0';
+          const windows=[
+            {from:1790968800602,to:1790968860602,client_requests:867,retained_during_run:186},
+            {from:1790968860602,to:1790968920602,client_requests:271,retained_during_run:24},
+            {from:1790968920602,to:1790968980602,client_requests:60,retained_during_run:2},
+            {from:1790968980602,to:1790969010602,client_requests:50,retained_during_run:0},
+          ];
+          const out=[];
+          for(const window of windows) {
+            const events=await queryPreviewEvents(fetch,token,account,window.from,window.to);
+            out.push({...window,from_iso:new Date(window.from).toISOString(),to_iso:new Date(window.to).toISOString(),
+              retained_now:events.length,expected_release_events:events.filter(e=>e.release===sha).length,
+              status_429:events.filter(e=>e.status===429).length,status_5xx:events.filter(e=>e.status>=500).length,
+              wrong_release_events:events.filter(e=>e.release!==sha).length});
+          }
+          fs.mkdirSync('artifacts/telemetry-evidence',{recursive:true});
+          fs.writeFileSync('artifacts/telemetry-evidence/historical-tail-counts.json',JSON.stringify({queried_at:new Date().toISOString(),windows:out},null,2));
+          console.log(JSON.stringify({event:'retained_preview_historical_tail_counts',windows:out}));
+          NODE
+      - uses: actions/upload-artifact@v4
+        with:
+          name: retained-preview-historical-tail-counts
+          path: artifacts/telemetry-evidence/historical-tail-counts.json
+          retention-days: 7
