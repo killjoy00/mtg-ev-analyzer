@@ -27,6 +27,11 @@ function install() {
   if(installed)return;installed=true;
   diagnosticsChannel.channel(UNDICI_TRANSPORT_CHANNELS.requestCreate).subscribe(({request})=>{
     const key={method:request.method,origin:String(request.origin),path:request.path};
+    // begin() runs immediately before global fetch, but Undici does not expose
+    // its eventual request object to begin(). Identical in-flight requests are
+    // therefore bound FIFO by method + origin + path. The Node 24 loopback
+    // regression checks this ordering assumption against server-recorded socket
+    // identity for six concurrent identical GETs; this is not a durable request ID.
     const index=pending.findIndex(state=>!state.bound&&state.method===key.method&&state.origin===key.origin&&state.path===key.path);
     if(index<0)return;
     const state=pending[index];state.bound=true;state.request=request;requestStates.set(request,state);
