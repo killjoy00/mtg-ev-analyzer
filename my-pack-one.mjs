@@ -234,10 +234,10 @@ export function myPackOneMarkup(profile,catalog,{account=null,patreon=null,setti
   return '<section class="player-profile-page my-pack-one-page growth-page" data-profile-key="'+esc(profile.player.profile_key||'')+'">'+
     '<header class="my-pack-one-heading"><h1>My Pack One</h1><p>Your stats, settings, and everything in one place.</p></header>'+
     usernameAttentionMarkup(profile)+
-    '<div class="my-pack-one-tabs" role="tablist" aria-label="My Pack One"><button type="button" role="tab" id="profile-stats-tab" aria-controls="profile-stats-panel" aria-selected="'+String(!accountSelected)+'" tabindex="'+(!accountSelected?'0':'-1')+'">Stats</button><button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(accountSelected)+'" tabindex="'+(accountSelected?'0':'-1')+'">Account</button></div>'+
+    '<div class="my-pack-one-tabs" role="tablist" aria-label="My Pack One"><button type="button" role="tab" id="profile-stats-tab" aria-controls="profile-stats-panel" aria-selected="'+String(!accountSelected)+'" tabindex="'+(!accountSelected?'0':'-1')+'">Stats</button><button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(accountSelected)+'" tabindex="'+(accountSelected?'0':'-1')+'">Account settings</button></div>'+
     '<section class="my-pack-one-panel" id="profile-stats-panel" role="tabpanel" aria-labelledby="profile-stats-tab" data-profile-panel="stats" '+(accountSelected?'hidden':'')+'>'+statsMarkup(profile,catalog,account,patreon)+'</section>'+
     '<section class="my-pack-one-panel my-pack-one-account-panel" id="profile-account-panel" role="tabpanel" aria-labelledby="profile-account-tab" data-profile-panel="account" '+(!accountSelected?'hidden':'')+'>'+
-      '<div class="my-account-heading"><h2>Account</h2><p>Manage your profile, membership, and sign-in.</p></div>'+
+      '<div class="my-account-heading"><h2>Account settings</h2><p>Manage your profile, membership, and sign-in.</p></div>'+
       (typeof settingsMarkup==='function'?settingsMarkup(profile,progress,account,patreon):'')+
     '</section>'+
   '</section>';
