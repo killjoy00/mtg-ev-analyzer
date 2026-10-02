@@ -1,7 +1,8 @@
 {
   "operation": "deploy",
-  "request_id": "read-stall-fix-dev-20261002",
-  "reason": "Deploy the exact capacity-tested Daily-status fanout fix revision to development before production promotion.",
+  "request_id": "read-stall-fix-dev-replay-20261002",
+  "replay_of": "read-stall-fix-dev-20261002",
+  "reason": "Intentional replay after the merge-topology replay guard rejected the reviewed development dispatch before any deployment began.",
   "commit": "d8632a8bca21bb0bc5bc713b5e395b42fc5c7ef0",
   "target": "development"
 }
