@@ -43,11 +43,15 @@ def rescore(sid, premier_pin, component_pin, directory):
     trad = SOURCES/f'{expected["source_archive"]["sha256"]}.csv.gz'
     built = build_v4_models(sid,draft,game,premier_pin)
     # Prove these independently reconstructed graders match the exact v9 import.
-    v9 = read_gzip_jsonl(ROOT/'generated/v5-build'/sid/'trophies'/sid/'puzzles.jsonl.gz')
+    def v9_records():
+        with gzip.open(ROOT/'generated/v5-build'/sid/'trophies'/sid/'puzzles.jsonl.gz','rt') as handle:
+            for line in handle:
+                if line.strip():
+                    yield json.loads(line)
     by_hash = {hashlib.sha256(f'{sid}|{did}'.encode()).hexdigest()[:32]:did
                for did in built['qualified']}
     parity = 0
-    for puzzle in v9:
+    for puzzle in v9_records():
         did = by_hash[puzzle['source_draft_hash']]
         examples = [p for p in built['output'][did] if p.raw_pick_number==puzzle['pick_number']-1]
         if len(examples)!=1:
@@ -150,8 +154,12 @@ def consolidate(build,output):
         sid = pin['set_id']
         source = build/sid/'traditional'
         checkpoint = read(source/'checkpoint.json')
-        if checkpoint['files'] != phase_files(source):
+        premier = read(build/sid/'trophies'/sid/'manifest.json')
+        summary = read(source/'summary.json')
+        if checkpoint['identity']!=read(build/sid/'summary.json')['build_identity'] or checkpoint['files'] != phase_files(source):
             raise ValueError(f'{sid}: corrupt Traditional checkpoint')
+        if summary['production_input_signature']!=premier['input_signature'] or summary['training_drafts']!=premier['training_drafts']:
+            raise ValueError(f'{sid}: stale Traditional grader')
         shutil.copytree(source,output/sid,dirs_exist_ok=True)
         evidence[sid]=read(source/'summary.json')
     write(output/'report.json',{'schema':SCHEMA,'model_version':V5_MODEL,'parent_corpus_version':V5_CORPUS,

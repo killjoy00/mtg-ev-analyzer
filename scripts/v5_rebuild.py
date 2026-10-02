@@ -130,6 +130,7 @@ def checkpoint(directory, key, build_id):
 
 
 def replay(sid, pin, directory):
+    directory.mkdir(parents=True, exist_ok=True)
     import import_sets as regular
     import backfill_legacy_sets as legacy
     import import_powered_cube as cube

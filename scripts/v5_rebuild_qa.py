@@ -43,7 +43,9 @@ def compare(previous,candidate):
         old_metric = puzzle_metrics(before)
         old_bands[old_metric['band']]+=1
         distance = sum(abs(a[c]-b[c]) for c in a)/2
-        scores = [abs(js_round_nonnegative(95*a[c]/max(a.values()))-js_round_nonnegative(95*b[c]/max(b.values()))) for c in a]
+        def card_score(support,card):
+            return 100 if card==p['historical_pick_id'] else js_round_nonnegative(95*support[card]/max(support.values()))
+        scores = [abs(card_score(a,c)-card_score(b,c)) for c in a]
         probability.append(distance);score.extend(scores)
         rating.append(abs(new_metric['rating']-old_metric['rating']))
         leader_changed = max(sorted(a),key=a.get)!=max(sorted(b),key=b.get)
@@ -95,7 +97,7 @@ def main(baseline):
         lines.append(f"| {p['id']} | {p['v4_training']:,} | {p['v5_training']:,} | {p['qualified_training_drafts']:,} | {p['matched_decisions']:,} | {p['leader_change_fraction']:.1%} | {tv:.4f} |")
     lines+=['', 'Largest changes and distribution shifts are recorded in the JSON report.',
         'Sets flagged for investigation: '+(', '.join(report['large_change_sets']) or 'none')+'.',
-        'Score displacement uses the unchanged 95 × support / leader calculation; ratings use the unchanged support-ratio-v1 calculation.']
+        'Score displacement uses the unchanged historical-pick score of 100 and otherwise 95 × support / leader; ratings use the unchanged support-ratio-v1 calculation.']
     (ROOT/'generated/V5-REBUILD-QA.md').write_text('\n'.join(lines)+'\n')
 
 
