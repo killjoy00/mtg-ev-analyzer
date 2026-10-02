@@ -2,6 +2,7 @@
 // fabricated network headers, mutation retries or between-stage quota reset.
 import assert from 'node:assert/strict';
 import {seededRandom} from '../gameplay.mjs';
+import {transportFailureEvidence,undiciTransportObserver} from './launch-distributed-transport.mjs';
 import {permittedRequest,quantiles,timing,fingerprint} from './launch-distributed-core.mjs';
 export const wait=async(ms,signal)=>{
   if(signal?.aborted)throw Error('cohort_aborted');
@@ -44,20 +45,22 @@ const requestEndpoint=path=>{
   if(/^\/draft\/v1\/runs\/[^/]+\/share$/.test(bare))return 'run_share';
   return null;
 };
-export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch}) {
+export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch,transportObserver=undiciTransportObserver,request_timeout_ms=30000}) {
   return async(actor,route,path,body,{report=null,windows=null}={})=>{
     const url=permittedRequest(path,body);
     if(++budget.gateway_requests>Math.floor((policy.maximum_requests-policy.telemetry_preflight_requests)/policy.generators))throw Object.assign(Error('request_ceiling'),{category:'cost'});
     const at=now(),record={route,at,status:0,ms:0,bytes:0,phase:!windows||at<windows.hold?'initial':at<windows.drain?'hold':at<windows.recovery?'drain':'recovery'};
     const endpoint=requestEndpoint(path);if(endpoint)record.endpoint=endpoint;
-    if(report)report.requests.push(record);
+    const request_index=report?report.requests.length:null;
+    if(report){record.index=request_index;report.requests.push(record);}
     const headers={'x-pack1-preview-key':fixture.preview,origin:'https://packone.pro','content-type':'application/json'};
     if(actor?.cookies.size)headers.cookie=[...actor.cookies].map(([k,v])=>k+'='+v).join('; ');
     if(actor?.csrf)headers['x-pack1-csrf']=actor.csrf;
     if(path==='/draft/v1/runs'&&!body.daily)headers['x-idempotency-key']=crypto.randomUUID();
+    const method=body===undefined?'GET':'POST',transport=transportObserver.begin({url,method,bodyPresent:body!==undefined});
     const start=performance.now();
     try {
-      const r=await fetcher(url,{method:body===undefined?'GET':'POST',headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(30000)])});
+      const r=await fetcher(url,{method,headers,body:body===undefined?undefined:JSON.stringify(body),redirect:'error',signal:AbortSignal.any([signal,AbortSignal.timeout(request_timeout_ms)])});
       record.status=r.status;const text=await r.text();record.bytes=Buffer.byteLength(text);budget.response_bytes+=record.bytes;
       const diagnostics=parseStartDiagnostics(r.headers,route);if(diagnostics)record.diagnostics=diagnostics;
       if(record.bytes>2*1024**2||budget.response_bytes>Math.floor(policy.maximum_response_bytes/policy.generators))throw Object.assign(Error('response_byte_ceiling'),{category:'cost'});
@@ -68,14 +71,21 @@ export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch}) 
         const [pair]=value.split(';'),eq=pair.indexOf('=');if(eq>0)actor.cookies.set(pair.slice(0,eq),pair.slice(eq+1));
       }
       return {data,network:r.headers.get('x-pack1-preview-network')};
+    } catch(error) {
+      if(record.status===0) {
+        const evidence=transportFailureEvidence(error,transport,{cohortAborted:signal.aborted,elapsedMs:performance.now()-start});record.transport=evidence;
+        const reason=evidence.label==='abort_fallout'?'cohort_aborted':`transport_${evidence.label}`;
+        throw Object.assign(Error(reason),{category:evidence.label==='abort_fallout'?'generator':'application',request_index,transport:evidence});
+      }
+      throw error;
     } finally {
-      record.ms=Math.round((performance.now()-start)*100)/100;
+      record.ms=Math.round((performance.now()-start)*100)/100;transportObserver.end(transport);
     }
   };
 }
 export async function runPlayerStage({fixture,policy,scope,stage,shard,start_at,network,now,signal,client,onFailure}) {
   const spec=policy.stages[stage],population=spec.players/policy.generators,windows=timing(start_at,spec,policy),offset=[0,25,75][stage];
-  const report={schema:2,scope,stage,shard,start_at,network,started:0,initial_completed:0,correctness_failures:0,failures:[],arrival_delay_ms:[],actors:[],requests:[],daily:{},windows};
+  const report={schema:2,scope,stage,shard,start_at,network,started:0,initial_completed:0,correctness_failures:0,failures:[],root_failure:null,arrival_delay_ms:[],actors:[],requests:[],daily:{},windows};
   const call=async(actor,route,path,body)=>{
     try {
       const result=(await client(actor,route,path,body,{report,windows})).data;
@@ -94,7 +104,8 @@ export async function runPlayerStage({fixture,policy,scope,stage,shard,start_at,
     const category=e.code==='ERR_ASSERTION'?'correctness':e.category||'generator';
     if(category==='correctness')report.correctness_failures++;
     const reason=/^[a-z0-9_]{1,80}$/.test(e.message)?e.message:category==='correctness'?'assertion_failed':'request_or_generator_failure';
-    report.failure_category=category;report.failures.push({category,reason});onFailure({category,reason});
+    const failure={category,reason};if(Number.isInteger(e.request_index))failure.request_index=e.request_index;if(e.transport?.label)failure.transport=e.transport.label;
+    if(!report.failure_category)report.failure_category=category;if(!report.root_failure&&reason!=='cohort_aborted')report.root_failure={...failure};report.failures.push(failure);onFailure({category,reason});
   };
   const actors=Array.from({length:population},(_,i)=>{
     const id=shard*population+i,user=fixture.users[offset+id],guest=id%10<5;
