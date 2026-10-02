@@ -127,14 +127,19 @@ jobs:
           grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle
           expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
           grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle || grep -Fq "versionName '$expected_version_name'" android/app/build.gradle
-      - name: Audit fast-path generated Android manifest
+      - name: Merge release Android manifest for fast-path privacy audit
         if: env.NATIVE_FULL == 'false'
+        working-directory: mobile/android
+        run: ./gradlew :app:processReleaseMainManifest --no-daemon
+      - name: Audit fast-path merged Android manifest
+        if: env.NATIVE_FULL == 'false'
+        working-directory: mobile/android
         shell: bash
         run: |
           set -euo pipefail
-          manifest="android/app/src/main/AndroidManifest.xml"
-          test -f "$manifest"
-          python3 ./scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-fast-native-audit.json"
+          manifest="$(find app/build/intermediates/merged_manifests/release -name AndroidManifest.xml -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-fast-native-audit.json"
       - name: Upload fast-path Android native audit evidence
         if: env.NATIVE_FULL == 'false'
         uses: actions/upload-artifact@v4
