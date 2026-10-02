@@ -120,6 +120,9 @@ test('native Account keeps auth on /account and splits signed-in management into
   assert.match(accountProfileScreen, />Retry</);
   assert.match(accountSecurityScreen, />Retry</);
   assert.match(accountDeleteScreen, />Retry</);
+  assert.match(accountProfileScreen, /onPress=\{\(\) => void refresh\(\)\}/);
+  assert.match(accountSecurityScreen, /onPress=\{\(\) => void refresh\(\)\}/);
+  assert.match(accountDeleteScreen, /onPress=\{\(\) => void refresh\(\)\}/);
   assert.match(accountStateHook, /clearEnrichment\(\);\n\s+setMessage\(error instanceof Error/);
   assert.equal((publicProfileScreen.match(/router\.replace\(\{\s*pathname: '\/account'/g)||[]).length,2);
   assert.match(publicProfileScreen, /pendingActionShown=useRef\(false\)/);
