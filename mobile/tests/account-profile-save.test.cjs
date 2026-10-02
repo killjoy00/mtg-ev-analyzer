@@ -37,7 +37,6 @@ function makeProfile(overrides = {}) {
     ...overrides.player,
   };
   return {
-    player,
     ranking_identity: overrides.ranking_identity ?? { eligible: player.username_owned === true, reason: player.display_name_reason ?? null },
     summary: { games: 1, average_score: 80, best_score: 90 },
     achievements: [{ id: 'first_run', label: 'First Run', unlocked: true }],
@@ -67,7 +66,7 @@ function text(node) {
 const host = (name) => function Host(props) { return React.createElement(name, props, props.children); };
 
 async function fixture(t, options = {}) {
-  const mobile = path.resolve(__dirname, '..');
+  const mobile = process.cwd();
   const cache = new Map();
   const adopted = [];
   const calls = [];
