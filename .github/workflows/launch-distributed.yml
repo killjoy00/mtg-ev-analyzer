@@ -7,8 +7,7 @@ on:
 permissions:
   contents: read
 concurrency:
-  # Temporary draft-PR lane for focused telemetry reproduction; reverted before merge.
-  group: pack1-gateway-preview-draft-888
+  group: pack1-gateway-preview
   cancel-in-progress: false
 jobs:
   scope:
