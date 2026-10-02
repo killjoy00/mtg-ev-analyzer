@@ -35,14 +35,19 @@ test('Admin Users browser uses PATCH rename, typed destructive confirmation, sta
   assert.match(users,/\/username'.*'PATCH'/s);
   assert.match(users,/confirm:String\(values\.get\('confirm'\)/);
   assert.match(users,/acknowledgeAdmin/);
-  assert.match(users,/Promise\.allSettled/);
+  assert.match(users,/const deletionPromise=deletionStatus\(id\)\.then/);
+  assert.match(users,/Checking deletion status/);
   assert.match(users,/Deletion status is temporarily unavailable/);
+  assert.match(users,/deletionCommitted/);
   assert.match(users,/Refresh deletion status/);
   assert.match(users,/Apple subscriptions or Patreon memberships/);
   assert.match(users,/Public username/);
   assert.match(users,/previous_display_name/);
   assert.match(shell,/renderUsers\(root,request,growthRequest\)/);
   assert.match(shell,/method=body\?'POST':'GET'/);
+  const growth=fs.readFileSync('worker/growth-function.js','utf8');
+  assert.match(growth,/deletionCommitted:true/);
+  assert.match(growth,/operationId:error\.operationId/);
 });
 
 test('0047 is registered in secure auth and isolated backend release paths',()=>{
