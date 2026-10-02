@@ -32,3 +32,5 @@ export const config = Object.freeze({
     legacyBaseUrl: `${apiOrigin}/legacy`,
   }),
 });
+
+// CI latency probe for #844; comment-only, no behavior change.
