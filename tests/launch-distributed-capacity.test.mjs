@@ -182,7 +182,7 @@ test('AbortSignal timeout is distinct from cohort abort fallout',async()=>{
 test('draft PRs cannot provision preview resources and rerun artifacts are attempt-scoped',()=>{
  const workflow=fs.readFileSync(new URL('../.github/workflows/launch-distributed.yml',import.meta.url),'utf8');
  assert.match(workflow,/github\.event\.pull_request\.draft == false/);
- const artifactLines=workflow.split('\n').filter(line=>/name: (?:isolated-encrypted-fixtures|distributed-capacity-(?:setup|runner|final))|pattern: distributed-capacity/.test(line));
+ const artifactLines=workflow.split('\n').filter(line=>/name: (?:isolated-encrypted-fixtures|distributed-capacity-)|pattern: distributed-capacity-/.test(line));
  assert.ok(artifactLines.length>=6);for(const line of artifactLines)assert.match(line,/github\.run_attempt/);
 });
 
