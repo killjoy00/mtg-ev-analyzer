@@ -45,7 +45,7 @@ test('linked accounts with no owned display name get a persistent actionable war
   assert.match(product, /Shown on Daily leaderboards and your public profile/);
 });
 
-test('signed-in progression uses My Pack One stats and Account tabs', () => {
+test('signed-in progression uses My Pack One stats and Account settings tabs', () => {
   assert.match(bootstrap, /renderAccount\(\{source:'nav'\}\)/);
   assert.match(product, /myPackOneMarkup/);
   assert.match(product, /id = 'account-nav'/);
@@ -60,4 +60,11 @@ test('signed-in progression uses My Pack One stats and Account tabs', () => {
   assert.match(myPack, /data-share-achievement/);
   assert.match(myPack, /data-share-daily/);
   assert.match(product, /profile-account/);
+  assert.match(myPack, /Account settings/);
+  assert.match(myPack, /Shared W–L/);
+  assert.match(myPack, /Welcome to My Pack One/);
+  assert.match(myPack, /Empty data is not treated as a zero score/);
+  assert.match(product, /Your record starts when you play/);
+  assert.match(product, /Sign in or create account/);
+  assert.doesNotMatch(product, /Back to game/);
 });
