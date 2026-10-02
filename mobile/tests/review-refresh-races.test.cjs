@@ -547,6 +547,40 @@ test('Profile visibility toggles an initially public profile off on the first ta
   await act(async () => { await save.props.onPress(); });
   assert.equal(writes.length, 1);
   assert.equal(writes[0].profilePublic, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(writes[0], 'acceptPublicIdentityTerms'), false);
+  await act(async () => root.unmount());
+});
+
+
+test('shared account state hook stops loading and exposes account fetch failures', async () => {
+  const focus = focusControl();
+  const session = { playerToken: 'player', accountToken: 'account', accountUser: { id: 'account-id' } };
+  const hook = compileModule('src/hooks/useAccountState.ts', {
+    'expo-router': { router: { replace() {} }, useFocusEffect: focus.useFocusEffect },
+    '@/src/api/client': { ApiError: class ApiError extends Error {} },
+    '@/src/api/account': {
+      forgetAccountLocally: async (value) => value,
+      loadMobileAccount: async () => { throw new Error('account offline'); },
+    },
+    '@/src/api/career': { loadMobileCareer: async () => profile('Never loaded') },
+    '@/src/api/draftRun': { loadSetCatalog: async () => ({ sets: [] }) },
+    '@/src/api/guest': { ensureGuestSession: async () => session },
+  }).useAccountState;
+
+  function Harness() {
+    const state = hook({ loadProfile: true, loadCatalog: true });
+    return React.createElement('Text', null, `${state.busy}:${state.enrichmentBusy}:${state.message || 'none'}`);
+  }
+
+  let root;
+  await act(async () => {
+    root = TestRenderer.create(React.createElement(Harness));
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  assert.match(renderedText(root.toJSON()), /false:false:account offline/);
   await act(async () => root.unmount());
 });
 
