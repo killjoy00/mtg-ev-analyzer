@@ -130,6 +130,28 @@ async function fresh({source='nav',validateDailyRunId=null,intent=null,width=390
   await page.evaluate(async args=>window.__renderAccount(args),{source,validateDailyRunId,intent});
 }
 
+async function startVerificationSignup({source,validateDailyRunId=null,intent=null,email='verify@example.invalid'}={}) {
+  await fresh({source,validateDailyRunId,intent});
+  verificationRequired=true;
+  const signup=page.locator('#account-signup');
+  await signup.locator('[name="email"]').fill(email);
+  await signup.locator('[name="password"]').fill('fixture-password-123');
+  await signup.getByRole('button',{name:'Create account',exact:true}).click();
+  await page.getByRole('heading',{name:'Check your email'}).waitFor();
+  return page.evaluate(()=>JSON.parse(sessionStorage.getItem('pack1-auth-flow-v1')||'null'));
+}
+
+async function resumeVerificationAfterReload({navigate=false}={}) {
+  signed=false;
+  await page.goto(base+'/tests/auth-context-harness.html?auth=verify',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>Boolean(window.__renderAccount));
+  if(navigate) {
+    await page.evaluate(()=>{void import('/growth.mjs').then(growth=>growth.resumeAccountAuth('verify'));});
+    return;
+  }
+  await page.evaluate(async()=>{const growth=await import('/growth.mjs');await growth.resumeAccountAuth('verify');});
+}
+
 try {
   // Normal nav/route auth defaults to sign-in and shows exactly one email mode.
   await fresh({source:'nav',width:390});
@@ -207,6 +229,31 @@ try {
   assert.equal(await page.locator('.account-verification-success.form-error').count(),0);
   await page.locator('#account-verification-signin').click();
   await page.locator('#account-signin').waitFor();
+
+  // Verification-required email signup persists pending Daily context across a full document reload.
+  let savedFlow=await startVerificationSignup({source:'daily_result',validateDailyRunId:runId,email:'daily-verify@example.invalid'});
+  assert.deepEqual(savedFlow,{intent:null,source:'daily_result',validateDailyRunId:runId});
+  nextLinkNewlyClaimed=false;
+  await resumeVerificationAfterReload();
+  await page.getByText("Score added to today's leaderboard",{exact:true}).waitFor();
+  assert.deepEqual(linkBodies.at(-1),{validateDailyRunId:runId},'verification return must submit the pending Daily run when linking the account');
+
+  // Elite entry intent survives the verification reload and resumes at the Elite destination.
+  savedFlow=await startVerificationSignup({source:'practice_gate',intent:'elite',email:'elite-verify@example.invalid'});
+  assert.deepEqual(savedFlow,{intent:'elite',source:'practice_gate',validateDailyRunId:null});
+  nextLinkNewlyClaimed=false;
+  await resumeVerificationAfterReload({navigate:true});
+  await page.waitForURL(url=>new URL(url).pathname==='/patreon/');
+  assert.equal(new URL(page.url()).pathname,'/patreon/');
+
+  // Patreon activation intent also survives the reload and resumes the provider handoff screen.
+  savedFlow=await startVerificationSignup({source:'welcome_note',intent:'patreon-activate',email:'patreon-verify@example.invalid'});
+  assert.deepEqual(savedFlow,{intent:'patreon-activate',source:'welcome_note',validateDailyRunId:null});
+  nextLinkNewlyClaimed=false;
+  await resumeVerificationAfterReload();
+  await page.getByRole('heading',{name:'Activate Pack One Elite'}).waitFor();
+  await page.getByRole('heading',{name:'Authorize Patreon to activate Elite.'}).waitFor();
+  await page.evaluate(()=>sessionStorage.removeItem('pack1-patreon-activation-v1'));
 
   // Unverified password sign-in gets a recovery message and a resend action.
   await fresh({source:'nav'});
