@@ -152,7 +152,54 @@ async function resumeVerificationAfterReload({navigate=false}={}) {
   await page.evaluate(async()=>{const growth=await import('/growth.mjs');await growth.resumeAccountAuth('verify');});
 }
 
+async function captureProductionAuthEvidence() {
+  signed=false;
+  verificationRequired=false;
+  nextLinkNewlyClaimed=false;
+  nextLinkRankingReason=null;
+  linkBodies=[];
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(base+'/',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>Boolean(document.querySelector('#account-nav')));
+  await page.evaluate(async()=>{
+    const growth=await import('/growth.mjs');
+    await growth.renderAccount({source:'nav',mode:'signin'});
+  });
+  await page.locator('#account-signin').waitFor();
+  await page.screenshot({path:'artifacts/ui-auth-production-signin-390.png',fullPage:true});
+
+  await page.evaluate(async()=>{
+    const growth=await import('/growth.mjs');
+    await growth.renderAccount({source:'nav',mode:'signup'});
+  });
+  await page.locator('#account-signup').waitFor();
+  await page.screenshot({path:'artifacts/ui-auth-production-signup-390.png',fullPage:true});
+
+  await page.setViewportSize({width:1440,height:900});
+  await page.screenshot({path:'artifacts/ui-auth-production-signup-desktop.png',fullPage:true});
+
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>{document.documentElement.style.fontSize='125%';});
+  await page.screenshot({path:'artifacts/ui-auth-production-signup-large-text-390.png',fullPage:true});
+  await page.evaluate(()=>{document.documentElement.style.fontSize='';});
+
+  signed=true;
+  nextLinkNewlyClaimed=true;
+  nextLinkRankingReason='username_taken';
+  await page.evaluate(()=>{
+    sessionStorage.setItem('pack1-auth-flow-v1',JSON.stringify({intent:null,source:'account',validateDailyRunId:null}));
+  });
+  await page.evaluate(async()=>{
+    const growth=await import('/growth.mjs');
+    await growth.resumeAccountAuth('verify');
+  });
+  await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
+  await page.screenshot({path:'artifacts/ui-auth-production-verification-account-ready-390.png',fullPage:true});
+}
+
 try {
+  await captureProductionAuthEvidence();
+
   // Normal nav/route auth defaults to sign-in and shows exactly one email mode.
   await fresh({source:'nav',width:390});
   await page.locator('#account-signin').waitFor();
