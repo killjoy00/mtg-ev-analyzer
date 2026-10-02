@@ -1,0 +1,55 @@
+name: App Store public availability
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/app-store-app-availability-request.json'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: app-store-public-availability
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    name: configure App Store public availability
+    if: ${{ github.ref == 'refs/heads/main' && github.event_name == 'push' }}
+    runs-on: ubuntu-latest
+    environment: pack-one-mobile-release
+    env:
+      ASC_KEY_ID: ${{ secrets.ASC_KEY_ID }}
+      ASC_ISSUER_ID: ${{ secrets.ASC_ISSUER_ID }}
+      ASC_PRIVATE_KEY: ${{ secrets.ASC_KEY_P8 }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate guarded availability request
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          r=json.loads(Path('.github/app-store-app-availability-request.json').read_text())
+          if set(r) != {'operation','reason','territories'}:
+              raise SystemExit('Invalid App Store availability request keys.')
+          if r.get('operation') != 'configure-app-store-availability':
+              raise SystemExit('Invalid App Store availability operation.')
+          if r.get('territories') != ['USA','CAN']:
+              raise SystemExit('This guarded request is pinned to USA + CAN only.')
+          if not isinstance(r.get('reason'),str) or not r['reason'].strip():
+              raise SystemExit('Request reason is required.')
+          PY
+      - name: Require current approved main revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin main
+          [[ "$(git rev-parse HEAD)" == "$(git rev-parse FETCH_HEAD)" ]]
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Configure Pack One App Store availability to USA + Canada only
+        run: node .github/scripts/app-store-app-availability.mjs
