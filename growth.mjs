@@ -220,18 +220,22 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
   const app=document.querySelector('#app');if(!app)return;
   let profile=null;
   try {profile=await loadMyProfile();} catch {}
-  const initial=String(profile?.player?.display_name||'').trim();
   const initialReason=profile?.player?.display_name_reason||profile?.ranking_identity?.reason||linked?.rankingIdentity?.reason||null;
+  const storedInitial=String(profile?.player?.display_name||'').trim();
+  const initial=initialReason==='username_required'?'':storedInitial;
   const initialWarning=initialReason==='name_not_allowed'
     ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
     : initialReason==='username_taken'
       ? 'Choose a different display name. That one is already taken.'
-      : initialReason==='username_required'
-        ? 'Choose a display name to join Daily leaderboards.'
-        : '';
-  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small>Shown on Daily leaderboards and your public profile.</small><p class="account-identity-rules"><small>By saving a display name, you agree to the <a href="/terms/#public-identity-rules">Public Identity rules</a>: no harassment, impersonation, spam, private contact information, or abusive content.</small></p><button class="button primary" type="submit">Continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
+      : '';
+  const initialHelper=initialReason==='username_required'
+    ? 'Optional. Choose a display name if you want to join Daily leaderboards. Shown on Daily leaderboards and your public profile.'
+    : 'Shown on Daily leaderboards and your public profile.';
+  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>By saving a display name, you agree to the <a href="/terms/#public-identity-rules">Public Identity rules</a>: no harassment, impersonation, spam, private contact information, or abusive content.</small></p><button class="button primary" type="submit">Continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
   const form=document.querySelector('#account-ready-form');
   const input=form?.querySelector('input[name="displayName"]');
+  const status=form?.querySelector('.form-error');
+  input?.addEventListener('input',()=>{if(status)status.textContent='';});
   input?.focus();
   document.querySelector('#account-ready-skip')?.addEventListener('click',()=>void continueAfterSignupNamePrompt({skip:true}));
   form?.addEventListener('submit',async eventObject=>{
