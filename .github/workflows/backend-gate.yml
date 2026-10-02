@@ -16,6 +16,9 @@ on:
       - 'scripts/load_verified_draft_run.mjs'
       - 'scripts/*corpus*manifest.mjs'
       - 'scripts/load*tro*.mjs'
+      - 'scripts/backend-gate-scope.mjs'
+      - 'scripts/backend-gate-map.json'
+      - 'tests/backend-gate-scope.test.mjs'
       - '.github/workflows/prepare-rebuild.yml'
       - '.github/workflows/backend-gate.yml'
 
@@ -27,10 +30,68 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend-gate:
+  precheck:
+    name: backend schema gate precheck
+    runs-on: ubuntu-latest
+    outputs:
+      needs_neon: ${{ steps.scope.outputs.needs_neon }}
+      full_suite: ${{ steps.scope.outputs.full_suite }}
+      domains: ${{ steps.scope.outputs.domains }}
+      domains_json: ${{ steps.scope.outputs.domains_json }}
+      suites_json: ${{ steps.scope.outputs.suites_json }}
+      season_destructive: ${{ steps.scope.outputs.season_destructive }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify backend scope classifier
+        run: node --test tests/backend-gate-scope.test.mjs
+      - name: Detect Neon integration scope
+        id: scope
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          fail_closed() {
+            echo 'needs_neon=true' >> "$GITHUB_OUTPUT"
+            echo 'full_suite=true' >> "$GITHUB_OUTPUT"
+            echo 'domains=' >> "$GITHUB_OUTPUT"
+            echo 'domains_json=["account","subscriptions","draft_run","daily","corpus","seasons"]' >> "$GITHUB_OUTPUT"
+            echo 'suites_json=[]' >> "$GITHUB_OUTPUT"
+            echo 'season_destructive=true' >> "$GITHUB_OUTPUT"
+          }
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo '::warning::Unable to fetch origin/main; forcing the full Neon integration suite.'
+            fail_closed
+            exit 0
+          fi
+          if ! stack_base_sha="$(git merge-base origin/main "$HEAD_SHA")"; then
+            echo '::warning::Unable to compute stack merge base; forcing the full Neon integration suite.'
+            fail_closed
+            exit 0
+          fi
+          mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$HEAD_SHA")
+          printf 'Stack changes from %s to %s:\n' "$stack_base_sha" "$HEAD_SHA"
+          printf ' - %s\n' "${changed_files[@]}"
+          if ! node scripts/backend-gate-scope.mjs "${changed_files[@]}"; then
+            echo '::warning::Backend classifier failed; forcing the full Neon integration suite.'
+            fail_closed
+          fi
+
+  backend-domain:
+    name: backend ${{ matrix.domain }}
+    needs: precheck
     # Fork PRs do not receive repository secrets. Keep them skipped rather than
     # failing or ever pointing the fixture suites at the production branch.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        domain: ${{ fromJSON(needs.precheck.outputs.domains_json || '["account","subscriptions","draft_run","daily","corpus","seasons"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -66,7 +127,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
           # Explicit parent: never inherit Neon's default-branch label (see docs/DATABASE-RECOVERY.md).
           parent_branch: br-orange-feather-ayps8kep
-          branch_name: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          branch_name: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.domain }}
           database: pack1
           role: pack1_owner
           expires_at: ${{ steps.expiry.outputs.expires_at }}
@@ -133,67 +194,57 @@ jobs:
             done
           fi
 
-      - name: Run SQL-backed integration suites
+      - name: Run isolated backend domain
         shell: bash
         env:
           PACK1_CI_BRANCH_ID: ${{ steps.neon.outputs.branch_id }}
-          BASE_SHA: ${{ github.event.pull_request.base.sha }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          BACKEND_DOMAIN: ${{ matrix.domain }}
         run: |
           set -euo pipefail
-          DATABASE_URL="$(cat "$PACK1_CI_CONNECTION")" node scripts/verify-neon-schema.mjs
-          # Legacy primitive fixtures bypass readiness; the dedicated suite below enables and proves the production gate.
-          psql "$(cat "$PACK1_CI_CONNECTION")" -v ON_ERROR_STOP=1 -c "DELETE FROM draft_run_readiness_keys"
+          connection="$(cat "$PACK1_CI_CONNECTION")"
+
+          # Always-run foundation for every isolated backend group.
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          psql "$connection" -v ON_ERROR_STOP=1 -c "DELETE FROM draft_run_readiness_keys"
           node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --production-bootstrap
+
           # A corpus bump (or loader/import change) must still prove that the
-          # checked-in corpus can be loaded before production serves it. For
-          # unrelated backend PRs, the disposable branch already contains the
-          # production corpus copied from Neon's default branch; reloading stale
-          # checked-in display metadata can create a false failure after a
-          # successful display-only maintenance refresh.
+          # checked-in corpus can be loaded before production serves it.
           if git diff --quiet "$STACK_BASE_SHA" "$HEAD_SHA" -- 'corpus/draft-run/**' scripts/load_verified_draft_run.mjs worker/trophy-import.mjs; then
             echo 'No corpus or loader/import changes; using the cloned production corpus.'
           else
             node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
           fi
-          node tests/staged-manifest-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/source-eligibility-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/corpus-components-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/retirement-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/corpus-version-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/serving-statistics-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/selection-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/serving-cache-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/draft-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/cube-run-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/decision-measurements-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/measurement-report-math.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/fixed-daily-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/daily-generation-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/corpus-admin-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/snapshot-uniqueness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/corpus-health-freshness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/activated-snapshot-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/health-serving-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/account-session-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/mobile-auth-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/username-uniqueness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/public-identity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/account-deletion-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/patreon-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/patreon-webhook-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/apple-subscription-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/capabilities-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/eight-pick-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/request-integrity-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          node tests/corpus-readiness-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
-          # Destructive season edge cases run last because this isolated branch is deleted next.
-          node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+
+          mapfile -t targeted_suites < <(
+            BACKEND_DOMAIN="$BACKEND_DOMAIN" node -e '
+              const fs = require("node:fs");
+              const map = JSON.parse(fs.readFileSync("scripts/backend-gate-map.json", "utf8"));
+              const suites = map.domains?.[process.env.BACKEND_DOMAIN]?.suites;
+              if (!Array.isArray(suites) || suites.length === 0) process.exit(2);
+              for (const suite of suites) console.log(suite);
+            '
+          )
+          echo "Backend routing domain: $BACKEND_DOMAIN"
+
+          for suite in "${targeted_suites[@]}"; do
+            [[ -n "$suite" ]] || continue
+            # The destructive season suite is deliberately deferred to the end.
+            [[ "$suite" == 'tests/season-backend-smoke.mjs' ]] && continue
+            echo "Running isolated backend suite: $suite"
+            node "$suite" "$PACK1_CI_CONNECTION" --dev-fixtures
+          done
+
+          if [[ "$BACKEND_DOMAIN" == 'seasons' ]]; then
+            echo 'Running destructive season fixtures last.'
+            node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
+          fi
 
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: corpus-readiness-isolated-${{ github.run_id }}
+          name: corpus-readiness-isolated-${{ github.run_id }}-${{ matrix.domain }}
           path: artifacts/corpus-readiness
           if-no-files-found: ignore
           retention-days: 30
@@ -205,3 +256,35 @@ jobs:
           project_id: patient-shadow-91417882
           api_key: ${{ secrets.NEON_API_KEY }}
           branch: ${{ steps.neon.outputs.branch_id }}
+
+  backend-gate:
+    name: backend-gate
+    needs: [precheck, backend-domain]
+    if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate isolated backend domains
+        shell: bash
+        env:
+          PRECHECK_RESULT: ${{ needs.precheck.result }}
+          DOMAIN_RESULT: ${{ needs.backend-domain.result }}
+          BACKEND_FULL: ${{ needs.precheck.result != 'success' || needs.precheck.outputs.full_suite != 'false' }}
+          DOMAINS_JSON: ${{ needs.precheck.outputs.domains_json }}
+        run: |
+          set -euo pipefail
+          if [[ "$DOMAIN_RESULT" != 'success' ]]; then
+            echo "::error::At least one required isolated backend domain was skipped, cancelled, or failed (aggregate result: $DOMAIN_RESULT)."
+            exit 1
+          fi
+
+          if [[ "$BACKEND_FULL" == 'true' && "$PRECHECK_RESULT" == 'success' ]]; then
+            DOMAINS_JSON="$DOMAINS_JSON" node -e '
+              const expected = ["account","subscriptions","draft_run","daily","corpus","seasons"].sort();
+              const actual = JSON.parse(process.env.DOMAINS_JSON || "[]").sort();
+              if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+                throw new Error("Full backend routing omitted a domain: " + JSON.stringify(actual));
+              }
+            '
+          fi
+
+          echo 'All required isolated backend domain jobs succeeded.'

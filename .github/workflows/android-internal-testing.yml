@@ -2,9 +2,10 @@ name: Android internal testing
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
     paths:
       - 'mobile/**'
+      - 'scripts/audit-android-manifest.py'
       - '.github/workflows/android-internal-testing.yml'
   push:
     branches: [main]
@@ -20,10 +21,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  signing-config-smoke:
-    name: validate Android upload signing config
+  native-scope:
+    name: classify Android internal native scope
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
+    outputs:
+      native_full: ${{ steps.scope.outputs.native_full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+      - name: Classify native impact
+        id: scope
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          native_full=true
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo '::warning::Unable to fetch origin/main; forcing full native validation.'
+          elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
+            echo '::warning::Unable to compute merge base; forcing full native validation.'
+          else
+            mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
+            printf 'Changed files:\n'
+            printf ' - %s\n' "${changed_files[@]}"
+            if classified="$(node mobile/scripts/native-ci-scope.mjs "${changed_files[@]}")"; then
+              if [[ "$classified" == 'true' || "$classified" == 'false' ]]; then
+                native_full="$classified"
+              else
+                echo "::warning::Native classifier returned unexpected value '$classified'; forcing full validation."
+              fi
+            else
+              echo '::warning::Native classifier failed; forcing full validation.'
+            fi
+          fi
+          echo "native_full=$native_full" >> "$GITHUB_OUTPUT"
+          echo "Native full validation: $native_full"
+
+  signing-config-smoke:
+    name: validate Android upload signing config
+    needs: native-scope
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    env:
+      NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}
     defaults:
       run:
         working-directory: mobile
@@ -42,13 +88,17 @@ jobs:
         run: |
           node ./scripts/check-build-toolchain.mjs
           npm ci --no-audit --no-fund
-      # PR smoke builds are never uploaded. The publishing job below allocates
-      # against Google Play so workflow renames/retries cannot reuse a versionCode.
       - name: Set smoke version code
         shell: bash
         run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
         run: npm test
+      - name: Fast-path production Metro export for Android
+        if: env.NATIVE_FULL == 'false'
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo export --platform android --output-dir "$RUNNER_TEMP/pack-one-android-internal-export"
       - name: Generate production Android project
         env:
           CI: '1'
@@ -70,13 +120,26 @@ jobs:
             exit 1
           fi
           echo "Verified Android versionName: $expected_version_name"
+      - name: Merge release Android manifest for privacy audit
+        working-directory: mobile/android
+        run: ./gradlew :app:processReleaseMainManifest --no-daemon
+      - name: Audit merged Android manifest
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find app/build/intermediates -type f -name AndroidManifest.xml -path '*merged*manifest*release*' -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-internal-native-audit.json"
       - name: Apply upload-signing configuration
+        if: env.NATIVE_FULL == 'true'
         env:
           PACKONE_ANDROID_UPLOAD_KEYSTORE: /tmp/packone-upload.p12
           PACKONE_ANDROID_UPLOAD_PASSWORD: validation-only
           PACKONE_ANDROID_UPLOAD_KEY_ALIAS: packone-upload
         run: node ./scripts/configure-android-upload-signing.mjs
       - name: Verify release build points at Pack One upload signing
+        if: env.NATIVE_FULL == 'true'
         shell: bash
         run: |
           set -euo pipefail

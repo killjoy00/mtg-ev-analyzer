@@ -6,30 +6,91 @@ const unit = readFileSync('.github/workflows/test.yml','utf8');
 const browser = readFileSync('.github/workflows/e2e.yml','utf8');
 const mobile = readFileSync('.github/workflows/mobile.yml','utf8');
 
-for (const [name, flow] of [['test',unit],['browser',browser]]) {
-  test(name+' required workflow reruns after a stacked PR retarget',()=>{
-    assert.match(flow,/pull_request:\n\s+types: \[opened, synchronize, reopened, edited\]/);
-    assert.match(flow,/cancel-in-progress: true/);
-    assert.match(flow,/git diff --name-only "\$PR_BASE_SHA" "\$PR_HEAD_SHA"/);
-    assert.match(flow,/mobile\/\*/);
-    assert.match(flow,/\.github\/workflows\/android-\*\.yml/);
-    assert.match(flow,/Native-mobile\/release-only PR/);
+for (const [name, flow] of [['test', unit], ['browser', browser], ['mobile', mobile]]) {
+  test(name + ' ignores PR metadata edits while keeping cancellation', () => {
+    assert.match(flow, /pull_request:\n(?:[\s\S]*?)types: \[opened, synchronize, reopened\]/);
+    assert.doesNotMatch(flow, /types: \[[^\]]*edited/);
+    assert.match(flow, /cancel-in-progress: true/);
   });
 }
 
-test('required test fast path keeps the account-deletion secret guard',()=>{
-  assert.match(unit,/workflow_dispatch:/);
-  assert.match(unit,/Verify account-deletion release secrets are provisioned/);
-  assert.match(unit,/if: github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository\)/);
+test('required test fast path keeps the account-deletion secret guard', () => {
+  assert.match(unit, /Verify account-deletion release secrets are provisioned/);
+  assert.match(unit, /if: github\.event_name == 'workflow_dispatch' \|\| \(github\.event_name == 'pull_request' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository\)/);
 });
 
-test('browser dependency installation is skipped on the mobile-only fast path',()=>{
-  assert.match(browser,/name: Install browser test dependency\n\s+if: steps\.scope\.outputs\.run_full == 'true'/);
-  assert.match(browser,/name: Run browser regression\n\s+if: steps\.scope\.outputs\.run_full == 'true'/);
+test('signed and publishing mobile jobs remain unreachable from pull-request execution and never touch the unsigned Gradle cache', () => {
+  const android = readFileSync('.github/workflows/android-production-bundle.yml','utf8');
+  const internal = readFileSync('.github/workflows/android-internal-testing.yml','utf8');
+  const ios = readFileSync('.github/workflows/ios-testflight.yml','utf8');
+
+  const signedAndroid = android.split('  signed-bundle:')[1] ?? '';
+  const publishAndroid = internal.split('  internal-release:')[1] ?? '';
+  const publishIos = ios.split('  testflight:')[1] ?? '';
+
+  for (const flow of [signedAndroid, publishAndroid, publishIos]) {
+    assert.match(flow, /github\.ref == 'refs\/heads\/main'/);
+    assert.doesNotMatch(flow, /actions\/cache\/(?:restore|save)@/);
+  }
+  assert.match(signedAndroid, /environment: pack-one-mobile-release/);
+  assert.match(publishAndroid, /environment: pack-one-mobile-release/);
+  assert.match(publishIos, /environment: pack-one-mobile-release/);
 });
 
-test('targeted mobile validation also reruns after a stacked PR retarget',()=>{
-  assert.match(mobile,/pull_request:\n\s+types: \[opened, synchronize, reopened, edited\]/);
-  assert.match(mobile,/group: mobile-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}/);
-  assert.match(mobile,/cancel-in-progress: true/);
+test('unsigned Gradle cache is main-seeded, PR-read-only, and excludes signing material', () => {
+  const mainRc = readFileSync('.github/workflows/mobile-exact-main-rc.yml','utf8');
+  const android = readFileSync('.github/workflows/android-production-bundle.yml','utf8');
+  assert.match(mainRc, /actions\/cache\/save@v4/);
+  assert.match(mainRc, /Verify unsigned Gradle cache contains no signing material/);
+  assert.match(mainRc, /Log unsigned Gradle cache size/);
+  assert.match(android, /actions\/cache\/restore@v4/);
+  assert.doesNotMatch(android.split('  signed-bundle:')[1] ?? '', /actions\/cache\/(?:restore|save)@/);
+});
+
+test('exact-main RC treats main movement as stale evidence, not a build failure', () => {
+  const mainRc = readFileSync('.github/workflows/mobile-exact-main-rc.yml','utf8');
+  assert.match(mainRc, /id: freshness/);
+  assert.match(mainRc, /echo "current=false" >> "\$GITHUB_OUTPUT"/);
+  assert.match(mainRc, /if: steps\.freshness\.outputs\.current == 'true'/);
+});
+
+test('backend Neon job is wired fail-closed behind the fork-safety guard', () => {
+  const backend = readFileSync('.github/workflows/backend-gate.yml','utf8');
+  assert.match(backend, /!cancelled\(\).*github\.event\.pull_request\.head\.repo\.full_name == github\.repository.*needs\.precheck\.result != 'success'.*needs\.precheck\.outputs\.needs_neon != 'false'/);
+  assert.match(backend, /scripts\/backend-gate-scope\.mjs/);
+  assert.match(backend, /scripts\/backend-gate-map\.json/);
+  assert.match(backend, /tests\/backend-gate-scope\.test\.mjs/);
+});
+
+
+test('expensive PR jobs stay cancellable and no job-level condition uses always()', () => {
+  const workflows = [
+    ['Android production', readFileSync('.github/workflows/android-production-bundle.yml', 'utf8')],
+    ['Android internal', readFileSync('.github/workflows/android-internal-testing.yml', 'utf8')],
+    ['iOS TestFlight', readFileSync('.github/workflows/ios-testflight.yml', 'utf8')],
+    ['backend gate', readFileSync('.github/workflows/backend-gate.yml', 'utf8')],
+  ];
+  for (const [name, flow] of workflows) {
+    const jobLevelIfs = flow.split('\n').filter((line) => /^    if:/.test(line));
+    for (const condition of jobLevelIfs) assert.doesNotMatch(condition, /always\(\)/, name + ': ' + condition);
+  }
+});
+
+test('native PR workflows trigger for root helpers they consume', () => {
+  const android = readFileSync('.github/workflows/android-production-bundle.yml', 'utf8');
+  const internal = readFileSync('.github/workflows/android-internal-testing.yml', 'utf8');
+  const ios = readFileSync('.github/workflows/ios-testflight.yml', 'utf8');
+  assert.match(android, /- 'scripts\/audit-android-manifest\.py'/);
+  assert.match(internal, /- 'scripts\/audit-android-manifest\.py'/);
+  assert.match(ios, /- '\.github\/scripts\/app-store-\*\.mjs'/);
+});
+
+test('backend full path fans out by domain and aggregates fail closed', () => {
+  const backend = readFileSync('.github/workflows/backend-gate.yml', 'utf8');
+  assert.match(backend, /backend-domain:\n[\s\S]*?fail-fast: false[\s\S]*?matrix:/);
+  assert.match(backend, /branch_name: ci-pr-.*matrix\.domain/);
+  assert.match(backend, /name: backend-gate\n    needs: \[precheck, backend-domain\]/);
+  assert.match(backend, /DOMAIN_RESULT: \$\{\{ needs\.backend-domain\.result \}\}/);
+  assert.match(backend, /At least one required isolated backend domain was skipped, cancelled, or failed/);
+  assert.match(backend, /if: always\(\) && steps\.neon\.outputs\.branch_id != ''/);
 });

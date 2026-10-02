@@ -2,9 +2,10 @@ name: iOS TestFlight
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
     paths:
       - 'mobile/**'
+      - '.github/scripts/app-store-*.mjs'
       - '.github/workflows/ios-testflight.yml'
   push:
     branches: [main]
@@ -20,10 +21,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native-scope:
+    name: classify iOS native scope
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    outputs:
+      native_full: ${{ steps.scope.outputs.native_full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+      - name: Classify native impact
+        id: scope
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          native_full=true
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo '::warning::Unable to fetch origin/main; forcing full native validation.'
+          elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
+            echo '::warning::Unable to compute merge base; forcing full native validation.'
+          else
+            mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
+            printf 'Changed files:\n'
+            printf ' - %s\n' "${changed_files[@]}"
+            if classified="$(node mobile/scripts/native-ci-scope.mjs "${changed_files[@]}")"; then
+              if [[ "$classified" == 'true' || "$classified" == 'false' ]]; then
+                native_full="$classified"
+              else
+                echo "::warning::Native classifier returned unexpected value '$classified'; forcing full validation."
+              fi
+            else
+              echo '::warning::Native classifier failed; forcing full validation.'
+            fi
+          fi
+          echo "native_full=$native_full" >> "$GITHUB_OUTPUT"
+          echo "Native full validation: $native_full"
+
   archive-smoke:
     name: production iOS archive structure
-    if: ${{ github.event_name == 'pull_request' }}
-    runs-on: macos-latest
+    needs: native-scope
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ${{ (needs.native-scope.result == 'success' && needs.native-scope.outputs.native_full == 'false') && 'ubuntu-latest' || 'macos-latest' }}
+    env:
+      NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}
     defaults:
       run:
         working-directory: mobile
@@ -40,19 +86,56 @@ jobs:
           npm ci --no-audit --no-fund
       - name: Validate App Store RC helper syntax
         run: node --check ../.github/scripts/app-store-finalize-release-candidate.mjs
-      # PR smoke archives are never uploaded. The publishing job below allocates
-      # against App Store Connect so workflow renames/retries cannot reuse a number.
       - name: Set smoke build number
         shell: bash
         run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
         run: npm test
+      - name: Fast-path production Metro export for iOS
+        if: env.NATIVE_FULL == 'false'
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/pack-one-ios-export"
       - name: Generate production iOS project
         env:
           CI: '1'
           PACKONE_BUILD_PROFILE: production
         run: npx expo prebuild --platform ios --clean
+      - name: Validate generated iOS project structure
+        if: env.NATIVE_FULL == 'false'
+        shell: bash
+        run: |
+          set -euo pipefail
+          project='ios/PackOne.xcodeproj/project.pbxproj'
+          plist='ios/PackOne/Info.plist'
+          test -f "$project"
+          test -f "$plist"
+          expected_marketing_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
+          python3 - "$project" "$expected_marketing_version" <<'PY'
+          import re, sys
+          project = open(sys.argv[1], encoding='utf-8').read()
+          marketing = re.escape(sys.argv[2])
+          checks = {
+              'production bundle identifier': r'PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?pro\.packone\.app"?\s*;',
+              'marketing version': rf'MARKETING_VERSION\s*=\s*"?{marketing}"?\s*;',
+          }
+          for label, pattern in checks.items():
+              if not re.search(pattern, project):
+                  raise SystemExit(f'Missing generated iOS {label}: {pattern}')
+          PY
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$plist"
+          PACKONE_BUILD_PROFILE=production npx expo config --type public --json > "$RUNNER_TEMP/pack-one-production-expo-config.json"
+          node - "$RUNNER_TEMP/pack-one-production-expo-config.json" "$PACKONE_IOS_BUILD_NUMBER" "$expected_marketing_version" <<'NODE'
+          const fs = require('node:fs');
+          const config = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
+          if (config.ios?.bundleIdentifier !== 'pro.packone.app') throw new Error('Production Expo bundle identifier drifted.');
+          if (String(config.ios?.buildNumber) !== process.argv[3]) throw new Error('Production Expo build number drifted.');
+          if (config.version !== process.argv[4]) throw new Error('Production Expo marketing version drifted.');
+          NODE
+          echo "Verified generated production iOS metadata without compiling an archive."
       - name: Archive iPhone device build without signing
+        if: env.NATIVE_FULL == 'true'
         shell: bash
         run: |
           set -euo pipefail
@@ -61,17 +144,7 @@ jobs:
           scheme="PackOne"
           xcodebuild -workspace "$workspace" -list -json > "$RUNNER_TEMP/xcode-workspace.json"
           python3 -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); schemes=data.get("workspace",{}).get("schemes",[]); expected=sys.argv[2]; assert expected in schemes, f"Expected app scheme {expected!r} not found. Available schemes: {schemes}"' "$RUNNER_TEMP/xcode-workspace.json" "$scheme"
-          xcodebuild \
-            -workspace "$workspace" \
-            -scheme "$scheme" \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/PackOne.xcarchive" \
-            CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            archive
-          test -d "$RUNNER_TEMP/PackOne.xcarchive"
+          xcodebuild             -workspace "$workspace"             -scheme "$scheme"             -configuration Release             -destination 'generic/platform=iOS'             -archivePath "$RUNNER_TEMP/PackOne.xcarchive"             CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER"             CODE_SIGNING_ALLOWED=NO             CODE_SIGNING_REQUIRED=NO             archive
           archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
           test -f "$archive_plist"
           archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
@@ -85,15 +158,16 @@ jobs:
             echo "Expected archive build $PACKONE_IOS_BUILD_NUMBER, got $archived_build_number." >&2
             exit 1
           }
-          echo "Verified Pack One archive build number: $archived_build_number"
           python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
-          echo "Verified Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
+          echo "Verified unsigned Pack One archive build, marketing version, and export-compliance declaration."
       - name: Audit PR iOS privacy surface
+        if: env.NATIVE_FULL == 'true'
         shell: bash
         run: |
           set -euo pipefail
           python3 ./scripts/audit-ios-archive.py "$RUNNER_TEMP/PackOne.xcarchive" --output "$RUNNER_TEMP/pack-one-ios-native-audit.json"
       - name: Upload PR iOS native audit evidence
+        if: env.NATIVE_FULL == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: pack-one-ios-pr-native-audit

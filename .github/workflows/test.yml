@@ -3,7 +3,7 @@ name: test
 on:
   workflow_dispatch:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
   push:
     branches: [main]
     paths-ignore: ['.github/model-rollout-request.json']
@@ -29,29 +29,34 @@ jobs:
         id: scope
         shell: bash
         env:
-          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
           PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
           set -euo pipefail
           run_full=true
           if [[ "$GITHUB_EVENT_NAME" == "pull_request" ]]; then
-            run_full=false
-            mapfile -t changed_files < <(git diff --name-only "$PR_BASE_SHA" "$PR_HEAD_SHA")
-            if (( ${#changed_files[@]} == 0 )); then
-              run_full=true
+            if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+              echo '::warning::Unable to fetch origin/main; running full validation.'
+            elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
+              echo '::warning::Unable to compute merge base against origin/main; running full validation.'
             else
-              printf 'Changed files:\n'
-              printf ' - %s\n' "${changed_files[@]}"
-              for path in "${changed_files[@]}"; do
-                case "$path" in
-                  mobile/*|docs/mobile-*|docs/android-*|docs/parity.md|.github/workflows/mobile*.yml|.github/workflows/android-*.yml|.github/workflows/ios-*.yml|.github/workflows/google-play-access.yml|.github/android-*.txt|.github/ios-*.txt|.github/app-store-*.txt|.github/scripts/app-store-*.mjs|.gitignore)
-                    ;;
-                  *)
-                    run_full=true
-                    break
-                    ;;
-                esac
-              done
+              run_full=false
+              mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
+              if (( ${#changed_files[@]} == 0 )); then
+                run_full=true
+              else
+                printf 'Changed files:\n'
+                printf ' - %s\n' "${changed_files[@]}"
+                for path in "${changed_files[@]}"; do
+                  case "$path" in
+                    mobile/*|docs/mobile-*|docs/android-*|docs/parity.md|.github/workflows/mobile*.yml|.github/workflows/android-*.yml|.github/workflows/ios-*.yml|.github/workflows/google-play-access.yml|.github/android-*.txt|.github/ios-*.txt|.github/app-store-*.txt|.github/scripts/app-store-*.mjs|.gitignore)
+                      ;;
+                    *)
+                      run_full=true
+                      break
+                      ;;
+                  esac
+                done
+              fi
             fi
           fi
           echo "run_full=$run_full" >> "$GITHUB_OUTPUT"

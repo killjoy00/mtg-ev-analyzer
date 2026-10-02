@@ -2,9 +2,10 @@ name: Android production bundle
 
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, synchronize, reopened]
     paths:
       - 'mobile/**'
+      - 'scripts/audit-android-manifest.py'
       - '.github/workflows/android-production-bundle.yml'
   push:
     branches: [main]
@@ -20,10 +21,55 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  smoke:
-    name: validate production Android bundle build
+  native-scope:
+    name: classify Android production native scope
     if: ${{ github.event_name == 'pull_request' }}
     runs-on: ubuntu-latest
+    outputs:
+      native_full: ${{ steps.scope.outputs.native_full }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: mobile/.node-version
+      - name: Classify native impact
+        id: scope
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -u
+          native_full=true
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo '::warning::Unable to fetch origin/main; forcing full native validation.'
+          elif ! stack_base_sha="$(git merge-base origin/main "$PR_HEAD_SHA")"; then
+            echo '::warning::Unable to compute merge base; forcing full native validation.'
+          else
+            mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$PR_HEAD_SHA")
+            printf 'Changed files:\n'
+            printf ' - %s\n' "${changed_files[@]}"
+            if classified="$(node mobile/scripts/native-ci-scope.mjs "${changed_files[@]}")"; then
+              if [[ "$classified" == 'true' || "$classified" == 'false' ]]; then
+                native_full="$classified"
+              else
+                echo "::warning::Native classifier returned unexpected value '$classified'; forcing full validation."
+              fi
+            else
+              echo '::warning::Native classifier failed; forcing full validation.'
+            fi
+          fi
+          echo "native_full=$native_full" >> "$GITHUB_OUTPUT"
+          echo "Native full validation: $native_full"
+
+  smoke:
+    name: validate production Android bundle build
+    needs: native-scope
+    if: ${{ !cancelled() && github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    env:
+      NATIVE_FULL: ${{ needs.native-scope.result != 'success' || needs.native-scope.outputs.native_full != 'false' }}
     defaults:
       run:
         working-directory: mobile
@@ -47,11 +93,34 @@ jobs:
         run: echo "PACKONE_ANDROID_VERSION_CODE=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
       - name: Validate production mobile config
         run: npm test
+      - name: Fast-path production Metro export for Android
+        if: env.NATIVE_FULL == 'false'
+        env:
+          CI: '1'
+          PACKONE_BUILD_PROFILE: production
+        run: npx expo export --platform android --output-dir "$RUNNER_TEMP/pack-one-android-export"
       - name: Generate production Android project
         env:
           CI: '1'
           PACKONE_BUILD_PROFILE: production
         run: npx expo prebuild --platform android --clean
+      - name: Compute unsigned Gradle cache key
+        if: env.NATIVE_FULL == 'true'
+        id: gradle-cache
+        env:
+          PACKONE_GRADLE_CACHE_JAVA: '17'
+        run: node ./scripts/gradle-cache-key.mjs
+      - name: Restore main-seeded unsigned Gradle cache
+        if: env.NATIVE_FULL == 'true'
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            mobile/node_modules/**/.cxx
+          key: ${{ steps.gradle-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.gradle-cache.outputs.restore_key }}
       - name: Verify native Android version code
         shell: bash
         run: |
@@ -59,13 +128,37 @@ jobs:
           grep -Eq "versionCode[[:space:]]+$PACKONE_ANDROID_VERSION_CODE([[:space:]]|$)" android/app/build.gradle
           expected_version_name="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.playVersionName)')"
           grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle || grep -Fq "versionName '$expected_version_name'" android/app/build.gradle
-      - name: Build non-publishing PR smoke bundle
+      - name: Merge release Android manifest for fast-path privacy audit
+        if: env.NATIVE_FULL == 'false'
         working-directory: mobile/android
-        run: ./gradlew :app:bundleRelease --no-daemon
+        run: ./gradlew :app:processReleaseMainManifest --no-daemon
+      - name: Audit fast-path merged Android manifest
+        if: env.NATIVE_FULL == 'false'
+        working-directory: mobile/android
+        shell: bash
+        run: |
+          set -euo pipefail
+          manifest="$(find app/build/intermediates -type f -name AndroidManifest.xml -path '*merged*manifest*release*' -print -quit)"
+          test -n "$manifest"
+          python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-fast-native-audit.json"
+      - name: Upload fast-path Android native audit evidence
+        if: env.NATIVE_FULL == 'false'
+        uses: actions/upload-artifact@v4
+        with:
+          name: pack-one-android-pr-fast-native-audit
+          path: ${{ runner.temp }}/pack-one-android-fast-native-audit.json
+          if-no-files-found: error
+          retention-days: 30
+      - name: Build non-publishing PR smoke bundle
+        if: env.NATIVE_FULL == 'true'
+        working-directory: mobile/android
+        run: ./gradlew :app:bundleRelease --no-daemon --build-cache
       - name: Verify PR smoke bundle exists
+        if: env.NATIVE_FULL == 'true'
         working-directory: mobile/android
         run: test -s app/build/outputs/bundle/release/app-release.aab
       - name: Audit PR Android privacy surface
+        if: env.NATIVE_FULL == 'true'
         working-directory: mobile/android
         shell: bash
         run: |
@@ -74,6 +167,7 @@ jobs:
           test -n "$manifest"
           python3 ../scripts/audit-android-manifest.py "$manifest" --output "$RUNNER_TEMP/pack-one-android-native-audit.json"
       - name: Upload PR Android native audit evidence
+        if: env.NATIVE_FULL == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: pack-one-android-pr-native-audit
