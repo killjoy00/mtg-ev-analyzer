@@ -30,7 +30,7 @@ import { colors, spacing } from '@/src/theme';
 const BILLING_WARNING = 'Deleting your Pack One account does not cancel subscriptions. Apple subscriptions must be canceled in your Apple subscription settings. Patreon memberships must be canceled on Patreon.';
 
 export default function AccountDeleteScreen() {
-  const { session, account, busy, clearAccount } = useAccountState({ requireAccount: true });
+  const { session, account, busy, message: loadMessage, refresh, clearAccount } = useAccountState({ requireAccount: true });
   const [deletePassword, setDeletePassword] = useState('');
   const [deleteCode, setDeleteCode] = useState('');
   const [deleteCodeSent, setDeleteCodeSent] = useState(false);
@@ -123,11 +123,22 @@ export default function AccountDeleteScreen() {
     }
   };
 
-  if (busy || !account) return (
+  if (busy) return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} />
         <Text style={styles.body}>Loading deletion options...</Text>
+      </View>
+    </SafeAreaView>
+  );
+
+  if (!account) return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.center}>
+        <Text accessibilityRole="alert" style={styles.message}>{loadMessage || 'Could not load deletion options.'}</Text>
+        <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.secondaryButton}>
+          <Text style={styles.secondaryButtonText}>Retry</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
