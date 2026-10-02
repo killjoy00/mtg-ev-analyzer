@@ -7,10 +7,14 @@ const browser = readFileSync('.github/workflows/e2e.yml','utf8');
 const mobile = readFileSync('.github/workflows/mobile.yml','utf8');
 
 for (const [name, flow] of [['test',unit],['browser',browser]]) {
-  test(name+' required workflow reruns after a stacked PR retarget',()=>{
-    assert.match(flow,/pull_request:\n\s+types: \[opened, synchronize, reopened, edited\]/);
+  test(name+' classification is retarget-invariant and metadata edits do not rerun it',()=>{
+    assert.match(flow,/pull_request:\n\s+types: \[opened, synchronize, reopened\]/);
+    assert.doesNotMatch(flow,/types: \[[^\]]*edited/);
     assert.match(flow,/cancel-in-progress: true/);
-    assert.match(flow,/git diff --name-only "\$PR_BASE_SHA" "\$PR_HEAD_SHA"/);
+    assert.match(flow,/git fetch --no-tags origin main:refs\/remotes\/origin\/main/);
+    assert.match(flow,/git merge-base origin\/main "\$PR_HEAD_SHA"/);
+    assert.match(flow,/git diff --name-only "\$stack_base_sha" "\$PR_HEAD_SHA"/);
+    assert.doesNotMatch(flow,/PR_BASE_SHA/);
     assert.match(flow,/mobile\/\*/);
     assert.match(flow,/\.github\/workflows\/android-\*\.yml/);
     assert.match(flow,/Native-mobile\/release-only PR/);
@@ -28,8 +32,9 @@ test('browser dependency installation is skipped on the mobile-only fast path',(
   assert.match(browser,/name: Run browser regression\n\s+if: steps\.scope\.outputs\.run_full == 'true'/);
 });
 
-test('targeted mobile validation also reruns after a stacked PR retarget',()=>{
-  assert.match(mobile,/pull_request:\n\s+types: \[opened, synchronize, reopened, edited\]/);
+test('targeted mobile validation ignores PR metadata edits',()=>{
+  assert.match(mobile,/pull_request:\n\s+types: \[opened, synchronize, reopened\]/);
+  assert.doesNotMatch(mobile,/types: \[[^\]]*edited/);
   assert.match(mobile,/group: mobile-\$\{\{ github\.event\.pull_request\.number \|\| github\.ref \}\}/);
   assert.match(mobile,/cancel-in-progress: true/);
 });
