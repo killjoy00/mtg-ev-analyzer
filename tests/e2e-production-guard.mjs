@@ -1,9 +1,11 @@
 // Preloaded with `node --import` by every e2e browser step (.github/workflows/e2e.yml).
-// On any host but packone.pro, leaderboard-config.js points the app straight at the
-// production Neon Functions, so every request a test did not stub reached production:
-// fixture tokens produced a steady stream of 401s on /v1/events and unstubbed guest
-// session calls could create real players (#803). This blocks the production API for
-// every browser the tests launch. A test's own page and context routes still win.
+// leaderboard-config.js used to send localhost straight to the production Neon
+// Functions, so every request a test did not stub reached production: fixture
+// tokens produced a steady stream of 401s on /v1/events and unstubbed guest
+// session calls could create real players (#803). Localhost now uses the
+// development branch, but this still blocks every Neon and production API host
+// for every browser the tests launch, so tests stay hermetic. A test's own page
+// and context routes still win.
 // WebKit has no resolver override, so there only the context route applies.
 import {chromium,firefox,webkit} from 'playwright';
 import {CHROMIUM_RESOLVER_RULES,PRODUCTION_API_HOST} from './e2e-production-hosts.mjs';

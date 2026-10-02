@@ -33,13 +33,23 @@ test('only the apex host is first-party, matching the gateway origin allowlist',
   assert.equal(evaluate('www.packone.pro').firstParty,false);
 });
 
-test('localhost keeps the direct development-compatible endpoints',()=>{
-  const config=evaluate('127.0.0.1');
+test('localhost uses the development Functions branch, never production',()=>{
+  // Local manual testing against production created real guest players (#803).
+  for(const hostname of ['127.0.0.1','localhost']) {
+    const config=evaluate(hostname);
+    assert.equal(config.firstParty,false);
+    assert.equal(config.authBase,'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth');
+    assert.equal(config.url,'https://br-twilight-hill-ayffyd2b-pack1api.compute.c-5.us-east-2.aws.neon.tech');
+    assert.equal(config.growthUrl,'https://br-twilight-hill-ayffyd2b-pack1growth.compute.c-5.us-east-2.aws.neon.tech');
+    assert.equal(config.draftRunUrl,'https://br-twilight-hill-ayffyd2b-draftrunapi.compute.c-5.us-east-2.aws.neon.tech');
+  }
+});
+
+test('non-apex production hosts keep the direct production Functions branch',()=>{
+  const config=evaluate('magic.planitnow.us');
   assert.equal(config.firstParty,false);
-  assert.equal(config.authBase,'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth');
-  assert.match(config.url,/pack1api\.compute\.c-5\.us-east-2\.aws\.neon\.tech$/);
-  assert.match(config.growthUrl,/pack1growth\.compute\.c-5\.us-east-2\.aws\.neon\.tech$/);
-  assert.match(config.draftRunUrl,/draftrunapi\.compute\.c-5\.us-east-2\.aws\.neon\.tech$/);
+  assert.equal(config.authBase,PROD_AUTH_BASE);
+  assert.equal(config.growthUrl,'https://br-orange-feather-ayps8kep-pack1growth.compute.c-5.us-east-2.aws.neon.tech');
 });
 
 
