@@ -2,13 +2,14 @@
 
 Updated 2026-10-02. This file is the source-of-truth submission packet for the first free public mobile release.
 
-## Current store release checkpoint — 2026-10-01
+## Current store release checkpoint — 2026-10-02
 
 - **iOS 1.0 current post-#837 candidate:** signed build `100415`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. GitHub Actions run `36957484955` uploaded it; App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached build `100415` to App Store version 1.0. Release type remains manual.
 - **Android 1.0 current post-#837 candidate:** versionCode `100444`, source revision `fa588b40bc380946735385abfac0ff52586e1873`. Build run `36957485029` produced the Play-signed production AAB and exact-artifact release run `36965315032` uploaded it unchanged to Internal Testing, then promoted that same version unchanged to Closed Testing `production-access`. Google reported `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`. VersionCode `100444` is the live qualification-track candidate.
 - **Closed-test geography:** the `production-access` track targets Canada and the United States. Legacy `alpha` is not the qualification track.
 - **Apple public availability:** the owner completed first-time App Store availability setup for **United States + Canada only** in App Store Connect on 2026-10-01. The repo now carries a read-only API verifier; it must confirm exactly `CAN,USA`, `availableInNewTerritories=false`, and no pre-order state.
 - **Store assets:** Apple iPhone/iPad screenshots and the Elite review screenshot are uploaded. Google Play has the reviewed icon, five phone screenshots, and the feature graphic committed. Re-capture only if the final accepted RC materially changes a captured scene.
+- **Google Play console setup:** complete for the currently available first-launch forms/settings: Ads, Sign-in details/App access, Target audience/content, IARC content rating, Data Safety, listing/assets, and Production countries **United States + Canada**. The remaining Google owner gate is the closed-test qualification clock followed by the Production-access application when Google enables it.
 - **Google Data Safety:** submitted successfully by run `36632174516`.
 - **Apple metadata already live:** version 1.0 is manual release; the en-US listing copy, privacy policy/choices URLs, content-rights declaration, and reviewed 12+ age-rating answers are present.
 
@@ -272,37 +273,24 @@ Only unfinished owner actions are listed here. Completed, intentionally declined
 
 ### Apple / App Store Connect
 
-1. **Enter the prepared reviewer account in App Store Connect.**
-   - The shared reviewer account `ryanmindell+packone-app-review@gmail.com` is verified and already has non-expiring manual Elite access for both `custom_corpus` and `unlimited_cube_practice`.
+1. **Finish any remaining App Review Information contact/notes fields.**
+   - The non-expiring reviewer credentials are already entered in App Store Connect.
    - App Store Connect -> Apps -> Pack One -> version 1.0 -> **App Review Information**.
-   - Enter the review contact name, phone, and email.
-   - Enter the reviewer account email/password there. Keep the password private and do not put it in Git, an issue, or chat.
-   - Use the review notes/reviewer path already prepared in this document.
+   - Confirm the review contact **name, phone, and email** are filled in.
+   - Confirm the **Notes** field contains the prepared review instructions/reviewer path in this document.
+   - Do not submit the app for review until the exact iOS RC has completed the separate physical-device acceptance gates in issue #575.
 
 Physical iPhone/iPad acceptance remains separate and is intentionally not listed here.
 
 ### Google Play Console
 
-2. **Finish the remaining App content forms.**
-   - Play Console -> Pack One -> **Policy and programs -> App content**.
-   - **Ads:** answer **Yes** because Pack One has the dedicated Daily-home sponsored TCGplayer affiliate promotion/banner. There is no ad SDK or advertising ID.
-   - **App access / Sign-in details:** state that some features work as a guest but account/Elite features require sign-in. Enter the same non-expiring Elite reviewer account used for Apple.
-   - **Target audience and content:** select the intended **13+** audience; do not select under-13 groups.
-   - **Content rating (IARC):** complete the questionnaire from the real app: no gambling/wagering/chat; card art can contain fantasy combat/violence.
-   - Data Safety is already submitted; do not redo it unless Play reports a required correction.
-
-3. **Set public Production countries to United States + Canada only.**
-   - Play Console -> Pack One -> **Production** -> **Countries / regions**.
-   - Target **United States** and **Canada** only.
-   - Treat Production geography as separate from the `production-access` closed-test geography.
-
-4. **Keep the closed-test qualification alive until Google marks it complete.**
-   - Play Console -> Pack One -> **Closed testing -> production-access**.
-   - Do not recreate, reset, or replace the track while the qualification clock is running.
+2. **Wait for the closed-test qualification clock to complete.**
+   - All currently available Google Play console setup is complete, including App content, Ads, Sign-in details/App access, Target audience/content, IARC content rating, Data Safety, store assets/listing, and Production countries **United States + Canada**.
+   - Leave **Closed testing -> production-access** unchanged while the qualification clock is running.
    - Keep at least 12 testers continuously opted in for the required 14-day period.
-   - No additional action is required unless Play shows that the tester count or continuity requirement has been broken.
+   - No owner action is required unless Play reports that tester count/continuity was broken.
 
-5. **Apply for Production access when Google enables the application.**
+3. **Apply for Production access when Google enables the application.**
    - When Play Console says the testing requirement is satisfied, open the Production access application.
    - Answer Google's questions about the closed test, tester engagement/feedback, app purpose, and production readiness truthfully.
    - Submit the application.
