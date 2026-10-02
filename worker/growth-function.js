@@ -19,6 +19,7 @@ import {inspectLaunchCoverageFreshness} from './launch-watcher-stale.mjs';
 import {reconcileLaunchWatcherAlert} from './launch-watcher-alert.mjs';
 import {launchWatcherRecoveryConfigured,reconcileLaunchWatcherCadence,reconcileLaunchWatcherDispatch} from './launch-watcher-dispatch.mjs';
 import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaign-link-publish.mjs';
+import {handleAdminAccountDeletion} from './admin-account-deletion.mjs';
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {rankingIdentityStatus} from './account-identity.mjs';
@@ -1636,6 +1637,15 @@ async function handleMobileSignout(request) {
   return json({ok:true});
 }
 
+
+async function adminAccountIdentity(request,{mutation=false}={}) {
+  if(mutation)requireTrustedOrigin(request,ALLOWED_ORIGINS);
+  const auth=await authSession(request,{required:true,allowLegacy:true,csrf:true});
+  if(!(await query('SELECT 1 FROM pack1_admins WHERE auth_user_id=$1::uuid',[auth.user_id])).rows.length)
+    throw Object.assign(Error('This account does not have admin access.'),{status:403});
+  return auth;
+}
+
 async function accountMutationAuth(request,{mobile=false}={}) {
   if(mobile)return (await mobileAccountIdentity(request)).auth;
   requireTrustedOrigin(request,ALLOWED_ORIGINS);
@@ -2352,6 +2362,17 @@ async function route(request) {
   if (request.method === 'GET' && url.pathname === '/v1/mobile/version') return handleMobileVersionCheck(request,{query,json});
   if (url.pathname.startsWith('/v1/patreon/')) return handlePatreon(request,{query,authSession,json});
   if (url.pathname.startsWith('/v1/apple-subscriptions/')) return handleAppleSubscriptions(request,{query,json,readJson,mobileAccountIdentity});
+  const adminUserDeletionMatch=url.pathname.match(/^\/v1\/admin\/users\/[a-f0-9-]+\/(?:delete|deletion)$/i);
+  if(adminUserDeletionMatch&&['GET','POST'].includes(request.method)) {
+    const admin=await adminAccountIdentity(request,{mutation:request.method==='POST'});
+    const result=await handleAdminAccountDeletion(request,query,url,{
+      readJson,
+      adminAuthUserId:admin.user_id,
+      deletionEnabled,
+      resumeDeletionOperation,
+    });
+    return json(result.body,result.status);
+  }
   if (url.pathname === '/v1/admin/campaign-links/publish') return handleCampaignLinkPublish(request,{query,readJson,allowedOrigins:ALLOWED_ORIGINS});
   if (request.method === 'POST' && url.pathname === '/internal/player-session-refresh') return handleBrowserPlayerSession(request,{existingOnly:true});
   if (request.method === 'POST' && url.pathname === '/v1/player/session') return handleBrowserPlayerSession(request);
