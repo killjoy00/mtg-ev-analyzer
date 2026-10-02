@@ -483,6 +483,74 @@ test('successful authentication returns to Practice even when optional profile/c
 });
 
 
+test('Profile visibility toggles an initially public profile off on the first tap', async () => {
+  const currentProfile = {
+    ...profile('Public Player'),
+    player: {
+      ...profile('Public Player').player,
+      profile_public: true,
+      favorite_set_id: null,
+      showcase_achievement: null,
+      public_identity_hidden: false,
+      username_owned: true,
+    },
+  };
+  const writes = [];
+  const mocks = {
+    'expo-router': { router: { push() {} } },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'cancel' }) },
+    'react-native': {
+      ActivityIndicator: host('ActivityIndicator'),
+      Pressable: host('Pressable'),
+      ScrollView,
+      StyleSheet: { create: (value) => value },
+      Text: host('Text'),
+      TextInput: host('TextInput'),
+      View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/career': {
+      updateMobileProfile: async (_session, body) => {
+        writes.push(body);
+        return {
+          ...currentProfile,
+          player: { ...currentProfile.player, profile_public: body.profilePublic },
+        };
+      },
+    },
+    '@/src/hooks/useAccountState': {
+      useAccountState: () => ({
+        session: { playerToken: 'player', accountToken: 'account', accountUser: { id: 'account-id' } },
+        account: { user: { id: 'account-id' } },
+        profile: currentProfile,
+        catalogSets: [],
+        busy: false,
+        enrichmentBusy: false,
+        enrichmentWarning: null,
+        refresh: async () => null,
+      }),
+    },
+    '@/src/theme': theme,
+  };
+
+  const Screen = compileScreen('app/account-profile.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); });
+  let toggle = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'switch')[0];
+  assert.equal(toggle.props.accessibilityState.checked, true);
+  await act(async () => { toggle.props.onPress(); });
+  toggle = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'switch')[0];
+  assert.equal(toggle.props.accessibilityState.checked, false);
+
+  const save = root.root.findAll((node) => node.type === 'Pressable'
+    && renderedText(node).includes('Save profile'))[0];
+  await act(async () => { await save.props.onPress(); });
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].profilePublic, false);
+  await act(async () => root.unmount());
+});
+
+
 test('shared account state hook keeps focus refreshes ordered and rejects late enrichment', async () => {
   const focus = focusControl();
   const oldProfile = deferred();
