@@ -43,7 +43,9 @@ test('verification-required signup offers resend and expired-link recovery',()=>
   assert.match(growth,/EMAIL_NOT_VERIFIED/);
   assert.match(growth,/account-signin-verification-resend/);
   assert.match(growth,/Send a new verification link/);
-  assert.doesNotMatch(growth,/Display name<input/);
+  assert.doesNotMatch(growth.slice(growth.indexOf('function formMarkup'),growth.indexOf('async function openEliteLanding')),/Display name<input/);
+  assert.match(growth,/id="account-ready"/);
+  assert.match(growth,/Shown on Daily leaderboards and your public profile\./);
   assert.match(growth,/name="email" autocomplete="username"/);
   assert.match(growth,/Your account is ready\./);
   assert.match(growth,/account-ready-skip/);
