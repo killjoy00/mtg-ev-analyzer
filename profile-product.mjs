@@ -157,10 +157,10 @@ function deletionControlMarkup(account,patreon) {
     return `<form class="account-form" id="account-delete-email">
       <label class="profile-toggle"><input required type="checkbox" name="confirm"><span><strong>I understand this permanently deletes my account and cannot be undone.</strong></span></label>
       <button class="button secondary" type="button" id="account-delete-send">Send deletion code</button>
-      ${billing}
       <div id="account-delete-code-step" hidden>
         <p>Enter the 8-digit code sent to the verified email associated with this account. It expires in about 10 minutes.</p>
         <label>Deletion code<input required type="text" name="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{8}" minlength="8" maxlength="8"></label>
+        ${billing}
         <button class="button secondary" type="submit">Verify and delete account</button>
         <button class="text-button" type="button" id="account-delete-resend">Send a new code</button>
       </div>
