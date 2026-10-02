@@ -15,6 +15,24 @@ export function parseRequest(value) {
 export function checkBranch(branch) {
   if(!/^br-[a-z0-9-]+$/.test(branch||'')||['br-orange-feather-ayps8kep','br-twilight-hill-ayffyd2b'].includes(branch))throw Error('An isolated preview branch is required.');
 }
+export async function waitForPreviewReadiness({fetcher=fetch,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms)),clock=Date.now,host=HOST,preview,commit,requiredSuccesses=20,deadlineMs=180000,intervalMs=2000}={}) {
+  if(!/^[a-f0-9]{64}$/.test(preview||'')||!/^[a-f0-9]{40}$/.test(commit||'')||!Number.isInteger(requiredSuccesses)||requiredSuccesses<1||!Number.isFinite(deadlineMs)||deadlineMs<=0||!Number.isFinite(intervalMs)||intervalMs<0)throw Error('Invalid preview readiness identity.');
+  const deadline=clock()+deadlineMs;let consecutive=0,lastStatus=null,lastRelease=null;
+  while(clock()<deadline&&consecutive<requiredSuccesses) {
+    try {
+      const response=await fetcher(`https://${host}/draft/health?quick=1`,{headers:{'x-pack1-preview-key':preview,connection:'close'},redirect:'error',signal:AbortSignal.timeout(10000)});
+      lastStatus=response.status;
+      let body=null;try {body=await response.json();}catch { /* non-JSON cannot prove readiness */ }
+      const received=body?.release_commit;
+      lastRelease=typeof received==='string'&&/^[a-f0-9]{40}$/.test(received)?received:null;
+      consecutive=response.status===200&&received===commit?consecutive+1:0;
+    } catch {
+      consecutive=0;lastStatus=null;lastRelease=null;
+    }
+    if(consecutive<requiredSuccesses&&clock()<deadline)await sleep(intervalMs);
+  }
+  return {ready:consecutive>=requiredSuccesses,consecutive,last_status:lastStatus,last_release:lastRelease};
+}
 export function inheritedFunctionSlugs(list,branch,created) {
   checkBranch(branch);
   if(created!=='true')throw Error('Require a newly created isolated branch for inherited function isolation.');
@@ -133,17 +151,14 @@ async function main(action) {
   run('wrangler',['deploy','--config',configPath]);
   run('wrangler',['secret','bulk','--config',configPath],JSON.stringify({ORIGIN_SECRET:origin,PREVIEW_KEY:preview,QUOTA_KEY:quota}));
   await cf(`/accounts/${zone.account.id}/workers/domains`,{method:'PUT',body:{hostname:HOST,service:WORKER,zone_id:zone.id}});
-  // A newly attached hostname can lag the control-plane response. Verify the
-  // public preview route and exact revision before handing it to any browser.
-  let ready=false;const deadline=Date.now()+90000;
-  while(Date.now()<deadline&&!ready) {
-    try {
-      const r=await fetch(`https://${HOST}/draft/health?quick=1`,{headers:{'x-pack1-preview-key':preview},redirect:'error',signal:AbortSignal.timeout(10000)});
-      ready=r.status===200&&(await r.json()).release_commit===commit;
-    } catch { /* bounded read-only propagation probe */ }
-    if(!ready)await new Promise(resolve=>setTimeout(resolve,2000));
+  // A newly attached hostname can lag the control-plane response. Require
+  // sustained exact-revision success on fresh connections before handing it to
+  // another process; one lucky keep-alive path must never prove readiness.
+  const readiness=await waitForPreviewReadiness({preview,commit});
+  if(!readiness.ready) {
+    console.error(JSON.stringify({event:'preview_readiness_failed',status:readiness.last_status,release_commit:readiness.last_release,consecutive:readiness.consecutive}));
+    throw Error('Preview hostname did not serve the reviewed revision before the readiness deadline.');
   }
-  if(!ready)throw Error('Preview hostname did not serve the reviewed revision before the readiness deadline.');
   variable('PREVIEW_ACCESS_KEY',preview);variable('PREVIEW_ORIGIN_SECRET',origin);
   console.log('Private preview deployed. Live acceptance must still pass.');
 }
