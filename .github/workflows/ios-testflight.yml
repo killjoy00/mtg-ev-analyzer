@@ -23,7 +23,7 @@ jobs:
   archive-smoke:
     name: production iOS archive structure
     if: ${{ github.event_name == 'pull_request' }}
-    runs-on: macos-latest
+    runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: mobile
@@ -40,8 +40,9 @@ jobs:
           npm ci --no-audit --no-fund
       - name: Validate App Store RC helper syntax
         run: node --check ../.github/scripts/app-store-finalize-release-candidate.mjs
-      # PR smoke archives are never uploaded. The publishing job below allocates
-      # against App Store Connect so workflow renames/retries cannot reuse a number.
+      # PR validation proves Expo can materialize the production iOS project and
+      # that the generated native metadata is correct. Full device archives stay
+      # in exact-main RC and the true TestFlight publishing path.
       - name: Set smoke build number
         shell: bash
         run: echo "PACKONE_IOS_BUILD_NUMBER=$((100000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
@@ -52,54 +53,22 @@ jobs:
           CI: '1'
           PACKONE_BUILD_PROFILE: production
         run: npx expo prebuild --platform ios --clean
-      - name: Archive iPhone device build without signing
+      - name: Validate generated iOS project structure
         shell: bash
         run: |
           set -euo pipefail
-          workspace="$(find ios -maxdepth 1 -name '*.xcworkspace' -print -quit)"
-          test -n "$workspace"
-          scheme="PackOne"
-          xcodebuild -workspace "$workspace" -list -json > "$RUNNER_TEMP/xcode-workspace.json"
-          python3 -c 'import json,sys; data=json.load(open(sys.argv[1], encoding="utf-8")); schemes=data.get("workspace",{}).get("schemes",[]); expected=sys.argv[2]; assert expected in schemes, f"Expected app scheme {expected!r} not found. Available schemes: {schemes}"' "$RUNNER_TEMP/xcode-workspace.json" "$scheme"
-          xcodebuild \
-            -workspace "$workspace" \
-            -scheme "$scheme" \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -archivePath "$RUNNER_TEMP/PackOne.xcarchive" \
-            CURRENT_PROJECT_VERSION="$PACKONE_IOS_BUILD_NUMBER" \
-            CODE_SIGNING_ALLOWED=NO \
-            CODE_SIGNING_REQUIRED=NO \
-            archive
-          test -d "$RUNNER_TEMP/PackOne.xcarchive"
-          archive_plist="$RUNNER_TEMP/PackOne.xcarchive/Products/Applications/PackOne.app/Info.plist"
-          test -f "$archive_plist"
-          archived_build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$archive_plist")"
+          project='ios/PackOne.xcodeproj/project.pbxproj'
+          plist='ios/PackOne/Info.plist'
+          test -f "$project"
+          test -f "$plist"
+          grep -Fq 'PRODUCT_BUNDLE_IDENTIFIER = pro.packone.app;' "$project"
+          grep -Fq "CURRENT_PROJECT_VERSION = $PACKONE_IOS_BUILD_NUMBER;" "$project"
           expected_marketing_version="$(node -e 'const fs=require("node:fs"); const v=JSON.parse(fs.readFileSync("store-release.json","utf8")); process.stdout.write(v.appStoreVersion)')"
-          archived_marketing_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$archive_plist")"
-          [[ "$archived_marketing_version" == "$expected_marketing_version" ]] || {
-            echo "Expected archive marketing version $expected_marketing_version, got $archived_marketing_version." >&2
-            exit 1
-          }
-          [[ "$archived_build_number" == "$PACKONE_IOS_BUILD_NUMBER" ]] || {
-            echo "Expected archive build $PACKONE_IOS_BUILD_NUMBER, got $archived_build_number." >&2
-            exit 1
-          }
-          echo "Verified Pack One archive build number: $archived_build_number"
-          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$archive_plist"
-          echo "Verified Pack One archive export-compliance declaration: ITSAppUsesNonExemptEncryption=false"
-      - name: Audit PR iOS privacy surface
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 ./scripts/audit-ios-archive.py "$RUNNER_TEMP/PackOne.xcarchive" --output "$RUNNER_TEMP/pack-one-ios-native-audit.json"
-      - name: Upload PR iOS native audit evidence
-        uses: actions/upload-artifact@v4
-        with:
-          name: pack-one-ios-pr-native-audit
-          path: ${{ runner.temp }}/pack-one-ios-native-audit.json
-          if-no-files-found: error
-          retention-days: 30
+          grep -Fq "MARKETING_VERSION = $expected_marketing_version;" "$project"
+          python3 -c 'import plistlib,sys; data=plistlib.load(open(sys.argv[1], "rb")); value=data.get("ITSAppUsesNonExemptEncryption"); assert value is False, f"Expected ITSAppUsesNonExemptEncryption=false, got {value!r}"' "$plist"
+          privacy_manifest="$(find ios/PackOne -name PrivacyInfo.xcprivacy -print -quit)"
+          test -n "$privacy_manifest"
+          echo "Verified generated production iOS metadata without compiling an archive."
 
   testflight:
     name: sign and upload App Store-eligible TestFlight build
