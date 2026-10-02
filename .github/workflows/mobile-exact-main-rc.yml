@@ -156,6 +156,8 @@ jobs:
             ~/.gradle/wrapper
             mobile/node_modules/**/.cxx
           key: ${{ steps.gradle-cache.outputs.key }}
+          restore-keys: |
+            ${{ steps.gradle-cache.outputs.restore_key }}
       - name: Verify native Android version
         shell: bash
         run: |
@@ -219,6 +221,20 @@ jobs:
             exit 1
           fi
           echo 'Verified Gradle cache roots exclude Gradle user properties and keystore material.'
+      - name: Log unsigned Gradle cache size
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo 'Unsigned Gradle cache roots before save:'
+          du -sh "$HOME/.gradle/caches" "$HOME/.gradle/wrapper" 2>/dev/null || true
+          find node_modules -type d -name .cxx -prune -exec du -sh {} + 2>/dev/null || true
+          total_kb="$(
+            {
+              du -sk "$HOME/.gradle/caches" "$HOME/.gradle/wrapper" 2>/dev/null || true
+              find node_modules -type d -name .cxx -prune -exec du -sk {} + 2>/dev/null || true
+            } | awk '{sum += $1} END {print sum + 0}'
+          )"
+          echo "Unsigned Gradle cache total: ${total_kb} KiB"
       - name: Save unsigned Gradle cache from main
         uses: actions/cache/save@v4
         with:
