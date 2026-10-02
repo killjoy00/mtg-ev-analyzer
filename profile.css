@@ -13,7 +13,7 @@
 .profile-scoreboard span,
 .profile-identity-strip span,
 .profile-mode-card span,
-.cube-profile-callout span { display:block; color:var(--muted); font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+.cube-profile-callout span { display:block; color:var(--muted); font-size:12px; font-weight:750; letter-spacing:.02em; }
 .profile-scoreboard strong { display:block; margin-top:7px; font-size:clamp(24px,3.2vw,38px); line-height:1; letter-spacing:-.04em; }
 
 .profile-identity-strip { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-bottom:20px; }
@@ -23,12 +23,12 @@
 .profile-career-snapshot { grid-template-columns:repeat(4,minmax(0,1fr)); align-items:stretch; margin:8px 0 24px; padding:16px; border-block:1px solid var(--line); background:transparent; }
 .profile-career-snapshot > .profile-snapshot-heading { grid-column:1/-1; padding:0 0 4px; background:transparent; }
 .profile-snapshot-heading span { display:block; color:var(--ink); font-size:13px; font-weight:800; letter-spacing:0; text-transform:none; }
-.profile-snapshot-heading small { display:block; margin-top:2px; color:var(--muted); font-size:11px; }
+.profile-snapshot-heading small { display:block; margin-top:2px; color:var(--muted); font-size:12px; line-height:1.4; }
 .profile-career-snapshot > .profile-snapshot-stat { border:1px solid var(--line); background:var(--surface); }
-.profile-career-snapshot > .profile-snapshot-stat small { display:block; margin-top:4px; color:var(--muted); font-size:10px; line-height:1.35; }
+.profile-career-snapshot > .profile-snapshot-stat small { display:block; margin-top:4px; color:var(--muted); font-size:12px; line-height:1.4; }
 
 .profile-claim { display:flex; align-items:center; justify-content:space-between; gap:24px; margin:0 0 24px; padding:16px; border:0; border-radius:0; background:var(--surface-soft); }
-.profile-claim span { color:#6c501f; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.08em; }
+.profile-claim span { color:#6c501f; font-size:12px; font-weight:800; letter-spacing:.02em; }
 .profile-claim strong { display:block; margin:4px 0; }
 .profile-claim p { margin:0; color:var(--muted); font-size:13px; }
 
@@ -298,7 +298,7 @@
 .my-career-metrics > div { min-width:0; padding:8px 12px; text-align:center; border-right:1px solid var(--line); }
 .my-career-metrics > div:last-child { border-right:0; }
 .my-career-metrics strong { display:block; overflow:hidden; color:var(--ink); font-size:25px; line-height:1.15; text-overflow:ellipsis; white-space:nowrap; }
-.my-career-metrics span { display:block; margin-top:5px; color:var(--muted); font-size:11px; }
+.my-career-metrics span { display:block; margin-top:5px; color:var(--muted); font-size:13px; line-height:1.3; }
 
 .my-performance-scroll { overflow-x:auto; overscroll-behavior-inline:contain; }
 .my-performance-bars { display:grid; grid-template-columns:repeat(10,minmax(34px,1fr)); gap:8px; min-width:480px; height:156px; align-items:end; }
