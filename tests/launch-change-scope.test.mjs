@@ -1,4 +1,4 @@
-// Temporary concurrency holder for #870. Draft PR only; no runtime behavior.
+// Temporary concurrency holder for #870 after merge. Draft PR only; no runtime behavior.
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {adminOnlyGatewayPatch,classifyLaunchChange} from '../scripts/launch-change-scope.mjs';
