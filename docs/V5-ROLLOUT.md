@@ -90,11 +90,15 @@ quality floors or lifecycle gates.
 
 Use this order in development, then production with the exact same candidate:
 
-1. stage and verify v9 without changing active pointers;
-2. apply the cross-version builder migration and deploy the reviewed v8 bridge;
-3. health-check and activate the exact v9 snapshots/components while the bridge
-   continues serving v8;
-4. deploy the exact accepted v9 release commit, then complete readiness and
+1. apply the cross-version migration as part of the stage-only operation, then
+   stage and verify v9 without changing active pointers; inactive future-version
+   rows and Candidate components do not churn the current serving revision;
+2. deploy the reviewed v8 bridge worker before any active pointer changes;
+3. health-check and activate the exact v9 snapshots/components. A revision
+   change may carry the verified v8 cache forward only when an exact database
+   comparison proves its selector inventory and environment metadata are
+   unchanged; otherwise normal readiness remains fail-closed;
+4. deploy the exact accepted v9 release commit, then complete v9 readiness and
    gameplay acceptance;
 5. on rollback, deploy the bridge/v8 worker before restoring the captured v8
    pointers with compare-and-swap, then verify the restored v8 revision.
