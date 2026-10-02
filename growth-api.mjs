@@ -150,7 +150,7 @@ async function api(path,{method='GET',body,auth=true,authSession=null}={}) {
   if(authSession)headers.set('x-pack1-auth-session',authSession);
   const response=await fetch(`${baseUrl()}${path}`,{method,headers,body:body===undefined?undefined:JSON.stringify(body),keepalive:path==='/v1/events'});
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw Object.assign(new Error(data.error||`Pack 1 API failed (${response.status}).`),{status:response.status});
+  if(!response.ok)throw Object.assign(new Error(data.error||`Pack 1 API failed (${response.status}).`),{status:response.status,code:data.code||null});
   return data;
 }
 
