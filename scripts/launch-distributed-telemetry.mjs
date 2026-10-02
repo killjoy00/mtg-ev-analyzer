@@ -89,3 +89,23 @@ export async function inspectPreviewTelemetry({reports,sha,from,to,policy,accoun
   return {service:'pack1-gateway-preview',sha,bins,passed:bins.some(b=>b.client_requests>0)&&bins.every(b=>b.passed),
     limitation:'The finite private preview emits every success and error, but the retained log API is not a lossless request ledger or a population latency SLO. Exact route percentiles come from unsampled client records. Preview-only 4xx boundary rejects are retained separately because generated client non-2xx responses already fail the client record.'};
 }
+
+export async function settlePreviewTelemetry({reports,sha,from,to,policy,account,token=process.env.CLOUDFLARE_EDGE_TOKEN,fetcher=fetch,
+  clock=Date.now,sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms))}) {
+  const deadline=to+policy.telemetry_timeout_seconds*1000,checks=[];
+  for(;;) {
+    const queriedAt=clock(),inspection=await inspectPreviewTelemetry({reports,sha,from,to,policy,account,token,fetcher,clock});
+    const missing=inspection.bins.filter(bin=>bin.failures.includes('missing_or_sparse_retained_telemetry'))
+      .map(({from,to,client_requests,retained_events,required_events})=>({from,to,client_requests,retained_events,required_events}));
+    checks.push({queried_at:new Date(queriedAt).toISOString(),
+      retained_events:inspection.bins.reduce((sum,bin)=>sum+bin.retained_events,0),missing_or_sparse_bins:missing});
+    const report={...inspection,settlement_seconds:policy.telemetry_settlement_seconds,timeout_seconds:policy.telemetry_timeout_seconds,checks};
+    if(inspection.passed)return report;
+    // Retry only eventual visibility of the same fixed request windows. Wrong
+    // release, retained 429/5xx, schema/API errors and every other hard failure
+    // remain immediate fail-closed outcomes.
+    const coverageOnly=missing.length>0&&inspection.bins.every(bin=>bin.failures.every(failure=>failure==='missing_or_sparse_retained_telemetry'));
+    if(!coverageOnly||queriedAt>=deadline)return report;
+    await sleep(Math.min(15000,Math.max(1,deadline-queriedAt)));
+  }
+}
