@@ -1,5 +1,5 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, Share, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -80,7 +80,7 @@ function PublicRecordDetails({ profile }: { profile: CareerProfile }) {
   );
 }
 
-function PublicProfileRecord({ profileKey }: { profileKey: string }) {
+function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }: { profileKey: string; pendingAction?: 'report' | 'block'; pendingReportReason?: ReportReason }) {
   const [state, setState] = useState<State>(initial);
   const stateRef = useRef<State>(state);
   const requestId = useRef(0);
@@ -92,10 +92,18 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
   const [sharing, setSharing] = useState(false);
   const [shareError, setShareError] = useState<string | null>(null);
   const [viewerSession,setViewerSession]=useState<MobileSession|null>(null);
-  const [reportReason,setReportReason]=useState<ReportReason>('offensive_name');
+  const [reportReason,setReportReason]=useState<ReportReason>(pendingReportReason || 'offensive_name');
   const [safetyBusy,setSafetyBusy]=useState(false);
   const [safetyMessage,setSafetyMessage]=useState<string|null>(null);
   const commit = useCallback((next: State) => { stateRef.current = next; setState(next); }, []);
+  useEffect(() => {
+    if (pendingReportReason) setReportReason(pendingReportReason);
+    if (!viewerSession?.accountToken || !pendingAction) return;
+    setSafetyMessage(pendingAction === 'block'
+      ? 'Signed in. Review this profile, then choose Block profile to continue.'
+      : 'Signed in. Review the reason, then choose Report profile to continue.');
+  }, [pendingAction, pendingReportReason, viewerSession?.accountToken]);
+
 
   const deny = useCallback((error: unknown) => {
     requestId.current += 1;
@@ -178,7 +186,13 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
 
   const report = async () => {
     if(safetyBusy)return;
-    if(!viewerSession?.accountToken) { setSafetyMessage('Sign in to report a public profile.'); return; }
+    if(!viewerSession?.accountToken) {
+      router.push({
+        pathname: '/account',
+        params: { profileKey, pendingAction: 'report', reportReason },
+      });
+      return;
+    }
     setSafetyBusy(true);setSafetyMessage(null);
     try {
       await reportPublicProfile(profileKey,viewerSession,reportReason);
@@ -190,7 +204,13 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
 
   const block = async () => {
     if(safetyBusy)return;
-    if(!viewerSession?.accountToken) { setSafetyMessage('Sign in to block a public profile.'); return; }
+    if(!viewerSession?.accountToken) {
+      router.push({
+        pathname: '/account',
+        params: { profileKey, pendingAction: 'block' },
+      });
+      return;
+    }
     setSafetyBusy(true);setSafetyMessage(null);
     try {
       await blockPublicProfile(profileKey,viewerSession);
@@ -258,7 +278,7 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
       {shareError ? <Text accessibilityRole="alert" style={styles.error}>{shareError}</Text> : null}
       <View style={styles.safetyPanel}>
         <Text style={styles.heading}>Profile safety</Text>
-        <Text style={styles.body}>Report a public identity that violates the Pack One rules, or block it from your account.</Text>
+        <Text style={styles.body}>Report a display name or public profile that violates the Pack One rules, or block it from your account.</Text>
         <View style={styles.reasonRow}>
           {reportReasons.map((reason)=><Pressable key={reason.id} accessibilityRole="button"
             accessibilityState={{selected:reportReason===reason.id}}
@@ -317,14 +337,20 @@ function PublicProfileRecord({ profileKey }: { profileKey: string }) {
 }
 
 export default function PublicProfileScreen() {
-  const params = useLocalSearchParams<{ key?: string }>();
+  const params = useLocalSearchParams<{ key?: string; pendingAction?: string; reportReason?: string }>();
   const key = typeof params.key === 'string' && /^[a-f0-9]{16}$/.test(params.key) ? params.key : null;
+  const pendingAction = params.pendingAction === 'report' || params.pendingAction === 'block'
+    ? params.pendingAction
+    : undefined;
+  const pendingReportReason = reportReasons.some((item) => item.id === params.reportReason)
+    ? params.reportReason as ReportReason
+    : undefined;
   if (!key) return <SafeAreaView style={styles.safe}><View style={styles.center}>
     <Text style={styles.title}>Profile unavailable</Text><Text style={styles.body}>This public profile link is invalid.</Text>
   </View></SafeAreaView>;
   // A -> B is a new browsing scope, not a refresh of A. React discards all old
   // rows/actions synchronously and effect cleanup rejects late A responses.
-  return <PublicProfileRecord key={key} profileKey={key} />;
+  return <PublicProfileRecord key={key} profileKey={key} pendingAction={pendingAction} pendingReportReason={pendingReportReason} />;
 }
 
 const styles = StyleSheet.create({
