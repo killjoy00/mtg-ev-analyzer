@@ -266,10 +266,11 @@ test('real global fetch transport diagnostics match loopback socket ground truth
  const destroyed=await failOnReused('/destroy','UND_ERR_SOCKET',/other side closed/i);assert.equal(destroyed.evidence.socket,'reused');
 });
 
-test('draft PRs cannot provision preview resources and ready-for-review can trigger the scoped workflow',()=>{
+test('pull requests are regression-only and live distributed provisioning requires manual dispatch',()=>{
  const workflow=fs.readFileSync(new URL('../.github/workflows/launch-distributed.yml',import.meta.url),'utf8');
  assert.match(workflow,/pull_request:\n\s+types: \[opened, synchronize, reopened, ready_for_review\]/);
- assert.match(workflow,/github\.event\.pull_request\.draft == false/);
+ assert.match(workflow,/setup:\n\s+needs: \[scope, regression\]\n\s+if: needs\.scope\.outputs\.run_load == 'true' && github\.event_name == 'workflow_dispatch'/);
+ assert.doesNotMatch(workflow,/github\.event\.pull_request\.draft == false/);
  const artifactLines=workflow.split('\n').filter(line=>/name: (?:isolated-encrypted-fixtures|distributed-capacity-)|pattern: distributed-capacity-/.test(line));
  assert.ok(artifactLines.length>=6);for(const line of artifactLines)assert.match(line,/github\.run_attempt/);
 });
