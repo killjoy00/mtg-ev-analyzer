@@ -22,7 +22,7 @@ jobs:
           fetch-depth: 0
       - name: Hold preview lock until reviewed fix is on main
         env:
-          FIX_SHA: 9a4f565455985651d36439159e84d6cd6b6227ef
+          FIX_SHA: 4d7d6f646befa358ef207ee3c8de38d196a41c25
         shell: bash
         run: |
           set -euo pipefail
