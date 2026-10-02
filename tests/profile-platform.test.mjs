@@ -34,15 +34,15 @@ test('public profile is opt-in and profile API supports history and lookup', () 
   assert.match(api, /lookupPublicProfiles/);
   assert.match(api, /displayName/);
   assert.match(worker, /leaderboard_name_changed/);
-  assert.match(product, /Leaderboard name/);
+  assert.match(product, /Display name/);
 });
 
-test('linked accounts with no owned username get a persistent actionable warning', () => {
+test('linked accounts with no owned display name get a persistent actionable warning', () => {
   assert.match(worker, /username_owned/);
-  assert.match(myPack, /Username needs attention/);
-  assert.match(myPack, /Choose a unique username to join Daily leaderboards/);
+  assert.match(myPack, /Display name needs attention/);
+  assert.match(myPack, /Choose a display name to join Daily leaderboards/);
   assert.match(myPack, /profile-username-fix/);
-  assert.match(product, /Choose a unique name to appear on Daily leaderboards/);
+  assert.match(product, /Shown on Daily leaderboards and your public profile/);
 });
 
 test('signed-in progression uses My Pack One stats and Account tabs', () => {

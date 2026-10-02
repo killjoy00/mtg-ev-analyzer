@@ -30,7 +30,7 @@ const ScrollView = React.forwardRef(function ScrollViewHost(props, ref) {
   return React.createElement('ScrollView', props, props.children);
 });
 
-function compileScreen(relativePath, mocks) {
+function compileModule(relativePath, mocks) {
   const filename = path.join(process.cwd(), relativePath);
   const source = fs.readFileSync(filename, 'utf8');
   const output = ts.transpileModule(source, {
@@ -55,7 +55,11 @@ function compileScreen(relativePath, mocks) {
   } finally {
     Module._load = priorLoad;
   }
-  return compiled.exports.default;
+  return compiled.exports;
+}
+
+function compileScreen(relativePath, mocks) {
+  return compileModule(relativePath, mocks).default;
 }
 
 function renderedText(node) {
@@ -415,6 +419,22 @@ test('successful authentication returns to Practice even when optional profile/c
       loadSetCatalog: async () => { throw new Error('catalog enrichment offline'); },
     },
     '@/src/api/guest': { ensureGuestSession: async () => guest },
+    '@/src/hooks/useAccountState': {
+      useAccountState: () => {
+        const [current, setCurrent] = React.useState(guest);
+        const [hookMessage, setHookMessage] = React.useState(null);
+        return {
+          session: current,
+          account: null,
+          busy: false,
+          message: hookMessage,
+          enrichmentWarning: 'Some profile details could not refresh. Try again.',
+          setMessage: setHookMessage,
+          adoptSession: async (next) => { setCurrent(next); return accountState; },
+          clearAccount: (next) => setCurrent(next),
+        };
+      },
+    },
     '@/src/theme': theme,
   };
 
@@ -459,6 +479,165 @@ test('successful authentication returns to Practice even when optional profile/c
   assert.match(renderedText(root.toJSON()), /Signed in to your Pack One account/);
   assert.match(renderedText(root.toJSON()), /profile details could not refresh/i);
 
+  await act(async () => root.unmount());
+});
+
+
+test('Profile visibility toggles an initially public profile off on the first tap', async () => {
+  const currentProfile = {
+    ...profile('Public Player'),
+    player: {
+      ...profile('Public Player').player,
+      profile_public: true,
+      favorite_set_id: null,
+      showcase_achievement: null,
+      public_identity_hidden: false,
+      username_owned: true,
+    },
+  };
+  const writes = [];
+  const mocks = {
+    'expo-router': { router: { push() {} } },
+    'expo-web-browser': { openBrowserAsync: async () => ({ type: 'cancel' }) },
+    'react-native': {
+      ActivityIndicator: host('ActivityIndicator'),
+      Pressable: host('Pressable'),
+      ScrollView,
+      StyleSheet: { create: (value) => value },
+      Text: host('Text'),
+      TextInput: host('TextInput'),
+      View: host('View'),
+    },
+    'react-native-safe-area-context': { SafeAreaView: host('SafeAreaView') },
+    '@/src/api/career': {
+      updateMobileProfile: async (_session, body) => {
+        writes.push(body);
+        return {
+          ...currentProfile,
+          player: { ...currentProfile.player, profile_public: body.profilePublic },
+        };
+      },
+    },
+    '@/src/hooks/useAccountState': {
+      useAccountState: () => ({
+        session: { playerToken: 'player', accountToken: 'account', accountUser: { id: 'account-id' } },
+        account: { user: { id: 'account-id' } },
+        profile: currentProfile,
+        catalogSets: [],
+        busy: false,
+        enrichmentBusy: false,
+        enrichmentWarning: null,
+        refresh: async () => null,
+      }),
+    },
+    '@/src/theme': theme,
+  };
+
+  const Screen = compileScreen('app/account-profile.tsx', mocks);
+  let root;
+  await act(async () => { root = TestRenderer.create(React.createElement(Screen)); });
+  let toggle = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'switch')[0];
+  assert.equal(toggle.props.accessibilityState.checked, true);
+  await act(async () => { toggle.props.onPress(); });
+  toggle = root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityRole === 'switch')[0];
+  assert.equal(toggle.props.accessibilityState.checked, false);
+
+  const save = root.root.findAll((node) => node.type === 'Pressable'
+    && renderedText(node).includes('Save profile'))[0];
+  await act(async () => { await save.props.onPress(); });
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].profilePublic, false);
+  assert.equal(Object.prototype.hasOwnProperty.call(writes[0], 'acceptPublicIdentityTerms'), false);
+  await act(async () => root.unmount());
+});
+
+
+test('shared account state hook stops loading and exposes account fetch failures', async () => {
+  const focus = focusControl();
+  const session = { playerToken: 'player', accountToken: 'account', accountUser: { id: 'account-id' } };
+  const hook = compileModule('src/hooks/useAccountState.ts', {
+    'expo-router': { router: { replace() {} }, useFocusEffect: focus.useFocusEffect },
+    '@/src/api/client': { ApiError: class ApiError extends Error {} },
+    '@/src/api/account': {
+      forgetAccountLocally: async (value) => value,
+      loadMobileAccount: async () => { throw new Error('account offline'); },
+    },
+    '@/src/api/career': { loadMobileCareer: async () => profile('Never loaded') },
+    '@/src/api/draftRun': { loadSetCatalog: async () => ({ sets: [] }) },
+    '@/src/api/guest': { ensureGuestSession: async () => session },
+  }).useAccountState;
+
+  function Harness() {
+    const state = hook({ loadProfile: true, loadCatalog: true });
+    return React.createElement('Text', null, `${state.busy}:${state.enrichmentBusy}:${state.message || 'none'}`);
+  }
+
+  let root;
+  await act(async () => {
+    root = TestRenderer.create(React.createElement(Harness));
+    await Promise.resolve();
+    await Promise.resolve();
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  });
+
+  assert.match(renderedText(root.toJSON()), /false:false:account offline/);
+  await act(async () => root.unmount());
+});
+
+
+test('shared account state hook keeps focus refreshes ordered and rejects late enrichment', async () => {
+  const focus = focusControl();
+  const oldProfile = deferred();
+  const sessionA = { playerToken: 'player-a', accountToken: 'account-a', accountUser: { id: 'a' } };
+  const sessionB = { playerToken: 'player-b', accountToken: 'account-b', accountUser: { id: 'b' } };
+  let sessionReads = 0;
+  const hook = compileModule('src/hooks/useAccountState.ts', {
+    'expo-router': { router: { replace() {} }, useFocusEffect: focus.useFocusEffect },
+    '@/src/api/client': { ApiError: class ApiError extends Error {} },
+    '@/src/api/account': {
+      forgetAccountLocally: async (value) => value,
+      loadMobileAccount: async (value) => ({
+        user: value.accountUser,
+        session: {},
+        credentials: { password: true, google: false, apple: false },
+        deletion: { enabled: true, available: true, googleOnly: false, method: 'password' },
+      }),
+    },
+    '@/src/api/career': {
+      loadMobileCareer: async (value) => value === sessionA ? oldProfile.promise : profile('Player B'),
+    },
+    '@/src/api/draftRun': {
+      loadSetCatalog: async () => ({ sets: [] }),
+    },
+    '@/src/api/guest': {
+      ensureGuestSession: async () => (++sessionReads === 1 ? sessionA : sessionB),
+    },
+  }).useAccountState;
+
+  function Harness() {
+    const state = hook({ loadProfile: true, loadCatalog: true });
+    return React.createElement('Text', null, state.profile?.player.display_name || 'none');
+  }
+
+  let root;
+  await act(async () => {
+    root = TestRenderer.create(React.createElement(Harness));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  await act(async () => {
+    await focus.trigger();
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  assert.match(renderedText(root.toJSON()), /Player B/);
+  await act(async () => {
+    oldProfile.resolve(profile('Player A'));
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+  assert.match(renderedText(root.toJSON()), /Player B/);
+  assert.doesNotMatch(renderedText(root.toJSON()), /Player A/);
   await act(async () => root.unmount());
 });
 

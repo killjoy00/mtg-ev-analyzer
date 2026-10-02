@@ -323,7 +323,8 @@ test('Apple launch hardening blocks pre-hijack, separates token keys, and uses A
   const apple = read('worker/apple-auth.mjs');
   const worker = read('worker/growth-function.js');
   const workflow = read('.github/workflows/secure-auth-release.yml');
-  const mobile = read('mobile/app/account.tsx');
+  const account = read('mobile/app/account.tsx');
+  const deletion = read('mobile/app/account-delete.tsx');
   const api = read('mobile/src/api/account.ts');
   const docs = read('docs/mobile-release-config.md');
 
@@ -338,10 +339,12 @@ test('Apple launch hardening blocks pre-hijack, separates token keys, and uses A
   assert.match(worker, /flow_kind='mobile'[\s\S]*purpose='signin'/);
   assert.match(api, /startAppleDeletionVerification/);
   assert.match(api, /finishAppleDeletion/);
-  assert.match(mobile, /Verify with Apple and delete account/);
-  assert.match(mobile, /appleDeleteHandoff/);
+  assert.match(deletion, /Verify with Apple and delete account/);
+  assert.match(deletion, /appleDeleteHandoff/);
+  assert.match(deletion, /Deleting your Pack One account does not cancel subscriptions/);
+  assert.match(deletion, /Manage subscription/);
   assert.match(docs, /Private Email Relay/);
   assert.match(docs, /at least as prominent as the Google control/);
-  assert.match(mobile, /appleButton: \{ width: '100%', height: 52 \}/);
-  assert.match(mobile, /googleButton: \{ minHeight: 52/);
+  assert.match(account, /appleButton: \{ width: '100%', height: 52 \}/);
+  assert.match(account, /googleButton: \{ minHeight: 52/);
 });

@@ -1,10 +1,9 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
 import { router, useLocalSearchParams } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   Pressable,
   ScrollView,
@@ -13,49 +12,33 @@ import {
   TextInput,
   View,
 } from 'react-native';
-
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ApiError } from '@/src/api/client';
 import {
-  changeMobilePassword,
-  deleteMobileAccount,
-  finishAppleDeletion,
   finishAppleSignIn,
   finishGoogleSignIn,
   finishNativeAppleSignIn,
-  forgetAccountLocally,
   linkMobileAccount,
-  loadMobileAccount,
   requestMobilePasswordReset,
   requestMobileVerificationEmail,
   signInWithEmail,
   signOutMobileAccount,
   signUpWithEmail,
-  startAppleDeletionVerification,
   startAppleSignIn,
-  startDeletionVerification,
   startGoogleSignIn,
-  type AccountState,
   type MobileAuthResponse,
 } from '@/src/api/account';
-import {
-  loadMobileCareer,
-  updateMobileProfile,
-  type CareerProfile,
-} from '@/src/api/career';
-import {
-  isDailyEnvironment,
-  loadSetCatalog,
-  type PracticeSet,
-} from '@/src/api/draftRun';
+import { updateMobileProfile } from '@/src/api/career';
+import { isDailyEnvironment } from '@/src/api/draftRun';
 import { ensureGuestSession } from '@/src/api/guest';
-import { type MobileSession } from '@/src/storage/session';
+import { useAccountState } from '@/src/hooks/useAccountState';
 import { colors, spacing } from '@/src/theme';
 
 WebBrowser.maybeCompleteAuthSession();
 
 type Mode = 'signin' | 'signup';
+type PendingAction = 'report' | 'block' | undefined;
 
 function authResult(value: unknown): value is MobileAuthResponse {
   return Boolean(
@@ -66,214 +49,180 @@ function authResult(value: unknown): value is MobileAuthResponse {
   );
 }
 
+function unverified(error: unknown) {
+  if (!(error instanceof ApiError) || !error.body || typeof error.body !== 'object') return false;
+  return 'code' in error.body && error.body.code === 'EMAIL_NOT_VERIFIED';
+}
+
+function displayNameReasonMessage(reason?: string | null) {
+  if (reason === 'name_not_allowed') return 'That display name is not allowed. Choose another to join Daily leaderboards.';
+  if (reason === 'username_taken') return 'Choose a different display name. That one is already taken.';
+  return null;
+}
+
 export default function AccountScreen() {
-  const params = useLocalSearchParams<{ validateDailyRunId?: string; environment?: string; returnTo?: string }>();
+  const params = useLocalSearchParams<{
+    validateDailyRunId?: string;
+    environment?: string;
+    returnTo?: string;
+    profileKey?: string;
+    pendingAction?: string;
+    reportReason?: string;
+    notice?: string;
+  }>();
   const validateDailyRunId = typeof params.validateDailyRunId === 'string'
     ? params.validateDailyRunId
     : undefined;
   const requestedEnvironment = typeof params.environment === 'string' ? params.environment : 'mixed';
   const returnEnvironment = isDailyEnvironment(requestedEnvironment) ? requestedEnvironment : 'mixed';
   const returnToPractice = params.returnTo === 'practice';
-  const [session, setSession] = useState<MobileSession | null>(null);
-  const [account, setAccount] = useState<AccountState | null>(null);
-  const [profile, setProfile] = useState<CareerProfile | null>(null);
-  const [catalogSets, setCatalogSets] = useState<PracticeSet[]>([]);
+  const returnProfileKey = typeof params.profileKey === 'string' && /^[a-f0-9]{16}$/.test(params.profileKey)
+    ? params.profileKey
+    : null;
+  const pendingAction: PendingAction = params.pendingAction === 'report' || params.pendingAction === 'block'
+    ? params.pendingAction
+    : undefined;
+  const reportReason = typeof params.reportReason === 'string' ? params.reportReason : undefined;
+  const routeNotice = typeof params.notice === 'string' ? params.notice : null;
+
+  const {
+    session,
+    account,
+    busy,
+    message,
+    enrichmentWarning,
+    setMessage,
+    adoptSession,
+    clearAccount,
+  } = useAccountState();
+
   const [mode, setMode] = useState<Mode>('signin');
-  const [promptLeaderboardName, setPromptLeaderboardName] = useState(false);
-  const [pendingClaimValidatedDaily, setPendingClaimValidatedDaily] = useState(false);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [profileName, setProfileName] = useState('');
-  const [profilePublic, setProfilePublic] = useState(false);
-  const [favoriteSetId, setFavoriteSetId] = useState('');
-  const [showcaseAchievement, setShowcaseAchievement] = useState('');
-  const [currentPassword, setCurrentPassword] = useState('');
-  const [newPassword, setNewPassword] = useState('');
-  const [confirmPassword, setConfirmPassword] = useState('');
-  const [deletePassword, setDeletePassword] = useState('');
-  const [deleteCode, setDeleteCode] = useState('');
-  const [deleteCodeSent, setDeleteCodeSent] = useState(false);
-  const [busy, setBusy] = useState(true);
-  const [message, setMessage] = useState<string | null>(null);
-  const [enrichmentWarning, setEnrichmentWarning] = useState<string | null>(null);
-  const enrichmentRequestId = useRef(0);
+  const [verificationPending, setVerificationPending] = useState(false);
+  const [signinNeedsVerification, setSigninNeedsVerification] = useState(false);
+  const [promptDisplayName, setPromptDisplayName] = useState(false);
+  const [pendingClaimValidatedDaily, setPendingClaimValidatedDaily] = useState(false);
+  const [readyInitialName, setReadyInitialName] = useState('');
+  const [readyDisplayName, setReadyDisplayName] = useState('');
+  const [readyError, setReadyError] = useState<string | null>(null);
+  const [readyNameOptionalHint, setReadyNameOptionalHint] = useState(false);
+  const [actionBusy, setActionBusy] = useState(false);
 
-  const applyProfile = useCallback((next: CareerProfile | null) => {
-    setProfile(next);
-    setProfileName(next?.player.display_name ?? '');
-    setProfilePublic(Boolean(next?.player.profile_public));
-    setFavoriteSetId(next?.player.favorite_set_id ?? '');
-    setShowcaseAchievement(next?.player.showcase_achievement ?? '');
-  }, []);
-
-  const loadOptionalEnrichment = useCallback(async (current: MobileSession) => {
-    const id = ++enrichmentRequestId.current;
-    setEnrichmentWarning(null);
-    const [profileResult, catalogResult] = await Promise.allSettled([
-      loadMobileCareer(current),
-      loadSetCatalog(current),
-    ]);
-    if (id !== enrichmentRequestId.current) return;
-    if (profileResult.status === 'fulfilled') applyProfile(profileResult.value);
-    if (catalogResult.status === 'fulfilled') setCatalogSets(catalogResult.value.sets);
-    if (profileResult.status === 'rejected' || catalogResult.status === 'rejected') {
-      setEnrichmentWarning('Signed in. Some profile details could not refresh; account access is still active.');
-    }
-  }, [applyProfile]);
-
-  useEffect(() => {
-    let active = true;
-    void ensureGuestSession()
-      .then(async (current) => {
-        if (!active) return;
-        setSession(current);
-        if (!current.accountToken) return;
-        try {
-          const state = await loadMobileAccount(current);
-          if (active) {
-            setAccount(state);
-            void loadOptionalEnrichment(current);
-          }
-        } catch (error: unknown) {
-          if (!active) return;
-          if (error instanceof ApiError && error.status === 401) {
-            const guest = await forgetAccountLocally(current);
-            if (!active) return;
-            enrichmentRequestId.current += 1;
-            setSession(guest);
-            setAccount(null);
-            applyProfile(null);
-            setCatalogSets([]);
-            setEnrichmentWarning(null);
-            setMessage('Your account session expired. Sign in again.');
-          } else {
-            setMessage(error instanceof Error ? error.message : 'Could not restore your account session.');
-          }
-        }
-      })
-      .finally(() => {
-        if (active) setBusy(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [applyProfile, loadOptionalEnrichment]);
-
-  const continueAfterLeaderboardNamePrompt = (validatedDailyScore = pendingClaimValidatedDaily) => {
-    setPromptLeaderboardName(false);
-    setPendingClaimValidatedDaily(false);
+  const returnAfterAccount = (fallbackToCareer = false) => {
     if (validateDailyRunId) {
-      setTimeout(() => router.replace({
+      router.replace({
         pathname: '/draft-run',
         params: { environment: returnEnvironment },
-      }), 300);
-    } else if (returnToPractice) {
-      setTimeout(() => router.replace('/practice'), 300);
+      });
+      return;
     }
+    if (returnToPractice) {
+      router.replace('/practice');
+      return;
+    }
+    if (returnProfileKey) {
+      router.replace({
+        pathname: '/profile',
+        params: {
+          key: returnProfileKey,
+          ...(pendingAction ? { pendingAction } : {}),
+          ...(reportReason ? { reportReason } : {}),
+        },
+      });
+      return;
+    }
+    if (fallbackToCareer) router.replace('/career');
+  };
+
+  const continueAfterDisplayNamePrompt = (validatedDailyScore = pendingClaimValidatedDaily) => {
+    setPromptDisplayName(false);
+    setPendingClaimValidatedDaily(false);
+    returnAfterAccount(true);
     return validatedDailyScore;
   };
 
-  const finish = async (next: MobileSession, result: MobileAuthResponse) => {
-    setSession(next);
+  const finish = async (next: Parameters<typeof adoptSession>[0], result: MobileAuthResponse) => {
     setPassword('');
+    setSigninNeedsVerification(false);
     const newlyClaimed = result.linked.newlyClaimed === true;
-    const successMessage = newlyClaimed
-      ? 'Choose the name shown on leaderboards.'
-      : result.linked.validatedDailyScore
+    if (newlyClaimed) {
+      const displayNameReason = result.linked.rankingIdentity?.reason;
+      const initialDisplayName = displayNameReason === 'username_required' ? '' : (result.linked.displayName || '');
+      setReadyInitialName(initialDisplayName);
+      setReadyDisplayName(initialDisplayName);
+      setReadyError(displayNameReasonMessage(displayNameReason));
+      setReadyNameOptionalHint(displayNameReason === 'username_required');
+      setPromptDisplayName(true);
+      setPendingClaimValidatedDaily(Boolean(result.linked.validatedDailyScore));
+      setMessage(null);
+    } else {
+      setMessage(result.linked.validatedDailyScore
         ? 'Signed in. Today\'s guest Daily was validated for this account.'
         : result.linked.rankingIdentity?.eligible === false
-          ? 'Signed in. Choose a unique leaderboard name below before using ranked public identity.'
-          : 'Signed in to your Pack One account.';
-    setMessage(successMessage);
-
-    if (newlyClaimed) {
-      setPromptLeaderboardName(true);
-      setPendingClaimValidatedDaily(Boolean(result.linked.validatedDailyScore));
-    } else if (result.linked.validatedDailyScore) {
-      setTimeout(() => router.replace({
-        pathname: '/draft-run',
-        params: { environment: returnEnvironment },
-      }), 600);
-    } else if (returnToPractice) {
-      setTimeout(() => router.replace('/practice'), 300);
+          ? 'Signed in. Choose an available display name in Profile & visibility before joining Daily leaderboards.'
+          : 'Signed in to your Pack One account.');
     }
-
-    void loadOptionalEnrichment(next);
-    try {
-      const state = await loadMobileAccount(next);
-      setAccount(state);
-    } catch (error: unknown) {
-      if (error instanceof ApiError && error.status === 401) {
-        const guest = await forgetAccountLocally(next);
-        enrichmentRequestId.current += 1;
-        setSession(guest);
-        setAccount(null);
-        applyProfile(null);
-        setCatalogSets([]);
-        setEnrichmentWarning(null);
-        setMessage('The new account session could not be verified. Sign in again.');
-        return;
+    await adoptSession(next);
+    if (!newlyClaimed) {
+      if (result.linked.validatedDailyScore || returnToPractice || returnProfileKey) {
+        returnAfterAccount(false);
       }
-      setEnrichmentWarning('Signed in. Account details could not refresh yet; your secure session is still saved.');
     }
   };
 
   const submitEmail = async () => {
-    if (!session || busy) return;
-    setBusy(true);
+    if (!session || actionBusy) return;
+    setActionBusy(true);
     setMessage(null);
+    setSigninNeedsVerification(false);
     try {
       if (mode === 'signin') {
         const next = await signInWithEmail(session, email.trim(), password, validateDailyRunId);
         await finish(next.session, next.result);
       } else {
-        const next = await signUpWithEmail(
-          session,
-          email.trim(),
-          password,
-          validateDailyRunId,
-        );
+        const next = await signUpWithEmail(session, email.trim(), password, validateDailyRunId);
         if (!next.session || !authResult(next.result)) {
-          setMode('signin');
+          setVerificationPending(true);
           setPassword('');
-          setMessage('Check your email to verify the new Pack One account, then sign in here.');
         } else {
           await finish(next.session, next.result);
         }
       }
     } catch (error: unknown) {
+      if (mode === 'signin' && unverified(error)) setSigninNeedsVerification(true);
       setMessage(error instanceof Error ? error.message : 'Account request failed.');
     } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
   };
 
   const openGoogle = async () => {
-    if (!session || busy) return;
-    setBusy(true);
+    if (!session || actionBusy) return;
+    setActionBusy(true);
     setMessage(null);
     try {
       const start = await startGoogleSignIn(session);
       const result = await WebBrowser.openAuthSessionAsync(start.url, 'packone://account');
       if (result.type !== 'success') {
-        throw new Error(result.type === 'cancel' ? 'Google sign in was cancelled.' : 'Google sign in did not finish.');
+        throw new Error(result.type === 'cancel' ? 'Google sign in was cancelled.' : 'Google sign in did not finish. Please try again.');
       }
       const callback = new URL(result.url);
-      if (callback.searchParams.get('google') === 'error') throw new Error('Google sign in did not finish.');
+      if (callback.searchParams.get('google') === 'error') throw new Error('Google sign in did not finish. Please try again.');
       const handoff = callback.searchParams.get('googleHandoff');
-      if (!handoff) throw new Error('Google sign in did not return a Pack One handoff.');
+      if (!handoff) throw new Error('Google sign in did not finish. Please try again.');
       const next = await finishGoogleSignIn(session, handoff, validateDailyRunId);
       await finish(next.session, next.result);
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Google sign in failed.');
     } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
   };
 
   const openApple = async () => {
-    if (!session || busy) return;
-    setBusy(true);
+    if (!session || actionBusy) return;
+    setActionBusy(true);
     setMessage(null);
     try {
       const start = await startAppleSignIn(session);
@@ -291,7 +240,7 @@ export default function AccountScreen() {
         });
         if (credential.state !== start.flowToken) throw new Error('Apple sign in could not be verified.');
         if (!credential.identityToken || !credential.authorizationCode) {
-          throw new Error('Apple sign in did not return the required credentials.');
+          throw new Error('Apple sign in did not return the required information.');
         }
         const next = await finishNativeAppleSignIn(session, {
           flowToken: start.flowToken,
@@ -304,17 +253,17 @@ export default function AccountScreen() {
       } else {
         const result = await WebBrowser.openAuthSessionAsync(start.url, 'packone://account');
         if (result.type !== 'success') {
-          throw new Error(result.type === 'cancel' ? 'Apple sign in was cancelled.' : 'Apple sign in did not finish.');
+          throw new Error(result.type === 'cancel' ? 'Apple sign in was cancelled.' : 'Apple sign in did not finish. Please try again.');
         }
         const callback = new URL(result.url);
         if (callback.searchParams.get('apple') === 'error') {
           const code = callback.searchParams.get('appleErrorCode');
           throw new Error(code === 'APPLE_EXISTING_ACCOUNT_UNVERIFIED'
             ? 'An unverified Pack One account already uses this email. Reset its password from that inbox, then try Apple again.'
-            : 'Apple sign in did not finish.');
+            : 'Apple sign in did not finish. Please try again.');
         }
         const handoff = callback.searchParams.get('appleHandoff');
-        if (!handoff) throw new Error('Apple sign in did not return a Pack One handoff.');
+        if (!handoff) throw new Error('Apple sign in did not finish. Please try again.');
         const next = await finishAppleSignIn(session, handoff, validateDailyRunId);
         await finish(next.session, next.result);
       }
@@ -324,75 +273,35 @@ export default function AccountScreen() {
         ? 'Apple sign in was cancelled.'
         : error instanceof Error ? error.message : 'Apple sign in failed.');
     } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
   };
 
   const signOut = async () => {
-    if (!session || busy) return;
-    setBusy(true);
+    if (!session || actionBusy) return;
+    setActionBusy(true);
     setMessage(null);
     try {
       await signOutMobileAccount(session);
-      enrichmentRequestId.current += 1;
-      enrichmentRequestId.current += 1;
       const fresh = await ensureGuestSession();
-      setSession(fresh);
-      setAccount(null);
-      setPromptLeaderboardName(false);
+      clearAccount(fresh);
+      setPromptDisplayName(false);
       setPendingClaimValidatedDaily(false);
-      applyProfile(null);
-      setCatalogSets([]);
-      setEnrichmentWarning(null);
       setMessage('Signed out.');
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Could not sign out.');
     } finally {
-      setBusy(false);
-    }
-  };
-
-  const saveProfile = async () => {
-    if (!session?.accountToken || busy || !profile) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      const updated = await updateMobileProfile(session, {
-        displayName: profileName.trim(),
-        profilePublic,
-        favoriteSetId: favoriteSetId || null,
-        showcaseAchievement: showcaseAchievement || null,
-      });
-      applyProfile(updated);
-      if (promptLeaderboardName && updated.player.username_owned !== false) {
-        let validatedDailyScore = pendingClaimValidatedDaily;
-        if (validateDailyRunId && !validatedDailyScore) {
-          const linked = await linkMobileAccount(session, validateDailyRunId);
-          validatedDailyScore = Boolean(linked.validatedDailyScore);
-        }
-        setMessage(validatedDailyScore
-          ? 'Profile saved. Today\'s guest Daily was validated for this account.'
-          : 'Profile settings saved.');
-        continueAfterLeaderboardNamePrompt(validatedDailyScore);
-        return;
-      }
-      setMessage(updated.player.username_owned === false
-        ? 'Profile saved. Choose a different unique leaderboard name to become rank-eligible.'
-        : 'Profile settings saved.');
-    } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : 'Could not save profile settings.');
-    } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
   };
 
   const forgotPassword = async () => {
-    if (!session || busy) return;
+    if (!session || actionBusy) return;
     if (!email.trim()) {
       setMessage('Enter your account email first.');
       return;
     }
-    setBusy(true);
+    setActionBusy(true);
     setMessage(null);
     try {
       const result = await requestMobilePasswordReset(session, email.trim());
@@ -400,17 +309,13 @@ export default function AccountScreen() {
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Password recovery is temporarily unavailable.');
     } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
   };
 
   const resendVerification = async () => {
-    if (!session || busy) return;
-    if (!email.trim()) {
-      setMessage('Enter your account email first.');
-      return;
-    }
-    setBusy(true);
+    if (!session || actionBusy || !email.trim()) return;
+    setActionBusy(true);
     setMessage(null);
     try {
       const result = await requestMobileVerificationEmail(session, email.trim());
@@ -418,540 +323,258 @@ export default function AccountScreen() {
     } catch (error: unknown) {
       setMessage(error instanceof Error ? error.message : 'Email verification is temporarily unavailable.');
     } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
   };
 
-  const changePassword = async () => {
-    if (!session?.accountToken || busy || !account?.credentials.password) return;
-    if (newPassword !== confirmPassword) {
-      setMessage('New passwords do not match.');
+  const saveReadyDisplayName = async () => {
+    if (!session?.accountToken || actionBusy) return;
+    const nextName = readyDisplayName.trim();
+    if (nextName === readyInitialName.trim()) {
+      continueAfterDisplayNamePrompt();
       return;
     }
-    if (newPassword.length < 8) {
-      setMessage('New password must be at least 8 characters.');
+    if (nextName.length < 2) {
+      setReadyError('Display name must be 2-24 characters.');
       return;
     }
-    setBusy(true);
-    setMessage(null);
+    setActionBusy(true);
+    setReadyError(null);
     try {
-      await changeMobilePassword(session, currentPassword, newPassword);
-      enrichmentRequestId.current += 1;
-      const guest = await forgetAccountLocally(session);
-      setSession(guest);
-      setAccount(null);
-      applyProfile(null);
-      setCatalogSets([]);
-      setEnrichmentWarning(null);
-      setCurrentPassword('');
-      setNewPassword('');
-      setConfirmPassword('');
-      setPassword('');
-      setMessage('Password changed. Pack One signed out every account session; sign in again with your new password.');
-    } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : 'Could not change your password.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const sendDeleteCode = async () => {
-    if (!session || busy) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      const result = await startDeletionVerification(session);
-      setDeleteCodeSent(true);
-      setMessage(`Deletion code sent. It expires in about ${Math.ceil(result.expiresInSeconds / 60)} minutes.`);
-    } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : 'Could not send a deletion code.');
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const performDelete = async () => {
-    if (!session || busy || !account?.deletion.method) return;
-    setBusy(true);
-    setMessage(null);
-    try {
-      if (account.deletion.method === 'apple') {
-        const start = await startAppleDeletionVerification(session);
-        const result = await WebBrowser.openAuthSessionAsync(start.url, 'packone://account');
-        if (result.type !== 'success') {
-          throw new Error(result.type === 'cancel' ? 'Apple verification was cancelled.' : 'Apple verification did not finish.');
-        }
-        const callback = new URL(result.url);
-        if (callback.searchParams.get('appleDelete') === 'error') {
-          throw new Error('Apple verification did not finish.');
-        }
-        const handoff = callback.searchParams.get('appleDeleteHandoff');
-        if (!handoff) throw new Error('Apple verification did not return a deletion proof.');
-        await finishAppleDeletion(session, handoff);
-      } else {
-        await deleteMobileAccount(
-          session,
-          account.deletion.method === 'password'
-            ? { currentPassword: deletePassword }
-            : { code: deleteCode },
-        );
+      const updated = await updateMobileProfile(session, {
+        displayName: nextName,
+        acceptPublicIdentityTerms: true,
+      });
+      if (updated.player.username_owned === false) {
+        setReadyError(updated.player.display_name_reason === 'name_not_allowed'
+          ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+          : 'Choose a different display name. That one is already taken.');
+        return;
       }
-      const fresh = await ensureGuestSession();
-      setSession(fresh);
-      setAccount(null);
-      applyProfile(null);
-      setCatalogSets([]);
-      setEnrichmentWarning(null);
-      setDeletePassword('');
-      setDeleteCode('');
-      setDeleteCodeSent(false);
-      router.replace('/');
+      let validatedDailyScore = pendingClaimValidatedDaily;
+      if (validateDailyRunId && !validatedDailyScore) {
+        const linked = await linkMobileAccount(session, validateDailyRunId);
+        validatedDailyScore = Boolean(linked.validatedDailyScore);
+      }
+      continueAfterDisplayNamePrompt(validatedDailyScore);
     } catch (error: unknown) {
-      setMessage(error instanceof Error ? error.message : 'Could not delete the account.');
+      setReadyError(error instanceof Error ? error.message : 'Could not save your display name.');
     } finally {
-      setBusy(false);
+      setActionBusy(false);
     }
-  };
-
-  const confirmDelete = () => {
-    Alert.alert(
-      'Permanently delete Pack One account?',
-      'This deletes your Pack One account, profile, career, scores, Draft Runs, provider links, and entitlements. This cannot be undone.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Delete permanently', style: 'destructive', onPress: () => void performDelete() },
-      ],
-    );
   };
 
   const signedInLabel = account?.user.email ?? account?.user.name ?? 'Pack One account';
-  const favoriteOptions = [...catalogSets].sort((a, b) => (
-    String(b.release_date ?? '').localeCompare(String(a.release_date ?? ''))
-      || a.set_name.localeCompare(b.set_name)
-  ));
-  const unlockedAchievements = (profile?.achievements ?? []).filter((item) => item.unlocked);
+  const disabled = actionBusy || busy;
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.page} keyboardShouldPersistTaps="handled">
         <Text style={styles.eyebrow}>PACK ONE ACCOUNT</Text>
-        <Text style={styles.title}>{account ? 'One account everywhere.' : 'Sign in to Pack One.'}</Text>
-        <Text style={styles.body}>
-          {validateDailyRunId
-            ? 'Sign in to attach this device to your Pack One career and validate today\'s completed guest Daily when eligible.'
-            : 'Use the same Pack One identity across web, iPhone, iPad, and Android.'}
-        </Text>
 
         {busy && !session ? <ActivityIndicator color={colors.accent} /> : null}
 
-        {account ? (
-          <View style={styles.panel}>
-            <Text style={styles.panelTitle}>{signedInLabel}</Text>
-            <Text style={styles.body}>This device has a revocable Pack One account session stored in the platform secure store.</Text>
-
-            {promptLeaderboardName ? (
-              <View style={styles.warning}>
-                <Text style={styles.warningTitle}>Choose the name shown on leaderboards.</Text>
-                <Text style={styles.body}>Use the prefilled leaderboard name below, change it, or skip for now.</Text>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel="Skip leaderboard name for now"
-                  disabled={busy}
-                  onPress={() => continueAfterLeaderboardNamePrompt()}
-                  style={styles.textButton}
-                >
-                  <Text style={styles.textButtonText}>Skip for now</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            {profile ? (
-              <View style={styles.settingsSection}>
-                <Text style={styles.sectionTitle}>Profile settings</Text>
-                {profile.player.public_identity_hidden ? (
-                  <View style={styles.warning}>
-                    <Text style={styles.warningTitle}>Public identity hidden</Text>
-                    <Text style={styles.body}>
-                      {profile.player.public_identity_hidden_reason || 'Contact Pack One support if you believe this is a mistake.'}
-                    </Text>
-                  </View>
-                ) : profile.player.username_owned === false ? (
-                  <View style={styles.warning}>
-                    <Text style={styles.warningTitle}>Username needs attention</Text>
-                    <Text style={styles.body}>
-                      Choose a unique leaderboard name below before this account can appear in ranked public identity.
-                    </Text>
-                  </View>
-                ) : null}
-
-                <Text style={styles.fieldLabel}>Leaderboard name</Text>
-                <TextInput
-                  accessibilityLabel="Leaderboard name"
-                  autoCapitalize="words"
-                  autoComplete="nickname"
-                  maxLength={24}
-                  editable={!profile.player.public_identity_hidden}
-                  onChangeText={setProfileName}
-                  placeholder="Leaderboard name"
-                  placeholderTextColor={colors.faint}
-                  style={styles.input}
-                  value={profileName}
-                />
-                <Text style={styles.fieldHelp}>Shown on Pack One Daily leaderboards.</Text>
-
-                {!profile.player.public_identity_hidden ? (
-                  <View style={styles.termsBox}>
-                    <Text style={styles.fieldHelp}>
-                      By saving a leaderboard name or public profile, you agree to the Public Identity rules: no harassment, impersonation, spam, private contact information, or abusive content.
-                    </Text>
-                    <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
-                      <Text style={styles.linkText}>Read the Public Identity rules</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-
-                <Pressable
-                  accessibilityRole="switch"
-                  accessibilityState={{ checked: profilePublic, disabled: Boolean(profile.player.public_identity_hidden) }}
-                  disabled={Boolean(profile.player.public_identity_hidden)}
-                  onPress={() => setProfilePublic((value) => !value)}
-                  style={[styles.toggle, profilePublic && styles.toggleActive]}
-                >
-                  <View style={styles.toggleCopy}>
-                    <Text style={styles.toggleTitle}>Public profile</Text>
-                    <Text style={styles.fieldHelp}>Allows leaderboard visitors and shared links to open your Pack One record.</Text>
-                  </View>
-                  <Text style={[styles.toggleValue, profilePublic && styles.toggleValueActive]}>
-                    {profilePublic ? 'ON' : 'OFF'}
-                  </Text>
-                </Pressable>
-
-                <Text style={styles.fieldLabel}>Favorite environment</Text>
-                <View style={styles.optionGrid}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: favoriteSetId === '' }}
-                    onPress={() => setFavoriteSetId('')}
-                    style={[styles.optionChip, favoriteSetId === '' && styles.optionChipSelected]}
-                  >
-                    <Text style={[styles.optionChipText, favoriteSetId === '' && styles.optionChipTextSelected]}>No favorite</Text>
-                  </Pressable>
-                  {favoriteOptions.map((item) => (
-                    <Pressable
-                      key={item.set_id}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: favoriteSetId === item.set_id }}
-                      onPress={() => setFavoriteSetId(item.set_id)}
-                      style={[styles.optionChip, favoriteSetId === item.set_id && styles.optionChipSelected]}
-                    >
-                      <Text style={[styles.optionChipText, favoriteSetId === item.set_id && styles.optionChipTextSelected]}>
-                        {item.set_name}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Text style={styles.fieldLabel}>Showcase achievement</Text>
-                <View style={styles.optionGrid}>
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityState={{ selected: showcaseAchievement === '' }}
-                    onPress={() => setShowcaseAchievement('')}
-                    style={[styles.optionChip, showcaseAchievement === '' && styles.optionChipSelected]}
-                  >
-                    <Text style={[styles.optionChipText, showcaseAchievement === '' && styles.optionChipTextSelected]}>No showcase</Text>
-                  </Pressable>
-                  {unlockedAchievements.map((item) => (
-                    <Pressable
-                      key={item.id}
-                      accessibilityRole="button"
-                      accessibilityState={{ selected: showcaseAchievement === item.id }}
-                      onPress={() => setShowcaseAchievement(item.id)}
-                      style={[styles.optionChip, showcaseAchievement === item.id && styles.optionChipSelected]}
-                    >
-                      <Text style={[styles.optionChipText, showcaseAchievement === item.id && styles.optionChipTextSelected]}>
-                        ◆ {item.label}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-
-                <Pressable
-                  accessibilityRole="button"
-                  disabled={busy || profileName.trim().length < 2
-                    || Boolean(profile.player.public_identity_hidden)}
-                  onPress={() => void saveProfile()}
-                  style={[styles.primaryButton, (busy || profileName.trim().length < 2
-                    || Boolean(profile.player.public_identity_hidden)) && styles.disabled]}
-                >
-                  <Text style={styles.primaryButtonText}>Save profile</Text>
-                </Pressable>
-
-                <Pressable accessibilityRole="button" onPress={() => router.push('/career')} style={styles.secondaryButton}>
-                  <Text style={styles.secondaryButtonText}>Open My Pack One</Text>
-                </Pressable>
-              </View>
-            ) : null}
-
-            <View style={styles.settingsSection}>
-              <Text style={styles.sectionTitle}>Sign-in credentials</Text>
-              <Text style={styles.credentialLine}>
-                {account.credentials.password ? 'Password · connected' : 'Password · not configured'}
-              </Text>
-              <Text style={styles.credentialLine}>
-                {account.credentials.google ? 'Google · connected' : 'Google · not connected'}
-              </Text>
-              <Text style={styles.credentialLine}>
-                {account.credentials.apple ? 'Apple · connected' : 'Apple · not connected'}
-              </Text>
-
-              {account.credentials.password ? (
-                <View style={styles.passwordBox}>
-                  <Text style={styles.fieldLabel}>Change password</Text>
-                  <Text style={styles.fieldHelp}>Changing your password signs out every Pack One account session, including this device.</Text>
-                  <TextInput
-                    accessibilityLabel="Current password"
-                    autoCapitalize="none"
-                    autoComplete="current-password"
-                    onChangeText={setCurrentPassword}
-                    placeholder="Current password"
-                    placeholderTextColor={colors.faint}
-                    secureTextEntry
-                    style={styles.input}
-                    value={currentPassword}
-                  />
-                  <TextInput
-                    accessibilityLabel="New password"
-                    autoCapitalize="none"
-                    autoComplete="new-password"
-                    onChangeText={setNewPassword}
-                    placeholder="New password"
-                    placeholderTextColor={colors.faint}
-                    secureTextEntry
-                    style={styles.input}
-                    value={newPassword}
-                  />
-                  <TextInput
-                    accessibilityLabel="Confirm new password"
-                    autoCapitalize="none"
-                    autoComplete="new-password"
-                    onChangeText={setConfirmPassword}
-                    placeholder="Confirm new password"
-                    placeholderTextColor={colors.faint}
-                    secureTextEntry
-                    style={styles.input}
-                    value={confirmPassword}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={busy || !currentPassword || newPassword.length < 8 || !confirmPassword}
-                    onPress={() => void changePassword()}
-                    style={[
-                      styles.secondaryButton,
-                      (busy || !currentPassword || newPassword.length < 8 || !confirmPassword) && styles.disabled,
-                    ]}
-                  >
-                    <Text style={styles.secondaryButtonText}>Change password</Text>
-                  </Pressable>
-                </View>
-              ) : (
-                <Text style={styles.fieldHelp}>
-                  {account.credentials.apple
-                    ? 'This account signs in with Apple and does not have a Pack One password to change.'
-                    : account.credentials.google
-                      ? 'This account signs in with Google and does not have a Pack One password to change.'
-                      : 'This account does not have a password credential to change.'}
-                </Text>
-              )}
-            </View>
-
-            <Pressable accessibilityRole="button" disabled={busy} onPress={() => void signOut()} style={styles.secondaryButton}>
-              <Text style={styles.secondaryButtonText}>Sign out</Text>
-            </Pressable>
-
-            <View style={styles.dangerZone}>
-              <Text style={styles.dangerTitle}>Delete account</Text>
-              <Text style={styles.body}>Deletion uses the same permanent, tombstoned Pack One deletion system as the website.</Text>
-
-              {!account.deletion.enabled ? (
-                <Text style={styles.body}>Account deletion is temporarily unavailable.</Text>
-              ) : account.deletion.method === 'password' ? (
-                <>
-                  <TextInput
-                    accessibilityLabel="Current password for account deletion"
-                    autoCapitalize="none"
-                    autoComplete="current-password"
-                    onChangeText={setDeletePassword}
-                    placeholder="Current password"
-                    placeholderTextColor={colors.faint}
-                    secureTextEntry
-                    style={styles.input}
-                    value={deletePassword}
-                  />
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={busy || !deletePassword}
-                    onPress={confirmDelete}
-                    style={[styles.dangerButton, (busy || !deletePassword) && styles.disabled]}
-                  >
-                    <Text style={styles.dangerButtonText}>Permanently delete account</Text>
-                  </Pressable>
-                </>
-              ) : account.deletion.method === 'apple' ? (
-                <>
-                  <Text style={styles.body}>Verify with Apple again to confirm permanent deletion. No email code is required.</Text>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={busy}
-                    onPress={confirmDelete}
-                    style={[styles.dangerButton, busy && styles.disabled]}
-                  >
-                    <Text style={styles.dangerButtonText}>Verify with Apple and delete account</Text>
-                  </Pressable>
-                </>
-              ) : account.deletion.method === 'email' ? (
-                <>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={busy}
-                    onPress={() => void sendDeleteCode()}
-                    style={[styles.secondaryButton, busy && styles.disabled]}
-                  >
-                    <Text style={styles.secondaryButtonText}>{deleteCodeSent ? 'Send a new deletion code' : 'Email me a deletion code'}</Text>
-                  </Pressable>
-                  {deleteCodeSent ? (
-                    <>
-                      <TextInput
-                        accessibilityLabel="Account deletion code"
-                        keyboardType="number-pad"
-                        maxLength={8}
-                        onChangeText={setDeleteCode}
-                        placeholder="8-digit deletion code"
-                        placeholderTextColor={colors.faint}
-                        style={styles.input}
-                        value={deleteCode}
-                      />
-                      <Pressable
-                        accessibilityRole="button"
-                        disabled={busy || !/^\d{8}$/.test(deleteCode)}
-                        onPress={confirmDelete}
-                        style={[styles.dangerButton, (busy || !/^\d{8}$/.test(deleteCode)) && styles.disabled]}
-                      >
-                        <Text style={styles.dangerButtonText}>Permanently delete account</Text>
-                      </Pressable>
-                    </>
-                  ) : null}
-                </>
-              ) : (
-                <Text style={styles.body}>A verified account email is required before this account can be deleted.</Text>
-              )}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.panel}>
-            {Platform.OS === 'ios' ? (
-              <AppleAuthentication.AppleAuthenticationButton
-                buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
-                buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
-                cornerRadius={6}
-                onPress={() => void openApple()}
-                style={[styles.appleButton, busy && styles.disabled]}
+        {account && promptDisplayName ? (
+          <>
+            <Text style={styles.title}>Your account is ready.</Text>
+            <Text style={styles.body}>Your progress is saved across devices.</Text>
+            <View style={styles.panel}>
+              <Text style={styles.fieldLabel}>Display name</Text>
+              <TextInput
+                accessibilityLabel="Display name"
+                autoCapitalize="words"
+                autoComplete="nickname"
+                maxLength={24}
+                onChangeText={(value) => {
+                  setReadyDisplayName(value);
+                  if (value.trim() !== readyInitialName.trim()) setReadyError(null);
+                }}
+                placeholder="Display name"
+                placeholderTextColor={colors.faint}
+                style={styles.input}
+                value={readyDisplayName}
               />
-            ) : (
-              <Pressable accessibilityRole="button" disabled={busy} onPress={() => void openApple()} style={[styles.appleWebButton, busy && styles.disabled]}>
-                <Text style={styles.appleWebButtonText}>Continue with Apple</Text>
+              <Text style={styles.fieldHelp}>Shown on Daily leaderboards and your public profile.</Text>
+              {readyNameOptionalHint ? (
+                <Text style={styles.fieldHelp}>Optional. Choose a display name if you want to join Daily leaderboards.</Text>
+              ) : null}
+              <View style={styles.termsBox}>
+                <Text style={styles.fieldHelp}>
+                  By saving a display name, you agree to the Public Identity rules: no harassment,
+                  impersonation, spam, private contact information, or abusive content.
+                </Text>
+                <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
+                  <Text style={styles.linkText}>Read the Public Identity rules</Text>
+                </Pressable>
+              </View>
+              {readyError ? <Text accessibilityRole="alert" style={styles.error}>{readyError}</Text> : null}
+              <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void saveReadyDisplayName()}
+                style={[styles.primaryButton, disabled && styles.disabled]}>
+                {actionBusy ? <ActivityIndicator color="#fff" /> : <Text style={styles.primaryButtonText}>Continue</Text>}
               </Pressable>
-            )}
-
-            <Pressable accessibilityRole="button" disabled={busy} onPress={() => void openGoogle()} style={[styles.googleButton, busy && styles.disabled]}>
-              <Text style={styles.googleButtonText}>Continue with Google</Text>
-            </Pressable>
-
-            {/* Signing in is how a player joins the leaderboards, so the Public
-                Identity rules are agreed here rather than with a separate checkbox. */}
-            <View style={styles.termsBox}>
-              <Text style={styles.fieldHelp}>
-                By continuing, you agree to the Pack One Terms, including the Public Identity rules for leaderboard names and profiles.
-              </Text>
-              <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
-                <Text style={styles.linkText}>Read the Pack One Terms</Text>
-              </Pressable>
-            </View>
-
-            <View style={styles.dividerRow}>
-              <View style={styles.dividerLine} />
-              <Text style={styles.dividerText}>or use email</Text>
-              <View style={styles.dividerLine} />
-            </View>
-
-            <View style={styles.modeRow}>
-              <Pressable accessibilityRole="button" onPress={() => setMode('signin')} style={[styles.modeButton, mode === 'signin' && styles.modeButtonActive]}>
-                <Text style={[styles.modeText, mode === 'signin' && styles.modeTextActive]}>Sign in</Text>
-              </Pressable>
-              <Pressable accessibilityRole="button" onPress={() => setMode('signup')} style={[styles.modeButton, mode === 'signup' && styles.modeButtonActive]}>
-                <Text style={[styles.modeText, mode === 'signup' && styles.modeTextActive]}>Create account</Text>
+              <Pressable accessibilityRole="button" accessibilityLabel="Skip display name for now" disabled={disabled}
+                onPress={() => continueAfterDisplayNamePrompt()} style={styles.textButton}>
+                <Text style={styles.textButtonText}>Skip for now</Text>
               </Pressable>
             </View>
+          </>
+        ) : account ? (
+          <>
+            <Text style={styles.title}>Account</Text>
+            <View style={styles.panel}>
+              <Text style={styles.panelTitle}>{signedInLabel}</Text>
+              <Text style={styles.body}>You&apos;re signed in on this device. Your Pack One progress syncs with this account.</Text>
 
-            <TextInput
-              accessibilityLabel="Email"
-              autoCapitalize="none"
-              autoComplete="username"
-              keyboardType="email-address"
-              onChangeText={setEmail}
-              placeholder="Email"
-              placeholderTextColor={colors.faint}
-              style={styles.input}
-              textContentType={Platform.OS === 'ios' ? 'username' : undefined}
-              value={email}
-            />
-            <TextInput
-              accessibilityLabel="Password"
-              autoCapitalize="none"
-              autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
-              onChangeText={setPassword}
-              placeholder="Password"
-              placeholderTextColor={colors.faint}
-              secureTextEntry
-              style={styles.input}
-              value={password}
-            />
-            <Pressable
-              accessibilityRole="button"
-              disabled={busy || !email.trim() || !password}
-              onPress={() => void submitEmail()}
-              style={[styles.primaryButton, (busy || !email.trim() || !password) && styles.disabled]}
-            >
-              {busy ? <ActivityIndicator color="#fff" /> : (
-                <Text style={styles.primaryButtonText}>{mode === 'signin' ? 'Sign in' : 'Create account'}</Text>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/account-profile')} style={styles.row}>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle}>Profile &amp; visibility</Text>
+                  <Text style={styles.fieldHelp}>Display name, public profile and profile preferences</Text>
+                </View>
+                <Text style={styles.rowArrow}>›</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/membership')} style={styles.row}>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle}>Membership</Text>
+                  <Text style={styles.fieldHelp}>Elite access from Apple or Patreon</Text>
+                </View>
+                <Text style={styles.rowArrow}>›</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/account-security')} style={styles.row}>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.rowTitle}>Sign-in &amp; security</Text>
+                  <Text style={styles.fieldHelp}>Sign-in methods and password</Text>
+                </View>
+                <Text style={styles.rowArrow}>›</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" onPress={() => router.push('/account-delete')} style={[styles.row, styles.dangerRow]}>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.dangerTitle}>Delete account</Text>
+                  <Text style={styles.fieldHelp}>Permanently remove your Pack One account</Text>
+                </View>
+                <Text style={[styles.rowArrow, styles.dangerTitle]}>›</Text>
+              </Pressable>
+
+              <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void signOut()} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>Sign out</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : verificationPending ? (
+          <>
+            <Text style={styles.title}>Check your email</Text>
+            <View style={styles.panel}>
+              <Text style={styles.body}>We sent a verification link to {email.trim()}. Open it to finish creating your Pack One account. Links expire after 15 minutes.</Text>
+              <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void resendVerification()} style={styles.secondaryButton}>
+                <Text style={styles.secondaryButtonText}>Send a new verification link</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" disabled={disabled} onPress={() => {
+                setVerificationPending(false);
+                setMode('signin');
+                setMessage(null);
+              }} style={styles.textButton}>
+                <Text style={styles.textButtonText}>Back to sign in</Text>
+              </Pressable>
+            </View>
+          </>
+        ) : (
+          <>
+            <Text style={styles.title}>Sign in to Pack One.</Text>
+            <Text style={styles.body}>
+              {validateDailyRunId
+                ? 'Sign in to save this Daily score to your Pack One career and add it to the leaderboard when eligible.'
+                : 'Use the same Pack One account across web, iPhone, iPad, and Android.'}
+            </Text>
+            <View style={styles.panel}>
+              {Platform.OS === 'ios' ? (
+                <AppleAuthentication.AppleAuthenticationButton
+                  buttonStyle={AppleAuthentication.AppleAuthenticationButtonStyle.BLACK}
+                  buttonType={AppleAuthentication.AppleAuthenticationButtonType.CONTINUE}
+                  cornerRadius={6}
+                  onPress={() => void openApple()}
+                  style={[styles.appleButton, disabled && styles.disabled]}
+                />
+              ) : (
+                <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void openApple()} style={[styles.appleWebButton, disabled && styles.disabled]}>
+                  <Text style={styles.appleWebButtonText}>Continue with Apple</Text>
+                </Pressable>
               )}
-            </Pressable>
-            {mode === 'signin' ? (
-              <Pressable
-                accessibilityRole="button"
-                disabled={busy}
-                onPress={() => void forgotPassword()}
-                style={styles.textButton}
-              >
-                <Text style={styles.textButtonText}>Forgot password?</Text>
+
+              <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void openGoogle()} style={[styles.googleButton, disabled && styles.disabled]}>
+                <Text style={styles.googleButtonText}>Continue with Google</Text>
               </Pressable>
-            ) : null}
-            <Pressable
-              accessibilityRole="button"
-              disabled={busy}
-              onPress={() => void resendVerification()}
-              style={styles.textButton}
-            >
-              <Text style={styles.textButtonText}>Resend verification email</Text>
-            </Pressable>
-          </View>
+
+              <View style={styles.termsBox}>
+                <Text style={styles.fieldHelp}>
+                  By continuing, you agree to the Pack One Terms, including the Public Identity rules for display names and profiles.
+                </Text>
+                <Pressable accessibilityRole="link" onPress={() => void WebBrowser.openBrowserAsync('https://packone.pro/terms/#public-identity-rules')}>
+                  <Text style={styles.linkText}>Read the Pack One Terms</Text>
+                </Pressable>
+              </View>
+
+              <View style={styles.dividerRow}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>or use email</Text>
+                <View style={styles.dividerLine} />
+              </View>
+
+              <View style={styles.modeRow}>
+                <Pressable accessibilityRole="button" onPress={() => { setMode('signin'); setSigninNeedsVerification(false); }}
+                  style={[styles.modeButton, mode === 'signin' && styles.modeButtonActive]}>
+                  <Text style={[styles.modeText, mode === 'signin' && styles.modeTextActive]}>Sign in</Text>
+                </Pressable>
+                <Pressable accessibilityRole="button" onPress={() => { setMode('signup'); setSigninNeedsVerification(false); }}
+                  style={[styles.modeButton, mode === 'signup' && styles.modeButtonActive]}>
+                  <Text style={[styles.modeText, mode === 'signup' && styles.modeTextActive]}>Create account</Text>
+                </Pressable>
+              </View>
+
+              <TextInput
+                accessibilityLabel="Email"
+                autoCapitalize="none"
+                autoComplete="username"
+                keyboardType="email-address"
+                onChangeText={(value) => { setEmail(value); setSigninNeedsVerification(false); }}
+                placeholder="Email"
+                placeholderTextColor={colors.faint}
+                style={styles.input}
+                textContentType={Platform.OS === 'ios' ? 'username' : undefined}
+                value={email}
+              />
+              <TextInput
+                accessibilityLabel="Password"
+                autoCapitalize="none"
+                autoComplete={mode === 'signin' ? 'current-password' : 'new-password'}
+                onChangeText={setPassword}
+                placeholder="Password"
+                placeholderTextColor={colors.faint}
+                secureTextEntry
+                style={styles.input}
+                value={password}
+              />
+              <Pressable accessibilityRole="button" disabled={disabled || !email.trim() || !password}
+                onPress={() => void submitEmail()}
+                style={[styles.primaryButton, (disabled || !email.trim() || !password) && styles.disabled]}>
+                {actionBusy ? <ActivityIndicator color="#fff" /> : (
+                  <Text style={styles.primaryButtonText}>{mode === 'signin' ? 'Sign in' : 'Create account'}</Text>
+                )}
+              </Pressable>
+              {mode === 'signin' ? (
+                <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void forgotPassword()} style={styles.textButton}>
+                  <Text style={styles.textButtonText}>Forgot password?</Text>
+                </Pressable>
+              ) : null}
+              {signinNeedsVerification ? (
+                <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void resendVerification()} style={styles.secondaryButton}>
+                  <Text style={styles.secondaryButtonText}>Send a new verification link</Text>
+                </Pressable>
+              ) : null}
+            </View>
+          </>
         )}
 
-        {message ? <Text style={styles.message}>{message}</Text> : null}
-        {enrichmentWarning ? (
-          <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text>
-        ) : null}
-
+        {message || routeNotice ? <Text accessibilityRole="alert" style={styles.message}>{message || routeNotice}</Text> : null}
+        {enrichmentWarning ? <Text accessibilityRole="alert" style={styles.enrichmentWarning}>{enrichmentWarning}</Text> : null}
       </ScrollView>
     </SafeAreaView>
   );
@@ -993,48 +616,18 @@ const styles = StyleSheet.create({
   secondaryButtonText: { color: colors.accentDark, fontSize: 15, fontWeight: '800' },
   disabled: { opacity: 0.42 },
   message: { color: colors.accentDark, fontSize: 14, lineHeight: 21, fontWeight: '700' },
+  error: { color: colors.danger, fontSize: 14, lineHeight: 21, fontWeight: '700' },
   enrichmentWarning: { color: colors.muted, fontSize: 13, lineHeight: 19, fontWeight: '700' },
-  settingsSection: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.md },
-  sectionTitle: { color: colors.ink, fontSize: 18, fontWeight: '800' },
   fieldLabel: { color: colors.ink, fontSize: 13, fontWeight: '800' },
   fieldHelp: { color: colors.muted, fontSize: 12, lineHeight: 18 },
   termsBox: { gap: spacing.sm },
   linkText: { color: colors.accentDark, fontSize: 13, fontWeight: '700', textDecorationLine: 'underline' },
-  warning: { borderWidth: 1, borderLeftWidth: 4, borderColor: colors.accent, padding: spacing.md, gap: spacing.xs },
-  warningTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
-  toggle: {
-    minHeight: 62,
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
-    padding: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  toggleActive: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  toggleCopy: { flex: 1, gap: 3 },
-  toggleTitle: { color: colors.ink, fontSize: 14, fontWeight: '800' },
-  toggleValue: { color: colors.muted, fontSize: 12, fontWeight: '900' },
-  toggleValueActive: { color: colors.accentDark },
-  optionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
-  optionChip: {
-    minHeight: 40,
-    maxWidth: '100%',
-    borderWidth: 1,
-    borderColor: colors.lineStrong,
-    paddingHorizontal: spacing.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  optionChipSelected: { borderColor: colors.accent, backgroundColor: colors.accentSoft },
-  optionChipText: { color: colors.muted, fontSize: 12, fontWeight: '700' },
-  optionChipTextSelected: { color: colors.accentDark },
-  credentialLine: { color: colors.ink, fontSize: 13, fontWeight: '700' },
-  passwordBox: { gap: spacing.md },
   textButton: { minHeight: 40, alignItems: 'center', justifyContent: 'center' },
   textButtonText: { color: colors.accentDark, fontSize: 14, fontWeight: '800', textDecorationLine: 'underline' },
-  dangerZone: { borderTopWidth: 1, borderColor: colors.line, paddingTop: spacing.lg, gap: spacing.md },
+  row: { minHeight: 68, borderTopWidth: 1, borderColor: colors.line, paddingVertical: spacing.md, flexDirection: 'row', alignItems: 'center', gap: spacing.md },
+  rowCopy: { flex: 1, gap: 4 },
+  rowTitle: { color: colors.ink, fontSize: 16, fontWeight: '800' },
+  rowArrow: { color: colors.muted, fontSize: 26, lineHeight: 30 },
+  dangerRow: { marginTop: spacing.sm },
   dangerTitle: { color: colors.danger, fontSize: 16, fontWeight: '800' },
-  dangerButton: { minHeight: 50, borderWidth: 1, borderColor: colors.danger, alignItems: 'center', justifyContent: 'center', paddingHorizontal: spacing.md },
-  dangerButtonText: { color: colors.danger, fontSize: 15, fontWeight: '800' },
 });

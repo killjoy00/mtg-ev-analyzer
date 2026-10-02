@@ -138,7 +138,7 @@ export async function renderPatreonActivation({result=null,source='welcome_note'
     bindOAuth(source);return;
   }
   if(state==='not_entitled') {
-    shell('<h2>Patreon is connected, but Pack One does not currently see an active Elite entitlement.</h2><p>Review the membership on Patreon or authorize again to check the latest provider state.</p><p id="patreon-activation-status" aria-live="polite"></p>',support+retry);
+    shell('<h2>Patreon is connected, but Pack One does not currently see an active Elite membership.</h2><p>Review the membership on Patreon or authorize again to check the latest Patreon status.</p><p id="patreon-activation-status" aria-live="polite"></p>',support+retry);
     bindOAuth(source);return;
   }
   shell('<h2>Patreon is connected.</h2><p>Pack One could not classify the latest membership state yet. Check Patreon again.</p><p id="patreon-activation-status" aria-live="polite"></p>',retry+'<a class="button secondary" data-patreon-activation-exit href="./">Back to Pack One</a>');

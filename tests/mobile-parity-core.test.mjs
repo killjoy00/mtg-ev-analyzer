@@ -11,6 +11,13 @@ const [
   howToScreen,
   scoringScreen,
   accountScreen,
+  accountProfileScreen,
+  accountSecurityScreen,
+  accountDeleteScreen,
+  accountStateHook,
+  accountLayout,
+  homeScreen,
+  publicProfileScreen,
   webHowTo,
   webScoring,
 ] = await Promise.all([
@@ -22,6 +29,13 @@ const [
   readFile(new URL('../mobile/app/how-to.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/scoring.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../mobile/app/account.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account-profile.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account-security.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/account-delete.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/src/hooks/useAccountState.ts', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/_layout.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/index.tsx', import.meta.url), 'utf8'),
+  readFile(new URL('../mobile/app/profile.tsx', import.meta.url), 'utf8'),
   readFile(new URL('../how-it-works/index.html', import.meta.url), 'utf8'),
   readFile(new URL('../scoring/index.html', import.meta.url), 'utf8'),
 ]);
@@ -80,4 +94,36 @@ test('native instructional copy preserves current web Daily eligibility semantic
   assert.match(leaderboardScreen, /validated to an eligible account/);
   assert.doesNotMatch(leaderboardScreen, /signed-in Pack One Daily runs/);
   assert.match(accountScreen, /web, iPhone, iPad, and Android/);
+});
+
+
+test('native Account keeps auth on /account and splits signed-in management into flat routes', () => {
+  assert.match(accountScreen, /Profile &amp; visibility/);
+  assert.match(accountScreen, /router\.push\('\/account-profile'\)/);
+  assert.match(accountScreen, /router\.push\('\/membership'\)/);
+  assert.match(accountScreen, /router\.push\('\/account-security'\)/);
+  assert.match(accountScreen, /router\.push\('\/account-delete'\)/);
+  assert.match(accountProfileScreen, /Shown on Daily leaderboards and your public profile\./);
+  assert.match(accountSecurityScreen, /Changing your password signs out every device\./);
+  assert.match(accountDeleteScreen, /Deleting your Pack One account does not cancel subscriptions\./);
+  assert.match(accountStateHook, /useFocusEffect/);
+  assert.match(accountStateHook, /generation\.current/);
+  assert.match(accountLayout, /name="account-profile" options=\{\{ title: 'Profile & visibility' \}\}/);
+  assert.match(accountLayout, /name="account-security" options=\{\{ title: 'Sign-in & security' \}\}/);
+  assert.match(accountLayout, /name="account-delete" options=\{\{ title: 'Delete account' \}\}/);
+  assert.match(homeScreen, /name_not_allowed/);
+  assert.match(homeScreen, /That display name is not allowed\. Choose another to join Daily leaderboards\./);
+  assert.match(homeScreen, /Choose a different display name\. That one is already taken\./);
+  assert.match(accountProfileScreen, /if \(!account \|\| !profile\)/);
+  assert.match(accountSecurityScreen, /if \(!account\)/);
+  assert.match(accountDeleteScreen, /if \(!account\)/);
+  assert.match(accountProfileScreen, />Retry</);
+  assert.match(accountSecurityScreen, />Retry</);
+  assert.match(accountDeleteScreen, />Retry</);
+  assert.match(accountProfileScreen, /onPress=\{\(\) => void refresh\(\)\}/);
+  assert.match(accountSecurityScreen, /onPress=\{\(\) => void refresh\(\)\}/);
+  assert.match(accountDeleteScreen, /onPress=\{\(\) => void refresh\(\)\}/);
+  assert.match(accountStateHook, /clearEnrichment\(\);\n\s+setMessage\(error instanceof Error/);
+  assert.equal((publicProfileScreen.match(/router\.replace\(\{\s*pathname: '\/account'/g)||[]).length,2);
+  assert.match(publicProfileScreen, /pendingActionShown=useRef\(false\)/);
 });

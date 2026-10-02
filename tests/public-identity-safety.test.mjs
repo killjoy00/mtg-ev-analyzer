@@ -31,6 +31,7 @@ test('public identity eligibility requires a signed-in owned name and fails clos
   const accepted={
     auth_user_id:'11111111-1111-4111-8111-111111111111',
     username_owned:true,
+    display_name:'Ryan',
     is_placeholder:false,
     public_identity_terms_version:PUBLIC_IDENTITY_TERMS_VERSION,
     public_identity_terms_accepted_at:'2026-09-30T00:00:00Z',
@@ -47,7 +48,8 @@ test('public identity eligibility requires a signed-in owned name and fails clos
   assert.deepEqual(publicIdentityEligibility({...accepted,public_identity_terms_version:'old'}),{eligible:true,reason:null});
   assert.deepEqual(publicIdentityEligibility({...accepted,public_identity_hidden_at:'2026-09-30T01:00:00Z'}),{eligible:false,reason:'moderated'});
   assert.deepEqual(publicIdentityEligibility({...accepted,username_owned:false,is_placeholder:true}),{eligible:false,reason:'username_required'});
-  assert.deepEqual(publicIdentityEligibility({...accepted,username_owned:false,is_placeholder:false}),{eligible:false,reason:'username_taken'});
+  assert.deepEqual(publicIdentityEligibility({...accepted,username_owned:false,is_placeholder:false,display_name:'Taken Name'}),{eligible:false,reason:'username_taken'});
+  assert.deepEqual(publicIdentityEligibility({...accepted,username_owned:false,is_placeholder:false,display_name:'Pack One Admin'}),{eligible:false,reason:'name_not_allowed'});
 });
 
 test('leaderboards rank signed-in owned names without a separate rules-acceptance gate',()=>{

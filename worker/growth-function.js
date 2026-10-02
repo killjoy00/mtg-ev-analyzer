@@ -22,7 +22,7 @@ import {campaignLinkPublishConfigured,handleCampaignLinkPublish} from './campaig
 import {maintainServingReadiness} from './corpus-readiness.mjs';
 import {PLACEHOLDER_USERNAME,isPlaceholderUsername,isUsernameConflict,normalizeDisplayName as normalizeName,rethrowUsernameConflict} from './username.mjs';
 import {rankingIdentityStatus} from './account-identity.mjs';
-import {PUBLIC_IDENTITY_TERMS_VERSION,assertPublicDisplayNameAllowed,normalizedReportDetails,normalizedReportReason,publicIdentityHidden,publicIdentityTermsCurrent} from './public-identity-safety.mjs';
+import {PUBLIC_IDENTITY_TERMS_VERSION,assertPublicDisplayNameAllowed,normalizedReportDetails,normalizedReportReason,publicIdentityEligibility,publicIdentityHidden,publicIdentityTermsCurrent} from './public-identity-safety.mjs';
 import {handleMobileVersionCheck} from './mobile-version.mjs';
 import {APPLE_NATIVE_CLIENT_ID,APPLE_REDIRECT_URI,APPLE_WEB_CLIENT_ID,appleAuthorizeUrl,appleConfigured,markApplePasswordEstablished,resolveAppleAccount,revokeAppleAuthorization,sanitizeAppleFirstName,storeAppleRefreshToken,verifyAppleAuthorization} from './apple-auth.mjs';
 const ACCOUNT_CONFIG=accountRuntimeConfig();
@@ -622,6 +622,7 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
     .slice(0, 5);
   const cube = bySet.find((row) => row.set_id === 'powered-cube') || null;
   const finalPercentiles=dailyHistory.filter(r=>r.final&&r.percentile).map(r=>r.percentile);
+  const rankingIdentity=own?publicIdentityEligibility({...meta,auth_user_id:bool(meta.claimed)?'linked':null,is_placeholder:isPlaceholderUsername(meta.display_name)}):null;
 
   return {
     player: {
@@ -633,12 +634,14 @@ async function buildProfile(playerId, meta, { own = false } = {}) {
       ...(own ? {
         claimed: bool(meta.claimed),
         username_owned: bool(meta.username_owned),
+        display_name_reason: rankingIdentity?.eligible?null:rankingIdentity?.reason||null,
         public_identity_terms_version: meta.public_identity_terms_version || null,
         public_identity_terms_current: publicIdentityTermsCurrent(meta),
         public_identity_hidden: publicIdentityHidden(meta),
         public_identity_hidden_reason: meta.public_identity_hidden_reason || null,
       } : {}),
     },
+    ...(own?{ranking_identity:{eligible:Boolean(rankingIdentity?.eligible),reason:rankingIdentity?.reason||null}}:{}),
     summary: normalizedSummary,
     environment_total: reportedEnvironmentTotal,
     by_set: bySet,
@@ -2257,9 +2260,9 @@ async function handleProfileUpdate(request,{mobile=false}={}) {
   if (favorite && !allowedSets.has(favorite)) throw Object.assign(new Error('Choose a playable environment.'), { status: 400 });
   if (showcase && !unlocked.has(showcase)) throw Object.assign(new Error('Showcase an achievement you have unlocked.'), { status: 400 });
   if(hidden&&(payload.displayName!==undefined||payload.profilePublic===true||acceptsTerms)) {
-    throw Object.assign(new Error('This public identity is unavailable. Contact Pack One support if you believe this is a mistake.'),{status:403,code:'PUBLIC_IDENTITY_MODERATED'});
+    throw Object.assign(new Error('This display name is unavailable. Contact Pack One support if you believe this is a mistake.'),{status:403,code:'PUBLIC_IDENTITY_MODERATED'});
   }
-  if(profilePublic&&!wantsOwned)throw Object.assign(new Error('Choose a leaderboard name before publishing a profile.'),{status:400});
+  if(profilePublic&&!wantsOwned)throw Object.assign(new Error('Choose a display name before publishing a profile.'),{status:400});
   if(wantsOwned)assertPublicDisplayNameAllowed(displayName);
 
   try {

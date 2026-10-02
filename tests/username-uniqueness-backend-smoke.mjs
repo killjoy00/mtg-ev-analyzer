@@ -81,7 +81,7 @@ assert.equal(await owned(first.playerId),true,'a chosen username is owned');
 for(const attempt of [username,username.toLowerCase(),username.toUpperCase(),`  Ryan   ${tag} `]) {
   const denied=await rename(second,attempt,409);
   assert.equal(denied.error,USERNAME_TAKEN_MESSAGE);
-  assert.equal(denied.error,'That username is already taken.');
+  assert.equal(denied.error,'That display name is already taken.');
   assert.doesNotMatch(JSON.stringify(denied),/duplicate key|unique constraint|players_username_uq|23505|pg/i,
     'a Postgres constraint error must never reach the caller');
 }

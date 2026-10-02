@@ -106,10 +106,17 @@ function cardGrid(p,answer=null) {
 function rankingStateMarkup(value=run) {
   if(!value?.day)return '';
   if(value.leaderboard_eligible)return `<p class="run-ranking-state" role="status">Ranked as ${esc(value.ranked_name||'your account')}</p>`;
-  if(['username_taken','username_required'].includes(value.ranking_identity?.reason))
+  if(['username_taken','username_required','name_not_allowed'].includes(value.ranking_identity?.reason)) {
+    const reason=value.ranking_identity?.reason;
+    const fix=reason==='name_not_allowed'
+      ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+      : reason==='username_taken'
+        ? 'Choose a different display name. That one is already taken.'
+        : 'Choose a display name to join Daily leaderboards.';
     return value.complete
-      ? '<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> Choose a unique username to add this score to the leaderboard.</p>'
-      : '<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> Your account needs a unique username. Choose one in My Pack One; you can add the completed score afterward.</p>';
+      ? `<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> ${fix} You can add this score afterward.</p>`
+      : `<p class="run-ranking-state" role="alert"><strong>This Daily isn’t ranked yet.</strong> ${fix} You can add the completed score afterward.</p>`;
+  }
   return value.complete
     ? '<p class="run-ranking-state" role="status">Playing as guest. Sign in to add this score to the leaderboard.</p>'
     : '<p class="run-ranking-state is-quiet" role="status">Playing as guest.</p>';
@@ -212,12 +219,12 @@ function renderResult() {
     ${dailyValidationConfirmation?`<div class="run-validation-success" role="status" data-daily-validation-confirmation><strong>Score added to today's leaderboard</strong>${dailyValidationConfirmation.standing?`<span>#${dailyValidationConfirmation.standing.rank} of ${dailyValidationConfirmation.standing.total}${dailyValidationConfirmation.standing.percentile?` · Top ${dailyValidationConfirmation.standing.percentile}%`:''}</span>`:''}<a class="text-button" href="${gameUrl('board=daily')}">View leaderboard</a></div>`:''}
     ${rankingStateMarkup(run)}
     ${run.comparison?`<p class="run-friend">${run.comparison.exact?`You: ${run.score} · ${esc(run.comparison.name)}: ${run.comparison.score}`:'These scores came from different decisions.'}</p>`:''}
-    <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required'].includes(run.ranking_identity?.reason)?'Choose username to add score':'Sign in to add score'):'View your career'}</button></div>
+    <div class="run-result-actions"><a class="button primary" href="${repeat.href}">${repeat.label}</a><button class="button secondary" id="run-share">${run.day?'Share result':'Share this run and compare'}</button><a class="button secondary" href="${gameUrl('board=daily')}">Leaderboard</a><button class="button secondary" id="run-career">${run.day&&!run.leaderboard_eligible?(['username_taken','username_required','name_not_allowed'].includes(run.ranking_identity?.reason)?'Choose display name to add score':'Sign in to add score'):'View your career'}</button></div>
     <h2>Your ${runLength()} picks</h2><ol class="run-review-list">${run.answers.map((a,i)=>`<li><button data-review="${i}"><span>${i+1}</span><div><strong>${esc(setName(a.puzzle.set_id))} · Pick ${a.pickNumber}</strong><small>${esc(a.selectedName)}${a.historicalMatch?' · Trophy match':''}</small></div><b>${a.score}</b></button></li>`).join('')}</ol>
     <p class="run-note">Your final score is the rounded average of ${runLength()} decisions. Trophy picks earn 100; other picks can earn up to 95 based on broader drafting evidence.</p><p id="run-share-status" role="status"></p><p id="run-error" role="alert"></p></section>`;
   app().querySelectorAll('[data-review]').forEach(b=>b.onclick=()=>{review=Number(b.dataset.review);render();window.scrollTo({top:0,behavior:'instant'});});
   document.querySelector('#run-share').onclick=()=>shareResult();
-  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=7')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
+  document.querySelector('#run-career').onclick=async()=>{if(run.day&&!run.leaderboard_eligible){(await import('./growth.mjs?v=8')).renderAccount({validateDailyRunId:run.id,source:'daily_result'});return;}document.querySelector('#account-nav')?.click();};
   if(run.day)void renderDailyResultCue(run.id);
   document.dispatchEvent(new CustomEvent('pack1:result-visible',{detail:{id:`draft-run:${run.id}`,score:run.score,mode:'draft_run',set_id:run.environment,daily:Boolean(run.day)}}));
 }
@@ -298,8 +305,8 @@ function renderLoadFailure(error,isBoard) {
     const premium=['custom_corpus','unlimited_cube_practice'].includes(error.capability);
     const signedIn=hasAccountSession();
     app().innerHTML=`<section class="message-card"><h1>${premium?'Elite practice':signedIn?'Practice access':'Keep drafting with a free account'}</h1><p>${esc(error.message)}</p>${premium?'<p>Elite membership includes custom sets and unlimited Cube practice.</p>':''}<div class="button-row">${premium?'<button class="button primary" id="practice-membership">'+(signedIn?'Become Elite':'Sign in to become Elite')+'</button>':''}${!premium&&!signedIn?'<button class="button primary" id="practice-account">Sign in or create an account</button>':''}<a class="button secondary" href="./">Back to Dailies</a></div></section>`;
-    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=7')).beginEliteUpgrade({source:'practice_gate'});});
-    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=7')).renderAccount();});return;
+    document.querySelector('#practice-membership')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=8')).beginEliteUpgrade({source:'practice_gate'});});
+    document.querySelector('#practice-account')?.addEventListener('click',async()=>{(await import('./growth.mjs?v=8')).renderAccount();});return;
   }
   console.warn('Draft Run page failed to load',error?.message);
   const retry=`<button class="button primary" type="button" data-run-retry="1">Try again</button>`;

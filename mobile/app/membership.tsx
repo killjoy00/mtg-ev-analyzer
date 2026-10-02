@@ -230,7 +230,7 @@ function AppleElitePanel({
       return;
     }
     if (otherProviderActive) {
-      setError('Elite access is already active from another provider. Apple purchase is disabled to avoid duplicate billing.');
+      setError('Elite is already active through Patreon. Apple purchase is disabled to avoid duplicate billing.');
       return;
     }
     setRequesting(true);
@@ -311,7 +311,7 @@ function AppleElitePanel({
           ? ` through ${new Date(status.subscription.expiresAt).toLocaleDateString()}`
           : ''}.</Text>
       ) : otherProviderActive ? (
-        <Text style={styles.body}>Elite access is already active from another provider. Apple purchase is disabled here to avoid duplicate billing.</Text>
+        <Text style={styles.body}>Elite is already active through Patreon. Apple purchase is disabled here to avoid duplicate billing.</Text>
       ) : (
         <Text style={styles.body}>{product
           ? `Apple price: ${product.displayPrice}${period ? ` ${period}` : ''}.`
@@ -409,7 +409,7 @@ export default function MembershipScreen() {
     if (!current?.connected || state.busy) return;
     const { account_user_id: accountUserId, player_id: playerId } = current;
     Alert.alert('Disconnect Patreon?',
-      'This removes only Patreon-provided access in Pack One. Other account access is kept. This does not cancel billing at Patreon.',
+      'This disconnects Patreon from Pack One. Your other Pack One access stays the same. This does not cancel billing at Patreon.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Disconnect', style: 'destructive', onPress: () => void controller.disconnect(accountUserId, playerId) },
@@ -430,7 +430,7 @@ export default function MembershipScreen() {
               <Text style={styles.body}>Regular Draft Run practice: included</Text>
               <Text style={styles.body}>Powered Cube practice: {current.account_capabilities.includes('unlimited_cube_practice') ? 'available' : 'not currently included'}</Text>
               <Text style={styles.body}>Custom-set practice: {current.account_capabilities.includes('custom_corpus') ? 'available' : 'not currently included'}</Text>
-              <Text style={styles.help}>This is the same provider-independent account access checked by gameplay. Patreon and Apple are independent entitlement sources for the same account capabilities.</Text>
+              <Text style={styles.help}>Elite works the same whether it comes from Apple or Patreon.</Text>
             </>
           ) : state.phase === 'error' ? (
             <Text style={styles.body}>Access is not verified right now. A failed lookup does not mean your account is Free or that access was removed.</Text>
@@ -448,17 +448,17 @@ export default function MembershipScreen() {
           <View style={styles.panel}>
             <Text style={styles.heading}>Patreon account</Text>
             <Text style={styles.body}>{current.connected ? 'Patreon is connected to this account.' : 'No Patreon account is connected.'}</Text>
-            {!current.configured ? <Text style={styles.body}>Patreon connection service is unavailable. Account access above remains a separate check.</Text> : null}
+            {!current.configured ? <Text style={styles.body}>Patreon is temporarily unavailable. Your current access is unchanged.</Text> : null}
             {current.membership?.sync_pending ? (
               <Text style={styles.body}>Membership reconciliation is pending. A refresh request is not confirmation of a completed sync.</Text>
             ) : current.connected ? (
               <Text style={styles.body}>{current.capabilities.includes('custom_corpus') && current.capabilities.includes('unlimited_cube_practice')
-                ? 'Patreon-provided account access is active.'
+                ? 'Elite from Patreon is active.'
                 : current.capabilities.length
-                  ? 'Some Patreon-provided account access is active.'
-                  : 'No Patreon-provided access is currently active. Manage your membership through your subscription provider.'}</Text>
+                  ? 'Some Pack One benefits from Patreon are active.'
+                  : 'Patreon is connected, but Elite is not currently active. Manage your membership on Patreon.'}</Text>
             ) : null}
-            {current.membership?.last_synced_at ? <Text style={styles.help}>Last provider sync: {current.membership.last_synced_at}</Text> : null}
+            {current.membership?.last_synced_at ? <Text style={styles.help}>Last Patreon sync: {current.membership.last_synced_at}</Text> : null}
             {current.configured ? (
               <Pressable accessibilityRole="button" accessibilityLabel="Sign in with Patreon" disabled={state.busy}
                 onPress={() => void controller.connect()} style={[styles.button, state.busy && styles.disabled]}>

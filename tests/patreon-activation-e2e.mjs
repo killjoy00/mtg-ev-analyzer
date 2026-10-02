@@ -184,7 +184,7 @@ try {
   // Authoritative non-entitlement is truthful and is not mislabeled pending.
   await reset({isSigned:true,status:notEntitled});
   await page.goto(base+'/?patreon=activate');
-  await page.getByText('Patreon is connected, but Pack One does not currently see an active Elite entitlement.',{exact:true}).waitFor();
+  await page.getByText('Patreon is connected, but Pack One does not currently see an active Elite membership.',{exact:true}).waitFor();
   assert.doesNotMatch((await page.locator('.patreon-activation-page').textContent())||'',/waiting for the latest membership update/i);
 
   // Provider identity uniqueness gets a safe focused result with no other-account details.

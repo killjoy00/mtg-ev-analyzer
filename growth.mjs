@@ -1,6 +1,6 @@
 import { escapeHtml as esc } from './html.mjs';
-import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn } from './growth-api.mjs';
-import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs';
+import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile } from './growth-api.mjs';
+import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs?v=2';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
 let currentAccount = null;
@@ -9,12 +9,48 @@ let currentAccountError = null;
 let pendingDailyRunValidation = null;
 let pendingSignupNamePrompt = null;
 const AUTH_FLOW_KEY='pack1-auth-flow-v1';
+const PROFILE_SAFETY_KEY='pack1-profile-safety-intent-v1';
 
 function saveAuthFlow(intent,source) {
   try {sessionStorage.setItem(AUTH_FLOW_KEY,JSON.stringify({intent,source,validateDailyRunId:pendingDailyRunValidation||null}));} catch {}
 }
 function takeAuthFlow() {
   try {const raw=sessionStorage.getItem(AUTH_FLOW_KEY);sessionStorage.removeItem(AUTH_FLOW_KEY);return raw?JSON.parse(raw):null;} catch {return null;}
+}
+
+function takeProfileSafetyIntent() {
+  try {
+    const raw=sessionStorage.getItem(PROFILE_SAFETY_KEY);
+    sessionStorage.removeItem(PROFILE_SAFETY_KEY);
+    const value=raw?JSON.parse(raw):null;
+    return value&&/^[a-f0-9]{16}$/.test(String(value.profileKey||''))?value:null;
+  } catch {return null;}
+}
+
+async function resumeProfileSafetyIntent() {
+  const pending=takeProfileSafetyIntent();
+  if(!pending)return false;
+  const profiles=await import('./profile-product.mjs?v=8');
+  profiles.installProfileProductLayer();
+  (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+  await profiles.renderPublicProfile(pending.profileKey);
+  const reason=document.querySelector('#profile-report-reason');
+  if(reason&&pending.reason)reason.value=pending.reason;
+  const action=pending.action==='block'?'block':'report';
+  const status=document.querySelector('#profile-safety-status');
+  if(status)status.textContent=action==='block'
+    ? 'Signed in. Review this profile, then choose Block profile to continue.'
+    : 'Signed in. Review the reason, then choose Report profile to continue.';
+  document.querySelector('#profile-'+action)?.focus();
+  return true;
+}
+
+async function renderSignedInHome(source='account') {
+  if(source==='profile_safety'&&await resumeProfileSafetyIntent())return;
+  const profiles=await import('./profile-product.mjs?v=8');
+  profiles.installProfileProductLayer();
+  (await import('./profile-polish.mjs?v=6')).installProfilePolish();
+  await profiles.renderMyProfile();
 }
 
 function syncAccountNav() {
@@ -70,8 +106,8 @@ async function claimCurrentSession() {
   const session=await getAuthSession(); if(!session?.user) return null;
   const validationRunId=pendingDailyRunValidation;
   const linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
-  const usernameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required'].includes(linked?.rankingIdentity?.reason));
-  if(!usernameAttention)pendingDailyRunValidation=null;
+  const displayNameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required','name_not_allowed'].includes(linked?.rankingIdentity?.reason));
+  if(!displayNameAttention)pendingDailyRunValidation=null;
   currentAccount=session;
   currentAccountState='signed-in';
   currentAccountError=null;
@@ -156,7 +192,7 @@ function setFormPending(form,pending,label) {
 
 async function returnToValidatedDaily(validationRunId,linked,source,{confirmed=true}={}) {
   if(confirmed)event('daily_score_validated',{source});
-  const draft=await import('./draft-run-product.mjs?v=6');
+  const draft=await import('./draft-run-product.mjs?v=9');
   await draft.returnToValidatedDaily(validationRunId,{standing:linked?.standing||null,confirmed});
 }
 
@@ -164,7 +200,7 @@ async function continueAfterSignupNamePrompt({skip=false}={}) {
   const context=pendingSignupNamePrompt;
   if(!context)return;
   pendingSignupNamePrompt=null;
-  document.querySelector('#account-new-name-prompt')?.remove();
+  document.querySelector('#account-ready')?.remove();
   if(context.validationRunId) {
     let linked=context.linked;
     if(!skip&&!linked?.validatedDailyScore)linked=await linkAccount(undefined,{validateDailyRunId:context.validationRunId});
@@ -175,25 +211,54 @@ async function continueAfterSignupNamePrompt({skip=false}={}) {
   }
   if(context.intent==='patreon-activate'){await renderPatreonActivation({source:context.source});return;}
   if(context.intent==='elite'){await openEliteLanding(context.source);return;}
+  await renderSignedInHome(context.source);
 }
 
 async function openSignupNamePrompt({linked,validationRunId=null,intent=null,source='account'}={}) {
   pendingSignupNamePrompt={linked,validationRunId,intent,source};
   if(validationRunId)pendingDailyRunValidation=validationRunId;
-  const profiles=await import('./profile-product.mjs?v=7');
-  profiles.installProfileProductLayer();
-  (await import('./profile-polish.mjs?v=6')).installProfilePolish();
-  await profiles.renderMyProfile();
-  document.querySelector('#profile-account-tab')?.click();
-  const input=document.querySelector('#profile-account input[name="displayName"]');
-  if(!input)return;
-  const prompt=document.createElement('div');
-  prompt.id='account-new-name-prompt';
-  prompt.className='form-success';
-  prompt.innerHTML='<strong>Choose the name shown on leaderboards.</strong> <button class="text-button" id="account-new-name-skip" type="button">Skip for now</button>';
-  input.closest('label')?.insertAdjacentElement('afterend',prompt);
-  input.focus();
-  document.querySelector('#account-new-name-skip')?.addEventListener('click',()=>void continueAfterSignupNamePrompt({skip:true}));
+  const app=document.querySelector('#app');if(!app)return;
+  let profile=null;
+  try {profile=await loadMyProfile();} catch {}
+  const initialReason=profile?.player?.display_name_reason||profile?.ranking_identity?.reason||linked?.rankingIdentity?.reason||null;
+  const storedInitial=String(profile?.player?.display_name||linked?.displayName||'').trim();
+  const initial=initialReason==='username_required'?'':storedInitial;
+  const initialWarning=initialReason==='name_not_allowed'
+    ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+    : initialReason==='username_taken'
+      ? 'Choose a different display name. That one is already taken.'
+      : '';
+  const initialHelper=initialReason==='username_required'
+    ? 'Optional. Choose a display name if you want to join Daily leaderboards. Shown on Daily leaderboards and your public profile.'
+    : 'Shown on Daily leaderboards and your public profile.';
+  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>By saving a display name, you agree to the <a href="/terms/#public-identity-rules">Public Identity rules</a>: no harassment, impersonation, spam, private contact information, or abusive content.</small></p><button class="button primary" type="submit">Continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
+  const form=document.querySelector('#account-ready-form');
+  const input=form?.querySelector('input[name="displayName"]');
+  const status=form?.querySelector('.form-error');
+  input?.addEventListener('input',()=>{if(status)status.textContent='';});
+  input?.focus();
+  document.querySelector('#account-ready-skip')?.addEventListener('click',()=>void continueAfterSignupNamePrompt({skip:true}));
+  form?.addEventListener('submit',async eventObject=>{
+    eventObject.preventDefault();
+    const status=form.querySelector('.form-error');
+    const next=String(new FormData(form).get('displayName')||'').trim();
+    if(next===initial){await continueAfterSignupNamePrompt({skip:true});return;}
+    if(!setFormPending(form,true,'Saving…'))return;
+    status.textContent='';
+    try {
+      const updated=await updateProfile({displayName:next,acceptPublicIdentityTerms:true});
+      document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:updated.player?.username_owned===true}}));
+      if(updated.player?.username_owned!==true) {
+        status.textContent=updated.player?.display_name_reason==='name_not_allowed'
+          ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+          : 'Choose a different display name. That one is already taken.';
+        setFormPending(form,false);
+      }
+    } catch(error) {
+      status.textContent=error?.message||'Could not save your display name.';
+      setFormPending(form,false);
+    }
+  });
 }
 
 document.addEventListener('pack1:profile-updated',async eventObject=>{
@@ -240,10 +305,14 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       renderAccountError(app,error,()=>renderAccount({validateDailyRunId:validationRunId,intent,source,mode}));
       return;
     }
-    const usernameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required'].includes(linked?.rankingIdentity?.reason));
-    if(usernameAttention) {
+    if(linked?.newlyClaimed) {
+      await openSignupNamePrompt({linked,validationRunId,intent,source});
+      return;
+    }
+    const displayNameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required','name_not_allowed'].includes(linked?.rankingIdentity?.reason));
+    if(displayNameAttention) {
       pendingDailyRunValidation=validationRunId;
-      const profiles=await import('./profile-product.mjs?v=7');
+      const profiles=await import('./profile-product.mjs?v=8');
       profiles.installProfileProductLayer();
       (await import('./profile-polish.mjs?v=6')).installProfilePolish();
       await profiles.renderMyProfile();
@@ -259,10 +328,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     }
     if(intent==='patreon-activate') { await renderPatreonActivation({source}); return; }
     if(intent==='elite') { await openEliteLanding(source); return; }
-    const profiles=await import('./profile-product.mjs?v=7');
-    profiles.installProfileProductLayer();
-    (await import('./profile-polish.mjs?v=6')).installProfilePolish();
-    await profiles.renderMyProfile();
+    await renderSignedInHome(source);
     return;
   }
 
@@ -279,7 +345,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
         ? 'Create or sign in to your free Pack One account first. Then we’ll show you the Elite benefits and Patreon connection steps.'
         : '';
   const social=firstPartyAuthEnabled()
-    ? '<div class="account-social"><button class="button primary" id="account-apple" type="button">Sign in with Apple</button><p class="form-error" id="account-apple-error" aria-live="polite"></p><button class="button secondary" id="account-google" type="button">Sign in with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p></div>'
+    ? '<div class="account-social"><button class="button primary" id="account-apple" type="button">Continue with Apple</button><p class="form-error" id="account-apple-error" aria-live="polite"></p><button class="button secondary" id="account-google" type="button">Continue with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p></div>'
     : '';
   const toggleCopy=authMode==='signup'
     ? 'Already have an account? <button class="text-button" id="account-mode-toggle" type="button">Sign in</button>'
@@ -287,7 +353,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
   const accountNote=authMode==='signin'?'<small>A free account saves your record and enables leaderboard participation.</small>':'';
   // Signing in is how a player joins the leaderboards, so the Public Identity
   // rules are agreed here rather than with a separate checkbox.
-  const identityRules='<p class="account-identity-rules"><small>By continuing, you agree to the <a href="/terms/">Pack One Terms</a>, including the <a href="/terms/#public-identity-rules">Public Identity rules</a> for leaderboard names and profiles.</small></p>';
+  const identityRules='<p class="account-identity-rules"><small>By continuing, you agree to the <a href="/terms/">Pack One Terms</a>, including the <a href="/terms/#public-identity-rules">Public Identity rules</a> for display names and profiles.</small></p>';
   app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account Access</p><h1>${heading}</h1>${intro?`<p>${intro}</p>`:''}${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header><div class="account-auth-card">${formMarkup(authMode)}</div>${social}${identityRules}<div class="account-new-user"><p>${toggleCopy}</p>${accountNote}</div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite&&!activatingPatreon?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite||activatingPatreon?'Not now, keep playing':'Keep playing as guest'}</button></div></section>`;
 
   document.querySelector('#account-mode-toggle')?.addEventListener('click',()=>void renderAccount({
@@ -330,7 +396,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     }
   });
   document.querySelector('#account-forgot')?.addEventListener('click',()=>void renderForgotPassword());
-  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=7')).renderMyProfile();});
+  document.querySelector('#account-career')?.addEventListener('click',async()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();await (await import('./profile-product.mjs?v=8')).renderMyProfile();});
   document.querySelector('#account-home')?.addEventListener('click',()=>{pendingDailyRunValidation=null;if(activatingPatreon)clearPatreonActivation();document.querySelector('#brand-home')?.click();});
 
   const signup=document.querySelector('#account-signup');
@@ -371,7 +437,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
       if(activatingPatreon){await renderPatreonActivation({source});return;}
       if(upgradingElite){await openEliteLanding(source);return;}
-      await renderAccount({intent,source});
+      await renderSignedInHome(source);
     } catch(error) {
       err.textContent=error?.message||'Account creation failed.';
       setFormPending(form,false);
@@ -387,7 +453,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
     try {
       const data=Object.fromEntries(new FormData(form));
       const auth=await signInAccount(data);
-      if(!accountAuthCompleted(auth))throw Error('Sign in did not return an account session.');
+      if(!accountAuthCompleted(auth))throw Error('Sign in did not finish. Please try again.');
       const claimed=await claimCurrentSession();
       event('auth_sign_in',{source});
       if(claimed?.linked?.newlyClaimed) {
@@ -401,7 +467,7 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       if(claimed?.validationRunId){await returnToValidatedDaily(claimed.validationRunId,claimed.linked,source);return;}
       if(activatingPatreon){await renderPatreonActivation({source});return;}
       if(upgradingElite){await openEliteLanding(source);return;}
-      await renderAccount({intent,source});
+      await renderSignedInHome(source);
     } catch(error) {
       err.textContent=error?.message||'Sign in failed.';
       if(error?.code==='EMAIL_NOT_VERIFIED') {

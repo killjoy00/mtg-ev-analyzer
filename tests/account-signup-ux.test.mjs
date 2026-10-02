@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFile} from 'node:fs/promises';
 
-const [worker,mobileScreen,mobileApi]=await Promise.all([
+const [worker,growth,mobileScreen,mobileApi]=await Promise.all([
   readFile(new URL('../worker/growth-function.js',import.meta.url),'utf8'),
+  readFile(new URL('../growth.mjs',import.meta.url),'utf8'),
   readFile(new URL('../mobile/app/account.tsx',import.meta.url),'utf8'),
   readFile(new URL('../mobile/src/api/account.ts',import.meta.url),'utf8'),
 ]);
@@ -33,13 +34,28 @@ test('native signup has no name field or name payload and uses username autofill
   assert.match(signup,/body: \{ email, password, validateDailyRunId \}/);
 });
 
-test('native first claim prompts for leaderboard name before continuing',()=>{
+test('native first claim shows the account-ready display-name step before continuing',()=>{
   assert.match(mobileApi,/newlyClaimed\?: boolean/);
   assert.match(mobileApi,/\/growth\/v1\/mobile\/account\/link/);
   assert.match(worker,/url\.pathname === '\/v1\/mobile\/account\/link'/);
   assert.match(mobileScreen,/result\.linked\.newlyClaimed === true/);
-  assert.match(mobileScreen,/Choose the name shown on leaderboards\./);
-  assert.match(mobileScreen,/accessibilityLabel="Skip leaderboard name for now"/);
+  assert.match(mobileScreen,/const initialDisplayName = displayNameReason === 'username_required' \? ''/);
+  assert.match(mobileScreen,/setReadyError\(displayNameReasonMessage\(displayNameReason\)\)/);
+  assert.doesNotMatch(mobileScreen,/reason === 'username_required'\) return 'Choose a display name/);
+  assert.match(mobileScreen,/Optional\. Choose a display name if you want to join Daily leaderboards\./);
+  assert.match(mobileScreen,/Your account is ready\./);
+  assert.match(mobileScreen,/accessibilityLabel="Skip display name for now"/);
   assert.match(mobileScreen,/linkMobileAccount\(session, validateDailyRunId\)/);
-  assert.match(mobileScreen,/continueAfterLeaderboardNamePrompt/);
+  assert.match(mobileScreen,/continueAfterDisplayNamePrompt/);
+});
+
+
+test('web signed-in auth callbacks route newly claimed accounts through account-ready',()=>{
+  const signedInBranch=growth.slice(growth.indexOf('if(currentAccount?.user)'),growth.indexOf('const validatingDaily='));
+  assert.match(signedInBranch,/if\(linked\?\.newlyClaimed\)/);
+  assert.match(signedInBranch,/openSignupNamePrompt\(\{linked,validationRunId,intent,source\}\)/);
+  assert.match(growth,/profile\?\.player\?\.display_name_reason\|\|profile\?\.ranking_identity\?\.reason\|\|linked\?\.rankingIdentity\?\.reason/);
+  assert.match(growth,/const initial=initialReason==='username_required'\?'':storedInitial/);
+  assert.match(growth,/Optional\. Choose a display name if you want to join Daily leaderboards\./);
+  assert.match(growth,/input\?\.addEventListener\('input',\(\)=>\{if\(status\)status\.textContent=''\;\}\)/);
 });

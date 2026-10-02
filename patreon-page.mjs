@@ -1,5 +1,5 @@
 import { getAuthSession, loadPatreonStatus } from '/growth-api.mjs';
-import { startPatreonOAuth } from '/patreon-activation.mjs';
+import { startPatreonOAuth } from '/patreon-activation.mjs?v=2';
 
 const statusNode=document.querySelector('[data-patreon-status]');
 const action=document.querySelector('[data-patreon-connect]');

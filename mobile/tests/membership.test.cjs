@@ -151,7 +151,7 @@ test('loading, timeout and retry never turn unknown membership into Free', async
 test('expired or revoked Patreon grants do not erase current grants from another provider', async (t) => {
   const h = await mount(t, { data: connected({ capabilities: [] }) });
   assert.match(h.text(), /Additional practice access active/);
-  assert.match(h.text(), /No Patreon-provided access is currently active/);
+  assert.match(h.text(), /Patreon is connected, but Elite is not currently active/);
 });
 
 test('refresh has explicit pending semantics and never reports completed reconciliation', async (t) => {
@@ -278,10 +278,9 @@ test('membership browser return does not request or overwrite Account profile en
   let tree;
   await act(async () => { tree = Renderer.create(React.createElement(layout)); });
   const accountRoute = tree.root.findAll((node) => node.type === 'Screen' && node.props.name === 'account')[0];
-  assert.equal(typeof accountRoute.props.options.headerRight, 'function');
-  const entry = accountRoute.props.options.headerRight();
-  entry.props.onPress();
-  assert.equal(h.routes.at(-1), '/membership');
+  assert.equal(accountRoute.props.options.headerRight, undefined, 'Account no longer owns a Membership header action');
+  const accountSource = fs.readFileSync(path.join(process.cwd(), 'app/account.tsx'), 'utf8');
+  assert.match(accountSource, /router\.push\('\/membership'\)/, 'Account home keeps the Membership row as the navigation entry');
   await act(async () => tree.unmount());
 });
 

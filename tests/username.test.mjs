@@ -71,7 +71,7 @@ test('the conflict surfaces a 409 and never the Postgres error', () => {
   assert.equal(error.status, 409);
   assert.equal(error.code, 'USERNAME_TAKEN');
   assert.equal(error.message, USERNAME_TAKEN_MESSAGE);
-  assert.equal(error.message, 'That username is already taken.');
+  assert.equal(error.message, 'That display name is already taken.');
 
   assert.throws(
     () => rethrowUsernameConflict(Object.assign(new Error('duplicate key'), { pgCode: '23505', pgConstraint: USERNAME_INDEX })),

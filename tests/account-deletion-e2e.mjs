@@ -99,7 +99,7 @@ async function submitPasswordDeletion(page) {
   await form.waitFor();
   await form.locator('[name="currentPassword"]').fill('fixture-current-value');
   await form.locator('[name="confirm"]').check();
-  await form.getByRole('button',{name:'Delete Account'}).click();
+  await form.getByRole('button',{name:'Delete account'}).click();
 }
 
 async function issueEmailCode(page) {
@@ -134,7 +134,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       await openAccountTab(page);
       await page.locator('#account-delete').waitFor();
       assert.match(await page.locator('.profile-danger').textContent(),/This cannot be undone/i);
-      assert.equal((await page.locator('#delete-account-title').textContent())?.trim(),'Delete Account');
+      assert.equal((await page.locator('#delete-account-title').textContent())?.trim(),'Delete account');
+      assert.match(await page.locator('#account-delete').textContent(),/Deleting your Pack One account does not cancel subscriptions/);
       await submitPasswordDeletion(page);
       await page.waitForURL('**/?account=deleting');
       await page.getByText('Your deletion request has been accepted.').waitFor();
@@ -168,7 +169,8 @@ for(const [name,type] of [['chromium',chromium],['webkit',webkit]]) {
       await installApi(page,{password:false,google:true,deletionMethod:undefined});
       await page.goto(base+'/tests/credential-management-harness.html');
       await openAccountTab(page);
-      await page.getByText('Deletion is temporarily unavailable for Google-only accounts.').waitFor();
+      await page.getByText("Deletion for Google-only accounts isn't available yet.").waitFor();
+      await page.getByText('admin@packone.pro').waitFor();
       assert.equal(await page.locator('#account-delete').count(),0);
       assert.equal(await page.locator('#account-delete-email').count(),0);
       assert.equal(await page.getByRole('button',{name:'Delete account'}).isDisabled(),true);

@@ -16,6 +16,7 @@ let delayGoogle=false;
 let googleStartFails=false;
 let unverifiedSignin=false;
 let nextLinkNewlyClaimed=false;
+let nextLinkRankingReason=null;
 let linkBodies=[];
 let resendBodies=[];
 
@@ -74,7 +75,14 @@ await page.route('https://api.packone.pro/growth/**',async route=>{
   } else if(path==='/v1/account/link-browser') {
     const input=route.request().postDataJSON();
     linkBodies.push(input);
-    body={ok:true,merged:false,newlyClaimed:nextLinkNewlyClaimed,validatedDailyScore:Boolean(input.validateDailyRunId),displayName:'QA Player'};
+    body={
+      ok:true,
+      merged:false,
+      newlyClaimed:nextLinkNewlyClaimed,
+      validatedDailyScore:Boolean(input.validateDailyRunId),
+      displayName:'QA Player',
+      rankingIdentity:nextLinkRankingReason?{eligible:false,reason:nextLinkRankingReason}:{eligible:true},
+    };
     nextLinkNewlyClaimed=false;
   } else if(path==='/v1/account/migrate') {
     signed=true;
@@ -114,7 +122,7 @@ await page.route('https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.ne
 });
 
 async function fresh({source='nav',validateDailyRunId=null,intent=null,width=390}={}) {
-  signed=false;verificationRequired=false;delaySignup=false;delaySignin=false;delayGoogle=false;googleStartFails=false;unverifiedSignin=false;nextLinkNewlyClaimed=false;linkBodies=[];resendBodies=[];
+  signed=false;verificationRequired=false;delaySignup=false;delaySignin=false;delayGoogle=false;googleStartFails=false;unverifiedSignin=false;nextLinkNewlyClaimed=false;nextLinkRankingReason=null;linkBodies=[];resendBodies=[];
   await page.setViewportSize({width,height:width<700?844:900});
   await page.goto(base+'/tests/auth-context-harness.html');
   await page.waitForFunction(()=>Boolean(window.__renderAccount));
@@ -127,7 +135,7 @@ try {
   await fresh({source:'nav',width:390});
   await page.locator('#account-signin').waitFor();
   assert.equal(await page.locator('#account-signup').count(),0);
-  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Sign in with Google');
+  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Continue with Google');
   assert.equal((await page.locator('.account-page h1').textContent())?.trim(),'Sign In');
   assert.match((await page.locator('.account-new-user').textContent())||'',/New to Pack One\?\s*Create account/i);
   await page.screenshot({path:'artifacts/ui-auth-signin-390.png',fullPage:true});
@@ -203,19 +211,51 @@ try {
   await page.getByText("If an unverified account exists for that email, we've sent a verification link.",{exact:true}).waitFor();
   assert.deepEqual(resendBodies.at(-1),{email:'qa@example.invalid'});
 
-  // A first account claim routes through the existing profile name field.
+  // A first account claim routes through the compact account-ready step.
   await fresh({source:'nav'});
   nextLinkNewlyClaimed=true;
+  nextLinkRankingReason='username_required';
   const newlyClaimed=page.locator('#account-signin');
   await newlyClaimed.locator('[name="email"]').fill('qa@example.invalid');
   await newlyClaimed.locator('[name="password"]').fill('fixture-password-123');
   await newlyClaimed.getByRole('button',{name:'Sign in',exact:true}).click();
-  await page.getByText('Choose the name shown on leaderboards.',{exact:true}).waitFor();
-  assert.equal(await page.locator('#profile-account-tab').getAttribute('aria-selected'),'true');
-  assert.equal(await page.locator('#profile-account input[name="displayName"]').evaluate(el=>document.activeElement===el),true);
-  assert.equal(await page.locator('#profile-account input[name="displayName"]').inputValue(),'QA Player');
+  await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
+  assert.equal(await page.locator('#account-ready input[name="displayName"]').evaluate(el=>document.activeElement===el),true);
+  assert.equal(await page.locator('#account-ready input[name="displayName"]').inputValue(),'');
+  await page.getByText('Optional. Choose a display name if you want to join Daily leaderboards. Shown on Daily leaderboards and your public profile.',{exact:true}).waitFor();
+  assert.equal((await page.locator('#account-ready .form-error').textContent())?.trim(),'');
   await page.getByRole('button',{name:'Skip for now',exact:true}).click();
-  assert.equal(await page.locator('#account-new-name-prompt').count(),0);
+  assert.equal(await page.locator('#account-ready').count(),0);
+
+  // Social OAuth first claims use the same account-ready step and precise name reason.
+  await fresh({source:'nav'});
+  nextLinkNewlyClaimed=true;
+  nextLinkRankingReason='name_not_allowed';
+  await page.evaluate(()=>{
+    sessionStorage.setItem('pack1-auth-flow-v1',JSON.stringify({intent:null,source:'nav',validateDailyRunId:null}));
+    history.replaceState({},'','/tests/auth-context-harness.html?auth=google&neon_auth_session_verifier=fixture');
+  });
+  await page.evaluate(async()=>{const growth=await import('/growth.mjs');await growth.resumeAccountAuth('google');});
+  await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
+  const socialError=page.locator('#account-ready .form-error');
+  await page.getByText('That display name is not allowed. Choose another to join Daily leaderboards.',{exact:true}).waitFor();
+  await page.locator('#account-ready input[name="displayName"]').fill('New Display Name');
+  assert.equal((await socialError.textContent())?.trim(),'');
+  await page.getByRole('button',{name:'Skip for now',exact:true}).click();
+
+  // A verification callback that returns authenticated also uses account-ready.
+  await fresh({source:'nav'});
+  signed=true;
+  nextLinkNewlyClaimed=true;
+  nextLinkRankingReason='username_taken';
+  await page.evaluate(()=>{
+    sessionStorage.setItem('pack1-auth-flow-v1',JSON.stringify({intent:null,source:'account',validateDailyRunId:null}));
+    history.replaceState({},'','/tests/auth-context-harness.html?auth=verify');
+  });
+  await page.evaluate(async()=>{const growth=await import('/growth.mjs');await growth.resumeAccountAuth('verify');});
+  await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
+  await page.getByText('Choose a different display name. That one is already taken.',{exact:true}).waitFor();
+  await page.getByRole('button',{name:'Skip for now',exact:true}).click();
 
   // Email submit disables while pending and restores/finishes without double-submit.
   await fresh({source:'nav'});
@@ -261,7 +301,7 @@ try {
   assert.deepEqual(linkBodies.at(-1),{validateDailyRunId:runId});
 
   assert.deepEqual(errors,[]);
-  console.log('Auth context browser contract passed: single-mode forms, Google errors, verification success, pending controls, Daily return and Google redirect.');
+  console.log('Auth context browser contract passed: single-mode forms, verification recovery, first-claim account-ready across email/OAuth/verification, pending controls, and Daily return.');
 } finally {
   await browser.close();
 }
