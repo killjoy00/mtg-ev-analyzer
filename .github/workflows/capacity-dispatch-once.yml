@@ -1,0 +1,47 @@
+name: one-time distributed capacity dispatcher
+on:
+  push:
+    branches: [main]
+    paths: ['.github/capacity-dispatch-request.json']
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: pack1-gateway-preview
+  cancel-in-progress: false
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Hold preview lock until reviewed fix is on main
+        env:
+          FIX_SHA: 9a4f565455985651d36439159e84d6cd6b6227ef
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 150); do
+            git fetch --no-tags origin main
+            if git merge-base --is-ancestor "$FIX_SHA" origin/main; then
+              echo "Reviewed capacity-readiness fix is on main."
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Reviewed capacity-readiness fix did not land on main before timeout."
+          exit 1
+      - name: Dispatch one distributed-capacity run on main
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh api --method POST "repos/$GITHUB_REPOSITORY/actions/workflows/launch-distributed.yml/dispatches" -f ref=main
+          echo "Dispatched launch-distributed.yml on main."
+# Provenance: OpenAI ChatGPT (GPT-5.6 Sol), connected GitHub workspace.
