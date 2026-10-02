@@ -231,6 +231,7 @@ function writeOutputs(result) {
   appendFileSync(process.env.GITHUB_OUTPUT, `needs_neon=${result.needsNeon}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `full_suite=${result.fullSuite}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `domains=${result.domains.join(',')}\n`);
+  appendFileSync(process.env.GITHUB_OUTPUT, `domains_json=${JSON.stringify(result.domains)}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `suites_json=${JSON.stringify(result.suites)}\n`);
   appendFileSync(process.env.GITHUB_OUTPUT, `season_destructive=${result.seasonDestructive}\n`);
 }

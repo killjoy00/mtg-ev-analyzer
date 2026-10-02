@@ -37,6 +37,7 @@ jobs:
       needs_neon: ${{ steps.scope.outputs.needs_neon }}
       full_suite: ${{ steps.scope.outputs.full_suite }}
       domains: ${{ steps.scope.outputs.domains }}
+      domains_json: ${{ steps.scope.outputs.domains_json }}
       suites_json: ${{ steps.scope.outputs.suites_json }}
       season_destructive: ${{ steps.scope.outputs.season_destructive }}
     steps:
@@ -59,6 +60,7 @@ jobs:
             echo 'needs_neon=true' >> "$GITHUB_OUTPUT"
             echo 'full_suite=true' >> "$GITHUB_OUTPUT"
             echo 'domains=' >> "$GITHUB_OUTPUT"
+            echo 'domains_json=["account","subscriptions","draft_run","daily","corpus","seasons"]' >> "$GITHUB_OUTPUT"
             echo 'suites_json=[]' >> "$GITHUB_OUTPUT"
             echo 'season_destructive=true' >> "$GITHUB_OUTPUT"
           }
@@ -80,11 +82,16 @@ jobs:
             fail_closed
           fi
 
-  backend-gate:
+  backend-domain:
+    name: backend ${{ matrix.domain }}
     needs: precheck
     # Fork PRs do not receive repository secrets. Keep them skipped rather than
     # failing or ever pointing the fixture suites at the production branch.
     if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    strategy:
+      fail-fast: false
+      matrix:
+        domain: ${{ fromJSON(needs.precheck.outputs.domains_json || '["account","subscriptions","draft_run","daily","corpus","seasons"]') }}
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
@@ -120,7 +127,7 @@ jobs:
           api_key: ${{ secrets.NEON_API_KEY }}
           # Explicit parent: never inherit Neon's default-branch label (see docs/DATABASE-RECOVERY.md).
           parent_branch: br-orange-feather-ayps8kep
-          branch_name: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}
+          branch_name: ci-pr-${{ github.event.pull_request.number }}-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.domain }}
           database: pack1
           role: pack1_owner
           expires_at: ${{ steps.expiry.outputs.expires_at }}
@@ -187,15 +194,12 @@ jobs:
             done
           fi
 
-      - name: Run SQL-backed integration suites
+      - name: Run isolated backend domain
         shell: bash
         env:
           PACK1_CI_BRANCH_ID: ${{ steps.neon.outputs.branch_id }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
-          BACKEND_FULL: ${{ needs.precheck.result != 'success' || needs.precheck.outputs.full_suite != 'false' }}
-          BACKEND_SUITES_JSON: ${{ needs.precheck.outputs.suites_json }}
-          BACKEND_SEASON_DESTRUCTIVE: ${{ needs.precheck.result != 'success' || needs.precheck.outputs.season_destructive != 'false' }}
-          BACKEND_DOMAINS: ${{ needs.precheck.outputs.domains }}
+          BACKEND_DOMAIN: ${{ matrix.domain }}
         run: |
           set -euo pipefail
           connection="$(cat "$PACK1_CI_CONNECTION")"
@@ -213,15 +217,16 @@ jobs:
             node scripts/load_verified_draft_run.mjs "$PACK1_CI_CONNECTION"
           fi
 
-          if [[ "$BACKEND_FULL" == 'true' ]]; then
-            echo 'Backend routing: full suite (fail-closed or shared/unmapped change).'
-            mapfile -t targeted_suites < <(node scripts/backend-gate-scope.mjs --all-suites)
-          else
-            echo "Backend routing domains: ${BACKEND_DOMAINS:-none}"
-            mapfile -t targeted_suites < <(
-              BACKEND_SUITES_JSON="$BACKEND_SUITES_JSON" node -e                 'for (const suite of JSON.parse(process.env.BACKEND_SUITES_JSON || "[]")) console.log(suite)'
-            )
-          fi
+          mapfile -t targeted_suites < <(
+            BACKEND_DOMAIN="$BACKEND_DOMAIN" node -e '
+              const fs = require("node:fs");
+              const map = JSON.parse(fs.readFileSync("scripts/backend-gate-map.json", "utf8"));
+              const suites = map.domains?.[process.env.BACKEND_DOMAIN]?.suites;
+              if (!Array.isArray(suites) || suites.length === 0) process.exit(2);
+              for (const suite of suites) console.log(suite);
+            '
+          )
+          echo "Backend routing domain: $BACKEND_DOMAIN"
 
           for suite in "${targeted_suites[@]}"; do
             [[ -n "$suite" ]] || continue
@@ -231,7 +236,7 @@ jobs:
             node "$suite" "$PACK1_CI_CONNECTION" --dev-fixtures
           done
 
-          if [[ "$BACKEND_SEASON_DESTRUCTIVE" == 'true' ]]; then
+          if [[ "$BACKEND_DOMAIN" == 'seasons' ]]; then
             echo 'Running destructive season fixtures last.'
             node tests/season-backend-smoke.mjs "$PACK1_CI_CONNECTION" --dev-fixtures
           fi
@@ -239,7 +244,7 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: corpus-readiness-isolated-${{ github.run_id }}
+          name: corpus-readiness-isolated-${{ github.run_id }}-${{ matrix.domain }}
           path: artifacts/corpus-readiness
           if-no-files-found: ignore
           retention-days: 30
@@ -251,3 +256,35 @@ jobs:
           project_id: patient-shadow-91417882
           api_key: ${{ secrets.NEON_API_KEY }}
           branch: ${{ steps.neon.outputs.branch_id }}
+
+  backend-gate:
+    name: backend-gate
+    needs: [precheck, backend-domain]
+    if: ${{ !cancelled() && github.event.pull_request.head.repo.full_name == github.repository && (needs.precheck.result != 'success' || needs.precheck.outputs.needs_neon != 'false') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Aggregate isolated backend domains
+        shell: bash
+        env:
+          PRECHECK_RESULT: ${{ needs.precheck.result }}
+          DOMAIN_RESULT: ${{ needs.backend-domain.result }}
+          BACKEND_FULL: ${{ needs.precheck.result != 'success' || needs.precheck.outputs.full_suite != 'false' }}
+          DOMAINS_JSON: ${{ needs.precheck.outputs.domains_json }}
+        run: |
+          set -euo pipefail
+          if [[ "$DOMAIN_RESULT" != 'success' ]]; then
+            echo "::error::At least one required isolated backend domain was skipped, cancelled, or failed (aggregate result: $DOMAIN_RESULT)."
+            exit 1
+          fi
+
+          if [[ "$BACKEND_FULL" == 'true' && "$PRECHECK_RESULT" == 'success' ]]; then
+            DOMAINS_JSON="$DOMAINS_JSON" node -e '
+              const expected = ["account","subscriptions","draft_run","daily","corpus","seasons"].sort();
+              const actual = JSON.parse(process.env.DOMAINS_JSON || "[]").sort();
+              if (JSON.stringify(actual) !== JSON.stringify(expected)) {
+                throw new Error("Full backend routing omitted a domain: " + JSON.stringify(actual));
+              }
+            '
+          fi
+
+          echo 'All required isolated backend domain jobs succeeded.'
