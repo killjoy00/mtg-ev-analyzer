@@ -231,7 +231,7 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
   const initialHelper=initialReason==='username_required'
     ? 'Optional. Choose a display name if you want to join Daily leaderboards. Shown on Daily leaderboards and your public profile.'
     : 'Shown on Daily leaderboards and your public profile.';
-  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>By saving a display name, you agree to the <a href="/terms/#public-identity-rules">Public Identity rules</a>: no harassment, impersonation, spam, private contact information, or abusive content.</small></p><button class="button primary" type="submit">Continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
+  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small id="account-ready-name-help">${esc(initialHelper)}</small><p class="account-identity-rules"><small>Display names and public profiles follow the <a href="/terms/#public-identity-rules">Public Identity rules</a>.</small></p><button class="button primary" type="submit">Continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
   const form=document.querySelector('#account-ready-form');
   const input=form?.querySelector('input[name="displayName"]');
   const status=form?.querySelector('.form-error');
@@ -344,17 +344,19 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       : upgradingElite
         ? 'Create or sign in to your free Pack One account first. Then we’ll show you the Elite benefits and Patreon connection steps.'
         : '';
+  const providerVerb=authMode==='signup'?'Create':'Sign in';
   const social=firstPartyAuthEnabled()
-    ? '<div class="account-social"><button class="button primary" id="account-apple" type="button">Continue with Apple</button><p class="form-error" id="account-apple-error" aria-live="polite"></p><button class="button secondary" id="account-google" type="button">Continue with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p></div>'
+    ? `<div class="account-social"><button class="button primary provider-button" id="account-apple" type="button">${providerVerb} with Apple</button><p class="form-error" id="account-apple-error" aria-live="polite"></p><button class="button secondary provider-button" id="account-google" type="button">${providerVerb} with Google</button><p class="form-error" id="account-google-error" aria-live="polite"></p></div>`
     : '';
   const toggleCopy=authMode==='signup'
     ? 'Already have an account? <button class="text-button" id="account-mode-toggle" type="button">Sign in</button>'
     : 'New to Pack One? <button class="text-button" id="account-mode-toggle" type="button">Create account</button>';
   const accountNote=authMode==='signin'?'<small>A free account saves your record and enables leaderboard participation.</small>':'';
-  // Signing in is how a player joins the leaderboards, so the Public Identity
-  // rules are agreed here rather than with a separate checkbox.
-  const identityRules='<p class="account-identity-rules"><small>By continuing, you agree to the <a href="/terms/">Pack One Terms</a>, including the <a href="/terms/#public-identity-rules">Public Identity rules</a> for display names and profiles.</small></p>';
-  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account Access</p><h1>${heading}</h1>${intro?`<p>${intro}</p>`:''}${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header><div class="account-auth-card">${formMarkup(authMode)}</div>${social}${identityRules}<div class="account-new-user"><p>${toggleCopy}</p>${accountNote}</div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite&&!activatingPatreon?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">Back to my career</button><button class="text-button" id="account-home">${upgradingElite||activatingPatreon?'Not now, keep playing':'Keep playing as guest'}</button></div></section>`;
+  const accountConsent=authMode==='signup'
+    ? '<p class="account-identity-rules account-creation-consent"><small>By creating an account, you agree to the <a href="https://packone.pro/terms/">Pack One Terms</a>.</small></p>'
+    : '';
+  const divider=social?'<div class="account-divider" aria-hidden="true"><span>or</span></div>':'';
+  app.innerHTML=`<section class="account-page growth-page"><header><p class="eyebrow">Account Access</p><h1>${heading}</h1>${intro?`<p>${intro}</p>`:''}${notice?`<p class="form-success" role="status">${esc(notice)}</p>`:""}</header><div class="account-auth-card">${social}${divider}${formMarkup(authMode)}${accountConsent}<div class="account-mode-toggle"><p>${toggleCopy}</p>${accountNote}</div></div><div class="account-actions">${new URLSearchParams(location.search).get('game')==='draft-run'&&!upgradingElite&&!activatingPatreon?`<a class="button primary" href="${esc(location.href)}">Continue to your run</a>`:''}<button class="button secondary" id="account-career">My Pack One</button><button class="text-button" id="account-home">${upgradingElite||activatingPatreon?'Not now, keep playing':'Keep playing as guest'}</button></div></section>`;
 
   document.querySelector('#account-mode-toggle')?.addEventListener('click',()=>void renderAccount({
     validateDailyRunId:pendingDailyRunValidation,
