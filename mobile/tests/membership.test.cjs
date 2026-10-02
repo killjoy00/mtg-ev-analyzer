@@ -151,7 +151,7 @@ test('loading, timeout and retry never turn unknown membership into Free', async
 test('expired or revoked Patreon grants do not erase current grants from another provider', async (t) => {
   const h = await mount(t, { data: connected({ capabilities: [] }) });
   assert.match(h.text(), /Additional practice access active/);
-  assert.match(h.text(), /No Patreon-provided access is currently active/);
+  assert.match(h.text(), /Patreon is connected, but Elite is not currently active/);
 });
 
 test('refresh has explicit pending semantics and never reports completed reconciliation', async (t) => {
