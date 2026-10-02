@@ -145,7 +145,7 @@ export default function AccountProfileScreen() {
             accessibilityRole="switch"
             accessibilityState={{ checked: profilePublic, disabled: Boolean(profile.player.public_identity_hidden) }}
             disabled={Boolean(profile.player.public_identity_hidden)}
-            onPress={() => setProfilePublic((value) => !value)}
+            onPress={() => setProfilePublic(!profilePublic)}
             style={[styles.toggle, profilePublic && styles.toggleActive]}
           >
             <View style={styles.toggleCopy}>
