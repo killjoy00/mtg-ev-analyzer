@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MAX_CONTINUATION_DEPTH,evaluate,inspectGatewayCoverage,parseGatewayEvent,parseNeonUsage,queryEvents,routeAlert,scheduleCoverageContinuation,
+  GATEWAY_MAX_PAGES,GATEWAY_PAGE_SIZE,MAX_CONTINUATION_DEPTH,evaluate,inspectGatewayCoverage,parseGatewayEvent,parseNeonUsage,queryEvents,routeAlert,scheduleCoverageContinuation,
 } from '../scripts/launch-alert.mjs';
 import {
   WINDOW_MS,coverageTarget,mergeCoverageState,parseCoverageState,renderCoverageState,
@@ -96,11 +96,40 @@ test('recorded replay evidence never suppresses re-routing after a prior route f
  assert.ok(result.alerts.includes('network_or_application_429'));
 });
 
+test('gateway telemetry uses bounded cursor pages for dense same-timestamp events',async()=>{
+ const row=id=>({$metadata:{id},timestamp:'2026-10-02T05:10:00.000Z',source:{event:'gateway_request',status:200,sample_rate:.1,duration_ms:20,route:'draft',release:'a'.repeat(40)}});
+ const first=Array.from({length:GATEWAY_PAGE_SIZE},(_,i)=>row('dense-'+i)),calls=[];
+ const fetcher=async(url,options)=>{
+  const body=JSON.parse(options.body);calls.push(body);
+  assert.equal(url,'https://api.cloudflare.com/client/v4/accounts/'+('a'.repeat(32))+'/workers/observability/telemetry/query');
+  assert.equal(body.limit,GATEWAY_PAGE_SIZE);assert.deepEqual(body.timeframe,{from:0,to:1000});
+  assert.equal(body.parameters.filters[0].value,'pack1-gateway');assert.equal(body.parameters.filters[1].value,'gateway_request');
+  return Response.json({result:{events:{events:calls.length===1?first:[row('dense-'+(GATEWAY_PAGE_SIZE-1)),row('dense-'+GATEWAY_PAGE_SIZE)]}}});
+ };
+ const events=await queryEvents(fetcher,'token','a'.repeat(32),0,1000);
+ assert.equal(calls.length,2);assert.equal(calls[0].offset,undefined);
+ assert.equal(calls[1].offset,'dense-'+(GATEWAY_PAGE_SIZE-1));assert.equal(calls[1].offsetDirection,'next');
+ assert.equal(events.length,GATEWAY_PAGE_SIZE+1);
+ assert.equal(new Set(events.map(event=>event.id)).size,GATEWAY_PAGE_SIZE+1);
+});
+
 test('duplicate telemetry IDs are counted once',async()=>{
  const row={$metadata:{id:'same'},source:{event:'gateway_request',status:503,sample_rate:1,duration_ms:20,route:'draft',release:'a'.repeat(40)}};
  const events=await queryEvents(async()=>Response.json({result:{events:{events:[row,row]}}}),'token','a'.repeat(32),0,1000);
  assert.equal(events.length,1);
  assert.equal(events[0].id,'same');
+});
+
+test('gateway telemetry pagination fails closed on stuck cursors and the page bound',async()=>{
+ const row=id=>({$metadata:{id},source:{event:'gateway_request',status:200,sample_rate:.1,duration_ms:20,route:'draft',release:'a'.repeat(40)}});
+ const stuck=Array.from({length:GATEWAY_PAGE_SIZE},(_,i)=>row('stuck-'+i));
+ await assert.rejects(()=>queryEvents(async()=>Response.json({result:{events:{events:stuck}}}),'token','a'.repeat(32),0,1000),/Gateway telemetry cursor invalid/);
+ let calls=0;
+ await assert.rejects(()=>queryEvents(async()=>{
+  const page=calls++;
+  return Response.json({result:{events:{events:Array.from({length:GATEWAY_PAGE_SIZE},(_,i)=>row('page-'+page+'-'+i))}}});
+ },'token','a'.repeat(32),0,1000),/Gateway telemetry exceeds bounded query capacity/);
+ assert.equal(calls,GATEWAY_MAX_PAGES);
 });
 
 test('overlapping stale state writers cannot regress coverage or erase alert-window dedupe',()=>{

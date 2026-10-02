@@ -8,6 +8,7 @@ import {
 const PROJECT='patient-shadow-91417882',TITLE='[launch alert] Production capacity needs attention';
 const CONTINUATION_WORKFLOW='launch-alert.yml';
 export const MAX_CONTINUATION_DEPTH=12;
+export const GATEWAY_PAGE_SIZE=2000,GATEWAY_MAX_PAGES=32;
 const RECOVERABLE_ALERTS=new Set(['coverage_pending','coverage_continuation_failed','telemetry_unavailable']);
 export const thresholds={window_minutes:15,minimum_errors:5,estimated_error_fraction:.01,minimum_429:10,minimum_slow_samples:3,slow_ms:5000,quota_ms:1000,requests_per_day:100000,compute_cu_hours_per_day:24,compute_cu_hours_per_billing_period:200,egress_bytes_per_day:5*1024**3,egress_bytes_per_billing_period:50*1024**3};
 
@@ -55,15 +56,20 @@ export function parseNeonUsage(data) {
 }
 
 export async function queryEvents(fetcher,token,account,from,to) {
-  let calls=0;const seen=new Map();
-  async function window(a,b) {
-    if(++calls>63)throw Error('Gateway telemetry exceeds bounded query capacity');
-    const d=await json(fetcher,`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`,token,{queryId:'pack1-launch-watch',timeframe:{from:a,to:b},dry:true,limit:200,view:'events',parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters:[{key:'$metadata.service',operation:'eq',type:'string',value:'pack1-gateway'},{key:'event',operation:'eq',type:'string',value:'gateway_request'}]}});
+  const url=`https://api.cloudflare.com/client/v4/accounts/${account}/workers/observability/telemetry/query`,seen=new Map();
+  let offset=null;
+  for(let page=0;page<GATEWAY_MAX_PAGES;page++) {
+    const body={queryId:'pack1-launch-watch',timeframe:{from,to},dry:true,limit:GATEWAY_PAGE_SIZE,view:'events',parameters:{datasets:['cloudflare-workers'],filterCombination:'and',filters:[{key:'$metadata.service',operation:'eq',type:'string',value:'pack1-gateway'},{key:'event',operation:'eq',type:'string',value:'gateway_request'}]}};
+    if(offset){body.offset=offset;body.offsetDirection='next';}
+    const d=await json(fetcher,url,token,body);
     const rows=d.result?.events?.events;if(!Array.isArray(rows))throw Error('Unexpected gateway log schema');
-    if(rows.length>=200){if(b-a<1000)throw Error('Gateway telemetry truncated');const mid=Math.floor((a+b)/2);await window(a,mid);await window(mid,b);return;}
     for(const row of rows){const event=parseGatewayEvent(row);if(event?.id)seen.set(event.id,event);}
+    if(rows.length<GATEWAY_PAGE_SIZE)return [...seen.values()];
+    const next=rows.at(-1)?.$metadata?.id;
+    if(typeof next!=='string'||!next||next.length>512||next===offset)throw Error('Gateway telemetry cursor invalid');
+    offset=next;
   }
-  await window(from,to);return [...seen.values()];
+  throw Error('Gateway telemetry exceeds bounded query capacity');
 }
 
 function dedupeEvents(events) {
