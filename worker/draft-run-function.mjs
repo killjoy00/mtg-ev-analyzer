@@ -445,5 +445,5 @@ export default {async fetch(request) {
   const internal=new URL(request.url).pathname===DAILY_GENERATION_PATH;
   if(!internal){const denied=guardIngress(request);if(denied)return denied;}
   try {const response=await route(request);response.headers.set('cache-control','no-store');return withCors(response,request);}
-  catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);const response=json({error:status===500?'Could not save your run. Please retry.':error.message,...(error.capability?{capability:error.capability}:{})},status);if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));return withCors(response,request);}
+  catch(error) {const status=Number(error.status)||500;if(status===500) console.error('Draft Run request failed',error.message);const response=json({error:status===500?'Could not save your run. Please retry.':error.message,...(error.capability?{capability:error.capability}:{}),...(error.code?{code:String(error.code)}:{})},status);if(error.retryAfter)response.headers.set('retry-after',String(error.retryAfter));return withCors(response,request);}
 }};
