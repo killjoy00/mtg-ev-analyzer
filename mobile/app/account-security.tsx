@@ -16,7 +16,7 @@ import { useAccountState } from '@/src/hooks/useAccountState';
 import { colors, spacing } from '@/src/theme';
 
 export default function AccountSecurityScreen() {
-  const { session, account, busy, clearAccount } = useAccountState({ requireAccount: true });
+  const { session, account, busy, message: loadMessage, refresh, clearAccount } = useAccountState({ requireAccount: true });
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -50,11 +50,22 @@ export default function AccountSecurityScreen() {
     }
   };
 
-  if (busy || !account) return (
+  if (busy) return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.center}>
         <ActivityIndicator color={colors.accent} />
         <Text style={styles.body}>Loading sign-in settings...</Text>
+      </View>
+    </SafeAreaView>
+  );
+
+  if (!account) return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.center}>
+        <Text accessibilityRole="alert" style={styles.message}>{loadMessage || 'Could not load sign-in settings.'}</Text>
+        <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.button}>
+          <Text style={styles.buttonText}>Retry</Text>
+        </Pressable>
       </View>
     </SafeAreaView>
   );
