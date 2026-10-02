@@ -57,7 +57,6 @@ function unverified(error: unknown) {
 function displayNameReasonMessage(reason?: string | null) {
   if (reason === 'name_not_allowed') return 'That display name is not allowed. Choose another to join Daily leaderboards.';
   if (reason === 'username_taken') return 'Choose a different display name. That one is already taken.';
-  if (reason === 'username_required') return 'Choose a display name to join Daily leaderboards.';
   return null;
 }
 
@@ -107,6 +106,7 @@ export default function AccountScreen() {
   const [readyInitialName, setReadyInitialName] = useState('');
   const [readyDisplayName, setReadyDisplayName] = useState('');
   const [readyError, setReadyError] = useState<string | null>(null);
+  const [readyNameOptionalHint, setReadyNameOptionalHint] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
 
   const returnAfterAccount = (fallbackToCareer = false) => {
@@ -147,9 +147,12 @@ export default function AccountScreen() {
     setSigninNeedsVerification(false);
     const newlyClaimed = result.linked.newlyClaimed === true;
     if (newlyClaimed) {
-      setReadyInitialName(result.linked.displayName || '');
-      setReadyDisplayName(result.linked.displayName || '');
-      setReadyError(displayNameReasonMessage(result.linked.rankingIdentity?.reason));
+      const displayNameReason = result.linked.rankingIdentity?.reason;
+      const initialDisplayName = displayNameReason === 'username_required' ? '' : (result.linked.displayName || '');
+      setReadyInitialName(initialDisplayName);
+      setReadyDisplayName(initialDisplayName);
+      setReadyError(displayNameReasonMessage(displayNameReason));
+      setReadyNameOptionalHint(displayNameReason === 'username_required');
       setPromptDisplayName(true);
       setPendingClaimValidatedDaily(Boolean(result.linked.validatedDailyScore));
       setMessage(null);
@@ -392,6 +395,9 @@ export default function AccountScreen() {
                 value={readyDisplayName}
               />
               <Text style={styles.fieldHelp}>Shown on Daily leaderboards and your public profile.</Text>
+              {readyNameOptionalHint ? (
+                <Text style={styles.fieldHelp}>Optional. Choose a display name if you want to join Daily leaderboards.</Text>
+              ) : null}
               <View style={styles.termsBox}>
                 <Text style={styles.fieldHelp}>
                   By saving a display name, you agree to the Public Identity rules: no harassment,
