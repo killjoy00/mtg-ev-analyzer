@@ -6,12 +6,12 @@ Updated 2026-10-01. This file is the source-of-truth submission packet for the f
 
 - **iOS 1.0 current pre-#837 candidate:** signed build `100383`, source revision `304cc1cb007361ff61722ce3439a669405a406a1`. GitHub Actions run `36945800291` uploaded it, App Store Connect reported `processingState=VALID` and `buildAudienceType=APP_STORE_ELIGIBLE`, and the workflow attached that exact build to App Store version 1.0. Release type remains manual.
 - **Android 1.0 current pre-#837 candidate:** signed versionCode `100368`, source revision `8cd42a70344f9f2000f8652babc63d7d65af7a38`. Internal upload run `36942689929` committed it to Google Play Internal Testing. Closed-testing run `36945786549` promoted it to the existing `production-access` Closed Testing track with `releaseStatus=completed`, `requiresConsoleRollout=false`, and `committed=true`.
-- **Open native-change gate:** PR #837 changes native account/profile/security/membership surfaces and explicitly requires fresh mobile release candidates after merge. If #837 is included in v1, merge it before final physical acceptance or store submission, then cut fresh iOS and Android candidates and promote the new Android bundle unchanged to `production-access`.
+- **Fresh-RC gate after #837:** PR #837 merged as `f9e8a79f1eac34637faa443d19bc1ced31ff49c1` with native account/profile/security/membership changes. iOS 100383 and Android 100368 are therefore superseded as final device-acceptance/submission candidates. Cut fresh post-#837 iOS and Android candidates, attach the new iOS build to version 1.0, and promote the new Android bundle unchanged to `production-access` before final physical acceptance or store submission.
 - **Closed-test geography:** the `production-access` track is active and targets Canada and the United States. Legacy `alpha` is not the qualification track.
 - **Store assets:** Apple iPhone/iPad screenshots and the Elite review screenshot are uploaded. Google Play has the reviewed icon, five phone screenshots, and the feature graphic committed. Re-capture only if the final post-#837 accepted RC materially changes a captured scene.
 - **Google Data Safety:** submitted successfully by run `36632174516`.
 - **Apple metadata already live:** version 1.0 is manual release; the en-US listing copy, privacy policy/choices URLs, content-rights declaration, and reviewed 12+ age-rating answers are present.
-- **Source-equivalence note:** changes after iOS source `304cc1c` through the current pre-#837 main do not change the native mobile application source/dependencies/configuration. PR #837 does change native application source and therefore invalidates these candidates if it is merged for v1.
+- **Source-equivalence note:** changes after iOS source `304cc1c` through the pre-#837 main did not change native mobile application source/dependencies/configuration. The #837 merge does change native application source, so a fresh signed candidate is required on each platform.
 
 ## Shared release identity
 
@@ -340,7 +340,7 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 Do **not** spend console time on these unless an automated probe reports a problem:
 - uploading/replacing the current RC binaries;
-- attaching the current successful App Store-eligible iOS candidate to App Store version 1.0; build `100383` is already `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `36945800291`; if #837 merges for v1, the guarded workflow should replace it with the fresh post-merge candidate;
+- attaching the current successful App Store-eligible iOS candidate to App Store version 1.0; build `100383` is already `VALID`, `APP_STORE_ELIGIBLE`, and attached by run `36945800291`; the guarded workflow must replace it with a fresh post-#837 candidate;
 - moving Android to the `production-access` Closed Testing track; versionCode `100368` is active there with `releaseStatus=completed`;
 - Google Data Safety or store graphics (already done);
 - App Store listing copy, manual-release flag, reviewed age-rating answers, or content-rights declaration (already present);
