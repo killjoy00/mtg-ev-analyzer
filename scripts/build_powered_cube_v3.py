@@ -8,6 +8,11 @@ row and context exactly. No synthetic P1P1 pick or pool injection is performed.
 
 from __future__ import annotations
 
+try:
+    from model_training import parser_training_arguments, resolve_training_arguments
+except ModuleNotFoundError:
+    from scripts.model_training import parser_training_arguments, resolve_training_arguments
+
 import argparse
 import datetime as dt
 import json
@@ -36,14 +41,14 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--minimum-games", type=int, default=100)
     parser.add_argument("--top-fraction", type=float, default=0.15)
-    parser.add_argument("--max-training-drafts", type=int, default=5000)
+    parser_training_arguments(parser, 5000)
     parser.add_argument("--max-output-candidates", type=int, default=1200)
     parser.add_argument("--target-replays", type=int, default=300)
     parser.add_argument("--minimum-replays", type=int, default=100)
     parser.add_argument("--minimum-first-visible-candidates", type=int, default=14)
     parser.add_argument("--shard-size", type=int, default=2)
     parser.add_argument("--max-path-bytes", type=int, default=8_000_000)
-    return parser.parse_args(argv)
+    return resolve_training_arguments(parser.parse_args(argv), 5000)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -117,6 +122,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "--source-date", source_date,
                 "--minimum-games", str(args.minimum_games),
                 "--top-fraction", str(args.top_fraction),
+                "--model-version", args.model_version,
                 "--max-training-drafts", str(args.max_training_drafts),
                 "--max-output-drafts", str(args.max_output_candidates),
                 "--minimum-picks", "30",
@@ -148,6 +154,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
                 "--source-date", source_date,
                 "--minimum-games", str(args.minimum_games),
                 "--top-fraction", str(args.top_fraction),
+                "--model-version", args.model_version,
                 "--max-training-drafts", str(args.max_training_drafts),
                 "--max-bytes", str(args.max_path_bytes),
             ])

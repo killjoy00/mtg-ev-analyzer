@@ -57,3 +57,12 @@ After an owner explicitly dispatches **Run workflow**, GitHub Actions performs t
 Corpus loads use a direct connection that the reviewed workflow obtains for the explicit target branch; `load_all_trophies.mjs` refuses an `https://` target. The direct loader stages the immutable source snapshot before inserting any of its puzzles, so a batch can never reference a snapshot that does not exist. `/v1/trophy-import` still accepts only a GitHub-signed, short-lived OIDC identity with the exact repository/owner IDs, main branch, workflow path, allowed event, and dedicated audience; pull requests and other workflows are rejected. It now serves only the card-image refresh actions (image-refresh identity) and the fixed `refresh-statistics` action (import identity). The retired remote corpus actions `batch`, `status` and `finish-set` return 410 without running SQL. Newly discovered environments are registered by discovery in the database, not by editing the checked-in catalog, and source conflicts still stop rather than silently replacing published puzzles.
 
 OIDC trust follows [GitHub's documented claims](https://docs.github.com/en/actions/reference/security/oidc). No recurring model task or new long-lived credential is involved.
+# V5 rollout policy
+
+For the separately versioned v5/v9 rollout, behavior training uses every draft
+in the existing qualified cohort. A positive `--max-training-drafts` or training
+cap is rejected for v5; preserve capped defaults only for historical v4 builds.
+Do not run a model-selection experiment to reapprove v5. Qualification, five-fold
+isolation, scoring and colour-table algorithms remain unchanged. See
+[V5-ROLLOUT.md](V5-ROLLOUT.md) for the authorized newer-source pins and complete
+rebuild/staging/promotion gates.

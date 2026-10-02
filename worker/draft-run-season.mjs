@@ -1,4 +1,5 @@
 import {gameDateKey} from '../game-date.mjs';
+import {DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION} from '../draft-run.mjs';
 
 const num=value=>Number(value||0);
 const textDate=value=>value==null?null:String(value).slice(0,10);
@@ -39,11 +40,12 @@ export async function resolveCurrentSeason(query,{today=gameDateKey(),ensureSche
   return reconcilePersistedSeasons(query);
 }
 
-export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,blockedByPlayerId=null,limit=100}={}) {
+export async function draftRunLeaderboardRows(query,{start,end,environment,playerId=null,blockedByPlayerId=null,limit=100,corpusVersion=DRAFT_RUN_CORPUS_VERSION}={}) {
   const result=await query(`WITH results AS (
       SELECT player_id,round(avg(score),1) score,count(*) days
       FROM scores
       WHERE mode='draft_run' AND set_id=$3
+        AND ($7::text IS NULL OR details_json->>'corpus_version'=$7)
         AND EXISTS (
           SELECT 1 FROM account_links a JOIN players owned ON owned.id=a.player_id
           WHERE a.player_id=scores.player_id
@@ -73,7 +75,7 @@ export async function draftRunLeaderboardRows(query,{start,end,environment,playe
     FROM ranked
     WHERE ($4::uuid IS NULL OR player_id=$4::uuid)
     ORDER BY score DESC,days DESC,display_name
-    LIMIT $5::int`,[start,end,environment,playerId,limit,blockedByPlayerId]);
+    LIMIT $5::int`,[start,end,environment,playerId,limit,blockedByPlayerId,corpusVersion===V5_CORPUS_VERSION?V5_CORPUS_VERSION:null]);
   return result.rows.map(row=>({
     ...row,
     rank:num(row.rank),

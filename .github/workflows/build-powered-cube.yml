@@ -203,7 +203,6 @@ jobs:
         continue-on-error: true
         run: >-
           python scripts/build_powered_cube_v3.py
-          --max-training-drafts 5000
           --max-output-candidates 1200
           --target-replays 300
           --minimum-replays 100

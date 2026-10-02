@@ -11,6 +11,10 @@ import {
  CUBE_TRADITIONAL_V4_COMPONENT_VERSION as v4CubeComponent,
  FROZEN_CONTEXT_MODEL_VERSION as model,
  V4_CONTEXT_MODEL_VERSION as v4Model,
+ TRADITIONAL_V5_PHASE2_COMPONENT_VERSION as v5Component,
+ CUBE_TRADITIONAL_V5_COMPONENT_VERSION as v5CubeComponent,
+ V5_CONTEXT_MODEL_VERSION as v5Model,
+ V5_PARENT_CORPUS_VERSION as v5Parent,
  modelVersionForComponent,
  supportedComponent
 } from '../corpus-components.mjs';
@@ -25,8 +29,23 @@ test('Traditional source revisions map to exactly one grader version',()=>{
  assert.equal(modelVersionForComponent(cubeComponent),model);
  assert.equal(modelVersionForComponent(v4Component),v4Model);
  assert.equal(modelVersionForComponent(v4CubeComponent),v4Model);
+ assert.equal(modelVersionForComponent(v5Component),v5Model);
+ assert.equal(modelVersionForComponent(v5CubeComponent),v5Model);
  assert.equal(modelVersionForComponent('arbitrary'),null);
  for(const version of [component,phase2Component,cubeComponent,v4Component,v4CubeComponent])assert.equal(supportedComponent(version),true);
+});
+
+test('v5 components require their separate parent and preserve the Cube serving window',()=>{
+ const p={...v4Candidate(),corpus_version:v5Component,model_version:v5Model,parent_corpus_version:v5Parent};
+ assert.equal(validateDraftRunPuzzle(p,v5Component),true);
+ assert.equal(validateDraftRunPuzzle({...p,parent_corpus_version:DRAFT_RUN_CORPUS_VERSION},v5Component),false);
+ assert.equal(validateDraftRunPuzzle({...p,model_version:v4Model},v5Component),false);
+ const cube=JSON.parse(gunzipSync(fs.readFileSync(new URL('../corpus/draft-run/powered-cube.json.gz',import.meta.url))));
+ for(const source of cube.filter(row=>row.pick_number<=9)) {
+  const candidate={...source,corpus_version:v5CubeComponent,parent_corpus_version:v5Parent,
+   model_version:v5Model,model_source_event:'PremierDraft',source_event_type:'TradDraft',event_match_wins:3,event_match_losses:0};
+  assert.equal(validateDraftRunPuzzle(candidate,v5CubeComponent),source.pick_number<=7);
+ }
 });
 
 test('Traditional source and Premier evidence are independent; trophy match remains 100',()=>{

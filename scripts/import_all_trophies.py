@@ -2,7 +2,7 @@
 """Enumerate every official Premier Draft trophy, independently of replay samples.
 
 Outputs immutable additional puzzles and a disposition for EVERY source trophy.
-Model training is bounded, broad-elite, and five-fold held out; trophy output is not.
+Model training is versioned, broad-elite, and five-fold held out; trophy output is not.
 Raw archives/checkpoints stay under generated/. The loader never changes old puzzles.
 """
 import argparse
@@ -30,17 +30,15 @@ from build_replays import (CountStore, OutOfFoldModel, DraftSkill, MODEL_VERSION
 from backfill_legacy_sets import arena_rank_proxy, arena_rank_tier, _game_order
 from fetch_card_metadata import aliases, fetch_named, metadata_for_alias
 from set_policy import corpus_version, supported_set, require_supported_set
+from model_training import V4_MODEL, V5_MODEL, ALL_QUALIFIED, current_model_version, training_cap as resolve_training_cap, validate_training_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 VERSION = corpus_version()
+CONTEXT_MODEL_VERSION = current_model_version()
 IMPORT_VERSION = 'all-premier-trophies-v1'
-# Training drafts kept per set, after the hash ordering in select_strong_drafts.
-# Most sets have several times this many eligible drafts, so for them this is a
-# random subsample and not the whole cohort. Raising it is a real model change:
-# published puzzles keep the probabilities they were first scored with (see
-# build_set), so a new cap only reaches puzzles added afterwards. Measure a
-# candidate cap with scripts/eval_model.py before changing this.
-TRAINING_DRAFT_CAP = 5000
+# Frozen v4 keeps its historical sample. The separately versioned v5 corpus
+# always uses the complete unchanged behavior-training cohort.
+TRAINING_DRAFT_CAP = None if CONTEXT_MODEL_VERSION == V5_MODEL else 5000
 SOURCE_PAGE = 'https://www.17lands.com/public_datasets'
 BASE = 'https://17lands-public.s3.amazonaws.com/analysis_data'
 USER_AGENT = 'PackOne-Trophy-Import/2.0 (https://github.com/killjoy00/mtg-ev-analyzer)'
@@ -443,7 +441,7 @@ def source_snapshot_identity(sid, schema_version, source, skill_source):
         'draft_sha256': source['sha256'],
         'game_sha256': skill_source['sha256'],
         'import_version': IMPORT_VERSION,
-        'model_version': ISOLATED_MODEL_VERSION,
+        'model_version': CONTEXT_MODEL_VERSION,
     })).hexdigest()
 
 def input_signature(root, source, skill_source, baseline, manifest, training_cap):
@@ -455,6 +453,8 @@ def input_signature(root, source, skill_source, baseline, manifest, training_cap
         'legacy_model': digest(root/'scripts/backfill_legacy_sets.py'),
         'images': digest(root/'corpus/draft-run/card-images.json'),
         'baseline': baseline, 'manifest': manifest, 'training_cap': training_cap,
+        'model_version': CONTEXT_MODEL_VERSION,
+        'training_policy': digest(root/'scripts/model_training.py'),
     })).hexdigest()
 
 
@@ -484,15 +484,25 @@ def reusable_checkpoint(directory, old, signature, draft_url, game_url):
     return True
 
 
-def build_set(sid, output_dir, refresh=False, discovered_expansion=None, training_cap=TRAINING_DRAFT_CAP):
+def verify_source_pin(sid, source, skill_source, pin):
+    """A cached checkpoint must meet the same frozen-source gate as a new build."""
+    for key, actual in [('source_archive', source), ('skill_source', skill_source)]:
+        expected = pin[key]
+        for field in ('url', 'sha256', 'etag', 'compressed_bytes', 'last_modified'):
+            if not expected.get(field) or actual.get(field) != expected[field]:
+                raise ValueError(f'{sid}: pinned {key} {field} changed; refusing source refresh')
+
+
+def build_set(sid, output_dir, refresh=False, discovered_expansion=None, training_cap=TRAINING_DRAFT_CAP, *, source_pin=None):
+    training_cap = resolve_training_cap(CONTEXT_MODEL_VERSION, training_cap)
     require_supported_set(sid)
     if discovered_expansion: require_supported_set(discovered_expansion)
     started = time.monotonic(); root = ROOT; directory = Path(output_dir)/sid; directory.mkdir(parents=True, exist_ok=True)
     catalog = json.loads((root/'corpus/draft-run/catalog.json').read_text())
     base_entry = next((s for s in catalog['sets'] if s['id']==sid), None)
-    if base_entry and catalog.get('model_version') != ISOLATED_MODEL_VERSION:
+    if base_entry and catalog.get('corpus_version') == VERSION and catalog.get('model_version') != CONTEXT_MODEL_VERSION:
         raise ValueError(
-            f'{sid}: corrected model {ISOLATED_MODEL_VERSION} cannot be written into '
+            f'{sid}: corrected model {CONTEXT_MODEL_VERSION} cannot be written into '
             f'published corpus {catalog.get("corpus_version")} whose baseline is '
             f'{catalog.get("model_version")}. Build and validate a separately versioned '
             'corpus before importing corrected puzzles.')
@@ -504,6 +514,8 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     completed = directory/'manifest.json'
     if not refresh and completed.exists():
         old = json.loads(completed.read_text())
+        if source_pin:
+            verify_source_pin(sid, old.get('source_archive', {}), old.get('skill_source', {}), source_pin)
         signature = input_signature(root, old.get('source_archive'), old.get('skill_source'), base_entry, manifest, training_cap)
         if reusable_checkpoint(directory, old, signature, url, game_url):
             print(f'{sid}: complete checkpoint reused; both source objects unchanged', flush=True)
@@ -516,6 +528,8 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     # needs it now: the colour table is estimated from which cards reached a
     # deck, and building without one silently ships a model with no colour term.
     skill_source = archive(game_url, directory/'games.csv.gz', refresh)
+    if source_pin:
+        verify_source_pin(sid, source, skill_source, source_pin)
     snapshot_id = source_snapshot_identity(sid, schema_version, source, skill_source)
     signature = input_signature(root, source, skill_source, base_entry, manifest, training_cap)
     previous_decisions = None
@@ -541,6 +555,11 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
     if len(experienced)>=5:
         training, calculated, _ = select_strong_drafts(training_skills,100,.15,training_cap)
         cutoff = None if legacy else max(.6,calculated,manifest.get('cohort',{}).get('win_rate_cutoff',0))
+    qualified_training, _, _ = select_strong_drafts(training_skills,100,.15,None)
+    if CONTEXT_MODEL_VERSION == V5_MODEL and set(training) != set(qualified_training):
+        raise ValueError(f'{sid}: v5 omitted qualified behavior-training evidence')
+    if source_pin and not source_pin.get('source_refresh_authorized') and cutoff != source_pin.get('win_rate_cutoff'):
+        raise ValueError(f'{sid}: pinned qualification cutoff changed')
     qualified, rejected = eligible_trophies(drafts, cutoff or .6, legacy, conflicts)
     old_rows = json.loads(gzip.decompress((root/'corpus/draft-run'/f'{sid}.json.gz').read_bytes())) if base_entry else []
     # A baseline written under a different corpus version is a SUPERSEDED
@@ -602,7 +621,7 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
                 absent=[c['name'] for c in cards+history if not c.get('image_url','').startswith('https://')]
                 if absent: missing_names.update(absent);skipped['image_unresolved']+=1;continue
                 if len({c['id'] for c in cards})!=len(cards): skipped['card_identity_collision']+=1;continue
-                additions.append({'puzzle_id':pid,'set_id':sid,'source_snapshot_id':snapshot_id,'source_draft_hash':source_hash,'source_fingerprint':fingerprint,'corpus_version':VERSION,'source_evidence':'official_archive_trajectory','skill_evidence':'earliest_game_arena_rank' if legacy else 'win_rate_bucket','player_rank_tier':d.get('rank') if legacy else None,'pick_number':n,'historical_pick_id':p['historical_pick_id'],'prior_picks':history,'candidates':cards,'event_match_wins':7,'player_games_lower_bound':d['games'],'player_win_rate_bucket':None if legacy else d['rate']})
+                additions.append({'puzzle_id':pid,'set_id':sid,'source_snapshot_id':snapshot_id,'source_draft_hash':source_hash,'source_fingerprint':fingerprint,'corpus_version':VERSION,**({'model_version':CONTEXT_MODEL_VERSION} if CONTEXT_MODEL_VERSION==V5_MODEL else {}),'source_evidence':'official_archive_trajectory','skill_evidence':'earliest_game_arena_rank' if legacy else 'win_rate_bucket','player_rank_tier':d.get('rank') if legacy else None,'pick_number':n,'historical_pick_id':p['historical_pick_id'],'prior_picks':history,'candidates':cards,'event_match_wins':7,'player_games_lower_bound':d['games'],'player_win_rate_bucket':None if legacy else d['rate']})
                 included+=1;new+=1
             status='included' if included else 'excluded'
             reason=why or ('invalid_source_pick' if invalid[did] else None)
@@ -620,7 +639,12 @@ def build_set(sid, output_dir, refresh=False, discovered_expansion=None, trainin
                       if previous_decisions is not None else decision_semantics_digest(additions))
     puzzle_file=directory/'puzzles.jsonl.gz';ledger_file=directory/'trophies.jsonl.gz'
     write_gzip_jsonl(puzzle_file,sorted(additions,key=lambda p:p['puzzle_id']));write_gzip_jsonl(ledger_file,sorted(dispositions,key=lambda d:d['draft_id']))
-    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'source_snapshot_id':snapshot_id,'schema_version':schema_version,'input_signature':signature,'decision_semantics_sha256':semantics_sha256,'source_archive':source,'skill_source':skill_source,'schema_verified':True,'source_event_type':'PremierDraft','qualified_drafts':sum(1 for did,d in drafts.items() if did not in conflicts and (d.get('games') or 0)>=100 and (d.get('rank') in ('diamond','mythic') if legacy else d.get('rate') is not None and d['rate'] >= (cutoff or .6))),'trophy_outcomes':dict(Counter(f"7-{d.get('losses') if d.get('losses') is not None else 'unknown'}" for d in drafts.values() if d['wins']==7)),'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':ISOLATED_MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
+    info={'id':sid,'import_version':IMPORT_VERSION,'corpus_version':VERSION,'source_snapshot_id':snapshot_id,'schema_version':schema_version,'input_signature':signature,'decision_semantics_sha256':semantics_sha256,'source_archive':source,'skill_source':skill_source,'schema_verified':True,'source_event_type':'PremierDraft','qualified_drafts':sum(1 for did,d in drafts.items() if did not in conflicts and (d.get('games') or 0)>=100 and (d.get('rank') in ('diamond','mythic') if legacy else d.get('rate') is not None and d['rate'] >= (cutoff or .6))),'trophy_outcomes':dict(Counter(f"7-{d.get('losses') if d.get('losses') is not None else 'unknown'}" for d in drafts.values() if d['wins']==7)),'source_rows':source_rows,'source_drafts':len(drafts),'source_trophies':trophy_count,'qualified_trophies':len(qualified),'included_trophies':sum(d['status']=='included' for d in dispositions),'excluded_trophies':sum(d['status']=='excluded' for d in dispositions),'exclusion_reasons':dict(reasons),'missing_image_names':sorted(missing_names),'existing_puzzles_preserved':len(retained),'additional_puzzles':len(additions),'total_puzzles':len(retained)+len(additions),'training_drafts':len(training),'training_cap':training_cap,'training_picks':training_picks,'model_version':CONTEXT_MODEL_VERSION,'holdout':'5-fold by draft_id','training_cohort':'broader elite players, independent of trophy outcome','win_rate_cutoff':cutoff,'minimum_games':100,'puzzle_file':puzzle_file.name,'puzzle_file_sha256':digest(puzzle_file),'ledger_file':ledger_file.name,'ledger_file_sha256':digest(ledger_file),'seconds':round(time.monotonic()-started)}
+    info.update(qualified_training_drafts=len(qualified_training), training_mode=ALL_QUALIFIED if training_cap is None else 'stable-hash-capped')
+    if CONTEXT_MODEL_VERSION == V5_MODEL:
+        validate_training_manifest(info)
+        if not legacy and info['training_drafts'] != info['qualified_drafts']:
+            raise ValueError(f'{sid}: qualified and trained populations differ')
     atomic_json(completed,info);print(json.dumps(info),flush=True);return info
 
 
