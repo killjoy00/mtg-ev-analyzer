@@ -15,6 +15,9 @@ const released=()=>{let s=formed();for(let i=0;i<5;i++)s=transition(s,msg(i,{ack
 
 test('committed policy is bounded and cannot silently claim 100 or launch 500 players',()=>{
  assert.equal(validatePolicy(policy),policy);
+ assert.deepEqual(policy.stages,[{players:25,hold_seconds:120},{players:50,hold_seconds:600}]);assert.equal(policy.proposed_target,50);
+ assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:100,hold_seconds:600}],proposed_target:100}));
+ assert.throws(()=>validatePolicy({...policy,stages:[policy.stages[0],{players:50,hold_seconds:180}]}),'final stage keeps the 600 s sustained hold');
  assert.deepEqual(policy.route_budgets_ms.start,{p95:3000,p99:8000});
  for(const patch of [{supported_launch_target:100},{generators:20},{maximum_compute_cu:9},{maximum_error_fraction:.01},{maximum_branch_lifetime_minutes:120},{telemetry_preflight_requests:101}])assert.throws(()=>validatePolicy({...policy,...patch}));
  assert.throws(()=>validatePolicy({...policy,stages:[...policy.stages,{players:500,hold_seconds:600}]}));

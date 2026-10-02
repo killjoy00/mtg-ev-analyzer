@@ -1,5 +1,21 @@
 # Next distributed capacity evidence (#629)
 
+## 100-player target dropped — 2026-10-02
+
+Owner decision: 100 players is no longer a distributed-capacity target. Policy version 3 (`scripts/launch-distributed-policy.json`) reduces the ladder to **25→50**. The 50-player stage becomes the final stage and inherits the 600-second sustained hold that the 100 stage carried. Every other gate, budget and envelope is unchanged. #685 is closed by this change.
+
+Evidence at the time of the decision:
+- 50 players passed completely three times under policy version 2:
+  - run 36326543142;
+  - run 36792854202, attempt 4;
+  - run 37011654672 (#847).
+
+  All three used the 180-second 50-player hold.
+- Run 37011654672's 100 stage stopped on `rolling_route_latency` at the synchronized hold opening. Reads took 1.5–4.0 s and practice starts 2.5–4.4 s on all five runners. No transport failure occurred.
+- Earlier 100-stage attempts stopped on a single slow request or on single-connection transport failures; see #685.
+
+This does not reinterpret any earlier run. **Formal supported distributed capacity remains 25** until a complete 25→50 run passes under policy version 3, including the longer 600-second hold at 50. The historical evidence below is unchanged.
+
 ## Release decision — 2026-09-27
 
 The current-practice selector work is accepted for the release path. No further selector/model tuning is a v1 release blocker on the evidence below. This decision does **not** retroactively change the predeclared capacity gates or call the 100-player stage a pass.
@@ -26,8 +42,9 @@ Reviewed application baseline: `731a0b4b897ca1b0d4b8f8bd9f8e96658f7a83dc`. Concu
 | Stage | Active mixed-lifecycle players | Persistent real egress networks | Initial window | Sustained hold | Drain | Recovery |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: |
 | Requalification | 25 | 5 | 120 seconds | 120 seconds | 90 seconds | 60 seconds |
-| Intermediate | 50 | 5 | 120 seconds | 180 seconds | 90 seconds | 60 seconds |
-| Proposed next level | 100 | 5 | 120 seconds | 600 seconds | 90 seconds | 60 seconds |
+| Proposed level (policy v3) | 50 | 5 | 120 seconds | 600 seconds | 90 seconds | 60 seconds |
+
+Policy version 2 (through 2026-10-02) used a 180-second hold at 50 and a final 100-player stage with a 600-second hold; the evidence above was measured under it.
 
 Actors arrive over 15 seconds and perform eight view/pick pairs with 3–8-second thinking. Fixed ten-actor blocks contain five original guests and five original signed-in accounts; the last two accounts practice, and the other actors divide among Mixed, Cube and Latest Dailies. At 25 this gives 15 guests, ten original signed-in accounts, 21 Daily players and four initial practice players. At 50/100 the ratios are exactly 50/50 and 80/20. Fixtures retain 2,000 synthetic accounts and 180,000 historical score rows.
 

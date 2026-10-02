@@ -86,7 +86,7 @@ export function requestClient({fixture,policy,budget,now,signal,fetcher=fetch,tr
   };
 }
 export async function runPlayerStage({fixture,policy,scope,stage,shard,start_at,network,now,signal,client,onFailure}) {
-  const spec=policy.stages[stage],population=spec.players/policy.generators,windows=timing(start_at,spec,policy),offset=[0,25,75][stage];
+  const spec=policy.stages[stage],population=spec.players/policy.generators,windows=timing(start_at,spec,policy),offset=[0,25][stage];
   const report={schema:2,scope,stage,shard,start_at,network,started:0,initial_completed:0,correctness_failures:0,failures:[],root_failure:null,arrival_delay_ms:[],actors:[],requests:[],daily:{},windows};
   const call=async(actor,route,path,body)=>{
     try {

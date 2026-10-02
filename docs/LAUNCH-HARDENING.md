@@ -1,6 +1,6 @@
 # Launch hardening (#527)
 
-Current distributed release qualification is recorded in [the #629 evidence report](reports/DISTRIBUTED-CAPACITY-629.md). As of 2026-09-27, the current-practice selector is accepted for release, 50 players have passed the full five-egress stage, and 100 remains promising but not formally certified after one 3,210.81 ms view outlier tripped the unchanged conservative rolling p99 gate. Formal promoted distributed capacity remains 25; further selector tuning is not a v1 release blocker, and formal 100-player certification is tracked in #685.
+Current distributed release qualification is recorded in [the #629 evidence report](reports/DISTRIBUTED-CAPACITY-629.md). As of 2026-09-27, the current-practice selector is accepted for release, 50 players have passed the full five-egress stage, and 100 remains promising but not formally certified after one 3,210.81 ms view outlier tripped the unchanged conservative rolling p99 gate. Formal promoted distributed capacity remains 25; further selector tuning is not a v1 release blocker. On 2026-10-02 the 100-player target was dropped (#685 closed): the distributed ladder is now 25→50 with the 600-second sustained hold at 50, and 50 becomes the formal level only after a complete run under that policy.
 
 Final measurements, supported capacity and release evidence are maintained in
 [the #516/#527 acceptance report](reports/PRACTICE-LAUNCH-CLOSEOUT-2026-09-26.md).
@@ -111,7 +111,8 @@ workload must pass its predefined gates before production uses this policy.
 The original workload selected a supported launch target of 25 active players, with
 25/50/100 NAT stages and 25/100/500/1,000 distributed targets. The #629 follow-up
 replaced the distributed escalation path with a persistent five-runner 25/50/100
-ladder and stricter sustained/telemetry/cleanup evidence. Stage escalation still
+ladder and stricter sustained/telemetry/cleanup evidence; policy version 3
+(2026-10-02) dropped the 100 stage, leaving 25/50. Stage escalation still
 stops on the first failed gate. The NAT run uses 50% new guests, 30% established
 accounts and 20% entitled practice, all three Dailies, 3–8-second decision times,
 eight view/pick pairs, rerolls, sharing, boards and a guest-to-ranked cohort.
@@ -126,7 +127,7 @@ acceptance record; a warm-up is not labeled a cold start. Twenty warm browser sa
 
 ## Distributed acceptance
 
-The paragraphs immediately below describe the original #527 workflow. The current #629 protocol uses five persistent runners across 25/50/100 stages; its exact result and release interpretation are authoritative in `reports/DISTRIBUTED-CAPACITY-629.md`.
+The paragraphs immediately below describe the original #527 workflow. The current #629 protocol uses five persistent runners across 25/50 stages (100 was dropped on 2026-10-02); its exact result and release interpretation are authoritative in `reports/DISTRIBUTED-CAPACITY-629.md`.
 
 The distributed workflow uses five independent runners for 25 actors, then
 20 runners for 100/500/1,000 actors. All use real outbound addresses. Private

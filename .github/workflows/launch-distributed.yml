@@ -184,7 +184,7 @@ jobs:
           name: isolated-encrypted-fixtures-${{ github.run_attempt }}
           path: artifacts/load-private
       - run: node scripts/launch-distributed-bundle.mjs unpack
-      - name: Persistent real-egress cohort, live barriers, gated 25/50/100 holds
+      - name: Persistent real-egress cohort, live barriers, gated 25/50 holds
         run: node scripts/launch-distributed-run.mjs
       - uses: actions/upload-artifact@v4
         if: always()
