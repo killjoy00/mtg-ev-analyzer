@@ -6,8 +6,8 @@ on:
 permissions:
   contents: read
 concurrency:
-  group: pack1-gateway-preview
-  cancel-in-progress: false
+  group: pack1-gateway-preview-evidence-read
+  cancel-in-progress: true
 jobs:
   evidence:
     if: github.event.pull_request.draft == true && github.head_ref == 'fix/distributed-telemetry-settlement-poll-20261002'
