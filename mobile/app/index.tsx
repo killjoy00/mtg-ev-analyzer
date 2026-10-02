@@ -113,7 +113,7 @@ export default function HomeScreen() {
       setPromotionError('Could not open TCGplayer. Try the affiliate link again.');
     }
   };
-  const usernameAttention = rankingReason === 'username_taken' || rankingReason === 'username_required';
+  const displayNameAttention = ['username_taken', 'username_required', 'name_not_allowed'].includes(rankingReason || '');
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -129,17 +129,23 @@ export default function HomeScreen() {
           {status?.day ? <Text style={styles.today}>{status.day} · {completedCount}/3 complete</Text> : null}
         </View>
 
-        {usernameAttention ? (
+        {displayNameAttention ? (
           <Pressable
             accessibilityRole="button"
-            onPress={() => router.push('/account')}
+            onPress={() => router.push('/account-profile')}
             style={styles.warning}
           >
-            <Text style={styles.warningTitle}>Choose a unique username before playing a ranked Daily.</Text>
-            <Text style={styles.warningBody}>
-              Your account is linked, but this name cannot appear on the leaderboard yet.
+            <Text style={styles.warningTitle}>
+              {rankingReason === 'name_not_allowed'
+                ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+                : rankingReason === 'username_taken'
+                  ? 'Choose a different display name. That one is already taken.'
+                  : 'Choose a display name before playing a Daily.'}
             </Text>
-            <Text style={styles.cardAction}>Fix username →</Text>
+            <Text style={styles.warningBody}>
+              Until you choose an available display name, Daily results will not appear on the leaderboard.
+            </Text>
+            <Text style={styles.cardAction}>Change display name →</Text>
           </Pressable>
         ) : null}
 
