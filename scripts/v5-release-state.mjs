@@ -1,4 +1,5 @@
 import fs from 'node:fs';
+import path from 'node:path';
 import modelVersions from '../model-versions.json' with {type:'json'};
 import {corpusDatabase} from './neon-corpus-db.mjs';
 
@@ -37,7 +38,7 @@ const comparable=value=>Object.fromEntries(Object.entries(value).filter(([key])=
 
 if(action==='capture') {
   const value=await snapshot();
-  fs.mkdirSync(new URL('../generated/',import.meta.url),{recursive:true});
+  fs.mkdirSync(path.dirname(stateFile),{recursive:true});
   fs.writeFileSync(stateFile,JSON.stringify(value,null,2)+'\n');
   console.log(JSON.stringify({captured:true,serving_revision:value.serving_revision,sets:value.sets.length,
     game_results:value.game_results_count,scores:value.scores_count,sessions:value.sessions_count,schedules:value.schedules_count}));
