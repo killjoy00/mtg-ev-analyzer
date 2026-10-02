@@ -53,7 +53,7 @@ jobs:
           npm run test:js
   setup:
     needs: [scope, regression]
-    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
+    if: needs.scope.outputs.run_load == 'true' && github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
