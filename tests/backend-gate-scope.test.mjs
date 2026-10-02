@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ALWAYS_STEPS, classifyBackendChanges, loadBackendMap } from '../scripts/backend-gate-scope.mjs';
+import { ALWAYS_STEPS, classifyBackendChanges, filterBackendChangedPaths, loadBackendMap } from '../scripts/backend-gate-scope.mjs';
 
 const map = loadBackendMap();
 
@@ -37,6 +37,35 @@ test('gate infrastructure, migrations, shared core, unmapped files, and empty di
   }
 });
 
+test('neutral files are removed before backend classification and mixed PR noise can stay narrow', () => {
+  const paths = [
+    'worker/apple-subscription-policy.mjs',
+    'docs/backend-gate.md',
+    'mobile/app/index.tsx',
+    'tests/apple-subscriptions.test.mjs',
+    'README.md',
+    '.github/dependabot.yml',
+  ];
+  assert.deepEqual(filterBackendChangedPaths(paths), ['worker/apple-subscription-policy.mjs']);
+  const result = classifyBackendChanges(paths, { map });
+  assert.equal(result.fullSuite, false);
+  assert.deepEqual(result.domains, ['subscriptions']);
+});
+
+test('modules reached through full-path handlers are shared and force the full suite', () => {
+  for (const path of [
+    'worker/capabilities.mjs',
+    'worker/draft-run-season.mjs',
+    'worker/account-deletion.mjs',
+    'worker/patreon.mjs',
+    'worker/public-identity-safety.mjs',
+  ]) {
+    const result = classifyBackendChanges([path], { map });
+    assert.equal(result.fullSuite, true, path);
+    assert.match(result.reasons.join('\n'), /shared across domains/, path);
+  }
+});
+
 test('a module reached from more than one mapped domain is treated as shared and forces full', () => {
   const result = classifyBackendChanges(['worker/account-session.mjs'], { map });
   assert.equal(result.fullSuite, true);
@@ -49,7 +78,6 @@ test('representative domain-owned files select only their mapped group', () => {
     ['worker/decision-measurements.mjs', 'draft_run'],
     ['worker/daily-generation-results.mjs', 'daily'],
     ['tests/corpus-version-backend-smoke.mjs', 'corpus'],
-    ['worker/draft-run-season.mjs', 'seasons'],
   ];
   for (const [path, domain] of cases) {
     const result = classifyBackendChanges([path], { map });
@@ -58,8 +86,15 @@ test('representative domain-owned files select only their mapped group', () => {
   }
 });
 
-test('season group schedules the destructive season fixture last via the dedicated flag', () => {
-  const result = classifyBackendChanges(['worker/draft-run-season.mjs'], { map });
+test('season smoke suite itself remains a narrow seasons route and schedules destructive fixtures last', () => {
+  const result = classifyBackendChanges(['tests/season-backend-smoke.mjs'], { map });
+  assert.equal(result.fullSuite, false);
+  assert.deepEqual(result.domains, ['seasons']);
   assert.equal(result.seasonDestructive, true);
   assert.ok(result.suites.includes('tests/season-backend-smoke.mjs'));
+});
+
+test('root web files remain classified and fail closed while a neutral-only filtered list is full', () => {
+  assert.equal(classifyBackendChanges(['web-only.mjs'], { map }).fullSuite, true);
+  assert.equal(classifyBackendChanges(['README.md', 'docs/only.md', 'mobile/app/index.tsx', 'tests/unit.test.mjs', '.github/dependabot.yml'], { map }).fullSuite, true);
 });

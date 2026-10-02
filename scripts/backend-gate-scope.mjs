@@ -34,6 +34,24 @@ export function matchesGlob(path, glob) {
   return globToRegExp(glob).test(path.replaceAll('\\', '/'));
 }
 
+function normalizeChangedPaths(paths) {
+  if (!Array.isArray(paths)) return [];
+  return [...new Set(paths.map((path) => String(path ?? '').trim().replaceAll('\\', '/')).filter(Boolean))];
+}
+
+export function filterBackendChangedPaths(paths) {
+  return normalizeChangedPaths(paths).filter((path) => {
+    if (path.startsWith('mobile/') || path.startsWith('docs/') || /^[^/]+\.md$/.test(path)) return false;
+    if (path.startsWith('.github/')) {
+      return path === '.github/workflows/backend-gate.yml' || path === '.github/workflows/prepare-rebuild.yml';
+    }
+    if (path.startsWith('tests/')) {
+      return /^tests\/[^/]*backend-smoke\.mjs$/.test(path) || path === 'tests/backend-gate-scope.test.mjs';
+    }
+    return true;
+  });
+}
+
 export function loadBackendMap(repoRoot = process.cwd()) {
   return JSON.parse(readFileSync(join(repoRoot, 'scripts/backend-gate-map.json'), 'utf8'));
 }
@@ -113,7 +131,6 @@ function derivedDomainsFor(path, repoRoot, map) {
       if (seen.has(current)) continue;
       seen.add(current);
       if (current === path) owners.add(domain);
-      if (isFullPath(current, map)) continue;
       for (const imported of importsFor(repoRoot, current)) stack.push(imported);
     }
   }
@@ -135,8 +152,8 @@ export function allSuites(map) {
 }
 
 export function classifyBackendChanges(paths, { repoRoot = process.cwd(), map = loadBackendMap(repoRoot) } = {}) {
-  const changed = [...new Set((paths ?? []).map((path) => String(path).trim().replaceAll('\\', '/')).filter(Boolean))];
-  if (changed.length === 0) {
+  const input = normalizeChangedPaths(paths);
+  if (input.length === 0) {
     return {
       needsNeon: true,
       fullSuite: true,
@@ -145,6 +162,19 @@ export function classifyBackendChanges(paths, { repoRoot = process.cwd(), map = 
       seasonDestructive: true,
       alwaysSteps: [...ALWAYS_STEPS],
       reasons: ['empty changed-file list'],
+    };
+  }
+
+  const changed = filterBackendChangedPaths(input);
+  if (changed.length === 0) {
+    return {
+      needsNeon: true,
+      fullSuite: true,
+      domains: [],
+      suites: allSuites(map),
+      seasonDestructive: true,
+      alwaysSteps: [...ALWAYS_STEPS],
+      reasons: ['no backend-relevant changed files after neutral filtering'],
     };
   }
 
