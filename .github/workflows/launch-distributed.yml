@@ -53,7 +53,8 @@ jobs:
           npm run test:js
   setup:
     needs: [scope, regression]
-    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
+    # PR #871 must not consume the single owner-approved post-merge live run.
+    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false && github.event.pull_request.number != 871))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
