@@ -60,3 +60,29 @@ test('exact-main RC treats main movement as stale evidence, not a build failure'
   assert.match(mainRc,/::notice::RC source/);
   assert.match(mainRc,/if: steps\.freshness\.outputs\.current == 'true'/);
 });
+
+
+test('backend gate runs cheap scope precheck before any Neon mutation',()=>{
+  const backend = readFileSync('.github/workflows/backend-gate.yml','utf8');
+  assert.match(backend,/precheck:[\s\S]*backend schema gate precheck/);
+  assert.match(backend,/node --test tests\/backend-gate-scope\.test\.mjs/);
+  assert.match(backend,/git merge-base origin\/main "\$HEAD_SHA"/);
+  assert.match(backend,/node scripts\/backend-gate-scope\.mjs "\$\{changed_files\[@\]\}"/);
+  assert.match(backend,/needs: precheck/);
+  assert.match(backend,/if: needs\.precheck\.outputs\.needs_neon == 'true' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
+  const beforeNeon = backend.split('  backend-gate:')[0];
+  assert.doesNotMatch(beforeNeon,/NEON_API_KEY|create-branch-action/);
+});
+
+test('PR iOS smoke prebuilds production config without compiling an archive',()=>{
+  const ios = readFileSync('.github/workflows/ios-testflight.yml','utf8');
+  const prSmoke = ios.split('  archive-smoke:')[1].split('  testflight:')[0];
+  const publish = ios.split('  testflight:')[1] ?? '';
+  assert.match(prSmoke,/name: production iOS archive structure/);
+  assert.match(prSmoke,/runs-on: ubuntu-latest/);
+  assert.match(prSmoke,/npx expo prebuild --platform ios --clean/);
+  assert.match(prSmoke,/Validate generated iOS project structure/);
+  assert.doesNotMatch(prSmoke,/xcodebuild|PackOne\.xcarchive|audit-ios-archive/);
+  assert.match(publish,/runs-on: macos-latest/);
+  assert.match(publish,/xcodebuild/);
+});
