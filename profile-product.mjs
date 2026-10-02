@@ -234,7 +234,7 @@ function settingsMarkup(profile, progress, account, patreon) {
     ${account?.user?`<section class="profile-credentials profile-settings-group" aria-labelledby="credential-settings-title">
       <div><p class="eyebrow">Security</p><h3 id="credential-settings-title">Sign-in &amp; security</h3>
         ${account?.credentials?.password
-          ? `<p><strong>Change password</strong><br><span>Changing your password signs out every Pack One session, including this device.</span></p>
+          ? `<p><strong>Change password</strong><br><span>Changing your password signs out every device.</span></p>
              <form class="account-form" id="account-password-change">
                <label>Current password<input required type="password" name="currentPassword" maxlength="256" autocomplete="current-password"></label>
                <label>New password<input required type="password" name="newPassword" minlength="8" maxlength="128" autocomplete="new-password"></label>
