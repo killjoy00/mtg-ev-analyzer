@@ -272,12 +272,12 @@ Only unfinished owner actions are listed here. Completed, intentionally declined
 
 ### Apple / App Store Connect
 
-1. **Enter the prepared reviewer account in App Store Connect.**
-   - The shared reviewer account `ryanmindell+packone-app-review@gmail.com` is verified and already has non-expiring manual Elite access for both `custom_corpus` and `unlimited_cube_practice`.
+1. **Finish any remaining App Review Information contact/notes fields.**
+   - The non-expiring reviewer credentials are already entered in App Store Connect.
    - App Store Connect -> Apps -> Pack One -> version 1.0 -> **App Review Information**.
-   - Enter the review contact name, phone, and email.
-   - Enter the reviewer account email/password there. Keep the password private and do not put it in Git, an issue, or chat.
-   - Use the review notes/reviewer path already prepared in this document.
+   - Confirm the review contact **name, phone, and email** are filled in.
+   - Confirm the **Notes** field contains the prepared review instructions/reviewer path in this document.
+   - Do not submit the app for review until the exact iOS RC has completed the separate physical-device acceptance gates in issue #575.
 
 Physical iPhone/iPad acceptance remains separate and is intentionally not listed here.
 
@@ -285,8 +285,8 @@ Physical iPhone/iPad acceptance remains separate and is intentionally not listed
 
 2. **Finish the remaining App content forms.**
    - Play Console -> Pack One -> **Policy and programs -> App content**.
+   - Google Play **Sign-in details / App access is complete**; the shared non-expiring reviewer account is already entered.
    - **Ads:** answer **Yes** because Pack One has the dedicated Daily-home sponsored TCGplayer affiliate promotion/banner. There is no ad SDK or advertising ID.
-   - **App access / Sign-in details:** state that some features work as a guest but account/Elite features require sign-in. Enter the same non-expiring Elite reviewer account used for Apple.
    - **Target audience and content:** select the intended **13+** audience; do not select under-13 groups.
    - **Content rating (IARC):** complete the questionnaire from the real app: no gambling/wagering/chat; card art can contain fantasy combat/violence.
    - Data Safety is already submitted; do not redo it unless Play reports a required correction.
