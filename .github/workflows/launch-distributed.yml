@@ -1,6 +1,7 @@
 name: isolated distributed launch acceptance
 on:
   pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
     paths: ['scripts/launch-distributed*', 'scripts/launch-change-scope.mjs', 'tests/launch-change-scope.test.mjs', 'tests/launch-distributed-capacity.test.mjs', 'tests/draft-start-timing.test.mjs', 'tests/ingress.test.mjs', 'worker/draft-start-timing.mjs', 'worker/draft-run-function.mjs', 'worker/draft-run-selection.mjs', 'migrations/0045_batched_practice_selector.sql', 'edge/gateway.mjs', 'scripts/edge-control.mjs', '.github/workflows/launch-distributed.yml']
   workflow_dispatch:
 permissions:
@@ -52,7 +53,7 @@ jobs:
           npm run test:js
   setup:
     needs: [scope, regression]
-    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository)
+    if: needs.scope.outputs.run_load == 'true' && (github.event_name == 'workflow_dispatch' || (github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false))
     runs-on: ubuntu-latest
     timeout-minutes: 15
     outputs:
@@ -150,13 +151,13 @@ jobs:
         run: node scripts/launch-distributed-bundle.mjs pack
       - uses: actions/upload-artifact@v4
         with:
-          name: isolated-encrypted-fixtures
+          name: isolated-encrypted-fixtures-${{ github.run_attempt }}
           path: artifacts/load-private
           retention-days: 1
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: distributed-capacity-setup
+          name: distributed-capacity-${{ github.run_attempt }}-setup
           path: artifacts/launch-load
           retention-days: 30
   cohort:
@@ -181,15 +182,15 @@ jobs:
           node-version: 24
       - uses: actions/download-artifact@v4
         with:
-          name: isolated-encrypted-fixtures
+          name: isolated-encrypted-fixtures-${{ github.run_attempt }}
           path: artifacts/load-private
       - run: node scripts/launch-distributed-bundle.mjs unpack
-      - name: Persistent real-egress cohort, live barriers, gated 25/50/100 holds
+      - name: Persistent real-egress cohort, live barriers, gated 25/50 holds
         run: node scripts/launch-distributed-run.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: distributed-capacity-runner-${{ matrix.shard }}
+          name: distributed-capacity-${{ github.run_attempt }}-runner-${{ matrix.shard }}
           path: artifacts/launch-load
           retention-days: 30
   collect_cleanup:
@@ -208,7 +209,7 @@ jobs:
           node-version: 24
       - uses: actions/download-artifact@v4
         with:
-          pattern: distributed-capacity-*
+          pattern: distributed-capacity-${{ github.run_attempt }}-*
           path: artifacts/distributed-results
       - name: Independently recompute cohort and complete-stage acceptance
         run: node scripts/launch-distributed-collect.mjs
@@ -228,6 +229,6 @@ jobs:
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: distributed-capacity-final
+          name: distributed-capacity-${{ github.run_attempt }}-final
           path: artifacts/launch-load
           retention-days: 30
