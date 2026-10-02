@@ -86,3 +86,5 @@ export default ({ config }: ConfigContext): ExpoConfig => {
     },
   };
 };
+
+// CI latency probe for #844; comment-only, no behavior change.
