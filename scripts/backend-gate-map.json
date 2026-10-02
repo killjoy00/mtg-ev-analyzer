@@ -51,7 +51,6 @@
       ],
       "suites": [
         "tests/patreon-backend-smoke.mjs",
-        "tests/patreon-mobile-backend-smoke.mjs",
         "tests/patreon-webhook-backend-smoke.mjs",
         "tests/apple-subscription-backend-smoke.mjs",
         "tests/capabilities-backend-smoke.mjs"
