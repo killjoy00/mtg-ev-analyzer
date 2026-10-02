@@ -366,10 +366,11 @@ export default function AccountScreen() {
   };
 
   useEffect(() => {
-    if (params.emailVerified !== '1' || account || verificationReturnHandled.current) return;
+    if (params.emailVerified !== '1' || account || busy || verificationReturnHandled.current) return;
     verificationReturnHandled.current = true;
-    if (verificationPending && session && email.trim() && password) {
-      void (async () => {
+    void (async () => {
+      await Promise.resolve();
+      if (verificationPending && session && email.trim() && password) {
         setActionBusy(true);
         setMessage('Email verified. Finishing your account…');
         try {
@@ -384,13 +385,13 @@ export default function AccountScreen() {
         } finally {
           setActionBusy(false);
         }
-      })();
-      return;
-    }
-    setVerificationPending(false);
-    setMode('signin');
-    setMessage('Email verified. Sign in to finish setting up your account on this device.');
-  }, [params.emailVerified]);
+        return;
+      }
+      setVerificationPending(false);
+      setMode('signin');
+      setMessage('Email verified. Sign in to finish setting up your account on this device.');
+    })();
+  }, [params.emailVerified, account, busy, verificationPending, session, email, password, validateDailyRunId, finish, setMessage]);
 
   const signedInLabel = account?.user.email ?? account?.user.name ?? 'Pack One account';
   const disabled = actionBusy || busy;
