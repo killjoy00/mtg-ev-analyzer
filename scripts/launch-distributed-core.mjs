@@ -12,7 +12,7 @@ export const quantiles=values=>{
 export function validatePolicy(p) {
   assert.equal(p.version,3);assert.equal(p.generators,5);
   assert.deepEqual(p.stages.map(s=>s.players),[25,50]);
-  assert.equal(p.supported_launch_target,25);assert.equal(p.proposed_target,p.stages.at(-1).players);
+  assert.equal(p.supported_launch_target,50);assert.equal(p.proposed_target,p.stages.at(-1).players);
   assert.ok(p.stages.every(s=>s.hold_seconds>=120&&s.players%p.generators===0));
   assert.ok(p.stages.at(-1).hold_seconds>=600&&p.recovery_seconds>=60);
   assert.ok(p.initial_seconds>=90&&p.drain_seconds>=60&&p.recovery_players===5);
