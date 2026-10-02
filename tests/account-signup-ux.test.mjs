@@ -39,7 +39,10 @@ test('native first claim shows the account-ready display-name step before contin
   assert.match(mobileApi,/\/growth\/v1\/mobile\/account\/link/);
   assert.match(worker,/url\.pathname === '\/v1\/mobile\/account\/link'/);
   assert.match(mobileScreen,/result\.linked\.newlyClaimed === true/);
-  assert.match(mobileScreen,/setReadyError\(displayNameReasonMessage\(result\.linked\.rankingIdentity\?\.reason\)\)/);
+  assert.match(mobileScreen,/const initialDisplayName = displayNameReason === 'username_required' \? ''/);
+  assert.match(mobileScreen,/setReadyError\(displayNameReasonMessage\(displayNameReason\)\)/);
+  assert.doesNotMatch(mobileScreen,/reason === 'username_required'\) return 'Choose a display name/);
+  assert.match(mobileScreen,/Optional\. Choose a display name if you want to join Daily leaderboards\./);
   assert.match(mobileScreen,/Your account is ready\./);
   assert.match(mobileScreen,/accessibilityLabel="Skip display name for now"/);
   assert.match(mobileScreen,/linkMobileAccount\(session, validateDailyRunId\)/);
@@ -52,4 +55,7 @@ test('web signed-in auth callbacks route newly claimed accounts through account-
   assert.match(signedInBranch,/if\(linked\?\.newlyClaimed\)/);
   assert.match(signedInBranch,/openSignupNamePrompt\(\{linked,validationRunId,intent,source\}\)/);
   assert.match(growth,/profile\?\.player\?\.display_name_reason\|\|profile\?\.ranking_identity\?\.reason\|\|linked\?\.rankingIdentity\?\.reason/);
+  assert.match(growth,/const initial=initialReason==='username_required'\?'':storedInitial/);
+  assert.match(growth,/Optional\. Choose a display name if you want to join Daily leaderboards\./);
+  assert.match(growth,/input\?\.addEventListener\('input',\(\)=>\{if\(status\)status\.textContent=''\;\}\)/);
 });
