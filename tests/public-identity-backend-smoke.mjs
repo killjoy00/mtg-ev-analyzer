@@ -349,6 +349,81 @@ try {
   });
   assert.equal(releaseWhilePublic.code,'PUBLIC_PROFILE_REQUIRES_USERNAME');
 
+  // Rename versus hide is serialized by the player row lock. Either rename
+  // commits first and hide immediately removes publication, or hide wins and
+  // rename observes the moderated state. The final identity must always be hidden.
+  await callGrowth('/v1/profile',{
+    method:'PATCH',playerToken:hideRaceTarget.token,accountToken:hideRaceTarget.accountToken,
+    body:{displayName:`PI Hide Race ${tag}`,profilePublic:true},
+  });
+  const [renameVsHide,hideVsRename]=await Promise.all([
+    callAdminRaw(`/v1/admin/users/${hideRaceTarget.authId}/username`,{
+      method:'PATCH',accountToken:adminToken,
+      body:{displayName:`PI Hide Renamed ${tag}`,reason:'QA rename-hide race'},
+    }),
+    callAdminRaw(`/v1/admin/users/${hideRaceTarget.authId}/public-identity`,{
+      accountToken:adminToken,
+      body:{action:'hide',reason:'QA rename-hide race'},
+    }),
+  ]);
+  assert.equal(hideVsRename.status,200,JSON.stringify(hideVsRename.data));
+  assert.ok([200,403].includes(renameVsHide.status),JSON.stringify(renameVsHide.data));
+  if(renameVsHide.status===403)assert.equal(renameVsHide.data.code,'PUBLIC_IDENTITY_MODERATED');
+  const hideRaceFinal=(await query(
+    'SELECT username_owned,profile_public,public_identity_hidden_at FROM players WHERE id=$1::uuid',
+    [hideRaceTarget.playerId],
+  )).rows[0];
+  assert.ok(hideRaceFinal.public_identity_hidden_at,'rename/hide race must finish hidden');
+  assert.equal(hideRaceFinal.username_owned===true||hideRaceFinal.username_owned==='t',false);
+  assert.equal(hideRaceFinal.profile_public===true||hideRaceFinal.profile_public==='t',false);
+  assert.equal(Number((await query(
+    "SELECT count(*)::int n FROM public_identity_moderation_actions WHERE target_player_id=$1::uuid AND action='hide'",
+    [hideRaceTarget.playerId],
+  )).rows[0].n),1);
+  if(renameVsHide.status===200)assert.equal(Number((await query(
+    "SELECT count(*)::int n FROM public_identity_moderation_actions WHERE target_player_id=$1::uuid AND action='rename' AND reason='QA rename-hide race'",
+    [hideRaceTarget.playerId],
+  )).rows[0].n),1);
+
+  // Rename versus deletion shares the per-Auth advisory lock. If rename wins it
+  // must commit completely before the deletion tombstone; if deletion wins the
+  // rename must be rejected as ACCOUNT_DELETING.
+  await callGrowth('/v1/profile',{
+    method:'PATCH',playerToken:deletionRaceTarget.token,accountToken:deletionRaceTarget.accountToken,
+    body:{displayName:`PI Delete Race ${tag}`,profilePublic:false},
+  });
+  const [renameVsDelete,deleteVsRename]=await Promise.all([
+    callAdminRaw(`/v1/admin/users/${deletionRaceTarget.authId}/username`,{
+      method:'PATCH',accountToken:adminToken,
+      body:{displayName:`PI Delete Renamed ${tag}`,reason:'QA rename-delete race'},
+    }),
+    beginAdminDeletion(query,{
+      authUserId:deletionRaceTarget.authId,
+      adminAuthUserId:adminId,
+      reason:'QA rename-delete race',
+      acknowledgeAdmin:false,
+    }),
+  ]);
+  assert.equal(deleteVsRename.start_status,'created');
+  assert.ok([200,409].includes(renameVsDelete.status),JSON.stringify(renameVsDelete.data));
+  if(renameVsDelete.status===409)assert.equal(renameVsDelete.data.code,'ACCOUNT_DELETING');
+  const deleteRaceOperation=(await query(
+    'SELECT operation_id::text operation_id,created_at FROM account_deletion_operations WHERE auth_user_id=$1::uuid',
+    [deletionRaceTarget.authId],
+  )).rows[0];
+  assert.equal(deleteRaceOperation.operation_id,deleteVsRename.operation_id);
+  const deleteRaceAudit=(await query(
+    "SELECT created_at FROM public_identity_moderation_actions WHERE target_player_id=$1::uuid AND action='rename' AND reason='QA rename-delete race' ORDER BY id DESC LIMIT 1",
+    [deletionRaceTarget.playerId],
+  )).rows[0]||null;
+  if(renameVsDelete.status===200) {
+    assert.ok(deleteRaceAudit,'successful race rename must have its atomic audit row');
+    assert.ok(new Date(deleteRaceAudit.created_at).getTime()<=new Date(deleteRaceOperation.created_at).getTime(),
+      'successful rename must commit before deletion tombstone creation');
+  } else {
+    assert.equal(deleteRaceAudit,null,'rename rejected after deletion starts must not leave an audit row');
+  }
+
   // Keep one durable gameplay record so moderation can prove it only affects
   // public identity, never career/game history.
   await query(
@@ -460,7 +535,12 @@ try {
 } finally {
   // The backend gate uses a disposable branch, but leave fixtures tidy so this
   // test is safe to rerun within the same branch.
+  await query('DELETE FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[deletionRaceTarget.authId]).catch(()=>{});
   await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid',[adminId]).catch(()=>{});
-  await query('DELETE FROM neon_auth.session WHERE token IN ($1,$2,$3)',[reporter.accountToken,target.accountToken,adminToken]).catch(()=>{});
-  await query('DELETE FROM neon_auth."user" WHERE id IN ($1::uuid,$2::uuid,$3::uuid)',[reporter.authId,target.authId,adminId]).catch(()=>{});
+  await query('DELETE FROM neon_auth.session WHERE token IN ($1,$2,$3,$4,$5)',[
+    reporter.accountToken,target.accountToken,hideRaceTarget.accountToken,deletionRaceTarget.accountToken,adminToken,
+  ]).catch(()=>{});
+  await query('DELETE FROM neon_auth."user" WHERE id IN ($1::uuid,$2::uuid,$3::uuid,$4::uuid,$5::uuid)',[
+    reporter.authId,target.authId,hideRaceTarget.authId,deletionRaceTarget.authId,adminId,
+  ]).catch(()=>{});
 }
