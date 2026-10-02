@@ -1,6 +1,6 @@
 {
   "operation": "configure-app-store-availability",
-  "reason": "Retry the owner-authorized Pack One v1 App Store availability change after correcting the read path for availableInNewTerritories: United States and Canada only, with automatic availability in newly added territories disabled. Verify the final available territory set is exactly USA + CAN. Do not submit for review, release the app, enable pre-order, or modify subscription availability.",
+  "reason": "Execute the owner-authorized Pack One v1 App Store availability change using Apple's legacy initial-availability resource because Pack One has no appAvailabilityV2/pre-order resource: United States and Canada only, with automatic availability in newly added territories disabled. Verify the final available territory set is exactly USA + CAN. Do not submit for review, release the app, enable/end pre-order, or modify subscription availability.",
   "territories": [
     "USA",
     "CAN"
