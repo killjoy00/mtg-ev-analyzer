@@ -65,7 +65,6 @@ jobs:
           python3 - "$project" "$PACKONE_IOS_BUILD_NUMBER" "$expected_marketing_version" <<'PY'
           import re, sys
           project = open(sys.argv[1], encoding='utf-8').read()
-          build = re.escape(sys.argv[2])
           marketing = re.escape(sys.argv[3])
           checks = {
               'production bundle identifier': r'PRODUCT_BUNDLE_IDENTIFIER\s*=\s*"?pro\.packone\.app"?\s*;',
