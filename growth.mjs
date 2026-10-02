@@ -1,5 +1,5 @@
 import { escapeHtml as esc } from './html.mjs';
-import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile } from './growth-api.mjs';
+import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeEmailVerification, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile } from './growth-api.mjs';
 import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs?v=2';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
@@ -505,16 +505,61 @@ export async function resumeAccountAuth(status) {
   if(status==='verify') {
     const current=new URL(location.href);
     const error=current.searchParams.get('error');
-    current.searchParams.delete('auth');
-    current.searchParams.delete('error');
-    current.searchParams.delete('error_description');
-    history.replaceState({},'',current.pathname+(current.searchParams.size?'?'+current.searchParams:''));
+    const nativeReturn=current.searchParams.get('native')==='1';
     if(error) {
+      current.searchParams.delete('auth');
+      current.searchParams.delete('error');
+      current.searchParams.delete('error_description');
+      current.searchParams.delete('native');
+      current.searchParams.delete('neon_auth_session_verifier');
+      history.replaceState({},'',current.pathname+(current.searchParams.size?'?'+current.searchParams:''));
       event('auth_verification_failed',{source:flow.source||'unknown'});
       return renderVerificationRecovery('This verification link has expired or is no longer valid. Request a new link.');
     }
+    if(nativeReturn) {
+      current.searchParams.delete('auth');
+      current.searchParams.delete('native');
+      current.searchParams.delete('neon_auth_session_verifier');
+      history.replaceState({},'',current.pathname+(current.searchParams.size?'?'+current.searchParams:''));
+      event('auth_verification_completed',{source:'native'});
+      const app=document.querySelector('#app');
+      if(app)app.innerHTML='<section class="account-page growth-page"><header><p class="eyebrow">Email verified</p><h1>Your email is verified.</h1><p>Return to Pack One on your phone or tablet to finish setting up this account and keep the progress already on that device.</p></header><div class="account-actions"><a class="button primary" href="packone://account?emailVerified=1">Return to Pack One app</a><a class="button secondary" href="?account=signin">Continue on web</a></div></section>';
+      return;
+    }
+    let verifiedSession=null;
+    let verificationSessionError=null;
+    try {verifiedSession=await completeEmailVerification();}
+    catch(sessionError){verificationSessionError=sessionError;}
+    current.searchParams.delete('auth');
+    current.searchParams.delete('error');
+    current.searchParams.delete('error_description');
+    current.searchParams.delete('neon_auth_session_verifier');
+    history.replaceState({},'',current.pathname+(current.searchParams.size?'?'+current.searchParams:''));
     event('auth_verification_completed',{source:flow.source||'unknown'});
-    return renderAccount({validateDailyRunId:flow.validateDailyRunId||null,intent:flow.intent||null,source:flow.source||'account',notice:'Email verified.'});
+    if(!verifiedSession) {
+      return renderAccount({
+        validateDailyRunId:flow.validateDailyRunId||null,
+        intent:flow.intent||null,
+        source:flow.source||'account',
+        mode:'signin',
+        notice:verificationSessionError
+          ? 'Email verified. Sign in to finish setting up your account.'
+          : 'Email verified. Sign in to continue on this browser.',
+      });
+    }
+    const claimed=await claimCurrentSession();
+    if(claimed?.linked?.newlyClaimed) {
+      return openSignupNamePrompt({
+        linked:claimed.linked,
+        validationRunId:claimed.pendingValidationRunId,
+        intent:flow.intent||null,
+        source:flow.source||'account',
+      });
+    }
+    if(claimed?.validationRunId)return returnToValidatedDaily(claimed.validationRunId,claimed.linked,flow.source||'account');
+    if(flow.intent==='patreon-activate')return renderPatreonActivation({source:flow.source||'account'});
+    if(flow.intent==='elite')return openEliteLanding(flow.source||'account');
+    return renderSignedInHome(flow.source||'account');
   }
 
   if(status==='apple-delete'||status==='apple-delete-error') {
