@@ -86,3 +86,16 @@ test('PR iOS smoke prebuilds production config without compiling an archive',()=
   assert.match(publish,/runs-on: macos-latest/);
   assert.match(publish,/xcodebuild/);
 });
+
+
+test('Android PR smoke narrows native ABI compile while release paths stay full',()=>{
+  const android = readFileSync('.github/workflows/android-production-bundle.yml','utf8');
+  const mainRc = readFileSync('.github/workflows/mobile-exact-main-rc.yml','utf8');
+  const smoke = android.split('  signed-bundle:')[0];
+  const signed = android.split('  signed-bundle:')[1] ?? '';
+  assert.match(smoke,/-PreactNativeArchitectures=arm64-v8a/);
+  assert.doesNotMatch(mainRc,/-PreactNativeArchitectures=/);
+  assert.doesNotMatch(signed,/-PreactNativeArchitectures=/);
+  assert.match(mainRc,/\.\/gradlew :app:bundleRelease --no-daemon --build-cache/);
+  assert.match(signed,/\.\/gradlew :app:bundleRelease --no-daemon/);
+});
