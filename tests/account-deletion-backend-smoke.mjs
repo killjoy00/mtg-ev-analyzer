@@ -235,3 +235,5 @@ try {
   await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid OR auth_user_id=$2::uuid',[verificationAuth,verificationRaceAuth]);
   await query('DELETE FROM players WHERE id=$1::uuid OR id=$2::uuid',[other,player]);
 }
+
+// CI latency probe for #844; comment-only, no behavior change.
