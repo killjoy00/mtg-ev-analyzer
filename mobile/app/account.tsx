@@ -365,33 +365,30 @@ export default function AccountScreen() {
   };
 
   useEffect(() => {
-    if (params.emailVerified !== '1' || account || actionBusy) return;
+    if (params.emailVerified !== '1' || account) return;
     if (verificationPending && session && email.trim() && password) {
-      let cancelled = false;
       void (async () => {
         setActionBusy(true);
         setMessage('Email verified. Finishing your account…');
         try {
           const next = await signInWithEmail(session, email.trim(), password, validateDailyRunId);
-          if (!cancelled) await finish(next.session, next.result);
+          await finish(next.session, next.result);
         } catch (error: unknown) {
-          if (!cancelled) {
-            setVerificationPending(false);
-            setMode('signin');
-            setMessage(error instanceof Error
-              ? `Email verified. ${error.message}`
-              : 'Email verified. Sign in to finish setting up your account.');
-          }
+          setVerificationPending(false);
+          setMode('signin');
+          setMessage(error instanceof Error
+            ? `Email verified. ${error.message}`
+            : 'Email verified. Sign in to finish setting up your account.');
         } finally {
-          if (!cancelled) setActionBusy(false);
+          setActionBusy(false);
         }
       })();
-      return () => { cancelled = true; };
+      return;
     }
     setVerificationPending(false);
     setMode('signin');
     setMessage('Email verified. Sign in to finish setting up your account on this device.');
-  }, [params.emailVerified, account, actionBusy, verificationPending, session, email, password, validateDailyRunId]);
+  }, [params.emailVerified]);
 
   const signedInLabel = account?.user.email ?? account?.user.name ?? 'Pack One account';
   const disabled = actionBusy || busy;
