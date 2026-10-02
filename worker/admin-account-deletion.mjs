@@ -91,14 +91,18 @@ export async function handleAdminAccountDeletion(
   if(!operation)fail('Account deletion could not be started.',500,'DELETE_START');
   try {
     operation=await resumeDeletionOperation(operation,{knownEmail});
-  } catch {
-    operation=await loadDeletionForAuth(query,targetAuthUserId)||operation;
+  } catch(error) {
+    try {
+      operation=await loadDeletionForAuth(query,targetAuthUserId)||operation;
+    } catch {}
     console.error(JSON.stringify({
       event:'admin_account_deletion_resume_error',
       operation_id:operation.operation_id,
       state:operation.state,
-      error_code:'ADMIN_DELETE_RESUME',
+      error_code:safeErrorCode(error?.code)||safeErrorCode(operation.last_error_code)||'ADMIN_DELETE_RESUME',
+      error_name:String(error?.name||'Error').slice(0,80),
     }));
+    throw error;
   }
 
   const view=adminDeletionStatus(operation);
