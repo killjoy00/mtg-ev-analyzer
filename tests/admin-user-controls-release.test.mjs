@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
+import {adminGrowthPath,adminPath} from '../edge/gateway.mjs';
 
 test('admin user control migration keeps rename and audit atomic and deletion attribution durable',()=>{
   const migration=fs.readFileSync('migrations/0047_admin_user_account_controls.sql','utf8');
@@ -19,11 +20,13 @@ test('admin user control migration keeps rename and audit atomic and deletion at
 });
 
 test('gateway allows only the narrow admin username and deletion routes and methods',()=>{
-  const source=fs.readFileSync('edge/gateway.mjs','utf8');
-  assert.match(source,/username\$\/\.test\(path\)&&method==='PATCH'/);
-  assert.match(source,/method==='POST'&&\/\^\\\/v1\\\/admin\\\/users.*delete\$/);
-  assert.match(source,/method==='GET'&&\/\^\\\/v1\\\/admin\\\/users.*deletion\$/);
-  assert.doesNotMatch(source,/admin\\\/users\\\/[a-f0-9-]+\\\/(?:email|password)/);
+  assert.equal(adminPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/username','PATCH'),true);
+  assert.equal(adminPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/username','POST'),false);
+  assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/delete','POST','production'),true);
+  assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/delete','GET','production'),false);
+  assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/deletion','GET','production'),true);
+  assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/delete','POST','preview'),false);
+  assert.equal(adminGrowthPath('/v1/admin/users/22222222-2222-4222-8222-222222222222/email','POST','production'),false);
 });
 
 test('Admin Users browser uses PATCH rename, typed destructive confirmation, status recovery and separate services',()=>{
