@@ -48,8 +48,8 @@ jobs:
               if (( ${#changed_files[@]} == 0 )); then
                 run_full=true
               else
-                printf 'Changed files:\\n'
-                printf ' - %s\\n' "${changed_files[@]}"
+                printf 'Changed files:\n'
+                printf ' - %s\n' "${changed_files[@]}"
                 for path in "${changed_files[@]}"; do
                   case "$path" in
                     mobile/*|docs/mobile-*|docs/android-*|docs/parity.md|.github/workflows/mobile*.yml|.github/workflows/android-*.yml|.github/workflows/ios-*.yml|.github/workflows/google-play-access.yml|.github/android-*.txt|.github/ios-*.txt|.github/app-store-*.txt|.github/scripts/app-store-*.mjs|.gitignore)
