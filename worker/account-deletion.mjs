@@ -30,24 +30,36 @@ export async function deletedPlayerTombstone(query,playerId) {
   return Boolean(result.rows[0]);
 }
 
+const OPERATION_COLUMNS=`operation_id,auth_user_id,player_id,state,attempts,last_error_code,
+  created_at,updated_at,app_cleanup_completed_at,provider_deleted_at,completed_at,
+  initiation_source,initiated_by_admin_auth_user_id,deletion_reason,target_was_admin`;
+
 export async function beginDeletion(query,{authUserId,playerId=null}) {
   const auth=uuid(authUserId);
   const player=playerId==null?null:uuid(playerId);
-  const result=await query(`SELECT operation_id,auth_user_id,player_id,state,attempts,last_error_code,created_at,updated_at
+  const result=await query(`SELECT ${OPERATION_COLUMNS}
     FROM pack1_begin_account_deletion($1::uuid,$2::uuid)`,[auth,player]);
   return result.rows[0]||null;
 }
 
+export async function beginAdminDeletion(query,{authUserId,adminAuthUserId,reason=null,acknowledgeAdmin=false}) {
+  const auth=uuid(authUserId),admin=uuid(adminAuthUserId);
+  const note=reason==null?null:String(reason);
+  const result=await query(`SELECT start_status,${OPERATION_COLUMNS}
+    FROM pack1_begin_admin_account_deletion($1::uuid,$2::uuid,$3,$4::boolean)`,[
+      auth,admin,note,Boolean(acknowledgeAdmin),
+    ]);
+  return result.rows[0]||null;
+}
+
 export async function loadDeletionOperation(query,operationId) {
-  const result=await query(`SELECT operation_id,auth_user_id,player_id,state,attempts,last_error_code,
-      created_at,updated_at,app_cleanup_completed_at,provider_deleted_at,completed_at
+  const result=await query(`SELECT ${OPERATION_COLUMNS}
     FROM account_deletion_operations WHERE operation_id=$1::uuid LIMIT 1`,[uuid(operationId)]);
   return result.rows[0]||null;
 }
 
 export async function loadDeletionForAuth(query,authUserId) {
-  const result=await query(`SELECT operation_id,auth_user_id,player_id,state,attempts,last_error_code,
-      created_at,updated_at,app_cleanup_completed_at,provider_deleted_at,completed_at
+  const result=await query(`SELECT ${OPERATION_COLUMNS}
     FROM account_deletion_operations WHERE auth_user_id=$1::uuid LIMIT 1`,[uuid(authUserId)]);
   return result.rows[0]||null;
 }
@@ -87,6 +99,15 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
         JOIN draft_run_sessions owner ON owner.id=sh.session_id
         WHERE owner.player_id=$1::uuid
       )`,[player]);
+  }
+
+  if(player) {
+    await query(`UPDATE public_identity_moderation_actions
+      SET target_auth_user_id=COALESCE(target_auth_user_id,$2::uuid),
+          previous_display_name=NULL,
+          new_display_name=NULL,
+          reason=CASE WHEN action='rename' THEN NULL ELSE reason END
+      WHERE target_player_id=$1::uuid`,[player,auth]);
   }
 
   await query('UPDATE pack1_admin_invites SET redeemed_by=NULL WHERE redeemed_by=$1::uuid',[auth]);
@@ -135,7 +156,8 @@ export async function cleanupPackOne(query,operation,{recoveryKey=null}={}) {
     WHERE operation_id=$1::uuid
       AND state IN ('pending','app_cleanup_complete','provider_delete_pending')
     RETURNING operation_id,auth_user_id,player_id,state,attempts,last_error_code,
-      created_at,updated_at,app_cleanup_completed_at,provider_deleted_at,completed_at`,[operationId]);
+      created_at,updated_at,app_cleanup_completed_at,provider_deleted_at,completed_at,
+      initiation_source,initiated_by_admin_auth_user_id,deletion_reason,target_was_admin`,[operationId]);
   return advanced.rows[0]||loadDeletionOperation(query,operationId);
 }
 
@@ -270,7 +292,8 @@ export async function finishProviderPhase(query,operation,result) {
   const updated=await query(`UPDATE account_deletion_operations
     SET state='complete',attempts=attempts+1,last_error_code=NULL,
         provider_deleted_at=COALESCE(provider_deleted_at,now()),
-        completed_at=COALESCE(completed_at,now()),updated_at=now()
+        completed_at=COALESCE(completed_at,now()),updated_at=now(),
+        deletion_reason=NULL
     WHERE operation_id=$1::uuid AND state IN ('provider_delete_pending','provider_deleted')
     RETURNING *`,[id]);
   return updated.rows[0]||loadDeletionOperation(query,id);
@@ -293,8 +316,7 @@ export async function sweepExpiredVerification(query,{limit=200}={}) {
 
 export async function maintenanceBatch(query,{limit=20}={}) {
   const bounded=Math.max(1,Math.min(50,Number(limit)||20));
-  const result=await query(`SELECT operation_id,auth_user_id,player_id,state,attempts,last_error_code,
-      created_at,updated_at,app_cleanup_completed_at,provider_deleted_at,completed_at
+  const result=await query(`SELECT ${OPERATION_COLUMNS}
     FROM account_deletion_operations
     WHERE state<>'complete'
     ORDER BY updated_at,operation_id
