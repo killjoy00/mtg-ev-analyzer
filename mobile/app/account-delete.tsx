@@ -181,6 +181,8 @@ export default function AccountDeleteScreen() {
             <Text style={styles.body}>A verified account email is required before this account can be deleted.</Text>
           )}
 
+          {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
+
           <View style={styles.warning}>
             <Text style={styles.warningText}>{BILLING_WARNING}</Text>
             {appleActive ? (
@@ -190,8 +192,6 @@ export default function AccountDeleteScreen() {
               </Pressable>
             ) : null}
           </View>
-
-          {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
 
           {account.deletion.enabled && account.deletion.method ? (
             <Pressable
