@@ -1,0 +1,11 @@
+{
+  "operation": "upload-promote-existing-android-aab",
+  "reason": "Owner-authorized release of the exact post-#837 Pack One Android 1.0 candidate already built and signed in run 36957485029. Upload that unchanged AAB as versionCode 100444 to Google Play Internal Testing, then promote the same version unchanged to the existing production-access Closed Testing track. Do not rebuild the bundle or publish to Production.",
+  "source_run_id": 36957485029,
+  "source_artifact_id": 11206639352,
+  "source_sha": "fa588b40bc380946735385abfac0ff52586e1873",
+  "artifact_name": "pack-one-play-signed-aab",
+  "artifact_digest": "sha256:9aa25360201435a68facc6ed25c21d965e883bcd1ae42204b2b7e4e0d219c20d",
+  "version_code": "100444",
+  "track": "production-access"
+}
