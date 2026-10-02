@@ -39,6 +39,7 @@ test('native first claim shows the account-ready display-name step before contin
   assert.match(mobileApi,/\/growth\/v1\/mobile\/account\/link/);
   assert.match(worker,/url\.pathname === '\/v1\/mobile\/account\/link'/);
   assert.match(mobileScreen,/result\.linked\.newlyClaimed === true/);
+  assert.match(mobileScreen,/setReadyError\(displayNameReasonMessage\(result\.linked\.rankingIdentity\?\.reason\)\)/);
   assert.match(mobileScreen,/Your account is ready\./);
   assert.match(mobileScreen,/accessibilityLabel="Skip display name for now"/);
   assert.match(mobileScreen,/linkMobileAccount\(session, validateDailyRunId\)/);
