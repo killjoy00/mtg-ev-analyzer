@@ -251,8 +251,8 @@ try {
   await page.evaluate(()=>{document.documentElement.style.fontSize='';});
 
   await page.locator('#profile-stats-tab').click();
-  assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Profile Tester');
-  assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="explorer5"]').count(),1,'loaded profile remains stable while save feedback is shown');
+  assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Leaderboard Ace');
+  assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="top10"]').count(),1,'successful save refreshes the authoritative profile while later failed edits stay local');
   await page.locator('#profile-share').click();
   await page.waitForFunction(() => (window.__pack1ShareCalls || 0) > 0, null, { timeout:5000 });
   shareCalls = await page.evaluate(() => window.__pack1ShareCalls || 0);
