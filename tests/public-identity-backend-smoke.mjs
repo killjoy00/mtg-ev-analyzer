@@ -45,6 +45,19 @@ async function callAdmin(path,{body,accountToken,method,status=200}={}) {
   return responseJson(response,status,path);
 }
 
+async function callAdminGrowth(path,{body,accountToken,method,status=200}={}) {
+  const response=await growth.fetch(new Request(origin+path,{
+    method:method||(body===undefined?'GET':'POST'),
+    headers:{
+      origin,
+      ...(body===undefined?{}:{'content-type':'application/json'}),
+      ...(accountToken?{'x-pack1-auth-session':accountToken}:{}),
+    },
+    body:body===undefined?undefined:JSON.stringify(body),
+  }));
+  return responseJson(response,status,path);
+}
+
 async function account(label) {
   const guest=await callGrowth('/v1/session',{body:{displayName:`QA PI ${label} ${tag}`}});
   const authId=crypto.randomUUID(),accountToken=crypto.randomUUID()+crypto.randomUUID();
@@ -77,6 +90,22 @@ try {
 
   const reporterName=`PI Reporter ${tag}`;
   let targetName=`PI Target ${tag}`;
+  const unauthRename=await callAdmin(`/v1/admin/users/${target.authId}/username`,{
+    method:'PATCH',status:401,body:{displayName:'Denied Rename'},
+  });
+  assert.match(unauthRename.error,/session/i);
+  const nonAdminRename=await callAdmin(`/v1/admin/users/${target.authId}/username`,{
+    method:'PATCH',accountToken:target.accountToken,status:403,body:{displayName:'Denied Rename'},
+  });
+  assert.match(nonAdminRename.error,/admin access/i);
+  const unauthDelete=await callAdminGrowth(`/v1/admin/users/${target.authId}/delete`,{
+    status:401,body:{confirm:'DELETE'},
+  });
+  assert.match(unauthDelete.error,/session/i);
+  const nonAdminDelete=await callAdminGrowth(`/v1/admin/users/${target.authId}/delete`,{
+    accountToken:target.accountToken,status:403,body:{confirm:'DELETE'},
+  });
+  assert.match(nonAdminDelete.error,/admin access/i);
   const prohibited=await callGrowth('/v1/profile',{
     method:'PATCH',playerToken:target.token,accountToken:target.accountToken,status:400,
     body:{displayName:'Pack One Support'},
@@ -128,7 +157,7 @@ try {
     target_auth_user_id:target.authId,admin_auth_user_id:adminId,
   });
   const duplicate=await callAdmin(`/v1/admin/users/${target.authId}/username`,{
-    method:'PATCH',accountToken:adminToken,status:409,body:{displayName:reporterName},
+    method:'PATCH',accountToken:adminToken,status:409,body:{displayName:'  '+reporterName.toUpperCase().replaceAll(' ','   ')+'  '},
   });
   assert.equal(duplicate.code,'USERNAME_TAKEN');
   const releaseWhilePublic=await callAdmin(`/v1/admin/users/${target.authId}/username`,{
