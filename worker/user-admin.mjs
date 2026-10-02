@@ -1,5 +1,7 @@
+import {assertPublicDisplayNameAllowed} from './public-identity-safety.mjs';
+import {isPlaceholderUsername,normalizeDisplayName,rethrowUsernameConflict} from './username.mjs';
 const UUID=/^[a-f0-9-]{36}$/i;
-const fail=(message,status=400)=>{throw Object.assign(Error(message),{status});};
+const fail=(message,status=400,code=null)=>{throw Object.assign(Error(message),{status,...(code?{code}:{})});};
 const bool=value=>value===true||value==='t'||value==='true'||value===1||value==='1';
 const num=(value,fallback=0)=>Number.isFinite(Number(value))?Number(value):fallback;
 const parse=value=>{
@@ -40,6 +42,47 @@ function normalizeUser(row) {
 }
 
 export async function handleUserAdmin(request,query,url=new URL(request.url),{readJson=null,adminAuthUserId=null}={}) {
+  const rename=url.pathname.match(/^\/v1\/admin\/users\/([a-f0-9-]+)\/username$/i);
+  if(rename&&request.method==='PATCH') {
+    if(!UUID.test(rename[1])||!readJson||!adminAuthUserId)fail('Invalid username change request.',400);
+    const body=await readJson(request);
+    const raw=String(body.displayName??'');
+    const reason=String(body.reason||'').trim();
+    if(raw.length>200)fail('Display name input is too long.',400);
+    if(reason.length>200)fail('Reason must be 200 characters or fewer.',400);
+    const displayName=normalizeDisplayName(raw);
+    const owned=!isPlaceholderUsername(displayName);
+    if(owned)assertPublicDisplayNameAllowed(displayName);
+    let changed;
+    try {
+      changed=await query(
+        `SELECT result_status,player_id,previous_display_name,new_display_name,username_owned
+         FROM pack1_admin_rename_public_username($1::uuid,$2::uuid,$3,$4::boolean,$5)`,
+        [rename[1],adminAuthUserId,displayName,owned,reason||null],
+      );
+    } catch(error) {
+      rethrowUsernameConflict(error);
+    }
+    const result=changed.rows[0];
+    if(!result)fail('Username change could not be completed.',500);
+    if(result.result_status==='forbidden')fail('This account does not have admin access.',403);
+    if(result.result_status==='deleting')fail('This account is being deleted.',409,'ACCOUNT_DELETING');
+    if(result.result_status==='unknown')fail('User not found.',404);
+    if(result.result_status==='unlinked')fail('User has no linked public identity.',409);
+    if(result.result_status==='moderated')
+      fail('This display name is unavailable. Restore the moderated identity before changing it.',403,'PUBLIC_IDENTITY_MODERATED');
+    if(result.result_status==='public_profile_requires_username')
+      fail('Make the public profile private before releasing its username.',409,'PUBLIC_PROFILE_REQUIRES_USERNAME');
+    if(result.result_status==='invalid')fail('Username change is invalid.',400);
+    return {
+      ok:true,
+      changed:result.result_status==='renamed',
+      player_id:result.player_id,
+      previous_display_name:result.previous_display_name,
+      display_name:result.new_display_name,
+      username_owned:bool(result.username_owned),
+    };
+  }
   const moderation=url.pathname.match(/^\/v1\/admin\/users\/([a-f0-9-]+)\/public-identity$/i);
   if(moderation&&request.method==='POST') {
     if(!UUID.test(moderation[1])||!readJson||!adminAuthUserId)fail('Invalid moderation request.',400);
@@ -147,7 +190,8 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
         FROM public_identity_reports
         WHERE target_player_id=(SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid)
         ORDER BY created_at DESC LIMIT 25`,[id]),
-      query(`SELECT action,reason,created_at,admin_auth_user_id::text
+      query(`SELECT action,reason,created_at,admin_auth_user_id::text,
+          previous_display_name,new_display_name
         FROM public_identity_moderation_actions
         WHERE target_player_id=(SELECT player_id FROM account_links WHERE auth_user_id=$1::uuid)
         ORDER BY created_at DESC LIMIT 25`,[id]),
@@ -182,7 +226,11 @@ export async function handleUserAdmin(request,query,url=new URL(request.url),{re
 
   if(url.pathname!=='/v1/admin/users')fail('Not found.',404);
   const filters=userAdminFilters(url),params=[filters.search,filters.status];
-  const where=`WHERE ($1='' OR coalesce(u.name,'') ILIKE '%'||$1||'%' OR coalesce(u.email,'') ILIKE '%'||$1||'%')
+  const where=`WHERE ($1='' OR coalesce(u.name,'') ILIKE '%'||$1||'%' OR coalesce(u.email,'') ILIKE '%'||$1||'%'
+      OR EXISTS(
+        SELECT 1 FROM account_links search_link JOIN players search_player ON search_player.id=search_link.player_id
+        WHERE search_link.auth_user_id=u.id AND coalesce(search_player.display_name,'') ILIKE '%'||$1||'%'
+      ))
     AND ($2='all'
       OR ($2='paid' AND EXISTS(SELECT 1 FROM entitlement_grants eg WHERE eg.auth_user_id=u.id AND eg.revoked_at IS NULL AND (eg.expires_at IS NULL OR eg.expires_at>now())))
       OR ($2='patreon' AND EXISTS(SELECT 1 FROM provider_accounts pc WHERE pc.auth_user_id=u.id AND pc.provider='patreon'))
