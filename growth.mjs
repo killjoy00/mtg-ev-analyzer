@@ -1,6 +1,6 @@
 import { escapeHtml as esc } from './html.mjs';
 import { accountAuthCompleted, completeAppleDeletion, completeAppleSignIn, completeGoogleSignIn, firstPartyAuthEnabled, getAuthSession, linkAccount, loadMyProfile, requestPasswordReset, requestVerificationEmail, signInAccount, signOutAccount, signUpAccount, startAppleSignIn, startGoogleSignIn, updateProfile } from './growth-api.mjs';
-import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs';
+import { clearPatreonActivation, hasPatreonActivationIntent, rememberPatreonActivation, renderPatreonActivation as renderPatreonActivationPage } from './patreon-activation.mjs?v=2';
 import { flushEvents, trackEvent as event } from './retention-events.mjs';
 
 let currentAccount = null;
