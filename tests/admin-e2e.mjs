@@ -122,7 +122,7 @@ try {
   await deleteForm.getByLabel('Type DELETE to confirm').fill('DELETE');
   await deleteForm.getByLabel('Reason (optional)').fill('requested by account owner');
   await deleteForm.getByRole('button',{name:'Delete account'}).click();
-  await page.getByText('Deletion has started and is continuing.',{exact:true}).waitFor();
+  await page.locator('#deletion-status').getByText('Deletion has started and is continuing.',{exact:false}).waitFor();
   assert.deepEqual(deleteBodies,[{confirm:'DELETE',reason:'requested by account owner',acknowledgeAdmin:false}]);
   assert.equal(await page.getByRole('button',{name:'Save username'}).isDisabled(),true);
 
