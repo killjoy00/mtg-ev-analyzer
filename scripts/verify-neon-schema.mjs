@@ -8,15 +8,16 @@ const result=await query(`SELECT
   to_regclass('draft_run_serving_inventory') IS NOT NULL practice_inventory,
   to_regclass('draft_run_serving_source_groups') IS NOT NULL practice_source_groups,
   EXISTS(SELECT 1 FROM pg_trigger WHERE tgname='serving_inventory_source_groups' AND tgenabled='O') practice_source_group_capture,
-  (SELECT count(*)=22 FROM pg_trigger WHERE tgname IN (
+  (SELECT count(*)=23 FROM pg_trigger WHERE tgname IN (
     'serving_puzzle_insert','serving_puzzle_delete','serving_puzzle_metadata','serving_puzzle_truncate',
     'serving_ratings_insert','serving_ratings_delete','serving_ratings','serving_ratings_truncate',
-    'serving_version_rows','serving_version_identity',
+    'serving_version_insert','serving_version_delete','serving_version_identity',
     'serving_exclusions_insert','serving_exclusions_delete','serving_exclusions_update','serving_exclusions_truncate',
     'serving_components_insert','serving_components_delete','serving_components_update','serving_components_truncate',
     'serving_policy_insert','serving_policy_delete','serving_policy_update','serving_policy_truncate'
   ) AND tgenabled='O') practice_invalidation,
   to_regprocedure('pack1_puzzle_can_affect_serving(text,text)') IS NOT NULL snapshot_aware_practice_invalidation,
+  to_regprocedure('pack1_serving_snapshot_matches_current(text,text,text,bigint)') IS NOT NULL cross_version_cutover,
   (SELECT count(*)=2 FROM pg_constraint WHERE conname IN ('draft_run_sessions_environment_check','draft_run_schedules_environment_check') AND pg_get_constraintdef(oid) LIKE '%latest%') latest_daily,
   (SELECT count(*)=2 FROM information_schema.columns WHERE table_name IN ('draft_run_sessions','draft_run_schedules') AND column_name='serving_policy_version') serving_policy,
   to_regclass('draft_run_rating_serving_lookup_idx') IS NOT NULL serving_quality_lookup,
