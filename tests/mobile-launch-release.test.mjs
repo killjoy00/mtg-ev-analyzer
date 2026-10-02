@@ -37,6 +37,10 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/testflight-release-request\.json'/s, path);
       assert.match(workflow, /request\.get\('operation'\) != 'upload-testflight-app-store-eligible'/, path);
+      // Each fresh runner's automatic-signing certificate must be revoked, or the
+      // team certificate limit eventually blocks archiving.
+      assert.match(workflow, /app-store-runner-certificates\.mjs snapshot[\s\S]+- name: Archive signed Pack One app/, path);
+      assert.match(workflow, /- name: Revoke the development certificate this runner created\s+if: always\(\)\s+continue-on-error: true\s+run: node \.\.\/\.github\/scripts\/app-store-runner-certificates\.mjs revoke/, path);
     } else if (path === '.github/workflows/android-internal-testing.yml') {
       assert.match(workflow, /github\.ref == 'refs\/heads\/main' && \(github\.event_name == 'workflow_dispatch' \|\| github\.event_name == 'push'\)/, path);
       assert.match(workflow, /push:\s+branches: \[main\]\s+paths:\s+- '\.github\/android-internal-release-request\.json'/s, path);
