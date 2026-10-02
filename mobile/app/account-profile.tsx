@@ -54,6 +54,12 @@ export default function AccountProfileScreen() {
 
   const save = async () => {
     if (!session?.accountToken || !profile || saving) return;
+    const submittedEdits = {
+      displayName: displayNameEdit,
+      profilePublic: profilePublicEdit,
+      favoriteSetId: favoriteSetIdEdit,
+      showcaseAchievement: showcaseAchievementEdit,
+    };
     setSaving(true);
     setSaveMessage('Saving profile…');
     setSaveTone(null);
@@ -67,6 +73,10 @@ export default function AccountProfileScreen() {
         acceptPublicIdentityTerms: true,
       });
       adoptProfile(updated);
+      setDisplayName((current) => current === submittedEdits.displayName ? null : current);
+      setProfilePublic((current) => current === submittedEdits.profilePublic ? null : current);
+      setFavoriteSetId((current) => current === submittedEdits.favoriteSetId ? null : current);
+      setShowcaseAchievement((current) => current === submittedEdits.showcaseAchievement ? null : current);
       setSaveTone('success');
       setSaveMessage('Profile saved.');
     } catch (error: unknown) {
