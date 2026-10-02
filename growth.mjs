@@ -221,7 +221,15 @@ async function openSignupNamePrompt({linked,validationRunId=null,intent=null,sou
   let profile=null;
   try {profile=await loadMyProfile();} catch {}
   const initial=String(profile?.player?.display_name||'').trim();
-  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small>Shown on Daily leaderboards and your public profile.</small><p class="account-identity-rules"><small>By saving a display name, you agree to the <a href="/terms/#public-identity-rules">Public Identity rules</a>: no harassment, impersonation, spam, private contact information, or abusive content.</small></p><button class="button primary" type="submit">Continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite"></p></form></div></section>`;
+  const initialReason=profile?.player?.display_name_reason||profile?.ranking_identity?.reason||linked?.rankingIdentity?.reason||null;
+  const initialWarning=initialReason==='name_not_allowed'
+    ? 'That display name is not allowed. Choose another to join Daily leaderboards.'
+    : initialReason==='username_taken'
+      ? 'Choose a different display name. That one is already taken.'
+      : initialReason==='username_required'
+        ? 'Choose a display name to join Daily leaderboards.'
+        : '';
+  app.innerHTML=`<section class="account-page growth-page" id="account-ready"><header><p class="eyebrow">Account ready</p><h1>Your account is ready.</h1><p>Your progress is saved across devices.</p></header><div class="account-auth-card"><form class="account-form" id="account-ready-form"><label>Display name<input type="text" name="displayName" minlength="2" maxlength="24" autocomplete="nickname" value="${esc(initial)}" placeholder="Display name"></label><small>Shown on Daily leaderboards and your public profile.</small><p class="account-identity-rules"><small>By saving a display name, you agree to the <a href="/terms/#public-identity-rules">Public Identity rules</a>: no harassment, impersonation, spam, private contact information, or abusive content.</small></p><button class="button primary" type="submit">Continue</button><button class="text-button" id="account-ready-skip" type="button">Skip for now</button><p class="form-error" aria-live="polite">${esc(initialWarning)}</p></form></div></section>`;
   const form=document.querySelector('#account-ready-form');
   const input=form?.querySelector('input[name="displayName"]');
   input?.focus();
@@ -291,6 +299,10 @@ export async function renderAccount({ validateDailyRunId = null, intent = null, 
       linked=await linkAccount(undefined,{validateDailyRunId:validationRunId});
     } catch(error) {
       renderAccountError(app,error,()=>renderAccount({validateDailyRunId:validationRunId,intent,source,mode}));
+      return;
+    }
+    if(linked?.newlyClaimed) {
+      await openSignupNamePrompt({linked,validationRunId,intent,source});
       return;
     }
     const displayNameAttention=Boolean(validationRunId&&linked?.rankingIdentity?.eligible===false&&['username_taken','username_required','name_not_allowed'].includes(linked?.rankingIdentity?.reason));
