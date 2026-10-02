@@ -547,7 +547,7 @@ test('Profile visibility toggles an initially public profile off on the first ta
   await act(async () => { await save.props.onPress(); });
   assert.equal(writes.length, 1);
   assert.equal(writes[0].profilePublic, false);
-  assert.equal(Object.prototype.hasOwnProperty.call(writes[0], 'acceptPublicIdentityTerms'), false);
+  assert.equal(writes[0].acceptPublicIdentityTerms, true);
   await act(async () => root.unmount());
 });
 
