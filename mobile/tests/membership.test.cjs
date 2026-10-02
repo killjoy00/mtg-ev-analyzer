@@ -278,10 +278,9 @@ test('membership browser return does not request or overwrite Account profile en
   let tree;
   await act(async () => { tree = Renderer.create(React.createElement(layout)); });
   const accountRoute = tree.root.findAll((node) => node.type === 'Screen' && node.props.name === 'account')[0];
-  assert.equal(typeof accountRoute.props.options.headerRight, 'function');
-  const entry = accountRoute.props.options.headerRight();
-  entry.props.onPress();
-  assert.equal(h.routes.at(-1), '/membership');
+  assert.equal(accountRoute.props.options.headerRight, undefined, 'Account no longer owns a Membership header action');
+  const accountSource = fs.readFileSync(path.join(process.cwd(), 'app/account.tsx'), 'utf8');
+  assert.match(accountSource, /router\.push\('\/membership'\)/, 'Account home keeps the Membership row as the navigation entry');
   await act(async () => tree.unmount());
 });
 
