@@ -1,1 +1,1 @@
-{"operation":"check-google-play-access","reason":"Verify the narrowed main-and-release-environment Google Play OIDC path and confirm the current Play app-signing fingerprint remains represented by assetlinks.json."}
+{"operation":"check-google-play-access","reason":"Verify owner-completed WIF narrowing on 2026-10-02 and confirm the current Play app-signing fingerprint remains represented by assetlinks.json."}
