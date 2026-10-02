@@ -177,7 +177,7 @@ test('Patreon stays passive while iOS exposes Apple-native Elite billing', async
   const copy = h.text();
   assert.match(copy, /Pack One Elite with Apple/);
   assert.match(copy, /Subscribe with Apple/);
-  assert.match(copy, /Sign in with Patreon connects an existing Patreon account/);
+  assert.match(copy, /Connect Patreon links an existing Patreon account/);
   assert.match(copy, /Patreon membership changes remain managed through Patreon/);
   assert.doesNotMatch(copy, /join Patreon|upgrade with Patreon/i);
   const patreon = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Connect Patreon')[0];
@@ -196,7 +196,7 @@ test('browser cancellation is not reported as successful connection', async (t) 
 test('a failed status read after browser return cannot report a verified connection', async (t) => {
   const h = await mount(t);
   h.browser = async () => { h.handler = (route) => { if (route.endsWith('/status')) throw Error('Read failed after browser'); }; return { type: 'dismiss' }; };
-  await h.press('Sign in with Patreon');
+  await h.press('Connect Patreon');
   assert.match(h.text(), /Read failed after browser/);
   assert.match(h.text(), /Account access not verified/);
 });
@@ -204,7 +204,7 @@ test('a failed status read after browser return cannot report a verified connect
 test('untrusted authorize destinations are blocked before opening the browser', async (t) => {
   const h = await mount(t);
   h.handler = (route) => route.endsWith('/connect') ? { url: authorize().replace('www.patreon.com', 'attacker.example') } : undefined;
-  await h.press('Sign in with Patreon');
+  await h.press('Connect Patreon');
   assert.equal(h.opened.length, 0);
   assert.match(h.text(), /could not be verified/);
 });
@@ -222,7 +222,7 @@ test('a stale status result cannot replace a new account result', async (t) => {
 test('signing out during the browser flow discards its late result', async (t) => {
   const pending = deferred();
   const h = await mount(t, { browser: () => pending.promise });
-  await h.press('Sign in with Patreon');
+  await h.press('Connect Patreon');
   await h.switchAccount({ playerToken: session().playerToken });
   await act(async () => { pending.resolve({ type: 'cancel' }); await drain(); });
   assert.match(h.text(), /Sign in to manage membership/);
@@ -232,7 +232,7 @@ test('signing out during the browser flow discards its late result', async (t) =
 test('duplicate connection taps join no second mutation', async (t) => {
   const pending = deferred();
   const h = await mount(t, { browser: () => pending.promise });
-  const button = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Sign in with Patreon')[0];
+  const button = h.root.root.findAll((node) => node.type === 'Pressable' && node.props.accessibilityLabel === 'Connect Patreon')[0];
   await act(async () => { button.props.onPress(); button.props.onPress(); await drain(); });
   assert.equal(h.posts('connect').length, 1);
   await act(async () => { pending.resolve({ type: 'cancel' }); await drain(); });
@@ -271,7 +271,7 @@ test('malformed and wrong-account payloads are never interpreted as entitlements
 
 test('membership browser return does not request or overwrite Account profile enrichment', async (t) => {
   const h = await mount(t);
-  await h.press('Sign in with Patreon');
+  await h.press('Connect Patreon');
   assert.ok(h.calls.filter(({ route }) => route.includes('/patreon/')).every(({ route }) => route.startsWith('/growth/v1/patreon/mobile/')));
   assert.equal(h.calls.filter(({ route, config }) => route.includes('/apple-subscriptions/') && config.method === 'POST').length, 0);
   const layout = h.compile('app/_layout.tsx').default;
