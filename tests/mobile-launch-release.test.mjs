@@ -184,6 +184,8 @@ test('store workflows cannot publish or use store credentials from arbitrary ref
   const appAvailabilityScript = read('.github/scripts/app-store-app-availability.mjs');
   assert.match(appAvailabilityScript, /targetTerritories=new Set\(\['USA','CAN'\]\)/);
   assert.match(appAvailabilityScript, /availableInNewTerritories:false/);
+  assert.match(appAvailabilityScript, /appAvailabilityV2\?fields%5BappAvailabilities%5D=availableInNewTerritories/);
+  assert.doesNotMatch(appAvailabilityScript, /fields%5Bapps%5D=bundleId,availableInNewTerritories/);
   assert.match(appAvailabilityScript, /\/v1\/territoryAvailabilities\//);
   assert.match(appAvailabilityScript, /available\.join\(','\)==='CAN,USA'/);
   assert.match(appAvailabilityScript, /preOrderEnabled===true/);
