@@ -537,11 +537,12 @@ async function bindProfile(profile, catalog, { own = false, publicKey = null } =
         if(status){status.className='profile-settings-status profile-save-status is-error';status.textContent='Profile not saved. Fix the display name and try again.';}
         return;
       }
-      if(status){status.className='profile-settings-status profile-save-status is-success';status.textContent='Profile saved.';}
-      window.PACK1_LAST_PROFILE=updated;
       track('profile_settings_saved', { public: updated.player?.profile_public || false });
       document.dispatchEvent(new CustomEvent('pack1:profile-updated',{detail:{usernameOwned:updated.player?.username_owned===true}}));
       if(updated.player?.display_name){try{localStorage.setItem('pack1-player-name-v1',updated.player.display_name);}catch{}}
+      await renderProfile(updated,{own:true});
+      const savedStatus=document.querySelector('#profile-save-status');
+      if(savedStatus){savedStatus.className='profile-settings-status profile-save-status is-success';savedStatus.textContent='Profile saved.';}
     } catch (error) {
       if(status){status.className='profile-settings-status profile-save-status is-error';status.textContent=(error?.message||'Profile could not be saved.')+' Your edits are still here.';}
     } finally {
