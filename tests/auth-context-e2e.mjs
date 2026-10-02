@@ -194,18 +194,10 @@ async function captureProductionAuthEvidence() {
   await page.screenshot({path:'artifacts/ui-auth-production-signup-large-text-390.png',fullPage:true});
   await page.evaluate(()=>{document.documentElement.style.fontSize='';});
 
-  signed=true;
-  nextLinkNewlyClaimed=true;
-  nextLinkRankingReason='username_taken';
-  await page.evaluate(()=>{
-    sessionStorage.setItem('pack1-auth-flow-v1',JSON.stringify({intent:null,source:'account',validateDailyRunId:null}));
-  });
-  await page.evaluate(async()=>{
-    const growth=await import('/growth.mjs');
-    await growth.resumeAccountAuth('verify');
-  });
-  await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
-  await page.screenshot({path:'artifacts/ui-auth-production-verification-account-ready-390.png',fullPage:true});
+  // Verification completion remains on the deterministic harness below so the
+  // E2E safety guard never permits the real production growth endpoint. The
+  // harness now loads the production visual layer; the real root shell above
+  // supplies final sign-in/signup appearance evidence.
 }
 
 try {
