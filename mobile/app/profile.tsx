@@ -168,7 +168,7 @@ function PublicProfileRecord({ profileKey, pendingAction, pendingReportReason }:
     } finally {
       if (generation === requestId.current) commit({ ...stateRef.current, refreshing: false });
     }
-  }, [commit, deny, history, profileKey]);
+  }, [commit, deny, history, pendingAction, profileKey]);
 
   useFocusEffect(useCallback(() => {
     void load();
