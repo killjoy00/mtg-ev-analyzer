@@ -333,5 +333,5 @@ test('Restore Purchases verifies the signed Apple transaction before finishing i
 test('Android keeps Apple billing out of the native membership surface', async (t) => {
   const h = await mount(t, { platform: 'android' });
   assert.doesNotMatch(h.text(), /Pack One Elite with Apple|Subscribe with Apple|Restore Purchases/);
-  assert.match(h.text(), /Sign in with Patreon/);
+  assert.match(h.text(), /Connect Patreon/);
 });
