@@ -184,13 +184,13 @@ export default function AccountDeleteScreen() {
           {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
 
           <View style={styles.warning}>
-            <Text style={styles.warningText}>{BILLING_WARNING}</Text>
             {appleActive ? (
               <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void manageSubscription()}
                 style={[styles.secondaryButton, disabled && styles.disabled]}>
                 <Text style={styles.secondaryButtonText}>Manage subscription</Text>
               </Pressable>
             ) : null}
+            <Text style={styles.warningText}>{BILLING_WARNING}</Text>
           </View>
 
           {account.deletion.enabled && account.deletion.method ? (
