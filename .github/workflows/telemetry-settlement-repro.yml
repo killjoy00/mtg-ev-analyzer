@@ -1,4 +1,5 @@
 name: temporary retained telemetry settlement reproduction
+# Focused disposable validation only; no gameplay capacity workload.
 on:
   pull_request:
     types: [synchronize]
