@@ -1,0 +1,6 @@
+{
+  "operation": "dispatch-launch-distributed-once",
+  "reviewed_fix_sha": "9a4f565455985651d36439159e84d6cd6b6227ef",
+  "reason": "Hold the shared preview lock across PR #870 merge, then dispatch the single approved main capacity run.",
+  "provenance": "OpenAI ChatGPT (GPT-5.6 Sol), connected GitHub workspace."
+}
