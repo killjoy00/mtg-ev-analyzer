@@ -12,13 +12,15 @@ try {
   const sample={exposures:40,players:35,answers:32,trophy_match_pct:37.5,average_partial_credit:65,median_seconds:12,p90_seconds:28,timed_answers:29,rerolls:5,likely_abandoned:2,mature_exposures:30,pending:1,partial_0_24:1,partial_25_49:4,partial_50_74:8,partial_75_95:7,runs:9,completed_runs:6};
   const fixture={generated_at:'2026-09-12T12:00:00Z',filters:{start:'2026-09-01',end:'2026-09-12',environment:'all',type:'all',set:'all',version:'all',band:'all',pick:'all'},coverage:{qa_excluded:8,repeats_excluded:3,unobserved_excluded:2},summary:sample,share_funnel:{arrivals:20,visitors:17,starts:12,completions:9,start_pct:60,completion_pct:75},habit_metrics:{cohorts:[{source:'reddit',campaign:'creator_one',cohort_people:10,next_day_mature:8,next_day_returned:3,next_day_immature:2,next_day_rate:37.5,seven_day_mature:5,seven_day_returned:2,seven_day_immature:5,seven_day_rate:40,three_in_seven_mature:6,three_in_seven_reached:2,three_in_seven_immature:4,three_in_seven_rate:33.3,ever_three_in_seven_people:4,ever_three_in_seven_rate:40}],daily_health:[{day:'2026-09-12',people:4}]},groups:['difficulty','pick','round','set','model_disagreement','version'].map((dimension,i)=>({...sample,dimension,label:['hard','9','8','blb','true','first-pack-v2 / trophy-consensus-v2 / support-ratio-v1'][i]})),sets:['blb','powered-cube'],reviews:[{...sample,puzzle_id:'a'.repeat(32),set_id:'blb',pick_number:9,model_disagreement:true}]};
   await page.addInitScript(()=>{localStorage.setItem('pack1-auth-session-v1','synthetic-admin-session');Object.defineProperty(navigator,'clipboard',{configurable:true,value:{writeText:async value=>{window.__copiedText=value;}}});});
-  const requests=[],publishBodies=[],usernameBodies=[],deleteBodies=[];
+  const requests=[],publishBodies=[],usernameBodies=[],deleteBodies=[],adminControlRequests=[];
   const userId='11111111-1111-4111-8111-111111111111';
   let renamedPublicUsername='Test Member',deletionFixture=null,deletionStatusFailure=false;
+  let holdDeletionStatus=false,releaseDeletionStatus=null,failDeleteAfterCommit=false;
   await page.route(/\/health\?quick=1$/,route=>route.fulfill({json:{ok:true,campaign_link_publish_configured:true}}));
   await page.route('**/v1/admin/**',async route=>{
     requests.push(route.request().url());
-    const requestUrl=new URL(route.request().url()),path=requestUrl.pathname;
+    const requestUrl=new URL(route.request().url()),path=requestUrl.pathname,method=route.request().method();
+    if(path.startsWith(`/v1/admin/users/${userId}`))adminControlRequests.push({url:route.request().url(),path,method});
     if(path==='/v1/admin/campaign-links/publish') {
       publishBodies.push(route.request().postDataJSON());
       return route.fulfill({status:202,json:{ok:true,status:'queued',slug:'new-launch',tracked_url:'https://packone.pro/?utm_source=reddit&utm_campaign=launch-week&utm_medium=social',vanity_url:'https://packone.pro/go/new-launch/'}});
@@ -28,13 +30,20 @@ try {
       renamedPublicUsername=String(usernameBodies.at(-1).displayName);
       return route.fulfill({json:{ok:true}});
     }
-    if(path===`/v1/admin/users/${userId}/deletion`&&route.request().method()==='GET') {
+    if(path===`/v1/admin/users/${userId}/deletion`&&method==='GET') {
+      if(holdDeletionStatus)await new Promise(resolve=>{releaseDeletionStatus=resolve;});
       if(deletionStatusFailure)return route.fulfill({status:503,json:{error:'Synthetic deletion status outage'}});
       return route.fulfill({json:{ok:true,deletion:deletionFixture}});
     }
-    if(path===`/v1/admin/users/${userId}/delete`&&route.request().method()==='POST') {
+    if(path===`/v1/admin/users/${userId}/delete`&&method==='POST') {
       deleteBodies.push(route.request().postDataJSON());
       deletionFixture={operation_id:'44444444-4444-4444-8444-444444444444',state:'pending',initiation_source:'admin',initiated_by_admin_auth_user_id:'22222222-2222-4222-8222-222222222222',target_was_admin:false,attempts:0,error_code:null,message:'Deletion has started and is continuing.'};
+      if(failDeleteAfterCommit)return route.fulfill({status:500,json:{
+        error:'Request failed. Please try again.',
+        deletionCommitted:true,
+        operationId:deletionFixture.operation_id,
+        deletion:deletionFixture,
+      }});
       return route.fulfill({status:202,json:{ok:true,deletion:'accepted',operationId:deletionFixture.operation_id,operation:deletionFixture}});
     }
     if(path===`/v1/admin/users/${userId}`)return route.fulfill({json:{user:{id:userId,name:'Test Member',email:'member@example.com',email_verified:true,created_at:'2026-09-01T12:00:00Z',last_active:'2026-09-18T18:00:00Z',linked:true,profile_name:renamedPublicUsername,username_owned:true,profile_public:false,is_admin:false,is_self:false,banned:false},stats:{runs:12,completed_runs:10,dailies:4,practice_runs:8,cube_runs:2,custom_runs:1,average_score:84.5,best_score:100},providers:[{provider:'patreon',membership_status:'active_patron',currently_entitled_amount_cents:500,is_free_trial:false,is_gifted:false,last_synced_at:'2026-09-18T18:00:00Z'}],entitlements:[{capability:'custom_corpus',provider:'patreon',granted_at:'2026-09-10T00:00:00Z',expires_at:null,revoked_at:null,active:true}],recent_runs:[{environment:'mixed',run_type:'Practice',answered:8,total:8,score:86,updated_at:'2026-09-18T18:00:00Z'}],recent_events:[{event_name:'game_started',event_props:{mode:'draft_run',set_id:'mixed'},created_at:'2026-09-18T17:58:00Z'}],moderation_actions:[]}});
@@ -99,11 +108,27 @@ try {
   assert.ok((await page.locator('#user-detail').innerText()).includes('game_started'));
   assert.equal((await page.locator('#user-detail').innerText()).includes('player_id'),false);
 
-  // Growth deletion-status outages must not block the rest of Admin -> Users detail.
+  const growthBase=await page.evaluate(()=>window.PACK1_API.growthUrl);
+
+  // A slow/hanging Growth status lookup must not block Draft Run user detail.
+  await page.getByRole('button',{name:'Close'}).click();
+  holdDeletionStatus=true;
+  await page.getByRole('button',{name:/Test Member/}).click();
+  await page.locator('#user-detail').getByRole('heading',{name:'Test Member'}).waitFor({timeout:3000});
+  await page.getByText('Checking deletion status…',{exact:false}).waitFor({timeout:3000});
+  assert.equal(await page.getByRole('button',{name:'Save username'}).isDisabled(),false);
+  assert.equal(typeof releaseDeletionStatus,'function','the intended deletion-status mock must hold the actual Growth request');
+  const heldStatusRequest=adminControlRequests.find(item=>item.path===`/v1/admin/users/${userId}/deletion`&&item.method==='GET');
+  assert.ok(heldStatusRequest,'captured the actual deletion-status request');
+  assert.ok(heldStatusRequest.url.startsWith(growthBase),heldStatusRequest.url);
+  releaseDeletionStatus();releaseDeletionStatus=null;holdDeletionStatus=false;
+  await page.getByText('Type DELETE to confirm',{exact:true}).waitFor();
+
+  // An immediate Growth failure also leaves the rest of the detail usable.
   await page.getByRole('button',{name:'Close'}).click();
   deletionStatusFailure=true;
   await page.getByRole('button',{name:/Test Member/}).click();
-  await page.locator('#user-detail').getByRole('heading',{name:'Test Member'}).waitFor();
+  await page.locator('#user-detail').getByRole('heading',{name:'Test Member'}).waitFor({timeout:3000});
   await page.getByText('Deletion status is temporarily unavailable.',{exact:false}).waitFor();
   assert.equal(await page.getByRole('button',{name:'Save username'}).isDisabled(),false);
   deletionStatusFailure=false;
@@ -113,18 +138,38 @@ try {
   const renameForm=page.locator('#change-username-form');
   await renameForm.getByLabel('Public username').fill('Renamed Member');
   await renameForm.getByLabel('Reason (optional)').fill('support request');
+  const oldDetailBody=await page.locator('#user-detail-body').elementHandle();
+  const renameRequest=page.waitForRequest(request=>new URL(request.url()).pathname===`/v1/admin/users/${userId}/username`&&request.method()==='PATCH');
   await renameForm.getByRole('button',{name:'Save username'}).click();
+  const actualRenameRequest=await renameRequest;
+  assert.ok(actualRenameRequest.url().includes('/v1/admin/users/'));
+  await page.waitForFunction(node=>!node.isConnected,oldDetailBody);
   await page.locator('#change-username-form input[name="displayName"]').waitFor();
   assert.equal(await page.locator('#change-username-form input[name="displayName"]').inputValue(),'Renamed Member');
   assert.deepEqual(usernameBodies,[{displayName:'Renamed Member',reason:'support request'}]);
+  assert.ok(adminControlRequests.some(item=>item.path===`/v1/admin/users/${userId}/username`&&item.method==='PATCH'));
 
+  // Simulate an interrupted initiating request after the durable deletion tombstone committed.
+  // Even with status lookup unavailable, the response's bounded operation state must keep deletion locked.
+  failDeleteAfterCommit=true;deletionStatusFailure=true;
   const deleteForm=page.locator('#delete-account-form');
   await deleteForm.getByLabel('Type DELETE to confirm').fill('DELETE');
   await deleteForm.getByLabel('Reason (optional)').fill('requested by account owner');
+  const deleteRequest=page.waitForRequest(request=>new URL(request.url()).pathname===`/v1/admin/users/${userId}/delete`&&request.method()==='POST');
   await deleteForm.getByRole('button',{name:'Delete account'}).click();
+  const actualDeleteRequest=await deleteRequest;
+  assert.ok(actualDeleteRequest.url().startsWith(growthBase),actualDeleteRequest.url());
   await page.locator('#deletion-status').getByText('Deletion has started and is continuing.',{exact:false}).waitFor();
+  await page.getByText('interrupted after permanent deletion committed',{exact:false}).waitFor();
   assert.deepEqual(deleteBodies,[{confirm:'DELETE',reason:'requested by account owner',acknowledgeAdmin:false}]);
+  assert.equal(await page.locator('#delete-account-form').count(),0,'committed deletion must never re-enable delete controls');
   assert.equal(await page.getByRole('button',{name:'Save username'}).isDisabled(),true);
+  assert.ok(adminControlRequests.some(item=>item.path===`/v1/admin/users/${userId}/delete`&&item.method==='POST'));
+
+  // Status recovery remains available after the interrupted request.
+  failDeleteAfterCommit=false;deletionStatusFailure=false;
+  await page.getByRole('button',{name:'Refresh deletion status'}).click();
+  await page.locator('#deletion-status').getByText('Deletion has started and is continuing.',{exact:false}).waitFor();
 
   for(const width of [320,390,1440]){await page.setViewportSize({width,height:844});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));await page.screenshot({path:`artifacts/ui-users-${width}.png`,fullPage:true});}
   await page.getByRole('button',{name:'Close'}).click();
