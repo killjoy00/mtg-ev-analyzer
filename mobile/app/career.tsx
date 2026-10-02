@@ -230,7 +230,7 @@ export default function CareerScreen() {
         </> : state.status === 'signed-out' ? <>
           <Text style={styles.eyebrow}>MY PACK ONE</Text>
           <Text style={styles.title}>Welcome to My Pack One.</Text>
-          <Text style={styles.body}>Your scores, streaks, achievements, and history will appear here after you play. Empty data is not a zero score.</Text>
+          <Text style={styles.body}>Play your first Daily to start your record. Your scores, streaks, achievements, and history will appear here as you play.</Text>
           <Pressable accessibilityRole="button" accessibilityLabel="Play Daily" onPress={() => router.push('/')} style={styles.primaryButton}>
             <Text style={styles.primaryButtonText}>Play Daily</Text>
           </Pressable>
