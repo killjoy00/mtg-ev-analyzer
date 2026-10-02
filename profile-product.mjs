@@ -275,12 +275,12 @@ function profileMarkup(profile, catalog, { own = false, publicKey = null, accoun
   const recent = (profile.recent || []).slice(0, 20);
   const publicUrl = profile.player.profile_public && profile.player.profile_key ? `${location.origin}${location.pathname}?profile=${encodeURIComponent(profile.player.profile_key)}` : '';
   const heroActions = own && !profile.player.claimed
-    ? '<button type="button" class="button primary" id="profile-claim-account">Sign In</button><button type="button" class="button secondary" id="profile-home">Back to game</button>'
-    : `<button type="button" class="button primary" id="profile-share">${profile.player.profile_public ? 'Share profile' : 'Share my record'}</button>${own ? '<a class="button secondary" href="#profile-account">Account settings</a><button type="button" class="button secondary" id="profile-home">Back to game</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}`;
+    ? '<button type="button" class="button primary" id="profile-claim-account">Sign In</button><button type="button" class="button secondary" id="profile-home">Dailies</button>'
+    : `<button type="button" class="button primary" id="profile-share">${profile.player.profile_public ? 'Share profile' : 'Share my record'}</button>${own ? '<a class="button secondary" href="#profile-account">Account settings</a><button type="button" class="button secondary" id="profile-home">Dailies</button>' : '<a class="button secondary" href="./">Play Pack One</a>'}`;
 
   return `<section class="player-profile-page growth-page" data-profile-key="${esc(publicKey || profile.player.profile_key || '')}">
     <header class="profile-hero">
-      <div><p class="eyebrow">${own ? 'Account' : 'Player Profile'}</p><h1 class="profile-player-name">${esc(profile.player.display_name)}${showcased?achievementMark(showcased.id):''}</h1><p>${own ? 'Your Pack One career, achievements, and account in one place.' : 'A public Pack One career across the Limited archive.'}</p></div>
+      <div><p class="eyebrow">${own ? 'My Pack One' : 'Player Profile'}</p><h1 class="profile-player-name">${esc(profile.player.display_name)}${showcased?achievementMark(showcased.id):''}</h1><p>${own ? 'Your Pack One career, achievements, and account in one place.' : 'A public Pack One career across the Limited archive.'}</p></div>
       <div class="profile-hero-actions">
         ${heroActions}
       </div>
