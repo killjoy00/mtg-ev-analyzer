@@ -25,7 +25,7 @@ const recovery='b'.repeat(64);
 const deletionEnv={PACK1_RATE_LIMIT_SECRET:'h'.repeat(64)};
 const verificationAuth=crypto.randomUUID();
 const verificationRaceAuth=crypto.randomUUID();
-let adminActor=null,adminTarget=null;
+let adminActor=null,adminTarget=null,adminRaceTarget=null;
 
 async function deletionTrigger(name='pack1-account-deletion-maintenance',status=[200,503]) {
   const invocationId='qa-delete-trigger-'+crypto.randomUUID();
@@ -107,6 +107,42 @@ try {
   const persistedAdmin=await loadDeletionForAuth(query,adminTarget);
   assert.equal(persistedAdmin.operation_id,adminOperation.operation_id);
   assert.equal(persistedAdmin.initiated_by_admin_auth_user_id,adminActor);
+
+  // Admin and self-service initiation share the same per-Auth advisory lock.
+  // Whichever request wins may define the original attribution, but both callers
+  // must observe the same single durable operation.
+  adminRaceTarget=(await query(`SELECT u.id
+    FROM neon_auth."user" u
+    WHERE u.id<>$1::uuid AND u.id<>$2::uuid
+      AND NOT EXISTS(SELECT 1 FROM pack1_admins a WHERE a.auth_user_id=u.id)
+      AND NOT EXISTS(SELECT 1 FROM account_deletion_operations d WHERE d.auth_user_id=u.id)
+    ORDER BY u."createdAt",u.id
+    LIMIT 1`,[adminActor,adminTarget])).rows[0]?.id;
+  assert.ok(adminRaceTarget,'isolated branch needs a non-admin Auth identity for concurrent deletion initiation');
+  const [selfStart,adminStart]=await Promise.all([
+    beginDeletion(query,{authUserId:adminRaceTarget}),
+    beginAdminDeletion(query,{
+      authUserId:adminRaceTarget,
+      adminAuthUserId:adminActor,
+      reason:'QA concurrent admin deletion',
+      acknowledgeAdmin:false,
+    }),
+  ]);
+  assert.equal(selfStart.operation_id,adminStart.operation_id,'admin/self-service race must converge on one operation');
+  assert.equal(Number((await query(
+    'SELECT count(*)::int n FROM account_deletion_operations WHERE auth_user_id=$1::uuid',
+    [adminRaceTarget],
+  )).rows[0].n),1);
+  const racedOperation=await loadDeletionForAuth(query,adminRaceTarget);
+  assert.equal(racedOperation.operation_id,selfStart.operation_id);
+  assert.ok(['self_service','admin'].includes(racedOperation.initiation_source));
+  if(racedOperation.initiation_source==='admin') {
+    assert.equal(racedOperation.initiated_by_admin_auth_user_id,adminActor);
+    assert.equal(racedOperation.deletion_reason,'QA concurrent admin deletion');
+  } else {
+    assert.equal(racedOperation.initiated_by_admin_auth_user_id,null);
+    assert.equal(racedOperation.deletion_reason,null);
+  }
 
   // The maintenance sweep must delete only expired verification rows. The
   // unexpired fixture is intentionally left for disposal with the CI branch.
@@ -269,6 +305,7 @@ try {
   await query('DELETE FROM share_challenges WHERE player_id=$1::uuid',[player]);
   await query('DELETE FROM account_deletion_verifications WHERE auth_user_id=$1::uuid OR auth_user_id=$2::uuid',[verificationAuth,verificationRaceAuth]);
   if(adminTarget)await query('DELETE FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[adminTarget]).catch(()=>{});
+  if(adminRaceTarget)await query('DELETE FROM account_deletion_operations WHERE auth_user_id=$1::uuid',[adminRaceTarget]).catch(()=>{});
   if(adminActor||adminTarget)await query('DELETE FROM pack1_admins WHERE auth_user_id=$1::uuid OR auth_user_id=$2::uuid',[adminActor,adminTarget]).catch(()=>{});
   await query('DELETE FROM players WHERE id=$1::uuid OR id=$2::uuid',[other,player]);
 }
