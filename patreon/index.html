@@ -34,59 +34,43 @@
   <section class="landing-hero">
     <p class="kicker">Membership</p>
     <h1>Pack One Elite</h1>
-    <p class="deck">Elite is for players who want more ways to practice. Join or upgrade on Patreon, then connect that Patreon account to Pack One so the site can verify your Elite membership and unlock the extra practice modes.</p>
-    <div class="quick-start-action" style="margin-top:24px">
-      <a class="button primary" data-patreon-offsite href="https://www.patreon.com/c/PackOne" rel="noopener noreferrer">View Elite on Patreon</a>
-      <a class="button secondary" href="#connect">Already a member? Connect Patreon</a>
-    </div>
+    <p class="deck">See what this Pack One account can use now, then take the one next step that applies.</p>
   </section>
+
+  <aside class="article-cta" id="connect" data-patreon-connect-card data-state="loading" aria-labelledby="patreon-current-title">
+    <p class="kicker">Current access</p>
+    <h2 id="patreon-current-title" data-patreon-title>Checking this account…</h2>
+    <p data-patreon-status role="status">Checking your Pack One and Patreon status…</p>
+    <div class="account-actions">
+      <button class="button primary" type="button" data-patreon-connect disabled>Checking…</button>
+      <a class="button secondary" data-patreon-offsite href="https://www.patreon.com/c/PackOne" rel="noopener noreferrer" hidden>View Patreon membership</a>
+    </div>
+  </aside>
 
   <div class="editorial-section-head">
     <p class="kicker">Elite benefits</p>
-    <h2>More practice, on your terms.</h2>
-    <p>The Daily Challenges stay fixed for everyone. Elite adds more ways to get reps between them.</p>
+    <h2>More practice between Dailies.</h2>
+    <p>Elite adds unlimited Powered Cube practice and lets you choose regular sets for custom practice. Daily Challenges stay the same for everyone.</p>
   </div>
   <section class="learn-directory" aria-label="Pack One Elite benefits">
     <article class="content-card">
-      <p class="kicker">Powered practice</p>
-      <h2>Unlimited Powered Cube</h2>
-      <p>Run eight-decision practice sessions from real Powered Cube trophy drafts whenever you want another set of decisions.</p>
+      <p class="kicker">Powered Cube</p>
+      <h2>Practice whenever you want</h2>
+      <p>Play eight-decision sessions from real Powered Cube trophy drafts.</p>
       <a href="/?game=draft-run&set=powered-cube">See Powered Cube practice</a>
     </article>
     <article class="content-card">
-      <p class="kicker">Custom practice</p>
-      <h2>Choose the sets you want</h2>
-      <p>Build random eight-decision Draft Runs from the regular sets you want to work on instead of taking whatever comes next.</p>
+      <p class="kicker">Custom sets</p>
+      <h2>Choose what to work on</h2>
+      <p>Build practice runs from the regular sets you want instead of taking whatever comes next.</p>
       <a href="/?game=draft-run&custom=1">See custom-set practice</a>
     </article>
   </section>
 
-  <div class="editorial-section-head">
-    <p class="kicker">Activation</p>
-    <h2>Patreon handles the membership. Pack One handles the unlock.</h2>
-    <p>Joining Patreon and connecting Patreon to Pack One are two separate steps. The connection is what lets Pack One verify the Elite tier on your account.</p>
-  </div>
-  <section class="quick-start" aria-label="How to activate Pack One Elite">
-    <article><span>01</span><strong>Use a free Pack One account</strong><p>Elite benefits attach to your Pack One account, so sign in or create one first.</p></article>
-    <article><span>02</span><strong>Join or upgrade on Patreon</strong><p>Choose the Elite membership on Patreon. Patreon remains the place where membership and billing are managed.</p></article>
-    <article><span>03</span><strong>Connect Patreon</strong><p>Authorize the Patreon account you used for Elite. Pack One checks the connected membership and unlocks premium practice when Elite is active.</p></article>
-  </section>
-
-  <aside class="article-cta" id="connect" data-patreon-connect-card>
-    <p class="kicker">Connect membership</p>
-    <h2>Link Patreon to this Pack One account.</h2>
-    <p data-patreon-status role="status">Checking your Pack One and Patreon status…</p>
-    <div class="account-actions">
-      <button class="button primary" type="button" data-patreon-connect>Connect Patreon</button>
-      <a class="button secondary" data-patreon-offsite href="https://www.patreon.com/c/PackOne" rel="noopener noreferrer">Open Patreon membership</a>
-    </div>
-  </aside>
-
-  <aside class="article-cta">
-    <p class="kicker">Already Elite?</p>
-    <h2>The connection is the key step.</h2>
-    <p>If Patreon shows that you are Elite but Pack One still looks free, do not buy another membership. Sign in to the Pack One account you want to use, connect or refresh Patreon here, and let Pack One verify the membership.</p>
-  </aside>
+  <details class="article-cta patreon-troubleshooting">
+    <summary><strong>Having trouble with Patreon access?</strong></summary>
+    <p>Do not buy another membership just because Pack One has not confirmed access yet. Sign in to the Pack One account you want to use, connect or refresh the same Patreon account, and check the status again. Membership and billing changes are still managed on Patreon.</p>
+  </details>
 </main>
 
 <footer class="site-footer">
@@ -94,6 +78,6 @@
   <nav aria-label="Footer"><a href="/about/">About</a><a href="/contact/">Contact</a><a href="/privacy/">Privacy</a><a href="/terms/">Terms</a></nav>
 </footer>
 <script type="module" src="/site-nav.mjs"></script>
-<script type="module" src="/patreon-page.mjs?v=2"></script>
+<script type="module" src="/patreon-page.mjs?v=3"></script>
 </body>
 </html>
