@@ -52,6 +52,19 @@ jobs:
           CI: '1'
           PACKONE_BUILD_PROFILE: production
         run: npx expo prebuild --platform android --clean
+      - name: Compute unsigned Gradle cache key
+        id: gradle-cache
+        env:
+          PACKONE_GRADLE_CACHE_JAVA: '17'
+        run: node ./scripts/gradle-cache-key.mjs
+      - name: Restore main-seeded unsigned Gradle cache
+        uses: actions/cache/restore@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            mobile/node_modules/**/.cxx
+          key: ${{ steps.gradle-cache.outputs.key }}
       - name: Verify native Android version code
         shell: bash
         run: |
@@ -61,7 +74,7 @@ jobs:
           grep -Fq "versionName \"$expected_version_name\"" android/app/build.gradle || grep -Fq "versionName '$expected_version_name'" android/app/build.gradle
       - name: Build non-publishing PR smoke bundle
         working-directory: mobile/android
-        run: ./gradlew :app:bundleRelease --no-daemon
+        run: ./gradlew :app:bundleRelease --no-daemon --build-cache
       - name: Verify PR smoke bundle exists
         working-directory: mobile/android
         run: test -s app/build/outputs/bundle/release/app-release.aab
