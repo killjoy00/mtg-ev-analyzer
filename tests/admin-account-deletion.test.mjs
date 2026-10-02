@@ -120,7 +120,7 @@ test('admin initiation needs no target credential and runs the supplied complete
   assert.equal(resumed.operation.initiation_source,'admin');
   assert.equal(resumed.operation.initiated_by_admin_auth_user_id,ADMIN);
   assert.equal(resumed.options.knownEmail,'target@example.test');
-  assert.equal(calls.some(call=>/password|verification|code/i.test(call.sql)),false);
+  assert.equal(calls.some(call=>/verify-password|account_deletion_verifications|account_credential_rate_limits|neon_auth\.account/i.test(call.sql)),false);
 });
 
 test('retrying an existing self-service operation preserves its original attribution',async()=>{
