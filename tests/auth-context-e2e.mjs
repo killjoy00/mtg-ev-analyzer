@@ -135,9 +135,13 @@ try {
   await fresh({source:'nav',width:390});
   await page.locator('#account-signin').waitFor();
   assert.equal(await page.locator('#account-signup').count(),0);
-  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Continue with Google');
+  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Sign in with Google');
+  assert.equal((await page.locator('#account-apple').textContent())?.trim(),'Sign in with Apple');
   assert.equal((await page.locator('.account-page h1').textContent())?.trim(),'Sign In');
-  assert.match((await page.locator('.account-new-user').textContent())||'',/New to Pack One\?\s*Create account/i);
+  assert.match((await page.locator('.account-mode-toggle').textContent())||'',/New to Pack One\?\s*Create account/i);
+  assert.equal(await page.locator('.account-auth-card #account-signin').count(),1);
+  assert.equal(await page.locator('.account-auth-card .account-social').count(),1);
+  assert.equal(await page.locator('.account-creation-consent').count(),0);
   await page.screenshot({path:'artifacts/ui-auth-signin-390.png',fullPage:true});
 
   await page.setViewportSize({width:1440,height:900});
@@ -147,6 +151,11 @@ try {
   await page.locator('#account-mode-toggle').click();
   await page.locator('#account-signup').waitFor();
   assert.equal(await page.locator('#account-signin').count(),0);
+  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Create with Google');
+  assert.equal((await page.locator('#account-apple').textContent())?.trim(),'Create with Apple');
+  assert.equal((await page.locator('.account-creation-consent').textContent())?.trim(),'By creating an account, you agree to the Pack One Terms.');
+  assert.equal(await page.locator('.account-creation-consent a[href="https://packone.pro/terms/"]').count(),1);
+  assert.equal(await page.locator('.account-creation-consent a').count(),1);
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'artifacts/ui-auth-signup-390.png',fullPage:true});
   await page.setViewportSize({width:1440,height:900});
@@ -255,6 +264,8 @@ try {
   await page.evaluate(async()=>{const growth=await import('/growth.mjs');await growth.resumeAccountAuth('verify');});
   await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
   await page.getByText('Choose a different display name. That one is already taken.',{exact:true}).waitFor();
+  assert.equal(await page.locator('#account-signin').count(),0,'normal verification completion must not require another sign-in');
+  await page.screenshot({path:'artifacts/ui-auth-verification-account-ready-390.png',fullPage:true});
   await page.getByRole('button',{name:'Skip for now',exact:true}).click();
 
   // Email submit disables while pending and restores/finishes without double-submit.
