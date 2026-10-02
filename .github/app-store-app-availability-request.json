@@ -1,0 +1,8 @@
+{
+  "operation": "verify-app-store-availability",
+  "reason": "Verify the owner-completed first public App Store availability setup is exactly United States and Canada only, with automatic future-territory availability disabled and no pre-order state. Read-only verification only; do not modify availability, submit review, or release the app.",
+  "territories": [
+    "USA",
+    "CAN"
+  ]
+}
