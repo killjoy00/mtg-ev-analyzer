@@ -27,10 +27,46 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  precheck:
+    name: backend schema gate precheck
+    runs-on: ubuntu-latest
+    outputs:
+      needs_neon: ${{ steps.scope.outputs.needs_neon }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Verify backend scope classifier
+        run: node --test tests/backend-gate-scope.test.mjs
+      - name: Detect Neon integration scope
+        id: scope
+        shell: bash
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -euo pipefail
+          if ! git fetch --no-tags origin main:refs/remotes/origin/main; then
+            echo '::warning::Unable to fetch origin/main; conservatively requiring Neon integration.'
+            echo 'needs_neon=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! stack_base_sha="$(git merge-base origin/main "$HEAD_SHA")"; then
+            echo '::warning::Unable to compute stack merge base; conservatively requiring Neon integration.'
+            echo 'needs_neon=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          mapfile -t changed_files < <(git diff --name-only "$stack_base_sha" "$HEAD_SHA")
+          printf 'Stack changes from %s to %s:\n' "$stack_base_sha" "$HEAD_SHA"
+          node scripts/backend-gate-scope.mjs "${changed_files[@]}"
+
   backend-gate:
+    needs: precheck
     # Fork PRs do not receive repository secrets. Keep them skipped rather than
     # failing or ever pointing the fixture suites at the production branch.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: needs.precheck.outputs.needs_neon == 'true' && github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-latest
     timeout-minutes: 40
     steps:
