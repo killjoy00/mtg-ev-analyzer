@@ -131,6 +131,9 @@ try {
   await page.waitForURL(base+'/patreon/');
   assert.equal(page.url(),base+'/patreon/');
   await page.getByRole('heading',{name:'Pack One Elite',exact:true}).waitFor();
+  await page.getByRole('heading',{name:'Connect Patreon to activate Elite',exact:true}).waitFor();
+  assert.equal((await page.locator('[data-patreon-connect]').textContent())?.trim(),'Connect Patreon');
+  assert.equal(await page.locator('[data-patreon-connect-card] .button.primary').count(),1,'Patreon access card shows one primary next action');
   assert.equal(await page.locator('[data-patreon-offsite]').first().getAttribute('href'),'https://www.patreon.com/c/PackOne');
 
   // A signed-in free member keeps the Daily home focused and upgrades from Practice.
