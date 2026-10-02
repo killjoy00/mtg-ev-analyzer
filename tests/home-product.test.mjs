@@ -100,11 +100,11 @@ test('all three complete hands signed-in players to Practice or guests to accoun
 test('linked accounts with unresolved usernames are warned before Dailies',()=>{
  const profile={player:{claimed:true},capabilities:['account'],ranking_identity:{eligible:false,reason:'username_taken'},daily_history:[]};
  const html=dailyHomeMarkup(profile,day);
- assert.match(html,/Choose a unique username before playing a Daily/);
+ assert.match(html,/Choose a different display name\. That one is already taken/);
  assert.match(html,/Daily results will not appear on the leaderboard/);
  assert.match(html,/data-home-username/);
  const owned=dailyHomeMarkup({...profile,ranking_identity:{eligible:true,reason:null}},day);
- assert.doesNotMatch(owned,/data-home-username|Username needs attention|Choose a unique username before playing a Daily/);
+ assert.doesNotMatch(owned,/data-home-username|Display name needs attention|Choose a different display name/);
 });
 
 test('home runtime isolates historical code and lazily loads profiles',()=>{
