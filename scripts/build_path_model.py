@@ -14,6 +14,11 @@ this model's counts.
 
 from __future__ import annotations
 
+try:
+    from model_training import parser_training_arguments, resolve_training_arguments
+except ModuleNotFoundError:
+    from scripts.model_training import parser_training_arguments, resolve_training_arguments
+
 import argparse
 import csv
 import json
@@ -157,9 +162,9 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--source-date", required=True)
     parser.add_argument("--minimum-games", type=int, default=100)
     parser.add_argument("--top-fraction", type=float, default=0.15)
-    parser.add_argument("--max-training-drafts", type=int, default=8000)
+    parser_training_arguments(parser, 8000)
     parser.add_argument("--max-bytes", type=int, default=4_000_000)
-    return parser.parse_args(argv)
+    return resolve_training_arguments(parser.parse_args(argv), 8000)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:
@@ -194,6 +199,16 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         len(held_out),
         cutoff,
     )
+    # The path architecture has its own unchanged identity. Record the parent
+    # consensus generation and the source/replay exclusion population separately.
+    try:
+        from model_training import V5_MODEL, ALL_QUALIFIED
+    except ModuleNotFoundError:
+        from scripts.model_training import V5_MODEL, ALL_QUALIFIED
+    if args.model_version == V5_MODEL:
+        model['context_model_version'] = args.model_version
+        model['training'].update(training_mode=ALL_QUALIFIED, training_cap=None,
+            qualified_training_drafts=len(strong_ids), excluded_replay_drafts=len(held_out))
     encoded = json.dumps(model, separators=(",", ":")) + "\n"
     size = len(encoded.encode("utf-8"))
     if size > args.max_bytes:

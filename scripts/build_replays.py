@@ -28,6 +28,11 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
+try:
+    from model_training import V5_MODEL, ALL_QUALIFIED, current_model_version, training_cap, parser_training_arguments, resolve_training_arguments
+except ModuleNotFoundError:
+    from scripts.model_training import V5_MODEL, ALL_QUALIFIED, current_model_version, training_cap, parser_training_arguments, resolve_training_arguments
+
 SCHEMA_VERSION = 2
 # v3 is the immutable model identity of the currently published corpus and is
 # retained for frozen historical reconstruction. v4 changes no scoring formula;
@@ -35,6 +40,7 @@ SCHEMA_VERSION = 2
 # fold's explicit training complement before any aggregation.
 MODEL_VERSION = "strong-player-colour-stage-v3"
 ISOLATED_MODEL_VERSION = "strong-player-colour-stage-v4"
+UNCAPPED_MODEL_VERSION = V5_MODEL
 # Weight on the colour-commitment shift, frozen with the rest of the
 # specification in docs/MODEL-EVALUATION.md and validated on six held-out sets.
 FIT_STRENGTH = 0.75
@@ -707,7 +713,10 @@ def build(args: argparse.Namespace) -> dict:
                          "derived from the same training complement as the pick model.")
     input_path = Path(args.input)
     skills, fieldnames = scan_draft_skill(input_path)
-    strong_ids, cutoff, experienced_count = select_strong_drafts(skills, args.minimum_games, args.top_fraction, args.max_training_drafts)
+    model_version = getattr(args, 'model_version', current_model_version())
+    cap = training_cap(model_version, args.max_training_drafts, 8000)
+    strong_ids, cutoff, experienced_count = select_strong_drafts(skills, args.minimum_games, args.top_fraction, cap)
+    qualified_ids, _, _ = select_strong_drafts(skills, args.minimum_games, args.top_fraction, None)
     if len(strong_ids) < 2:
         raise ValueError("At least two strong-player drafts are required for holdout grading.")
 
@@ -751,9 +760,12 @@ def build(args: argparse.Namespace) -> dict:
             "experienced_drafts": experienced_count,
             "training_drafts": len(strong_ids),
             "training_picks": parsed_examples,
+            "qualified_training_drafts": len(qualified_ids),
+            "training_cap": cap,
+            "training_mode": ALL_QUALIFIED if cap is None else 'stable-hash-capped',
         },
         "model": {
-            "model_version": ISOLATED_MODEL_VERSION,
+            "model_version": model_version,
             "holdout": f"{folds}-fold by draft_id",
             "probabilities_are_calibrated": False,
             "description": "Hierarchical strong-player pick tendency, adjusted by a stage-matched card/pool co-pick lift and a stage-matched colour-commitment shift; normalized within each pack.",
@@ -827,7 +839,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--source-date", required=True)
     parser.add_argument("--minimum-games", type=int, default=100)
     parser.add_argument("--top-fraction", type=float, default=0.15)
-    parser.add_argument("--max-training-drafts", type=int, default=8000)
+    parser_training_arguments(parser, 8000)
     parser.add_argument("--max-output-drafts", type=int, default=300)
     parser.add_argument("--minimum-picks", type=int, default=30)
     parser.add_argument("--folds", type=int, default=5)
@@ -841,7 +853,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="legacy compatibility flag. Fold-isolated builds "
                              "reject a shared fit; pass --game-data so every fold "
                              "derives its own colour statistics.")
-    return parser.parse_args(argv)
+    return resolve_training_arguments(parser.parse_args(argv), 8000)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

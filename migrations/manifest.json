@@ -51,7 +51,8 @@
     "0045_batched_practice_selector.sql",
     "0045_apple_subscriptions.sql",
     "0046_public_identity_safety.sql",
-    "0047_admin_user_account_controls.sql"
+    "0047_admin_user_account_controls.sql",
+    "0048_uncapped_v5_components.sql"
   ],
   "same_prefix_order": {
     "0037": [
@@ -125,7 +126,8 @@
         "0024_serving_quality_lookup.sql",
         "0025_traditional_phase2_components.sql",
         "0026_provider_accounts.sql",
-        "0032_traditional_v4_components.sql"
+        "0032_traditional_v4_components.sql",
+        "0048_uncapped_v5_components.sql"
       ]
     },
     "secure-auth-release": {
@@ -192,7 +194,8 @@
         "0044_snapshot_scoped_puzzle_uniqueness.sql",
         "0045_apple_subscriptions.sql",
         "0046_public_identity_safety.sql",
-        "0047_admin_user_account_controls.sql"
+        "0047_admin_user_account_controls.sql",
+        "0048_uncapped_v5_components.sql"
       ]
     },
     "launch-load": {

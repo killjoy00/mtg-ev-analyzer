@@ -54,6 +54,7 @@ from import_all_trophies import (
 )
 from traditional_puzzles import THRESHOLDS, compare, record
 from set_policy import corpus_version
+from model_training import VERSIONS
 from run_import_all_trophies import resilient_request
 from fetch_card_metadata import compact_card, aliases
 
@@ -72,8 +73,8 @@ EXCLUSIONS = {
     "vow": "No public TradDraft draft archive in the original Phase 1 source study.",
     "stx": "Traditional archive lacked the current skill-bucket evidence required by the frozen study and the environment is retired.",
 }
-PARENT = corpus_version()
-MODEL = ISOLATED_MODEL_VERSION
+PARENT = VERSIONS['v4']['corpus_version']
+MODEL = 'strong-player-colour-stage-v4'
 _HISTORY_PIN = json.loads((ROOT / "research/traditional-puzzle-v3-inputs.json").read_text())
 PREVIOUS_PARENT = _HISTORY_PIN["blb"]["corpus_version"]
 PREVIOUS_MODEL = _HISTORY_PIN["blb"]["model_version"]
@@ -292,7 +293,7 @@ def build_v4_models(sid: str, draft: Path, game: Path, pin: dict):
         if did not in conflicts and item.get("rate") is not None and item.get("games") is not None
     }
     training, calculated_cutoff, experienced = select_strong_drafts(
-        skills, 100, .15, int(pin["training_cap"])
+        skills, 100, .15, int(pin["training_cap"]) if pin["training_cap"] is not None else None
     )
     if len(training) != int(pin["training_drafts"]):
         raise ValueError(f"{sid}: production training cohort count changed")

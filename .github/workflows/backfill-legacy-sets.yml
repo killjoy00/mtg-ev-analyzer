@@ -61,7 +61,6 @@ jobs:
           --format PremierDraft
           --minimum-games 100
           --top-fraction 0.15
-          --max-training-drafts 5000
           --max-output-drafts 300
           --minimum-replays 100
           --minimum-picks 30

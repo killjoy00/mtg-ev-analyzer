@@ -26,6 +26,11 @@ cohort definition.
 
 from __future__ import annotations
 
+try:
+    from model_training import parser_training_arguments, resolve_training_arguments
+except ModuleNotFoundError:
+    from scripts.model_training import parser_training_arguments, resolve_training_arguments
+
 import argparse
 import csv
 import gzip
@@ -430,7 +435,8 @@ def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
             "--source-date", source_date,
             "--minimum-games", str(args.minimum_games),
             "--top-fraction", str(args.top_fraction),
-            "--max-training-drafts", str(args.max_training_drafts),
+            "--model-version", args.model_version,
+                "--max-training-drafts", str(args.max_training_drafts),
             "--max-output-drafts", str(args.max_output_drafts),
             "--minimum-picks", str(args.minimum_picks),
             "--folds", str(args.folds),
@@ -447,7 +453,8 @@ def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
             "--source-date", source_date,
             "--minimum-games", str(args.minimum_games),
             "--top-fraction", str(args.top_fraction),
-            "--max-training-drafts", str(args.max_training_drafts),
+            "--model-version", args.model_version,
+                "--max-training-drafts", str(args.max_training_drafts),
             "--max-bytes", str(args.max_path_bytes),
         ])
 
@@ -473,10 +480,10 @@ def build_legacy_one(remote: RemoteDataset, args: argparse.Namespace) -> dict:
         # of this guard is that the backfill must not QUIETLY change the model -
         # not that the model must be one particular version forever. Pinned to a
         # literal it fired on the first legitimate model change instead.
-        if manifest.get("model", {}).get("model_version") != ISOLATED_MODEL_VERSION:
+        if manifest.get("model", {}).get("model_version") != args.model_version:
             raise ValueError(
                 f"Legacy backfill wrote model {manifest.get('model', {}).get('model_version')!r}, "
-                f"expected {ISOLATED_MODEL_VERSION!r}.")
+                f"expected {args.model_version!r}.")
         if manifest.get("cohort", {}).get("selection_metric") != "earliest_game_arena_rank":
             raise ValueError("Legacy backfill did not replace the temporary selection metadata.")
         if "win_rate_cutoff" in manifest.get("cohort", {}):
@@ -510,7 +517,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
     parser.add_argument("--format", default="PremierDraft")
     parser.add_argument("--minimum-games", type=int, default=100)
     parser.add_argument("--top-fraction", type=float, default=0.15)
-    parser.add_argument("--max-training-drafts", type=int, default=5000)
+    parser_training_arguments(parser, 5000)
     parser.add_argument("--max-output-drafts", type=int, default=300)
     parser.add_argument("--minimum-replays", type=int, default=100)
     parser.add_argument("--minimum-picks", type=int, default=30)
@@ -527,7 +534,7 @@ def parse_args(argv: Optional[Sequence[str]] = None) -> argparse.Namespace:
                         help="rebuild sets already in data/catalog.json instead of "
                              "skipping them; required to carry a model change into "
                              "the legacy environments")
-    return parser.parse_args(argv)
+    return resolve_training_arguments(parser.parse_args(argv), 5000)
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

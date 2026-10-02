@@ -15,6 +15,8 @@ export function rolloutDispatch(request) {
     workflow='regenerate-draft-run-corpus.yml';inputs={corpus_version};extra=['corpus_version'];
   } else if(operation==='rebuild-v4') {
     workflow='rebuild-v4-draft-run-corpus.yml';
+  } else if(operation==='rebuild-v5') {
+    workflow='rebuild-v5-draft-run-corpus.yml';
   } else if(operation==='import') {
     if(!/^(all|[a-z0-9-]+(?:,[a-z0-9-]+)*)$/.test(sets||'')||!['build-only','development','production'].includes(target))throw Error('Invalid import request.');
     workflow='import-all-trophies.yml';inputs={sets,target};extra=['sets','target'];
@@ -106,7 +108,8 @@ export function assertRolloutReplayPolicy(request,priorRequests=[]) {
 
 function priorRolloutRequests(file='.github/model-rollout-request.json') {
   const head=execFileSync('git',['rev-parse','HEAD'],{encoding:'utf8'}).trim();
-  const commits=execFileSync('git',['log','--format=%H','--',file],{encoding:'utf8'}).trim().split(/\s+/).filter(Boolean);
+  // Only reviewed mainline history can prove a rollout was previously requested.
+  const commits=execFileSync('git',['log','--first-parent','--format=%H','--',file],{encoding:'utf8'}).trim().split(/\s+/).filter(Boolean);
   const prior=[];
   for(const commit of commits) {
     if(commit===head)continue;

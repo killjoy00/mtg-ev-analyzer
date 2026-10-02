@@ -1,3 +1,4 @@
+import fs from 'node:fs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {assertRolloutReplayPolicy,rolloutDispatch,rolloutFingerprint} from '../scripts/model-rollout-request.mjs';
@@ -13,6 +14,11 @@ test('equivalent rollout requests require an explicit replay reference',()=>{
   assert.throws(()=>assertRolloutReplayPolicy({...duplicate,replay_of:'other-request'},[prior]),/does not name an equivalent/);
   assert.throws(()=>assertRolloutReplayPolicy({...common,operation:'browser',replay_of:'season-prod-1'},[prior]),/does not name an equivalent/);
 });
+test('rollout replay history checks reviewed mainline ancestry only',()=>{
+  const source=fs.readFileSync('scripts/model-rollout-request.mjs','utf8');
+  assert.match(source,/\['log','--first-parent','--format=%H','--',file\]/);
+});
+
 test('rollout requests can target only fixed workflows on main',()=>{
   assert.deepEqual(rolloutDispatch({...common,operation:'deploy',target:'development',commit:'a'.repeat(40)}),{
     workflow:'deploy-functions.yml',body:{ref:'main',inputs:{target:'development',commit:'a'.repeat(40)}},
@@ -33,6 +39,12 @@ test('the issue 164 v4 rebuild can only dispatch its fixed reviewed workflow',()
     body:{ref:'main',inputs:{}},
   });
   for(const extra of [{corpus_version:'other'},{target:'production'},{ref:'branch'},{workflow:'other.yml'}])
+    assert.throws(()=>rolloutDispatch({...request,...extra}));
+});
+test('all-qualified v5 rebuild is fixed to reviewed main and accepts no source/cap override',()=>{
+  const request={...common,operation:'rebuild-v5'};
+  assert.deepEqual(rolloutDispatch(request),{workflow:'rebuild-v5-draft-run-corpus.yml',body:{ref:'main',inputs:{}}});
+  for(const extra of [{corpus_version:'other'},{target:'production'},{ref:'branch'},{training_cap:5000}])
     assert.throws(()=>rolloutDispatch({...request,...extra}));
 });
 test('format research dispatch cannot select arbitrary sets, code refs or targets',()=>{

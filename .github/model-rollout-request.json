@@ -1,8 +1,6 @@
 {
-  "operation": "deploy",
-  "request_id": "read-stall-fix-prod-replay-20261002",
-  "replay_of": "read-stall-fix-prod-20261002",
-  "reason": "Intentional replay after the merge-topology replay guard rejected the reviewed production dispatch before any production deployment began.",
-  "commit": "d8632a8bca21bb0bc5bc713b5e395b42fc5c7ef0",
-  "target": "production"
+  "operation": "rebuild-v5",
+  "request_id": "uncapped-v5-full-rebuild-20261002-retry1",
+  "replay_of": "uncapped-v5-full-rebuild-20261002",
+  "reason": "Retry the owner-authorized full all-qualified v5 rebuild after repairing the rollout mainline-history guard; exact v5/v9 scope and authorized HOB inputs are unchanged."
 }

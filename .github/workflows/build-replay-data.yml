@@ -18,9 +18,9 @@ on:
         type: choice
         options: [PremierDraft]
       max_training_drafts:
-        description: 'Training draft cap'
+        description: 'auto preserves the model policy; v5 accepts only uncapped 0'
         required: true
-        default: '5000'
+        default: auto
         type: string
       max_output_drafts:
         description: 'Replay count'
@@ -60,8 +60,16 @@ jobs:
         run: |
           [[ "$EXPANSION" =~ ^[A-Za-z0-9]{2,8}$ ]] || { echo 'Invalid expansion'; exit 1; }
           [[ "$SOURCE_DATE" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}$ ]] || { echo 'Invalid source date'; exit 1; }
-          [[ "$MAX_TRAINING" =~ ^[0-9]+$ ]] || exit 1
+          [[ "$MAX_TRAINING" == auto || "$MAX_TRAINING" =~ ^[0-9]+$ ]] || exit 1
           [[ "$MAX_OUTPUT" =~ ^[0-9]+$ ]] || exit 1
+          python - <<'PY'
+          import os
+          from scripts.model_training import current_model_version, training_cap
+          requested=os.environ['MAX_TRAINING']
+          cap=training_cap(current_model_version(),None if requested=='auto' else int(requested),5000)
+          with open(os.environ['GITHUB_ENV'],'a') as output:
+              output.write(f'RESOLVED_TRAINING_CAP={cap or 0}\n')
+          PY
       - name: Hydrate replay shards from R2
         run: bash scripts/r2_replay_shards.sh hydrate
       - name: Run unit tests
@@ -98,7 +106,7 @@ jobs:
           EXPANSION: ${{ inputs.expansion }}
           FORMAT: ${{ inputs.format }}
           SOURCE_DATE: ${{ inputs.source_date }}
-          MAX_TRAINING: ${{ inputs.max_training_drafts }}
+          MAX_TRAINING: ${{ env.RESOLVED_TRAINING_CAP }}
           MAX_OUTPUT: ${{ inputs.max_output_drafts }}
         run: |
           UPPER=$(printf '%s' "$EXPANSION" | tr '[:lower:]' '[:upper:]')
@@ -124,7 +132,7 @@ jobs:
           EXPANSION: ${{ inputs.expansion }}
           FORMAT: ${{ inputs.format }}
           SOURCE_DATE: ${{ inputs.source_date }}
-          MAX_TRAINING: ${{ inputs.max_training_drafts }}
+          MAX_TRAINING: ${{ env.RESOLVED_TRAINING_CAP }}
         run: |
           UPPER=$(printf '%s' "$EXPANSION" | tr '[:lower:]' '[:upper:]')
           LOWER=$(printf '%s' "$EXPANSION" | tr '[:upper:]' '[:lower:]')

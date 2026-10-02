@@ -236,7 +236,6 @@ jobs:
               --sets "$code" \
               --format PremierDraft \
               --limit 1 \
-              --max-training-drafts 5000 \
               --max-output-drafts 300 \
               --minimum-replays 100 \
               --minimum-picks 30 \
@@ -261,7 +260,6 @@ jobs:
             --queue data/import-queue.json
             --limit "$LIMIT"
             --earliest "$EARLIEST"
-            --max-training-drafts 5000
             --max-output-drafts 300
             --minimum-replays 100
             --minimum-picks 30
