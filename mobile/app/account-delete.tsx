@@ -41,7 +41,6 @@ export default function AccountDeleteScreen() {
   useEffect(() => {
     let active = true;
     if (!session?.accountToken || !session.accountUser?.id) {
-      setAppleActive(false);
       return () => { active = false; };
     }
     void loadNativeAppleSubscriptionStatus(session)
@@ -184,7 +183,7 @@ export default function AccountDeleteScreen() {
           {message ? <Text accessibilityRole="alert" style={styles.message}>{message}</Text> : null}
 
           <View style={styles.warning}>
-            {appleActive ? (
+            {session?.accountToken && session.accountUser?.id && appleActive ? (
               <Pressable accessibilityRole="button" disabled={disabled} onPress={() => void manageSubscription()}
                 style={[styles.secondaryButton, disabled && styles.disabled]}>
                 <Text style={styles.secondaryButtonText}>Manage subscription</Text>
