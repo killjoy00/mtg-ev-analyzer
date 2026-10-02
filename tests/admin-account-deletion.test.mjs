@@ -141,7 +141,15 @@ test('admin deletion lifecycle failures propagate after the durable start so nor
           resumeDeletionOperation:async()=>{throw Object.assign(Error('synthetic resume failure'),{code:'PROVIDER_NETWORK'});},
         },
       ),
-      error=>error?.code==='PROVIDER_NETWORK',
+      error=>{
+        assert.equal(error?.code,'PROVIDER_NETWORK');
+        assert.equal(error?.deletionCommitted,true);
+        assert.equal(error?.operationId,OP);
+        assert.equal(error?.deletion?.operation_id,OP);
+        assert.equal(error?.deletion?.state,'pending');
+        assert.equal('deletion_reason' in error.deletion,false);
+        return true;
+      },
     );
   } finally {
     console.error=originalError;
