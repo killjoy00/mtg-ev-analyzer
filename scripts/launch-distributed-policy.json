@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "supported_launch_target": 25,
+  "supported_launch_target": 50,
   "proposed_target": 50,
   "generators": 5,
   "stages": [
