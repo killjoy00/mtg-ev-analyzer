@@ -163,7 +163,7 @@ jobs:
         run: |
           set -euo pipefail
           connection=$(cat "$RUNNER_TEMP/target.connection")
-          for migration in migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql; do
+          for migration in migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql migrations/0050_practice_recency_bias.sql; do
             psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
           done
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
@@ -222,9 +222,31 @@ jobs:
           node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" rollback generated/v5-candidate generated/v5-release-baseline.json
           node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional Candidate
           node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
+          # The original stage remains immutable. Record a verified successor
+          # at the restored v8 revision for a later explicit reactivation.
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" capture generated/v5-candidate generated/v5-rollback-restored.json
+          node --input-type=module - <<'NODE'
+          import fs from 'node:fs';
+          import assert from 'node:assert/strict';
+          import {assertHistoryPreserved} from './scripts/v5-release-state.mjs';
+          const before=JSON.parse(fs.readFileSync('generated/v5-release-baseline.json'));
+          const restored=JSON.parse(fs.readFileSync('generated/v5-rollback-restored.json'));
+          for(const key of ['sets','environment','v8_manifest_hash'])
+            assert.deepEqual(restored[key],before[key],`Rollback did not restore ${key}`);
+          assert.match(String(before.serving_revision),/^\d+$/);
+          assert.match(String(restored.serving_revision),/^\d+$/);
+          assert.ok(BigInt(restored.serving_revision)>BigInt(before.serving_revision),'Rollback must have a newer serving revision');
+          assertHistoryPreserved(before.history,restored.history);
+          fs.copyFileSync('generated/v5-rollback-restored.json','generated/v5-release-baseline.json');
+          fs.writeFileSync('generated/stage.json',JSON.stringify({
+            target:process.env.TARGET,candidate_run_id:process.env.CANDIDATE_RUN_ID,
+            release_commit:process.env.RELEASE_COMMIT,workflow_run_id:process.env.GITHUB_RUN_ID,
+            preceding_stage_run_id:process.env.STAGE_RUN_ID,action:'verified-rollback'
+          },null,2)+'\n');
+          NODE
 
       - uses: actions/upload-artifact@v4
-        if: always() && inputs.action == 'stage'
+        if: always() && (inputs.action == 'stage' || inputs.action == 'rollback')
         with:
           name: v5-stage-${{ inputs.target }}-${{ github.run_id }}
           retention-days: 90
