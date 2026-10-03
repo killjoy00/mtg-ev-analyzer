@@ -8,6 +8,11 @@ export const HISTORY_SQL=Object.freeze({
   // Identity/privacy maintenance may move a result to another player or scrub
   // its opponent reference/name. Score and outcome semantics remain immutable.
   game_results: `SELECT md5((to_jsonb(t)-ARRAY['id','player_id','challenge_id','opponent_name']::text[])::text) fingerprint,count(*)::int n FROM game_results t GROUP BY 1 ORDER BY 1`,
+  game_result_environments: `SELECT md5(jsonb_build_object(
+      'client_result_id',g.client_result_id,'set_id',e.set_id,'score',e.score
+    )::text) fingerprint,count(*)::int n
+    FROM game_result_environments e JOIN game_results g ON g.id=e.game_result_id
+    GROUP BY 1 ORDER BY 1`,
   scores: `SELECT md5((to_jsonb(t)-ARRAY['id','player_id','is_featured']::text[])::text) fingerprint,count(*)::int n FROM scores t GROUP BY 1 ORDER BY 1`,
   // Every captured session must keep its release identity while active gameplay
   // is free to advance and account linking may attach/merge identity fields.
