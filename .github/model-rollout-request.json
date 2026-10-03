@@ -1,7 +1,9 @@
 {
-  "operation": "rebuild-v5",
-  "request_id": "uncapped-v5-finalize-20261003-python",
-  "replay_of": "uncapped-v5-finalize-20261003",
-  "reuse_run_id": "37097278712",
-  "reason": "Retry exact-artifact finalization after all 889 assembled-v9 JavaScript tests passed; explicitly version historical capped Python fixtures, preflight both serving versions, and scope replay verification to the 30 active v5 environments while retaining MID/VOW history. Training code and inputs remain unchanged."
+  "operation": "v5-corpus-release",
+  "request_id": "v5-v9-development-stage-20261003",
+  "target": "development",
+  "action": "stage",
+  "candidate_run_id": "37132557406",
+  "release_commit": "e9246a15254d14d1f15a092805fbca17bbda1c99",
+  "reason": "Stage the accepted exact 30-environment v5/v9 candidate after successful recovery and QA: 427437 of 427437 qualified training drafts used, unchanged cohorts except authorized HOB refresh, zero invalid outputs. Capture v8 rollback/history evidence and require complete loader, quality, gameplay and preservation gates without switching serving."
 }

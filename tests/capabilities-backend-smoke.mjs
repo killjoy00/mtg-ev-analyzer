@@ -36,6 +36,7 @@ await call('/v1/practice-sets',undefined,user,403);
 await query("INSERT INTO entitlement_grants(auth_user_id,capability,provider,provider_reference) VALUES($1::uuid,'unlimited_cube_practice','test','current'),($1::uuid,'custom_corpus','test','current')",[user.id]);
 assert.equal((await call('/v1/runs',{environment:'powered-cube'},user)).environment,'powered-cube');
 const {sets}=await call('/v1/practice-sets',undefined,user);
+assert.ok(sets.length>=4,'The isolated corpus must provide four complete custom-Practice sets.');
 // These retained Live archives omit complete P1P1 packs; they remain useful
 // in mixed runs but must not be advertised as complete custom-set runs.
 for(const id of ['ecl','tla','tmt']){

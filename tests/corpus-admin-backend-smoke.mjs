@@ -6,7 +6,7 @@ import {DAILY_SELECTION_VERSION} from '../daily-selection.mjs';
 import {registerHealthyCandidate} from '../scripts/corpus-candidate.mjs';
 import {CORPUS_GATE_VERSION} from '../corpus-quality.mjs';
 import {SERVING_POLICY_VERSION} from '../serving-quality.mjs';
-import {TRADITIONAL_GATE_VERSION,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION} from '../corpus-components.mjs';
+import {TRADITIONAL_GATE_VERSION,TRADITIONAL_V4_PHASE2_COMPONENT_VERSION,V4_CONTEXT_MODEL_VERSION,TRADITIONAL_V5_PHASE2_COMPONENT_VERSION,V5_CONTEXT_MODEL_VERSION,V5_PARENT_CORPUS_VERSION} from '../corpus-components.mjs';
 
 if(!process.argv.includes('--dev-fixtures'))throw Error('Isolated development branch required.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
@@ -19,7 +19,9 @@ let check,staleCheck;const discovered='qa-candidate-'+crypto.randomUUID().slice(
 const suffix=randomBytes(3).toString('hex'),snapshotSet=`qa-snapshot-${suffix}`,historicalSet=`qa-history-${suffix}`;
 const fixtureSets=[snapshotSet,historicalSet];
 const snapshotA=randomBytes(32).toString('hex'),snapshotB=randomBytes(32).toString('hex'),historicalSnapshot=randomBytes(32).toString('hex');
-const componentVersion=TRADITIONAL_V4_PHASE2_COMPONENT_VERSION;
+const v5=DRAFT_RUN_CORPUS_VERSION===V5_PARENT_CORPUS_VERSION;
+const componentVersion=v5?TRADITIONAL_V5_PHASE2_COMPONENT_VERSION:TRADITIONAL_V4_PHASE2_COMPONENT_VERSION;
+const componentModel=v5?V5_CONTEXT_MODEL_VERSION:V4_CONTEXT_MODEL_VERSION;
 const parse=x=>typeof x==='string'?JSON.parse(x):x;
 const yes=x=>x===true||x==='t';
 const findSet=(report,setId)=>{const row=report.sets.find(set=>set.set_id===setId);assert.ok(row,`${setId}: admin row missing`);return row;};
@@ -49,14 +51,14 @@ async function clonePuzzle({setId,version=DRAFT_RUN_CORPUS_VERSION,snapshotId=nu
  const puzzleId=randomBytes(16).toString('hex'),sourceHash=randomBytes(16).toString('hex');
  const patch=component?{
   source_event_type:'TradDraft',event_match_wins:3,event_match_losses:0,corpus_version:version,
-  parent_corpus_version:DRAFT_RUN_CORPUS_VERSION,model_version:V4_CONTEXT_MODEL_VERSION,
+  parent_corpus_version:DRAFT_RUN_CORPUS_VERSION,model_version:componentModel,
   model_source_event:'PremierDraft',skill_evidence:'win_rate_bucket'
  }:{source_event_type:'PremierDraft',event_match_wins:7,corpus_version:version};
  const template=(await query(`SELECT p.puzzle_id FROM draft_run_verified_puzzles p
   JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version='support-ratio-v1'
-  WHERE p.pick_number=1 AND p.pack_number=1 AND p.interesting
+  WHERE p.corpus_version=$1 AND p.pick_number=1 AND p.pack_number=1 AND p.interesting
    AND coalesce(p.payload->>'source_event_type','PremierDraft')='PremierDraft'
-  ORDER BY p.puzzle_id LIMIT 1`)).rows[0];
+  ORDER BY p.puzzle_id LIMIT 1`,[DRAFT_RUN_CORPUS_VERSION])).rows[0];
  assert.ok(template?.puzzle_id,'Eligible first-pick template is required.');
  await query(`INSERT INTO draft_run_verified_puzzles
   SELECT (jsonb_populate_record(NULL::draft_run_verified_puzzles,
@@ -104,7 +106,7 @@ async function snapshotReportingFixture() {
 
  await query('INSERT INTO corpus_set_versions(set_id,corpus_version,manifest) VALUES($1,$2,$3::jsonb)',[snapshotSet,componentVersion,JSON.stringify({fixture:'live-component'})]);
  await query(`INSERT INTO corpus_components(set_id,parent_version,component_version,event_type,model_version,status)
-  VALUES($1,$2,$3,'TradDraft',$4,'Live')`,[snapshotSet,DRAFT_RUN_CORPUS_VERSION,componentVersion,V4_CONTEXT_MODEL_VERSION]);
+  VALUES($1,$2,$3,'TradDraft',$4,'Live')`,[snapshotSet,DRAFT_RUN_CORPUS_VERSION,componentVersion,componentModel]);
  const componentHash=(await query('SELECT md5(manifest::text) hash FROM corpus_set_versions WHERE set_id=$1 AND corpus_version=$2',[snapshotSet,componentVersion])).rows[0].hash;
  await query("INSERT INTO corpus_health_checks(set_id,corpus_version,manifest_hash,gate_version,ready,report) VALUES($1,$2,$3,$4,true,'{\"fixture\":\"live-component\"}')",[snapshotSet,componentVersion,componentHash,TRADITIONAL_GATE_VERSION]);
  await clonePuzzle({setId:snapshotSet,version:componentVersion,ratio:.5,component:true});

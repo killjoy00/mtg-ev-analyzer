@@ -3,6 +3,7 @@ import {withPracticeAccess} from './practice-access-fixture.mjs';
 // Usage: node tests/draft-run-backend-smoke.mjs /path/to/dev.connection --dev-fixtures
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {digest} from '../worker/account-session.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw new Error('Use an isolated development database and --dev-fixtures.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
@@ -147,7 +148,7 @@ renamed=await call(growth,'/v1/profile',{displayName:leaderboardName},owner.toke
 assert.equal(renamed.player.display_name,leaderboardName);
 renamed=await call(growth,'/v1/profile',{showcaseAchievement:'first'},owner.token,200,{method:'PATCH',headers:authHeaders});
 assert.equal(renamed.player.showcase_achievement,'first');
-await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json) VALUES($1::uuid,$2::date,'mixed','draft_run',100,'A','[]'::jsonb) ON CONFLICT DO NOTHING",[owner.playerId,gameDateKey()]);
+await query("INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json) VALUES($1::uuid,$2::date,'mixed','draft_run',100,'A','[]'::jsonb,jsonb_build_object('corpus_version',$3::text)) ON CONFLICT DO NOTHING",[owner.playerId,gameDateKey(),DRAFT_RUN_CORPUS_VERSION]);
 const namedBoard=await call(runApi,'/v1/leaderboard?period=daily&environment=mixed');
 const namedRow=namedBoard.rows.find(row=>row.display_name===leaderboardName);
 assert.equal(namedRow?.display_name,leaderboardName);

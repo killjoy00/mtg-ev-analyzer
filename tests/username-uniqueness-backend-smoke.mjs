@@ -7,6 +7,7 @@
 // neither steal an established name nor raise an unhandled constraint error.
 import fs from 'node:fs';
 import assert from 'node:assert/strict';
+import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 if(!process.argv.includes('--dev-fixtures'))throw new Error('Use an isolated development database and --dev-fixtures.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
 const {default:growth,query,gameDateKey}=await import('../worker/growth-function.js');
@@ -198,9 +199,9 @@ const today=gameDateKey();
 for(const [playerId,score] of [[first.playerId,91],[contender.playerId,89]]) {
   await query(
     `INSERT INTO scores(player_id,challenge_date,set_id,mode,score,grade,selections_json,details_json,is_featured)
-     VALUES($1::uuid,$2::date,'mixed','draft_run',$3::int,'A','[]'::jsonb,'{}'::jsonb,true)
+     VALUES($1::uuid,$2::date,'mixed','draft_run',$3::int,'A','[]'::jsonb,jsonb_build_object('corpus_version',$4::text),true)
      ON CONFLICT(player_id,challenge_date,set_id,mode) DO NOTHING`,
-    [playerId,today,score],
+    [playerId,today,score,DRAFT_RUN_CORPUS_VERSION],
   );
 }
 const draftBoard=await call(draftRun,'/v1/leaderboard?period=all&environment=mixed',undefined,null,200);
