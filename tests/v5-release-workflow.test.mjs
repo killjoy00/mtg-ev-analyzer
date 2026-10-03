@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 
 const workflow=fs.readFileSync(new URL('../.github/workflows/release-v5-corpus.yml',import.meta.url),'utf8');
+const deployWorkflow=fs.readFileSync(new URL('../.github/workflows/deploy-functions.yml',import.meta.url),'utf8');
 
 test('v5 stage loads the exact rebuilt baseline before Premier additions',()=>{
   const capture=workflow.indexOf('v5-release-state.mjs "$RUNNER_TEMP/target.connection" capture');
@@ -22,4 +23,20 @@ test('v5 stage stays non-serving until the explicit activation action',()=>{
   assert.match(stage,/load_verified_draft_run\.mjs .* --stage-only/);
   assert.match(stage,/load_all_trophies\.mjs .* --stage-only/);
   assert.doesNotMatch(stage,/v5-corpus-cutover\.mjs .* activate/);
+});
+
+
+test('v5 production promotion rechecks development Practice before upload',()=>{
+  const gate=deployWorkflow.indexOf('Require the same revision tested in development before production');
+  const acceptance=deployWorkflow.indexOf('v5-live-practice-acceptance.mjs br-twilight-hill-ayffyd2b');
+  const upload=deployWorkflow.indexOf('Deploy the checked bundles without rebuilding');
+  assert.ok(gate>=0&&acceptance>gate&&upload>acceptance,
+    'production must re-accept the exact v5 commit in development before any function upload');
+});
+
+test('v5 target Practice acceptance runs after exact-revision Daily smoke',()=>{
+  const daily=deployWorkflow.indexOf('Verify revision, coverage and complete all three unranked Daily flows');
+  const practice=deployWorkflow.indexOf('Verify live v5 account-linked Practice flows');
+  assert.ok(daily>=0&&practice>daily);
+  assert.match(deployWorkflow,/v5-live-practice-acceptance\.mjs "\$TARGET_BRANCH" "\$RELEASE_COMMIT" "\$RUNNER_TEMP\/target\.connection"/);
 });
