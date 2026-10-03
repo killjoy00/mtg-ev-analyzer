@@ -102,7 +102,7 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
     const fresh=available.filter(g=>!sets.has(g.set_id));
     if(fresh.length&&!forced.has(round))available=fresh;
     else {const different=available.filter(g=>g.set_id!==selected.at(-1)?.set_id);if(different.length)available=different;}
-    const setId=chooseRunSet(available.map(g=>g.set_id).sort(),random,daily,selectionVersion,day);
+    const setId=chooseRunSet(available.map(g=>g.set_id).sort(),random,daily,selectionVersion,day,metadata);
     const count=Number(available.find(g=>g.set_id===setId)?.n||0);
     if(!count)throw Object.assign(new Error('Not enough verified puzzles for a balanced run.'),{status:503});
     params.push(setId,band,Math.floor(random()*count));
@@ -151,7 +151,7 @@ export function currentPracticeBatchPlan(snapshot,seed,environment='mixed',{day=
     if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});
   }
   const forced=requiredSetRounds(groups,bands,windows,random,required);
-  const setWeights=Object.fromEntries([...live].map(setId=>[setId,practiceSetWeight(setId,DRAFT_RUN_SELECTION_VERSION,day)]));
+  const setWeights=Object.fromEntries([...live].map(setId=>[setId,practiceSetWeight(setId,DRAFT_RUN_SELECTION_VERSION,day,metadata)]));
   // Keep policy RNG authoritative in JS. Replay only the already-consumed
   // planning draws into a clone, then materialize the per-round values that SQL
   // will consume. A failed invocation discards this local RNG exactly as today.

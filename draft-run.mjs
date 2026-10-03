@@ -270,9 +270,9 @@ export function selectDraftRun(pool, seed, environment = 'mixed', {daily=false,d
       const different = available.filter(p => p.set_id !== selected.at(-1)?.set_id);
       if (different.length) available = different;
     }
-    // Equal chance per environment: large sets must not crowd out small sets.
+    // Set weights are independent of corpus size; large sets cannot crowd out small sets.
     const setIds = [...new Set(available.map(p => p.set_id))].sort();
-    const setId = chooseRunSet(setIds,random,daily,selectionVersion,day);
+    const setId = chooseRunSet(setIds,random,daily,selectionVersion,day,metadata);
     available = available.filter(p => p.set_id === setId);
     if (!available.length) throw new Error('Not enough verified puzzles for a balanced run.');
     const chosen = available[Math.floor(random() * available.length)];

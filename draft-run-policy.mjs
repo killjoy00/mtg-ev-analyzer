@@ -34,15 +34,22 @@ export function dailySetWeight(setId,version=DRAFT_RUN_SELECTION_VERSION,day=gam
 // Current regular Practice keeps the same broad, distinct-set sampler but gives
 // newer releases a gentle nudge. Historical selection versions stay uniform so
 // archived/reference behavior is not silently reinterpreted.
-export function practiceSetWeight(setId,version=DRAFT_RUN_SELECTION_VERSION,day=gameDateKey()) {
+export function practiceSetWeight(setId,version=DRAFT_RUN_SELECTION_VERSION,day=gameDateKey(),metadata=null) {
   if(version!==DRAFT_RUN_SELECTION_VERSION)return 1;
-  const rank=releasedRunSets(day).indexOf(setId);
+  // Serving metadata can contain Live releases absent from the checked-in list.
+  // Include those dates in Practice chronology rather than giving an older set
+  // the newest-set fallback weight. Daily/historical release lists stay intact.
+  const dates={...policy.release_dates};
+  for(const s of metadata||[])if(s.status==='Live'&&s.regular_run&&s.release_date&&regularRunSet(s.set_id))dates[s.set_id]=s.release_date;
+  const ordered=Object.keys(dates).filter(id=>dates[id]<=day)
+    .sort((a,b)=>dates[b].localeCompare(dates[a])||a.localeCompare(b));
+  const rank=ordered.indexOf(setId);
   return rank<0?1:2**(-rank/PRACTICE_RECENCY_HALF_LIFE);
 }
 
-export function chooseRunSet(setIds,random,daily=false,version=DRAFT_RUN_SELECTION_VERSION,day=gameDateKey()) {
+export function chooseRunSet(setIds,random,daily=false,version=DRAFT_RUN_SELECTION_VERSION,day=gameDateKey(),metadata=null) {
   if(!setIds.length)return undefined;
-  const weights=setIds.map(s=>daily?dailySetWeight(s,version,day):practiceSetWeight(s,version,day));
+  const weights=setIds.map(s=>daily?dailySetWeight(s,version,day):practiceSetWeight(s,version,day,metadata));
   let ticket=random()*weights.reduce((a,b)=>a+b,0);
   for(let i=0;i<setIds.length;i++){ticket-=weights[i];if(ticket<0)return setIds[i];}
   return setIds.at(-1);

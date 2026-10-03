@@ -196,4 +196,3 @@ BEGIN
   RETURN jsonb_build_object('ok',true,'selections',selected,'draws_used',16);
 END;
 $function$
-

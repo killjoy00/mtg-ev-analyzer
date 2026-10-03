@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {verifyTarget,recordQueries,summarize,queryFamily,sqlQuery} from '../scripts/practice-performance.mjs';
 import {currentPracticeBatchPlan} from '../worker/draft-run-selection.mjs';
-import {PRACTICE_RECENCY_HALF_LIFE} from '../draft-run-policy.mjs';
+import {PRACTICE_RECENCY_HALF_LIFE,practiceSetWeight,chooseRunSet} from '../draft-run-policy.mjs';
 
 const target={branch:'br-disposable',connection:'postgresql://fixture:secret@ep-fixture.us-east-2.aws.neon.tech/pack1',
   branchRecord:{id:'br-disposable',parent_id:'br-orange-feather-ayps8kep'},
@@ -74,6 +74,27 @@ test('current regular Practice sends gentle recency weights to the batched selec
   assert.equal(PRACTICE_RECENCY_HALF_LIFE,12);
   assert.equal(plan.set_weights.hob,1);
   assert.ok(Math.abs(plan.set_weights.blb-.5)<1e-12);
+});
+
+test('Live release metadata prevents older unlisted sets from receiving newest-set weights',()=>{
+  const day='2026-10-02',metadata=[
+    {set_id:'hob',status:'Live',regular_run:true,release_date:'2026-08-14'},
+    {set_id:'vow',status:'Live',regular_run:true,release_date:'2021-11-19'},
+    {set_id:'mid',status:'Live',regular_run:true,release_date:'2021-09-24'},
+    {set_id:'future',status:'Live',regular_run:true,release_date:'2099-01-01'},
+    {set_id:'candidate',status:'Candidate',regular_run:true,release_date:'2026-09-01'},
+    {set_id:'powered-cube',status:'Live',regular_run:false,release_date:'2026-09-01'},
+  ];
+  const {plan}=currentPracticeBatchPlan({groups:[],metadata},'older-live-sets','mixed',{day});
+  assert.equal(plan.set_weights.hob,1);
+  assert.equal(plan.set_weights.vow,2**(-25/12));
+  assert.equal(plan.set_weights.mid,2**(-26/12));
+  assert.equal(plan.set_weights.future,undefined);
+  assert.equal(practiceSetWeight('powered-cube',undefined,day,metadata),1);
+  for(const id of ['hob','vow','mid'])assert.equal(plan.set_weights[id],practiceSetWeight(id,undefined,day,metadata));
+  assert.equal(chooseRunSet(['hob','mid'],()=>.6,false,undefined,day,metadata),'hob');
+  for(const version of ['balanced-v1','first-pack-v2','eight-pick-v3'])assert.equal(practiceSetWeight('mid',version,day,metadata),1);
+  assert.equal(chooseRunSet(['hob','mid'],()=>.6,true,undefined,day,metadata),chooseRunSet(['hob','mid'],()=>.6,true,undefined,day));
 });
 
 test('practice recency migration is wired into performance and both guarded release stages',()=>{
