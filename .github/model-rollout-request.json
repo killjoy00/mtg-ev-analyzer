@@ -2,7 +2,7 @@
   "operation": "deploy",
   "request_id": "v5-v9-development-rollback-bridge-20261003",
   "replay_of": "v5-v9-development-bridge-20261003",
-  "reason": "Owner-authorized issue #889 rollback rehearsal. Merge only after exact development v9 runtime acceptance from PR #919; redeploy the same reviewed v8 bridge before restoring captured v8 parent pointers. Preserve all histories.",
+  "reason": "Owner-authorized #889 rollback rehearsal after corrected v5 runtime acceptance from #919. Redeploy the accepted exact v8 bridge while inactive production staging from #920 proceeds; preserve all histories.",
   "target": "development",
   "commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
 }
