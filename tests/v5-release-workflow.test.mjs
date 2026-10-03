@@ -13,6 +13,10 @@ test('v5 stage loads the exact rebuilt baseline before Premier additions',()=>{
     'stage must capture v8, load v9 baseline, apply exact Premier additions, then prove serving/history preservation');
 });
 
+test('v5 readiness records the exact reviewed release commit',()=>{
+  assert.match(workflow,/PACK1_RELEASE_COMMIT:\s*\$\{\{ inputs\.release_commit \}\}/);
+});
+
 test('v5 stage stays non-serving until the explicit activation action',()=>{
   const stage=workflow.slice(workflow.indexOf('Stage immutable v9 candidate without switching serving'),workflow.indexOf('Require exact bridge revision before pointer mutation'));
   assert.match(stage,/load_verified_draft_run\.mjs .* --stage-only/);
