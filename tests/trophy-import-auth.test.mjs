@@ -307,11 +307,13 @@ test('image markers clear only after every served card has an HTTPS image',async
   await assert.rejects(normalizeResolvedImageMarkers(query,['not-a-real-environment']),/registered environments/);
 });
 
-import {verifyCorpusPublicationToken,CORPUS_PUBLICATION_AUDIENCE,CORPUS_PUBLICATION_WORKFLOW} from '../worker/trophy-import-auth.mjs';
+import {verifyCorpusPublicationToken,CORPUS_PUBLICATION_AUDIENCE,CORPUS_PUBLICATION_WORKFLOW,V5_CORPUS_RELEASE_WORKFLOW} from '../worker/trophy-import-auth.mjs';
 test('source publication requires its own signed main workflow and audience',async()=>{
  const c={...claims,aud:CORPUS_PUBLICATION_AUDIENCE,workflow_ref:CORPUS_PUBLICATION_WORKFLOW,actor:'release-operator'};
  const identity=await verifyCorpusPublicationToken(token(c),async()=>[jwk],1000);
  assert.equal(identity.provider,'github_actions');assert.equal(identity.actor,'release-operator');
+ const releaseIdentity=await verifyCorpusPublicationToken(token({...c,workflow_ref:V5_CORPUS_RELEASE_WORKFLOW}),async()=>[jwk],1000);
+ assert.equal(releaseIdentity.workflow_ref,V5_CORPUS_RELEASE_WORKFLOW);
  await assert.rejects(verifyCorpusPublicationToken(token(),async()=>[jwk],1000),/denied/);
  await assert.rejects(verifyImportToken(token(c),async()=>[jwk],1000),/denied/);
  for(const patch of [{ref:'refs/heads/pr'},{event_name:'pull_request'},{repository_id:'other'},{workflow_ref:IMPORT_WORKFLOW}])await assert.rejects(verifyCorpusPublicationToken(token({...c,...patch}),async()=>[jwk],1000),/denied/);

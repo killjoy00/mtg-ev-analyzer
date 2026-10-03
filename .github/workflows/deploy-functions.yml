@@ -26,7 +26,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
       NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
       PROJECT_ID: patient-shadow-91417882
@@ -82,8 +82,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          umask 077
           connection=$(neon connection-string "$TARGET_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
           echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/target.connection"
           DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
 
       - name: Require the same revision tested in development before production
@@ -92,6 +94,13 @@ jobs:
         run: |
           set -euo pipefail
           node tests/release-functions-smoke.mjs br-twilight-hill-ayffyd2b "$RELEASE_COMMIT" --daily --expect-deletion-email=false
+          if grep -q "DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v9'" draft-run.mjs; then
+            umask 077
+            development_connection=$(neon connection-string br-twilight-hill-ayffyd2b --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+            echo "::add-mask::$development_connection"
+            printf '%s' "$development_connection" > "$RUNNER_TEMP/development.connection"
+            node tests/v5-live-practice-acceptance.mjs br-twilight-hill-ayffyd2b "$RELEASE_COMMIT" "$RUNNER_TEMP/development.connection"
+          fi
           # The old frontend assumes ten picks. It must be replaced first.
           curl -fsS --max-time 30 https://packone.pro/draft-run-format.mjs -o "$RUNNER_TEMP/run-format.mjs"
           grep -q 'function draftRunLength' "$RUNNER_TEMP/run-format.mjs"
@@ -138,3 +147,13 @@ jobs:
       # answers with. The closing marker check inside the smoke stays strict.
       - name: Verify revision, coverage and complete all three unranked Daily flows
         run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$RELEASE_COMMIT" --daily --settle "--expect-deletion-email=$DELETION_EMAIL_EXPECTED"
+
+      - name: Verify live v5 account-linked Practice flows
+        shell: bash
+        run: |
+          set -euo pipefail
+          if grep -q "DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v9'" draft-run.mjs; then
+            node tests/v5-live-practice-acceptance.mjs "$TARGET_BRANCH" "$RELEASE_COMMIT" "$RUNNER_TEMP/target.connection"
+          else
+            echo 'Not a v5/v9 release; v5 Practice acceptance is not applicable.'
+          fi

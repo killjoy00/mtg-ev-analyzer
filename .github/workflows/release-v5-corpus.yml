@@ -1,0 +1,246 @@
+name: Release exact v5 corpus
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        type: choice
+        options: [development, production]
+        default: development
+        required: true
+      action:
+        type: choice
+        options: [stage, activate, rollback]
+        default: stage
+        required: true
+      candidate_run_id:
+        description: 'Successful rebuild-v5-draft-run-corpus run containing validated-v5-candidate-<run>'
+        type: string
+        required: true
+      release_commit:
+        description: 'Full reviewed main SHA containing the generated v5/v9 release'
+        type: string
+        required: true
+      stage_run_id:
+        description: 'Successful stage action run for this same target/candidate; required for activate/rollback'
+        type: string
+        required: false
+      bridge_commit:
+        description: 'Full reviewed v8 bridge SHA currently deployed to target; required for activate/rollback'
+        type: string
+        required: false
+
+permissions:
+  contents: read
+  actions: read
+  id-token: write
+
+concurrency:
+  group: packone-corpus-mutation
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+      PROJECT_ID: patient-shadow-91417882
+      TARGET: ${{ inputs.target }}
+      ACTION: ${{ inputs.action }}
+      CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      RELEASE_COMMIT: ${{ inputs.release_commit }}
+      PACK1_RELEASE_COMMIT: ${{ inputs.release_commit }}
+      STAGE_RUN_ID: ${{ inputs.stage_run_id }}
+      BRIDGE_COMMIT: ${{ inputs.bridge_commit }}
+      V5_CANDIDATE_RUN_ID: ${{ inputs.candidate_run_id }}
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.release_commit }}
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Resolve reviewed release identities
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::release_commit must be a full SHA'; exit 1; }
+          [[ "$CANDIDATE_RUN_ID" =~ ^[1-9][0-9]{4,20}$ ]] || { echo '::error::candidate_run_id must be numeric'; exit 1; }
+          git fetch origin main
+          git merge-base --is-ancestor "$RELEASE_COMMIT" origin/main
+          test "$(git rev-parse HEAD)" = "$RELEASE_COMMIT"
+          grep -q "DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v9'" draft-run.mjs
+          case "$ACTION" in
+            stage) test -z "$STAGE_RUN_ID" || { echo '::error::stage_run_id is not used for stage'; exit 1; } ;;
+            activate|rollback)
+              [[ "$STAGE_RUN_ID" =~ ^[1-9][0-9]{4,20}$ ]] || { echo '::error::activate/rollback requires numeric stage_run_id'; exit 1; }
+              [[ "$BRIDGE_COMMIT" =~ ^[a-f0-9]{40}$ ]] || { echo '::error::activate/rollback requires full bridge_commit'; exit 1; }
+              git merge-base --is-ancestor "$BRIDGE_COMMIT" "$RELEASE_COMMIT"
+              git show "$BRIDGE_COMMIT:draft-run.mjs" | grep -q "DRAFT_RUN_CORPUS_VERSION = 'elite-trophy-colour-stage-v8'"
+              git show "$BRIDGE_COMMIT:worker/corpus-components.mjs" | grep -q "modelVersions.v4.corpus_version"
+              git show "$BRIDGE_COMMIT:worker/corpus-components.mjs" | grep -q "modelVersions.v5.corpus_version"
+              git show "$BRIDGE_COMMIT:worker/corpus-components.mjs" | grep -q "next_snapshot.corpus_version="
+              ;;
+            *) exit 1 ;;
+          esac
+          case "$TARGET" in
+            development) echo 'TARGET_BRANCH=br-twilight-hill-ayffyd2b' >> "$GITHUB_ENV" ;;
+            production) echo 'TARGET_BRANCH=br-orange-feather-ayps8kep' >> "$GITHUB_ENV" ;;
+            *) exit 1 ;;
+          esac
+
+      - run: npm install -g neon@4.17.4
+
+      - name: Require successful reviewed source runs
+        shell: bash
+        run: |
+          set -euo pipefail
+          candidate=$(gh run view "$CANDIDATE_RUN_ID" --json conclusion,workflowName,headBranch,event)
+          echo "$candidate" | jq -e 'select(.conclusion=="success" and .workflowName=="rebuild-v5-draft-run-corpus" and .headBranch=="main" and .event=="workflow_dispatch")' >/dev/null
+          if [[ "$ACTION" != stage ]]; then
+            staged=$(gh run view "$STAGE_RUN_ID" --json conclusion,workflowName,headBranch,event)
+            echo "$staged" | jq -e 'select(.conclusion=="success" and .workflowName=="Release exact v5 corpus" and .headBranch=="main" and .event=="workflow_dispatch")' >/dev/null
+          fi
+
+      - name: Download exact validated rebuild artifact
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.candidate_run_id }}
+          name: validated-v5-candidate-${{ inputs.candidate_run_id }}
+          path: generated/v5-candidate
+
+      - name: Verify exact artifact identity and loader gates
+        run: |
+          set -euo pipefail
+          node scripts/verify-v5-release-candidate.mjs generated/v5-candidate "$CANDIDATE_RUN_ID"
+          node scripts/load_all_trophies.mjs unused generated/v5-candidate/v5-trophy-import --validate-only
+          node scripts/load-traditional-components.mjs unused generated/v5-candidate/v5-traditional --validate-only > generated/v5-traditional-validated.json
+
+      - name: Prepare reviewed target connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          connection=$(neon connection-string "$TARGET_BRANCH" --project-id "$PROJECT_ID" --database-name pack1 --role-name pack1_owner)
+          echo "::add-mask::$connection"
+          printf '%s' "$connection" > "$RUNNER_TEMP/target.connection"
+          if ! command -v psql >/dev/null 2>&1; then sudo apt-get update; sudo apt-get install -y postgresql-client; fi
+
+      - name: Download exact stage evidence
+        if: inputs.action != 'stage'
+        uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.stage_run_id }}
+          name: v5-stage-${{ inputs.target }}-${{ inputs.stage_run_id }}
+          path: generated/v5-stage-evidence
+
+      - name: Verify stage evidence identity
+        if: inputs.action != 'stage'
+        shell: bash
+        run: |
+          set -euo pipefail
+          node - <<'NODE'
+          const fs=require('fs');
+          const e=JSON.parse(fs.readFileSync('generated/v5-stage-evidence/stage.json','utf8'));
+          const expected={target:process.env.TARGET,candidate_run_id:process.env.CANDIDATE_RUN_ID,release_commit:process.env.RELEASE_COMMIT};
+          for(const [k,v] of Object.entries(expected))if(String(e[k])!==String(v))throw Error('Stage evidence mismatch: '+k);
+          NODE
+          cp generated/v5-stage-evidence/v5-release-baseline.json generated/v5-release-baseline.json
+
+      - name: Stage immutable v9 candidate without switching serving
+        if: inputs.action == 'stage'
+        shell: bash
+        run: |
+          set -euo pipefail
+          connection=$(cat "$RUNNER_TEMP/target.connection")
+          for migration in migrations/0048_uncapped_v5_components.sql migrations/0049_cross_version_corpus_cutover.sql; do
+            psql "$connection" -v ON_ERROR_STOP=1 --single-transaction -f "$migration"
+          done
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" capture generated/v5-candidate generated/v5-release-baseline.json
+          # Stage the exact checked-in v9 baseline without replacing v8 serving.
+          # Migration 0049 makes inactive future-version puzzle/rating inserts
+          # revision-neutral; the complete snapshot below remains separately
+          # source-scoped and is the only v9 parent selected after activation.
+          node scripts/load_verified_draft_run.mjs "$RUNNER_TEMP/target.connection" --stage-only
+          node scripts/load_all_trophies.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --stage-only
+          node scripts/load-traditional-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional
+          node scripts/check-corpus-health.mjs "$RUNNER_TEMP/target.connection"
+          node scripts/candidate-gameplay-canary.mjs "$RUNNER_TEMP/target.connection"
+          node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --complete
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional Candidate
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" verify generated/v5-candidate generated/v5-release-baseline.json
+          DATABASE_URL="$connection" node scripts/verify-neon-schema.mjs
+          node - <<'NODE'
+          const fs=require('fs');
+          fs.writeFileSync('generated/stage.json',JSON.stringify({
+            target:process.env.TARGET,
+            candidate_run_id:process.env.CANDIDATE_RUN_ID,
+            release_commit:process.env.RELEASE_COMMIT,
+            workflow_run_id:process.env.GITHUB_RUN_ID
+          },null,2)+'\n');
+          NODE
+
+      - name: Require exact bridge revision before pointer mutation
+        if: inputs.action != 'stage'
+        run: node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
+
+      - name: Reverify staged bytes and preservation immediately before activation
+        if: inputs.action == 'activate'
+        run: |
+          node scripts/verify-corpus-load.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-trophy-import --complete
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional Candidate
+          node scripts/v5-release-state.mjs "$RUNNER_TEMP/target.connection" verify generated/v5-candidate generated/v5-release-baseline.json
+
+      - name: Atomically activate all v9 parent snapshots and build readiness
+        if: inputs.action == 'activate'
+        run: node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" activate generated/v5-candidate generated/v5-release-baseline.json
+
+      - name: Publish only eligible v5 Traditional components
+        if: inputs.action == 'activate'
+        run: |
+          node scripts/publish-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional eligible
+          node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" verify-active generated/v5-candidate generated/v5-release-baseline.json
+          node scripts/verify-serving-quality.mjs "$RUNNER_TEMP/target.connection"
+          node scripts/verify-cube-expansion.mjs "$RUNNER_TEMP/target.connection" traditional-cube-p2p7-v5-v1
+          node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
+
+      - name: Roll back to captured v8 pointers after bridge redeploy
+        if: inputs.action == 'rollback'
+        run: |
+          node scripts/v5-corpus-cutover.mjs "$RUNNER_TEMP/target.connection" rollback generated/v5-candidate generated/v5-release-baseline.json
+          node scripts/verify-puzzle-components.mjs "$RUNNER_TEMP/target.connection" generated/v5-candidate/v5-traditional Candidate
+          node tests/release-functions-smoke.mjs "$TARGET_BRANCH" "$BRIDGE_COMMIT"
+
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.action == 'stage'
+        with:
+          name: v5-stage-${{ inputs.target }}-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: error
+          path: |
+            generated/v5-release-baseline.json
+            generated/stage.json
+            generated/v5-traditional-validated.json
+
+      - uses: actions/upload-artifact@v4
+        if: always() && inputs.action != 'stage'
+        with:
+          name: v5-${{ inputs.action }}-${{ inputs.target }}-${{ github.run_id }}
+          retention-days: 90
+          if-no-files-found: ignore
+          path: |
+            generated/v5-release-baseline.json
+            generated/serving-quality-verification.json
+            generated/cube-expansion-verification.json

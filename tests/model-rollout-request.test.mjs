@@ -84,6 +84,24 @@ test('source release requires an explicit action and a reviewed fixed artifact g
  for(const extra of [{source:'all'},{action:'automatic'},{target:'arbitrary'},{artifact_id:123}])assert.throws(()=>rolloutDispatch({...r,...extra}));
 });
 
+test('v5 corpus release dispatch pins exact candidate, release, stage and bridge identities',()=>{
+ const base={operation:'v5-corpus-release',request_id:'v5-stage',reason:'Stage exact v5 candidate',target:'development',action:'stage',candidate_run_id:'37077353281',release_commit:'a'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(base),{workflow:'release-v5-corpus.yml',body:{ref:'main',inputs:{target:'development',action:'stage',candidate_run_id:'37077353281',release_commit:'a'.repeat(40)}}});
+ const activate={...base,request_id:'v5-activate',action:'activate',stage_run_id:'37080000000',bridge_commit:'b'.repeat(40)};
+ assert.deepEqual(rolloutDispatch(activate).body.inputs,{target:'development',action:'activate',candidate_run_id:'37077353281',release_commit:'a'.repeat(40),stage_run_id:'37080000000',bridge_commit:'b'.repeat(40)});
+ assert.equal(rolloutDispatch({...activate,action:'rollback',target:'production'}).workflow,'release-v5-corpus.yml');
+ for(const bad of [
+   {...base,candidate_run_id:'latest'},
+   {...base,release_commit:'main'},
+   {...base,target:'other'},
+   {...base,action:'activate'},
+   {...base,stage_run_id:'37080000000'},
+   {...activate,stage_run_id:'bad'},
+   {...activate,bridge_commit:'main'},
+   {...activate,workflow:'other.yml'},
+ ])assert.throws(()=>rolloutDispatch(bad));
+});
+
 test('corpus health allows only explicit known targets and no source mutations',()=>{
  const r={operation:'corpus-health',request_id:'health-1',reason:'Full current corpus verification',target:'production'};
  assert.equal(rolloutDispatch(r).workflow,'corpus-health.yml');

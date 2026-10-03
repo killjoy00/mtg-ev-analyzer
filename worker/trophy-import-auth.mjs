@@ -61,8 +61,9 @@ export function verifyImportToken(token,getKeys=keys,now=Math.floor(Date.now()/1
 }
 export const CORPUS_PUBLICATION_AUDIENCE='pack-one-corpus-publication';
 export const CORPUS_PUBLICATION_WORKFLOW=`${REPO}/.github/workflows/publish-puzzle-components.yml@refs/heads/main`;
+export const V5_CORPUS_RELEASE_WORKFLOW=`${REPO}/.github/workflows/release-v5-corpus.yml@refs/heads/main`;
 export async function verifyCorpusPublicationToken(token,getKeys=keys,now=Math.floor(Date.now()/1000)) {
- const verified=await verifySignedWorkflow(token,getKeys,now,CORPUS_PUBLICATION_AUDIENCE,new Set([CORPUS_PUBLICATION_WORKFLOW]));
+ const verified=await verifySignedWorkflow(token,getKeys,now,CORPUS_PUBLICATION_AUDIENCE,new Set([CORPUS_PUBLICATION_WORKFLOW,V5_CORPUS_RELEASE_WORKFLOW]));
  const claims=JSON.parse(Buffer.from(token.split('.')[1],'base64url'));
  return {...verified,provider:'github_actions',subject:claims.sub,actor:claims.actor};
 }
