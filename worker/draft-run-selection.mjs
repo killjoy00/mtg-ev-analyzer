@@ -2,7 +2,7 @@ import {SERVING_POLICY_VERSION,SERVING_QUALITY_SQL} from '../serving-quality.mjs
 import {DAILY_SELECTION_VERSION,dailySetPlan,latestSetPlan,balancedSetPlan,liveRegularSets} from '../daily-selection.mjs';
 import {seededRandom} from '../gameplay.mjs';
 import {runPickWindows,eligiblePickForRound,selectDraftRunReroll,draftRunDifficulty} from '../draft-run.mjs';
-import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_SETS,chooseRunSet,runDifficultyBands,maxRunPick,isEightPickVersion,earlyRoundsForSelection,dailyRequiredSets,releasedRunSets,requiredSetRounds} from '../draft-run-policy.mjs';
+import {DRAFT_RUN_SELECTION_VERSION,PREVIOUS_SELECTION_VERSION,SELECTABLE_ONLY_SETS,chooseRunSet,practiceSetWeight,runDifficultyBands,maxRunPick,isEightPickVersion,earlyRoundsForSelection,dailyRequiredSets,releasedRunSets,requiredSetRounds} from '../draft-run-policy.mjs';
 import {gameDateKey} from '../game-date.mjs';
 import {corpusMembership} from './corpus-components.mjs';
 import {DRAFT_RUN_DIFFICULTY_VERSION,LEGACY_DIFFICULTY_VERSION,MAX_REROLL_RATING_DELTA} from '../draft-run-difficulty.mjs';
@@ -151,6 +151,7 @@ export function currentPracticeBatchPlan(snapshot,seed,environment='mixed',{day=
     if(setIds.some(s=>!eligible.has(s)))throw Object.assign(Error('Choose Live sets with complete eight-pick practice coverage.'),{status:400});
   }
   const forced=requiredSetRounds(groups,bands,windows,random,required);
+  const setWeights=Object.fromEntries([...live].map(setId=>[setId,practiceSetWeight(setId,DRAFT_RUN_SELECTION_VERSION,day)]));
   // Keep policy RNG authoritative in JS. Replay only the already-consumed
   // planning draws into a clone, then materialize the per-round values that SQL
   // will consume. A failed invocation discards this local RNG exactly as today.
@@ -162,7 +163,7 @@ export function currentPracticeBatchPlan(snapshot,seed,environment='mixed',{day=
     plan:{
       selection_version:DRAFT_RUN_SELECTION_VERSION,
       groups:groups.map(({set_id,pick_number,band,n})=>({set_id,pick_number,band,n})),
-      windows,bands,required,
+      windows,bands,required,set_weights:setWeights,
       forced:Array.from({length:windows.length},(_,i)=>forced.get(i)||''),
       round_randoms:roundRandoms,
     },

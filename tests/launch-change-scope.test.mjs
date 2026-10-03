@@ -44,6 +44,7 @@ test('capacity-sensitive application and harness paths always require the load r
     'worker/draft-run-selection.mjs',
     'worker/draft-start-timing.mjs',
     'migrations/0045_batched_practice_selector.sql',
+    'migrations/0050_practice_recency_bias.sql',
     'scripts/edge-control.mjs',
     'scripts/launch-distributed-run.mjs',
     'scripts/launch-distributed-policy.json',

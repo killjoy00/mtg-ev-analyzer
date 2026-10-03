@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import {verifyTarget,recordQueries,summarize,queryFamily} from '../scripts/practice-performance.mjs';
+import {currentPracticeBatchPlan} from '../worker/draft-run-selection.mjs';
+import {PRACTICE_RECENCY_HALF_LIFE} from '../draft-run-policy.mjs';
 
 const target={branch:'br-disposable',connection:'postgresql://fixture:secret@ep-fixture.us-east-2.aws.neon.tech/pack1',
   branchRecord:{id:'br-disposable',parent_id:'br-orange-feather-ayps8kep'},
@@ -34,4 +37,25 @@ test('coverage is distinct from puzzle group counts and percentiles retain sampl
   assert.equal(queryFamily('SELECT * WHERE p.puzzle_id=ANY($2::text[])'),'metadata_reload');
   assert.deepEqual(summarize([]),{samples:0,p50_ms:null,p95_ms:null,p99_ms:null});
   assert.deepEqual(summarize([30,10,20]),{samples:3,p50_ms:20,p95_ms:30,p99_ms:30});
+});
+
+
+test('current regular Practice sends gentle recency weights to the batched selector',()=>{
+  const metadata=[
+    {set_id:'hob',status:'Live',regular_run:true,release_date:'2026-08-14'},
+    {set_id:'blb',status:'Live',regular_run:true,release_date:'2024-08-02'},
+  ];
+  const {plan}=currentPracticeBatchPlan({groups:[],metadata},'practice-recency-test','mixed',{day:'2026-10-02'});
+  assert.equal(PRACTICE_RECENCY_HALF_LIFE,12);
+  assert.equal(plan.set_weights.hob,1);
+  assert.ok(Math.abs(plan.set_weights.blb-.5)<1e-12);
+});
+
+test('practice recency migration is wired into performance and both guarded release stages',()=>{
+  const migration=fs.readFileSync('migrations/0050_practice_recency_bias.sql','utf8');
+  assert.match(migration,/p_plan->'set_weights'/);
+  const performance=fs.readFileSync('.github/workflows/practice-performance.yml','utf8');
+  assert.match(performance,/migrations\/0050_practice_recency_bias\.sql/);
+  const release=fs.readFileSync('.github/workflows/secure-auth-release.yml','utf8');
+  assert.equal((release.match(/migrations\/0050_practice_recency_bias\.sql/g)||[]).length,2);
 });
