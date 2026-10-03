@@ -65,14 +65,14 @@ export function verifyTarget({branch,connection,branchRecord,endpoints}) {
   return endpoint;
 }
 
-function sqlQuery(connection) {
+export function sqlQuery(connection,{timeoutMs=90000,fetchImpl=fetch}={}) {
   const url=new URL(connection),parts=url.hostname.split('.');parts[0]='api';
   const endpoint='https://'+parts.join('.')+'/sql';
   return async(sql,params=[])=>{
     // All statements are repository-owned SELECTs, or EXPLAINs of those SELECTs.
     if(!/^(SELECT\b|WITH chosen AS\b|EXPLAIN \(ANALYZE, BUFFERS, FORMAT JSON\) (SELECT\b|WITH chosen AS\b))/i.test(sql.trim()))throw Error('Benchmark only permits read queries.');
-    const response=await fetch(endpoint,{
-      method:'POST',redirect:'error',signal:AbortSignal.timeout(90000),
+    const response=await fetchImpl(endpoint,{
+      method:'POST',redirect:'error',signal:AbortSignal.timeout(timeoutMs),
       headers:{'content-type':'application/json','Neon-Connection-String':connection,'Neon-Raw-Text-Output':'true','Neon-Array-Mode':'true'},
       body:JSON.stringify({query:sql,params:params.map(value=>value==null?null:String(value))}),
     });
@@ -120,8 +120,15 @@ export async function main() {
     report.table_estimates=(await query("SELECT s.relname,c.reltuples::bigint::text estimated_rows,s.n_live_tup::text branch_activity_live_rows,s.last_analyze::text,s.last_autoanalyze::text FROM pg_stat_user_tables s JOIN pg_class c ON c.oid=s.relid WHERE s.schemaname='public' AND s.relname IN ('draft_run_verified_puzzles','draft_run_puzzle_ratings','corpus_components','corpus_source_exclusions') ORDER BY s.relname")).rows;
     let cachedSnapshot=null;
     if(cached) {
-      const start=performance.now();cachedSnapshot=await loadServingSnapshot(query,DRAFT_RUN_CORPUS_VERSION);
-      report.cache_build={ms:elapsed(start),id:cachedSnapshot.id,revision:cachedSnapshot.revision,groups:cachedSnapshot.groups.length};
+      // A fresh production-sized clone rebuilds over a million inventory rows.
+      // Give this setup operation bounded headroom without relaxing the 90s
+      // deadline for discovery, measured selection, parity or query plans.
+      const timeoutMs=180000,build=recordQueries(sqlQuery(connection,{timeoutMs})),start=performance.now();
+      report.cache_build={timeout_ms:timeoutMs,queries:build.records,ok:false};
+      try {
+        cachedSnapshot=await loadServingSnapshot(build.query,DRAFT_RUN_CORPUS_VERSION);
+        Object.assign(report.cache_build,{id:cachedSnapshot.id,revision:cachedSnapshot.revision,groups:cachedSnapshot.groups.length,ok:true});
+      } finally {report.cache_build.ms=elapsed(start);}
       report.cache_storage=(await query(`SELECT
         pg_total_relation_size('draft_run_serving_inventory')::text inventory_bytes,
         pg_total_relation_size('draft_run_serving_source_groups')::text source_group_bytes,

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
-import {verifyTarget,recordQueries,summarize,queryFamily} from '../scripts/practice-performance.mjs';
+import {verifyTarget,recordQueries,summarize,queryFamily,sqlQuery} from '../scripts/practice-performance.mjs';
 import {currentPracticeBatchPlan} from '../worker/draft-run-selection.mjs';
 import {PRACTICE_RECENCY_HALF_LIFE} from '../draft-run-policy.mjs';
 
@@ -37,6 +37,31 @@ test('coverage is distinct from puzzle group counts and percentiles retain sampl
   assert.equal(queryFamily('SELECT * WHERE p.puzzle_id=ANY($2::text[])'),'metadata_reload');
   assert.deepEqual(summarize([]),{samples:0,p50_ms:null,p95_ms:null,p99_ms:null});
   assert.deepEqual(summarize([30,10,20]),{samples:3,p50_ms:20,p95_ms:30,p99_ms:30});
+});
+
+test('cache-build deadline is separate from ordinary benchmark requests and failures remain visible',async t=>{
+  const deadlines=[];
+  t.mock.method(AbortSignal,'timeout',ms=>{deadlines.push(ms);return new AbortController().signal;});
+  const fetchImpl=async(endpoint,options)=>{
+    assert.equal(endpoint,'https://api.us-east-2.aws.neon.tech/sql');
+    assert.equal(options.redirect,'error');
+    assert.ok(options.signal instanceof AbortSignal);
+    return {ok:true,json:async()=>({fields:[{name:'snapshot'}],rows:[['fixture']]})};
+  };
+  const ordinary=sqlQuery(target.connection,{fetchImpl});
+  const build=sqlQuery(target.connection,{fetchImpl,timeoutMs:180000});
+  assert.deepEqual(await ordinary('SELECT 1'),{rows:[{snapshot:'fixture'}]});
+  await build('SELECT pack1_serving_snapshot($1,$2,$3) snapshot',['corpus','difficulty','policy']);
+  await ordinary('SELECT pack1_select_serving_run_v1($1) selection',['fixture']);
+  assert.deepEqual(deadlines,[90000,180000,90000]);
+
+  const failure=new DOMException('provider-body-with-secret','TimeoutError');
+  const recorded=recordQueries(sqlQuery(target.connection,{timeoutMs:180000,fetchImpl:async()=>{throw failure;}}));
+  await assert.rejects(recorded.query('SELECT pack1_serving_snapshot($1,$2,$3) snapshot'),error=>error===failure);
+  assert.equal(recorded.records[0].family,'serving_snapshot');
+  assert.equal(recorded.records[0].error,'timeout');
+  assert.equal(recorded.records[0].ok,false);
+  assert.doesNotMatch(JSON.stringify(recorded.records),/secret|provider/);
 });
 
 
