@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
-import {loadActivatedEnvironment,assertFromActiveSnapshot,runActivatedSnapshotSmoke,loadRecentActivations,runRecentActivationSmokes} from '../scripts/activated-snapshot-smoke.mjs';
+import {loadActivatedEnvironment,assertFromActiveSnapshot,runActivatedSnapshotSmoke,loadRecentActivations,runRecentActivationSmokes,verifyMixedOnlySnapshot} from '../scripts/activated-snapshot-smoke.mjs';
 
 const ACTIVE='a'.repeat(64);
 const environment=row=>async()=>({rows:row?[row]:[]});
@@ -24,6 +24,43 @@ test('first-class snapshots expect their own ID on puzzles; historical ones expe
  const historical=await loadActivatedEnvironment(environment({...live,set_id:'hob',active_snapshot_id:'historical-'+'c'.repeat(32),schema_version:'historical-frozen'}),'hob');
  assert.equal(historical.puzzle_snapshot_id,null);
  assert.equal(historical.historical,true);
+});
+
+test('mixed-only inheritance requires a recorded v8 historical to v9 cutover',async()=>{
+ const inherited={...live,corpus_version:DRAFT_RUN_CORPUS_VERSION,previous_corpus_version:'elite-trophy-colour-stage-v8',previous_schema_version:'historical-frozen'};
+ assert.equal((await loadActivatedEnvironment(environment(inherited),'fra')).legacy_coverage_parent,true);
+ for(const change of [{previous_corpus_version:DRAFT_RUN_CORPUS_VERSION},{previous_schema_version:'premier-modern-skill-buckets-v1'},{previous_corpus_version:null}])
+  assert.equal((await loadActivatedEnvironment(environment({...inherited,...change}),'fra')).legacy_coverage_parent,false);
+});
+
+test('historical mixed-only rebuild proves mixed selection and reroll with exact snapshot provenance',async()=>{
+ const env={set_id:'fra',legacy_coverage_parent:true,puzzle_snapshot_id:ACTIVE};
+ const metadata=[{set_id:'fra',status:'Live',regular_run:true,release_date:'2026-10-02'}];
+ const groups=Array.from({length:7},(_,i)=>i+2).flatMap(pick_number=>['medium','hard'].map(band=>({set_id:'fra',pick_number,band,sources:16})));
+ const bridge={id:1,revision:2,metadata,groups},cache={id:2,revision:2,metadata,groups};
+ const practice=Array.from({length:8},(_,i)=>({puzzle_id:'p'+i,set_id:i===2?'fra':'blb',pick_number:i+1,source_draft_hash:'source'+i}));
+ Object.defineProperty(practice,'servingRevision',{value:2});
+ const reroll={puzzle_id:'replacement',set_id:'fra',pick_number:3,source_draft_hash:'new-source'};
+ const options={day:'2026-10-20',seed:'proof',readiness:true,
+  selectRun:async(_q,_v,_seed,_env,options)=>{if(options.setIds?.length)throw Object.assign(Error('Incomplete coverage'),{status:400});return practice;},
+  selectReroll:async()=>reroll};
+ const database=(old=bridge,snapshot=ACTIVE)=>async(sql,params)=>{
+  if(sql.includes('pack1_build_serving_snapshot'))return {rows:[{snapshot:old}]};
+  if(sql.includes('FROM draft_run_verified_puzzles'))return {rows:[practice[2],reroll].map(p=>({...p,corpus_version:DRAFT_RUN_CORPUS_VERSION,source_snapshot_id:snapshot}))};
+  throw Error('Unexpected mixed-only query: '+sql);
+ };
+ const result=await verifyMixedOnlySnapshot(database(),env,cache,options);
+ assert.equal(result.practice.mode,'mixed');assert.equal(result.practice.single_set_offered,false);
+ assert.equal(result.reroll.round,2);assert.equal(result.reroll.replacement,'replacement');
+ await assert.rejects(verifyMixedOnlySnapshot(database({...bridge,revision:3}),env,cache,options),/changed revision/);
+ const offered={...bridge,groups:[...groups,...['medium','hard'].map(band=>({set_id:'fra',pick_number:1,band,sources:16}))]};
+ await assert.rejects(verifyMixedOnlySnapshot(database(offered),env,cache,options),/removed previously available/);
+ await assert.rejects(verifyMixedOnlySnapshot(database(bridge,'b'.repeat(64)),env,cache,options),/not the active/);
+ await assert.rejects(verifyMixedOnlySnapshot(database(),env,cache,{...options,selectReroll:async()=>({...reroll,source_draft_hash:'source0'})}),/reused a source/);
+ await assert.rejects(verifyMixedOnlySnapshot(database(),{...env,legacy_coverage_parent:false},cache,options),/requires a recorded/);
+ await assert.rejects(verifyMixedOnlySnapshot(database(),env,cache,{...options,selectRun:async()=>practice}),/Incomplete coverage must still reject/);
+ const absent=practice.map(p=>({...p,set_id:'blb'}));Object.defineProperty(absent,'servingRevision',{value:2});
+ await assert.rejects(verifyMixedOnlySnapshot(database(),env,cache,{...options,selectRun:async(...args)=>args[4].setIds?options.selectRun(...args):absent}),/never selected/);
 });
 
 test('selected decisions must come from the active snapshot of the same set',async()=>{
@@ -68,7 +105,7 @@ test('no recent activation reads nothing else; a failed smoke fails the run',asy
  assert.equal(calls,1);
  assert.match(logs[0],/"activations":0/);
  // The activated environment disappeared before its smoke ran: report and fail.
- const query=async sql=>sql.includes('corpus_status_events')?{rows:[{set_id:'fra',active_snapshot_id:ACTIVE}]}:{rows:[]};
+ const query=async sql=>sql.includes('FROM corpus_status_events e JOIN')?{rows:[{set_id:'fra',active_snapshot_id:ACTIVE}]}:{rows:[]};
  await assert.rejects(runRecentActivationSmokes(query,{hours:26,log:()=>{}}),/1 of 1 recent activations failed: fra: .*has no serving environment/);
 });
 
