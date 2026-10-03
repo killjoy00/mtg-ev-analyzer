@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
 import {randomUUID} from 'node:crypto';
 import modelVersions from '../model-versions.json' with {type:'json'};
 import {corpusDatabase} from '../scripts/neon-corpus-db.mjs';
@@ -8,9 +7,7 @@ const [branch,commit,connectionFile]=process.argv.slice(2);
 const allowed=new Set(['br-twilight-hill-ayffyd2b','br-orange-feather-ayps8kep']);
 if(!allowed.has(branch)||!/^[a-f0-9]{40}$/.test(commit||'')||!connectionFile)
   throw Error('Usage: v5-live-practice-acceptance.mjs BRANCH_ID FULL_COMMIT_SHA CONNECTION_FILE');
-const connection=fs.readFileSync(connectionFile,'utf8').trim();
-if(!connection)throw Error('Target database connection is empty.');
-const query=corpusDatabase(connection);
+const query=corpusDatabase(connectionFile);
 const origin=slug=>`https://${branch}-${slug}.compute.c-5.us-east-2.aws.neon.tech`;
 const fixtures=[];
 
@@ -108,6 +105,17 @@ async function finish(run,user) {
   assert.equal(persisted.complete,true);
   assert.equal(persisted.score,run.score);
   assert.equal(persisted.answers.length,8);
+  const stored=(await query(`SELECT corpus_version,score,result_persisted_at,measurement_qa,leaderboard_eligible
+    FROM draft_run_sessions WHERE id=$1::uuid AND player_id=$2::uuid`,[run.id,user.playerId])).rows[0];
+  assert.equal(stored?.corpus_version,modelVersions.v5.corpus_version);
+  assert.equal(Number(stored?.score),Number(run.score));
+  assert.ok(stored?.result_persisted_at,'Completed Practice must persist its result transaction.');
+  assert.equal(stored?.measurement_qa,true);
+  assert.equal(stored?.leaderboard_eligible,false);
+  const result=(await query('SELECT count(*)::int n FROM game_results WHERE player_id=$1::uuid AND client_result_id=$2',[
+    user.playerId,`draft-run:${run.id}`,
+  ])).rows[0];
+  assert.equal(Number(result?.n),1,'Completed Practice must persist exactly one game result.');
   return persisted;
 }
 
@@ -187,10 +195,17 @@ try {
 
   const shared=await call('draftrunapi',`/v1/runs/${mixed.id}/share`,{body:{},...auth(owner)});
   assert.match(shared.id||'',/^[a-f0-9]+$/);
+  const self=await start({challenge:shared.id},owner);
+  assert.equal(self.id,mixed.id,'Opening your own share must return the original run.');
+  assert.equal(self.comparison,null);
   let replay=await start({challenge:shared.id},peer);
   assert.equal(replay.comparison?.exact,true);
   assert.deepEqual(replay.rerolls,{set:0,pack:0});
   assert.equal(replay.current.puzzle_id,mixed.answers[0].puzzle.puzzle_id);
+  await call('draftrunapi',`/v1/runs/${replay.id}/reroll`,{
+    body:{revision:replay.revision,round:0,puzzleId:replay.current.puzzle_id,type:'pack'},
+    ...auth(peer),status:409,
+  });
   replay=await finish(replay,peer);
   const comparison=await call('draftrunapi',`/v1/shared-runs/${shared.id}`);
   assert.equal(comparison.scores.length,2);
@@ -198,12 +213,14 @@ try {
   let cube=await start({environment:'powered-cube'},owner);
   assert.equal(cube.current.set_id,'powered-cube');
   cube=await reroll(cube,'pack',owner);
-  const cubePersisted=await call('draftrunapi',`/v1/runs/${cube.id}`,auth(owner));
-  assert.equal(cubePersisted.revision,cube.revision);
+  cube=await finish(cube,owner);
+  assert.ok(cube.answers.every(answer=>answer.puzzle.set_id==='powered-cube'));
 
   let latestRun=await start({environment:'mixed',setIds:[latest.set_id]},owner);
   assert.equal(latestRun.current.set_id,latest.set_id);
   latestRun=await reroll(latestRun,'pack',owner);
+  latestRun=await finish(latestRun,owner);
+  assert.ok(latestRun.answers.every(answer=>answer.puzzle.set_id===latest.set_id));
   const latestStored=(await query('SELECT custom_set_ids,measurement_qa,leaderboard_eligible FROM draft_run_sessions WHERE id=$1::uuid',[latestRun.id])).rows[0];
   assert.deepEqual(parse(latestStored.custom_set_ids),[latest.set_id]);
   assert.equal(latestStored.measurement_qa,true);
@@ -212,6 +229,8 @@ try {
   let archiveRun=await start({environment:'mixed',setIds:[archive.set_id]},owner);
   assert.equal(archiveRun.current.set_id,archive.set_id);
   archiveRun=await reroll(archiveRun,'pack',owner);
+  archiveRun=await finish(archiveRun,owner);
+  assert.ok(archiveRun.answers.every(answer=>answer.puzzle.set_id===archive.set_id));
 
   const ranked=(await query(`SELECT count(*)::int n FROM scores
     WHERE player_id=ANY($1::uuid[]) AND mode='draft_run'`,['{'+fixtures.map(f=>f.playerId).join(',')+'}'])).rows[0];
@@ -231,9 +250,9 @@ try {
       'guest Practice denied and account Practice granted',
       'mixed set reroll and persisted scoring',
       'shared friend replay identity and scores',
-      'Cube pack reroll',
-      'Latest Set custom Practice',
-      'archive set custom Practice',
+      'Cube pack reroll, completion and persistence',
+      'Latest Set custom Practice completion and persistence',
+      'archive set custom Practice completion and persistence',
       'no public leaderboard score',
     ],
   },null,2));
