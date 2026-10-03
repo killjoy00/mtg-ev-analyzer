@@ -66,13 +66,15 @@ test('missing gateway diff evidence fails safe into the full rehearsal',()=>{
 });
 
 
-test('production-like load harnesses replay serving readiness schema before verification',()=>{
+test('production-like load harnesses replay current serving schema before verification',()=>{
   for(const path of ['.github/workflows/launch-load.yml','.github/workflows/launch-distributed.yml']){
     const workflow=fs.readFileSync(path,'utf8');
     const i42=workflow.indexOf('migrations/0042_serving_revision_snapshot_staging.sql');
     const i43=workflow.indexOf('migrations/0043_corpus_activation_readiness.sql');
     const i44=workflow.indexOf('migrations/0044_snapshot_scoped_puzzle_uniqueness.sql');
+    const i48=workflow.indexOf('migrations/0048_uncapped_v5_components.sql');
+    const i49=workflow.indexOf('migrations/0049_cross_version_corpus_cutover.sql');
     const verify=workflow.indexOf('node scripts/verify-neon-schema.mjs');
-    assert.ok(i42>=0&&i43>i42&&i44>i43&&verify>i44,path);
+    assert.ok(i42>=0&&i43>i42&&i44>i43&&i48>i44&&i49>i48&&verify>i49,path);
   }
 });
