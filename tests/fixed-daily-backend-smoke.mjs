@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import assert from 'node:assert/strict';
 if(!process.argv.includes('--dev-fixtures'))throw Error('Use a disposable branch.');
 process.env.DATABASE_URL=fs.readFileSync(process.argv[2],'utf8').trim();
-const originalFetch=globalThis.fetch;globalThis.fetch=(url,options={})=>originalFetch(url,{...options,signal:AbortSignal.timeout(30000)});
+process.env.PACK1_CAPACITY_DIAGNOSTICS='1';
+const originalFetch=globalThis.fetch;globalThis.fetch=(url,options={})=>originalFetch(url,{...options,signal:AbortSignal.timeout(60000)});
 const RealDate=Date,instant=RealDate.parse('2040-01-10T16:00:00Z');
 globalThis.Date=class extends RealDate{constructor(...args){super(...(args.length?args:[instant]));}static now(){return instant;}};
 const growthModule=await import('../worker/growth-function.js');
@@ -14,6 +15,12 @@ const tag=crypto.randomUUID().slice(0,8),day='2040-01-10';
 const parse=v=>typeof v==='string'?JSON.parse(v):v;
 async function callWith(target,path,body,token,auth,status=200){
  const r=await target.fetch(new Request('https://packone.pro'+path,{method:body===undefined?'GET':'POST',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{}),...(auth?{'x-pack1-auth-session':auth}:{})},body:body===undefined?undefined:JSON.stringify(body)}));
+ const timing=r.headers.get('x-pack1-start-timing');
+ if(timing&&path==='/v1/runs') {
+   console.log('Draft start timing',timing);
+   const measured=JSON.parse(timing);
+   assert.ok(measured.total_ms<30000,`Draft Run start exceeded 30s SLA: ${timing}`);
+ }
  console.log('Checked',path,r.status);const data=await r.json();assert.equal(r.status,status,JSON.stringify(data));return data;
 }
 const call=(path,body,token,auth,status=200)=>callWith(api,path,body,token,auth,status);

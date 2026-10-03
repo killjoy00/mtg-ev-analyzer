@@ -33,35 +33,46 @@ BEGIN
     IF NOT FOUND THEN
       INSERT INTO draft_run_serving_snapshots(corpus_version,difficulty_version,serving_policy_version,cache_schema,revision)
         VALUES(p_parent_version,p_difficulty,p_policy_version,'serving-cache-v1',input_revision) RETURNING * INTO snapshot;
+      WITH active_parent_sets AS MATERIALIZED (
+        SELECT e.set_id,e.active_snapshot_id,a.corpus_version active_corpus_version,
+          a.schema_version active_schema_version,
+          EXISTS(
+            SELECT 1 FROM corpus_source_snapshots h
+            WHERE h.set_id=e.set_id AND h.corpus_version=p_parent_version
+              AND h.schema_version='historical-frozen'
+          ) has_historical_parent
+        FROM draft_run_environment_policy e
+        LEFT JOIN corpus_source_snapshots a ON a.source_snapshot_id=e.active_snapshot_id
+        WHERE e.status='Live'
+      ), live_components AS MATERIALIZED (
+        SELECT c.set_id,c.component_version
+        FROM corpus_components c
+        WHERE c.parent_version=p_parent_version AND c.status='Live'
+      )
       INSERT INTO draft_run_serving_inventory(snapshot_id,puzzle_id,set_id,pick_number,band,source_draft_hash)
       SELECT snapshot.id,p.puzzle_id,p.set_id,p.pick_number,r.band,p.source_draft_hash
-      FROM draft_run_verified_puzzles p JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=p_difficulty
+      FROM draft_run_verified_puzzles p
+      JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=p_difficulty
+      LEFT JOIN active_parent_sets e
+        ON e.set_id=p.set_id AND p.corpus_version=p_parent_version
+      LEFT JOIN live_components component
+        ON component.set_id=p.set_id AND component.component_version=p.corpus_version
       WHERE p.interesting AND p.pack_number=1 AND r.target_support_ratio>=0.20526315789473684::float8
-        AND (p.corpus_version<>p_parent_version OR EXISTS(
-          SELECT 1 FROM draft_run_environment_policy e
-          WHERE e.set_id=p.set_id AND e.status='Live'
-            AND (
-              e.active_snapshot_id IS NULL OR e.active_snapshot_id=p.source_snapshot_id
-              OR (p.source_snapshot_id IS NULL AND EXISTS(
-                SELECT 1 FROM corpus_source_snapshots hs
-                WHERE hs.source_snapshot_id=e.active_snapshot_id AND hs.schema_version='historical-frozen'
-              ))
-              OR (p.source_snapshot_id IS NULL
-                AND EXISTS(
-                  SELECT 1 FROM corpus_source_snapshots historical
-                  WHERE historical.set_id=p.set_id AND historical.corpus_version=p.corpus_version
-                    AND historical.schema_version='historical-frozen'
-                )
-                AND EXISTS(
-                  SELECT 1 FROM corpus_source_snapshots next_snapshot
-                  WHERE next_snapshot.source_snapshot_id=e.active_snapshot_id
-                    AND next_snapshot.corpus_version<>p.corpus_version
-                ))
-            )
-        ))
-        AND p.corpus_version IN (SELECT p_parent_version UNION SELECT c.component_version FROM corpus_components c WHERE c.parent_version=p_parent_version AND c.status='Live')
-        AND (p.corpus_version=p_parent_version OR EXISTS(SELECT 1 FROM corpus_components c WHERE c.parent_version=p_parent_version AND c.component_version=p.corpus_version AND c.set_id=p.set_id AND c.status='Live'))
-        AND NOT EXISTS(SELECT 1 FROM corpus_source_exclusions x WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version AND x.source_draft_hash=p.source_draft_hash);
+        AND (
+          (p.corpus_version=p_parent_version AND e.set_id IS NOT NULL AND (
+            e.active_snapshot_id IS NULL OR e.active_snapshot_id=p.source_snapshot_id
+            OR (p.source_snapshot_id IS NULL AND (
+              e.active_schema_version='historical-frozen'
+              OR (e.has_historical_parent AND e.active_corpus_version<>p.corpus_version)
+            ))
+          ))
+          OR (p.corpus_version<>p_parent_version AND component.component_version IS NOT NULL)
+        )
+        AND NOT EXISTS(
+          SELECT 1 FROM corpus_source_exclusions x
+          WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version
+            AND x.source_draft_hash=p.source_draft_hash
+        );
       SELECT coalesce(jsonb_agg(to_jsonb(g) ORDER BY g.set_id,g.pick_number,g.band),'[]') INTO snapshot.groups
       FROM (SELECT set_id,pick_number,band,count(*)::int n,count(DISTINCT source_draft_hash)::int sources
         FROM draft_run_serving_inventory WHERE snapshot_id=snapshot.id GROUP BY set_id,pick_number,band) g;
@@ -97,15 +108,89 @@ RETURNS boolean LANGUAGE sql STABLE AS $$
     OR EXISTS(SELECT 1 FROM draft_run_serving_snapshots WHERE corpus_version=p_version);
 $$;
 
+-- Puzzle/rating staging follows the same parent-version rule. The v9 checked-in
+-- baseline intentionally has NULL source_snapshot_id, so snapshot-awareness
+-- alone is insufficient: before v9 has a readiness key/cache, those rows are
+-- retained future data and cannot invalidate the serving v8 generation.
+CREATE OR REPLACE FUNCTION pack1_puzzle_can_affect_serving(
+  p_set_id text,p_corpus_version text,p_source_snapshot_id text
+)
+RETURNS boolean LANGUAGE sql STABLE AS $puzzle$
+  SELECT pack1_version_can_affect_serving(p_corpus_version) AND (
+    p_source_snapshot_id IS NULL OR EXISTS(
+      SELECT 1 FROM draft_run_environment_policy e
+      WHERE e.set_id=p_set_id AND e.status='Live'
+        AND e.active_snapshot_id=p_source_snapshot_id
+    )
+  );
+$puzzle$;
+
+CREATE OR REPLACE FUNCTION pack1_invalidate_inserted_puzzles()
+RETURNS trigger LANGUAGE plpgsql AS $insert_puzzles$
+BEGIN
+  IF EXISTS(
+    SELECT 1 FROM new_rows p
+    WHERE pack1_puzzle_can_affect_serving(p.set_id,p.corpus_version,p.source_snapshot_id)
+  ) THEN
+    PERFORM pack1_bump_serving_revision();
+  END IF;
+  RETURN NULL;
+END;
+$insert_puzzles$;
+
+CREATE OR REPLACE FUNCTION pack1_invalidate_deleted_puzzles()
+RETURNS trigger LANGUAGE plpgsql AS $delete_puzzles$
+BEGIN
+  IF EXISTS(
+    SELECT 1 FROM old_rows p
+    WHERE pack1_puzzle_can_affect_serving(p.set_id,p.corpus_version,p.source_snapshot_id)
+  ) THEN
+    PERFORM pack1_bump_serving_revision();
+  END IF;
+  RETURN NULL;
+END;
+$delete_puzzles$;
+
+CREATE OR REPLACE FUNCTION pack1_invalidate_updated_puzzle()
+RETURNS trigger LANGUAGE plpgsql AS $update_puzzle$
+BEGIN
+  IF ROW(
+    OLD.puzzle_id,OLD.set_id,OLD.corpus_version,OLD.source_snapshot_id,
+    OLD.source_draft_hash,OLD.interesting,OLD.pack_number,OLD.pick_number,
+    OLD.candidate_count,OLD.consensus_top_gap,OLD.support_entropy
+  ) IS NOT DISTINCT FROM ROW(
+    NEW.puzzle_id,NEW.set_id,NEW.corpus_version,NEW.source_snapshot_id,
+    NEW.source_draft_hash,NEW.interesting,NEW.pack_number,NEW.pick_number,
+    NEW.candidate_count,NEW.consensus_top_gap,NEW.support_entropy
+  ) THEN
+    RETURN NULL;
+  END IF;
+  IF pack1_puzzle_can_affect_serving(OLD.set_id,OLD.corpus_version,OLD.source_snapshot_id)
+     OR pack1_puzzle_can_affect_serving(NEW.set_id,NEW.corpus_version,NEW.source_snapshot_id) THEN
+    PERFORM pack1_bump_serving_revision();
+  END IF;
+  RETURN NULL;
+END;
+$update_puzzle$;
+
+CREATE OR REPLACE FUNCTION pack1_rating_can_affect_serving(p_puzzle_id text)
+RETURNS boolean LANGUAGE sql STABLE AS $rating$
+  SELECT EXISTS(
+    SELECT 1 FROM draft_run_verified_puzzles p
+    WHERE p.puzzle_id=p_puzzle_id
+      AND pack1_puzzle_can_affect_serving(p.set_id,p.corpus_version,p.source_snapshot_id)
+  );
+$rating$;
+
 CREATE OR REPLACE FUNCTION pack1_invalidate_inserted_versions()
-RETURNS trigger LANGUAGE plpgsql AS $$
+RETURNS trigger LANGUAGE plpgsql AS $insert_versions$
 BEGIN
   IF EXISTS(SELECT 1 FROM new_versions v WHERE pack1_version_can_affect_serving(v.corpus_version)) THEN
     PERFORM pack1_bump_serving_revision();
   END IF;
   RETURN NULL;
 END;
-$$;
+$insert_versions$;
 
 CREATE OR REPLACE FUNCTION pack1_invalidate_deleted_versions()
 RETURNS trigger LANGUAGE plpgsql AS $$
@@ -195,44 +280,40 @@ CREATE OR REPLACE FUNCTION pack1_serving_snapshot_matches_current(
   p_parent text,p_difficulty text,p_policy text,p_snapshot bigint
 )
 RETURNS boolean LANGUAGE sql STABLE AS $$
-WITH expected AS MATERIALIZED (
+WITH active_parent_sets AS MATERIALIZED (
+  SELECT e.set_id,e.active_snapshot_id,a.corpus_version active_corpus_version,
+    a.schema_version active_schema_version,
+    EXISTS(
+      SELECT 1 FROM corpus_source_snapshots h
+      WHERE h.set_id=e.set_id AND h.corpus_version=p_parent
+        AND h.schema_version='historical-frozen'
+    ) has_historical_parent
+  FROM draft_run_environment_policy e
+  LEFT JOIN corpus_source_snapshots a ON a.source_snapshot_id=e.active_snapshot_id
+  WHERE e.status='Live'
+), live_components AS MATERIALIZED (
+  SELECT c.set_id,c.component_version
+  FROM corpus_components c
+  WHERE c.parent_version=p_parent AND c.status='Live'
+), expected AS MATERIALIZED (
   SELECT p.puzzle_id,p.set_id,p.pick_number,r.band,p.source_draft_hash
   FROM draft_run_verified_puzzles p
   JOIN draft_run_puzzle_ratings r ON r.puzzle_id=p.puzzle_id AND r.difficulty_version=p_difficulty
+  LEFT JOIN active_parent_sets e
+    ON e.set_id=p.set_id AND p.corpus_version=p_parent
+  LEFT JOIN live_components component
+    ON component.set_id=p.set_id AND component.component_version=p.corpus_version
   WHERE p.interesting AND p.pack_number=1 AND r.target_support_ratio>=0.20526315789473684::float8
-    AND (p.corpus_version<>p_parent OR EXISTS(
-      SELECT 1 FROM draft_run_environment_policy e
-      WHERE e.set_id=p.set_id AND e.status='Live'
-        AND (
-          e.active_snapshot_id IS NULL OR e.active_snapshot_id=p.source_snapshot_id
-          OR (p.source_snapshot_id IS NULL AND EXISTS(
-            SELECT 1 FROM corpus_source_snapshots hs
-            WHERE hs.source_snapshot_id=e.active_snapshot_id AND hs.schema_version='historical-frozen'
-          ))
-          OR (p.source_snapshot_id IS NULL
-            AND EXISTS(
-              SELECT 1 FROM corpus_source_snapshots historical
-              WHERE historical.set_id=p.set_id AND historical.corpus_version=p.corpus_version
-                AND historical.schema_version='historical-frozen'
-            )
-            AND EXISTS(
-              SELECT 1 FROM corpus_source_snapshots next_snapshot
-              WHERE next_snapshot.source_snapshot_id=e.active_snapshot_id
-                AND next_snapshot.corpus_version<>p.corpus_version
-            ))
-        )
-    ))
-    AND p.corpus_version IN (
-      SELECT p_parent
-      UNION
-      SELECT c.component_version FROM corpus_components c
-      WHERE c.parent_version=p_parent AND c.status='Live'
+    AND (
+      (p.corpus_version=p_parent AND e.set_id IS NOT NULL AND (
+        e.active_snapshot_id IS NULL OR e.active_snapshot_id=p.source_snapshot_id
+        OR (p.source_snapshot_id IS NULL AND (
+          e.active_schema_version='historical-frozen'
+          OR (e.has_historical_parent AND e.active_corpus_version<>p.corpus_version)
+        ))
+      ))
+      OR (p.corpus_version<>p_parent AND component.component_version IS NOT NULL)
     )
-    AND (p.corpus_version=p_parent OR EXISTS(
-      SELECT 1 FROM corpus_components c
-      WHERE c.parent_version=p_parent AND c.component_version=p.corpus_version
-        AND c.set_id=p.set_id AND c.status='Live'
-    ))
     AND NOT EXISTS(
       SELECT 1 FROM corpus_source_exclusions x
       WHERE x.set_id=p.set_id AND x.corpus_version=p.corpus_version
@@ -292,7 +373,7 @@ BEGIN
       ORDER BY j.revision DESC LIMIT 1
     ) prior ON true
     WHERE next.revision=p_revision AND next.state='queued'
-      AND prior.evidence->>'day'=(clock_timestamp() AT TIME ZONE 'America/Los_Angeles')::date::text
+      AND prior.evidence->'inventory'->>'verified'='true'
       AND NOT EXISTS(
         SELECT 1 FROM draft_run_serving_snapshots s
         WHERE s.corpus_version=k.corpus_version
@@ -316,13 +397,16 @@ BEGIN
           cache_snapshot_id=carry.cache_snapshot_id,worker_release=carry.worker_release,last_error=NULL,
           evidence=jsonb_build_object(
             'revision',p_revision::text,
-            'day',(clock_timestamp() AT TIME ZONE 'America/Los_Angeles')::date::text,
+            -- Exact-equivalent carry does not pretend to re-run date-sensitive
+            -- gameplay samples. Preserve the original evidence day verbatim.
+            'day',carry.evidence->>'day',
             'cache_snapshot_id',carry.cache_snapshot_id::text,
             'inventory',jsonb_build_object('verified',true,'expected',inventory_count,'actual',inventory_count,'missing',0,'extra',0),
             'samples',jsonb_build_array(jsonb_build_object(
               'mode','exact-serving-input-carry-forward',
               'previous_revision',carry.prior_revision::text,
-              'cache_snapshot_id',carry.cache_snapshot_id::text
+              'cache_snapshot_id',carry.cache_snapshot_id::text,
+              'carried_evidence_day',carry.evidence->>'day'
             ))
           )
         WHERE id=carry.next_job_id AND state='queued';

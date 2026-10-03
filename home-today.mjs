@@ -61,7 +61,7 @@ function markup(status) {
     </div>
     <footer>
       <strong class="today-streak"><span aria-hidden="true">◆</span>${streak}</strong>
-      <button class="text-button" type="button" data-today-career>View career <span aria-hidden="true">›</span></button>
+      <button class="text-button" type="button" data-today-career>My Pack One <span aria-hidden="true">›</span></button>
     </footer>`;
 }
 

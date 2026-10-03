@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import {gunzipSync} from 'node:zlib';
+import modelVersions from '../model-versions.json' with {type:'json'};
 import {gradeDraftRunPick,validateDraftRunPuzzle,supportSharpening,DRAFT_RUN_CORPUS_VERSION} from '../draft-run.mjs';
 import {
  TRADITIONAL_COMPONENT_VERSION as component,
@@ -63,8 +64,9 @@ test('historical membership survives source pauses; new generation requires expl
  const serving=corpusMembership({serving:true});
  assert.ok(serving.includes("c.status='Live'"));
  assert.ok(serving.includes('active_snapshot_id=p.source_snapshot_id'));
- assert.ok(serving.includes('historical.corpus_version=p.corpus_version'));
- assert.ok(serving.includes('next_snapshot.corpus_version<>p.corpus_version'));
+ assert.ok(serving.includes(`p.corpus_version='${modelVersions.v4.corpus_version}'`));
+ assert.ok(serving.includes(`next_snapshot.corpus_version='${modelVersions.v5.corpus_version}'`));
+ assert.ok(!serving.includes('historical.corpus_version=p.corpus_version'),'runtime membership must not scan historical snapshots per puzzle');
  assert.ok(serving.includes('p.corpus_version<>$1'));
  assert.ok(serving.includes('c.parent_version=$1'));
  assert.ok(!corpusMembership().includes('active_snapshot_id'));
@@ -80,8 +82,9 @@ const cutoverMigration=fs.readFileSync(new URL('../migrations/0049_cross_version
 test('cross-version cutover patches only the readiness builder and stays fail-closed within one corpus version',()=>{
  assert.match(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_build_serving_snapshot/);
  assert.doesNotMatch(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_serving_snapshot\(/);
- assert.match(cutoverMigration,/next_snapshot\.corpus_version<>p\.corpus_version/);
- assert.match(cutoverMigration,/historical\.schema_version='historical-frozen'/);
+ assert.match(cutoverMigration,/active_corpus_version<>p\.corpus_version/);
+ assert.match(cutoverMigration,/schema_version='historical-frozen'/);
+ assert.match(cutoverMigration,/has_historical_parent/);
  assert.match(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_serving_snapshot_matches_current/);
  assert.match(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_enqueue_readiness/);
  assert.match(cutoverMigration,/exact-serving-input-carry-forward/);

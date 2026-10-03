@@ -835,7 +835,7 @@ async function handleMobileAccountSignup(request) {
     name:PASSWORD_ACCOUNT_NAME,
     email:String(payload.email||'').trim(),
     password:String(payload.password||''),
-    callbackURL:ACCOUNT_RETURN+'?auth=verify',
+    callbackURL:ACCOUNT_RETURN+'?auth=verify&native=1',
   }});
   const established=await establishAccount(data);
   if(!established)return json({ok:true,verificationRequired:true,user:data?.user||null},202);
@@ -1249,7 +1249,7 @@ async function handleVerificationEmailRequest(request,{mobile=false}={}) {
   try {
     await neonAuth('/send-verification-email',{method:'POST',body:{
       email,
-      callbackURL:ACCOUNT_RETURN+'?auth=verify',
+      callbackURL:ACCOUNT_RETURN+'?auth=verify'+(mobile?'&native=1':''),
     }});
   } catch(error) {
     if(Number(error?.status||500)>=500)throw Object.assign(Error('Email verification is temporarily unavailable.'),{status:503});

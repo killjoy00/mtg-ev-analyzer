@@ -10,6 +10,7 @@ await mkdir('artifacts', { recursive: true });
 const browser = await chromium.launch(process.env.CI ? { headless:true, channel:'chrome' } : { headless:true });
 const page = await browser.newPage({ viewport:{ width:390, height:844 } });
 let updatePayload = null;
+let updateMode = 'success';
 let shareCalls = 0;
 
 await page.addInitScript(() => {
@@ -118,16 +119,30 @@ await page.route(`${growthOrigin}/**`, async (route) => {
   } else if (url.pathname === '/v1/profile' && route.request().method() === 'PATCH') {
     assert.equal(route.request().headers()['x-pack1-auth-session'],'profile-auth-fixture');
     updatePayload = route.request().postDataJSON();
-    body = {
-      ...fixture,
-      player:{
-        ...fixture.player,
-        display_name:updatePayload.displayName || fixture.player.display_name,
-        profile_public:Boolean(updatePayload.profilePublic),
-        favorite_set_id:updatePayload.favoriteSetId || null,
-        showcase_achievement:updatePayload.showcaseAchievement || null,
-      },
-    };
+    if(updateMode === 'network') {
+      status = 503;
+      body = { error:'Profile save fixture unavailable.' };
+    } else if(updateMode === 'taken') {
+      status = 409;
+      body = { error:'That display name is already taken.', code:'USERNAME_TAKEN' };
+    } else if(updateMode === 'not_allowed') {
+      status = 400;
+      body = { error:'That display name is not allowed.', code:'USERNAME_NOT_ALLOWED' };
+    } else {
+      const placeholder = updateMode === 'placeholder';
+      body = {
+        ...fixture,
+        player:{
+          ...fixture.player,
+          display_name:updatePayload.displayName || fixture.player.display_name,
+          profile_public:Boolean(updatePayload.profilePublic),
+          favorite_set_id:updatePayload.favoriteSetId || null,
+          showcase_achievement:updatePayload.showcaseAchievement || null,
+          username_owned:!placeholder,
+          display_name_reason:placeholder ? 'username_required' : null,
+        },
+      };
+    }
   } else if (url.pathname === '/v1/profile-lookup') {
     body = { profiles:{ 'profile tester':{ display_name:'Profile Tester', profile_key:profileKey } } };
   } else if (url.pathname === '/v1/stats') {
@@ -202,22 +217,71 @@ try {
   await page.locator('#profile-account-tab').click();
   assert.equal(await page.locator('#profile-manage-account,#profile-share-progress').count(),0);
   assert.equal(await page.locator('input[name="displayName"]').inputValue(), 'Profile Tester');
-  // Saving carries the Public Identity rules as a notice, never a required checkbox.
-  assert.match((await page.locator('.profile-identity-rules').textContent())||'',/By saving a display name or public profile, you agree/);
+  // Saving carries a short directly linked Public Identity notice, never a required checkbox.
+  assert.match((await page.locator('.profile-identity-rules').textContent())||'',/Display names and public profiles follow the Pack One Public Identity rules/);
   assert.equal(await page.locator('.profile-identity-rules a[href="/terms/#public-identity-rules"]').count(),1);
   assert.equal(await page.locator('input[name="acceptPublicIdentityTerms"]').count(),0);
+  assert.equal((await page.locator('.profile-toggle strong').textContent())?.trim(),'Public profile');
+  assert.equal((await page.locator('.profile-toggle small').textContent())?.trim(),'Let players view your Pack One record from leaderboards and shared links.');
+  const toggleBox=await page.locator('.profile-toggle').boundingBox();
+  assert.ok(toggleBox&&toggleBox.height>=43.5,'public profile row is a full touch target');
+  const topSave=page.locator('button[form="profile-settings-form"][type="submit"]');
+  assert.equal(await topSave.count(),1,'Save profile is visible in the editor heading');
+  assert.equal(await page.locator('.profile-settings-heading-row').getByRole('link',{name:'Change name'}).count(),1);
+
+  updateMode='success';
   await page.locator('input[name="displayName"]').fill('Leaderboard Ace');
   await page.locator('select[name="favoriteSetId"]').selectOption('ktk');
   await page.locator('select[name="showcaseAchievement"]').selectOption('top10');
-  await page.locator('#profile-settings-form button[type="submit"]').click();
-  await page.waitForFunction(() => document.querySelector('input[name="displayName"]')?.value === 'Leaderboard Ace' && document.querySelector('select[name="favoriteSetId"]')?.value === 'ktk');
-  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10' });
+  await topSave.click();
+  await page.getByText('Profile saved.',{exact:true}).waitFor();
+  assert.deepEqual(updatePayload, { displayName:'Leaderboard Ace', profilePublic:true, favoriteSetId:'ktk', showcaseAchievement:'top10', acceptPublicIdentityTerms:true });
   await page.waitForFunction(() => localStorage.getItem('pack1-player-name-v1') === 'Leaderboard Ace');
-  assert.equal(await page.evaluate(() => localStorage.getItem('pack1-player-name-v1')), 'Leaderboard Ace');
+
+  updateMode='taken';
+  await page.locator('input[name="displayName"]').fill('Taken Name');
+  await topSave.click();
+  await page.getByText('That display name is already taken.',{exact:true}).waitFor();
+  assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Taken Name');
+  assert.match((await page.locator('#profile-save-status').textContent())||'',/Profile not saved/);
+
+  updateMode='not_allowed';
+  await page.locator('input[name="displayName"]').fill('Pack One Support');
+  await topSave.click();
+  await page.getByText('That display name is not allowed.',{exact:true}).waitFor();
+  assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Pack One Support');
+  assert.match((await page.locator('#profile-save-status').textContent())||'',/Profile not saved/);
+
+  updateMode='network';
+  await page.locator('input[name="displayName"]').fill('Unsaved Edit');
+  await page.locator('select[name="favoriteSetId"]').selectOption('neo');
+  await topSave.click();
+  await page.getByText(/Your edits are still here\./).waitFor();
+  assert.equal(await page.locator('input[name="displayName"]').inputValue(),'Unsaved Edit');
+  assert.equal(await page.locator('select[name="favoriteSetId"]').inputValue(),'neo');
+
+  updateMode='placeholder';
+  await page.locator('input[name="displayName"]').fill('Pack Player');
+  await page.locator('input[name="profilePublic"]').uncheck();
+  await topSave.click();
+  await page.getByText('Profile saved.',{exact:true}).waitFor();
+  assert.equal(await page.locator('#profile-display-name-error').textContent(),'Choose a display name to join Daily leaderboards.');
+  assert.deepEqual(updatePayload, {
+    displayName:'Pack Player',
+    profilePublic:false,
+    favoriteSetId:'neo',
+    showcaseAchievement:'top10',
+    acceptPublicIdentityTerms:true,
+  });
+
+  await page.evaluate(()=>{document.documentElement.style.fontSize='125%';});
+  await noOverflow();
+  await page.screenshot({path:'artifacts/ui-profile-settings-large-text-390.png',fullPage:true});
+  await page.evaluate(()=>{document.documentElement.style.fontSize='';});
 
   await page.locator('#profile-stats-tab').click();
-  assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Leaderboard Ace');
-  assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="top10"]').count(),1,'new showcase updates the name badge');
+  assert.equal((await page.locator('.my-profile-card h2').textContent())?.trim(), 'Pack Player');
+  assert.equal(await page.locator('.my-profile-card h2 [data-achievement-mark="top10"]').count(),1,'successful placeholder-name save refreshes the authoritative profile while prior failed edits stayed local');
   await page.locator('#profile-share').click();
   await page.waitForFunction(() => (window.__pack1ShareCalls || 0) > 0, null, { timeout:5000 });
   shareCalls = await page.evaluate(() => window.__pack1ShareCalls || 0);

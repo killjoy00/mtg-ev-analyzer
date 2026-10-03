@@ -130,14 +130,90 @@ async function fresh({source='nav',validateDailyRunId=null,intent=null,width=390
   await page.evaluate(async args=>window.__renderAccount(args),{source,validateDailyRunId,intent});
 }
 
+async function startVerificationSignup({source,validateDailyRunId=null,intent=null,email='verify@example.invalid'}={}) {
+  await fresh({source,validateDailyRunId,intent});
+  verificationRequired=true;
+  const signup=page.locator('#account-signup');
+  await signup.locator('[name="email"]').fill(email);
+  await signup.locator('[name="password"]').fill('fixture-password-123');
+  await signup.getByRole('button',{name:'Create account',exact:true}).click();
+  await page.getByRole('heading',{name:'Check your email'}).waitFor();
+  return page.evaluate(()=>JSON.parse(sessionStorage.getItem('pack1-auth-flow-v1')||'null'));
+}
+
+async function resumeVerificationAfterReload({navigate=false}={}) {
+  signed=false;
+  await page.goto(base+'/tests/auth-context-harness.html?auth=verify',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>Boolean(window.__renderAccount));
+  if(navigate) {
+    await page.evaluate(()=>{void import('/growth.mjs').then(growth=>growth.resumeAccountAuth('verify'));});
+    return;
+  }
+  await page.evaluate(async()=>{const growth=await import('/growth.mjs');await growth.resumeAccountAuth('verify');});
+}
+
+async function captureProductionAuthEvidence() {
+  signed=false;
+  verificationRequired=false;
+  nextLinkNewlyClaimed=false;
+  nextLinkRankingReason=null;
+  linkBodies=[];
+  await page.route('**/leaderboard-config.js',route=>route.fulfill({
+    status:200,
+    contentType:'application/javascript',
+    body:`window.PACK1_API={
+      firstParty:true,
+      authBase:'https://ep-lively-river-b5tky50l.neonauth.c-7.us-east-2.aws.neon.tech/neondb/auth',
+      url:'https://api.packone.pro/legacy',
+      growthUrl:'https://api.packone.pro/growth',
+      draftRunUrl:'https://api.packone.pro/draft'
+    };`,
+  }));
+  await page.setViewportSize({width:390,height:844});
+  await page.goto(base+'/',{waitUntil:'domcontentloaded'});
+  await page.waitForFunction(()=>Boolean(document.querySelector('#account-nav')));
+  await page.evaluate(async()=>{
+    const growth=await import('/growth.mjs');
+    await growth.renderAccount({source:'nav',mode:'signin'});
+  });
+  await page.locator('#account-signin').waitFor();
+  await page.screenshot({path:'artifacts/ui-auth-production-signin-390.png',fullPage:true});
+
+  await page.evaluate(async()=>{
+    const growth=await import('/growth.mjs');
+    await growth.renderAccount({source:'nav',mode:'signup'});
+  });
+  await page.locator('#account-signup').waitFor();
+  await page.screenshot({path:'artifacts/ui-auth-production-signup-390.png',fullPage:true});
+
+  await page.setViewportSize({width:1440,height:900});
+  await page.screenshot({path:'artifacts/ui-auth-production-signup-desktop.png',fullPage:true});
+
+  await page.setViewportSize({width:390,height:844});
+  await page.evaluate(()=>{document.documentElement.style.fontSize='125%';});
+  await page.screenshot({path:'artifacts/ui-auth-production-signup-large-text-390.png',fullPage:true});
+  await page.evaluate(()=>{document.documentElement.style.fontSize='';});
+
+  // Verification completion remains on the deterministic harness below so the
+  // E2E safety guard never permits the real production growth endpoint. The
+  // harness now loads the production visual layer; the real root shell above
+  // supplies final sign-in/signup appearance evidence.
+}
+
 try {
+  await captureProductionAuthEvidence();
+
   // Normal nav/route auth defaults to sign-in and shows exactly one email mode.
   await fresh({source:'nav',width:390});
   await page.locator('#account-signin').waitFor();
   assert.equal(await page.locator('#account-signup').count(),0);
-  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Continue with Google');
+  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Sign in with Google');
+  assert.equal((await page.locator('#account-apple').textContent())?.trim(),'Sign in with Apple');
   assert.equal((await page.locator('.account-page h1').textContent())?.trim(),'Sign In');
-  assert.match((await page.locator('.account-new-user').textContent())||'',/New to Pack One\?\s*Create account/i);
+  assert.match((await page.locator('.account-mode-toggle').textContent())||'',/New to Pack One\?\s*Create account/i);
+  assert.equal(await page.locator('.account-auth-card #account-signin').count(),1);
+  assert.equal(await page.locator('.account-auth-card .account-social').count(),1);
+  assert.equal(await page.locator('.account-creation-consent').count(),0);
   await page.screenshot({path:'artifacts/ui-auth-signin-390.png',fullPage:true});
 
   await page.setViewportSize({width:1440,height:900});
@@ -147,6 +223,11 @@ try {
   await page.locator('#account-mode-toggle').click();
   await page.locator('#account-signup').waitFor();
   assert.equal(await page.locator('#account-signin').count(),0);
+  assert.equal((await page.locator('#account-google').textContent())?.trim(),'Create with Google');
+  assert.equal((await page.locator('#account-apple').textContent())?.trim(),'Create with Apple');
+  assert.equal((await page.locator('.account-creation-consent').textContent())?.trim(),'By creating an account, you agree to the Pack One Terms.');
+  assert.equal(await page.locator('.account-creation-consent a[href="https://packone.pro/terms/"]').count(),1);
+  assert.equal(await page.locator('.account-creation-consent a').count(),1);
   await page.setViewportSize({width:390,height:844});
   await page.screenshot({path:'artifacts/ui-auth-signup-390.png',fullPage:true});
   await page.setViewportSize({width:1440,height:900});
@@ -198,6 +279,31 @@ try {
   assert.equal(await page.locator('.account-verification-success.form-error').count(),0);
   await page.locator('#account-verification-signin').click();
   await page.locator('#account-signin').waitFor();
+
+  // Verification-required email signup persists pending Daily context across a full document reload.
+  let savedFlow=await startVerificationSignup({source:'daily_result',validateDailyRunId:runId,email:'daily-verify@example.invalid'});
+  assert.deepEqual(savedFlow,{intent:null,source:'daily_result',validateDailyRunId:runId});
+  nextLinkNewlyClaimed=false;
+  await resumeVerificationAfterReload();
+  await page.getByText("Score added to today's leaderboard",{exact:true}).waitFor();
+  assert.deepEqual(linkBodies.at(-1),{validateDailyRunId:runId},'verification return must submit the pending Daily run when linking the account');
+
+  // Elite entry intent survives the verification reload and resumes at the Elite destination.
+  savedFlow=await startVerificationSignup({source:'practice_gate',intent:'elite',email:'elite-verify@example.invalid'});
+  assert.deepEqual(savedFlow,{intent:'elite',source:'practice_gate',validateDailyRunId:null});
+  nextLinkNewlyClaimed=false;
+  await resumeVerificationAfterReload({navigate:true});
+  await page.waitForURL(url=>new URL(url).pathname==='/patreon/');
+  assert.equal(new URL(page.url()).pathname,'/patreon/');
+
+  // Patreon activation intent also survives the reload and resumes the provider handoff screen.
+  savedFlow=await startVerificationSignup({source:'welcome_note',intent:'patreon-activate',email:'patreon-verify@example.invalid'});
+  assert.deepEqual(savedFlow,{intent:'patreon-activate',source:'welcome_note',validateDailyRunId:null});
+  nextLinkNewlyClaimed=false;
+  await resumeVerificationAfterReload();
+  await page.getByRole('heading',{name:'Activate Pack One Elite'}).waitFor();
+  await page.getByRole('heading',{name:'Authorize Patreon to activate Elite.'}).waitFor();
+  await page.evaluate(()=>sessionStorage.removeItem('pack1-patreon-activation-v1'));
 
   // Unverified password sign-in gets a recovery message and a resend action.
   await fresh({source:'nav'});
@@ -255,6 +361,8 @@ try {
   await page.evaluate(async()=>{const growth=await import('/growth.mjs');await growth.resumeAccountAuth('verify');});
   await page.getByRole('heading',{name:'Your account is ready.'}).waitFor();
   await page.getByText('Choose a different display name. That one is already taken.',{exact:true}).waitFor();
+  assert.equal(await page.locator('#account-signin').count(),0,'normal verification completion must not require another sign-in');
+  await page.screenshot({path:'artifacts/ui-auth-verification-account-ready-390.png',fullPage:true});
   await page.getByRole('button',{name:'Skip for now',exact:true}).click();
 
   // Email submit disables while pending and restores/finishes without double-submit.

@@ -115,10 +115,11 @@ function profileAside(profile,progress,account,patreon) {
   const favorite=progress.environments.find(entry=>entry.id===profile.player.favorite_set_id);
   const showcased=(profile.achievements||[]).find(item=>item.id===profile.player.showcase_achievement&&item.unlocked);
   const elite=patreon?.capabilities?.includes('custom_corpus')&&patreon?.capabilities?.includes('unlimited_cube_practice');
+  const membershipLabel=patreon?.configured!==true?'Status unavailable':elite?'Elite':patreon?.connected?'Patreon connected':'Free';
   const email=account?.user?.email||'';
   return '<section class="my-side-card my-profile-card" aria-labelledby="my-profile-card-title">'+
     '<div class="my-profile-head"><div class="my-avatar" aria-hidden="true">'+esc(initials(profile.player.display_name))+'</div><div><h2 id="my-profile-card-title" class="profile-name-line">'+esc(profile.player.display_name)+(showcased?achievementMark(showcased.id,{compact:true}):'')+'</h2>'+(email?'<p>'+esc(email)+'</p>':'')+'</div></div>'+
-    '<ul class="my-profile-facts"><li><span>Membership</span><strong>'+(elite?'Elite':'Free')+'</strong></li><li><span>Public profile</span><strong>'+(profile.player.profile_public?'On':'Off')+'</strong></li>'+(favorite?'<li><span>Favorite environment</span><strong>'+esc(favorite.name)+'</strong></li>':'')+(showcased?'<li><span>Showcase</span><strong class="profile-showcase-label">'+achievementMark(showcased.id,{decorative:true,compact:true})+esc(showcased.label)+'</strong></li>':'')+'</ul>'+
+    '<ul class="my-profile-facts"><li><span>Membership</span><strong>'+membershipLabel+'</strong></li><li><span>Public profile</span><strong>'+(profile.player.profile_public?'On':'Off')+'</strong></li>'+(favorite?'<li><span>Favorite environment</span><strong>'+esc(favorite.name)+'</strong></li>':'')+(showcased?'<li><span>Showcase</span><strong class="profile-showcase-label">'+achievementMark(showcased.id,{decorative:true,compact:true})+esc(showcased.label)+'</strong></li>':'')+'</ul>'+
   '</section>';
 }
 
@@ -151,12 +152,17 @@ function statsMarkup(profile,catalog,account,patreon) {
   const daily=(profile.daily_history||[]).slice(0,12);
   const unlocked=unlockedAchievements(profile).length;
   const totalAchievements=(profile.achievements||[]).length;
+  if(num(summary.games)===0) {
+    return '<div class="my-pack-one-grid is-first-run"><main class="my-pack-one-main">'+
+      '<section class="my-pack-card my-first-run-card"><p class="eyebrow">Welcome to My Pack One</p><h2>Start with today’s Daily.</h2><p>Play your first Daily to start your record. Your scores, streaks, environments, achievements, and history will appear here as you play.</p><a class="button primary" href="/?game=draft-run&daily=1">Play Daily</a></section>'+
+      '</main><aside class="my-pack-one-aside">'+profileAside(profile,progress,account,patreon)+membershipAside(patreon)+'</aside></div>';
+  }
   const metrics=[
     ['Games',num(summary.games)],
     ['Average',num(summary.average_score).toFixed(1)],
     ['Best',num(summary.best_score)],
     ['Daily streak',num(summary.current_streak)],
-    ['Shared runs',esc(formatChallengeRecord(summary))],
+    ['Shared W–L',esc(formatChallengeRecord(summary))],
     ['Environments',progress.played+'/'+progress.total],
   ];
   const metricHtml=metrics.map(([label,value])=>'<div><strong>'+value+'</strong><span>'+label+'</span></div>').join('');
@@ -229,10 +235,10 @@ export function myPackOneMarkup(profile,catalog,{account=null,patreon=null,setti
   return '<section class="player-profile-page my-pack-one-page growth-page" data-profile-key="'+esc(profile.player.profile_key||'')+'">'+
     '<header class="my-pack-one-heading"><h1>My Pack One</h1><p>Your stats, settings, and everything in one place.</p></header>'+
     usernameAttentionMarkup(profile)+
-    '<div class="my-pack-one-tabs" role="tablist" aria-label="My Pack One"><button type="button" role="tab" id="profile-stats-tab" aria-controls="profile-stats-panel" aria-selected="'+String(!accountSelected)+'" tabindex="'+(!accountSelected?'0':'-1')+'">Stats</button><button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(accountSelected)+'" tabindex="'+(accountSelected?'0':'-1')+'">Account</button></div>'+
+    '<div class="my-pack-one-tabs" role="tablist" aria-label="My Pack One"><button type="button" role="tab" id="profile-stats-tab" aria-controls="profile-stats-panel" aria-selected="'+String(!accountSelected)+'" tabindex="'+(!accountSelected?'0':'-1')+'">Stats</button><button type="button" role="tab" id="profile-account-tab" aria-controls="profile-account-panel" aria-selected="'+String(accountSelected)+'" tabindex="'+(accountSelected?'0':'-1')+'">Account settings</button></div>'+
     '<section class="my-pack-one-panel" id="profile-stats-panel" role="tabpanel" aria-labelledby="profile-stats-tab" data-profile-panel="stats" '+(accountSelected?'hidden':'')+'>'+statsMarkup(profile,catalog,account,patreon)+'</section>'+
     '<section class="my-pack-one-panel my-pack-one-account-panel" id="profile-account-panel" role="tabpanel" aria-labelledby="profile-account-tab" data-profile-panel="account" '+(!accountSelected?'hidden':'')+'>'+
-      '<div class="my-account-heading"><h2>Account</h2><p>Manage your profile, membership, and sign-in.</p></div>'+
+      '<div class="my-account-heading"><h2>Account settings</h2><p>Manage your profile, membership, and sign-in.</p></div>'+
       (typeof settingsMarkup==='function'?settingsMarkup(profile,progress,account,patreon):'')+
     '</section>'+
   '</section>';

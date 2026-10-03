@@ -153,7 +153,8 @@ test('Pack One recovery template uses only a fragment reset URL and contains no 
     assert.doesNotMatch(body,/neon\.tech/i);
     assert.doesNotMatch(body,/Neon Auth/i);
     assert.doesNotMatch(body,/\?token=/);
-    assert.match(body,/This reset link expires at 2026-09-21 21:00:00 UTC\./);
+    assert.match(body,/This reset link expires September 21, 2026/);
+    assert.match(body,/UTC/);
     assert.doesNotMatch(body,/verification link/i);
   }
 });
@@ -169,6 +170,11 @@ test('Pack One verification template uses the exact validated Neon link with Pac
   assert.match(rendered.html,/>P<sup[^>]*>1<\/sup><\/td>/);
   assert.match(rendered.html,/Verify your email/i);
   assert.match(rendered.html,/Verify email/);
+  assert.match(rendered.text,/If the button doesn’t work, copy and paste this link\./);
+  assert.match(rendered.html,/If the button doesn’t work, copy and paste this link\./);
+  assert.ok(rendered.html.includes('href="'+linkUrl+'"'),'fallback and button use the validated verification URL');
+  assert.ok(rendered.html.split(linkUrl).length>=3,'verification URL is both clickable and visibly copyable');
+  assert.match(rendered.html,/word-break:break-all/);
   assert.doesNotMatch(rendered.html,/<img\b/i);
   for(const body of [rendered.text,rendered.html]){
     assert.match(body,/Pack One/);
@@ -176,7 +182,8 @@ test('Pack One verification template uses the exact validated Neon link with Pac
     assert.doesNotMatch(body,/Reset your password/);
     // Regression: both templates share expiryCopy, which said "reset link" in
     // the verification email until the noun became a call-site argument.
-    assert.match(body,/This verification link expires at 2026-09-22 21:00:00 UTC\./);
+    assert.match(body,/This verification link expires September 22, 2026/);
+    assert.match(body,/UTC/);
     assert.doesNotMatch(body,/reset link/i);
   }
 });

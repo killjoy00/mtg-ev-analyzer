@@ -103,6 +103,19 @@ test('Google verifier is exchanged in the browser and immediately migrated to a 
   assert.equal(migrate.credentials,'include');
 });
 
+test('email verification adopts the provider auto-sign-in session before Pack One onboarding',async()=>{
+  location.href='https://packone.pro/?auth=verify';
+  const result=await auth.completeEmailVerification();
+  assert.equal(result.user.id,'google-user');
+  const exchange=calls.findLast(row=>row.path==='/pack1/auth/get-session');
+  assert.equal(exchange.host,PROD_AUTH_HOST);
+  assert.equal(exchange.credentials,'include');
+  assert.equal(new URL('https://'+exchange.host+exchange.path).searchParams.has('neon_auth_session_verifier'),false);
+  const migrate=calls.findLast(row=>row.path==='/growth/v1/account/migrate');
+  assert.equal(migrate.headers.get('x-pack1-auth-session'),'google-neon-session');
+  assert.equal(migrate.credentials,'include');
+});
+
 
 test('password recovery stays behind the Pack One first-party API and never accepts a browser redirect destination',async()=>{
   await auth.requestPasswordReset('qa@example.invalid');
