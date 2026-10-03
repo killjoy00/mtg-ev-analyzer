@@ -60,8 +60,8 @@ try {
  const beforeFutureStage=await revision();
  await query(`INSERT INTO draft_run_verified_puzzles
   SELECT (jsonb_populate_record(NULL::draft_run_verified_puzzles,to_jsonb(p)||jsonb_build_object(
-    'puzzle_id',$1,'corpus_version',$2,'source_snapshot_id',NULL,
-    'payload',p.payload||jsonb_build_object('corpus_version',$2)))).*
+    'puzzle_id',$1::text,'corpus_version',$2::text,'source_snapshot_id',NULL,
+    'payload',p.payload||jsonb_build_object('corpus_version',$2::text)))).*
   FROM draft_run_verified_puzzles p
   WHERE p.set_id=$3 AND p.corpus_version=$4
   ORDER BY p.puzzle_id LIMIT 1`,[futurePuzzle,futureVersion,setId,DRAFT_RUN_CORPUS_VERSION]);
