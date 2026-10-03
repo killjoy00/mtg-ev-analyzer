@@ -4,6 +4,6 @@
   "target": "production",
   "action": "stage",
   "candidate_run_id": "37132557406",
-  "release_commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
-  "reason": "Stage the exact accepted v5/v9 candidate in production only after development activation and full exact-runtime Daily and Practice acceptance pass. Preserve existing v8 serving pointers, readiness and history, and require exact artifact, health, canary, count, rating and preservation evidence before any production bridge or activation."
+  "release_commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5",
+  "reason": "Owner-authorized #889. Stage the unchanged exact candidate only after the corrected development runtime from #919 passes complete Daily and account-linked Practice acceptance; preserve v8 serving and every historical row."
 }
