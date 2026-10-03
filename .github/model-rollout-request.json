@@ -1,11 +1,11 @@
 {
   "operation": "v5-corpus-release",
-  "request_id": "v5-v9-development-activate-20261003",
+  "request_id": "v5-v9-development-selector-acceptance-20261003",
+  "reason": "Owner-authorized #889 recovery after activation 37147670630 completed all publication/readiness and serving-quality gates but found retained baseline copies decrementing active Cube counts. Reverify the identical fully published candidate with the corrected descendant runtime, all history checks and full quality gates; do not publish or mutate pointers again.",
   "target": "development",
-  "action": "activate",
+  "action": "verify-active",
   "candidate_run_id": "37132557406",
-  "release_commit": "f2a6083daecb09f3098c46e29625c51aa41ad217",
+  "release_commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5",
   "stage_run_id": "37146043862",
-  "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978",
-  "reason": "Activate the exact accepted v5/v9 candidate only after development stage 37146043862 and the exact reviewed v8 bridge deployment pass. Reverify staged bytes and preserved history, atomically switch all parent snapshots, build readiness, and publish only eligible Traditional components."
+  "bridge_commit": "c7e90fe333395bcb3f7468744c943c20a7231978"
 }
