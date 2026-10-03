@@ -80,8 +80,9 @@ const cutoverMigration=fs.readFileSync(new URL('../migrations/0049_cross_version
 test('cross-version cutover patches only the readiness builder and stays fail-closed within one corpus version',()=>{
  assert.match(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_build_serving_snapshot/);
  assert.doesNotMatch(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_serving_snapshot\(/);
- assert.match(cutoverMigration,/next_snapshot\.corpus_version<>p\.corpus_version/);
- assert.match(cutoverMigration,/historical\.schema_version='historical-frozen'/);
+ assert.match(cutoverMigration,/active_corpus_version<>p\.corpus_version/);
+ assert.match(cutoverMigration,/schema_version='historical-frozen'/);
+ assert.match(cutoverMigration,/has_historical_parent/);
  assert.match(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_serving_snapshot_matches_current/);
  assert.match(cutoverMigration,/CREATE OR REPLACE FUNCTION pack1_enqueue_readiness/);
  assert.match(cutoverMigration,/exact-serving-input-carry-forward/);
