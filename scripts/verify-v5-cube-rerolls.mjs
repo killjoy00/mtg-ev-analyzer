@@ -15,6 +15,7 @@ import {
 import {meetsServingQuality} from '../serving-quality.mjs';
 import {DRAFT_RUN_SELECTION_VERSION,earlyRoundsForSelection} from '../draft-run-policy.mjs';
 import {MAX_REROLL_RATING_DELTA} from '../draft-run-difficulty.mjs';
+import {CUBE_TRADITIONAL_V5_COMPONENT_VERSION} from '../corpus-components.mjs';
 
 const RUNTIME_CANDIDATE_LIMIT=20;
 const OTHER_RUN_SOURCES=7;
@@ -48,10 +49,14 @@ export function validateCubeRerollSlack(rows,{requireV5=true}={}) {
   if(requireV5) {
     assert.equal(DRAFT_RUN_CORPUS_VERSION,V5_CORPUS_VERSION,'V5 finalizer must validate from the v9 release tree.');
     assert.ok(rows.every(p=>p.set_id===POWERED_CUBE_ENVIRONMENT),'Candidate contains a non-Cube row.');
-    assert.ok(rows.every(p=>p.corpus_version===V5_CORPUS_VERSION),'Candidate contains a non-v9 Cube row.');
     assert.ok(rows.every(p=>p.model_version===V5_CONTEXT_MODEL_VERSION),'Candidate contains a non-v5 Cube model row.');
-    assert.ok(new Set(rows.map(p=>p.source_draft_hash)).size>300,
+    const premier=rows.filter(p=>p.corpus_version===V5_CORPUS_VERSION);
+    const traditional=rows.filter(p=>p.corpus_version===CUBE_TRADITIONAL_V5_COMPONENT_VERSION &&
+      p.parent_corpus_version===V5_CORPUS_VERSION);
+    assert.equal(premier.length+traditional.length,rows.length,'Candidate contains an unexpected Cube corpus/component version.');
+    assert.ok(new Set(premier.map(p=>p.source_draft_hash)).size>300,
       'Expected the complete first-class Cube trophy snapshot, not the 300-seat replay baseline.');
+    assert.ok(traditional.length>0,'Expected the admitted v5 Traditional Cube component in the serving-union proof.');
   }
 
   const groups=new Map();
@@ -115,6 +120,8 @@ export function validateCubeRerollSlack(rows,{requireV5=true}={}) {
   return {
     rows:rows.length,
     sources:new Set(rows.map(p=>p.source_draft_hash)).size,
+    premier_sources:new Set(rows.filter(p=>p.corpus_version===V5_CORPUS_VERSION).map(p=>p.source_draft_hash)).size,
+    traditional_sources:new Set(rows.filter(p=>p.corpus_version===CUBE_TRADITIONAL_V5_COMPONENT_VERSION).map(p=>p.source_draft_hash)).size,
     selectable,
     checked_first_replacements:checkedFirstReplacements,
     min_first_sources:minFirst,
@@ -127,8 +134,8 @@ function readJsonlGzip(file) {
 }
 
 if(process.argv[1]&&pathToFileURL(process.argv[1]).href===import.meta.url) {
-  const file=process.argv[2];
-  if(!file)throw Error('Usage: node scripts/verify-v5-cube-rerolls.mjs PATH_TO_POWERED_CUBE_PUZZLES_JSONL_GZ');
-  const report=validateCubeRerollSlack(readJsonlGzip(file));
+  const files=process.argv.slice(2);
+  if(!files.length)throw Error('Usage: node scripts/verify-v5-cube-rerolls.mjs PREMIER_CUBE_PUZZLES_JSONL_GZ TRADITIONAL_CUBE_PUZZLES_JSONL_GZ');
+  const report=validateCubeRerollSlack(files.flatMap(readJsonlGzip));
   console.log('V5_CUBE_REROLL_SLACK '+JSON.stringify(report));
 }
