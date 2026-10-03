@@ -34,10 +34,14 @@ async function callGrowth(path,{body,playerToken,accountToken,method,status=200}
   return responseJson(response,status,path);
 }
 
+// Admin renames are served by pack1growth (it sends the account notice); the
+// other admin user routes stay on the draft-run function.
 async function callAdminRaw(path,{body,accountToken,method}={}) {
-  const response=await draftRun.fetch(new Request(origin+path,{
+  const growthRoute=/\/username$/.test(path);
+  const response=await (growthRoute?growth:draftRun).fetch(new Request(origin+path,{
     method:method||(body===undefined?'GET':'POST'),
     headers:{
+      ...(growthRoute?{origin}:{}),
       ...(body===undefined?{}:{'content-type':'application/json'}),
       ...(accountToken?{'x-pack1-auth-session':accountToken}:{}),
     },
@@ -184,6 +188,13 @@ try {
   });
   assert.equal(renamed.display_name,renamedName);
   assert.equal(renamed.username_owned,true);
+  assert.ok(['sent','skipped','failed'].includes(renamed.notification?.status),'admin rename reports the account notice outcome');
+  const draftRename=await draftRun.fetch(new Request(origin+`/v1/admin/users/${target.authId}/username`,{
+    method:'PATCH',
+    headers:{'content-type':'application/json','x-pack1-auth-session':adminToken},
+    body:JSON.stringify({displayName:`PI Draft Path ${tag}`}),
+  }));
+  assert.equal(draftRename.status,405,'draft-run no longer accepts admin renames that would skip the account notice');
   targetName=renamedName;
   const renameRow=(await query(
     'SELECT display_name,username_owned,profile_public,public_identity_terms_version,public_identity_terms_accepted_at FROM players WHERE id=$1::uuid',
