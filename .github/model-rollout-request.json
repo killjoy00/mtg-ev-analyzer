@@ -1,7 +1,8 @@
 {
-  "operation": "deploy",
-  "request_id": "v5-v9-production-runtime-20261003",
-  "reason": "Owner-authorized #889. After production v9 activation passes, deploy the exact corrected runtime already accepted in restored development. Require development preflight, stable production markers, all three Daily flows and full account-linked Practice acceptance. Start fresh v9 public standings through corpus filtering while retaining historical results.",
-  "target": "production",
-  "commit": "3ce9fc14263b682cba04c62fe6e6423e1282ead5"
+  "operation": "production-browser",
+  "request_id": "v5-v9-production-browser-20261003",
+  "reason": "Owner-authorized #889 final browser acceptance after exact production v9 runtime deployment passes. Verify live website Daily behavior, sharing, completion, images and responsive layouts, starting with Latest Set; retain all historical data.",
+  "first_environment": "latest",
+  "measurement_mode": false,
+  "measurement_samples": 1
 }
