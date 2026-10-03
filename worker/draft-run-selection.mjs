@@ -118,7 +118,8 @@ export async function selectDatabaseRun(query,version,seed,environment='mixed',{
         ORDER BY puzzle_id COLLATE "C" LIMIT 1 OFFSET $8::int
       ) SELECT ${columns},chosen.puzzle_id selected_id ${from}
       JOIN chosen ON chosen.source_draft_hash=p.source_draft_hash
-      JOIN draft_run_serving_inventory inventory ON inventory.snapshot_id=$2::bigint AND inventory.puzzle_id=p.puzzle_id`,
+      JOIN draft_run_serving_inventory inventory ON inventory.snapshot_id=$2::bigint AND inventory.puzzle_id=p.puzzle_id
+      WHERE ${base} AND ${SERVING_QUALITY_SQL}`,
       [version,snapshot.id,window[0],window[1],toPgArray(sources),setId,band,params.at(-1)]);
     } else result=await query(`WITH chosen AS (
       SELECT p.puzzle_id,p.source_draft_hash ${from} WHERE ${where} AND p.set_id=$${params.length-2} AND r.band=$${params.length-1}
